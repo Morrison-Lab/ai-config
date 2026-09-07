@@ -23,6 +23,12 @@ Verifies:
   - Missing remote branch allows with stderr note.
   - Mutation check: flipping the regex to ignore 'read' fails the deny test.
   - Mutation check: consulting raw scan for parseable file fails unicode-escaped test.
+  - Escalating permission from none to read denies slide-major-tag (both job and workflow root).
+  - All rank upward pairs (none->read, none->write, read->write, absent->read, absent->write, absent->none) deny.
+  - All rank downward pairs (write->read, write->none, read->none, key removed) allow.
+  - Future permission value not in rank fails loudly with KeyError.
+  - Mutation check: making none and read compare equal fails the deny test.
+
 
 Run:
     python3 hooks/test-guard-slide-major-tag.py [hooks/guard-slide-major-tag.py]
@@ -578,6 +584,183 @@ def main() -> int:
         finally:
             if os.path.exists(mutant10_path):
                 os.unlink(mutant10_path)
+
+        # 11. Direct test of permission rank comparison covering all pairs
+        import importlib.util
+        spec11 = importlib.util.spec_from_file_location("guard_hook_mod", HOOK)
+        guard_mod = importlib.util.module_from_spec(spec11)
+        spec11.loader.exec_module(guard_mod)
+
+        # 11a. Upward pairs (escalation -> must be flagged):
+        # none->read, none->write, read->write, absent->read, absent->write, absent->none
+        upward_pairs = [
+            ("none->read", {"checks": "none"}, {"checks": "read"}, "checks: read"),
+            ("none->write", {"checks": "none"}, {"checks": "write"}, "checks: write"),
+            ("read->write", {"checks": "read"}, {"checks": "write"}, "checks: write"),
+            ("absent->read", {}, {"checks": "read"}, "checks: read"),
+            ("absent->write", {}, {"checks": "write"}, "checks: write"),
+            ("absent->none", {}, {"checks": "none"}, "checks: none"),
+        ]
+        for name, old_d, new_d, expected_line in upward_pairs:
+            res_up = guard_mod._find_added_permissions(
+                {"job:review": old_d}, {"job:review": new_d}
+            )
+            check(
+                res_up == [("job:review", expected_line)],
+                f"rank upward pair: {name} detected as escalation",
+                f"expected [('job:review', '{expected_line}')], got {res_up}",
+            )
+
+        # 11b. Workflow root upward pair (none->read)
+        res_wf_up = guard_mod._find_added_permissions(
+            {"workflow": {"checks": "none"}}, {"workflow": {"checks": "read"}}
+        )
+        check(
+            res_wf_up == [("workflow", "checks: read")],
+            "rank upward pair: workflow-root none->read detected as escalation",
+            f"expected [('workflow', 'checks: read')], got {res_wf_up}",
+        )
+
+        # 11c. Downward pairs (de-escalation / reduction -> must NOT be flagged / allowed):
+        # write->read, write->none, read->none, key removed
+        downward_pairs = [
+            ("write->read", {"checks": "write"}, {"checks": "read"}),
+            ("write->none", {"checks": "write"}, {"checks": "none"}),
+            ("read->none", {"checks": "read"}, {"checks": "none"}),
+            ("key removed", {"checks": "read"}, {}),
+        ]
+        for name, old_d, new_d in downward_pairs:
+            res_down = guard_mod._find_added_permissions(
+                {"job:review": old_d}, {"job:review": new_d}
+            )
+            check(
+                res_down == [],
+                f"rank downward pair: {name} allowed",
+                f"expected [], got {res_down}",
+            )
+
+        # 11d. Future / unknown permission value fails loudly with KeyError
+        raised_key_error = False
+        try:
+            guard_mod._find_added_permissions(
+                {"job:review": {}}, {"job:review": {"checks": "admin"}}
+            )
+        except KeyError:
+            raised_key_error = True
+        check(
+            raised_key_error,
+            "future permission value not in PERM_RANK fails loudly with KeyError",
+        )
+
+        # 12a. End-to-end: job-level checks: none -> checks: read denies slide-major-tag
+        repo12a = _make_repo(
+            permissions_block="    permissions:\n      contents: none\n      checks: none\n"
+        )
+        new_content12a = (
+            "name: Workflow\n"
+            "on:\n  workflow_call:\n"
+            "jobs:\n"
+            "  review:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    permissions:\n"
+            "      contents: none\n"
+            "      checks: read\n"
+            "    steps:\n"
+            "      - run: echo ok\n"
+        )
+        _advance_commit(repo12a, "reusable.yml", new_content12a)
+        v12a, r12a, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", repo12a)
+        check(
+            v12a == "deny" and "checks: read" in r12a and "reusable.yml" in r12a and "ALLOW_BREAKING_SLIDE=1" in r12a,
+            "deny job-level permission escalation from none to read in reusable workflow",
+            f"got verdict={v12a}, reason={r12a}",
+        )
+
+        # 12b. End-to-end: workflow-root checks: none -> checks: read denies slide-major-tag
+        repo12b = _make_repo(
+            permissions_block=""
+        )
+        root_v2_content = (
+            "name: Workflow\n"
+            "on:\n  workflow_call:\n"
+            "permissions:\n"
+            "  checks: none\n"
+            "jobs:\n"
+            "  review:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    steps:\n"
+            "      - run: echo ok\n"
+        )
+        _advance_commit(repo12b, "reusable.yml", root_v2_content)
+        _run(repo12b, "tag", "-f", "v2")
+        root_main_content = (
+            "name: Workflow\n"
+            "on:\n  workflow_call:\n"
+            "permissions:\n"
+            "  checks: read\n"
+            "jobs:\n"
+            "  review:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    steps:\n"
+            "      - run: echo ok\n"
+        )
+        _advance_commit(repo12b, "reusable.yml", root_main_content)
+        v12b, r12b, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", repo12b)
+        check(
+            v12b == "deny" and "checks: read" in r12b and "reusable.yml" in r12b and "ALLOW_BREAKING_SLIDE=1" in r12b,
+            "deny workflow-root permission escalation from none to read in reusable workflow",
+            f"got verdict={v12b}, reason={r12b}",
+        )
+
+        # 12c. End-to-end: downward permission transition (checks: write -> checks: read) allows
+        repo12c = _make_repo(
+            permissions_block="    permissions:\n      contents: read\n      checks: write\n"
+        )
+        new_content12c = (
+            "name: Workflow\n"
+            "on:\n  workflow_call:\n"
+            "jobs:\n"
+            "  review:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    permissions:\n"
+            "      contents: read\n"
+            "      checks: read\n"
+            "    steps:\n"
+            "      - run: echo ok\n"
+        )
+        _advance_commit(repo12c, "reusable.yml", new_content12c)
+        v12c, r12c, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", repo12c)
+        check(
+            v12c == "allow",
+            "allow downward permission transition (checks: write -> checks: read)",
+            f"got verdict={v12c}, reason={r12c}",
+        )
+
+        # 13. Mutation check: make two distinct rank levels compare equal (none == read)
+        # and confirm that none->read fails to deny (returns allow under mutant).
+        with open(HOOK, encoding="utf-8") as f:
+            src13 = f.read()
+
+        rank_orig = '"none": 1,\n    "read": 2,'
+        rank_mutant = '"none": 2,\n    "read": 2,'
+        if rank_orig not in src13:
+            sys.exit(f"FATAL: rank pattern not found in {HOOK}")
+
+        mutant13_src = src13.replace(rank_orig, rank_mutant, 1)
+        mutant13_fd, mutant13_path = tempfile.mkstemp(suffix=".py")
+        os.close(mutant13_fd)
+        _write_file(mutant13_path, mutant13_src)
+
+        try:
+            v13_mutant, _, _ = run_hook(mutant13_path, "gh workflow run slide-major-tag.yml", repo12a)
+            check(
+                v13_mutant == "allow",
+                "mutation check: making none and read compare equal flips deny to allow",
+                f"expected allow under mutant, got {v13_mutant}",
+            )
+        finally:
+            if os.path.exists(mutant13_path):
+                os.unlink(mutant13_path)
 
     finally:
         for d in _TMPDIRS:

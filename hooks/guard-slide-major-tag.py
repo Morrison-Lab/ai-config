@@ -64,6 +64,13 @@ LEAD_WORDS = {
 
 RX_PERM_VAL = re.compile(r"^(read|write|none)$")
 
+PERM_RANK: dict[str | None, int] = {
+    None: 0,
+    "none": 1,
+    "read": 2,
+    "write": 3,
+}
+
 
 def _extract_permissions_from_data(data: dict) -> dict[str, dict[str, str] | str]:
     """Extract workflow-level and job-level permissions from parsed YAML data."""
@@ -125,9 +132,13 @@ def _find_added_permissions(
             old_dict = old_scope if isinstance(old_scope, dict) else {}
             for key, val in perms.items():
                 old_val = old_dict.get(key)
-                if old_val is None:
-                    added.append((scope, f"{key}: {val}"))
-                elif old_val == "read" and val == "write":
+                clean_old = old_val.strip() if isinstance(old_val, str) else old_val
+                clean_new = val.strip() if isinstance(val, str) else val
+                if clean_old not in PERM_RANK:
+                    raise KeyError(f"Unknown permission value {old_val!r} not in PERM_RANK")
+                if clean_new not in PERM_RANK:
+                    raise KeyError(f"Unknown permission value {val!r} not in PERM_RANK")
+                if PERM_RANK[clean_new] > PERM_RANK[clean_old]:
                     added.append((scope, f"{key}: {val}"))
     return added
 

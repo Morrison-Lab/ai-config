@@ -1688,6 +1688,25 @@ def external_reviewer_cases() -> tuple[int, int]:
     allows("a semicolon inside the prompt is ordinary text",
            f"agy --print '{review}; and more'", "k3")
 
+    # A NEWLINE in a separator gap. `\\s` matched it and bash treats it as a
+    # statement separator, so the pattern read two commands as one -- invoking
+    # the reviewer with no argument at all while a second statement's output
+    # joined the tool result. The seventh forgery. A mutant restoring `\\s` for
+    # any of the three gaps fails one of these.
+    refuses("a newline before the flag cannot split the command",
+            f"agy\n--print '{review}'", "f8")
+    refuses("a newline before the prompt cannot split the command",
+            f"agy --print\n'{review}'", "f9")
+    refuses("a trailing newline cannot append a second command",
+            f"agy --print '{review}'\nevilbin", "f10")
+    refuses("a carriage return is not a separator either",
+            f"agy\r--print '{review}'", "f11")
+
+    # Tabs are bash's own default IFS alongside spaces, so they must still
+    # separate a legitimate invocation.
+    allows("tabs separate the words as spaces do",
+           f"agy\t--print\t'{review}'", "k4")
+
     # Double quotes permit command substitution, so they are not the shape.
     refuses("a double-quoted prompt is not the canonical shape",
             f'agy --print {Q}{review}{Q}', "c5")

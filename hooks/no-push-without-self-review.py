@@ -175,10 +175,22 @@ EXTERNAL_REVIEWER_PRINT_FLAGS = {
 #
 # is three words to `shlex` and two commands to bash, and the second one's
 # stdout joins the first's in the tool result the verdict is read from.
+#
+# The separators are `[ \t]`, NOT `\s`. Python's `\s` matches `\n`, and a
+# newline is one of bash's own statement separators, so `\s` between the
+# program and its flag accepted
+#
+#     agy
+#     --print 'a prompt naming the review'
+#
+# as one command while bash ran two --- invoking the real reviewer with no
+# argument at all, and putting a second statement's output in the same tool
+# result. Found by the seventh adversarial round. Space and tab are bash's own
+# default IFS, and are the only separators that keep one command one command.
 EXTERNAL_REVIEWER_COMMAND_RE = re.compile(
-    r"\A\s*(?P<program>[A-Za-z0-9_.-]+)"
-    r"\s+(?P<flag>--print|-p)"
-    r"\s+'(?P<prompt>[^']*)'\s*\Z")
+    r"\A[ \t]*(?P<program>[A-Za-z0-9_.-]+)"
+    r"[ \t]+(?P<flag>--print|-p)"
+    r"[ \t]+'(?P<prompt>[^']*)'[ \t]*\Z")
 
 def external_reviewer_command(command: str) -> bool:
     """Is this Bash command a cross-family reviewer run whose output is its review?

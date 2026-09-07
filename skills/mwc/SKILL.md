@@ -408,7 +408,7 @@ Three rules follow, and they hold whatever the block turned out to be:
   The denial and the grant are about different things: one is a guard's state,
   the other is the user's intent, and only the guard's state gates the action.
 
-## Four properties of the guard worth knowing before you trust it
+## Five properties of the guard worth knowing before you trust it
 
 **The denial you hit may not be this guard.**
 `no-unauthorized-merge.py` is a `PreToolUse` hook, and a hook only runs if it is
@@ -432,6 +432,29 @@ Measured on one machine, 2026-08-07: `registered=0 missing=15`, with
 The guard's own logic was fine: fed a `gh pr merge` payload directly it returned
 `permissionDecision: deny`, and with a valid marker it allowed.
 It simply never ran.
+
+**The denial you hit may not be a guard at all, and a merge command can stack three of these mechanisms in one shot.**
+The paragraph above names two.
+There is a third, independent of both: `hooks/require-gh-repo-flag.py` refuses a mutating `gh` command --- `gh pr merge` included --- that omits an explicit `-R`/`--repo`, and it is a separate `PreToolUse` registration from `no-unauthorized-merge.py`'s.
+All three can refuse the same command, in whatever order the harness happens to evaluate them, each with its own remedy, and each one's refusal text names only itself:
+
+1. `no-unauthorized-merge.py` (a corpus `PreToolUse` hook) --- remedy is `ALLOW_MERGE=1` on the command, or an active `/mwc` grant, or (for a PR targeting `Morrison-Lab/ai-config` specifically) the standing per-repository grant described above, which itself requires the `-R` flag to resolve a single target.
+2. `require-gh-repo-flag.py` (a separate corpus `PreToolUse` hook) --- remedy is adding `-R <owner>/<repo>`.
+3. Claude Code's own auto-mode permission classifier (not a corpus hook at all) --- remedy is neither of the above.
+   No environment variable, no `/mwc` grant, and no in-conversation user instruction clears it, because it is a harness permission-mode decision about the session rather than a question of who authorized what.
+   [`remind-retry-before-declaring-blocked.py`](../../hooks/remind-retry-before-declaring-blocked.py) covers what a classifier denial does and does not license (an identical retry is still worth one try;
+   varying the command or switching to a different tool for the same goal is the move Pattern 43 in `memories/mistake-patterns.md` warns feeds the classifier's own suspicion);
+   past a second denial of the same goal, hand the decision to the user rather than continuing to probe.
+
+Refusals from these three arrive one at a time, and each looks like "the merge guard" to a reader who is going by symptom (a blocked merge) rather than by the message text.
+Reading which one actually spoke, and applying that mechanism's own remedy, is the fix --- not re-issuing the last thing that worked for a different refusal.
+[`verify-the-right-artifact.md`](../../shared/workflow/verify-the-right-artifact.md) states the same rule at the general level (added in Morrison-Lab/ai-config#3301): answer a guard's refusal from the guard, reading the property its message names and its discharge condition in source before checking any state outside it.
+Here that mechanism is itself one of at least three candidates, so the first read has to identify *which*.
+
+- **Do:** read which of the three mechanisms produced the refusal text, and apply that mechanism's own remedy --- `ALLOW_MERGE=1`/`-R` for the two corpus hooks, escalation to the user for the classifier.
+- **Don't:** read a merge refusal as a statement about authorization in general.
+  A corpus hook's denial is a statement about authorization;
+  the classifier's is a claim about the session's permission mode that no amount of granted authority inside the conversation changes.
 
 **The marker is per-repository, so a grant in one repo authorizes nothing in
 another.**

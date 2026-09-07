@@ -126,7 +126,7 @@ Only once the interference has actually been read and named --- which record, wh
 state in the reply which record was misread.
 
 **One escape valve, and a documented ceiling on how far to push it.**
-An inline `VAR=1 command` form of that override was denied outright by a separate auto-mode permission classifier layered in front of the shell on the one occasion it was tried below, while the functionally identical `env VAR=1 command` form passed on its own single attempt.
+An inline `VAR=1 command` form of that override was denied outright by a separate auto-mode permission classifier layered in front of the shell on the one occasion it was tried, while the functionally identical `env VAR=1 command` form passed on its own single attempt.
 [`mistake-patterns`](mistake-patterns.md) Pattern 43 already covers what this classifier does under repeated denials --- it reads each new phrasing of the same goal as more suspicious, and can end up denying even a legitimately-shaped review dispatch --- so treat one alternate form as the full budget: try `env VAR=1 command` once, and if a second, differently-shaped denial follows, stop probing per Pattern 43 and hand the decision to the user rather than trying further phrasings.
 Nothing in a single trial of each form settles why the second one passed, and no claim about that cause is made here beyond the bare fact that it did.
 

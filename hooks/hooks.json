@@ -907,6 +907,18 @@
             "why": "Warns when a `gh api` command sets required status checks on a repository or organization ruleset, or on classic branch protection. A context string is matched against a check-run name exactly, so one no workflow emits sits as `Expected` forever and blocks every merge, silently. Detects lexical shapes only -- a write assembled across variables, or reached through a wrapper it does not know, is silent -- so its silence is never evidence that contexts were derived. Carries no discharge condition by design: every candidate was satisfiable by a pull request's own run, or by typing the string."
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-aborted-patch-script.py\"",
+            "timeout": 10,
+            "script": "flag-aborted-patch-script.py",
+            "why": "Warns before a commit when a file-writing script in the same window ended in a traceback: edits after the raise silently did not apply, and leave no trace for any later check to find."
+          }
+        ]
       }
     ],
     "Stop": [

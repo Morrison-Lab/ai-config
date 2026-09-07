@@ -1465,3 +1465,29 @@ the alternative reading --- that a stated condition amounts to a conditional
 approval --- was considered and declined:
 a rule that survives only until someone finds its own reasoning persuasive is
 not doing any work.)
+
+**Two verdict vocabularies coexist in this corpus, and one tool's parser
+recognizes only one of them.**
+`hooks/no-push-without-self-review.py`'s `VERDICT_LINE` regex (around line
+100) matches only `Ready for merge` or `Needs (more) work`.
+`scripts/check-pr-fully-clean.py` and the payload it reads speak a different
+vocabulary: it prints `FULLY CLEAN`, and the underlying JSON carries
+`"verdict": "CLEAN"` --- the word [`fully-clean.md`](fully-clean.md) is named
+for.
+Observed live: one adversarial-reviewer report carried both, prose `Ready for
+merge` alongside a JSON block reading `"verdict": "CLEAN"`.
+`no-push-without-self-review.py` reads only the prose half; a report that
+states its verdict solely as `CLEAN` (or any other synonym the hook's regex
+does not enumerate) is read as carrying NO verdict at all, and the hook's own
+refusal message then suggests dispatching the reviewer in the foreground ---
+advice that does nothing when a report already exists and simply used the
+other word for the same thing.
+Tracked as ai-config#3018.
+
+- **Do:** when briefing an adversarial reviewer whose report will be parsed
+  by `no-push-without-self-review.py`, pin the output format explicitly to
+  `Ready for merge` / `Needs work`, followed by a `Reviewed-Commit: <sha>`
+  line after the verdict.
+- **Don't:** assume a report is verdict-free just because a guard's refusal
+  message says so --- check which vocabulary the guard's own regex accepts
+  before concluding the review never reached a verdict.

@@ -1959,3 +1959,41 @@ per [`mistake-patterns`](../../memories/mistake-patterns.md) Pattern 43.
 - **Don't:** append a fresher record before that check --- a guard holding a current verdict is refusing on the merits, and appending over it is not an unblock.
 - **Don't:** treat an append-only log as sorted --- that is an assumption about the writer, not a property of the file.
 - **Don't:** diagnose a last-wins reader's wrong answer as a matcher bug without first checking the order of what it read.
+
+## A warn-only guard's two error directions are not equally expensive; a blocking guard's usually are
+
+Tuning a hook's matcher --- narrowing it after a "this over-fires" finding,
+widening it after a miss --- is itself a check, and the same "measure, don't
+eyeball" discipline applies: state which kind of guard is being tuned before
+choosing which direction to bias it.
+
+A **warn-only** guard's false positive costs one dismissed warning; its false
+negative silently fails to warn about the exact thing the guard exists to
+catch, with nothing in the transcript recording that a warning was owed.
+The two are not symmetric, so the correct default bias for a warn-only
+matcher is to over-warn, and a review finding that says "this fires too
+often" may deserve a rebuttal rather than a narrowing --- narrowing in
+response to every such finding, round after round, converges on a matcher
+that never fires at all.
+Measured on ai-config#3302: five review rounds each fixed a "false positive"
+in a warn-only matcher, and each fix narrowed the pattern and opened a new
+false negative next round.
+
+The mirror case does not transfer this bias.
+A **blocking** guard's false positive costs a stalled turn and a workaround
+search; its false negative lets through the exact thing the guard exists to
+stop.
+Both directions are expensive there, so a blocking guard gets no default
+lean and instead wants the narrowest matcher that still catches the real
+cases --- the opposite tuning instinct from the warn-only case just above.
+Seen the same day on ai-config#3304, a guard that denies (blocks) rather than
+warns.
+
+- **Do:** state whether the guard under discussion warns or blocks before
+  choosing which direction to bias its matcher.
+- **Do:** treat "this warn-only guard over-fires" as a candidate rebuttal,
+  not an automatic narrowing request --- a warn-only false negative is
+  invisible and a false positive is not.
+- **Don't:** apply the same tuning bias to a blocking guard; both of its
+  error directions carry a real cost, so it wants precision, not
+  over-triggering.

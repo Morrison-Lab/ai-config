@@ -1112,3 +1112,42 @@ A clean automated review from every available provider evaluating the current HE
   A push almost never names the PR it re-heads."
   --- so the guard fires only where the push has one PR it COULD re-head.
   What is not automated is the human/session habit of reading `gh pr view --json reviews` and stopping there instead of also checking the reviewed commit against the current head.
+
+## Pattern 52: A Variable `cd` Target on a Guarded Push Names the Wrong Commit, Confidently
+
+- **Mistake**: Running `cd "$WT" && git push ...` (or `git -C "$VAR" push`) past
+  `hooks/no-push-without-self-review.py` and trusting the guard's stated
+  reason for refusal, when the variable resolves to a *different* worktree
+  than the one actually pushed.
+- **Example**: 2026-09-06, ai-config#3319.
+  `cd "$WT" && git push ...` was refused with "The clean verdict is for
+  commit 988e7da89..., but this push would ship 19ca0ff67385" --- where
+  `19ca0ff67385` was the SESSION worktree's `HEAD`, not the commit the
+  variable-resolved `cd` actually pushed.
+  The byte-identical command with the literal path substituted for `$WT`
+  pushed successfully.
+  This is a residual of closed ai-config#2680, which fixed the case where the
+  guard cannot resolve a variable `cd` target at all and refuses admitting
+  ignorance ("could not be resolved").
+  The residual is worse: the guard now resolves *something*, just not the
+  worktree the command actually targets, and reports that wrong resolution
+  as fact rather than as an unknown.
+- **Canonical Rule**: A guard that reads command text literally (Pattern 21,
+  Pattern 50) cannot expand a shell variable inside an in-command `cd`, so it
+  falls back to a value that is not the one the command will use --- and a
+  confident wrong answer is more dangerous than an admitted unknown, because
+  it invites reaching for `ALLOW_UNREVIEWED_PUSH=1` to bypass a guard that is
+  actually correct about the commit it can see.
+- **Fix**: Use a literal path in a `cd` immediately before a guarded
+  `git push`, or use `git -C <literal path> push` --- either way, spell out
+  the worktree path rather than a variable, so the guard's parse and the
+  shell's actual target agree.
+- **Algorithmatizable?**
+  Partial.
+  The guard could refuse to resolve *any* variable-containing `cd`/`-C`
+  target rather than substituting a plausible-looking wrong one, which would
+  convert this back into Pattern 21's "could not be resolved" shape --- an
+  admitted unknown rather than a wrong fact.
+  That is a code change to the guard (ai-config#3319), not yet made as of
+  this writing; until it lands, the literal-path habit above is the only
+  defense.

@@ -893,6 +893,7 @@ A clean automated review from every available provider evaluating the current HE
   the plugin's shipped agents were absent from the session's Agent registry
   (writing `.claude/agents/adversarial-reviewer.md` into the repo mid-session does not register it immediately or reliably --- definitions load at session start, and the one measured mid-session appearance came about fifty minutes after the write, by a mechanism not yet identified),
   and the classifier denied the override in all three phrasings tried (Bash chained, Bash standalone, PowerShell `$env:`) --- consistent denials, not stochastic ones.
+  A fourth phrasing, `env VAR=1 command`, was not tried here and later succeeded on its first attempt in a separate 2026-09-06 incident where the inline `VAR=1 command` form had just been denied --- see [`claude-code-transcripts.md`](claude-code-transcripts.md)'s "A shared session's transcript can carry a genuinely later, genuinely unrelated verdict" for that record, which draws no conclusion from the single data point about why the `env` form passed.
   The [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820) fallback, merged earlier that same day, was ALSO unreachable, for a distinct reason:
   the harness runs the hook from the plugin CACHE snapshot (`~/.claude/plugins/cache/Morrison-Lab/ai-config/<rev>/hooks/`, via `${CLAUDE_PLUGIN_ROOT}`),
   which predated the fix (rev `a3e0fdb`, no `FALLBACK_AGENT_NAME`);

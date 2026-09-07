@@ -1474,15 +1474,26 @@ recognizes only one of them.**
 vocabulary: it prints `FULLY CLEAN`, and the underlying JSON carries
 `"verdict": "CLEAN"` --- the word [`fully-clean.md`](fully-clean.md) is named
 for.
-Observed live: one adversarial-reviewer report carried both, prose `Ready for
-merge` alongside a JSON block reading `"verdict": "CLEAN"`.
-`no-push-without-self-review.py` reads only the prose half; a report that
-states its verdict solely as `CLEAN` (or any other synonym the hook's regex
-does not enumerate) is read as carrying NO verdict at all, and the hook's own
-refusal message then suggests dispatching the reviewer in the foreground ---
-advice that does nothing when a report already exists and simply used the
-other word for the same thing.
-Tracked as ai-config#3018.
+Measured 2026-09-06, and recorded on ai-config#3018 as a fresh reproduction:
+an `adversarial-reviewer` dispatched in the foreground returned a report whose
+prose verdict line read solely `### Verdict: CLEAN`, followed by a
+`Reviewed-Commit:` line naming the commit.
+The hook refused the push with its no-verdict-at-all message, which then
+prescribed a foreground dispatch --- advice already followed, so it named no
+remedy that could work.
+Re-running the identical review with the output format pinned to
+`Ready for merge` was accepted immediately, on the same commit and with the
+same findings, which is what isolates the vocabulary as the whole cause.
+
+Be precise about which report demonstrates this, because the obvious candidate
+does not.
+A report carrying BOTH vocabularies --- prose `Ready for merge` beside a JSON
+block reading `"verdict": "CLEAN"` --- satisfies `VERDICT_LINE` on its prose
+half, so it is not an instance of this bug at all, whatever its JSON says.
+The report on ai-config#3018's opening post is that shape, and the refusal
+recorded there has a separate, still-unverified cause.
+Only a report whose prose verdict is `CLEAN` with no accepted phrase anywhere
+reproduces the failure described here.
 
 - **Do:** when briefing an adversarial reviewer whose report will be parsed
   by `no-push-without-self-review.py`, pin the output format explicitly to

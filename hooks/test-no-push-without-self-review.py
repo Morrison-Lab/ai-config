@@ -1624,6 +1624,43 @@ def external_reviewer_cases() -> tuple[int, int]:
     ])
     check("an unlisted program does not discharge the guard", ok and blocked)
 
+    # 12. The keyword in a trailing shell COMMENT. bash drops everything after
+    #     `#`, so agy is asked for something else entirely while a raw-text
+    #     match sees a review. Found by adversarial review, with a working
+    #     forgery, against a revision that matched the raw command string.
+    ok, blocked = blocked_by([
+        bash_call(f'agy --print="summarize the README"  # {review}', "b12"),
+        bash_result("b12", body("Ready for merge", HEAD)),
+    ])
+    check("the keyword in a shell comment does not discharge the guard",
+          ok and blocked)
+
+    # 13. The keyword as some other flag's value. A model name naming a review
+    #     says nothing about what the prompt asked for.
+    ok, blocked = blocked_by([
+        bash_call(f'agy --print="summarize the README" --model "{review}"', "b13"),
+        bash_result("b13", body("Ready for merge", HEAD)),
+    ])
+    check("the keyword in an unrelated flag's value is not a prompt",
+          ok and blocked)
+
+    # 14. `-p`, which case 8 leaves untested: without this, dropping `-p` from
+    #     EXTERNAL_REVIEWER_PRINT_FLAGS passes the whole suite.
+    ok, blocked = blocked_by([
+        bash_call(f'agy -p "{review}"', "b14"),
+        bash_result("b14", body("Ready for merge", HEAD)),
+    ])
+    check("the -p print flag discharges the guard", ok and not blocked)
+
+    # 15. A print-mode prompt reached past an unrelated flag's value, which the
+    #     candidate rule must still find rather than stopping at the decoy.
+    ok, blocked = blocked_by([
+        bash_call(f'agy --model "Claude Sonnet" -p "{review}"', "b15"),
+        bash_result("b15", body("Ready for merge", HEAD)),
+    ])
+    check("a preceding unrelated flag does not hide the prompt",
+          ok and not blocked)
+
     return failures, ran
 
 

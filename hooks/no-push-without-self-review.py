@@ -148,8 +148,13 @@ AGENT_TOOLS = {"agent", "task", "invoke_subagent", "taskoutput", "task_output", 
 # Accepting these lets `when-to-orchestrate`'s cross-family verify
 # recommendation reach the one check that most wants it, and gives a session at
 # its own quota ceiling a reviewed-push path at all.
+#
+# Only flags this repository has attested against the real CLI belong here.
+# `--print` and `-p` are both recorded in `memories/antigravity.md`; a plausible
+# third spelling was dropped rather than shipped on inference, since a flag that
+# does NOT mean print mode would let an interactive run count as a review.
 EXTERNAL_REVIEWER_PRINT_FLAGS = {
-    "agy": ("--print", "--prompt", "-p"),
+    "agy": ("--print", "-p"),
 }
 
 # Programs writing nothing to stdout, so their presence in the same command
@@ -177,14 +182,30 @@ def external_reviewer_command(command: str) -> bool:
     and are refused -- the same bare-and-unchained discipline a
     discharge-bearing command already owes, rather than a new rule to learn.
 
+    The review keyword is matched against the ARGUMENTS the program receives,
+    never against the raw command text. Matching the raw text is unsound, and
+    demonstrably so: `shlex` treats `#` as an ordinary character while bash
+    drops the rest of the line, so `agy --print="do something else" # review
+    the diff` satisfies a raw-text match while `agy` is asked for something
+    else entirely. `comments=True` makes the split agree with bash here.
+
+    A keyword in some OTHER flag's value is not a prompt either, so a candidate
+    is a print flag's own value or a positional argument -- never the value of
+    an unrelated flag, which is what stops `--model "adversarial review"` from
+    vouching for a prompt that says the opposite.
+
     Two residues this accepts rather than closes, stated because a guard that
     hides its own limits is worse than one that names them.
 
     The session composes the reviewer's prompt, so it can steer toward the
-    verdict it wants. That is NOT new: the in-family path takes its brief from
-    the same session and applies `REVIEW_PROMPT_RE` to it identically, so both
-    paths rest on the author briefing the reviewer honestly rather than on the
-    guard enforcing it. Parity, not a regression.
+    verdict it wants. The in-family path shares that weakness, taking its brief
+    from the same session. The two are not identical, though, and the
+    difference favours the in-family path: it matches a structured `prompt`
+    field, which is exactly the text the subagent receives, whereas the
+    candidates below are pre-expansion shell words, so a variable or
+    substitution can still make the delivered prompt differ from the token that
+    matched. Both paths ultimately rest on the author briefing the reviewer
+    honestly rather than on the guard enforcing it.
 
     The program name is resolved from `PATH`, so a script named `agy` earlier
     on `PATH` would satisfy this check. That one IS new -- the in-family path
@@ -203,7 +224,7 @@ def external_reviewer_command(command: str) -> bool:
 
     for segment in segments[:-1]:
         try:
-            argv = shlex.split(segment)
+            argv = shlex.split(segment, comments=True)
         except ValueError:
             return False
         _, argv = _strip_env(argv)
@@ -211,7 +232,7 @@ def external_reviewer_command(command: str) -> bool:
             return False
 
     try:
-        argv = shlex.split(segments[-1])
+        argv = shlex.split(segments[-1], comments=True)
     except ValueError:
         return False
     _, argv = _strip_env(argv)
@@ -222,9 +243,29 @@ def external_reviewer_command(command: str) -> bool:
         return False
     in_print_mode = any(token == flag or token.startswith(flag + "=")
                         for token in argv[1:] for flag in flags)
+    if not in_print_mode:
+        return False
+
+    # The tokens that could plausibly BE the prompt: a print flag's inline
+    # value, or a positional argument. A word following some other flag is that
+    # flag's value, so it is excluded -- a model name naming a review does not
+    # make the prompt a review.
+    candidates = []
+    for i, token in enumerate(argv[1:], start=1):
+        inline = next((token[len(flag) + 1:] for flag in flags
+                       if token.startswith(flag + "=")), None)
+        if inline is not None:
+            candidates.append(inline)
+        elif not token.startswith("-"):
+            # argv[0] is the program name, which never starts with "-", so the
+            # first argument reaches this by the same rule a positional does.
+            previous = argv[i - 1]
+            if not previous.startswith("-") or previous in flags:
+                candidates.append(token)
+
     # The prompt must name the review, exactly as the in-family fallback path
     # requires, so an ordinary `agy` run cannot become a verdict by accident.
-    return in_print_mode and bool(REVIEW_PROMPT_RE.search(command))
+    return any(REVIEW_PROMPT_RE.search(candidate) for candidate in candidates)
 
 OVERRIDE_ENV = re.compile(r"\AALLOW_UNREVIEWED_PUSH=1\Z")
 

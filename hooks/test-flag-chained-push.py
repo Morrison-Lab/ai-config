@@ -130,6 +130,23 @@ FIRES = [
      "git status && timeout 30 git push"),
     ("chained push after env with its own flag",
      "git status && env -i git push"),
+    # Hyphenated heredoc delimiter tag (Finding 2 regression case).
+    ("chained push after a hyphenated heredoc tag",
+     "cat <<END-MSG\nbody line\nEND-MSG\n&& git push"),
+    ("chained push after an indented hyphenated heredoc tag",
+     "cat <<-END-MSG\n  body line\n  END-MSG\n&& git push"),
+    # Backslash-escaped heredoc delimiter tag (Finding 3 regression case).
+    ("chained push after a backslash-escaped heredoc tag",
+     r"cat <<\EOF" + "\nbody line\nEOF\n&& git push"),
+    ("chained push after an indented backslash-escaped heredoc tag",
+     r"cat <<-\EOF" + "\n  body line\n  EOF\n&& git push"),
+    # Wrapper commands with option arguments (Finding 1 coverage).
+    ("chained push after nice with separate flag argument",
+     "git status && nice -n 5 git push"),
+    ("chained push after sudo with -u flag and argument",
+     "git status && sudo -u user -H git push"),
+    ("chained push after timeout with -s flag and argument",
+     "git status && timeout -s 9 30 git push"),
 ]
 
 QUIET = [
@@ -171,6 +188,30 @@ QUIET = [
      "echo hi " + chr(92) + "; git push"),
     ("git push as an argument to find -exec, chained via && around it",
      "foo && find . -exec git push " + chr(92) + "; -o -true"),
+    # Unrelated command wrapped by nice/sudo/timeout whose arguments happen to
+    # be the literal words "git push" (Finding 1 regression cases).
+    ("unrelated command wrapped by nice whose arguments happen to be git push",
+     "nice mycommand git push"),
+    ("unrelated command wrapped by nice chained after status",
+     "git status && nice mycommand git push"),
+    ("unrelated command wrapped by nice with redirection",
+     "nice mycommand git push > push.log"),
+    ("unrelated command wrapped by nice with flag whose args are git push",
+     "nice -n5 mycommand git push"),
+    ("unrelated command wrapped by nice with separate flag arg",
+     "nice -n 5 mycommand git push"),
+    ("unrelated command wrapped by sudo whose arguments are git push",
+     "sudo mycommand git push"),
+    ("unrelated command wrapped by timeout whose arguments are git push",
+     "timeout 30 mycommand git push"),
+    # Hyphenated heredoc body containing git push (Finding 2 regression case).
+    ("git push inside a hyphenated heredoc body",
+     "cat <<END-MSG\ngit push origin main\nEND-MSG"),
+    # Backslash-escaped heredoc tag containing git push in body (Finding 3 regression case).
+    ("git push inside a backslash-escaped heredoc body",
+     r"cat <<\EOF" + "\ngit push origin main\nEOF"),
+    ("git push inside an indented backslash-escaped heredoc body",
+     r"cat <<-\EOF" + "\n  git push origin main\n  EOF"),
 ]
 
 

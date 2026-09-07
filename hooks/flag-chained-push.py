@@ -85,7 +85,13 @@ import os
 import re
 import sys
 
-HEREDOC_START = re.compile(r"<<-?\s*(['\"]?)(\w+)\1")
+# Delimiter class is not `\w+`: a shell delimiter can contain hyphens, dots,
+# etc. (`END-MSG`, `EOF.1`), and standard POSIX allows backslash-escaped tags
+# (`<<\EOF`), where quote-removal strips the backslash so the terminator is
+# `EOF`.
+HEREDOC_START = re.compile(
+    r"(?<!<)<<(-?)[ \t]*(?:(['\"])([^\s'\"<>&|;()`$]+)\2|\\([^\s'\"<>&|;()`$]+)|([^\s'\"<>&|;()`$]+))"
+)
 
 # A backslash immediately followed by a newline is a line CONTINUATION, not a
 # command separator -- `git \` + newline + `push origin HEAD` is one logical
@@ -122,19 +128,23 @@ GIT_PUSH_RE = re.compile(r"\bgit\s+(?:-C\s+\S+\s+)?push\b")
 # Skipped before `GIT_PUSH_RE` is anchored: leading whitespace, any number
 # of env assignments (`VAR=val `), and a handful of wrapper commands that
 # still leave "git push" as the command actually run. Each wrapper may take
-# its OWN flags or arguments first (`sudo -H`, `nice -n5`, `timeout 30`,
-# `env -i VAR=1`), so a wrapper is followed by any run of tokens that is not
-# itself "git" -- an anchored `.match()` that stopped right after the bare
-# wrapper word regressed `sudo -H git push` (a real, common shape) to a
-# false negative, since `lead_end` landed on `-H` and `GIT_PUSH_RE` was
-# required to start exactly there (measured 2026-09-05 review). Deliberately
-# smaller than `no-clobbering-push.py`'s `LEAD_WORDS` -- this hook only
-# needs enough to avoid a false negative on common cases, not a full
-# simple-command grammar.
+# its OWN flags or arguments first (`sudo -H`, `nice -n5`, `nice -n 5`,
+# `timeout 30`, `env -i VAR=1`). Options taking an argument are allowed to
+# consume the argument token (excluding "git"), while bare words that are
+# neither option flags nor durations (e.g. `mycommand` in `nice mycommand
+# git push`) are not consumed as flags, keeping unrelated wrapped commands
+# from misclassifying as git push.
+WRAPPER_ARG_RE = (
+    r"(?:-(?:[unskagChD]|-[A-Za-z0-9-]+)[ \t]+(?!git\b)\S+|"
+    r"-\S+|"
+    r"\d+(?:\.\d+)?[smhd]?|"
+    r"[A-Za-z_][A-Za-z0-9_]*=\S*)"
+)
+
 LEAD_RE = re.compile(
     r"^\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
     r"(?:(?:sudo|exec|env|command|time|nohup|nice|timeout)\s+"
-    r"(?:(?!git\b)\S+\s+)*)*"
+    r"(?:" + WRAPPER_ARG_RE + r"\s+)*)*"
 )
 
 # A redirection suffix: plain or doubled `>`, its fd-duplication form
@@ -283,8 +293,8 @@ def _mask_heredocs(command: str) -> str:
 
         body_start = line_end + 1
         for tag_match in tags:
-            tag = tag_match.group(2)
-            strip_indent = tag_match.group(0).startswith("<<-")
+            tag = tag_match.group(3) or tag_match.group(4) or tag_match.group(5)
+            strip_indent = bool(tag_match.group(1))
             pattern = r"^[ \t]*" if strip_indent else r"^"
             terminator = re.compile(pattern + re.escape(tag) + r"$", re.M)
             term_match = terminator.search(command, body_start)

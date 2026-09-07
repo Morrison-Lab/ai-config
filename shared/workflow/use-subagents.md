@@ -132,17 +132,17 @@ state `main` was actually in by the time it finished --- and because the two
 additions land at different points in the file (the subagent's branch is
 missing the intervening content), a merge of the two need not even conflict:
 two `## Pattern 52` headings with different content can both survive the
-merge silently, because the CI check that exists for this file (below)
-inspects each PR's own branch and cannot see a sibling branch's still-open
-change at the moment either one runs.
+merge silently, because `scripts/check-mistake-patterns.py`, the CI check
+that exists for this file, inspects each PR's own branch and cannot see a
+sibling branch's still-open change at the moment either one runs.
 
 This was caught only because a human-directed review compared the PR against
 `origin/main` rather than trusting the PR's own diff in isolation --- the
 exact discipline [`derive-dont-enumerate`](derive-dont-enumerate.md) argues
 for when a set can change out from under you mid-task.
-`scripts/check-mistake-patterns.py` (ai-config#2946) already exists for
-exactly this file and this failure mode, and it is wired into CI --- but it
-checks the numbering **within one PR's own branch**, not against a sibling
+That checker (ai-config#2946) is wired into CI and covers exactly this file
+and this failure mode --- but it checks the numbering **within one PR's own
+branch**, not against a sibling
 branch's still-open, not-yet-merged change.
 Two branches that each independently pick the next free number, correctly
 for the state each started from, both pass the checker individually and only

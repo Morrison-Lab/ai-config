@@ -123,6 +123,54 @@ CASES = [
       say("All tests pass.")], False,
      "a python invocation after && (a real command position) still counts"),
 
+    # THIRD-round adversarial-review finding: the SAME mention-vs-run bug
+    # existed for every OTHER keyword alternative too, since only the
+    # python-file one was anchored in round two.
+    ([edit(), bash('echo "remember to run pytest before merging"'),
+      say("All tests pass.")], True,
+     "'pytest' mentioned inside an unrelated echo is not a run"),
+    ([edit(), bash('git commit -m "will run cargo test later"'),
+      say("All tests pass.")], True,
+     "'cargo test' mentioned inside a commit message is not a run"),
+    ([edit(), bash('echo "npm test should be added to CI"'),
+      say("All tests pass.")], True,
+     "'npm test' mentioned inside an unrelated echo is not a run"),
+
+    # THIRD-round finding: a small, explicit set of process wrappers must
+    # still be recognized once every alternative is anchored to command
+    # position, or the anchor itself becomes a regression.
+    ([edit(), bash("timeout 60 pytest -q"), say("All tests pass.")], False,
+     "'timeout N pytest' is still recognized as a real run"),
+    ([edit(), bash("sudo npm test"), say("All tests pass.")], False,
+     "'sudo npm test' is still recognized as a real run"),
+    ([edit(), bash("env FOO=1 cargo test"), say("All tests pass.")], False,
+     "'env VAR=val cargo test' is still recognized as a real run"),
+
+    # THIRD-round finding: `test[-_]` must anchor the FILENAME, not match
+    # as a substring anywhere inside an unrelated script name.
+    ([edit(), bash("python3 scripts/latest_run.py"),
+      say("All tests pass.")], True,
+     "running an unrelated script named *latest_run.py* is not a suite run"),
+    ([edit(), bash("python3 scripts/contest_data.py"),
+      say("All tests pass.")], True,
+     "running an unrelated script named *contest_data.py* is not a suite run"),
+    ([edit(), bash("python3 scripts/attest_config.py"),
+      say("All tests pass.")], True,
+     "running an unrelated script named *attest_config.py* is not a suite run"),
+
+    # THIRD-round finding: a heredoc BODY line is DATA, not a command, so a
+    # documentation line mentioning a test invocation inside one must not
+    # be read as a run. This is what motivated dropping the bare newline
+    # from the command-position anchor.
+    ([edit(), bash(
+        "cat <<'EOF' > NOTES.md\n"
+        "Remember to run\n"
+        "python3 hooks/test-foo.py hooks/foo.py\n"
+        "before merging.\n"
+        "EOF"
+     ), say("All tests pass.")], True,
+     "a test invocation mentioned inside a heredoc BODY is not a run"),
+
     # Adversarial-review finding: a disclosed partial result ("N passed, M
     # failed") must not read as a full passing claim.
     ([edit(), say("Ran the suite: 12 passed, 3 failed.")], False,

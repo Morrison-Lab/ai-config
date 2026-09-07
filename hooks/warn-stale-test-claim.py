@@ -109,54 +109,66 @@ BASH_WRITE_RE = re.compile(
 )
 
 # A command-position anchor: start of the command string, or immediately
-# after a shell separator (`;`, `&&`, `||`, a single `&` or `|`, or a
-# newline). Applied ONLY to the python-invocation alternative below, not to
-# the whole list -- a python3-plus-test-file STRING embedded inside an
-# unrelated command (`echo "run python3 hooks/test-foo.py before
-# merging"`, or a `#` comment quoting the same words) must not match, but
-# the keyword alternatives (`pytest`, `cargo test`, ...) legitimately
-# appear after a wrapper with no separator (`timeout 60 pytest -q`) and
-# anchoring THEM the same way would be a fresh false negative, not a fix.
-_CMD_START = r"(?:^|;|&&|\|\||[&|]|\n)\s*"
+# after a shell separator (`;`, `&&`, `||`, a single `&` or `|`). A bare
+# newline is DELIBERATELY EXCLUDED, unlike an earlier version of this
+# anchor -- a heredoc BODY line sits right after a newline with no real
+# command boundary there, so including `\n` let a documentation line like
+# "python3 hooks/test-foo.py" inside a `cat <<EOF > NOTES.md` heredoc read
+# as a run (third-round adversarial review finding). Dropping it means a
+# genuine multi-line script with one statement per line and no `;`/`&&`
+# joining them is no longer recognized either -- that is the SAFE
+# direction for a warn-only guard (an unrecognized real run costs one
+# extra warning; a recognized mention costs a missed one), not a
+# regression.
+#
+# `_WRAPPER` lets a small, explicit set of process wrappers sit between the
+# anchor and the actual invocation (`timeout 60 pytest -q`, `sudo npm
+# test`, `env FOO=1 cargo test`) without reopening the mention-vs-run gap
+# to arbitrary preceding text.
+_WRAPPER = r"(?:(?:timeout\s+\S+|nohup|sudo|env(?:\s+\w+=\S+)*)\s+)*"
+_CMD_START = r"(?:^|;|&&|\|\||[&|])\s*" + _WRAPPER
 
 # A small, explicit set of recognizable test-suite invocation shapes. See
 # the docstring's "TEST-SUITE RECOGNITION" section for why this stays a list
 # rather than a general heuristic.
 #
-# `python3? ... test[-_]*.py` requires the file to be preceded by a Python
-# interpreter invocation (with optional flags in between) sitting at a
-# COMMAND position, not merely mentioned anywhere in the string. Without the
-# python anchor, `cat hooks/test-foo.py`, `git diff hooks/test-foo.py`, and
-# `vim hooks/test-foo.py` all "recognized" a suite run that never happened --
-# a false NEGATIVE that inverted this hook's own documented safe direction
-# (an unrecognized real run should be the only false-positive source, never
-# a mention standing in for a run). Confirmed by adversarial review before
-# that fix: an Edit, then `cat hooks/test-foo.py`, then "All tests pass."
-# produced no warning at all. Without the _CMD_START anchor added on top, a
-# SECOND round of review found the python-anchor form still matched a full
-# invocation string quoted inside `echo "..."` or a `#` comment -- still a
-# mention, not a run.
+# EVERY alternative is anchored to `_CMD_START` -- not just the
+# python-file one. Two earlier rounds anchored only that alternative,
+# reasoning that `\bpytest\b` etc. needed to stay bare so `timeout 60
+# pytest -q` would still match; a THIRD round of adversarial review showed
+# that same bare-word matching let `echo "remember to run pytest before
+# merging"` and `git commit -m "will run cargo test later"` register as
+# real runs -- the identical mention-vs-run bug the first two rounds
+# fixed only for the python-file shape. `_WRAPPER` above is what makes the
+# uniform anchor safe: it is what lets `timeout 60 pytest` still match
+# without leaving the other fifteen alternatives unanchored.
+#
+# `(?:[\w./-]*/)?test[-_]` (rather than `[\w./-]*test[-_]`) requires
+# `test[-_]` to start the FILENAME itself, not merely appear as a
+# substring anywhere in it -- otherwise `python3 scripts/latest_run.py`,
+# `contest_data.py`, and `attest_config.py` all "matched" a suite run
+# that was really an unrelated script (third-round finding).
 TEST_SUITE_RE = re.compile(
-    r"""
-      \bpytest\b
-    | \bpy\.test\b
-    | \bpython[3]?\s+-m\s+(?:pytest|unittest)\b
-    | """ + _CMD_START + r"""python[3]?\s+(?:-\S+\s+)*[\w./-]*test[-_][\w./-]*\.py\b
-    | \bdevtools::test\(
-    | \btestthat::test_
-    | \bR\s+CMD\s+check\b
-    | \bnpm\s+(?:run\s+)?test\b
-    | \byarn\s+test\b
-    | \bpnpm\s+test\b
-    | \bcargo\s+test\b
-    | \bgo\s+test\b
-    | \bmake\s+test\b
-    | \bmvn\s+test\b
-    | \bgradle\s+test\b
-    | \brspec\b
-    | \bphpunit\b
-    | \bdotnet\s+test\b
-    """,
+    _CMD_START + r"""(?:
+      pytest\b
+    | py\.test\b
+    | python[3]?\s+-m\s+(?:pytest|unittest)\b
+    | python[3]?\s+(?:-\S+\s+)*(?:[\w./-]*/)?test[-_][\w./-]*\.py\b
+    | devtools::test\(
+    | testthat::test_
+    | R\s+CMD\s+check\b
+    | npm\s+(?:run\s+)?test\b
+    | yarn\s+test\b
+    | pnpm\s+test\b
+    | cargo\s+test\b
+    | go\s+test\b
+    | make\s+test\b
+    | mvn\s+test\b
+    | gradle\s+test\b
+    | rspec\b
+    | phpunit\b
+    | dotnet\s+test\b
+    )""",
     re.I | re.X,
 )
 

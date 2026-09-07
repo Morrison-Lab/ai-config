@@ -23,10 +23,10 @@ When matched, it:
      (defaulting to v2 if none).
   3. Resolves the default branch from `git symbolic-ref refs/remotes/origin/HEAD`
      falling back to main.
-  4. Runs `git diff <tag>..origin/<default> -- .github/workflows/` and scans added lines
-     for a job-level permission entry inside a workflow that has `workflow_call:` in its `on:`
-     block: an added line matching `^\\+\\s{4,}[a-z-]+:\\s*(read|write|none)\\s*(#.*)?$`
-     that follows (within the same hunk or file) a `permissions:` line.
+  4. Runs `git diff <tag>..origin/<default> -- .github/workflows/` and for each changed
+     reusable workflow (`workflow_call:` in its `on:` block), structurally parses
+     permissions between <tag> and origin/<default>. Scans for added or escalated
+     permissions matching `(read|write|none)` at either workflow root or job level.
   5. Denies when found, naming the file, permission line, and the remedy: land caller
      grants in every consumer first (suggesting `gh search code "uses: <owner>/<repo>/.github/workflows/<file>@"`),
      then slide.
@@ -45,6 +45,11 @@ import shlex
 import subprocess
 import sys
 
+try:
+    import yaml
+except ImportError:
+    yaml = None
+
 RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
 _SHELL_OPS = set("();|&")
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
@@ -53,8 +58,167 @@ LEAD_WORDS = {
     "exec", "nohup", "env", "{", "}",
 }
 
-RX_PERM_ENTRY = re.compile(r"^\+\s{4,}[a-z-]+:\s*(read|write|none)\s*(#.*)?$")
-RX_PERM_HEADER = re.compile(r"^\+?\s*permissions:\s*(#.*)?$")
+RX_PERM_VAL = re.compile(r"^(read|write|none)$")
+
+
+def _extract_permissions_yaml(content: str) -> dict[str, dict[str, str] | str] | None:
+    """Extract permissions via PyYAML when available."""
+    if yaml is None:
+        return None
+    try:
+        data = yaml.safe_load(content)
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    perms: dict[str, dict[str, str] | str] = {}
+
+    root_p = data.get("permissions")
+    if isinstance(root_p, dict):
+        perms["workflow"] = {
+            str(k): str(v)
+            for k, v in root_p.items()
+            if isinstance(k, str) and RX_PERM_VAL.match(str(v).strip())
+        }
+    elif isinstance(root_p, str) and root_p.strip() in ("read-all", "write-all"):
+        perms["workflow"] = root_p.strip()
+    elif isinstance(root_p, dict) and not root_p:
+        perms["workflow"] = {}
+
+    jobs = data.get("jobs")
+    if isinstance(jobs, dict):
+        for job_id, job_data in jobs.items():
+            if isinstance(job_data, dict):
+                jp = job_data.get("permissions")
+                if isinstance(jp, dict):
+                    perms[f"job:{job_id}"] = {
+                        str(k): str(v)
+                        for k, v in jp.items()
+                        if isinstance(k, str) and RX_PERM_VAL.match(str(v).strip())
+                    }
+                elif isinstance(jp, str) and jp.strip() in ("read-all", "write-all"):
+                    perms[f"job:{job_id}"] = jp.strip()
+                elif isinstance(jp, dict) and not jp:
+                    perms[f"job:{job_id}"] = {}
+    return perms
+
+
+def _extract_permissions_fallback(content: str) -> dict[str, dict[str, str] | str]:
+    """Extract permissions using block context and indentation."""
+    perms: dict[str, dict[str, str] | str] = {}
+    lines = content.splitlines()
+    cur_job: str | None = None
+    in_block: str | None = None
+    block_indent = 0
+    jobs_indent = 0
+
+    for raw_line in lines:
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(raw_line) - len(raw_line.lstrip(" "))
+
+        if in_block == "workflow_perms" and indent <= block_indent:
+            in_block = None
+        elif in_block == "job_perms" and indent <= block_indent:
+            in_block = "job"
+        elif in_block == "job" and indent <= jobs_indent:
+            in_block = "jobs"
+            cur_job = None
+        elif in_block == "jobs" and indent <= 0:
+            in_block = None
+
+        if indent == 0:
+            m_top = re.match(r"^([a-zA-Z0-9_-]+):\s*(.*)$", stripped)
+            if m_top:
+                key = m_top.group(1)
+                val = m_top.group(2).split("#")[0].strip()
+                if key == "permissions":
+                    if val in ("read-all", "write-all"):
+                        perms["workflow"] = val
+                    elif val == "{}":
+                        perms["workflow"] = {}
+                    else:
+                        in_block = "workflow_perms"
+                        block_indent = indent
+                        perms["workflow"] = {}
+                elif key == "jobs":
+                    in_block = "jobs"
+                    jobs_indent = indent
+            continue
+
+        if in_block == "workflow_perms":
+            m_entry = re.match(r"^([a-zA-Z0-9_-]+):\s*([a-zA-Z0-9_-]+)", stripped)
+            if m_entry and isinstance(perms.get("workflow"), dict):
+                k, v = m_entry.group(1), m_entry.group(2)
+                if RX_PERM_VAL.match(v):
+                    perms["workflow"][k] = v
+            continue
+
+        if in_block in ("jobs", "job"):
+            if in_block == "jobs" or indent <= 2:
+                m_job = re.match(r"^([a-zA-Z0-9_-]+):\s*$", stripped)
+                if m_job and indent > 0:
+                    cur_job = m_job.group(1)
+                    in_block = "job"
+                    continue
+            if cur_job and in_block == "job":
+                m_prop = re.match(r"^([a-zA-Z0-9_-]+):\s*(.*)$", stripped)
+                if m_prop:
+                    key = m_prop.group(1)
+                    val = m_prop.group(2).split("#")[0].strip()
+                    if key == "permissions":
+                        job_key = f"job:{cur_job}"
+                        if val in ("read-all", "write-all"):
+                            perms[job_key] = val
+                        elif val == "{}":
+                            perms[job_key] = {}
+                        else:
+                            in_block = "job_perms"
+                            block_indent = indent
+                            perms[job_key] = {}
+                        continue
+
+        if in_block == "job_perms" and cur_job:
+            job_key = f"job:{cur_job}"
+            m_entry = re.match(r"^([a-zA-Z0-9_-]+):\s*([a-zA-Z0-9_-]+)", stripped)
+            if m_entry and isinstance(perms.get(job_key), dict):
+                k, v = m_entry.group(1), m_entry.group(2)
+                if RX_PERM_VAL.match(v):
+                    perms[job_key][k] = v
+            continue
+
+    return perms
+
+
+def _extract_permissions(content: str) -> dict[str, dict[str, str] | str]:
+    """Extract workflow and job permissions, preferring PyYAML with indentation fallback."""
+    parsed = _extract_permissions_yaml(content)
+    if parsed is not None:
+        return parsed
+    return _extract_permissions_fallback(content)
+
+
+def _find_added_permissions(
+    old_perms: dict[str, dict[str, str] | str],
+    new_perms: dict[str, dict[str, str] | str],
+) -> list[tuple[str, str]]:
+    """Return list of (scope, perm_str) for any permissions added or escalated."""
+    added: list[tuple[str, str]] = []
+    for scope, perms in new_perms.items():
+        old_scope = old_perms.get(scope)
+        if isinstance(perms, str):
+            if old_scope != perms:
+                added.append((scope, perms))
+        elif isinstance(perms, dict):
+            old_dict = old_scope if isinstance(old_scope, dict) else {}
+            for key, val in perms.items():
+                old_val = old_dict.get(key)
+                if old_val is None:
+                    added.append((scope, f"{key}: {val}"))
+                elif old_val == "read" and val == "write":
+                    added.append((scope, f"{key}: {val}"))
+    return added
 
 
 def _git(args: list[str], cwd: str | None = None, timeout: int = 8) -> str | None:
@@ -265,41 +429,40 @@ def evaluate(command: str, base_cwd: str | None = None) -> tuple[str, str] | Non
         if not (filepath.endswith(".yml") or filepath.endswith(".yaml")):
             continue
 
-        file_content = _git(["show", f"{remote_ref}:{filepath}"], cwd=cwd)
-        if not file_content:
+        new_content = _git(["show", f"{remote_ref}:{filepath}"], cwd=cwd)
+        if not new_content:
             continue
-        if not _has_workflow_call(file_content):
+        if not _has_workflow_call(new_content):
             continue
 
-        # Check for job-level permission additions
-        file_has_perms = bool(re.search(r"^\s*permissions:\s*(#.*)?$", file_content, flags=re.MULTILINE))
-        chunk_saw_perms = False
+        old_content = _git(["show", f"{tag}:{filepath}"], cwd=cwd)
+        old_perms = _extract_permissions(old_content) if old_content else {}
+        new_perms = _extract_permissions(new_content)
 
-        for line in chunk.splitlines():
-            if RX_PERM_HEADER.match(line):
-                chunk_saw_perms = True
-            if (chunk_saw_perms or file_has_perms) and RX_PERM_ENTRY.match(line):
-                perm_line = line.lstrip("+").strip()
-                repo_nwo = _repo_nwo(cwd)
-                filename = os.path.basename(filepath)
-                reason = (
-                    "Blocked: slide-major-tag would release a breaking job-level permission addition "
-                    f"in a reusable workflow ({filepath}).\n\n"
-                    f"  file:            {filepath}\n"
-                    f"  permission line: {perm_line}\n\n"
-                    "In GitHub Actions, a called reusable workflow job cannot request permissions "
-                    "that its caller does not grant. Adding a job permission breaks every consumer "
-                    "caller with startup_failure until the caller grants the new permission "
-                    "(gha#830 / ucdavis/bcs#966; same class as gha#685).\n\n"
-                    "Remedy:\n"
-                    "1. Land caller grants in every consumer first:\n"
-                    f'     gh search code "uses: {repo_nwo}/.github/workflows/{filename}@"\n'
-                    "2. Once consumers have granted the permission, slide the major tag.\n\n"
-                    "If this release is deliberate and consumers have already been prepared, "
-                    "ALLOW_BREAKING_SLIDE=1 as an env assignment on the command records a deliberate override:\n\n"
-                    f"    ALLOW_BREAKING_SLIDE=1 {command.strip()}"
-                )
-                return "deny", reason
+        added_perms = _find_added_permissions(old_perms, new_perms)
+        if added_perms:
+            scope, perm_line = added_perms[0]
+            repo_nwo = _repo_nwo(cwd)
+            filename = os.path.basename(filepath)
+            scope_label = "workflow-level" if scope == "workflow" else "job-level"
+            reason = (
+                f"Blocked: slide-major-tag would release a breaking {scope_label} permission addition "
+                f"in a reusable workflow ({filepath}).\n\n"
+                f"  file:            {filepath}\n"
+                f"  permission line: {perm_line}\n\n"
+                "In GitHub Actions, a called reusable workflow job cannot request permissions "
+                "that its caller does not grant. Adding a permission breaks every consumer "
+                "caller with startup_failure until the caller grants the new permission "
+                "(gha#830 / ucdavis/bcs#966; same class as gha#685).\n\n"
+                "Remedy:\n"
+                "1. Land caller grants in every consumer first:\n"
+                f'     gh search code "uses: {repo_nwo}/.github/workflows/{filename}@"\n'
+                "2. Once consumers have granted the permission, slide the major tag.\n\n"
+                "If this release is deliberate and consumers have already been prepared, "
+                "ALLOW_BREAKING_SLIDE=1 as an env assignment on the command records a deliberate override:\n\n"
+                f"    ALLOW_BREAKING_SLIDE=1 {command.strip()}"
+            )
+            return "deny", reason
 
     return None
 

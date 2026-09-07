@@ -8,6 +8,8 @@ Verifies:
   - Adding a `# checks: read` comment line allows.
   - ALLOW_BREAKING_SLIDE=1 allows.
   - Non-slide commands allow.
+  - Unrelated step input (e.g. access: write inside with:) allows even when file has permissions block.
+  - Adding a permission at workflow root (2-space indent) denies slide-major-tag.
   - Missing tag allows with stderr note.
   - Missing remote branch allows with stderr note.
   - Mutation check: flipping the regex to ignore 'read' fails the deny test.
@@ -252,6 +254,56 @@ def main() -> int:
             v8 == "allow" and "remote branch origin/main does not resolve" in err8,
             "allow with stderr note when remote branch does not resolve",
             f"got verdict={v8}, stderr={err8}",
+        )
+
+        # 8b. False positive regression: unrelated step input (access: write inside with:)
+        # in a file that already has permissions allows.
+        repo8b = _make_repo(
+            permissions_block="    permissions:\n      contents: read\n"
+        )
+        new_content8b = (
+            "name: Workflow\n"
+            "on:\n  workflow_call:\n"
+            "jobs:\n"
+            "  review:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    permissions:\n"
+            "      contents: read\n"
+            "    steps:\n"
+            "      - run: echo ok\n"
+            "      - uses: actions/checkout@v4\n"
+            "        with:\n"
+            "          access: write\n"
+        )
+        _advance_commit(repo8b, "reusable.yml", new_content8b)
+        v8b, _, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", repo8b)
+        check(
+            v8b == "allow",
+            "allow unrelated step input (access: write) in with: block",
+            f"got verdict={v8b}",
+        )
+
+        # 8c. False negative regression: adding permission at workflow root denies.
+        repo8c = _make_repo(
+            permissions_block=""
+        )
+        new_content8c = (
+            "name: Workflow\n"
+            "on:\n  workflow_call:\n"
+            "permissions:\n"
+            "  checks: read\n"
+            "jobs:\n"
+            "  review:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    steps:\n"
+            "      - run: echo ok\n"
+        )
+        _advance_commit(repo8c, "reusable.yml", new_content8c)
+        v8c, r8c, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", repo8c)
+        check(
+            v8c == "deny" and "checks: read" in r8c and "reusable.yml" in r8c and "ALLOW_BREAKING_SLIDE=1" in r8c,
+            "deny added workflow-root permission to reusable workflow",
+            f"got verdict={v8c}, reason={r8c}",
         )
 
         # 9. Mutation check: flip regex to ignore 'read' and assert deny test fails

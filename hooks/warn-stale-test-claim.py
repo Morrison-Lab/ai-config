@@ -279,20 +279,28 @@ CLAIM_RE = re.compile(
     re.I | re.X,
 )
 
-# A window checked around a CLAIM_RE hit for a disclosed failure COUNT ("12
-# passed, 3 failed", "2 errors"). Without this, a reply that already
-# disclosed partial results still reads as a full passing claim -- worse
-# than a missed warning, since the reply is honest and this would tell the
-# author their honest disclosure was a stale-claim violation. Requires a
-# NUMBER next to the fail/error word (either order), not the bare word
-# alone: a first version matched bare "error"/"errors" anywhere in the
-# window, which suppressed a genuine warning next to unrelated prose like
-# "error handling" or "no errors expected" (second-round adversarial
-# review finding) -- the wrong direction for a warn-only guard, whose whole
-# value is not missing the case it exists to catch.
+# A window checked around a CLAIM_RE hit for a disclosed NONZERO failure
+# COUNT ("12 passed, 3 failed", "2 errors"). Without this, a reply that
+# already disclosed partial results still reads as a full passing claim --
+# worse than a missed warning, since the reply is honest and this would
+# tell the author their honest disclosure was a stale-claim violation.
+# Requires a NUMBER next to the fail/error word (either order), not the
+# bare word alone: a first version matched bare "error"/"errors" anywhere
+# in the window, which suppressed a genuine warning next to unrelated
+# prose like "error handling" or "no errors expected" (second-round
+# adversarial review finding) -- the wrong direction for a warn-only
+# guard, whose whole value is not missing the case it exists to catch.
+#
+# `(?!0+\b)` before the count rejects a ZERO count specifically: "297
+# passed, 0 failed" and "All tests pass (0 failures)" are the single most
+# natural phrasing of a COMPLETE passing claim -- most test runners report
+# results exactly this way -- and a prior version suppressed the warning
+# for them identically to a genuine partial disclosure like "3 failed"
+# (CI review finding on this PR, ai-config#3339). "0 failed" discloses
+# nothing partial; it is the full-pass claim itself.
 FAIL_NEARBY_RE = re.compile(
-    r"\b\d+\s+(?:fail(?:ed|ures?)?|errors?)\b"
-    r"|\b(?:fail(?:ed|ures?)?|errors?)\s*:?\s*\d+\b",
+    r"\b(?!0+\b)\d+\s+(?:fail(?:ed|ures?)?|errors?)\b"
+    r"|\b(?:fail(?:ed|ures?)?|errors?)\s*:?\s*(?!0+\b)\d+\b",
     re.I,
 )
 NEARBY_WINDOW = 80

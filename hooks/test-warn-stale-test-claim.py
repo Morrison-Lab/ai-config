@@ -250,6 +250,18 @@ CASES = [
     ([edit(), say("2 of 297 tests failed; the rest passed.")], False,
      "an explicit failure count near a passing claim does not warn"),
 
+    # CI @claude review finding on this PR: "0 failed"/"0 failures" is the
+    # single most natural phrasing of a COMPLETE passing claim (how most
+    # test runners report a full pass), not a partial honest disclosure --
+    # a prior version suppressed the warning for it identically to a
+    # genuine partial disclosure like "3 failed".
+    ([edit(), say("Ran the suite: 297 passed, 0 failed.")], True,
+     "'297 passed, 0 failed' is a full-pass claim and still warns"),
+    ([edit(), say("Tests: 300 passed, 0 failed, 0 skipped")], True,
+     "'0 failed' with a trailing '0 skipped' still warns"),
+    ([edit(), say("All 297 tests pass (0 failures).")], True,
+     "'(0 failures)' does not suppress the warning"),
+
     # SECOND-round adversarial-review finding: the fail-nearby check must
     # require an actual COUNT next to fail/error, not the bare word alone --
     # otherwise unrelated prose mentioning "error" wrongly suppresses a

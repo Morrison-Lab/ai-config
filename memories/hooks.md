@@ -143,6 +143,39 @@ refspec-form push to set the upstream the workaround skipped.
 See [`mistake-patterns.md`](mistake-patterns.md) Pattern 49 for the full
 mechanism and the guard's own no-upstream-is-undefined behaviour.
 
+### 3.2 "Fail loudly" in a brief can land inside a blanket exception handler and go silent
+
+A brief for a **blocking** guard asked a subagent to make unknown values
+"fail loudly rather than silently comparing as equal."
+The subagent added `raise KeyError(...)`, which reads as compliance and is
+the wrong fix: that hook's `main()` wraps its whole evaluation in
+`except Exception: return 0`, and `return 0` with empty stdout is the
+PreToolUse ALLOW outcome.
+A raise into that handler is quieter than no raise at all --- it looks like a
+safeguard in the diff, and it still fails open at runtime, because the
+handler converts every exception, deliberate or not, into the same silent
+allow.
+(Morrison-Lab/ai-config#3304, `hooks/guard-slide-major-tag.py`; reproduced
+end-to-end by a reviewer.
+Currently unreachable in that hook because a regex filters values first,
+so latent rather than live at the time of writing.)
+
+Before specifying "raise" or "fail loudly" in a brief for hook code, read
+what the entry point does with an exception --- `main()`'s own `try`/`except`,
+not the function the brief is asking to change.
+The same check applies when reviewing a subagent's diff that adds a `raise`:
+confirm the call stack between that raise and the process boundary contains
+no blanket handler, rather than trusting that "raise" alone satisfies
+fail-fast.
+
+- **Do:** check the entry point's exception handling before writing "raise"
+  or "fail loudly" into a brief for guard code.
+- **Do:** trace a newly-added `raise` up to the process boundary before
+  accepting it as a fix, confirming no intervening handler swallows it.
+- **Don't:** treat "the subagent added a raise" as having satisfied a
+  fail-loudly instruction --- a raise into a blanket `except Exception` is a
+  silent fail-open wearing a safeguard's shape.
+
 ---
 
 ## 4. Detached Timers & Monitoring Services

@@ -654,7 +654,7 @@ a different subset after the comment was written to prevent it.
 - **Don't:** read a passing suite as coverage of a named site when the
   assertion only tests for the class the site belongs to.
 
-(Measured 2026-09-05 on
+(Measured 2026-09-04 on
 [ucdavis/hac.sap#43](https://github.com/ucdavis/hac.sap/pull/43), still open
 as of this writing, across several review rounds.
 A test named for the property that every placeholder call site marks its own

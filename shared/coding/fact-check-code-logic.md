@@ -410,9 +410,10 @@ A 137-repo, 1695-file sweep run afterward, over corpora the hook's scope
 actually matched, is what the PR body cites instead, and it reports one true
 positive rather than a population-free zero.
 The hook itself never merged --- the PR was closed unmerged after four
-review rounds, on the grounds that `R CMD check` already catches the one
-real finding deterministically --- but the population-zero incident is a
-property of that review's own measurement, not of the hook's fate.)
+review rounds, on the grounds that `R CMD check` already catches the class
+deterministically, with the one true positive filed as its own issue
+upstream --- but the population-zero incident is a property of that
+review's own measurement, not of the hook's fate.)
 
 ### Mutate the fix, not only the test
 

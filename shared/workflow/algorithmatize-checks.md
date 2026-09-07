@@ -398,14 +398,16 @@ The row it builds is assembled by `paste0()` over several arguments
 including the text itself, and `paste0` vectorises independently of `hl()`:
 a two-element argument makes the row builder emit the whole table twice
 inside one document fragment, regardless of what `hl()` returns.
-`hl()`'s `any()` then collapses its own return to one boolean, which
-`paste0` recycles across both copies, so a filled element can be
-highlighted as though it were the unfilled one.
+`hl()` itself always returned one scalar string, one highlight span or
+none; `any()` only changed which *condition* selects it.
+`paste0` recycles that one string across both copies, so a filled element
+can be highlighted as though it were the unfilled one.
 Nobody had graded the fix on the *content* of its output, only on whether
 the abort was gone, so the corruption sat unnoticed for several rounds
 until a later adversarial pass rendered the fixed code on the same
 two-element input and read what it actually produced.
-The remedy that shipped took neither of the issue's two options: it rejects
+The remedy that shipped took neither of the issue's two options as its
+fix: `any()` survives only as defence in depth, behind a guard that rejects
 a non-scalar argument outright, naming it, rather than trying to make one
 render correctly.
 

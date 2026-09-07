@@ -250,11 +250,19 @@ def _strip_shell_literals(command):
 # A claim that tests/checks/cases pass. Matched against VISIBLE prose only
 # (see visible_prose() below) so a reply quoting or discussing this rule in
 # backticks or a fence does not self-trigger.
+# Both the "all N X pass" alternative and the bare "X pass(ed)" alternative
+# allow the SAME subject-noun set (tests/cases/checks/probes). A seventh
+# round of adversarial review found these had drifted apart: the first
+# alternative required the literal word "pass" (rejecting "passed"), and
+# the second allowed "passed" but only for tests/checks/suite, not
+# cases/probes -- so "the 25 probe cases passed" (ordinary past tense of
+# the exact incident phrasing this hook was built to catch) went
+# unmatched while "the 25 probe cases pass" matched. Both alternatives
+# now share one subject-noun group and one tense group.
 CLAIM_RE = re.compile(
     r"""
-      \ball\s+[\w\s]{0,40}?(?:tests?|cases?|checks?|probes?)\s+pass\b
-    | \b(?:tests?|checks?|suite)\s+(?:pass(?:es|ed)?|green|passing)\b
-    | \bsuite\s+pass(?:es|ed)?\b
+      \ball\s+[\w\s]{0,40}?(?:tests?|cases?|checks?|probes?)\s+pass(?:es|ed)?\b
+    | \b(?:tests?|cases?|checks?|probes?|suite)\s+(?:pass(?:es|ed)?|green|passing)\b
     | \b\d+\s*/\s*\d+\s+(?:tests?|cases?|checks?)\s+pass(?:ed)?\b
     | \b\d+\s+(?:tests?|cases?)\s+pass(?:ed)?\b
     | \b\d+\s+passed\b

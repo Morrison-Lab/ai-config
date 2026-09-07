@@ -52,6 +52,20 @@ CASES = [
         "All 25 probe cases pass, including every one of the five forgeries."
     )], True, "edit + ad-hoc probe + passing claim warns (the reported case)"),
 
+    # SEVENTH-round adversarial-review finding: the identical incident
+    # claim in ordinary PAST TENSE ("passed" rather than "pass") must
+    # match too -- the two CLAIM_RE alternatives had drifted onto
+    # different subject-noun/tense combinations, so "probe cases passed"
+    # went unmatched while "probe cases pass" matched.
+    ([edit(), PROBE, say("All 25 probe cases passed.")], True,
+     "the identical incident claim in past tense ('passed') still warns"),
+    ([edit(), say("The suite passed.")], True,
+     "'the suite passed' (past tense) still warns"),
+    ([edit(), say("The probe cases passed.")], True,
+     "'probe cases passed' with no leading 'all' still warns (isolates the "
+     "second CLAIM_RE alternative, whose subject-noun set once excluded "
+     "cases/probes)"),
+
     # Edit, no test run at all, claim of passing -- "never run" branch.
     ([edit(), say("Tests pass.")], True,
      "edit with no suite invocation anywhere, then a passing claim, warns"),

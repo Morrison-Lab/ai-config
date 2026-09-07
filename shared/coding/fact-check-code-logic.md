@@ -339,7 +339,10 @@ When a verification tool or change-time test
 reports "0 regressions" or "0 widened, 0 narrowed",
 confirm that the new code path or arm was actually **reached** during the run.
 
-Three distinct mechanisms produce a false zero from a sampling instrument:
+Four distinct mechanisms produce a false zero from a sampling instrument.
+The first three below concern an arm the run never reached; the fourth,
+covered after them, concerns a population the run had nothing left to
+examine.
 
 1. **Truncation before reaching the arm.**
    A generator that yields new cases after a truncation limit
@@ -372,6 +375,45 @@ because the structured payload arm was placed at index 241,920 where `--limit` t
 skipped by strided sampling,
 and bypassed by prose verdict checks,
 hiding 1 accepted widening and 5 fail-closed narrowings.)
+
+**The fourth mechanism produces a zero that reads as the best possible
+result rather than as a null one: the narrowing meant to fix the false
+positive removes the population the sweep re-runs against.**
+
+A false-positive claim is re-checked by re-running the same sweep over the
+same corpus after tightening the guard, and reading a lower hit count as
+progress.
+When the tightening also narrows *which files are in scope* --- restricting
+a guard to a directory, a file extension, or a role a corpus barely
+contains --- the corpus supplying the sweep's population can shrink to
+nothing in the same edit that was meant to shrink only the false positives.
+The sweep then reports zero, and "0 false positives" reads identically
+whether the denominator is 40 or 0.
+
+- **Do:** report the population size (files or cases the sweep actually
+  examined) beside the hit count, every time a false-positive rate is
+  claimed --- "0/0" and "0/40" are different claims that look the same
+  without it.
+- **Do:** re-derive the trigger population from the corpus **after** a
+  scope-narrowing edit, rather than reusing a count taken before it; the
+  narrowing is exactly what can make the two differ.
+- **Don't:** cite a lower or zero hit count as evidence a narrowing worked
+  without confirming the sweep still had a population able to produce a hit.
+
+(Measured 2026-09-04 on [ai-config#3281](https://github.com/Morrison-Lab/ai-config/pull/3281),
+a hook proposed to flag a test reading its own package's source from disk.
+An earlier claim of "fires on zero" in this repo's own corpus was 0 out of 0:
+requiring a test directory left `ai-config` with no in-scope files, so any of
+several narrowings could have been reverted and the sweep would still have
+read zero.
+A 137-repo, 1695-file sweep run afterward, over corpora the hook's scope
+actually matched, is what the PR body cites instead, and it reports one true
+positive rather than a population-free zero.
+The hook itself never merged --- the PR was closed unmerged after four
+review rounds, on the grounds that `R CMD check` already catches the class
+deterministically, with the one true positive filed as its own issue
+upstream --- but the population-zero incident is a property of that
+review's own measurement, not of the hook's fate.)
 
 ### Mutate the fix, not only the test
 
@@ -494,6 +536,51 @@ to mutate away from.
 
 See [`fact-check-code-logic.cases.md`](fact-check-code-logic.cases.md),
 "Mutate the fix, not only the test --- a fixture ordered like the table".
+
+### A test that legitimately passes both ways still has to say so
+
+**Misleading label**, above, is a test whose name overstates what it checks.
+This is the case that survives even a careful author: a test whose assertion
+is exactly right, that genuinely and correctly passes against both the old
+code and the new, and whose comment says nothing about that --- so its
+placement, sitting next to a set of ordinary regression cases, implies a
+property the test does not have.
+
+A reader who assumes every case in a suite is a regression case (fails on the
+old code, passes on the new) will not re-derive which ones are not, and two
+different tests earn this label for two different reasons.
+One guards against an over-correction: a narrower fix that only handles the
+exact case a proof-of-concept exposed would pass this test, and a wrong fix
+that reverts too far would fail it, so it discriminates between "fixed
+correctly" and "fixed too narrowly" even though it cannot discriminate
+"fixed" from "never broken."
+The other is a genuine coincidence, the **Coincident fixture** mechanism
+above, where a specific fixture happens to make two code paths agree.
+Both are worth keeping.
+Neither is a regression test, and the fix for both is the same: state in the
+test's own comment which case it is, rather than letting silence imply the
+default.
+
+- **Do:** write, in the test's own comment, whether it is a regression case,
+  an over-correction guard, or a documented coincidence --- three different
+  claims, and a reader cannot tell which one a passing assertion is making.
+- **Do:** verify a claimed over-correction guard the way the mutation
+  section above verifies a regression test: describe the narrower, wrong fix
+  it is meant to catch, and confirm that fix actually fails it.
+- **Don't:** delete a test because it passes against both the old and the new
+  code --- that is evidence it needs a comment, not evidence it needs
+  removing; see the DELETION section below for what a green suite can and
+  cannot tell you about redundancy.
+- **Don't:** let a dual-passing test sit unlabeled next to regression cases in
+  the same block; a reader triaging a failing suite will read it as one.
+
+(Morrison-Lab/ai-config#3168, 2026-09-05: a proof-of-concept test for a
+guard's attribution bypass was paired with a second case built from the same
+inputs but a different result ordering.
+The second case passed against the pre-fix hook too --- there, an earlier
+result had already emptied the queue the second one reads, so it authorized
+nothing by accident rather than by the fix's design --- and its own comment
+says exactly that, rather than presenting it as a second regression case.)
 
 ### A misleading test label also licenses a DELETION, which is the direction with no mutation available
 

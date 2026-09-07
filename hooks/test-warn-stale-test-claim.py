@@ -95,6 +95,57 @@ CASES = [
      "devtools::test() after the edit is recognized as a real suite run"),
     ([edit(path="R/foo.R"), say("devtools::test() says all tests pass.")],
      True, "a claim naming devtools::test() in prose (not run) still warns"),
+
+    # Adversarial-review finding: MENTIONING a test file must not read as
+    # RUNNING it. `cat`, `git diff`, and an editor opening the file all name
+    # it without executing it.
+    ([edit(), bash("cat hooks/test-warn-stale-test-claim.py"),
+      say("All tests pass.")], True,
+     "merely CATTING the test file does not count as running the suite"),
+    ([edit(), bash("git diff hooks/test-warn-stale-test-claim.py"),
+      say("All tests pass.")], True,
+     "diffing the test file does not count as running the suite"),
+    ([edit(), bash("python3 hooks/test-warn-stale-test-claim.py "
+                   "hooks/warn-stale-test-claim.py"),
+      say("All 12 tests pass.")], False,
+     "actually invoking `python3 hooks/test-*.py ...` is recognized as a run"),
+
+    # Adversarial-review finding: a disclosed partial result ("N passed, M
+    # failed") must not read as a full passing claim.
+    ([edit(), say("Ran the suite: 12 passed, 3 failed.")], False,
+     "a disclosed partial result (passed AND failed nearby) does not warn"),
+    ([edit(), say("2 of 297 tests failed; the rest passed.")], False,
+     "an explicit failure count near a passing claim does not warn"),
+
+    # Adversarial-review finding: intra-turn ordering. A single reply that
+    # edits AND runs the real suite in the same turn, in that order, must
+    # not warn even though both tool calls share one JSONL record.
+    ([{"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "Edit", "input": {
+            "file_path": "hooks/warn-stale-test-claim.py",
+            "old_string": "a", "new_string": "b"}},
+        {"type": "tool_use", "name": "Bash", "input": {
+            "command": "pytest -q"}},
+    ]}}, say("All tests pass.")], False,
+     "edit then real suite run WITHIN THE SAME turn/record does not warn"),
+    ([{"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "Bash", "input": {
+            "command": "pytest -q"}},
+        {"type": "tool_use", "name": "Edit", "input": {
+            "file_path": "hooks/warn-stale-test-claim.py",
+            "old_string": "a", "new_string": "b"}},
+    ]}}, say("All tests pass.")], True,
+     "real suite run then edit WITHIN THE SAME turn/record still warns"),
+
+    # A Bash command that WRITES a source file via redirection/heredoc, not
+    # through the Edit tool -- the secondary BASH_WRITE_RE path.
+    ([bash("cat <<'EOF' > hooks/scratch.py\nprint(1)\nEOF"),
+      say("All tests pass.")], True,
+     "a heredoc write to a .py file via Bash counts as a source edit"),
+    ([bash("cat <<'EOF' > hooks/scratch.py\nprint(1)\nEOF"),
+      bash("pytest -q"), say("All tests pass.")], False,
+     "a heredoc write followed by a real suite run does not warn"),
+
 ]
 
 
@@ -148,6 +199,72 @@ def main():
         passes += 1
     else:
         print("FAIL: sentinel did not suppress the repeat")
+        failures += 1
+
+    # Adversarial-review finding: the sentinel must be keyed on transcript
+    # path too, so two DIFFERENT sessions producing the identical short
+    # final reply do not share one /tmp sentinel and swallow the second
+    # session's genuine warning.
+    events_a = [edit(), say("All 25 probe cases pass.")]
+    fd_a, path_a = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd_a, "w") as fh:
+        for e in events_a:
+            fh.write(json.dumps(e) + "\n")
+    fd_b, path_b = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd_b, "w") as fh:
+        for e in events_a:  # identical content, different transcript file
+            fh.write(json.dumps(e) + "\n")
+    shared_env = dict(os.environ, TMPDIR=tempfile.mkdtemp())
+    out_a = subprocess.run(
+        [sys.executable, HOOK], input=json.dumps({"transcript_path": path_a}),
+        capture_output=True, text=True, env=shared_env,
+    ).stdout
+    out_b = subprocess.run(
+        [sys.executable, HOOK], input=json.dumps({"transcript_path": path_b}),
+        capture_output=True, text=True, env=shared_env,
+    ).stdout
+    os.unlink(path_a)
+    os.unlink(path_b)
+    if "systemMessage" in out_a and "systemMessage" in out_b:
+        print("PASS: two sessions with an identical reply both warn "
+              "(sentinel is keyed on transcript path)")
+        passes += 1
+    else:
+        print("FAIL: a second session's identical-text warning was "
+              "swallowed by the first session's sentinel")
+        failures += 1
+
+    # A missing transcript_path must not crash.
+    out = subprocess.run(
+        [sys.executable, HOOK], input=json.dumps({}),
+        capture_output=True, text=True, env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
+    )
+    if out.returncode == 0 and "systemMessage" not in out.stdout:
+        print("PASS: a missing transcript_path exits cleanly with no warning")
+        passes += 1
+    else:
+        print(f"FAIL: missing transcript_path misbehaved (rc={out.returncode}, "
+              f"stdout={out.stdout!r})")
+        failures += 1
+
+    # A malformed (non-JSON) transcript line must not crash the scan; the
+    # well-formed lines around it should still be read.
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        fh.write(json.dumps(edit()) + "\n")
+        fh.write("{not valid json\n")
+        fh.write(json.dumps(say("All tests pass.")) + "\n")
+    out = subprocess.run(
+        [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
+        capture_output=True, text=True, env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
+    )
+    os.unlink(path)
+    if out.returncode == 0 and "systemMessage" in out.stdout:
+        print("PASS: a malformed transcript line is skipped, not fatal")
+        passes += 1
+    else:
+        print(f"FAIL: a malformed transcript line broke the scan "
+              f"(rc={out.returncode}, stdout={out.stdout!r})")
         failures += 1
 
     print(f"\n{passes} passed, {failures} failed")

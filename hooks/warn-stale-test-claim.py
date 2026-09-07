@@ -112,16 +112,21 @@ BASH_WRITE_RE = re.compile(
 # the docstring's "TEST-SUITE RECOGNITION" section for why this stays a list
 # rather than a general heuristic.
 #
-# `test[-_][\w./-]*\.py` matches this repo's own `hooks/test-<name>.py`
-# convention as well as a generic `test_*.py` module -- but ONLY inside a
-# Bash COMMAND string, never against an Edit/Write file_path, so editing
-# (rather than running) a test file never counts as a suite invocation.
+# `python3? ... test[-_]*.py` requires the file to be preceded by a Python
+# interpreter invocation (with optional flags in between), not merely
+# mentioned. Without that anchor, `cat hooks/test-foo.py`, `git diff
+# hooks/test-foo.py`, and `vim hooks/test-foo.py` all "recognized" a suite
+# run that never happened -- a false NEGATIVE that inverted this hook's own
+# documented safe direction (an unrecognized real run should be the only
+# false-positive source, never a mention standing in for a run). Confirmed
+# by adversarial review before this fix: an Edit, then `cat
+# hooks/test-foo.py`, then "All tests pass." produced no warning at all.
 TEST_SUITE_RE = re.compile(
     r"""
       \bpytest\b
     | \bpy\.test\b
     | \bpython[3]?\s+-m\s+(?:pytest|unittest)\b
-    | \btest[-_][\w./-]*\.py\b
+    | \bpython[3]?\s+(?:-\S+\s+)*[\w./-]*test[-_][\w./-]*\.py\b
     | \bdevtools::test\(
     | \btestthat::test_
     | \bR\s+CMD\s+check\b
@@ -154,6 +159,16 @@ CLAIM_RE = re.compile(
     """,
     re.I | re.X,
 )
+
+# A window checked around a CLAIM_RE hit for a disclosed failure ("12
+# passed, 3 failed"). Without this, a reply that already disclosed partial
+# results still reads as a full passing claim -- worse than a missed
+# warning, since the reply is honest and this would tell the author their
+# honest disclosure was a stale-claim violation. Conservative in the safe
+# direction for a warn-only guard: it can suppress a genuine warning (a
+# reply saying "all tests pass, no failures" nearby) but never invents one.
+FAIL_NEARBY_RE = re.compile(r"\bfail(?:ed|ing|s|ure)?\b|\berrors?\b", re.I)
+NEARBY_WINDOW = 80
 
 FENCE = re.compile(r"```.*?```", re.S)
 QUOTED = re.compile(r"^\s*>.*$", re.M)
@@ -236,12 +251,23 @@ def _extract(m):
 
 
 def scan(path):
-    """Return (claim_text, last_edit_at, last_test_at)."""
+    """Return (claim_text, last_edit_at, last_test_at).
+
+    Ordering is tracked with a counter incremented once per TOOL CALL
+    (`tool_idx`), not per JSONL record. A single assistant turn can carry
+    both an Edit and a Bash test invocation in one content array, and
+    indexing by record collapses both to the same position -- losing the
+    real intra-turn order between them. Text (the claim itself) does not
+    need this fine-grained ordering: only the LAST non-empty text block in
+    the whole transcript is kept, which is always the reply about to be
+    sent.
+    """
     last_text = ""
     last_edit_at = -1
     last_test_at = -1
+    tool_idx = 0
 
-    for i, m in enumerate(records(path)):
+    for m in records(path):
         if m.get("isSidechain"):
             continue
 
@@ -252,6 +278,7 @@ def scan(path):
                 last_text = txt
 
         for name, inp in tool_calls:
+            tool_idx += 1
             if not isinstance(inp, dict):
                 continue
 
@@ -261,7 +288,7 @@ def scan(path):
                     or inp.get("TargetFile") or inp.get("target_file") or ""
                 )
                 if SOURCE_EXT_RE.search(file_path):
-                    last_edit_at = i
+                    last_edit_at = tool_idx
                 continue
 
             if name in BASH_TOOLS:
@@ -271,9 +298,9 @@ def scan(path):
                 if not command:
                     continue
                 if TEST_SUITE_RE.search(command):
-                    last_test_at = i
+                    last_test_at = tool_idx
                 elif BASH_WRITE_RE.search(command):
-                    last_edit_at = i
+                    last_edit_at = tool_idx
 
     return last_text, last_edit_at, last_test_at
 
@@ -300,11 +327,25 @@ def main() -> int:
         # all). Nothing is stale.
         return 0
 
-    hit = CLAIM_RE.search(visible_prose(text))
+    prose = visible_prose(text)
+    hit = CLAIM_RE.search(prose)
     if not hit:
         return 0
 
-    key = hashlib.sha256(text.encode()).hexdigest()[:16]
+    window_lo = max(0, hit.start() - NEARBY_WINDOW)
+    window_hi = min(len(prose), hit.end() + NEARBY_WINDOW)
+    if FAIL_NEARBY_RE.search(prose[window_lo:window_hi]):
+        # A disclosed failure nearby ("12 passed, 3 failed") means this is
+        # not a claim of full, verified success -- the honest disclosure
+        # must not be told it violated this rule.
+        return 0
+
+    # Keyed on the transcript path too, so the sentinel is per session.
+    # Without it, two sessions producing the identical short final reply
+    # (e.g. "All tests pass.") share one sentinel in /tmp, and the second
+    # session's genuine warning is silently swallowed -- the same class of
+    # bug `remind-ums-after-error.py` documents fixing for its own sentinel.
+    key = hashlib.sha256(f"{path}:{text}".encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-stale-test-claim-{key}")
     if os.path.exists(sentinel):
         return 0

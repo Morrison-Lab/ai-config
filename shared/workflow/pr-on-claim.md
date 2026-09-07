@@ -319,7 +319,8 @@ Merge-tree answers "will this apply", never "is this new".
   Use a one-directional `git diff <base>...<branch>` (three-dot, merge base on the left) to isolate the branch's own additions, then confirm those specific lines are present in the base with `git show <base>:<path> | grep -c '<distinctive phrase>'`.
 - **Do:** treat an **empty** path-scoped two-dot diff as conclusive on its own, without needing the three-dot form, **provided the path list is a complete enumeration of every path the branch touched** (renames and deletions included).
   If every one of those files is byte-identical to the base, nothing on the branch is missing from it, whoever wrote the matching content.
-  The scoping caveat above is about the non-empty result staying ambiguous, not about the empty one being unreliable --- but the path list itself still needs checking, since a source like `gh pr view --json files` can paginate or truncate on a PR with an unusually large file count, and a silently incomplete list makes "empty over the checked subset" look identical to "empty over everything the branch touched".
+  The scoping caveat above is about the non-empty result staying ambiguous, not about the empty one being unreliable.
+  But the path list itself still needs checking: a source like `gh pr view --json files` can paginate or truncate on a PR with an unusually large file count, and a silently incomplete list makes "empty over the checked subset" look identical to "empty over everything the branch touched".
 - **Don't:** offer a clean or a conflicting `merge-tree` as evidence either way about novelty.
 
 (Measured 2026-08-22 on `Morrison-Lab/ai-config`.

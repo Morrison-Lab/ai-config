@@ -47,6 +47,7 @@ jobs:
       issues: write
       id-token: write
       actions: read   # lets the reviewer read CI status (github_ci MCP server)
+      checks: read    # commits/<ref>/check-runs, required by gha@v2 since gha#830
     uses: Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2
     secrets: inherit
     with:

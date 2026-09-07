@@ -378,7 +378,7 @@ is still unmeasured.**
 Dispatching `agy -p "<brief>" --effort medium --mode accept-edits`
 (agy 1.1.27, `~/.local/bin/agy`) for a headless read-only task
 produced no output and exited 0, printing only:
-`jetski: no output produced -- a tool required the "command"
+`jetski: no output produced --- a tool required the "command"
 permission that headless mode cannot prompt for, so it was
 auto-denied.
 Add an allow-rule under permissions.allow in

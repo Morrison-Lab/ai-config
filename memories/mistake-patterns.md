@@ -1152,3 +1152,59 @@ A clean automated review from every available provider evaluating the current HE
   That is a code change to the guard (ai-config#3319), not yet made as of
   this writing; until it lands, the literal-path habit above is the only
   defense.
+
+## Pattern 53: Gating an Authoritative Parser on an Unsound Raw Text Pre-Filter
+
+- **Mistake**: putting a cheap raw-text scan *in front of* a real parser to
+  decide which inputs are worth parsing.
+  The scan then decides relevance for inputs the parser could have judged
+  correctly, and any encoding the format allows but the scan cannot see
+  becomes a silent bypass.
+- **Direction of failure**: fail-open, and invisibly.
+  Nothing errors; the input is simply skipped.
+  On a blocking guard that is the expensive direction, because the guard
+  reports success while not having looked.
+- **Example**: 2026-09-07, `Morrison-Lab/ai-config` PR
+  [#3304](https://github.com/Morrison-Lab/ai-config/pull/3304),
+  `hooks/guard-slide-major-tag.py`.
+  Commit `6694317a0` added a pre-filter skipping any workflow file whose text
+  lacked the substring `workflow_call`; commit `a401ea0eb` reordered it away
+  after review.
+  The bypass needs an ESCAPE, not merely quoting --- a plainly double-quoted
+  key still contains the substring, so it would not have tripped anything:
+
+  ```python
+  >>> "workflow_call" in 'on:\n  "workflow_call":\n'
+  True
+  >>> "workflow_call" in 'on:\n  "\\u0077orkflow_call":\n'
+  False
+  >>> yaml.safe_load('on:\n  "\\u0077orkflow_call":\n')
+  {True: {'workflow_call': None}}
+  ```
+
+  `\u0077` is `w`, so PyYAML and GitHub Actions both resolve the key, while
+  the raw text never carries it.
+  An added `checks: read` job permission passed the guard.
+- **Fix**: it is an ordering problem, not a matching problem.
+  Parse first, and let the parsed structure be the sole test for anything
+  that parses.
+  Consult the raw scan only for input the parser cannot read at all, where
+  nothing better exists and its error direction can be made conservative.
+- **Why widening the scan is the wrong repair**: hand-decoding a format's
+  escapes to decide whether to parse is the same mistake one level down, and
+  each widening fixes the named encoding while leaving the next one open.
+
+- **Do:** run the authoritative parser first, and reserve text heuristics for
+  input that fails to parse.
+- **Do:** mutation-test the ordering --- reintroduce the scan into the parsed
+  path and confirm an escaped-key test flips to allow.
+- **Don't:** add a pre-filter whose premise is that absence of a token proves
+  irrelevance; in any expressive format that premise is false.
+- **Don't:** treat a green suite as coverage of the fallback path, which is
+  usually the one no test forces.
+
+Closely related to **Pattern 34** above, which is the same transformation
+blindness in a different code shape: there a raw-text subsumption proof was
+used to DELETE a parser branch, here a raw-text scan is used to decide the
+parser never RUNS.
+Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.

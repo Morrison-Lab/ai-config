@@ -657,11 +657,22 @@ def main() -> int:
             "      - run: echo ok\n"
         )
         _advance_commit(repo11d, "reusable.yml", new_content11d)
-        v11d, r11d, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", repo11d)
+        v11d, r11d, e11d = run_hook(HOOK, "gh workflow run slide-major-tag.yml", repo11d)
         check(
             v11d == "allow",
             "permission value outside rank (admin) filtered by RX_PERM_VAL and does not produce spurious deny",
             f"got verdict={v11d}, reason={r11d}",
+        )
+        # The verdict alone cannot tell the two ways of reaching "allow" apart.
+        # If RX_PERM_VAL ever stops filtering, the out-of-rank value reaches
+        # PERM_RANK[...], raises KeyError, and main()'s blanket handler turns
+        # that into exit 0 with empty stdout -- ALLOW again, from a crash.
+        # stderr is what separates them, so assert on it: a clean run says
+        # nothing there, and the fail-open path prints "could not evaluate".
+        check(
+            "could not evaluate command" not in (e11d or ""),
+            "admin is filtered upstream rather than crashing into a fail-open allow",
+            f"got stderr={(e11d or '')!r}",
         )
 
         # 12a. End-to-end: job-level checks: none -> checks: read denies slide-major-tag

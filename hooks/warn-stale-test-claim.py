@@ -148,6 +148,16 @@ _CMD_START = r"(?:^|;|&&|\|\||[&|])\s*" + _WRAPPER
 # substring anywhere in it -- otherwise `python3 scripts/latest_run.py`,
 # `contest_data.py`, and `attest_config.py` all "matched" a suite run
 # that was really an unrelated script (third-round finding).
+#
+# `(?![-:])` after each `X\s+test\b` alternative rejects a PARTIAL or
+# adjacent target that merely starts with "test": `npm run test:unit`,
+# `npm run test:watch`, `mvn test-compile`, `make test-unit`, and `yarn
+# test:watch` are all ordinary, common script/build-target NAMES, not a
+# run of the whole suite -- bare `\b` is satisfied by the following `:`
+# or `-` since both are non-word characters, so without this guard a
+# lint-only or watch-mode target read as a genuine full run (fifth-round
+# adversarial review finding, reproduced with no adversarial shell
+# construction at all).
 TEST_SUITE_RE = re.compile(
     _CMD_START + r"""(?:
       pytest\b(?!=)
@@ -157,14 +167,14 @@ TEST_SUITE_RE = re.compile(
     | devtools::test\(
     | testthat::test_
     | R\s+CMD\s+check\b
-    | npm\s+(?:run\s+)?test\b
-    | yarn\s+test\b
-    | pnpm\s+test\b
-    | cargo\s+test\b
-    | go\s+test\b
-    | make\s+test\b
-    | mvn\s+test\b
-    | gradle\s+test\b
+    | npm\s+(?:run\s+)?test\b(?![-:])
+    | yarn\s+test\b(?![-:])
+    | pnpm\s+test\b(?![-:])
+    | cargo\s+test\b(?![-:])
+    | go\s+test\b(?![-:])
+    | make\s+test\b(?![-:])
+    | mvn\s+test\b(?![-:])
+    | gradle\s+test\b(?![-:])
     | rspec\b(?!=)
     | phpunit\b(?!=)
     | dotnet\s+test\b

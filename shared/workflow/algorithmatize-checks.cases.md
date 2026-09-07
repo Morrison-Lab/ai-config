@@ -395,22 +395,23 @@ caught", so every mutant read as caught, including genuinely surviving ones,
 and three separate readings of the mutation matrix were void this way
 before the cause was found.
 Only running an unmutated baseline **inside the same batch** exposed it: the
-baseline failed identically to every mutant, which is this file's sixth
-outcome above, a mutant failing for a reason other than the mutation, but
-reached here through resource exhaustion accumulated across many prior runs
-in the same location rather than through a single run executing somewhere
-different.
+baseline failed identically to every mutant, which is
+[`algorithmatize-checks.md`](algorithmatize-checks.md)'s sixth outcome, a
+mutant failing for a reason other than the mutation, but reached here
+through resource exhaustion accumulated across many prior runs in the same
+location rather than through a single run executing somewhere different.
 
-Outcome six's own discriminator, an unmutated copy run from the mutant's
-own location, is not enough when the location itself degrades between
-runs: a baseline run once at the start of a long session can pass while a
-baseline run inside the batch that follows it fails.
+That sixth outcome's own discriminator, an unmutated copy run from the
+mutant's own location, is not enough when the location itself degrades
+between runs: a baseline run once at the start of a long session can pass
+while a baseline run inside the batch that follows it fails.
 A mutation-testing harness needs three things a location-only discriminator
 does not supply on its own: a baseline run in every batch, not only the
 first; a known environmental failure signature, here the literal string
-`no suitable unused file name for pdf()`, classified as VOID rather than
-CAUGHT; and a cleanup step that clears the accumulating artifacts before or
-between batches, rather than relying on `.gitignore` to keep them out of
+`no suitable unused file name for pdf()`, recognized and excluded from
+scoring rather than counted as a caught mutation; and a cleanup step that
+clears the accumulating artifacts before or between batches, rather than
+relying on `.gitignore` to keep them out of
 review while they still break every run they never appear in.)
 
 ## There is a fourth outcome: a mutation that applies cleanly and is unfaithful

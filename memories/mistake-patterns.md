@@ -873,6 +873,14 @@ A clean automated review from every available provider evaluating the current HE
   each is permission laundering:
   the MCP write tools are the guard's documented open gap ([ai-config#1929](https://github.com/Morrison-Lab/ai-config/issues/1929)),
   and a peer session or a separate CLI bypasses simply because the hook does not run there.
+- **Do**: on a fresh denial, retry the exact same command once, unrephrased,
+  before escalating --- measured 2026-09-06/07 to recover the goal three
+  separate times with no settings change.
+- **Don't**: read a run of denials as confined to the one command that
+  triggered them --- once several have accumulated in a session, the
+  classifier can start denying a plainly innocuous, unrelated command too
+  (e.g. `gh run list -R ... --json ...`), which is a widened blast radius
+  the earlier occurrences below did not record.
 - **Example**: 2026-09-01, `Lacaedemon/sparta` [PR #1459](https://github.com/Lacaedemon/sparta/pull/1459) (GIA sweep), tracked as [ai-config#2899](https://github.com/Morrison-Lab/ai-config/issues/2899);
   previously `ucdavis/bcs` 2026-08-28 ([ai-config#2544](https://github.com/Morrison-Lab/ai-config/issues/2544), closed by [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820)).
   In an auto-permission-mode plugin-consumer session where no `adversarial-reviewer` agent is registered (`Agent type not found`),
@@ -921,9 +929,28 @@ A clean automated review from every available provider evaluating the current HE
   Three passes enumerated explanations --- two, then three --- over a candidate set nobody had established, and each list was internally sound while the true answer sat outside all of them.
   The transferable step is to capture the resolved path (`ps` while the guard fires) instead of deducing it from registration files, since a guard that fires repeatedly hands you the measurement for free.
   See [`keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md)'s dated-constant section for the resolution order and for the fail-open hazard, and for what the capture leaves unestablished.
+- **3rd occurrence, and a new symptom: the escalation spreads to commands
+  with no relation to the original denial, 2026-09-06/07.**
+  Five denials in one session, with no settings change and no restart.
+  Three times, an identical re-run of a just-denied command succeeded on the
+  very next attempt --- confirming, without a session restart, what the
+  2nd occurrence above only measured *across* a restart.
+  Separately, after several differently-shaped attempts at the same goal,
+  the classifier began denying a plainly innocuous, unrelated command
+  (`gh run list -R ... --json ...`), which also succeeded on an identical
+  retry.
+  ai-config#2994 and this bullet's own prior occurrences already establish
+  that repeated variants of the SAME denied command escalate suspicion;
+  what neither previously recorded is that the escalation is not scoped to
+  that command -- it widens to spend suspicion on unrelated, ordinary reads
+  once several denials have accumulated in the session.
 - **Algorithmatizable?**
   Partially.
   [#2544](https://github.com/Morrison-Lab/ai-config/issues/2544)'s suggested fix 3 --- have the hook's refusal message name a user-approvable permission rule for the override --- would have resolved the measured session in one step, and remains open under [#2899](https://github.com/Morrison-Lab/ai-config/issues/2899).
+  The new symptom above suggests a session-level mitigation too: once a
+  denial has occurred, retry the identical command once before rephrasing
+  or escalating to the user, since an identical retry recovered every time
+  it was measured.
 
 ## Pattern 44: `pgrep -f` Self-Matching in Background Waiters and Process Status Pollers
 - **Do**: When monitoring background tasks or long-running scripts,

@@ -156,6 +156,27 @@ there.
   before picking the refspec's remote.
 - This avoids clobber-prone workarounds (`checkout -B`) and avoids opening a
   new sibling PR by mistake.
+- **When you need to CREATE new commits on that branch (a merge, not just a
+  re-push of a commit you already have), get a starting point with
+  `git checkout --detach origin/<branch>` instead** --
+  it lands you on that branch's tip with no branch name occupied,
+  so the checkout cannot collide with the other worktree.
+  Commit or merge there,
+  then `git push origin HEAD:refs/heads/<branch>`.
+  Confirmed live 2026-09-06: a loop ran `git checkout -q -B "$b" "origin/$b"`
+  on one line and `git merge --no-edit origin/main` on the next,
+  with no `&&` between them --
+  exactly the unchained pattern
+  [`flag-unchained-branch-switch.py`](../hooks/flag-unchained-branch-switch.py)
+  warns on, and it fired correctly here.
+  Three of four checkouts failed with `is already used by worktree at ...`,
+  and the unmutated `git merge` ran anyway against whatever was left checked
+  out (a detached `main` HEAD from the prior loop iteration),
+  reporting "merged cleanly" for branches it had never actually checked out.
+  The loop exited 0 throughout.
+  Chaining the whole sequence with `&&` is the general fix;
+  the detached-checkout form above is the specific one for a loop that must
+  land new commits on branches other sessions have checked out elsewhere.
 
 ## Two worktrees on the same branch name silently move a shared ref, not a conflict error
 

@@ -147,3 +147,54 @@ get a warning added to the example/README.
   group-name pattern -- if the reusable workflow already declares an
   identically-named group on a nested job, this deadlocks rather than merely
   racing.
+
+## A missing review is not a pending one; a caller-permission fix on `main` heals every open PR via redispatch
+
+Fourth occurrence of the same permission-mismatch class this file already
+tracks,
+now `checks: read` rather than `actions:` or `issues:`.
+Every `claude-review` run in `Morrison-Lab/ai-config` ended `startup_failure`
+from 2026-09-06T06:50Z:
+gha's reusable review job needed `checks: read`,
+which the caller had not granted,
+and a called job may not request more than its caller grants --
+so the call broke at parse time
+(ai-config#3303, Morrison-Lab/gha#830, fixed by `checks: read` in #3313).
+
+A `startup_failure` creates zero jobs and zero check runs,
+so an affected PR's checks read all-green with simply no review comment,
+and `check-pr-fully-clean.py` correctly reports "No automated review comments
+or reviews found" --
+which reads as "not yet reviewed" and is actually "the review workflow
+cannot start."
+When a PR shows green checks and no review for longer than one normal
+review round,
+check `gh run list --workflow=<review>.yml --json conclusion` for
+`startup_failure` rather than continuing to wait.
+
+**`workflow_dispatch` always runs the workflow FILE from the default
+branch**, never the file on the branch it targets.
+So once the caller-side `checks: read` fix merged to `main`,
+redispatching `claude-review.yml` against any open PR --
+with no branch sync and no push to that PR's own branch --
+ran the fixed caller immediately.
+Verified on #3312, #3310, and #3305:
+all three were reviewed within four minutes of redispatch,
+and two came back clean with no code change at all.
+This is cheaper than the reflex of merging `main` into every affected
+branch,
+which spends a push, a CI cycle, and a review round per PR,
+and which is impossible outright when a peer session already holds that
+branch checked out in its own worktree.
+
+- **Do:** read a PR with green checks and no review as a possible
+  `startup_failure`, and check `gh run list --workflow=<review>.yml` before
+  waiting longer.
+- **Do:** after fixing a caller-permission gap on `main`, redispatch the
+  review workflow against every open PR it affected, rather than merging
+  `main` into each branch.
+- **Don't:** read "No automated review comments or reviews found" from
+  `check-pr-fully-clean.py` as proof the review is merely pending -- confirm
+  the workflow actually started.
+- **Don't:** sync every affected branch with `main` to pick up a caller-side
+  workflow fix; `workflow_dispatch` already reads the default branch's file.

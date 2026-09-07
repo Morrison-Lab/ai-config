@@ -333,6 +333,40 @@ These probes settle a different question, a file write rather than a review:
 - **Don't:** apply an `agy` style finding as though it were a corpus rule without that check.
 - **Don't:** hand headless `agy` a task that requires reading, running, or writing anything in the repo.
 
+**Confirmed again 2026-09-06/07: `--mode accept-edits` gates COMMANDS, not
+only edits, so it is not sufficient on its own.**
+The allow-list at `~/.gemini/antigravity-cli/settings.json` already carried
+a broad `write_file(*)` entry from prior use,
+alongside only narrow per-command entries such as `command(pytest)` --
+so write permission was already open while command permission stayed
+closed,
+and a brief that ran an arbitrary shell command still hit the same
+`command(<target>)` denial the first probe above found.
+Add the specific command under `permissions.allow`,
+or accept `--dangerously-skip-permissions` for a fully trusted brief.
+
+**Also measured: `agy -p ""` fails fast rather than hanging.**
+An empty prompt -- which happens when a brief file meant to be interpolated
+with `$(cat file.txt)` was never actually written,
+so the substitution is empty --
+returns immediately with `Error: Error: empty prompt.` and a non-zero exit.
+This is diagnostically useful: a zero-byte `agy` log can mean either this
+fast-fail or a genuine stall,
+and the two are distinguishable by checking whether the process has already
+exited (fast-fail) or is still running (stall),
+and by reading the log's first line for the `empty prompt` error before
+assuming a hang.
+
+- **Do:** add a `command(<target>)` allow-rule (or `--dangerously-skip-permissions`)
+  before assuming `--mode accept-edits` alone lets a headless `agy` brief
+  run a shell command.
+- **Do:** check whether the brief file that feeds `$(cat file.txt)` actually
+  has content before dispatching, and read a zero-byte log's process state
+  and first line before diagnosing it as a stall.
+- **Don't:** treat `--mode accept-edits` as equivalent to
+  `--dangerously-skip-permissions` for command execution -- it is not, even
+  when `write_file` is already broadly allowed.
+
 ## A measured lane comparison: codex, opencode, agy, and Sonnet reviewers, one real task each
 
 Measured 2026-08-27/28 PT across a 13-merge GIA sweep on Morrison-Lab/ai-config, comparing four lanes on real work rather than a benchmark.

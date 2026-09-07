@@ -469,6 +469,48 @@ def main():
                   f"(rc={out.returncode}, stderr={out.stderr!r})")
             failures += 1
 
+    # Fuzz-style regression for the CONTAINMENT boundary the two crashes
+    # above both fell outside of: `scan()` is wrapped in a broad
+    # `try/except Exception: return 0` in main(), so a type-confusion
+    # crash deep in the transcript-parsing logic (as opposed to main()'s
+    # own un-guarded field access) should already fail open. This exercises
+    # that boundary directly with a batch of wildly-mistyped transcript
+    # records, rather than asserting it from reading the code.
+    fuzz_records = [
+        {"type": "assistant", "message": {"content": "not-a-list-but-a-string"}},
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "name": 123, "input": "not-a-dict"}]}},
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "name": "Edit",
+             "input": {"file_path": {"nested": "dict"}}}]}},
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "name": "Bash",
+             "input": {"command": ["not", "a", "string"]}}]}},
+        {"type": "assistant", "message": {"content": [
+            {"type": "text", "text": 12345}]}},
+        "not-even-a-dict-record",
+        12345,
+        None,
+        ["a", "list", "record"],
+    ]
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        for r in fuzz_records:
+            fh.write(json.dumps(r) + "\n")
+    out = subprocess.run(
+        [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
+        capture_output=True, text=True,
+        env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
+    )
+    os.unlink(path)
+    if out.returncode == 0 and "Traceback" not in out.stderr:
+        print("PASS: a batch of mistyped transcript records does not crash")
+        passes += 1
+    else:
+        print(f"FAIL: mistyped transcript records crashed the scan "
+              f"(rc={out.returncode}, stderr={out.stderr!r})")
+        failures += 1
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

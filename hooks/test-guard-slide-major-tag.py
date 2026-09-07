@@ -10,6 +10,11 @@ Verifies:
   - Non-slide commands allow.
   - Unrelated step input (e.g. access: write inside with:) allows even when file has permissions block.
   - Adding a permission at workflow root (2-space indent) denies slide-major-tag.
+  - Adding a quoted permission value (checks: "read") denies slide-major-tag.
+  - Adding a permission under a quoted key ('permissions':) denies slide-major-tag.
+  - Missing PyYAML fails closed (denies) with PyYAML explanation.
+  - Malformed workflow YAML fails closed (denies) with YAML parse error explanation.
+  - Malformed workflow YAML at tag ref fails closed (denies).
   - Missing tag allows with stderr note.
   - Missing remote branch allows with stderr note.
   - Mutation check: flipping the regex to ignore 'read' fails the deny test.
@@ -304,6 +309,115 @@ def main() -> int:
             v8c == "deny" and "checks: read" in r8c and "reusable.yml" in r8c and "ALLOW_BREAKING_SLIDE=1" in r8c,
             "deny added workflow-root permission to reusable workflow",
             f"got verdict={v8c}, reason={r8c}",
+        )
+
+        # 8d. Quoted permission value: checks: "read" denies.
+        repo8d = _make_repo()
+        new_content8d = (
+            "name: Workflow\n"
+            "on:\n  workflow_call:\n"
+            "jobs:\n"
+            "  review:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    permissions:\n"
+            "      contents: read\n"
+            '      checks: "read"\n'
+            "    steps:\n"
+            "      - run: echo ok\n"
+        )
+        _advance_commit(repo8d, "reusable.yml", new_content8d)
+        v8d, r8d, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", repo8d)
+        check(
+            v8d == "deny" and "checks: read" in r8d and "reusable.yml" in r8d and "ALLOW_BREAKING_SLIDE=1" in r8d,
+            'deny quoted permission value (checks: "read") in reusable workflow',
+            f"got verdict={v8d}, reason={r8d}",
+        )
+
+        # 8e. Quoted permissions key: 'permissions': denies added permission.
+        repo8e = _make_repo()
+        new_content8e = (
+            "name: Workflow\n"
+            "on:\n  workflow_call:\n"
+            "jobs:\n"
+            "  review:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    'permissions':\n"
+            "      contents: read\n"
+            "      checks: read\n"
+            "    steps:\n"
+            "      - run: echo ok\n"
+        )
+        _advance_commit(repo8e, "reusable.yml", new_content8e)
+        v8e, r8e, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", repo8e)
+        check(
+            v8e == "deny" and "checks: read" in r8e and "reusable.yml" in r8e and "ALLOW_BREAKING_SLIDE=1" in r8e,
+            "deny added permission under quoted key ('permissions':) in reusable workflow",
+            f"got verdict={v8e}, reason={r8e}",
+        )
+
+        # 8f. Fail closed when PyYAML is unavailable: denies with explanation and PyYAML note.
+        with open(HOOK, encoding="utf-8") as f:
+            hook_src_no_yaml = f.read().replace("import yaml", "yaml = None # import yaml")
+        no_yaml_fd, no_yaml_path = tempfile.mkstemp(suffix=".py")
+        os.close(no_yaml_fd)
+        _write_file(no_yaml_path, hook_src_no_yaml)
+        try:
+            v8f, r8f, _ = run_hook(no_yaml_path, "gh workflow run slide-major-tag.yml", repo1)
+            check(
+                v8f == "deny" and "PyYAML is not installed" in r8f and "ALLOW_BREAKING_SLIDE=1" in r8f,
+                "fail closed: deny slide-major-tag when PyYAML is unavailable",
+                f"got verdict={v8f}, reason={r8f}",
+            )
+            v8f_override, _, _ = run_hook(
+                no_yaml_path, "ALLOW_BREAKING_SLIDE=1 gh workflow run slide-major-tag.yml", repo1
+            )
+            check(
+                v8f_override == "allow",
+                "allow when ALLOW_BREAKING_SLIDE=1 even if PyYAML is unavailable",
+                f"got verdict={v8f_override}",
+            )
+        finally:
+            if os.path.exists(no_yaml_path):
+                os.unlink(no_yaml_path)
+
+        # 8g. Fail closed when workflow YAML is malformed: denies with parse error note.
+        repo8g = _make_repo()
+        new_content8g = (
+            "name: Workflow\n"
+            "on:\n  workflow_call:\n"
+            "jobs: [invalid syntax:\n"
+        )
+        _advance_commit(repo8g, "reusable.yml", new_content8g)
+        v8g, r8g, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", repo8g)
+        check(
+            v8g == "deny" and "could not be parsed as valid YAML" in r8g and "ALLOW_BREAKING_SLIDE=1" in r8g,
+            "fail closed: deny slide-major-tag when workflow YAML is malformed",
+            f"got verdict={v8g}, reason={r8g}",
+        )
+        v8g_override, _, _ = run_hook(
+            HOOK, "ALLOW_BREAKING_SLIDE=1 gh workflow run slide-major-tag.yml", repo8g
+        )
+        check(
+            v8g_override == "allow",
+            "allow when ALLOW_BREAKING_SLIDE=1 even if workflow YAML is malformed",
+            f"got verdict={v8g_override}",
+        )
+
+        # 8h. Fail closed when workflow YAML at tag ref is malformed.
+        repo8h = _make_repo()
+        bad_tag_content = (
+            "name: Workflow\n"
+            "on:\n  workflow_call:\n"
+            "jobs: [broken syntax:\n"
+        )
+        _advance_commit(repo8h, "reusable.yml", bad_tag_content)
+        _run(repo8h, "tag", "-f", "v2")
+        _advance_commit(repo8h, "reusable.yml", new_content1)
+        v8h, r8h, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", repo8h)
+        check(
+            v8h == "deny" and "could not be parsed as valid YAML" in r8h and "at v2" in r8h,
+            "fail closed: deny slide-major-tag when workflow YAML at tag is malformed",
+            f"got verdict={v8h}, reason={r8h}",
         )
 
         # 9. Mutation check: flip regex to ignore 'read' and assert deny test fails

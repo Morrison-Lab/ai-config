@@ -33,6 +33,9 @@ When matched, it:
 
 `ALLOW_BREAKING_SLIDE=1` as an env assignment on the command records a deliberate override.
 
+Fails CLOSED (denies) when a changed workflow cannot be parsed as valid YAML or
+when PyYAML is unavailable, preventing undetected breaking releases.
+
 Fails OPEN (with a stderr note) when git is unavailable, the tag or remote branch does not
 resolve, or the command is not a slide. Never reads the transcript.
 """
@@ -61,16 +64,8 @@ LEAD_WORDS = {
 RX_PERM_VAL = re.compile(r"^(read|write|none)$")
 
 
-def _extract_permissions_yaml(content: str) -> dict[str, dict[str, str] | str] | None:
-    """Extract permissions via PyYAML when available."""
-    if yaml is None:
-        return None
-    try:
-        data = yaml.safe_load(content)
-    except Exception:
-        return None
-    if not isinstance(data, dict):
-        return None
+def _extract_permissions_from_data(data: dict) -> dict[str, dict[str, str] | str]:
+    """Extract workflow-level and job-level permissions from parsed YAML data."""
     perms: dict[str, dict[str, str] | str] = {}
 
     root_p = data.get("permissions")
@@ -78,7 +73,7 @@ def _extract_permissions_yaml(content: str) -> dict[str, dict[str, str] | str] |
         perms["workflow"] = {
             str(k): str(v)
             for k, v in root_p.items()
-            if isinstance(k, str) and RX_PERM_VAL.match(str(v).strip())
+            if isinstance(k, (str, int)) and RX_PERM_VAL.match(str(v).strip())
         }
     elif isinstance(root_p, str) and root_p.strip() in ("read-all", "write-all"):
         perms["workflow"] = root_p.strip()
@@ -90,113 +85,28 @@ def _extract_permissions_yaml(content: str) -> dict[str, dict[str, str] | str] |
         for job_id, job_data in jobs.items():
             if isinstance(job_data, dict):
                 jp = job_data.get("permissions")
+                job_key = f"job:{job_id}"
                 if isinstance(jp, dict):
-                    perms[f"job:{job_id}"] = {
+                    perms[job_key] = {
                         str(k): str(v)
                         for k, v in jp.items()
-                        if isinstance(k, str) and RX_PERM_VAL.match(str(v).strip())
+                        if isinstance(k, (str, int)) and RX_PERM_VAL.match(str(v).strip())
                     }
                 elif isinstance(jp, str) and jp.strip() in ("read-all", "write-all"):
-                    perms[f"job:{job_id}"] = jp.strip()
+                    perms[job_key] = jp.strip()
                 elif isinstance(jp, dict) and not jp:
-                    perms[f"job:{job_id}"] = {}
-    return perms
-
-
-def _extract_permissions_fallback(content: str) -> dict[str, dict[str, str] | str]:
-    """Extract permissions using block context and indentation."""
-    perms: dict[str, dict[str, str] | str] = {}
-    lines = content.splitlines()
-    cur_job: str | None = None
-    in_block: str | None = None
-    block_indent = 0
-    jobs_indent = 0
-
-    for raw_line in lines:
-        stripped = raw_line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        indent = len(raw_line) - len(raw_line.lstrip(" "))
-
-        if in_block == "workflow_perms" and indent <= block_indent:
-            in_block = None
-        elif in_block == "job_perms" and indent <= block_indent:
-            in_block = "job"
-        elif in_block == "job" and indent <= jobs_indent:
-            in_block = "jobs"
-            cur_job = None
-        elif in_block == "jobs" and indent <= 0:
-            in_block = None
-
-        if indent == 0:
-            m_top = re.match(r"^([a-zA-Z0-9_-]+):\s*(.*)$", stripped)
-            if m_top:
-                key = m_top.group(1)
-                val = m_top.group(2).split("#")[0].strip()
-                if key == "permissions":
-                    if val in ("read-all", "write-all"):
-                        perms["workflow"] = val
-                    elif val == "{}":
-                        perms["workflow"] = {}
-                    else:
-                        in_block = "workflow_perms"
-                        block_indent = indent
-                        perms["workflow"] = {}
-                elif key == "jobs":
-                    in_block = "jobs"
-                    jobs_indent = indent
-            continue
-
-        if in_block == "workflow_perms":
-            m_entry = re.match(r"^([a-zA-Z0-9_-]+):\s*([a-zA-Z0-9_-]+)", stripped)
-            if m_entry and isinstance(perms.get("workflow"), dict):
-                k, v = m_entry.group(1), m_entry.group(2)
-                if RX_PERM_VAL.match(v):
-                    perms["workflow"][k] = v
-            continue
-
-        if in_block in ("jobs", "job"):
-            if in_block == "jobs" or indent <= 2:
-                m_job = re.match(r"^([a-zA-Z0-9_-]+):\s*$", stripped)
-                if m_job and indent > 0:
-                    cur_job = m_job.group(1)
-                    in_block = "job"
-                    continue
-            if cur_job and in_block == "job":
-                m_prop = re.match(r"^([a-zA-Z0-9_-]+):\s*(.*)$", stripped)
-                if m_prop:
-                    key = m_prop.group(1)
-                    val = m_prop.group(2).split("#")[0].strip()
-                    if key == "permissions":
-                        job_key = f"job:{cur_job}"
-                        if val in ("read-all", "write-all"):
-                            perms[job_key] = val
-                        elif val == "{}":
-                            perms[job_key] = {}
-                        else:
-                            in_block = "job_perms"
-                            block_indent = indent
-                            perms[job_key] = {}
-                        continue
-
-        if in_block == "job_perms" and cur_job:
-            job_key = f"job:{cur_job}"
-            m_entry = re.match(r"^([a-zA-Z0-9_-]+):\s*([a-zA-Z0-9_-]+)", stripped)
-            if m_entry and isinstance(perms.get(job_key), dict):
-                k, v = m_entry.group(1), m_entry.group(2)
-                if RX_PERM_VAL.match(v):
-                    perms[job_key][k] = v
-            continue
-
+                    perms[job_key] = {}
     return perms
 
 
 def _extract_permissions(content: str) -> dict[str, dict[str, str] | str]:
-    """Extract workflow and job permissions, preferring PyYAML with indentation fallback."""
-    parsed = _extract_permissions_yaml(content)
-    if parsed is not None:
-        return parsed
-    return _extract_permissions_fallback(content)
+    """Extract workflow and job permissions via PyYAML; raises RuntimeError if PyYAML is unavailable."""
+    if yaml is None:
+        raise RuntimeError("PyYAML is not installed")
+    data = yaml.safe_load(content)
+    if not isinstance(data, dict):
+        return {}
+    return _extract_permissions_from_data(data)
 
 
 def _find_added_permissions(
@@ -339,31 +249,17 @@ def _repo_nwo(cwd: str) -> str:
     return "<owner>/<repo>"
 
 
-def _has_workflow_call(content: str) -> bool:
-    """True if workflow YAML has workflow_call in its on: trigger block."""
-    lines = content.splitlines()
-    in_on_block = False
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("#"):
-            continue
-        m_inline = re.match(r"^on:\s*\[(.*)\]", stripped)
-        if m_inline:
-            events = [e.strip() for e in m_inline.group(1).split(",")]
-            if "workflow_call" in events:
-                return True
-            continue
-        if re.match(r"^on:\s*workflow_call\b", stripped):
-            return True
-        if re.match(r"^on:\s*$", stripped):
-            in_on_block = True
-            continue
-        if in_on_block:
-            if re.match(r"^[a-zA-Z0-9_-]+:", line) and not line.startswith(" "):
-                in_on_block = False
-                continue
-            if re.match(r"^\s+workflow_call\b", line):
-                return True
+def _has_workflow_call(data: dict) -> bool:
+    """True if parsed workflow YAML has workflow_call in its on: trigger block."""
+    on_trigger = data.get("on") if "on" in data else data.get(True)
+    if on_trigger is None:
+        return False
+    if isinstance(on_trigger, str):
+        return on_trigger.strip() == "workflow_call"
+    if isinstance(on_trigger, list):
+        return any(isinstance(item, str) and item.strip() == "workflow_call" for item in on_trigger)
+    if isinstance(on_trigger, dict):
+        return "workflow_call" in on_trigger
     return False
 
 
@@ -432,12 +328,85 @@ def evaluate(command: str, base_cwd: str | None = None) -> tuple[str, str] | Non
         new_content = _git(["show", f"{remote_ref}:{filepath}"], cwd=cwd)
         if not new_content:
             continue
-        if not _has_workflow_call(new_content):
+
+        if yaml is None:
+            reason = (
+                "Blocked: slide-major-tag cannot verify reusable workflow permissions because "
+                f"PyYAML is not installed in the Python environment running this guard ({filepath}).\n\n"
+                "In GitHub Actions, a called reusable workflow job cannot request permissions "
+                "that its caller does not grant. Adding a permission breaks every consumer "
+                "caller with startup_failure until the caller grants the new permission "
+                "(gha#830 / ucdavis/bcs#966; same class as gha#685).\n\n"
+                "Remedy:\n"
+                "1. Install PyYAML in the Python environment running this hook:\n"
+                "     pip install pyyaml\n"
+                "2. If this release is deliberate and consumers have already been prepared, "
+                "ALLOW_BREAKING_SLIDE=1 as an env assignment on the command records a deliberate override:\n\n"
+                f"    ALLOW_BREAKING_SLIDE=1 {command.strip()}"
+            )
+            return "deny", reason
+
+        try:
+            new_data = yaml.safe_load(new_content)
+        except Exception as exc:
+            reason = (
+                "Blocked: slide-major-tag cannot verify reusable workflow permissions because "
+                f"{filepath} could not be parsed as valid YAML ({exc}).\n\n"
+                "In GitHub Actions, a called reusable workflow job cannot request permissions "
+                "that its caller does not grant. Adding a permission breaks every consumer "
+                "caller with startup_failure until the caller grants the new permission "
+                "(gha#830 / ucdavis/bcs#966; same class as gha#685).\n\n"
+                "Remedy:\n"
+                "1. Fix the YAML syntax in the workflow file.\n"
+                "2. If this release is deliberate and consumers have already been prepared, "
+                "ALLOW_BREAKING_SLIDE=1 as an env assignment on the command records a deliberate override:\n\n"
+                f"    ALLOW_BREAKING_SLIDE=1 {command.strip()}"
+            )
+            return "deny", reason
+
+        if new_data is None:
             continue
 
+        if not isinstance(new_data, dict):
+            reason = (
+                "Blocked: slide-major-tag cannot verify reusable workflow permissions because "
+                f"{filepath} does not contain a top-level YAML mapping.\n\n"
+                "In GitHub Actions, a workflow file must be a mapping (dictionary) at the top level.\n\n"
+                "Remedy:\n"
+                "1. Fix the structure of the workflow file.\n"
+                "2. If this release is deliberate and consumers have already been prepared, "
+                "ALLOW_BREAKING_SLIDE=1 as an env assignment on the command records a deliberate override:\n\n"
+                f"    ALLOW_BREAKING_SLIDE=1 {command.strip()}"
+            )
+            return "deny", reason
+
+        if not _has_workflow_call(new_data):
+            continue
+
+        new_perms = _extract_permissions_from_data(new_data)
+
         old_content = _git(["show", f"{tag}:{filepath}"], cwd=cwd)
-        old_perms = _extract_permissions(old_content) if old_content else {}
-        new_perms = _extract_permissions(new_content)
+        old_perms: dict[str, dict[str, str] | str] = {}
+        if old_content:
+            try:
+                old_data = yaml.safe_load(old_content)
+            except Exception as exc:
+                reason = (
+                    "Blocked: slide-major-tag cannot verify reusable workflow permissions because "
+                    f"{filepath} at {tag} could not be parsed as valid YAML ({exc}).\n\n"
+                    "In GitHub Actions, a called reusable workflow job cannot request permissions "
+                    "that its caller does not grant. Adding a permission breaks every consumer "
+                    "caller with startup_failure until the caller grants the new permission "
+                    "(gha#830 / ucdavis/bcs#966; same class as gha#685).\n\n"
+                    "Remedy:\n"
+                    "1. Fix the YAML syntax in the tag ref or pass ALLOW_BREAKING_SLIDE=1.\n"
+                    "2. If this release is deliberate and consumers have already been prepared, "
+                    "ALLOW_BREAKING_SLIDE=1 as an env assignment on the command records a deliberate override:\n\n"
+                    f"    ALLOW_BREAKING_SLIDE=1 {command.strip()}"
+                )
+                return "deny", reason
+            if isinstance(old_data, dict):
+                old_perms = _extract_permissions_from_data(old_data)
 
         added_perms = _find_added_permissions(old_perms, new_perms)
         if added_perms:

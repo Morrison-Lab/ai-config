@@ -247,3 +247,13 @@ Then cite the found comment by URL.
 - **Do:** run the comments query and quote what it returned before writing
   "no permalink exists".
 - **Don't:** rebut an absence finding from the issue body alone.
+
+## Verify supporting claims across the full matrix before rebutting
+
+When rebutting a review finding that proposes reusing a shared module or function, test each claimed shared defect individually.
+Do not overstate that the candidate module exhibits "the same two defects" without measuring both --- a shared function may handle one case correctly (e.g. `scripts/lib/shellcmd.py` handles hyphenated heredoc delimiters correctly) while only failing on another (backslash-escaped delimiters).
+An overstated claim discredits the rebuttal even when the bottom-line architectural decision to reject reuse is sound.
+
+- **Do:** run individual reproducer commands against the external or shared code for each specific defect named in the finding, and quote the exact output.
+- **Do:** correct an overstated claim immediately when scrutinized rather than defending it.
+- **Don't:** assume two related defects (e.g. two heredoc tag syntax variants) share the same code path or failure mode in a third-party or shared module without verification.

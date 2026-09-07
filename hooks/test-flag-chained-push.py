@@ -147,6 +147,20 @@ FIRES = [
      "git status && sudo -u user -H git push"),
     ("chained push after timeout with -s flag and argument",
      "git status && timeout -s 9 30 git push"),
+    ("chained push after sudo with -p prompt flag",
+     'git status && sudo -p "Password:" git push'),
+    ("chained push after sudo with -U user flag",
+     "git status && sudo -U someuser git push"),
+    ("chained push after env with -S flag and string argument",
+     'git status && env -S "a b" git push'),
+    # Accepted false positives for warn-only hook: unrelated commands wrapped by
+    # nice/sudo whose arguments happen to be "git push", when chained or
+    # redirected. Accepted as intentional behavior because warn-only hooks bias
+    # toward over-warning rather than risking silent false negatives on real pushes.
+    ("accepted false positive: unrelated command wrapped by nice chained after status",
+     "git status && nice mycommand git push"),
+    ("accepted false positive: unrelated command wrapped by nice with redirection",
+     "nice mycommand git push > push.log"),
 ]
 
 QUIET = [
@@ -189,13 +203,9 @@ QUIET = [
     ("git push as an argument to find -exec, chained via && around it",
      "foo && find . -exec git push " + chr(92) + "; -o -true"),
     # Unrelated command wrapped by nice/sudo/timeout whose arguments happen to
-    # be the literal words "git push" (Finding 1 regression cases).
+    # be the literal words "git push" without chaining or redirection.
     ("unrelated command wrapped by nice whose arguments happen to be git push",
      "nice mycommand git push"),
-    ("unrelated command wrapped by nice chained after status",
-     "git status && nice mycommand git push"),
-    ("unrelated command wrapped by nice with redirection",
-     "nice mycommand git push > push.log"),
     ("unrelated command wrapped by nice with flag whose args are git push",
      "nice -n5 mycommand git push"),
     ("unrelated command wrapped by nice with separate flag arg",

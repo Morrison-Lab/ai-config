@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PreToolUse guard: a `git push` chained with other commands, or suffixed by
+r"""PreToolUse guard: a `git push` chained with other commands, or suffixed by
 a pipe or redirection.
 
 ## The incident
@@ -76,6 +76,26 @@ chased here; a miss on that shape costs nothing a refusal would not already
 surface on its own, the same argument this hook already makes for subshells
 and `case` statements.
 
+## Asymmetric error costs and wrapper handling
+
+This hook is warn-only (PreToolUse `additionalContext`/`systemMessage`, exit 0);
+it never blocks. The two error directions have sharply asymmetric costs:
+a false positive produces one spurious warning that the author reads and
+dismisses in a second; a false negative silently fails to warn about a genuinely
+dangerous chained push.
+
+Wrapper commands (`sudo`, `env`, `nice`, `timeout`, etc.) take an unbounded
+variety of flags with separate arguments (`sudo -p "prompt"`, `sudo -U user`,
+`env -S "args"`, `nice -n 5`, etc.). Enumerating flag grammars to distinguish
+wrapper option arguments from wrapped command names cannot converge and
+inevitably causes false negatives on real chained pushes.
+
+Therefore, `LEAD_RE` uses a permissive skip-loop `(?:(?!git\b)\S+\s+)*` following
+a recognized wrapper word. An unrelated wrapped command whose arguments happen
+to be `git push` (e.g. `git status && nice mycommand git push`) is accepted as
+an intentional false positive: over-warning on rare argument shapes is far safer
+than silently failing to warn on chained pushes with unlisted wrapper flags.
+
 Fails open on any parse trouble.
 """
 from __future__ import annotations
@@ -128,23 +148,22 @@ GIT_PUSH_RE = re.compile(r"\bgit\s+(?:-C\s+\S+\s+)?push\b")
 # Skipped before `GIT_PUSH_RE` is anchored: leading whitespace, any number
 # of env assignments (`VAR=val `), and a handful of wrapper commands that
 # still leave "git push" as the command actually run. Each wrapper may take
-# its OWN flags or arguments first (`sudo -H`, `nice -n5`, `nice -n 5`,
-# `timeout 30`, `env -i VAR=1`). Options taking an argument are allowed to
-# consume the argument token (excluding "git"), while bare words that are
-# neither option flags nor durations (e.g. `mycommand` in `nice mycommand
-# git push`) are not consumed as flags, keeping unrelated wrapped commands
-# from misclassifying as git push.
-WRAPPER_ARG_RE = (
-    r"(?:-(?:[unskagChD]|-[A-Za-z0-9-]+)[ \t]+(?!git\b)\S+|"
-    r"-\S+|"
-    r"\d+(?:\.\d+)?[smhd]?|"
-    r"[A-Za-z_][A-Za-z0-9_]*=\S*)"
-)
-
+# its OWN flags or arguments first (`sudo -H`, `sudo -p "Password:"`,
+# `sudo -U user`, `nice -n 5`, `env -S "a b"`, `timeout 30`, `env -i VAR=1`).
+# Because wrapper flag grammars are unbounded across tools and operating
+# systems, attempting to enumerate which flags take separate arguments cannot
+# converge and causes false negatives on real chained pushes.
+#
+# For a warn-only hook, false negatives are far more dangerous than false
+# positives: failing to warn on a chained push risks silent prefix loss if
+# refused by downstream guards, whereas a false warning on an unrelated wrapped
+# command whose arguments happen to be "git push" (e.g. `git status && nice
+# mycommand git push`) is harmlessly dismissed. We therefore keep the
+# permissive skip-loop `(?:(?!git\b)\S+\s+)*` after any wrapper word.
 LEAD_RE = re.compile(
     r"^\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
     r"(?:(?:sudo|exec|env|command|time|nohup|nice|timeout)\s+"
-    r"(?:" + WRAPPER_ARG_RE + r"\s+)*)*"
+    r"(?:(?!git\b)\S+\s+)*)*"
 )
 
 # A redirection suffix: plain or doubled `>`, its fd-duplication form

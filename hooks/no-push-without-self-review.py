@@ -182,17 +182,27 @@ def external_reviewer_command(command: str) -> bool:
     and are refused -- the same bare-and-unchained discipline a
     discharge-bearing command already owes, rather than a new rule to learn.
 
-    The review keyword is matched against the ARGUMENTS the program receives,
-    never against the raw command text. Matching the raw text is unsound, and
-    demonstrably so: `shlex` treats `#` as an ordinary character while bash
-    drops the rest of the line, so `agy --print="do something else" # review
-    the diff` satisfies a raw-text match while `agy` is asked for something
-    else entirely. `comments=True` makes the split agree with bash here.
+    The review keyword must appear in THE PRINT FLAG'S OWN VALUE -- either
+    `--print=<value>`, or the single token directly after `--print` or `-p`.
+    Nowhere else counts. Two rounds of adversarial review each broke a laxer
+    rule by putting the keyword somewhere the program would not read as its
+    prompt: first in a trailing `#` comment against a match on the raw command
+    text, then in a decoy trailing argument against a match on any positional.
+    Both worked, and both were the same defect -- the matched text was not the
+    delivered prompt -- so the rule is now the narrowest one that still
+    identifies a prompt unambiguously, rather than a third attempt to model
+    which arguments a program treats as positional.
 
-    A keyword in some OTHER flag's value is not a prompt either, so a candidate
-    is a print flag's own value or a positional argument -- never the value of
-    an unrelated flag, which is what stops `--model "adversarial review"` from
-    vouching for a prompt that says the opposite.
+    The cost is a false rejection: `agy --print --model X "review the diff"`
+    supplies a real prompt this refuses to find. That is the safe direction,
+    and the remedy is to put the prompt straight after the flag.
+
+    `shlex.split(comments=True)` handles the first of those forgeries, and its
+    rule is not bash's: bash starts a comment only at a word boundary, while
+    `shlex` truncates at any unquoted `#`. The divergence drops tokens bash
+    would keep, so it can only narrow the candidate and never invent one. A
+    bare `--` is refused outright, since everything after it is positional and
+    a `--print` past it is not a flag at all.
 
     Two residues this accepts rather than closes, stated because a guard that
     hides its own limits is worse than one that names them.
@@ -241,27 +251,33 @@ def external_reviewer_command(command: str) -> bool:
     flags = EXTERNAL_REVIEWER_PRINT_FLAGS.get(os.path.basename(argv[0]))
     if flags is None:
         return False
-    in_print_mode = any(token == flag or token.startswith(flag + "=")
-                        for token in argv[1:] for flag in flags)
-    if not in_print_mode:
+    arguments = argv[1:]
+    # Everything after a bare `--` is positional, so a print flag there is not
+    # one. Refusing the whole command is the fail-closed reading.
+    if "--" in arguments:
         return False
 
-    # The tokens that could plausibly BE the prompt: a print flag's inline
-    # value, or a positional argument. A word following some other flag is that
-    # flag's value, so it is excluded -- a model name naming a review does not
-    # make the prompt a review.
+    # The print flag's own value, and nothing else. Two rounds of adversarial
+    # review broke wider rules by planting the keyword where the program would
+    # not read it as the prompt, so this identifies the prompt rather than
+    # guessing at it.
     candidates = []
-    for i, token in enumerate(argv[1:], start=1):
+    in_print_mode = False
+    for i, token in enumerate(arguments):
         inline = next((token[len(flag) + 1:] for flag in flags
                        if token.startswith(flag + "=")), None)
         if inline is not None:
+            in_print_mode = True
             candidates.append(inline)
-        elif not token.startswith("-"):
-            # argv[0] is the program name, which never starts with "-", so the
-            # first argument reaches this by the same rule a positional does.
-            previous = argv[i - 1]
-            if not previous.startswith("-") or previous in flags:
-                candidates.append(token)
+        elif token in flags:
+            in_print_mode = True
+            following = arguments[i + 1] if i + 1 < len(arguments) else None
+            # A flag directly after the print flag means the prompt is
+            # elsewhere -- on stdin, or past arguments this cannot attribute.
+            if following is not None and not following.startswith("-"):
+                candidates.append(following)
+    if not in_print_mode:
+        return False
 
     # The prompt must name the review, exactly as the in-family fallback path
     # requires, so an ordinary `agy` run cannot become a verdict by accident.

@@ -390,6 +390,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-chained-push.py\"",
+            "timeout": 10,
+            "script": "flag-chained-push.py",
+            "why": "Lacaedemon/sparta, 2026-09-05: three refusals in one session, each a `git push` either chained after another command with `&&`/`;`/`||` or suffixed by a pipe/redirect. no-clobbering-push.py and the plugin's own no-push-without-self-review.py push policy both parse the WHOLE command text for a push rather than the isolated push segment, so a trailing `2>&1` hands either parser a bare `2` sitting where a commit-ish token would sit in other shapes, and a chained prefix reads as part of the same invocation. A PreToolUse deny rejects the whole Bash call, so a refused chain runs NOTHING -- not the commands before the push either -- and the refusal naming only the push invites the misreading that the prefix succeeded. WARNS, never blocks: neither shape is wrong on its own (an ordinary `git fetch && git push`, a push piped to `tee` for a log), so the message asks the author to run the push alone and, after any refusal, re-check state rather than assume the prefix ran."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-dupe-check-chained-to-create.py\"",
             "timeout": 10,
             "script": "warn-dupe-check-chained-to-create.py",

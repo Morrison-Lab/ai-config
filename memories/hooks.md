@@ -65,6 +65,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 | [`flag-stale-adjacent-comment.py`](../hooks/flag-stale-adjacent-comment.py) | Warn | Warns when a `git commit` modifies a numeric/string literal while an adjacent comment within 10 lines retains the old value. | Check nearby comments when modifying constants, thresholds, or counts, and update comments to match the new code values. | None. |
 | [`no-delete-branch-under-stacked-pr.py`](../hooks/no-delete-branch-under-stacked-pr.py) | Warn | Warns when merging or closing a PR with `--delete-branch` while child PRs are stacked on top of it. | Check whether dependent PRs are stacked on the head branch before deleting. Pass `--delete-branch=false` if stacked PRs exist. | None. |
 | [`no-clobbering-push.py`](../hooks/no-clobbering-push.py) | **Block** on bare `-f`; Warn on divergence | Denies bare `git push --force`/`-f`. Warns when remote tracking tip has diverged from local branch. | Run `git ls-remote --heads origin <branch>` immediately before every push. Use `git push --force-with-lease --force-if-includes`. Reconcile diverged remotes via fetch and rebase. | Set `ALLOW_FORCE_PUSH=1 git push ...` if lease is unsatisfiable and reason is documented. |
+| [`flag-chained-push.py`](../hooks/flag-chained-push.py) | Warn | Warns when a `git push` is chained after another command with `&&`, `;`, or `\|\|`, piped onward, or suffixed by a redirection (`>`, `>>`, or an fd form like `2>&1`) -- either shape can make `no-clobbering-push.py`/`no-push-without-self-review.py` misparse the command, and a refused chain runs nothing, which reads as if only the push failed. | Run a `git push` alone, in its own Bash call, with nothing chained before it and no pipe/redirect after it. After any refused chain, re-check state (`git status`, `git log`) rather than assume the prefix ran. | None. |
 | [`warn-new-line-breaks-on-push.py`](../hooks/warn-new-line-breaks-on-push.py) | Warn | Warns on `git push` when committed markdown lines lack semantic line breaks (SemBr). | Run `NLB_BASE_REF=origin/main python3 scripts/vendor/gha-check-new-line-breaks.py` and ensure semantic line breaks before pushing. | None. |
 | [`warn-nonglobal-substitution.py`](../hooks/warn-nonglobal-substitution.py) | Warn | Warns on in-place `perl -i` / `sed -i` substitutions lacking the global `g` flag or occurrence specifier. | Ensure substitution expressions include `g` (e.g. `s/pattern/replacement/g`) when replacing across files. | None. |
 | [`warn-dupe-check-chained-to-create.py`](../hooks/warn-dupe-check-chained-to-create.py) | Warn | Warns when a duplicate search and a `gh pr create` / `gh issue create` share the same Bash command string. | Execute the search command first, inspect the results, and then execute the create command in a separate, subsequent tool call. | None. |
@@ -218,6 +219,23 @@ The mechanism is owned by
 [`errexit-is-not-uniform`](../shared/coding/errexit-is-not-uniform.md)'s "A
 pipe discards the status of everything left of it"; the separate `&&`-chain
 shape the guard does not reach is recorded there and tracked separately.)
+
+---
+
+## 4.6 Asymmetric error costs in warn-only hooks: prefer over-warning to brittle narrowing
+
+A warn-only hook (`exit 0`, `additionalContext` or `systemMessage`) cannot block execution.
+Therefore, its two error directions have sharply asymmetric costs:
+- **False positive**: Costs a single advisory message that the author reads and dismisses in seconds.
+- **False negative**: Silently fails to warn about a genuinely risky command, defeating the entire purpose of the guard.
+
+When a review finding points out an edge-case false positive in a warn-only hook (such as an unrelated wrapped command like `nice mycommand git push` or flags to commands like `sudo`/`env`), attempting to narrow the regex by enumerating option grammars (`-[unskagChD]`, etc.) is an anti-pattern.
+Command wrapper flag grammars are unbounded across tools and operating systems (`sudo -p "prompt"`, `sudo -U user`, `env -S "args"`, `nice -n 5`, etc.), and enumerating them cannot converge.
+Each narrowing step trades a cheap false positive for an expensive, silent false negative on real commands.
+For a warn-only hook, accept benign false positives on rare command-argument shapes as the intended, cheaper error, and keep the matcher permissive to prevent false negatives.
+
+(Measured on `hooks/flag-chained-push.py` across five review rounds, Morrison-Lab/ai-config#3302: narrowing `LEAD_RE` to silence `nice mycommand git push` introduced silent false negatives on `sudo -p`, `sudo -U`, and `env -S` chained pushes.
+Resolved by restoring the permissive skip-loop and documenting the trade-off.)
 
 ---
 

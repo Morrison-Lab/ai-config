@@ -55,6 +55,16 @@ SHOULD_WARN = [
            ">= 1\"",
      "the incident, verbatim in shape: gha#839's own duplicate-key-blind "
      "check, as a -c one-liner"),
+    ("W1_semicolon",
+     "python3 -c \"import yaml; job = yaml.safe_load(open('f.yml')); "
+     "print(isinstance(job.get('with'), dict) and len(job['with']) >= 1)\"",
+     "W1's identical check joined with semicolons on ONE physical line. "
+     "Python gives every statement on a line the same lineno, so an "
+     "ordering test on lineno alone discards the assertion and the case "
+     "goes silent -- measured, before the position pair was introduced. "
+     "This is at least as natural a shape for a shell one-liner as W1's, "
+     "so its absence left the suite pinning the incident only in the form "
+     "that happened to be written first"),
     ("W2", "python3 <<'PY'\n"
            "import yaml\n"
            "d = yaml.safe_load(open('f.yml'))\n"
@@ -337,8 +347,9 @@ MUTATIONS = {
           "        return True",
           "    if False:\n"
           "        return True")],
-        {"W1", "W2", "W3", "W4", "W6", "W7", "W8", "W_assert_only",
-         "W_keys_only", "W_len_only", "W_in_only", "W_set_only"},
+        {"W1", "W1_semicolon", "W2", "W3", "W4", "W6", "W7", "W8",
+         "W_assert_only", "W_keys_only", "W_len_only", "W_in_only",
+         "W_set_only"},
     ),
     "M2_bare_name_load_call": (
         "a bare `safe_load(...)` NAME call (from `from yaml import "
@@ -378,7 +389,29 @@ MUTATIONS = {
         [('        if isinstance(f, ast.Name) and f.id == "len":\n'
           '            return True\n',
           '')],
-        {"W_len_only"},
+        # W1_semicolon rides on this clause and W1 does not, which is a real
+        # difference between them rather than an oversight: W1 asserts
+        # (`assert isinstance(...) and len(...)`), so the Assert node alone
+        # carries it, while W1_semicolon prints (`print(isinstance(...) and
+        # len(...))`), leaving `len` as its only key-assertion signal. The
+        # printing form is the more natural shell one-liner, which is the
+        # whole reason that case exists, so it stays as written.
+        {"W_len_only", "W1_semicolon"},
+    ),
+    "M6b_position_is_a_pair": (
+        "statement order must compare (lineno, col_offset), not lineno "
+        "alone -- semicolon-joined statements share one lineno",
+        [('        pos = (getattr(n, "lineno", 0), getattr(n, "col_offset", 0))\n'
+          '        if pos <= load_pos:\n'
+          '            continue\n',
+          '        pos = (getattr(n, "lineno", 0), 0)\n'
+          '        if pos <= load_pos:\n'
+          '            continue\n')],
+        # Only the one-line case flips. Every multi-line WARN case already
+        # has distinct linenos, so zeroing the column changes nothing for
+        # them -- which is exactly why the bug survived a 31-case suite and
+        # a 15-mutation sweep before this case existed.
+        {"W1_semicolon"},
     ),
     "M7_in_clause": (
         "a membership test (`ast.Compare` with an `In` op) must count as "
@@ -463,8 +496,8 @@ MUTATIONS = {
           '                j += 1\n'
           '                continue\n',
           '')],
-        {"W1", "W4", "W5", "W6", "W7", "W_assert_only", "W_keys_only",
-         "W_len_only", "W_in_only", "W_set_only"},
+        {"W1", "W1_semicolon", "W4", "W5", "W6", "W7", "W_assert_only",
+         "W_keys_only", "W_len_only", "W_in_only", "W_set_only"},
         # Every -c-based WARN case goes silent (no script text is
         # ever extracted for it); the -c-based SILENT cases stay
         # silent -- they were never WARNing, so removing extraction

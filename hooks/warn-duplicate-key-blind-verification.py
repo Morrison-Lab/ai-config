@@ -371,21 +371,37 @@ def find_blind_verification(script_text):
     if any(_is_add_constructor_call(n) for n in nodes):
         return None  # already guarded -- the fix this hook recommends
 
-    load_lineno = None
+    # Position is a (lineno, col_offset) PAIR, not a bare line number.
+    #
+    # Python gives every statement on one physical line the same lineno, so a
+    # semicolon-joined one-liner puts the load and the assertion at the same
+    # lineno, and a `<=` test on lineno alone discards the assertion entirely.
+    # That silently missed the incident's own check restated as the one-liner a
+    # shell command naturally reaches for:
+    #
+    #   python3 -c "import yaml; job = yaml.safe_load(open('f.yml'));
+    #               print(isinstance(job.get('with'), dict)
+    #                     and len(job['with']) >= 1)"
+    #
+    # Measured: the load call sits at (1, 17) and the assertion at (1, 44), so
+    # comparing the pair orders them correctly. It changes nothing in the
+    # multi-line case, where the linenos already differ and the column is never
+    # reached.
+    load_pos = None
     for n in nodes:
         if _is_yaml_load_call(n):
-            lineno = getattr(n, "lineno", 0)
-            if load_lineno is None or lineno < load_lineno:
-                load_lineno = lineno
-    if load_lineno is None:
+            pos = (getattr(n, "lineno", 0), getattr(n, "col_offset", 0))
+            if load_pos is None or pos < load_pos:
+                load_pos = pos
+    if load_pos is None:
         return None
 
     for n in nodes:
-        lineno = getattr(n, "lineno", 0)
-        if lineno <= load_lineno:
+        pos = (getattr(n, "lineno", 0), getattr(n, "col_offset", 0))
+        if pos <= load_pos:
             continue
         if _is_key_assertion(n):
-            return (load_lineno, lineno)
+            return (load_pos[0], pos[0])
 
     return None
 

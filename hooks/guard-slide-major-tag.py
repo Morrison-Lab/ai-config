@@ -134,10 +134,6 @@ def _find_added_permissions(
                 old_val = old_dict.get(key)
                 clean_old = old_val.strip() if isinstance(old_val, str) else old_val
                 clean_new = val.strip() if isinstance(val, str) else val
-                if clean_old not in PERM_RANK:
-                    raise KeyError(f"Unknown permission value {old_val!r} not in PERM_RANK")
-                if clean_new not in PERM_RANK:
-                    raise KeyError(f"Unknown permission value {val!r} not in PERM_RANK")
                 if PERM_RANK[clean_new] > PERM_RANK[clean_old]:
                     added.append((scope, f"{key}: {val}"))
     return added

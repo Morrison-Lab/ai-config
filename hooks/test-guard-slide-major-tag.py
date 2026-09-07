@@ -26,7 +26,7 @@ Verifies:
   - Escalating permission from none to read denies slide-major-tag (both job and workflow root).
   - All rank upward pairs (none->read, none->write, read->write, absent->read, absent->write, absent->none) deny.
   - All rank downward pairs (write->read, write->none, read->none, key removed) allow.
-  - Future permission value not in rank fails loudly with KeyError.
+  - Permission value outside rank (e.g. admin) filtered upstream by RX_PERM_VAL and does not deny.
   - Mutation check: making none and read compare equal fails the deny test.
 
 
@@ -639,17 +639,29 @@ def main() -> int:
                 f"expected [], got {res_down}",
             )
 
-        # 11d. Future / unknown permission value fails loudly with KeyError
-        raised_key_error = False
-        try:
-            guard_mod._find_added_permissions(
-                {"job:review": {}}, {"job:review": {"checks": "admin"}}
-            )
-        except KeyError:
-            raised_key_error = True
+        # 11d. End-to-end: permission value outside rank (e.g. admin) filtered upstream
+        # by RX_PERM_VAL before comparison; does not produce a spurious deny
+        repo11d = _make_repo(
+            permissions_block="    permissions:\n      contents: none\n"
+        )
+        new_content11d = (
+            "name: Workflow\n"
+            "on:\n  workflow_call:\n"
+            "jobs:\n"
+            "  review:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    permissions:\n"
+            "      contents: none\n"
+            "      checks: admin\n"
+            "    steps:\n"
+            "      - run: echo ok\n"
+        )
+        _advance_commit(repo11d, "reusable.yml", new_content11d)
+        v11d, r11d, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", repo11d)
         check(
-            raised_key_error,
-            "future permission value not in PERM_RANK fails loudly with KeyError",
+            v11d == "allow",
+            "permission value outside rank (admin) filtered by RX_PERM_VAL and does not produce spurious deny",
+            f"got verdict={v11d}, reason={r11d}",
         )
 
         # 12a. End-to-end: job-level checks: none -> checks: read denies slide-major-tag

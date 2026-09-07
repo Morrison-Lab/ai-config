@@ -145,3 +145,51 @@ A seventh, fresh review dispatch did not visibly change the outcome, and the tra
 The harness's `bridge-session`/`atis-latch`/`pr-link` record types visible nearby suggest a multi-task bridging layer specific to this deployment, offered as context rather than as confirmation.
 The inline `ALLOW_UNREVIEWED_PUSH=1 git push` form was denied by the auto-mode classifier on its first and only attempt at that phrasing;
 `env ALLOW_UNREVIEWED_PUSH=1 git push` succeeded immediately after, the single alternate form the Do/Don't pair above budgets for.)
+
+## Two guards prescribing opposite actions can both be right; the refusing one is not automatically the misread
+
+The section above licenses overriding `no-push-without-self-review.py` once
+the record it holds is shown to be a **misread** --- stale, replayed, or
+about an unrelated PR.
+It does not cover the case where the same guard refuses over a record that is
+simply **accurate**: a real blocking verdict against the branch's current
+head, with a fix round genuinely in flight.
+
+That case arose alongside a second guard, `hooks/no-unshipped-commit.py`,
+which demands a push for the very commit the first guard is refusing to
+publish.
+The two prescriptions are opposite and neither is wrong: the branch really
+does carry an unpushed commit, and that commit really does carry a blocking
+verdict.
+Reading the first guard's refusal as a misread to be overridden here would
+be applying the override this file's own remedy describes to a record that
+needed no correcting --- the guard was doing exactly its job.
+
+The correct action was neither hook's stated demand: wait for the in-flight
+fix round to land, review the result, and push once, satisfying both guards
+in the order that makes sense rather than forcing either one open.
+Recorded 2026-09-07 as a comment on
+[ai-config#3272](https://github.com/Morrison-Lab/ai-config/issues/3272)
+(open at the time of writing), which that issue's own text names as a
+"standoff between two hooks" its original filing did not cover --- the
+issue's top-level body is about a different symptom (a peer's worktree
+misattributed as this session's own); the two-guards case is the later
+comment thread on the same tracking issue, not a separate one.
+A related, earlier-filed and separately-numbered issue,
+[ai-config#3270](https://github.com/Morrison-Lab/ai-config/issues/3270),
+covers the same class of deadlock (a draft PR whose branch carries a
+blocking self-review verdict) on a different repo and session, and proposes
+teaching one of the two guards to recognize a draft PR's deferred-push state
+as a third option neither guard currently models.
+
+- **Do:** check whether a blocking record is accurate before reaching for an
+  override, exactly as the misread case above requires --- and when it is
+  accurate, wait rather than override.
+- **Do:** treat a draft PR with an in-flight fix round as a reason to wait
+  for that round, not as a deadlock requiring `ALLOW_UNREVIEWED_PUSH=1`.
+- **Don't:** treat "two guards disagree" as evidence that one of them holds
+  a stale or misattributed record; both can be correct about the same
+  commit at once.
+- **Don't:** cite this file's override remedy for a refusal that is accurate
+  --- that remedy is for the record shown to be wrong, not for every
+  deadlock between two guards.

@@ -109,6 +109,63 @@ For those the prose rule is the whole mechanism, and saying so plainly is better
 - **Don't:** rely on someone remembering.
   Recollection is the only detector this failure has, and it does not survive a session boundary.
 
+## A cap re-argued once is discipline; re-argued twice, it is no cap at all
+
+The rule above is about a decision dropped in silence.
+Here the decision was not dropped --- it was re-argued out loud, which the
+rule permits and this section does not contradict.
+The gap is narrower: nothing above says what happens the *second* time the
+same kind of argument gets made.
+
+A self-imposed round cap on a PR fix loop ("if round 4 is not clean, escalate
+to human review") is exactly this kind of decision: it exists to stop an
+open-ended loop, and it only does that if hitting it actually stops
+something.
+Round 4 came back not clean.
+Re-arguing the cap there --- the finding was pre-existing rather than a
+regression introduced by the capped rounds, so one more round to close it out
+is a different case than the one the cap was written for --- is the
+permitted move above: name what failed, check whether the decision as stated
+covers it, and state the reversal rather than silently taking the extra
+round.
+The cap was restated afterward, narrower: no round 6, on this session's own
+judgment.
+
+Round 5 then introduced a **new** defect, unrelated to the pre-existing one
+that justified the first extension.
+Re-arguing the cap a second time, on a structurally identical "this one is
+different too" basis, is not a second instance of the permitted move.
+It is the same move made about a decision whose entire purpose was to be a
+line that does not move --- so a cap that survives one re-argument and then
+absorbs a second is not a cap with two exceptions, it is a target that keeps
+retreating, and the retreating is invisible from inside each individual
+argument because each one, taken alone, sounds exactly as reasonable as the
+first.
+
+The asymmetry is the operative content here, and it is not "never
+re-argue."
+Re-arguing once, on stated grounds distinct from the reason the cap exists
+(a pre-existing finding, not a regression from the capped rounds), is the
+rule above working as intended.
+Re-arguing again, on grounds of the same shape, is the cap meaning nothing:
+at that point the correct action is not a third restatement but the
+escalation the cap was written to trigger.
+
+(Morrison-Lab/ai-config#3304, 2026-09-06/07: a five-round fix loop, capped
+publicly at round 4, re-argued once at round 4 and escalated at round 5.)
+
+- **Do:** treat a cap's first re-argument as available when the ground for
+  it differs in kind from the cap's own reason for existing, and restate the
+  cap narrower afterward.
+- **Do:** escalate --- rather than re-argue again --- the second time a cap
+  would otherwise be extended, whatever the stated ground.
+- **Don't:** read "the rule permits re-arguing a decision" as permitting
+  unlimited re-arguments of the same cap; the permission is for correcting a
+  misapplied decision, not for moving the line each time it is reached.
+- **Don't:** treat two re-arguments that each sound locally reasonable as
+  evidence the cap is being honoured --- a cap honoured only by argument, not
+  by ever actually stopping anything, is not functioning as a cap.
+
 ## Relationship to other rules
 
 The nearest neighbour is

@@ -116,6 +116,22 @@ CASES = [
      "an env-wrapped read-only grep does not warn"),
     ([use('timeout 5 grep -n "sed -i" hooks/x.py', "t1"), result(TB, "t1")],
      False, "a timeout-wrapped read-only grep does not warn"),
+    # ... and a wrapper OPTION taking a separate value must not be read as
+    # the program. Skipping only dash-led and numeric tokens stopped at
+    # `me`, which is in no read-only set, so `sudo -u me grep` read as a
+    # writer -- the one wrapper shape every sibling guard here already
+    # covers by name, and the exact false positive R2-F1 exists to prevent.
+    ([use('sudo -u me grep -n ".write(" hooks/x.py', "t1"), result(TB, "t1")],
+     False, "a sudo -u wrapped read-only grep does not warn"),
+
+    # The counterweight, and the asymmetry the lookahead relies on: it may
+    # only ever find a READ-ONLY program, so a wrapper grammar it cannot
+    # parse still reads as a writer rather than being silently cleared.
+    # Without this, narrowing `_program` until everything looked read-only
+    # would pass the case above.
+    ([use("sudo -u me sed -i s/a/b/ hooks/x.py", "t1"), result(TB, "t1"),
+      use("git commit -m x", "t2")], True,
+     "a sudo -u wrapped in-place edit still warns"),
 
     # R3: a leading `VAR=value` assignment is not the program. Without the
     # skip, `_program` returns "CI=1", which is not in READ_ONLY, so an

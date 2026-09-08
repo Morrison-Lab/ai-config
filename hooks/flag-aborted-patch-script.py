@@ -170,6 +170,12 @@ def is_commit(command):
 # command's own TEXT, so a grep or a cat whose subject happens to contain
 # `.write(` or `sed -i` would otherwise be classed as a writer -- and in this
 # repo, auditing hook sources for exactly these patterns is routine.
+# How far past a wrapper to look for a read-only program. Matches
+# `scripts/lib/shellcmd.py`'s own WRAPPER_ARG_WINDOW, which bounds the
+# same scan for the same reason: a wrapper's options are unbounded in
+# principle, and an unbounded search would reach the next command's words.
+WRAPPER_ARG_WINDOW = 6
+
 READ_ONLY = {
     "grep", "rg", "egrep", "fgrep", "cat", "bat", "head", "tail", "less",
     "more", "find", "ls", "wc", "diff", "git", "awk", "sort", "uniq", "jq",
@@ -223,6 +229,28 @@ def _program(argv):
             i += 1
             # A wrapper may take its own options or operands first
             # (`timeout 5 grep`), so skip those before the real program.
+            #
+            # Skipping only dash-led and numeric tokens is not enough: a
+            # short option can take a SEPARATE value, so `sudo -u me grep`
+            # stopped at `me` and returned that as the program. `me` is in
+            # no read-only set, so an audit grep for these very patterns
+            # read as a writer -- the exact false positive M3 promises
+            # cannot happen, on the example M3 itself uses.
+            #
+            # Enumerating each wrapper's option grammar would be its own
+            # parser, which `scripts/lib/shellcmd.py` explicitly declines
+            # to write; it looks a bounded distance ahead for the token it
+            # wants instead. Same technique here, with one asymmetry that
+            # keeps an unparsed grammar safe: the lookahead may only ever
+            # find a READ-ONLY program. It can therefore clear a command
+            # this scan would have called a writer, and can never do the
+            # reverse -- so a wrapper we cannot parse still costs at worst
+            # the warning it already cost, and never silences one.
+            window = argv[i:i + WRAPPER_ARG_WINDOW]
+            hit = next((k for k, t in enumerate(window)
+                        if os.path.basename(t) in READ_ONLY), None)
+            if hit is not None:
+                return os.path.basename(window[hit])
             while i < len(argv) and (argv[i].startswith("-")
                                      or argv[i].isdigit()):
                 i += 1

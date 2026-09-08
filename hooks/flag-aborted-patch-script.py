@@ -296,7 +296,27 @@ def _text(block):
 # A path-shaped token: something with a directory separator, or a bare name
 # with a file extension. Good enough to recover the targets a patch script
 # names as string literals, which is all this is for.
-PATHISH = re.compile(r"[\w.-]+(?:/[\w.-]+)*\.[A-Za-z]{1,6}\b")
+# Each component is BOUNDED rather than `+`. The leading class contains
+# `.`, which the required trailing `\.[A-Za-z]{1,6}` also needs, so an
+# unbounded run of `[\w.-]` with no extension after it made the engine
+# try every split point before failing -- quadratic, measured 0.087s /
+# 0.396s / 1.471s at 2k / 4k / 8k characters.
+#
+# That is reachable from ordinary input, not a crafted one: `_covers()`
+# runs this over a failed patch script's whole text, and patch text
+# routinely carries one long unbroken token (a slug, a hash, a minified
+# or base64 blob). At 30k characters the hook took 23.8s against its own
+# registered 10s timeout, so the harness killed it and the guard went
+# silent on exactly the large patch scripts it exists to inspect.
+#
+# A path component longer than this is not a path, so the bound costs
+# nothing real and makes each start position O(128) instead of O(n).
+# Measured after: 0.041s at 8k, 0.171s at 30k, 0.578s at 100k.
+# See `shared/coding/regex-backtracking-pitfalls.md`.
+PATH_COMPONENT_MAX = 128
+PATHISH = re.compile(
+    r"[\w.-]{1,%d}(?:/[\w.-]{1,%d})*\.[A-Za-z]{1,6}\b"
+    % (PATH_COMPONENT_MAX, PATH_COMPONENT_MAX))
 
 
 def _paths(command):

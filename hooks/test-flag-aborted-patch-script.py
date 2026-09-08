@@ -425,6 +425,36 @@ def main():
     else:
         print(f"FAIL: sentinel (first={first}, second={second})"); failures += 1
 
+    # PATHISH must stay LINEAR. Its leading class contains `.`, which the
+    # required trailing extension also needs, so an unbounded run of
+    # `[\w.-]` with no extension after it made the engine try every
+    # split point -- quadratic, and reachable from ordinary input, since
+    # `_covers()` runs this over a failed patch script's whole text and patch
+    # text routinely carries one long unbroken token. At 30k characters the
+    # hook took 23.8s against its own registered 10s timeout, so the harness
+    # killed it and the guard went silent on the large scripts it exists for.
+    #
+    # Asserts a WALL-CLOCK bound rather than a shape, because the defect is
+    # the running time and a regex can be rewritten into a new pathology that
+    # still looks fine. Generous enough not to flake on a loaded runner: the
+    # unbounded form took 1.5s at 8k and did not finish 20k within 8s, while
+    # the bounded one measured 0.17s at 30k.
+    import importlib.util as _ilu
+    import time as _time
+    _spec = _ilu.spec_from_file_location("hookmod", HOOK)
+    _hook = _ilu.module_from_spec(_spec)
+    _spec.loader.exec_module(_hook)
+    _t0 = _time.time()
+    _hook.PATHISH.findall("a" * 30000)
+    _elapsed = _time.time() - _t0
+    _label = f"PATHISH stays linear on a long extensionless run ({_elapsed:.2f}s)"
+    if _elapsed < 2.0:
+        print(f"PASS: {_label}")
+        passes += 1
+    else:
+        print(f"FAIL: {_label} (expected under 2.0s)")
+        failures += 1
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

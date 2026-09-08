@@ -2055,11 +2055,39 @@ def classify_verdict(body: str, state: str = "") -> str:
     Cited finding vocabulary is blanked first (see strip_cited_finding_vocab),
     so a clean verdict that merely quotes "Needs more work" is not misread as
     stating it -- the #1202 false positive, one surface over.
+
+    A well-formed ``review-data`` payload -- one carrying a ``schema_version``
+    key, the contract's own version marker -- decides directly and the prose
+    scan below never runs for that comment (ai-config#3054). Three measured
+    false positives (d-morrison/rme#1128, #1130, #1132) and a fourth on the
+    gha side (Lacaedemon/sparta#1547) each carried a payload of
+    ``"verdict": "CLEAN", "findings": []`` that flatly contradicted a phrase
+    the scan below matched anyway -- a retrospective "blocking issues ...
+    addresses all of them", a negated "don't block merge", a heading whose own
+    parenthetical says "(all clean)". The payload is the reviewer's own
+    machine-readable verdict; letting a retrospective or negated prose match
+    override it is backwards.  ``NOT_CLEAN`` always wins this way.  ``CLEAN``
+    only wins when ``findings`` is present, a list, and empty -- a CLEAN label
+    next to a non-empty or malformed ``findings`` field is self-contradicting,
+    so it is NOT trusted here and falls through to ``payload_is_blocking``
+    immediately below, which already treats a non-empty/malformed
+    ``findings`` field as blocking regardless of the stated verdict.
     """
     if state in ("CHANGES_REQUESTED", "REJECTED"):
         return "not-clean"
 
     structured = extract_structured_review(body)
+    if isinstance(structured, dict) and "schema_version" in structured:
+        payload_verdict = normalize_verdict(structured.get("verdict"))
+        if payload_verdict == "NOT_CLEAN":
+            return "not-clean"
+        if (
+            payload_verdict == "CLEAN"
+            and not payload_findings(structured)
+            and not payload_findings_malformed(structured)
+        ):
+            return "clean"
+
     if payload_is_blocking(structured):
         return "not-clean"
 
@@ -2220,6 +2248,17 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
     Same scan criterion 3 uses on HEAD items. A ``## Nits`` heading with
     real items is a finding even when ``classify_verdict`` returns clean
     because the same body also says Ready for merge (#2274).
+
+    A well-formed ``review-data`` payload (``schema_version`` present) with
+    an exact ``CLEAN`` verdict and a confirmed-empty ``findings`` list is
+    trusted directly, and the ``FINDING_PATTERNS`` prose scan below never
+    runs for that comment (ai-config#3054) -- the same payload-first rule
+    ``classify_verdict`` applies for criterion 4. This DELIBERATELY
+    supersedes the #2945 "findings win over a same-comment CLEAN payload"
+    stance for the exact case that rule covered (a resolution log under a
+    bare ``### Findings`` heading): the issue thread that requested this
+    change names #2945 as one of the false positives the new rule is meant
+    to subsume, alongside #3307, #2452, #1690 and #2523.
     """
     structured = extract_structured_review(body)
     findings = payload_findings(structured)
@@ -2242,6 +2281,15 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
         )
     if payload_is_blocking(structured):
         return f"structured blocking verdict ({normalize_verdict(structured.get('verdict'))})"
+    if (
+        isinstance(structured, dict)
+        and "schema_version" in structured
+        and normalize_verdict(structured.get("verdict")) == "CLEAN"
+    ):
+        # `findings` is confirmed empty and well-formed by the two checks
+        # above (a non-empty or malformed list already returned above), so
+        # this is exactly the well-formed CLEAN payload #3054 asks to trust.
+        return None
 
     scan_body, cited = strip_cited_finding_vocab_with_mask(body)
     for pat in FINDING_PATTERNS:
@@ -2415,6 +2463,7 @@ def check_latest_verdict(
             last_seen_by_author[login] = when_c
 
     expired_ledgers = []
+    payload_decided = []
     for item in dated:
         _kind, when, body, _oid, state = item[:5]
         author = item[5] if len(item) > 5 else ""
@@ -2426,6 +2475,22 @@ def check_latest_verdict(
                     body, author, when, last_seen_by_author):
             expired_ledgers.append((when, identity))
             continue
+        # Report when the payload -- not the prose scan -- decided this
+        # item's verdict (ai-config#3054), so a reader can see the phrase
+        # scan never ran rather than inferring it from a clean scan line.
+        if not finding_pat and state not in ("CHANGES_REQUESTED", "REJECTED"):
+            payload = extract_structured_review(body)
+            if isinstance(payload, dict) and "schema_version" in payload:
+                payload_verdict = normalize_verdict(payload.get("verdict"))
+                if payload_verdict == "NOT_CLEAN" and verdict == "not-clean":
+                    payload_decided.append((when, identity, "not-clean"))
+                elif (
+                    payload_verdict == "CLEAN"
+                    and verdict == "clean"
+                    and not payload_findings(payload)
+                    and not payload_findings_malformed(payload)
+                ):
+                    payload_decided.append((when, identity, "clean"))
         # Findings win over unreadable: a known-agent body with ## Nits and no
         # classifiable verdict line is a standing not-clean, not a NOTE.
         if verdict == "not-clean" or finding_pat:
@@ -2459,6 +2524,12 @@ def check_latest_verdict(
         "dispositioned in that comment itself"
         for when, identity in expired_ledgers
     ]
+    payload_notes = [
+        f"NOTE: verdict for {identity} ({when}) came from its review-data "
+        f"payload ({verdict}); the prose phrase scan did not run for this "
+        "comment (ai-config#3054)"
+        for when, identity, verdict in payload_decided
+    ]
     if (
         latest_verdict == "not-clean"
         and not _approval_clears(latest_identity, latest_author, approved_authors)
@@ -2466,7 +2537,7 @@ def check_latest_verdict(
         return False, [
             f"Latest verdict-bearing review statement ({latest_when}) is NOT clean, "
             "and no later comment supersedes it with a clean verdict"
-        ] + ledger_notes
+        ] + ledger_notes + payload_notes
 
     # Global latest is clean (or NONE), but another reviewer's latest may
     # still be not-clean -- the #2274 hole: a later all-clear from a
@@ -2495,6 +2566,7 @@ def check_latest_verdict(
             "classifier cannot read -- not treated as 'no review'"
         )
     issues.extend(ledger_notes)
+    issues.extend(payload_notes)
     blocking = [i for i in issues if not i.startswith("NOTE: ")]
     return len(blocking) == 0, issues
 

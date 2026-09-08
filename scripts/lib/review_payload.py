@@ -43,8 +43,16 @@ CLEAN_VERDICTS = frozenset({"CLEAN", "READY_FOR_MERGE", "APPROVED", "APPROVE"})
 # One accepted spelling only.  `review-json` was accepted here and in
 # REVIEW_BODY_MARKERS while nothing in the corpus emitted or documented it --
 # a second verdict-bearing input spelling with no producer, bought for nothing.
-_PAYLOAD_RE = re.compile(
-    r"<!--\s*review-data\s*:\s*(\{[\s\S]*?\})\s*-->",
+#
+# This matches only the OPENER (`<!-- review-data: `), not the JSON body --
+# see `extract_structured_review`'s use of `json.JSONDecoder().raw_decode`
+# below.  A single regex that captures `\{[\s\S]*?\}` non-greedily up to the
+# next `-->` truncates the payload the moment a finding's own text contains
+# a literal `} -->` substring (ai-config#3054): the non-greedy group stops at
+# THAT `}`, not the JSON object's real closing brace, and the parse either
+# fails or silently reads a truncated object.
+_PAYLOAD_OPEN_RE = re.compile(
+    r"<!--\s*review-data\s*:\s*",
     re.IGNORECASE,
 )
 
@@ -121,7 +129,7 @@ def extract_structured_review(body: str) -> Optional[Dict[str, Any]]:
 
     mask = code_region_mask(body)
     found: Optional[Dict[str, Any]] = None
-    for m in _PAYLOAD_RE.finditer(body):
+    for m in _PAYLOAD_OPEN_RE.finditer(body):
         if mask[m.start()]:
             continue
         # Everything before the payload ON ITS OWN LINE must be WHITESPACE.
@@ -155,10 +163,39 @@ def extract_structured_review(body: str) -> Optional[Dict[str, Any]]:
         line_start = body.rfind("\n", 0, m.start()) + 1
         if body[line_start:m.start()].strip():
             continue
-        try:
-            data = json.loads(m.group(1).strip())
-        except Exception:
+
+        # Skip whitespace between the opener and the JSON object -- the
+        # template renders it flush against `review-data:` but a hand-typed
+        # payload may put it on the next line (see the docstring's own
+        # multi-line example).
+        json_start = m.end()
+        while json_start < len(body) and body[json_start] in " \t\r\n":
+            json_start += 1
+        if json_start >= len(body) or body[json_start] != "{":
             continue
+
+        # `raw_decode` parses exactly one JSON value starting at `json_start`
+        # and returns where it stopped -- respecting JSON string escaping the
+        # whole way, so a finding's own text containing a literal `} -->`
+        # substring cannot terminate the object early (ai-config#3054). The
+        # old single-regex capture (`\{[\s\S]*?\}\s*-->`) had no such respect
+        # for string contents: its non-greedy group stopped at the FIRST
+        # `}` followed by `-->` textually, wherever that fell.
+        try:
+            data, end_idx = json.JSONDecoder().raw_decode(body, json_start)
+        except (ValueError, json.JSONDecodeError):
+            continue
+
+        # Only whitespace may separate the JSON object from the comment's
+        # closing `-->` -- anything else means this wasn't really a
+        # `<!-- review-data: {...} -->` comment (e.g. trailing garbage), and
+        # the object we parsed may not be the one the author intended.
+        tail = end_idx
+        while tail < len(body) and body[tail] in " \t\r\n":
+            tail += 1
+        if body[tail:tail + 3] != "-->":
+            continue
+
         if isinstance(data, dict) and "verdict" in data:
             found = data
     return found

@@ -302,3 +302,42 @@ see [`challenge-the-assignment`](challenge-the-assignment.md)'s "The limit".
 
 Tracked as [ai-config#3125](https://github.com/Morrison-Lab/ai-config/issues/3125);
 a guard is *proposed* under [ai-config#3039](https://github.com/Morrison-Lab/ai-config/issues/3039), open and unimplemented as of 2026-09-03.
+
+## A guard's comment and a label's own description disagreed about scope
+
+Morrison-Lab/ai-config#3304, 2026-09-06/07.
+
+`hooks/no-unreviewed-pr.py` documents two ways to exempt a PR from its
+review-required guard, and introduces them while explaining a redaction
+scenario: a PR that must not be sent to an AI reviewer because doing so would
+leak a secret.
+The stronger of the two forms is a repository label, `EXEMPT_LABEL =
+"no-ai-review"`, and the weaker is an env-assignment prefix literally named
+`ALLOW_UNREVIEWED_REDACTION_PR=1`.
+
+Working a PR that needed the same exemption for an unrelated reason --- no
+redaction involved --- three separate attempts to apply the label were each
+declined on the same reasoning: the comment discusses redaction, the label
+sits in that discussion, so applying it here would be inventing an exemption
+the guard never intended.
+That reasoning treats the comment as the label's specification.
+It is the comment author's motivating case, and the repository disagrees:
+
+```
+$ gh label list -R Morrison-Lab/ai-config --json name,description \
+    --jq '.[] | select(.name == "no-ai-review")'
+{"name":"no-ai-review","description":"AI code review deliberately withheld on this PR; see the PR comment for the reason"}
+```
+
+General.
+No mention of redaction, secrets, or any other named cause.
+The one command that would have settled the question was never run for that
+purpose, across three refusals, because the comment read as authoritative and
+a comment is not where a label's contract lives --- the label's own metadata
+is, and it was one `gh label list` away the entire time.
+
+The pattern is not "the docstring was wrong."
+It was accurate about the case it was written to explain.
+The error was reading a launching example as a boundary, which is a claim
+about a different artifact (the mechanism's actual scope) than the one being
+read (the prose that motivates one instance of it).

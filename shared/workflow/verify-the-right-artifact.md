@@ -201,6 +201,93 @@ When a brief, an issue body, or a review finding asserts what a repository says,
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale branch read that produced two issues and a config edit".
 
+## A mechanism's prose is not the mechanism's definition
+
+A hook's comment, a skill's description, a docstring: each one explains a
+mechanism, and each is written by someone who had a specific case in mind
+while writing it.
+That case becomes the prose's running example, and the example is narrower
+than the mechanism it illustrates almost by construction --- a comment
+motivates a design decision by pointing at the situation that forced it, not
+by re-deriving the mechanism's full scope from nothing.
+
+Reading the prose and concluding the mechanism is scoped to the example is
+this fragment's substitution again, in a form the four shapes do not name:
+the artifact you read (the prose) is real, and the claim you draw from it (the
+mechanism's boundary) is about a different artifact --- the mechanism's own,
+separately-recorded definition, which the prose was never trying to state
+exhaustively.
+
+This differs from ["A summary read as its
+source"](verify-the-right-artifact.cases.md) in what goes missing.
+A summary drops a source document's hedges and caveats in the act of
+restating it, so the fix is to open the source it claims to restate.
+Here there may be no single document being restated at all --- the prose
+motivates a design by its launching case, and the mechanism's actual boundary
+lives in a separate, independently-queryable artifact (a label's own
+description, a config file, a schema) that the prose never claims to
+reproduce.
+The fix is not to read the prose more carefully; it is to query the
+mechanism directly.
+
+Two measured instances, one on each side of the substitution:
+
+**A guard's comment framed an exemption around its launching case, and the
+label's own definition was broader.**
+`hooks/no-unreviewed-pr.py`'s comment introduces `EXEMPT_LABEL = "no-ai-review"`
+while discussing a redaction PR, and pairs it with an env var literally named
+`ALLOW_UNREVIEWED_REDACTION_PR`.
+Reading only the comment, applying the label to a non-redaction PR reads as
+inventing an exemption the label was never meant to cover, and three separate
+attempts to use it were refused on that reading.
+The label's own description, on the repository, says otherwise:
+
+```
+$ gh label list -R Morrison-Lab/ai-config --json name,description \
+    --jq '.[] | select(.name == "no-ai-review")'
+{"name":"no-ai-review","description":"AI code review deliberately withheld on this PR; see the PR comment for the reason"}
+```
+
+General, and silent about redaction.
+Redaction is the comment's motivating case, not the label's scope, and the one
+command above settles which of the two governs.
+(Morrison-Lab/ai-config#3304, 2026-09-06/07.)
+
+**A written verification step tested a reconstruction of a string, not the
+string a file actually contains.**
+A memory entry claimed a single backslash in some source text makes a
+substring check return `False`, and the claim was "verified" by rebuilding the
+intended string with `chr(92)` and running the check against that
+reconstruction.
+That confirms the check behaves as expected on the string you *meant* to
+write.
+It says nothing about the string the file *actually holds*, because a
+non-raw Python string literal has its escapes decoded by the parser before the
+check ever sees it --- `"a\b"` in source is the two characters `a` and a
+literal backslash-b sequence only if the parser reads it as written, and
+pasting the file's real text and evaluating it in place (rather than
+reconstructing what it "should" contain) is the only read that reports the
+actual behaviour.
+The general form: when the object under test is "does this file's text trip
+this check", read the file's text, not a hand-rebuilt stand-in for it, however
+carefully the stand-in is constructed.
+(Measured in the same 2026-09-06/07 session as the label instance above,
+while drafting a `memories/mistake-patterns.md` entry; caught before that
+entry was committed, so no PR or issue number attaches to it.)
+
+- **Do:** query a mechanism's own recorded definition (a label's description,
+  a config's schema, a constant's value) before concluding its scope from a
+  comment's motivating example.
+- **Do:** evaluate a check against the artifact's actual bytes --- extracted
+  from the file, not reconstructed from what you believe it should contain
+  --- when the claim is about what that artifact's text does.
+- **Don't:** read a comment's launching case as a boundary on the mechanism
+  it explains; a comment motivates, it does not define.
+- **Don't:** treat "I rebuilt the string and the check passed" as evidence
+  about a file's own text; rebuilding tests the intent, not the artifact.
+
+See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A guard's comment and a label's own description disagreed about scope".
+
 ## A comparison's base is an artifact too, and it moves the scope in both directions
 
 Every shape above concerns an artifact you **read**.

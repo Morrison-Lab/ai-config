@@ -259,6 +259,53 @@ When you do build custom, note in the PR (or a code comment) that you
 checked and nothing fit, so the next reader doesn't re-run the search
 --- and so the reviewer's DRW check below has its answer up front.
 
+## "Reuse the shared module" is a correctness claim about that module, and should be measured
+
+DRW's search step and its escape hatches above both assume the existing
+option, once found, actually does the job.
+"Reuse the shared module" is normally the right review finding, and normally
+correct.
+But it is a claim about the shared module's own correctness on the case at
+hand, and that claim can be false even when the module exists, is in-repo,
+is actively used, and was built specifically to fix the class of bug being
+discussed --- none of which is evidence the specific input in front of you
+was ever tested against it.
+
+`scripts/lib/shellcmd.py` was built to de-duplicate eight hand-rolled shell
+parsers scattered across this repo's hooks, and a finding that says "use the
+shared module instead of a local parser" is exactly the DRW rule above
+working as intended.
+Measured 2026-09-06 (ai-config#3321, following on closed ai-config#2993):
+`shellcmd.git_subcommand(['nice', 'mycommand', 'git', 'push'])` returns
+`('push', [], [])` for a command that invokes no git at all --- the
+wrapper-lookahead logic in `strip_env` cannot tell a wrapper's own flags
+from the wrapped command's arguments, a false positive.
+`shellcmd.simple_commands("cat <<\\EOF\nbody\nEOF\n&& git push")` returns
+`[['cat', '<<']]` --- a backslash-escaped heredoc tag makes `_heredoc_free`
+mask to the end of the string, and the `&& git push` disappears from the
+parse entirely, a false negative.
+The false-negative direction is the more dangerous one for a push guard: it
+cannot refuse what it cannot see.
+
+The transferable lesson is not "shellcmd.py is broken" --- it has already
+absorbed several rounds of fixes for exactly this class of bug (see
+`memories/git.md`'s heredoc-scanner fix commits and
+`shared/workflow/metacognitive-monitoring.cases.md`'s "A defect attributed
+to the fix that merely sits beside it").
+It is that accepting a reuse recommendation on the strength of the
+recommendation alone imports whatever the shared module currently gets
+wrong, exactly as writing a hand-rolled equivalent imports whatever you get
+wrong yourself --- the DRW argument for reuse argues against duplicating the
+maintenance burden, not for correctness on your specific input.
+
+- **Do:** run the shared module against the actual input in a review
+  finding or a brief before accepting "reuse it" as sufficient, the same way
+  a claimed count or state fact gets a deriving command before being
+  trusted.
+- **Don't:** treat "a shared module already exists for this" as having
+  settled whether it produces the right answer on your case --- that is a
+  second, separate claim, and it needs its own check.
+
 ## A constraint your own change authored is not evidence against an upstream
 
 The escape hatches above are all statements about the world: nothing close

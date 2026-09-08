@@ -114,6 +114,61 @@ Open PR #1407 had touched those exact files sixteen minutes earlier, and a `pr-s
 The two PRs conflicted as a result.
 Extending `pr-sweep.py` to print each PR's file set --- so this check needs no separate round of calls --- was filed as [#1419](https://github.com/Morrison-Lab/ai-config/issues/1419) and shipped in [#1421](https://github.com/Morrison-Lab/ai-config/pull/1421), merged 2026-08-13T16:28:22Z, which is why the guidance above leads with the sweep rather than with a per-PR call.)
 
+## A subagent appending to a shared numbered list collides on the number, not the file
+
+The section above finds a collision by intersecting file **paths**.
+A shared enumerated file --- `memories/mistake-patterns.md`'s `## Pattern N`
+headings, or any similarly numbered running list --- can collide on the same
+path while the file-path check reports no overlap problem at all, because the
+collision is in the **number**, not in which file was touched.
+
+A subagent dispatched to append a new pattern to that file picked the next
+number available in the branch it started from.
+An hour earlier, in the same session, a different PR had merged to `main`
+adding a *different* pattern under that same number.
+The subagent's branch had not seen that merge, so its own next-number
+computation was correct for the state it started from and wrong for the
+state `main` was actually in by the time it finished --- and because the two
+additions land at different points in the file (the subagent's branch is
+missing the intervening content), a merge of the two need not even conflict:
+two `## Pattern 52` headings with different content can both survive the
+merge silently, because `scripts/check-mistake-patterns.py`, the CI check
+that exists for this file, inspects each PR's own branch and cannot see a
+sibling branch's still-open change at the moment either one runs.
+
+This was caught only because a human-directed review compared the PR against
+`origin/main` rather than trusting the PR's own diff in isolation --- the
+exact discipline [`derive-dont-enumerate`](derive-dont-enumerate.md) argues
+for when a set can change out from under you mid-task.
+That checker (ai-config#2946) is wired into CI and covers exactly this file
+and this failure mode --- but it checks the numbering **within one PR's own
+branch**, not against a sibling
+branch's still-open, not-yet-merged change.
+Two branches that each independently pick the next free number, correctly
+for the state each started from, both pass the checker individually and only
+collide once both are merged --- which is the same gap the checker's own
+docstring names as its reason for existing (a PR's number is typed "by hand
+against the `main` it branched from"), one level up: the checker closes the
+single-file race and does not close the cross-branch one.
+
+- **Do:** brief a subagent appending to a shared enumerated file to re-fetch
+  the target file from the current default branch immediately before
+  picking its number, not from whatever base its worktree started at.
+- **Do:** re-run `scripts/check-mistake-patterns.py` (or the equivalent for
+  whatever file is shared) against `origin/main` after a batch of concurrent
+  sessions each append to the same file, since each one individually passing
+  CI on its own branch does not imply the merged result still does.
+- **Don't:** assume a file-path intersection check (the section above), or a
+  same-file uniqueness checker run per-branch, also catches a cross-branch
+  numbering collision --- both answer a narrower question than "did the
+  merged file end up with a duplicate number."
+- **Don't:** treat a clean, conflict-free merge of two additions to the same
+  numbered list as evidence the numbers themselves did not collide.
+
+(Morrison-Lab/ai-config, 2026-09-06/07: an `agy` subagent appended "Pattern
+52" to `memories/mistake-patterns.md` while `main` already carried a
+different Pattern 52 from a PR merged an hour earlier in the same session.)
+
 ## Conversation-inheriting subagent dispatch vs. clean-context dispatch for UMS and CAI
 
 When delegating sidecar work like UMS (`update-memories-and-skills`) or CAI (`config-ai`),

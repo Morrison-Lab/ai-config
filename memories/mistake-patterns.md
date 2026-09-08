@@ -873,6 +873,14 @@ A clean automated review from every available provider evaluating the current HE
   each is permission laundering:
   the MCP write tools are the guard's documented open gap ([ai-config#1929](https://github.com/Morrison-Lab/ai-config/issues/1929)),
   and a peer session or a separate CLI bypasses simply because the hook does not run there.
+- **Do**: on a fresh denial, retry the exact same command once, unrephrased,
+  before escalating --- measured 2026-09-06/07 to recover the goal three
+  separate times with no settings change.
+- **Don't**: read a run of denials as confined to the one command that
+  triggered them --- once several have accumulated in a session, the
+  classifier can start denying a plainly innocuous, unrelated command too
+  (e.g. `gh run list -R ... --json ...`), which is a widened blast radius
+  the earlier occurrences below did not record.
 - **Example**: 2026-09-01, `Lacaedemon/sparta` [PR #1459](https://github.com/Lacaedemon/sparta/pull/1459) (GIA sweep), tracked as [ai-config#2899](https://github.com/Morrison-Lab/ai-config/issues/2899);
   previously `ucdavis/bcs` 2026-08-28 ([ai-config#2544](https://github.com/Morrison-Lab/ai-config/issues/2544), closed by [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820)).
   In an auto-permission-mode plugin-consumer session where no `adversarial-reviewer` agent is registered (`Agent type not found`),
@@ -922,9 +930,28 @@ A clean automated review from every available provider evaluating the current HE
   Three passes enumerated explanations --- two, then three --- over a candidate set nobody had established, and each list was internally sound while the true answer sat outside all of them.
   The transferable step is to capture the resolved path (`ps` while the guard fires) instead of deducing it from registration files, since a guard that fires repeatedly hands you the measurement for free.
   See [`keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md)'s dated-constant section for the resolution order and for the fail-open hazard, and for what the capture leaves unestablished.
+- **3rd occurrence, and a new symptom: the escalation spreads to commands
+  with no relation to the original denial, 2026-09-06/07.**
+  Five denials in one session, with no settings change and no restart.
+  Three times, an identical re-run of a just-denied command succeeded on the
+  very next attempt --- confirming, without a session restart, what the
+  2nd occurrence above only measured *across* a restart.
+  Separately, after several differently-shaped attempts at the same goal,
+  the classifier began denying a plainly innocuous, unrelated command
+  (`gh run list -R ... --json ...`), which also succeeded on an identical
+  retry.
+  ai-config#2994 and this bullet's own prior occurrences already establish
+  that repeated variants of the SAME denied command escalate suspicion;
+  what neither previously recorded is that the escalation is not scoped to
+  that command -- it widens to spend suspicion on unrelated, ordinary reads
+  once several denials have accumulated in the session.
 - **Algorithmatizable?**
   Partially.
   [#2544](https://github.com/Morrison-Lab/ai-config/issues/2544)'s suggested fix 3 --- have the hook's refusal message name a user-approvable permission rule for the override --- would have resolved the measured session in one step, and remains open under [#2899](https://github.com/Morrison-Lab/ai-config/issues/2899).
+  The new symptom above suggests a session-level mitigation too: once a
+  denial has occurred, retry the identical command once before rephrasing
+  or escalating to the user, since an identical retry recovered every time
+  it was measured.
 
 ## Pattern 44: `pgrep -f` Self-Matching in Background Waiters and Process Status Pollers
 - **Do**: When monitoring background tasks or long-running scripts,
@@ -1086,3 +1113,98 @@ A clean automated review from every available provider evaluating the current HE
   A push almost never names the PR it re-heads."
   --- so the guard fires only where the push has one PR it COULD re-head.
   What is not automated is the human/session habit of reading `gh pr view --json reviews` and stopping there instead of also checking the reviewed commit against the current head.
+
+## Pattern 52: A Variable `cd` Target on a Guarded Push Names the Wrong Commit, Confidently
+
+- **Mistake**: Running `cd "$WT" && git push ...` (or `git -C "$VAR" push`) past
+  `hooks/no-push-without-self-review.py` and trusting the guard's stated
+  reason for refusal, when the variable resolves to a *different* worktree
+  than the one actually pushed.
+- **Example**: 2026-09-06, ai-config#3319.
+  `cd "$WT" && git push ...` was refused with "The clean verdict is for
+  commit 988e7da89..., but this push would ship 19ca0ff67385" --- where
+  `19ca0ff67385` was the SESSION worktree's `HEAD`, not the commit the
+  variable-resolved `cd` actually pushed.
+  The byte-identical command with the literal path substituted for `$WT`
+  pushed successfully.
+  This is a residual of closed ai-config#2680, which fixed the case where the
+  guard cannot resolve a variable `cd` target at all and refuses admitting
+  ignorance ("could not be resolved").
+  The residual is worse: the guard now resolves *something*, just not the
+  worktree the command actually targets, and reports that wrong resolution
+  as fact rather than as an unknown.
+- **Canonical Rule**: A guard that reads command text literally (Pattern 21,
+  Pattern 50) cannot expand a shell variable inside an in-command `cd`, so it
+  falls back to a value that is not the one the command will use --- and a
+  confident wrong answer is more dangerous than an admitted unknown, because
+  it invites reaching for `ALLOW_UNREVIEWED_PUSH=1` to bypass a guard that is
+  actually correct about the commit it can see.
+- **Fix**: Use a literal path in a `cd` immediately before a guarded
+  `git push`, or use `git -C <literal path> push` --- either way, spell out
+  the worktree path rather than a variable, so the guard's parse and the
+  shell's actual target agree.
+- **Algorithmatizable?**
+  Partial.
+  The guard could refuse to resolve *any* variable-containing `cd`/`-C`
+  target rather than substituting a plausible-looking wrong one, which would
+  convert this back into Pattern 21's "could not be resolved" shape --- an
+  admitted unknown rather than a wrong fact.
+  That is a code change to the guard (ai-config#3319), not yet made as of
+  this writing; until it lands, the literal-path habit above is the only
+  defense.
+
+## Pattern 53: Gating an Authoritative Parser on an Unsound Raw Text Pre-Filter
+
+- **Mistake**: putting a cheap raw-text scan *in front of* a real parser to
+  decide which inputs are worth parsing.
+  The scan then decides relevance for inputs the parser could have judged
+  correctly, and any encoding the format allows but the scan cannot see
+  becomes a silent bypass.
+- **Direction of failure**: fail-open, and invisibly.
+  Nothing errors; the input is simply skipped.
+  On a blocking guard that is the expensive direction, because the guard
+  reports success while not having looked.
+- **Example**: 2026-09-07, `Morrison-Lab/ai-config` PR
+  [#3304](https://github.com/Morrison-Lab/ai-config/pull/3304),
+  `hooks/guard-slide-major-tag.py`.
+  Commit `6694317a0` added a pre-filter skipping any workflow file whose text
+  lacked the substring `workflow_call`; commit `a401ea0eb` reordered it away
+  after review.
+  The bypass needs an ESCAPE, not merely quoting --- a plainly double-quoted
+  key still contains the substring, so it would not have tripped anything:
+
+  ```python
+  >>> "workflow_call" in 'on:\n  "workflow_call":\n'
+  True
+  >>> "workflow_call" in 'on:\n  "\\u0077orkflow_call":\n'
+  False
+  >>> yaml.safe_load('on:\n  "\\u0077orkflow_call":\n')
+  {True: {'workflow_call': None}}
+  ```
+
+  `\u0077` is `w`, so PyYAML and GitHub Actions both resolve the key, while
+  the raw text never carries it.
+  An added `checks: read` job permission passed the guard.
+- **Fix**: it is an ordering problem, not a matching problem.
+  Parse first, and let the parsed structure be the sole test for anything
+  that parses.
+  Consult the raw scan only for input the parser cannot read at all, where
+  nothing better exists and its error direction can be made conservative.
+- **Why widening the scan is the wrong repair**: hand-decoding a format's
+  escapes to decide whether to parse is the same mistake one level down, and
+  each widening fixes the named encoding while leaving the next one open.
+
+- **Do:** run the authoritative parser first, and reserve text heuristics for
+  input that fails to parse.
+- **Do:** mutation-test the ordering --- reintroduce the scan into the parsed
+  path and confirm an escaped-key test flips to allow.
+- **Don't:** add a pre-filter whose premise is that absence of a token proves
+  irrelevance; in any expressive format that premise is false.
+- **Don't:** treat a green suite as coverage of the fallback path, which is
+  usually the one no test forces.
+
+Closely related to **Pattern 34** above, which is the same transformation
+blindness in a different code shape: there a raw-text subsumption proof was
+used to DELETE a parser branch, here a raw-text scan is used to decide the
+parser never RUNS.
+Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.

@@ -265,6 +265,40 @@ The pass count is routinely quoted in commit messages and reviews as evidence of
 A third instance in the same suite iterated the flag list, so dropping the flag that marks harness-injected records stayed green.
 The malformed-mutant hazard was hit in the same session while checking these very fixes.)
 
+### A verdict script must not grep an interpreter's own echoed source
+
+Some interpreters echo the source they were handed before executing it, so a
+one-liner invocation and its own output share the same stdout stream.
+`R -q -e '...'` is one: it prints the literal string that follows `-e` before
+running it, and a verdict script that greps that combined stream for the
+string it expects on success finds it every time, whether the mutation was
+caught, survived, or never applied.
+The check reports the same verdict regardless of outcome, and nothing about a
+single run reveals this, because the expected string genuinely is present in
+the output.
+
+The general form: any check that greps an interpreter's own stdout for
+literal text also present in the invocation itself is vacuous, and the fix
+is structural rather than textual, the same shift this section's "DRY form"
+passage above makes.
+Put verdict logic in a script file the interpreter loads and runs, so nothing
+echoes it, or have the interpreter write its verdict to a stream or file the
+invocation itself never touches, and grep that instead.
+
+- **Do:** write verdict logic to a file the interpreter executes, never a
+  `-e`/`-c` inline string, when the interpreter echoes its invocation.
+- **Do:** confirm a verdict check discriminates by deliberately breaking the
+  code path it is meant to detect and watching the verdict change, before
+  trusting a green run.
+- **Don't:** grep a run's combined stdout for text that also appears in how
+  the run was invoked; a match there proves nothing about what ran.
+
+(Measured 2026-09-06 during mutation testing on `ucdavis/hac.sap#43`: a
+verdict script invoked as `R -q -e '<verdict logic>'` reported the same
+result for every mutation in the matrix, discovered only when a reviewer
+inspected the harness's own raw output mid-run and found the discrepancy
+came from the echoed invocation rather than from anything executed.)
+
 ### A test gated on a production constant loses coverage when that constant moves
 
 Everything above concerns an assertion that cannot fail **today**.

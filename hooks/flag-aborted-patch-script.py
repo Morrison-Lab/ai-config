@@ -125,7 +125,15 @@ TRACEBACK = "Traceback (most recent call last):"
 # it would train the reader to ignore this.
 WRITES = re.compile(
     r"""\.write\(|\.write_text\(|\.writelines\(|"""
-    r"""open\s*\([^)]*['"][wa]['"]|"""
+    # `[^)]{0,256}` rather than `[^)]*`: the run sits immediately before a
+    # required three-character suffix, so an unclosed `open(` made the
+    # engine try every length -- quadratic, 0.065s / 0.278s / 1.155s /
+    # 7.403s at 8k / 16k / 32k / 82k characters of `open(` repeats. The
+    # same shape, and the same remedy, as PATHISH above. `\n` is excluded
+    # too, since a call spanning lines is not one this scan can read
+    # anyway. All eleven realistic writer and non-writer forms checked
+    # match identically; the bounded form measures 0.082s at 82k.
+    r"""open\s*\([^)\n]{0,256}['"][wa]['"]|"""
     r"""\bsed\s+-i\b|\bpatch\s+(-p\d|<)|\btee\b""",
     re.VERBOSE,
 )
@@ -184,7 +192,13 @@ READ_ONLY = {
 
 def writes(command):
     """True when `command` plausibly edits a file in place."""
-    if not WRITES.search(command):
+    # Capped like every other scan over command text. Bounding the
+    # pattern above is what makes this fast -- removing this cap alone
+    # leaves the suite green -- and the cap is here so the ceiling holds
+    # absolutely rather than only linearly, which is what a fixed
+    # timeout needs and what the last three rounds each got wrong by
+    # settling for linear.
+    if not WRITES.search(command[:SCAN_MAX_CHARS]):
         return False
     if simple_commands is None:
         return True

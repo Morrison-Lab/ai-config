@@ -490,7 +490,8 @@ def main():
             ('curl -s -X POST -d "%s" https://example.com' % ("word " * 130000),
              "a huge non-commit command"),
             ('git commit -m "%s"' % ("word " * 130000),
-             "a huge commit message")):
+             "a huge commit message"),
+            ):
         _t0 = _time.time()
         subprocess.run([sys.executable, HOOK],
                        input=json.dumps({
@@ -507,6 +508,25 @@ def main():
         else:
             print(f"FAIL: {_label} (expected under 2.0s)")
             failures += 1
+
+    # WRITES.search is a THIRD unbounded scan, and neither case above can
+    # reach it: `main()` returns at the "commit" prefilter, so a payload that
+    # looks like a writer never gets there as the current command. It is
+    # reached through the TRANSCRIPT, which is also where a huge command
+    # actually turns up in practice. An unclosed `open(` run cost 14.6s end
+    # to end while every timing case above passed.
+    _big = "open(" * 20000
+    _t0 = _time.time()
+    run([use(_big, "t1"), result(TB, "t1")])
+    _elapsed = _time.time() - _t0
+    _label = (f"the hook fits its budget on a huge writer-shaped transcript "
+              f"command ({len(_big)} chars, {_elapsed:.2f}s)")
+    if _elapsed < 2.0:
+        print(f"PASS: {_label}")
+        passes += 1
+    else:
+        print(f"FAIL: {_label} (expected under 2.0s)")
+        failures += 1
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

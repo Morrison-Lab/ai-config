@@ -313,10 +313,20 @@ def _text(block):
 # nothing real and makes each start position O(128) instead of O(n).
 # Measured after: 0.041s at 8k, 0.171s at 30k, 0.578s at 100k.
 # See `shared/coding/regex-backtracking-pitfalls.md`.
+# BOTH quantifiers are bounded, and the second matters as much as the
+# first. Capping the component alone fixed only the one-giant-token
+# shape; the outer `(?:/component)*` still had to try every stopping
+# point, so a chain of short extensionless components -- a directory
+# tree, a nested key breadcrumb -- stayed quadratic at the SAME scale:
+# 0.032s / 0.130s / 0.578s / 2.366s for 2k / 4k / 8k / 16k characters of
+# `abc/`. Bounding the depth too makes each start position O(depth x
+# component) rather than O(n): the same four inputs measure 0.002s /
+# 0.004s / 0.011s / 0.021s.
 PATH_COMPONENT_MAX = 128
+PATH_DEPTH_MAX = 16
 PATHISH = re.compile(
-    r"[\w.-]{1,%d}(?:/[\w.-]{1,%d})*\.[A-Za-z]{1,6}\b"
-    % (PATH_COMPONENT_MAX, PATH_COMPONENT_MAX))
+    r"[\w.-]{1,%d}(?:/[\w.-]{1,%d}){0,%d}\.[A-Za-z]{1,6}\b"
+    % (PATH_COMPONENT_MAX, PATH_COMPONENT_MAX, PATH_DEPTH_MAX))
 
 
 def _paths(command):

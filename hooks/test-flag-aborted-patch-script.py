@@ -444,16 +444,24 @@ def main():
     _spec = _ilu.spec_from_file_location("hookmod", HOOK)
     _hook = _ilu.module_from_spec(_spec)
     _spec.loader.exec_module(_hook)
-    _t0 = _time.time()
-    _hook.PATHISH.findall("a" * 30000)
-    _elapsed = _time.time() - _t0
-    _label = f"PATHISH stays linear on a long extensionless run ({_elapsed:.2f}s)"
-    if _elapsed < 2.0:
-        print(f"PASS: {_label}")
-        passes += 1
-    else:
-        print(f"FAIL: {_label} (expected under 2.0s)")
-        failures += 1
+    # TWO shapes, because bounding only the component fixed only the
+    # first. A chain of short `/`-separated components stayed quadratic
+    # through the outer repetition, and the single-token case cannot see
+    # that -- it contains no `/` at all, so it passed while the general
+    # defect was live and the fix was reported as complete.
+    for _payload, _what in (("a" * 30000, "one long token"),
+                            ("abc/" * 7500, "a deep component chain")):
+        _t0 = _time.time()
+        _hook.PATHISH.findall(_payload)
+        _elapsed = _time.time() - _t0
+        _label = (f"PATHISH stays linear on {_what} "
+                  f"({len(_payload)} chars, {_elapsed:.2f}s)")
+        if _elapsed < 2.0:
+            print(f"PASS: {_label}")
+            passes += 1
+        else:
+            print(f"FAIL: {_label} (expected under 2.0s)")
+            failures += 1
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

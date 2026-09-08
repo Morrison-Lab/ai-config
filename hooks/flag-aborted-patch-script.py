@@ -219,13 +219,17 @@ def _program(argv):
     if argv and argv[0] in ("for", "case", "select"):
         return None
     # `find -exec <prog>` RUNS <prog>, so the head token lies about what
-    # the command does. `find` is in READ_ONLY, and the whole invocation
-    # is one simple command -- the `;` terminator is escaped, so the
-    # splitter never separates it -- which made
+    # the command does. `find` is in READ_ONLY, which made
     # `find . -name '*.md' -exec sed -i ... {} ;` read as a pure reader.
     # A bulk fix across several files is an ordinary way to repair what a
     # patch script half-applied, so that verdict cleared nothing and the
     # guard kept warning after the work was genuinely done.
+    #
+    # The `-exec` clause stays inside the `find` segment whatever the
+    # splitter does with the terminator, which is why resolving here is
+    # enough. Escaping it changes nothing: `shlex` drops the backslash,
+    # so `{} \; echo done` and `{} ; echo done` both split into two
+    # commands, and both leave `-exec sed` in the first one.
     for flag in ("-exec", "-execdir", "-ok", "-okdir"):
         if flag in argv:
             k = argv.index(flag) + 1

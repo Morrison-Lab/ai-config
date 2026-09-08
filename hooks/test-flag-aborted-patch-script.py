@@ -135,12 +135,13 @@ CASES = [
       use("git commit -m x", "t2")], True,
      "a sudo -u wrapped in-place edit still warns"),
 
-    # R2-F2: `find -exec <prog>` RUNS <prog>, and the whole invocation is one
-    # simple command (the `;` is escaped, so the splitter never separates it),
-    # so the head token `find` -- a member of READ_ONLY -- described the
-    # command as a pure reader. A bulk fix across several files is an
-    # ordinary way to repair what a patch script half-applied, so the verdict
-    # cleared nothing and the guard warned on after the work was done.
+    # R2-F2: `find -exec <prog>` RUNS <prog>, so the head token `find` --
+    # a member of READ_ONLY -- described the command as a pure reader. A
+    # bulk fix across several files is an ordinary way to repair what a
+    # patch script half-applied, so the verdict cleared nothing and the
+    # guard kept warning after the work was done. The `-exec` clause stays
+    # in the `find` segment however the splitter treats the terminator, so
+    # writing it bare here rather than escaped tests the same path.
     ([use(THREE_FILE_PATCH, "t1"), result(TB, "t1"),
       use("find . -name '*.md' -exec sed -i s/a/b/ "
           "memories/gh-cli.md CLAUDE.md skills/use-math-macros/SKILL.md ;",

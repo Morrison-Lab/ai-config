@@ -161,6 +161,29 @@ CASES = [
       result("", "t2")], True,
      "an echoed summary naming the files does NOT clear the warning"),
 
+    # The pair the README makes a claim about, and the one the suite could
+    # not see. An announcer does two separate things: it contributes no
+    # path of its own, AND it disables the whole-command fallback that
+    # recovers a heredoc's targets. Only the first is obvious, so a later
+    # command that genuinely re-runs the failed heredoc and then announces
+    # reads as a real fix and still clears nothing -- the incident's own
+    # shape. Pinned so the README's wording stays answerable to the code.
+    ([use(THREE_FILE_PATCH, "t1"), result(TB, "t1"),
+      use(THREE_FILE_PATCH + '\necho "fixed all three"', "t2"),
+      result("", "t2")], True,
+     "a heredoc re-run WITH an announcer does not clear"),
+
+    # Its counterweight: writer segments that name the paths themselves are
+    # unaffected by the announcer, because they never needed the fallback.
+    # Without this case, narrowing the announcer rule until nothing ever
+    # cleared would pass every other case in the suite.
+    ([use(THREE_FILE_PATCH, "t1"), result(TB, "t1"),
+      use("sed -i s/a/b/ memories/gh-cli.md; sed -i s/c/d/ CLAUDE.md; "
+          "sed -i s/e/f/ skills/use-math-macros/SKILL.md; "
+          'echo "fixed all three"', "t2"),
+      result("", "t2")], False,
+     "named writer segments clear even alongside an announcer"),
+
     # R7: the writer's OWN target is often extensionless (`tee log`,
     # `/dev/null`, a bare build-log). An earlier gate keyed on "no writing
     # segment named a path", which such a target satisfies -- so the

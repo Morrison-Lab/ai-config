@@ -156,7 +156,7 @@ def is_commit(command):
     """
     if simple_commands is None:
         return False
-    argvs = simple_commands(command)
+    argvs = simple_commands(command[:SCAN_MAX_CHARS])
     if argvs is None:
         return False
     for argv in argvs:
@@ -188,7 +188,7 @@ def writes(command):
         return False
     if simple_commands is None:
         return True
-    argvs = simple_commands(command)
+    argvs = simple_commands(command[:SCAN_MAX_CHARS])
     if argvs is None:
         return True
     # A command every one of whose simple commands is a known reader cannot
@@ -339,8 +339,13 @@ PATH_DEPTH_MAX = 10
 #
 # So cap the text scanned as well. A command longer than this is not a
 # path list, and a patch script names its targets near the top; the
-# worst case measures about 1.4s at this cap against a 10s budget shared
-# with every other call the hook makes.
+# worst case measures about 1.4s at this cap.
+#
+# The same cap bounds the shlex parses, which are a separate and larger
+# exposure than this regex ever was -- `simple_commands` on one big
+# quoted argument took 1.7s at 300k characters and ran away from there.
+# It is the only reason a budget statement here can mean anything: an
+# unbounded parse can spend the whole 10s before this regex is reached.
 SCAN_MAX_CHARS = 65536
 
 PATHISH = re.compile(
@@ -386,7 +391,7 @@ def _writing_paths(command):
     """
     if simple_commands is None:
         return _paths(command)
-    argvs = simple_commands(command)
+    argvs = simple_commands(command[:SCAN_MAX_CHARS])
     if argvs is None:
         return _paths(command)
     out = set()
@@ -561,7 +566,19 @@ def main() -> int:
     ti = payload.get("tool_input") or {}
     cmd = str(ti.get("command") or ti.get("CommandLine") or ti.get("cmd")
               or ti.get("script") or "")
-    if not is_commit(cmd):
+    # The same substring prefilter `scan()` uses before its own parse, and
+    # for the same reason: this matcher is `Bash`, so it runs on EVERY
+    # tool call, and `simple_commands` shlex-parses whatever it is given.
+    # One large quoted argument -- an ordinary `curl -d`, a `gh api -f
+    # body=`, a long inline JSON payload -- made that parse dominate, and
+    # a 12.7s end-to-end run was measured on a command carrying no commit
+    # and no traceback at all, past the registered 10s.
+    #
+    # `SCAN_MAX_CHARS` on the parse itself is what BOUNDS that; removing
+    # this line alone leaves the suite green. It is here to skip the
+    # parse outright on the overwhelming majority of calls, which are not
+    # commits, rather than to hold the ceiling.
+    if "commit" not in cmd or not is_commit(cmd):
         return 0
 
     path = payload.get("transcript_path") or ""

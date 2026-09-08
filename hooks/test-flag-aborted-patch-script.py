@@ -476,6 +476,38 @@ def main():
             print(f"FAIL: {_label} (expected under 2.0s)")
             failures += 1
 
+    # The whole HOOK must fit its registered budget, not just PATHISH. This
+    # matcher is `Bash`, so it runs on every tool call, and `simple_commands`
+    # shlex-parses whatever it is handed -- one large quoted argument (an
+    # ordinary `curl -d`, a big inline JSON body) made that parse dominate,
+    # and 12.7s was measured end to end on a command carrying no commit and
+    # no traceback. PATHISH was never reached on that path, so every timing
+    # assertion above passed while the hook blew its 10s timeout.
+    #
+    # Measured through the real subprocess, because the defect was the
+    # process wall clock rather than any one function's.
+    for _cmd, _what in (
+            ('curl -s -X POST -d "%s" https://example.com' % ("word " * 130000),
+             "a huge non-commit command"),
+            ('git commit -m "%s"' % ("word " * 130000),
+             "a huge commit message")):
+        _t0 = _time.time()
+        subprocess.run([sys.executable, HOOK],
+                       input=json.dumps({
+                           "tool_name": "Bash",
+                           "tool_input": {"command": _cmd},
+                           "transcript_path": "/nonexistent/none.jsonl"}),
+                       capture_output=True, text=True)
+        _elapsed = _time.time() - _t0
+        _label = (f"the hook fits its budget on {_what} "
+                  f"({len(_cmd)} chars, {_elapsed:.2f}s)")
+        if _elapsed < 2.0:
+            print(f"PASS: {_label}")
+            passes += 1
+        else:
+            print(f"FAIL: {_label} (expected under 2.0s)")
+            failures += 1
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

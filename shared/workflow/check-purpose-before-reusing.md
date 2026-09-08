@@ -459,7 +459,7 @@ The existing hooks block messages that are wrong to send; an error
 admission is right to send, so the copy inverted the purpose while
 remaining structurally valid at every step, with passing tests.
 An earlier instance of the same failure is already recorded narrowly in
-`memories/r-quarto.md`: a `.jarlignore` invented by analogy to other
+`memories/r-linting.md`: a `.jarlignore` invented by analogy to other
 tools' ignore-file conventions, structurally plausible and silently
 inert, because nobody checked that tool's own config reference.)
 

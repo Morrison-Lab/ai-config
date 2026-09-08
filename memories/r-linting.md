@@ -1,13 +1,11 @@
 # R linting and formatting
 
-Split out of [`r-quarto.md`](r-quarto.md) when that file reached two lines of
-headroom under the 1250-line gate (ai-config#1306, ai-config#2003). The three
-tools here answer one question --- what shape must R source be in before CI
-accepts it --- so they were the seam that leaves both halves coherent rather
-than merely shorter.
+Split out of [`r-quarto.md`](r-quarto.md) when that file reached two lines of headroom under the 1250-line gate (ai-config#1306, ai-config#2003).
+The tools here answer one question --- what shape must R source be in before CI accepts it --- so they were the seam that leaves both halves coherent rather than merely shorter.
 
-`r-quarto.md` keeps everything else about the R toolchain, including the
-spell-check and WORDLIST material, which is a different kind of check.
+`r-quarto.md` keeps everything else about the R toolchain, including the spell-check and WORDLIST material, which is a different kind of check.
+It also keeps two `lintr::object_usage_linter` bullets, which sit in a section organized by what only fails in CI rather than by which tool reports it.
+So `lintr` is findable in both files, and this one is not its sole home.
 
 Every pull request and issue cited below is a clickable link, per
 [AGENTS.md](../AGENTS.md)'s "File formatting & links" rule, whose

@@ -322,16 +322,44 @@ def _text(block):
 # `abc/`. Bounding the depth too makes each start position O(depth x
 # component) rather than O(n): the same four inputs measure 0.002s /
 # 0.004s / 0.011s / 0.021s.
-PATH_COMPONENT_MAX = 128
-PATH_DEPTH_MAX = 16
+# Sized from the corpus rather than guessed: across this repo's 1067
+# tracked paths the longest component is 48 characters and the deepest
+# path is 5, so these leave real headroom. Checked directly -- every one
+# of those 1067 paths matches identically under 64/10 and under the
+# 128/16 they replace.
+PATH_COMPONENT_MAX = 64
+PATH_DEPTH_MAX = 10
+
+# Bounding the pattern makes the scan linear; it does not bound the work
+# absolutely, and the constant is large. `_covers()` runs this over a
+# failed patch script's WHOLE text, so a chain of near-cap components
+# still cost 8.2s at 90k characters -- linear, and still enough to blow
+# the 10s the hook registers in hooks.json, which is the same silent
+# death the bounds were added to prevent.
+#
+# So cap the text scanned as well. A command longer than this is not a
+# path list, and a patch script names its targets near the top; the
+# worst case measures about 1.4s at this cap against a 10s budget shared
+# with every other call the hook makes.
+SCAN_MAX_CHARS = 65536
+
 PATHISH = re.compile(
     r"[\w.-]{1,%d}(?:/[\w.-]{1,%d}){0,%d}\.[A-Za-z]{1,6}\b"
     % (PATH_COMPONENT_MAX, PATH_COMPONENT_MAX, PATH_DEPTH_MAX))
 
 
 def _paths(command):
-    """Path-shaped tokens in `command`, as a set."""
-    return {m.group(0) for m in PATHISH.finditer(command or "")}
+    """Path-shaped tokens in `command`, as a set.
+
+    Only the first `SCAN_MAX_CHARS` are examined, which bounds the work
+    absolutely rather than merely making it linear. Truncating can lose
+    a target named very late in a very long command, and that errs
+    toward CLEARING -- the direction this module already prefers, and
+    strictly better than being killed by the timeout, which loses the
+    warning outright and reports nothing at all.
+    """
+    return {m.group(0)
+            for m in PATHISH.finditer((command or "")[:SCAN_MAX_CHARS])}
 
 
 # Programs that only ANNOUNCE. A status line naming the files it believes

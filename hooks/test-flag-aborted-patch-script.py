@@ -449,10 +449,23 @@ def main():
     # through the outer repetition, and the single-token case cannot see
     # that -- it contains no `/` at all, so it passed while the general
     # defect was live and the fix was reported as complete.
-    for _payload, _what in (("a" * 30000, "one long token"),
-                            ("abc/" * 7500, "a deep component chain")):
+    # THREE shapes and an over-cap input. Short components were the only
+    # chain tested once, and near-cap components are several times more
+    # expensive per start position -- they took 8.2s at 90k while the
+    # short chain stayed fast, so the cheap shape passed while the
+    # expensive one blew the registered timeout. The last entry is twice
+    # SCAN_MAX_CHARS, which pins the cap itself: without it the worst
+    # shape simply grows with the input.
+    _near = "a" * (_hook.PATH_COMPONENT_MAX - 1) + "/"
+    for _payload, _what in (
+            ("a" * 30000, "one long token"),
+            ("abc/" * 7500, "a shallow component chain"),
+            (_near * (30000 // _hook.PATH_COMPONENT_MAX),
+             "a near-cap component chain"),
+            (_near * (2 * _hook.SCAN_MAX_CHARS // _hook.PATH_COMPONENT_MAX),
+             "an over-cap near-cap chain")):
         _t0 = _time.time()
-        _hook.PATHISH.findall(_payload)
+        _hook._paths(_payload)
         _elapsed = _time.time() - _t0
         _label = (f"PATHISH stays linear on {_what} "
                   f"({len(_payload)} chars, {_elapsed:.2f}s)")

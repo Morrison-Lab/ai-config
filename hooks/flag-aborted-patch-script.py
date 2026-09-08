@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PreToolUse guard: committing after a multi-edit patch script raised.
+r"""PreToolUse guard: committing after a multi-edit patch script raised.
 
 ## The incident
 
@@ -146,7 +146,7 @@ except Exception as _exc:  # broken install; fail open and say so
 
 
 def is_commit(command):
-    """True when `command` actually runs `git commit`.
+    r"""True when `command` actually runs `git commit`.
 
     argv-based rather than a regex, because `\b` sits happily between
     `commit` and `-`: a `git\s+commit\b` scan matches `git commit-tree` and

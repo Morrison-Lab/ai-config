@@ -11,8 +11,10 @@ patch. Warning on every traceback would train the reader to ignore this,
 which per README costs more than the missing hook.
 
 RESOLVED-BY-A-CLEAN-WRITE: a later writing command that ran clean is taken
-as the re-application. Deliberately weak (it does not check WHICH files),
-because the transcript does not record which edits were intended.
+as the re-application, and it must name every path the failed one did.
+The rule used to accept ANY later clean write, which let the motivating
+incident through -- repairing one of three files discharged the warning
+for the other two. R5-D1 pins that it no longer does.
 
 Run: python3 hooks/test-flag-aborted-patch-script.py \
          hooks/flag-aborted-patch-script.py
@@ -132,6 +134,35 @@ CASES = [
     ([use("sudo -u me sed -i s/a/b/ hooks/x.py", "t1"), result(TB, "t1"),
       use("git commit -m x", "t2")], True,
      "a sudo -u wrapped in-place edit still warns"),
+
+    # R2-F2: `find -exec <prog>` RUNS <prog>, and the whole invocation is one
+    # simple command (the `;` is escaped, so the splitter never separates it),
+    # so the head token `find` -- a member of READ_ONLY -- described the
+    # command as a pure reader. A bulk fix across several files is an
+    # ordinary way to repair what a patch script half-applied, so the verdict
+    # cleared nothing and the guard warned on after the work was done.
+    ([use(THREE_FILE_PATCH, "t1"), result(TB, "t1"),
+      use("find . -name '*.md' -exec sed -i s/a/b/ "
+          "memories/gh-cli.md CLAUDE.md skills/use-math-macros/SKILL.md ;",
+          "t2"),
+      result("", "t2")], False,
+     "a find -exec in-place edit clears the warning"),
+
+    # Its counterweight: the exec'd program decides, so a find that execs a
+    # READER is still a reader. Without this, resolving `find` to "writer"
+    # outright would pass the case above.
+    ([use('find . -name "*.py" -exec grep -n ".write(" {} ;', "t1"),
+      result(TB, "t1")], False,
+     "a find -exec read-only grep does not warn"),
+
+    # R7-F1: ANNOUNCERS is `echo`/`printf`, not every reader. An announcer
+    # also disables the heredoc fallback, so with readers in the set a
+    # `grep -q` PRECONDITION guarding a re-run made a genuine multi-file fix
+    # recover nothing and read as unresolved.
+    ([use(THREE_FILE_PATCH, "t1"), result(TB, "t1"),
+      use("grep -q x memories/gh-cli.md && " + THREE_FILE_PATCH, "t2"),
+      result("", "t2")], False,
+     "a read-only precondition does not block heredoc recovery"),
 
     # R3: a leading `VAR=value` assignment is not the program. Without the
     # skip, `_program` returns "CI=1", which is not in READ_ONLY, so an

@@ -218,6 +218,20 @@ def _program(argv):
     # set, so an audit loop over source files reads as a writer.
     if argv and argv[0] in ("for", "case", "select"):
         return None
+    # `find -exec <prog>` RUNS <prog>, so the head token lies about what
+    # the command does. `find` is in READ_ONLY, and the whole invocation
+    # is one simple command -- the `;` terminator is escaped, so the
+    # splitter never separates it -- which made
+    # `find . -name '*.md' -exec sed -i ... {} ;` read as a pure reader.
+    # A bulk fix across several files is an ordinary way to repair what a
+    # patch script half-applied, so that verdict cleared nothing and the
+    # guard kept warning after the work was genuinely done.
+    for flag in ("-exec", "-execdir", "-ok", "-okdir"):
+        if flag in argv:
+            k = argv.index(flag) + 1
+            if k < len(argv):
+                return _program(argv[k:])
+            return None
     i = 0
     while i < len(argv):
         tok = argv[i]
@@ -290,7 +304,15 @@ def _paths(command):
 # were fixed is exactly what this hook's own warning text asks for, so
 # counting those mentions as coverage would let the summary discharge the
 # warning it was written in response to.
-ANNOUNCERS = READ_ONLY | {"echo", "printf"}
+#
+# Just the two, NOT all of READ_ONLY. Every reader was in here once, on
+# the reasoning that a reader cannot have written anything -- true, and
+# not what this set decides. Presence of an announcer also disables the
+# heredoc fallback, so a `grep -q` PRECONDITION guarding a re-run
+# (`grep -q x a.md && python3 - <<'PY' ... PY`) made a genuine multi-file
+# fix recover no targets at all and read as unresolved. A reader is not
+# an announcement; only a program whose whole output IS the claim is.
+ANNOUNCERS = {"echo", "printf"}
 
 
 def _writing_paths(command):
@@ -314,6 +336,14 @@ def _writing_paths(command):
             continue
         if head in ANNOUNCERS:
             saw_announcer = True
+            continue
+        # A READER contributes nothing and is not a writer. It used to do
+        # both, because READ_ONLY sat inside ANNOUNCERS; taking it out
+        # left readers falling through to here, where a `grep -q a.md`
+        # precondition put its own subject into `out` and the non-empty
+        # `out` then blocked the fallback -- so a guarded heredoc re-run
+        # recovered the grep's file and none of its own.
+        if head in READ_ONLY:
             continue
         saw_writer = True
         out |= _paths(" ".join(argv))

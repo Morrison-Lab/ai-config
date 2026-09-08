@@ -166,8 +166,11 @@ CASES = [
     # path of its own, AND it disables the whole-command fallback that
     # recovers a heredoc's targets. Only the first is obvious, so a later
     # command that genuinely re-runs the failed heredoc and then announces
-    # reads as a real fix and still clears nothing -- the incident's own
-    # shape. Pinned so the README's wording stays answerable to the code.
+    # reads as a real fix and still clears nothing. Not the incident's own
+    # shape -- that was the narrow single-file repair R5-D1 pins -- but a
+    # heredoc is the shape the incident's FAILED command had, so it is the
+    # re-run a session would most plausibly reach for. Pinned so the
+    # README's wording stays answerable to the code.
     ([use(THREE_FILE_PATCH, "t1"), result(TB, "t1"),
       use(THREE_FILE_PATCH + '\necho "fixed all three"', "t2"),
       result("", "t2")], True,

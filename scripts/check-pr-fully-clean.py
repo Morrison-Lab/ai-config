@@ -2078,14 +2078,19 @@ def classify_verdict(body: str, state: str = "") -> str:
 
     structured = extract_structured_review(body)
     if isinstance(structured, dict) and "schema_version" in structured:
-        payload_verdict = normalize_verdict(structured.get("verdict"))
-        if payload_verdict == "NOT_CLEAN":
+        # Reuse the SAME helpers `payload_is_blocking`/`payload_is_clean`
+        # already use a few lines below (and that `pre-push-review.py` and
+        # the pre-push hook also share) rather than re-deriving a narrower
+        # literal "CLEAN"/"NOT_CLEAN" string check here. A hand-rolled
+        # comparison silently missed the CLEAN_VERDICTS/NOT_CLEAN_VERDICTS
+        # synonyms (`READY_FOR_MERGE`, `APPROVED`, `NEEDS_WORK`, `BLOCKED`,
+        # ...) that this same file already treats as equivalent everywhere
+        # else, leaving exactly the false-positive class this fast path
+        # exists to close only half-closed for a reviewer that spells its
+        # verdict any other accepted way (review finding, PR #3359).
+        if payload_is_blocking(structured):
             return "not-clean"
-        if (
-            payload_verdict == "CLEAN"
-            and not payload_findings(structured)
-            and not payload_findings_malformed(structured)
-        ):
+        if payload_is_clean(structured):
             return "clean"
 
     if payload_is_blocking(structured):
@@ -2284,8 +2289,12 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
     if (
         isinstance(structured, dict)
         and "schema_version" in structured
-        and normalize_verdict(structured.get("verdict")) == "CLEAN"
+        and payload_is_clean(structured)
     ):
+        # `payload_is_clean`, not a literal `verdict == "CLEAN"` string
+        # check: the latter silently missed the `CLEAN_VERDICTS` synonyms
+        # (`READY_FOR_MERGE`, `APPROVED`, `APPROVE`) this same file already
+        # treats as clean everywhere else (review finding, PR #3359).
         # `findings` is confirmed empty and well-formed by the two checks
         # above (a non-empty or malformed list already returned above), so
         # this is exactly the well-formed CLEAN payload #3054 asks to trust.
@@ -2478,18 +2487,17 @@ def check_latest_verdict(
         # Report when the payload -- not the prose scan -- decided this
         # item's verdict (ai-config#3054), so a reader can see the phrase
         # scan never ran rather than inferring it from a clean scan line.
+        # Uses payload_is_blocking/payload_is_clean, not a literal
+        # "CLEAN"/"NOT_CLEAN" string check, for the same reason
+        # classify_verdict's own fast path does (review finding, PR #3359):
+        # a hand-rolled comparison would silently under-report this NOTE for
+        # a CLEAN_VERDICTS/NOT_CLEAN_VERDICTS synonym spelling.
         if not finding_pat and state not in ("CHANGES_REQUESTED", "REJECTED"):
             payload = extract_structured_review(body)
             if isinstance(payload, dict) and "schema_version" in payload:
-                payload_verdict = normalize_verdict(payload.get("verdict"))
-                if payload_verdict == "NOT_CLEAN" and verdict == "not-clean":
+                if payload_is_blocking(payload) and verdict == "not-clean":
                     payload_decided.append((when, identity, "not-clean"))
-                elif (
-                    payload_verdict == "CLEAN"
-                    and verdict == "clean"
-                    and not payload_findings(payload)
-                    and not payload_findings_malformed(payload)
-                ):
+                elif payload_is_clean(payload) and verdict == "clean":
                     payload_decided.append((when, identity, "clean"))
         # Findings win over unreadable: a known-agent body with ## Nits and no
         # classifiable verdict line is a standing not-clean, not a NOTE.

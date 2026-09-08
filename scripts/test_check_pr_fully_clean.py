@@ -5244,6 +5244,28 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check("check_latest_verdict: reports a NOTE when the verdict came from the payload (#3054)",
           ok and any("came from its review-data payload" in n for n in notes))
 
+    # Review finding on PR #3359: the payload-first fast path must recognize
+    # every CLEAN_VERDICTS/NOT_CLEAN_VERDICTS synonym this file already
+    # treats as equivalent (READY_FOR_MERGE, APPROVED, NEEDS_WORK, BLOCKED,
+    # ...), not just the literal strings "CLEAN"/"NOT_CLEAN" -- reusing
+    # payload_is_clean/payload_is_blocking rather than a hand-rolled string
+    # comparison is what buys this for free. Reproduces the reviewer's
+    # concrete repro: a schema_version payload spelled "READY_FOR_MERGE"
+    # combined with retrospective "blocking" prose.
+    synonym_verdict_shaped = (
+        "### Verdict\n"
+        "**Ready for merge** -- the one blocking finding from the prior "
+        "review round has been fixed.\n\n"
+        "<!-- review-data:\n"
+        '{"schema_version": "1.0", "verdict": "READY_FOR_MERGE", '
+        '"findings": []}\n'
+        "-->\n"
+    )
+    check("classify_verdict: a CLEAN_VERDICTS synonym (READY_FOR_MERGE) fast-paths too, not just the literal 'CLEAN' string (PR #3359 finding)",
+          checker.classify_verdict(synonym_verdict_shaped) == "clean")
+    check("_unresolved_finding_pattern: a CLEAN_VERDICTS synonym (READY_FOR_MERGE) fast-paths too (PR #3359 finding)",
+          checker._unresolved_finding_pattern(synonym_verdict_shaped) is None)
+
     struct_not_clean = """
 ## Review Summary
 Found defects.

@@ -1,6 +1,7 @@
 # `pkill -f <script>` on a path shared across worktrees kills every worktree's run, not just yours
 
-Split out of [`git-worktrees.md`](git-worktrees.md) (ai-config#694 pattern) at the 1250-line gate.
+A satellite of [`git-worktrees.md`](git-worktrees.md) (ai-config#694 pattern), written here rather than appended there because that file already sits at the 1250-line gate.
+Nothing was moved out of it, so it carries no "Moved to" stub back to this file and discoverability rests on the [`MEMORY.md`](MEMORY.md) index row alone (ai-config#3449).
 
 Three worktrees of this repo can each run the identical validation script (`scripts/run-local-validation.py`) from the identical relative path, in parallel, in their own separate working directories.
 `pkill -f` matches the full command line as a pattern.
@@ -20,6 +21,19 @@ The *damage on this specific occasion* is not established, and asserting it occu
 Two safe forms exist.
 Keep the PID from the launch (`nohup ... & pid=$!`, or an equivalent capture of `$!`) and `kill "$pid"` against that specific number.
 Or, when the PID was not captured, resolve candidates with `pgrep -f <pattern>` and filter each one on its actual working directory before killing it --- `readlink /proc/<pid>/cwd` (or the platform equivalent) compared against your own worktree path, killing only a match.
+
+**That working-directory filter is necessary and not sufficient, and the case it misses is your own caller.**
+`pgrep` excludes its own PID and no other, so the shell running the `pgrep` is itself a candidate: that shell's command line contains the pattern, because the pattern was typed into it.
+Its working directory is your worktree by construction, which is exactly what the filter is told to accept.
+So the filter protects a peer correctly --- a peer's run has a different working directory and is excluded --- while admitting the one process whose death costs you the operation in progress.
+Measured directly, in a plain `bash -c` invocation with no agent harness involved:
+
+```
+pid=9204 cwd=/tmp/pkilltest selfpid=9204 match_self=YES
+pid=9205 cwd=/tmp/pkilltest selfpid=9204 match_self=no
+```
+
+Pass `pgrep -A`/`--ignore-ancestors`, or drop `$$` and its ancestors from the candidate list, before killing anything the working-directory filter accepted.
 The general shape: a kill with any peer-visible side effect needs a scoping predicate the pattern itself does not supply, because the pattern is necessarily identical across every worktree running the same script.
 It does not matter how confident you are that only your own run is stale --- the pattern cannot tell your worktree's process from a peer's.
 
@@ -29,13 +43,14 @@ Acting on that suggestion without checking first is exactly backwards: if the pe
 The report is evidence that a kill was *attempted*, not evidence about its *effect*.
 Only a fresh read of the peer's own process table settles the effect.
 
-This is the same premise this file's "A quiet worktree is not evidence the session working it has stopped" section states for a different signal --- a snapshot answers a question about a moment, not about what is true now --- applied here to a report of an action rather than to an absence of activity.
+The same premise appears in [`git-worktrees.md`](git-worktrees.md)'s "A quiet worktree is not evidence the session working it has stopped" section, for a different signal --- a snapshot answers a question about a moment, not about what is true now --- applied here to a report of an action rather than to an absence of activity.
 That section's remedy is to ask the affected party or re-read live state before concluding a peer is *idle*.
-This is the same remedy applied one step earlier, before concluding a peer's process is *dead*.
+The same remedy applies one step earlier here, before concluding a peer's process is *dead*.
 
 - **Do:** re-check the peer's actual process state (or ask the peer) before recommending, or acting on, a remediation that assumes a kill succeeded.
-- **Do:** capture the PID at launch and kill that PID, or filter `pgrep -f` candidates by `/proc/<pid>/cwd` against your own worktree before killing any of them.
-- **Don't:** run `pkill -f`/`killall` against a script path that more than one worktree can run.
+- **Do:** capture the PID at launch and kill that PID, or filter `pgrep -f` candidates by `/proc/<pid>/cwd` against your own worktree *and* drop `$$` and its ancestors (`pgrep -A`) before killing any of them.
+- **Don't:** run `pkill -f` against a script path that more than one worktree can run.
+- **Don't:** reach for `killall` as the narrower alternative --- it has no full-command-line mode at all, so it cannot match a script path, and `killall python3` instead kills every `python3` on the machine.
 - **Don't:** treat your own report of an attempted kill as confirmation of its effect, and don't pass a "you should re-run" recommendation to a peer without that check --- the recommendation itself can cause the damage the report only suspected.
 
 (Measured 2026-09-09, `Morrison-Lab/ai-config`: three worktrees of this repo each ran `scripts/run-local-validation.py`.

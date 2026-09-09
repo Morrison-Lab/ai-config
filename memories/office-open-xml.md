@@ -585,7 +585,7 @@ The two breaks are independent: either can be present while the other is missing
 
 Neither omission has anything to do with whether `m:oMathPara` was the right choice.
 The equation is still correctly display either way, so "this equation runs into its neighbouring prose" does not by itself say whether the fix is converting to inline or adding the missing break --- reading the two break positions is what decides it.
-This is a *rendering* gap distinct from the ctrlPr entry above: that one is about a structure's own container losing its revision mark;
+This is a *rendering* gap distinct from the ctrlPr entry above: that one is about a structure's own container never being given a revision mark of its own;
 this one is about a correctly-marked display equation missing the plain line breaks that put it on its own line, and the two can be checked independently.
 
 - **Do:** check both `w:br` positions --- immediately before the `m:oMathPara`, and as the last child of `m:oMath` --- before concluding a running-together equation has the wrong display/inline form.
@@ -593,7 +593,7 @@ this one is about a correctly-marked display equation missing the plain line bre
 - **Don't:** convert a correctly-display equation to inline as the fix for prose running into it;
   that discards a correct choice without repairing the missing break, and the equation will still run into whatever follows it if the closing break is also missing.
 
-(Measured 2026-09-09, same manuscript and session as the entries above.
+(Measured 2026-09-09, same manuscript and session as the OMML entries above.
 Three new equations, each correctly authored as display, were missing one or both of these breaks;
 two further equations elsewhere in the same document had the identical gap, unnoticed until a per-file checker counted display equations against their break requirements.
 Five equations in total, missing seven breaks between them (three missing one side, two missing both) --- the same tally [`shared/writing/math-derivation-steps.md`](../shared/writing/math-derivation-steps.md)'s "Choose display or inline, deliberately" section records, which also carries the display-versus-inline decision this defect is easy to mistake for.)

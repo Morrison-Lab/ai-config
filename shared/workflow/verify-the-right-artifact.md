@@ -1199,3 +1199,33 @@ Neither tells you which branch this run took.
 Only running the reader against the exact artifact does, and
 [`mistake-patterns`](../../memories/mistake-patterns.md) Pattern 17 names that move ---
 which is worth stating twice, because it was cited in the same change that failed to perform it.)
+
+## A content diff verifies WHAT CHANGED, not whether the markup is valid
+
+[`memories/office-open-xml.md`](../../memories/office-open-xml.md)'s "Two pandoc diffs verify a redlined docx" section already gives the standard content-level check for a tracked edit: diff the accept/reject conversions, and treat a clean pair as evidence the edit is right.
+That is a check applied correctly and answering a narrower question than it looks like it answers -- related to the ninth shape above (a lossy conversion) and still distinct from it.
+The ninth shape is about a conversion that *drops information it cannot carry*, such as a hyperlink target.
+This is about a conversion that reports success over markup that is *outright invalid* -- the derived text comes out looking exactly right, and the file that produced it does not open.
+
+The mechanism is specific to any format where an annotation is supposed to **gate** whether some content counts as present.
+A tracked-change marker in OOXML gates a run's text under accept versus reject.
+When the marker itself is malformed -- written as an empty child of a run's properties instead of wrapping those properties and the text (see `memories/office-open-xml.md`'s "Writing a NEW OMML tracked-change marker..." entry) -- a walker that simulates accept/reject has nothing to gate: the malformed marker sits *beside* the text rather than *around* it, so the same text is emitted whichever mode the walker simulates, and the diff between the edited file and the original comes out exactly as intended.
+The check passes not because the markup is valid, but because content identity and markup validity are two different properties, and the check was only ever measuring the first.
+A namespace defect can be just as invisible to the same diff for an unrelated reason: a part whose `mc:Ignorable` attribute names a prefix that part no longer declares (the same manuscript's second, independent defect) changes nothing about any run's text at all, so a text-level diff has no way to notice it regardless of how carefully it is read.
+
+That is [`The test`](#the-test) above, applied to a check rather than to a claim: what would have to be true for this diff to be non-empty, and could a genuinely malformed file ever produce that?
+For both defects here, no.
+The malformed marker is symmetric under both readings, and the namespace defect touches no text a diff examines, so the diff cannot distinguish "the edit is correct" from "the edit corrupted the file's markup while leaving its rendered text (or its namespace-unrelated content) alone" -- the two states produce an identical diff.
+
+- **Do:** run a structural/schema-level check (parse every part;
+  verify the shapes an annotation is allowed to take;
+  verify a prefix-list attribute against what is actually declared) *in addition to* a content diff, on any edit to a format where an annotation can be malformed without changing the content it annotates.
+- **Do:** treat a clean content diff as evidence about content only, never as evidence that the file is well-formed or that its consuming application will open it.
+- **Don't:** infer markup validity from a passing accept/reject (or any other rendered-content) comparison -- a malformed gate and a working one can render identically, and a namespace defect can sit entirely outside what the comparison looks at.
+- **Don't:** trust a hand-rolled accept/reject walker's silence as confirmation;
+  per this file's "A hand-built accept/reject simulator is itself an unverified instrument..." section above, run it against a document you know is malformed and confirm it actually flags something, not only against documents you expect to pass.
+
+(Measured 2026-09-09: a repair pass on a manuscript's tracked-change OMML equations swapped a `w:ins`/`w:del` marker from an invalid child-of-`w:rPr` position to the valid wrapping position across five successive delivered copies, while the verification in use throughout was `word/document.xml`'s accept/reject text diff (comparing paragraph text under each mode).
+That diff reported the documents clean at every delivery -- the malformed marker was an empty element with no children, so neither the accept walk nor the reject walk treated it as gating anything, and the run's text simply always appeared.
+A second, unrelated defect in the same manuscript -- `word/comments.xml`'s `mc:Ignorable` naming ten namespace prefixes it no longer declared, after a generic XML library re-serialized the part -- was equally invisible to the same text diff, for the unrelated reason that it touches no run text at all.
+[`scripts/check-docx-tracked-changes.py`](../../scripts/check-docx-tracked-changes.py) in this repo is the structural check that would have caught both: it parses the actual XML and flags a `w:ins`/`w:del` sitting as a `w:rPr` child outside the one legal `w:pPr` exception, and a `mc:Ignorable` prefix with no matching namespace declaration in scope -- exactly the two properties a content diff cannot see.)

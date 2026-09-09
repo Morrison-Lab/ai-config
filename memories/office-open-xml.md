@@ -449,3 +449,72 @@ but it is worth knowing before planning a workflow around the `docx` skill's
 - **Do:** plan a docx workflow so its verification is XML-level and pandoc-level,
   treating a PDF render as a bonus.
 - **Don't:** assume `soffice --convert-to pdf` will load any `.docx` you can otherwise edit.
+
+## Writing a NEW OMML tracked-change marker: wrap `w:rPr`, don't put the marker inside it
+
+The "A regex simulating accept/reject..." section above is about *reading* tracked changes someone else already made;
+this is about *writing* a new one by hand, and it is a different mistake with a different fix.
+
+Writing a fresh `w:ins`/`w:del` marker for an OMML (`<m:oMath>`) run as a **child** of that run's own `<w:rPr>` produced markup Word refused outright ("Word found unreadable content ...
+Do you want to recover the contents"):
+
+```xml
+<m:r><w:rPr><w:ins w:id="9301" w:author="..." w:date="..."/><w:rFonts .../></w:rPr><m:t>x</m:t></m:r>
+```
+
+`CT_RPr` has no `w:ins`/`w:del` child.
+The shape that opens correctly, confirmed against the *same* document's own pre-existing, Word-authored tracked changes, **wraps** the run properties and the text instead:
+
+```xml
+<m:r><w:del w:id="9" w:author="..." w:date="..."><w:rPr>...</w:rPr><m:t>x</m:t></w:del></m:r>
+<m:ctrlPr><w:del w:id="10" w:author="..." w:date="..."><w:rPr>...</w:rPr></w:del></m:ctrlPr>
+```
+
+The one place a marker legitimately sits **inside** a `w:rPr` is when that `w:rPr`'s own parent is `w:pPr` --- `CT_ParaRPr`, the inserted/deleted paragraph-mark case.
+That single exception is the whole of it: everywhere else, `w:ins`/`w:del` wraps `w:rPr` and the content, rather than sitting inside it.
+
+**The cause was a direction-ambiguous note, and the fix is to quote the source instead of describing its shape.**
+An earlier note recorded a related measurement as "54 del / 53 ins on path `w:del < w:rPr < m:r < m:oMath`" --- see this same file's "A regex simulating accept/reject..." section above, which is the entry that notation comes from.
+A "path" written as a chain of tag names carries no marked direction: read one way it says the marker sits *inside* the properties, read the other way it says the marker *wraps* them, and nothing in the four bare names decides which.
+That note was read in the wrong direction when used as a template for writing brand-new markers, and the nesting came out inverted.
+
+The reading that inverted it is not obviously wrong on its face, which is what makes the notation worthless rather than merely imprecise: the same sentence in that earlier entry also calls the measured element "a sibling of `m:t`", language that describes a marker sitting *alongside* the run's content rather than one level deeper inside its properties.
+A path expression and a prose description of the same structure disagreeing about what "inside" means is the ambiguity, not a one-off misreading of a clear note --- and it is left as an open question here (not resolved, since it is not independently re-checkable from this repository) whether that earlier 54/53 measurement was itself affected by the same ambiguity, or describes a genuinely different shape.
+What is independently confirmed, from this document's own markup and from Word's refusal to open the alternative, is the wrapping shape above.
+
+The durable fix is the one this incident's own working notes reached for independently: don't describe a nesting relationship as a nameless chain of tags.
+Quote the literal snippet from the source file instead.
+A quoted snippet carries its own direction --- the wrapping element is visibly the one with the opening and closing tags on the outside --- where a path notation has to be interpreted.
+
+- **Do:** write `w:ins`/`w:del` as the element that wraps `w:rPr` and the run's text, for any OMML run outside a paragraph mark.
+- **Do:** treat `w:pPr`'s own `w:rPr` as the sole exception where a marker legitimately sits inside `w:rPr` rather than around it.
+- **Do:** record a structural finding as a literal quoted snippet, not as a chain of tag names --- a snippet's own opening/closing tags carry the direction that a path notation strips out.
+- **Don't:** infer a marker's correct position from a "path" note without also confirming which way that note's author meant it to read.
+- **Don't:** treat a document's OWN pre-existing tracked changes as safe to skip checking against --- they are the ground truth for what that document's markup generator actually produces, and confirming an edit against a note *about* them is a weaker check than confirming it against a literal example pulled from the file itself.
+
+(Measured 2026-09-09 on a manuscript resubmission.
+The invalid shape was introduced by hand while adding new tracked-change markers to an OMML equation, propagated through five successive delivered copies (75 malformed elements in the first, 92 by the fifth) because the verification in use --- a pandoc-style accept/reject text diff over `word/document.xml` --- cannot see a markup-validity defect at all;
+see [`shared/workflow/verify-the-right-artifact.md`](../shared/workflow/verify-the-right-artifact.md)'s "A content diff verifies WHAT CHANGED, not whether the markup is valid" section for why.
+`scripts/check-docx-tracked-changes.py` in this repo is the structural checker that would have caught it before delivery.)
+
+## Re-serializing an OOXML part with a generic XML library drops prefix bindings, not prefix-shaped text
+
+A second, independent defect turned up in the same manuscript, in a different part: `word/comments.xml` had been rebuilt by an XML library (ElementTree/lxml) and came out carrying `mc:Ignorable="w14 w15 w16se w16cid w16 w16cex w16sdtdh w16sdtfl w16du wp14"` on its root element while declaring **none** of those ten namespace prefixes.
+[Markup Compatibility (ECMA-376 Part 3)](https://ecma-international.org/publications-and-standards/standards/ecma-376/) requires every prefix an `mc:Ignorable` attribute names to be declared in scope on that same element.
+Word refused the part;
+the three Word-authored sibling parts (`commentsExtended.xml`, `commentsIds.xml`, `commentsExtensible.xml`) each declared the full ten-prefix set, which is what made the missing one noticeable at all.
+
+The mechanism generalizes past `mc:Ignorable` specifically, and it is worth naming on its own: a generic XML library reserializes a document's actual `xmlns:*` **declarations** faithfully (or regenerates its own, differently named, `ns0:`/`ns1:`-style prefixes for whatever it still uses), but it has no way to know that a prefix also appears as plain **text** inside some attribute's *value* -- `mc:Ignorable`'s value is a whitespace-separated list of prefix names, which to a generic serializer is just a string, not a reference to anything.
+So the round-trip preserves the string and can silently stop preserving the binding that string depends on, and nothing in that round-trip errors: the attribute is still there, spelled exactly as before, and the file still opens as XML.
+It only breaks under the schema this specific attribute's semantics impose, which no general-purpose XML library enforces.
+
+The repair was to rebuild the affected root using a Word-authored sibling part's own `nsmap` and `mc:Ignorable` value as the template, rather than trying to patch the broken one in place.
+
+- **Do:** treat any attribute whose value is a whitespace- or comma-separated list of namespace prefixes (`mc:Ignorable`, `mc:ProcessContent`'s `PreserveAttributes`, and their relatives) as a second reference to check after a re-serialization, separately from checking that the element's own tag and normal attributes survived.
+- **Do:** compare a re-serialized part's namespace declarations against an untouched Word-authored sibling part when one exists, rather than reasoning about what the library "should" have preserved.
+- **Don't:** assume a generic XML library's round-trip is content-preserving for a prefix that only appears inside an attribute's text -- the serializer's namespace handling cannot see it there.
+- **Don't:** trust `ElementTree.fromstring()`'s parsed tree to answer "which prefixes are declared in scope here" -- it discards prefix bindings once parsed, keeping only resolved `{uri}local` names;
+  checking `mc:Ignorable` against them needs a re-parse that tracks namespace events directly (see `scripts/check-docx-tracked-changes.py`'s `check_ignorable_prefixes`).
+
+(Measured 2026-09-09, same manuscript and session as the OMML entry above.
+`scripts/check-docx-tracked-changes.py` in this repo implements the check this incident argues for.)

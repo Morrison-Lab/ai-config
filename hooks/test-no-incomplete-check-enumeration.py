@@ -297,6 +297,17 @@ CONTENT_CASES = [
      "without a tie reason the WARN ships an empty explanation -- and it "
      "must not blame the subagent, since a complete read did happen"),
     ([PARTIAL,
+      say("Unrelated to this: #4242 is an issue in another repo, filed "
+          "months ago and nothing to do with the work here, mentioned only "
+          "because it came up in passing during an unrelated conversation "
+          "earlier today about something else entirely. Anyway, this is "
+          "fully clean.")],
+     "the PR you named",
+     "#4242",
+     "a far-away reference the message itself calls unrelated must not be "
+     "taken as the claim's subject -- an honest vague label beats a "
+     "confident wrong one"),
+    ([PARTIAL,
       say("#100 was closed as a duplicate. #200 is green, awaiting your "
           "merge.")],
      "#200",

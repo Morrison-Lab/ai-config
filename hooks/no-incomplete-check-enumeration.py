@@ -297,28 +297,44 @@ def already_fired(text):
     return False
 
 
+# How far from the claim phrase a `#N` may sit and still be taken as its
+# subject. Past this, the message is naming something else -- another PR, a
+# closed duplicate, an issue -- and a guess is worse than saying nothing,
+# because the label is carried into the remediation command the user runs.
+_LABEL_WINDOW = 120
+
+
 def _pr_label(text, hit=None):
-    """Name the PR the CLAIM is about, not the first one in the message.
+    """Name the PR the CLAIM is about, or decline to name one.
 
-    A message routinely mentions several PRs -- "#100 was closed as a
-    duplicate. #200 is green, awaiting your merge." -- and the first
+    A message routinely mentions several PRs and issues -- "#100 was closed
+    as a duplicate. #200 is green, awaiting your merge." -- and the first
     reference is very often not the subject of the terminal claim. The
-    payload's remediation command carries this label, so getting it wrong
-    points the user's instrument run at the wrong PR (#3475 round 5).
+    payload's remediation command carries this label, so naming the wrong
+    one points the user's instrument run at the wrong PR (#3475 round 5).
 
-    Prefers the nearest reference at or before the claim phrase, since a
-    claim's subject usually precedes it, then the nearest one after.
+    No heuristic over free text can always pick right, so this one is
+    bounded rather than clever: the nearest reference within
+    `_LABEL_WINDOW` characters of the claim phrase, preferring one before
+    it, since a claim's subject usually precedes it. Outside that window it
+    returns the generic label. Round 6 found the unbounded form reaching
+    across a whole message to grab a reference the text itself called
+    unrelated -- a confident wrong label, which is worse than an honest
+    vague one.
     """
-    if hit is not None:
-        pos = hit.start()
-        before = [m for m in RX_PR_REF.finditer(text) if m.start() <= pos]
-        if before:
-            return before[-1].group(0)
-        after = RX_PR_REF.search(text, pos)
-        if after:
-            return after.group(0)
-    m = RX_PR_REF.search(text)
-    return m.group(0) if m else "the PR you named"
+    generic = "the PR you named"
+    if hit is None:
+        m = RX_PR_REF.search(text)
+        return m.group(0) if m else generic
+    pos = hit.start()
+    before = [m for m in RX_PR_REF.finditer(text)
+              if m.end() <= pos and pos - m.end() <= _LABEL_WINDOW]
+    if before:
+        return before[-1].group(0)
+    after = RX_PR_REF.search(text, pos)
+    if after and after.start() - hit.end() <= _LABEL_WINDOW:
+        return after.group(0)
+    return generic
 
 
 def _relevant_last_subagent(subagent_events, last_partial, claim_pr_refs):

@@ -44,8 +44,8 @@ what a run does once it starts, split at the 1200-line gate.
   workflow never runs.
   What happens to the comment instead is per-repo, and one of the two named
   above ignores it entirely.
-  **What that job accepts differs per repo, so do not carry one repo's answer
-  to another.**
+  **What the comment-dispatch job accepts differs per repo, so do not carry
+  one repo's answer to another.**
   serocalculator's gate accepts `/review` at the start of the body and nothing
   else, so `@claude review` is silently ignored there.
   serodynamics' accepts `/review` *or* any comment containing `@claude`, from a
@@ -363,7 +363,9 @@ so a repo that has deliberately disabled automatic review reports it as live
 the thing to trust instead of memory.
 Measured that day against `UCD-SERG/serocalculator` and
 `UCD-SERG/serodynamics`, both of which returned `pull_request` while their
-`on:` blocks carry `#   pull_request:`.
+`on:` blocks carry `  # pull_request:` (verified with `od -c` against
+`claude-code-review.yml:40` and `:39` respectively --- two spaces of indent,
+then `#`, then one space).
 
 **Read the caller stub's row, not the reusable workflow's.**
 A `workflow_call` file's `on:` block is mostly input *descriptions*, and those

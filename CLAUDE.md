@@ -1651,7 +1651,7 @@ re-verify it.
 
 [`shared/writing/math-derivation-steps.md`](shared/writing/math-derivation-steps.md)
 
-Two axes.
+Three axes.
 *Between* displayed lines, write out every step, and flag gaps in review.
 *Within* one line, decompose complicated internal structure out into extra
 notation, then reapply that until each line carries one operation.
@@ -1661,6 +1661,8 @@ silently duplicated across sections.
 Stop unfolding at a modeled quantity the reader already accepts at that point
 in the argument, which is a test against the exposition rather than a class
 of expression.
+*Whether a line is displayed at all*: ask this explicitly for every equation written or edited, rather than inheriting the form of the nearest neighbouring equation --- display when the prose returns to it or it carries the argument, inline when it is a grammatical constituent of its own sentence, and the same form as its counterpart for any equation meant to be compared against another.
+Format-general: applies to `$...$` versus `$$...$$`/an `equation` environment in Quarto/LaTeX exactly as it applies to `<m:oMath>` versus `<m:oMathPara>` in Word/OOXML.
 
 When running `code-review` or the `ard`/`ardi` loop on a diff that touches
 math, apply this in addition to the fact-check above.

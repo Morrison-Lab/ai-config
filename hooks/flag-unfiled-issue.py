@@ -121,7 +121,7 @@ RX_ALREADY = getattr(_unfiled, "RX_ALREADY", None)
 # `hasn't` spelled with an ASCII escape rather than a literal curly
 # apostrophe, per shared/coding/ascii-punctuation-in-source.md; the plain
 # `'` alternative tolerates a model that drops the apostrophe outright.
-_APOS = "['’]"
+_APOS = "['" + chr(0x2019) + "]"
 
 # A RETROSPECTIVE status report about a gap the session already knows about,
 # not a fresh claim that something is worth tracking. Deliberately bound to

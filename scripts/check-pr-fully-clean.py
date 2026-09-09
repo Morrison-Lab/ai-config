@@ -2494,7 +2494,11 @@ def check_latest_verdict(
         # classify_verdict's own fast path does (review finding, PR #3359):
         # a hand-rolled comparison would silently under-report this NOTE for
         # a CLEAN_VERDICTS/NOT_CLEAN_VERDICTS synonym spelling.
-        if not finding_pat and state not in ("CHANGES_REQUESTED", "REJECTED"):
+        # Not gated on `finding_pat`: a NOT_CLEAN payload makes
+        # `_unresolved_finding_pattern` return its "structured blocking
+        # verdict" string, so gating on an empty finding_pat would suppress
+        # the NOTE for exactly the not-clean half (review finding, PR #3359).
+        if state not in ("CHANGES_REQUESTED", "REJECTED"):
             payload = extract_structured_review(body)
             if isinstance(payload, dict) and "schema_version" in payload:
                 if payload_is_blocking(payload) and verdict == "not-clean":

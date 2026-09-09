@@ -1440,3 +1440,24 @@ the round as clean.
 Push the next code change, or the round's own follow-up, so a fresh round is
 worded cleanly, and let the instrument read that one.
 Only a round with no such phrase and no such heading exits 0.)
+
+## A prose "Ready for merge" over a structured `NOT_CLEAN` payload
+
+(`d-morrison/rme#1138`, review posted 2026-09-09T15:40:54Z.
+The comment's "### Verdict" section read "**Ready for merge** --- ... no new
+blocking issues were found; the remaining items above (subfile extraction,
+`\ba`/`\ea` consistency, citation verification) are suggestions/nits, not
+blockers", while the same comment's structured payload carried
+`"verdict": "NOT_CLEAN"` with three entries in `findings`.
+`scripts/check-pr-fully-clean.py` consumed the structured payload and
+refused, per the payload-wins rule this file's companion document settles
+(ai-config#3054): a confirming occurrence, not a new failure mode.
+What made it worth recording anyway is the driving session's own state going
+in --- it had cached the *previous* round on this same head as "Ready for
+merge with zero findings," so the new round's prose/payload disagreement read
+as consistent with what was already believed, and stayed invisible until the
+checker was run fresh against the current head.
+The reviewer's own "suggestions/nits, not blockers" framing was also not the
+bar to apply: `CLAUDE.md`'s Strict Merge Control Policy vetoes a merge over
+any standing not-clean, nits included, regardless of the reviewer's own
+blocking/non-blocking classification of its findings.)

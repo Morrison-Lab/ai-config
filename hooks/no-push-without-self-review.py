@@ -1758,6 +1758,26 @@ def verify_review(transcript_path: str, directory: str | None,
         )
 
     try:
+        resolved_commit = _rev_parse(directory, env, f"{reviewed_commit}^{{commit}}")
+    except TimeoutError as e:
+        return False, (
+            f"This guard {e}.\n"
+            "It refuses rather than letting the push through unchecked; re-run once the "
+            "repository is responsive, or use the override and say so."
+        )
+    if resolved_commit is None:
+        return False, (
+            f"The clean verdict's fingerprint `{reviewed_commit}` does not resolve to any "
+            "commit in this repository.\n"
+            "That is a fabricated or corrupted fingerprint, not a stale verdict for a "
+            "different commit -- a reviewer that recalls or reconstructs a SHA instead of "
+            "reading it can get a prefix right and invent the rest. Re-dispatch the "
+            "reviewer and tell it to obtain the SHA by running `git rev-parse HEAD` and "
+            "copy the 40-character output verbatim, not reconstruct or abbreviate it."
+        )
+    reviewed_commit = resolved_commit
+
+    try:
         commits, why = shipped_commits(directory, argv, env)
     except TimeoutError as e:
         return False, (

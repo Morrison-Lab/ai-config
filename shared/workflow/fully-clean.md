@@ -586,9 +586,10 @@ not-clean; only a later clean from the same reviewer does
   standing not-clean, even with `mwc` active.
 
 **The standing not-clean can be your own, and clearing it takes a specific comment shape.**
-The rule above is usually read as being about a *reviewer's* verdict, but the per-reviewer scan does not distinguish a bot's identity from a human session's own `gh pr comment` --- so a scoped do-not-merge warning a session posted itself, about a head that has since been replaced, sits exactly the same way and needs the same same-identity supersession.
+The rule above is usually read as being about a *reviewer's* verdict, but the per-reviewer scan does not distinguish a bot's identity from a human session's own `gh pr comment` --- so a scoped do-not-merge warning a session posted itself, about a head that has since been replaced, sits exactly the same way and needs the same identity-scoped supersession.
 Prose does not clear it.
-`_is_structured_review_body()` admits a non-bot clean verdict only through the structured-report branch --- a report heading (`## Summary` / `## Findings` / `### Verdict`) plus a `Reviewed-Commit: <full 40-char sha>` fingerprint line --- while a non-bot not-clean is admitted unconditionally, so the two paths are not mirror images.
+`_is_structured_review_body()` admits a non-bot clean verdict only through the structured-report branch --- a report heading (`## Summary` / `## Findings` / `### Verdict`) plus a line starting `Reviewed-Commit:` --- while a non-bot not-clean is admitted unconditionally, so the two paths are not mirror images.
+The function itself checks only for the heading and the `Reviewed-Commit:` label, not what follows the colon, but writing the full 40-character sha there is still the right convention, since it is what lets a human or another tool confirm which head the withdrawal actually covers.
 A prose withdrawal ("the blocking concern is withdrawn") that fails the structure gate is silently discarded, with nothing distinguishing "not admitted" from "never commented."
 
 - **Do:** withdraw your own earlier not-clean as a structured report --- `## Summary` / `## Findings` / `### Verdict` headings plus a `Reviewed-Commit: <full sha>` line --- not as prose.

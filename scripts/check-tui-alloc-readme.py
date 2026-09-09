@@ -39,31 +39,25 @@ CLAIM = re.compile(
     r"defaults: (\S+) hwthreads / (\S+) / (\S+), off GPU node (\S+)\)"
 )
 
-# Every walltime spelling salloc accepts. Checked before compaction, so a
-# script value SLURM would reject -- the README's own "7d" shorthand, most
-# plausibly -- is refused here rather than compacting to itself and
-# comparing equal against the README that taught it.
-SLURM_TIME = re.compile(
-    r"""\d+                    # minutes
-      | \d+:\d\d               # minutes:seconds
-      | \d+:\d\d:\d\d          # hours:minutes:seconds
-      | \d+-\d\d?              # days-hours
-      | \d+-\d\d?:\d\d         # days-hours:minutes
-      | \d+-\d\d?:\d\d:\d\d    # days-hours:minutes:seconds
-    """,
-    re.X,
-)
+# The README's own shorthand, which salloc does not accept. This is the one
+# way an unrecognised value could compact to itself and compare equal against
+# the README that taught it, so it is refused by name. Validating SLURM's
+# whole walltime grammar here was tried and reverted: it accepts unpadded
+# fields (`1:0:0`) and the keywords UNLIMITED and INFINITE, so a pattern
+# tight enough to be worth having rejected valid values and failed CI on
+# them, which is a worse failure than the one it guarded.
+README_SHORTHAND = re.compile(r"\d+[dh]")
 
 
 def compact_time(slurm_time: str) -> str:
     """Render a SLURM walltime the way the README states it (48h, 7d).
 
-    Both SLURM forms the default has used are handled: HH:MM:SS, and the
-    D-HH:MM:SS form the 7-day default introduced. Any other accepted SLURM
-    spelling is returned unchanged, so the README must then state it
-    verbatim; `parse_script` has already refused anything SLURM would not
-    accept at all, which is what stops an unknown value compacting to
-    itself and matching a README that copied it.
+    Both SLURM forms the default has used are handled: zero-padded
+    HH:MM:SS, and the D-HH:MM:SS form the 7-day default introduced. Any
+    other spelling is returned unchanged, so the README must then state it
+    verbatim and drift is still caught by the comparison. The one value that
+    could compact to itself and match a README that copied it is this
+    README's own shorthand, which `parse_script` refuses.
     """
     m = re.fullmatch(r"(\d+)-(\d\d):(\d\d):(\d\d)", slurm_time)
     if m and m.group(2) == "00" and m.group(3) == "00" and m.group(4) == "00":
@@ -86,10 +80,10 @@ def parse_script(text: str) -> dict[str, str]:
                   file=sys.stderr)
             sys.exit(2)
         values[name] = m.group(1)
-    if not re.fullmatch(SLURM_TIME, values["time"]):
+    if re.fullmatch(README_SHORTHAND, values["time"]):
         print(f"parse failure: the script's walltime {values['time']!r} is"
-              " not a spelling salloc accepts -- fix the script rather than"
-              " teaching this check to compare an invalid value",
+              " this README's shorthand, which salloc does not accept -- the"
+              " script wants a SLURM spelling such as 7-00:00:00",
               file=sys.stderr)
         sys.exit(2)
     return values

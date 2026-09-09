@@ -312,6 +312,13 @@ The far-side case the coverage rule above prescribes catches what a narrowing ex
 It says nothing about whether the fix still does its own job, and a fix that hides a signal can pass a far-side case while quietly failing the case that prompted it.
 The `2>/dev/null` fix is the cheapest illustration: it silenced the very failure it was added to tidy, so the original probe was the only one that could have caught it, and it was the one probe nobody thought to repeat.
 
+**A near-identical sibling block is the same probe failing for a location reason rather than a content reason.**
+On `ucdavis/hac.sap#43` (2026-09-06), a file held two near-identical `test_that` blocks, one a DOCX round-trip and one an HTML round-trip.
+A mutation demonstrated a finding against the HTML block, and the fix was a first-occurrence string replacement whose anchor text matched both blocks equally.
+It landed on the DOCX block instead, and nothing about the edit looked wrong: the replacement text was correct, the diff was clean, and the file still parsed.
+Only re-running the exact mutation that had demonstrated the finding exposed it, because that mutation still survived against the untouched HTML block.
+The general form is that a fix's anchor needs to be unique to the site the finding is about, not merely present at it, and the check for that is the same re-run this section already prescribes: confirm the demonstrating mutation is caught after the fix, not merely that some edit was made near where the finding was.
+
 **Deleting a partly-true claim is the over-correction's prose form, and it is the one that leaves no artifact.**
 The over-correction above narrows a pattern past its target.
 Its prose sibling is a claim a reviewer shows to be false *in one direction*, answered by removing the whole claim.

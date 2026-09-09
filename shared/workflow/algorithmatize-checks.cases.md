@@ -379,6 +379,41 @@ directory passed, every row still reported a genuine non-zero failure count, and
 the mutations themselves applied, so the only wrong thing was the one field the
 matrix exists to publish.)
 
+## An accumulating test artifact made a real baseline fail like a caught mutant
+
+(`ucdavis/hac.sap#49`, 2026-09-06: a mutation-testing session against an R
+flextable rendering path ran `testthat::test_local()` many times in a row.
+Each run left behind a gitignored `Rplots1.pdf`, `Rplots2.pdf`, and so on in
+`tests/testthat/`, since nothing in the suite tells the plotting device to
+overwrite rather than open a fresh file.
+Past roughly 1000 accumulated files, R could no longer name an unused file
+for `pdf()`, and every flextable test in the suite failed with
+`no suitable unused file name for pdf()`.
+
+During mutation testing "the suite failed" reads as "the mutant was
+caught", so every mutant read as caught, including genuinely surviving ones,
+and three separate readings of the mutation matrix were void this way
+before the cause was found.
+Only running an unmutated baseline **inside the same batch** exposed it: the
+baseline failed identically to every mutant, which is
+[`algorithmatize-checks.md`](algorithmatize-checks.md)'s sixth outcome, a
+mutant failing for a reason other than the mutation, but reached here
+through resource exhaustion accumulated across many prior runs in the same
+location rather than through a single run executing somewhere different.
+
+That sixth outcome's own discriminator, an unmutated copy run from the
+mutant's own location, is not enough when the location itself degrades
+between runs: a baseline run once at the start of a long session can pass
+while a baseline run inside the batch that follows it fails.
+A mutation-testing harness needs three things a location-only discriminator
+does not supply on its own: a baseline run in every batch, not only the
+first; a known environmental failure signature, here the literal string
+`no suitable unused file name for pdf()`, recognized and excluded from
+scoring rather than counted as a caught mutation; and a cleanup step that
+clears the accumulating artifacts before or between batches, rather than
+relying on `.gitignore` to keep them out of review while they still break
+every run they never appear in.)
+
 ## There is a fourth outcome: a mutation that applies cleanly and is unfaithful
 
 (`Morrison-Lab/ai-config#1278`, 2026-08-08, round 6: a mutation meant to restore

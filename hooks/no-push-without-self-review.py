@@ -140,6 +140,154 @@ REVIEW_PROMPT_RE = re.compile(
 
 AGENT_TOOLS = {"agent", "task", "invoke_subagent", "taskoutput", "task_output", "manage_task"}
 
+# A cross-family reviewer invoked as a CLI, whose print-mode output IS its
+# review. Each value lists the flags putting that program in non-interactive
+# print mode, so an interactive session -- whose transcript carries no
+# response -- cannot be mistaken for a review.
+#
+# Accepting these lets `when-to-orchestrate`'s cross-family verify
+# recommendation reach the one check that most wants it, and gives a session at
+# its own quota ceiling a reviewed-push path at all.
+#
+# Only flags this repository has attested against the real CLI belong here.
+# `--print` and `-p` are both recorded in `memories/antigravity.md`; a plausible
+# third spelling was dropped rather than shipped on inference, since a flag that
+# does NOT mean print mode would let an interactive run count as a review.
+EXTERNAL_REVIEWER_PRINT_FLAGS = {
+    "agy": ("--print", "-p"),
+}
+
+# The ONE accepted shape, matched against the raw command text:
+#
+#     agy --print 'a prompt naming the review'
+#
+# The prompt must be SINGLE-quoted, which is what makes this sound. Bash
+# performs no expansion or substitution inside single quotes and no character
+# escapes them, so every metacharacter in there is literal and the quoted run
+# ends at the next `'`. Anchoring to the whole string then leaves nowhere for a
+# second command to live.
+#
+# Matching raw text rather than `shlex.split` output is the sixth adversarial
+# finding against this check, and the reason is worth keeping: `shlex.split`
+# splits on WHITESPACE only and knows nothing of `;`, `&&`, `|` or `&`. So
+#
+#     agy --print adversarial-self-review;evilbin
+#
+# is three words to `shlex` and two commands to bash, and the second one's
+# stdout joins the first's in the tool result the verdict is read from.
+#
+# The separators are `[ \t]`, NOT `\s`. Python's `\s` matches `\n`, and a
+# newline is one of bash's own statement separators, so `\s` between the
+# program and its flag accepted
+#
+#     agy
+#     --print 'a prompt naming the review'
+#
+# as one command while bash ran two --- invoking the real reviewer with no
+# argument at all, and putting a second statement's output in the same tool
+# result. Found by the seventh adversarial round. Space and tab are bash's own
+# default IFS, and are the only separators that keep one command one command.
+EXTERNAL_REVIEWER_COMMAND_RE = re.compile(
+    r"\A[ \t]*(?P<program>[A-Za-z0-9_.-]+)"
+    r"[ \t]+(?P<flag>--print|-p)"
+    r"[ \t]+'(?P<prompt>[^']*)'[ \t]*\Z")
+
+def external_reviewer_command(command: str) -> bool:
+    """Is this Bash command a cross-family reviewer run whose output is its review?
+
+    The guard is sound because the harness produces the tool result and a
+    session cannot fabricate one. That property survives the move to a CLI
+    reviewer only if the COMMAND is verified rather than the text of its
+    result: scanning the transcript for a `Reviewed-Commit:` line would be
+    satisfied by typing `echo`, which is the discharge
+    `shared/workflow/algorithmatize-checks.md` says to refuse to ship rather
+    than to weaken.
+
+    So the command must be ONE CANONICAL SHAPE, compared rather than parsed:
+
+        agy --print 'a prompt naming the review'
+        agy -p 'a prompt naming the review'
+
+    A recognized reviewer, a print-mode flag attested against the real CLI, and
+    a SINGLE-QUOTED prompt naming the review, matched against the whole raw
+    command. Anything else is refused.
+
+    The single quotes carry the weight. Bash expands nothing inside them and no
+    character escapes them, so the quoted run ends at the next `'` and every
+    metacharacter within it is literal; anchoring the match to the whole string
+    then leaves nowhere for a second command to live.
+
+    That severity is the point, and it was expensive to learn. Five successive
+    adversarial review rounds each produced a working end-to-end bypass of a
+    laxer rule, and every round after the first was defeated by the fix for the
+    round before it:
+
+        1. the keyword in a trailing `#` comment, against a match on the raw
+           command text
+        2. the keyword in a decoy trailing argument, against a match on any
+           positional
+        3. the keyword in the first of two `--print` flags, where a last-wins
+           parser delivers the second
+        4. the keyword behind a mid-word `#`, where a second comment rule
+           deleted the second `--print` and made an ambiguous command read as
+           an unambiguous one
+        5. a comment truncated to end of string rather than end of line, hiding
+           `echo` lines whose forged verdict the report parser read as the last
+
+    All five were one defect: the matched text was not the delivered prompt.
+    Each fix modelled another program's argument grammar from outside that
+    program, closing one instance while feeling like it closed the class.
+
+    A shape comparison ends that. It has no model of how `agy` parses anything,
+    so there is no model to be wrong.
+
+    A sixth round then showed why the shape must be compared against the RAW
+    command rather than against `shlex.split` output. `shlex` splits on
+    whitespace alone and knows nothing of bash's operators, so
+
+        agy --print adversarial-self-review;evilbin
+
+    is three words to it and two commands to bash, and the second program's
+    stdout joins the first's in the very tool result the verdict is read from.
+    An unquoted word cannot be certified by counting words.
+
+    The cost is real and deliberate. Refused: a double-quoted prompt, since
+    bash expands `$(...)` inside one; `$'...'`, whose leading `$` is outside
+    the quotes; a leading `cd /x &&`; any extra flag, `--model` included; and a
+    prompt supplied on stdin. A prompt containing an apostrophe is refused too,
+    which is the sharpest edge here. Run the `cd` as its own earlier command,
+    pass the prompt as one single-quoted argument, and reword an apostrophe.
+
+    Refusing `--model` means this path cannot select a model, so an invocation
+    needing a specific one falls back to the in-family dispatch. That is worth
+    revisiting only with an attested flag and a shape that keeps this
+    property, never by loosening the quoting.
+
+    Two residues this accepts rather than closes, stated because a guard that
+    hides its own limits is worse than one that names them.
+
+    The session composes the prompt, so it can steer toward the verdict it
+    wants. The in-family path shares that: it takes its brief from the same
+    session and applies `REVIEW_PROMPT_RE` to it. The difference favours the
+    in-family path, whose `prompt` field is exactly what the subagent receives,
+    while this is a pre-expansion shell word -- a variable or substitution can
+    still make the delivered prompt differ from the word that matched.
+
+    The program name is resolved from `PATH`, so a script named `agy` earlier
+    on `PATH` satisfies this. That one IS new, since the in-family path names a
+    `subagent_type` the harness resolves. Accepted deliberately (user decision,
+    2026-09-06, on #3209): forging it costs writing an executable that prints a
+    verdict, which is a decision to defeat the guard rather than a shape a
+    session falls into by accident.
+    """
+    match = EXTERNAL_REVIEWER_COMMAND_RE.match(command)
+    if match is None:
+        return False
+    if match.group("flag") not in EXTERNAL_REVIEWER_PRINT_FLAGS.get(
+            match.group("program"), ()):
+        return False
+    return bool(REVIEW_PROMPT_RE.search(match.group("prompt")))
+
 OVERRIDE_ENV = re.compile(r"\AALLOW_UNREVIEWED_PUSH=1\Z")
 
 # Degraded mode only, where the shell parser is unavailable and the strict
@@ -1478,6 +1626,11 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                             if task_id and task_id in reviewer_task_ids:
                                 if isinstance(call_id, str) and call_id:
                                     reviewer_call_ids.add(call_id)
+                    elif tool_name == "bash" and external_reviewer_command(
+                            str(inp.get("command") or "")):
+                        saw_reviewer_call = True
+                        if isinstance(call_id, str) and call_id:
+                            reviewer_call_ids.add(call_id)
                     elif tool_name == "send_message" and record_is_reviewer:
                         msg_text = str(inp.get("Message") or inp.get("message") or "")
                         if msg_text:

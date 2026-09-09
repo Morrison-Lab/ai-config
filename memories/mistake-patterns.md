@@ -1152,3 +1152,99 @@ A clean automated review from every available provider evaluating the current HE
   That is a code change to the guard (ai-config#3319), not yet made as of
   this writing; until it lands, the literal-path habit above is the only
   defense.
+
+## Pattern 53: Gating an Authoritative Parser on an Unsound Raw Text Pre-Filter
+
+- **Mistake**: putting a cheap raw-text scan *in front of* a real parser to
+  decide which inputs are worth parsing.
+  The scan then decides relevance for inputs the parser could have judged
+  correctly, and any encoding the format allows but the scan cannot see
+  becomes a silent bypass.
+- **Direction of failure**: fail-open, and invisibly.
+  Nothing errors; the input is simply skipped.
+  On a blocking guard that is the expensive direction, because the guard
+  reports success while not having looked.
+- **Example**: 2026-09-07, `Morrison-Lab/ai-config` PR
+  [#3304](https://github.com/Morrison-Lab/ai-config/pull/3304),
+  `hooks/guard-slide-major-tag.py`.
+  Commit `6694317a0` added a pre-filter skipping any workflow file whose text
+  lacked the substring `workflow_call`; commit `a401ea0eb` reordered it away
+  after review.
+  The bypass needs an ESCAPE, not merely quoting --- a plainly double-quoted
+  key still contains the substring, so it would not have tripped anything:
+
+  ```python
+  >>> "workflow_call" in 'on:\n  "workflow_call":\n'
+  True
+  >>> "workflow_call" in 'on:\n  "\\u0077orkflow_call":\n'
+  False
+  >>> yaml.safe_load('on:\n  "\\u0077orkflow_call":\n')
+  {True: {'workflow_call': None}}
+  ```
+
+  `\u0077` is `w`, so PyYAML and GitHub Actions both resolve the key, while
+  the raw text never carries it.
+  An added `checks: read` job permission passed the guard.
+- **Fix**: it is an ordering problem, not a matching problem.
+  Parse first, and let the parsed structure be the sole test for anything
+  that parses.
+  Consult the raw scan only for input the parser cannot read at all, where
+  nothing better exists and its error direction can be made conservative.
+- **Why widening the scan is the wrong repair**: hand-decoding a format's
+  escapes to decide whether to parse is the same mistake one level down, and
+  each widening fixes the named encoding while leaving the next one open.
+
+- **Do:** run the authoritative parser first, and reserve text heuristics for
+  input that fails to parse.
+- **Do:** mutation-test the ordering --- reintroduce the scan into the parsed
+  path and confirm an escaped-key test flips to allow.
+- **Don't:** add a pre-filter whose premise is that absence of a token proves
+  irrelevance; in any expressive format that premise is false.
+- **Don't:** treat a green suite as coverage of the fallback path, which is
+  usually the one no test forces.
+
+Closely related to **Pattern 34** above, which is the same transformation
+blindness in a different code shape: there a raw-text subsumption proof was
+used to DELETE a parser branch, here a raw-text scan is used to decide the
+parser never RUNS.
+Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
+
+## Pattern 54: A Briefed "Measured" Claim Ships Unverified Because It Already Sounds Checked
+
+- **Mistake**: publishing a technical claim into a memory file because a task
+  brief stated it as already "measured", instead of reproducing it first.
+  A claim pre-labelled as verified reads as settled input rather than as an
+  assertion to check ---
+  [`dont-take-my-word-for-it.md`](../shared/principles/dont-take-my-word-for-it.md)'s
+  "illusion of prior verification", with the label doing confidence's work.
+- **Direction of failure**: fail-open into the corpus.
+  The false claim was the entry's whole thesis, so shipping it would have
+  taught every later reader a wrong lesson from a "reproduction" that never ran.
+- **Example**: 2026-09-09,
+  [#3379](https://github.com/Morrison-Lab/ai-config/pull/3379).
+  The brief asserted that an unpinned `npx markdownlint-cli2` matched no files
+  and that `Summary: 0 issues in 0 files` was the tell.
+  Reproduction disproved both: an unpinned run lints the whole corpus exactly
+  as a pinned one does, and that string is a later version's wording for the
+  same clean verdict, appearing over 752 files and over an empty match alike.
+  Scope lives on the `Linting:` line above it, and this was caught before
+  review.
+- **A second, narrower miss rode along**, caught by a reviewer rather than by
+  me: the dupe-check grepped only the two files the brief named, missing
+  `shared/principles/fail-fast.rationale.md` and
+  `memories/nested-worktree-instrument-inflation.md`, which already carried the
+  lesson.
+  [`grep-is-not-coverage.md`](../shared/workflow/grep-is-not-coverage.md) names
+  the shape; the specific error was letting the brief set the search scope.
+- **Fix**: treat "measured" in a brief as a claim to re-measure, and scope a
+  dupe-check to the corpus rather than to the files a brief happens to name.
+
+- **Do:** reproduce a brief's own "measured" claim before writing it into a
+  memory file, exactly as for any unverified assertion.
+- **Do:** grep the whole corpus for a dupe-check, not the files the task names.
+- **Don't:** read a stated measurement, a date, or confident phrasing as
+  evidence the claim was checked --- those are the signals
+  [`dont-take-my-word-for-it.md`](../shared/principles/dont-take-my-word-for-it.md)
+  says to distrust.
+- **Don't:** let a brief-scoped grep stand in for a corpus-wide one because it
+  returned zero hits.

@@ -121,6 +121,30 @@ into this rule.
 - **Don't:** validate a matcher by reading it -- a wrong one reads as correct.
 - **Don't:** trust a comment describing what the pattern cannot match.
 
+**The bad-input test above is not the negative control, and a brand-new
+instrument needs both before its first real finding is trusted.**
+Passing the reported bad input proves the instrument can catch the thing it
+was built for; it says nothing about whether the instrument reports a clean
+result on input that is already fine, which is the direction a hand-rolled
+checker fails silently and dangerously.
+A false **negative** here -- reporting a defect that is not there -- is not
+the safe-side error it usually is: it reads as a rigorous, structural
+finding rather than a guess, so it invites "fixing" content that was never
+broken, which can destroy real work the false positive in the other
+direction never would have.
+
+- **Do:** run a newly built instrument against a known-good input and require
+  a clean (no-op) result before trusting any finding it reports elsewhere.
+- **Don't:** treat an instrument's own careful construction as a substitute
+  for running it against a case where the right answer is "nothing wrong".
+
+See [`memories/office-open-xml.md`](../../memories/office-open-xml.md)'s "A
+hand-built accept/reject simulator is itself an unverified instrument until
+it passes a negative control", where a self-built docx tracked-change
+renderer reported data loss that did not exist, and rewriting it to walk
+the document in order and re-running it against the untouched original
+found the bug immediately.
+
 ### Scale that from one reported input to a corpus of real ones
 
 The rule above fixes the exact input that prompted the guard, and asks for
@@ -427,6 +451,69 @@ as of this writing.
 The corruption was caught and mutation-tested by a later adversarial-review
 round within that same PR, before it ever reached `main`.)
 
+### Confirm a mutation reached the file by its CONTENT, and never by `git diff`
+
+A mutation applied by string replacement can silently fail to match, so the
+sweep has to check that the file changed before reading the suite's verdict.
+`git diff --quiet` is the reflex for that and is wrong for the commonest
+case: it reports no change for an **untracked** file, whatever you wrote into
+it.
+
+The false "did not apply" is not the expensive half.
+A harness that skips the suite on that reading usually skips the **restore**
+with it, so the mutation stays in the file and the next one is applied on top.
+Three mutations then accumulate, every later result is meaningless, and the
+run ends with a broken file and a green-looking log.
+Compare a hash, or the anchor string's presence, instead.
+
+- **Do:** hash the file before and after, and treat an unchanged hash as a
+  harness failure rather than as a finding about the test.
+- **Do:** restore from a pristine copy on every path, including the
+  did-not-apply path.
+- **Don't:** use `git diff` to confirm a mutation on a file the branch has not
+  committed yet --- which is exactly when a new instrument is being mutated.
+
+(Measured 2026-09-08 while adding `scripts/resolve-equation-anchors.py`:
+three mutations of a new, still-untracked script all read as "did not apply",
+all three had in fact applied, and none was restored.
+The suite's final run was against a file carrying all three.)
+
+### A surviving mutation is a question before it is a coverage gap
+
+The natural reading of a mutation nothing catches is that the suite is thin
+there, and the natural fix is another test.
+Both can be wrong at once, and writing the test first hides which.
+
+A mutation also survives when a **second mechanism masks its effect**, and
+then the test you add to kill it either passes vacuously or asserts on the
+wrong observable.
+Diagnose the survivor before treating it: run the mutated code on the
+discriminating input and look at the intermediate state, not just the output.
+
+The distinction matters beyond the test, because a survivor of this kind
+usually means a comment somewhere overstates what the mutated line does.
+That comment is itself a claim-bearing artifact, so it wants correcting in the
+same commit as the test.
+
+- **Do:** print the intermediate state under the mutation before writing a
+  test for it.
+- **Do:** assert on whatever the mutation actually changes, which may be a
+  structure rather than the reported result.
+- **Do:** correct the mutated line's own comment when the diagnosis shows it
+  claimed more than the line does.
+- **Don't:** add a test that pins the output when the output is provably
+  identical either way --- it passes under the mutation and reads as coverage.
+
+(Measured 2026-09-08, same script.
+Removing a void-element guard from an HTML tree builder changed no reported
+anchor, so the guard looked dead.
+It is not: it keeps the tree faithful.
+The effect was masked because a generated `eq-anchor-N` id itself begins with
+`eq-`, so the next equation's ancestor-walk found it and reused it whether or
+not the void tag had reparented anything.
+The first replacement test asserted on anchors and passed under the mutation;
+the one that discriminates asserts on parents.)
+
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 
 "Test the instrument against the incident that prompted it, verbatim"'s closing **Don't** governs a comment claiming *what* a matcher matches.
@@ -568,6 +655,19 @@ A distribution beats a pass/fail here: a property's *signature* is visible in a 
 - **Don't:** treat "two independent checks agree" as corroboration when neither has been shown able to disagree.
 
 See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md), "A citation to a check that answers the same on every tree, and two retractions of it".
+
+**A corollary, measured on [ai-config#3395](https://github.com/Morrison-Lab/ai-config/pull/3395), where the rule above was loaded and the citation was made anyway.**
+
+**Re-enabling the disabled rule is the wrong remedy.**
+The bullets above say to read the configuration, and to measure the property directly when no gate discriminates;
+neither names the move that finding a disabled rule actually invites, and that move makes things worse.
+A rule is disabled repo-wide precisely because the corpus already violates it at scale, so turning it back on floods every future diff with that drift and the disable returns within a release.
+The substitute is a scan over **added lines only**, which is what the disable exists to permit --- the same scoping argument `validate.yml`'s own `check-new-line-breaks` comment makes for `MD013`.
+Measured: `markdownlint-cli2` reported `753 file(s)` and `0 error(s)` over a diff carrying a blanks-around-lists defect, since `.markdownlint-cli2.jsonc` sets `MD032` false;
+an added-lines scan for the same shape found it immediately.
+
+- **Do:** write a diff-scoped scan for the property when the rule is disabled, rather than re-enabling it.
+- **Don't:** re-enable a repo-wide disable to close the gap --- that reflags the drift the disable exists to tolerate.
 
 ## Widening an instrument invalidates every figure it produced, not only the one that exposed it
 
@@ -933,6 +1033,20 @@ unrelated case flips and the row reports caught.
 - **Don't:** infer coverage from a matrix whose rows all read caught; the count
   is a fact about the rows, and only the identity check makes it one about the
   clauses.
+
+**A third mechanism lands on the same shape from neither side named above: a test's own assertions can differ in sensitivity to one mutation, and the insensitive one is satisfied by a DIFFERENT failure the mutant produces, not by a pre-existing needle or an earlier rejection stage.**
+
+Removing an empty-`--reference`-document guard left one of the test's two assertions unchanged: `rc == 1` still holds, because a run with no guard still exits 1 --- now by flagging every nesting triple in the document as novel, which is exactly the false-positive flood the guard exists to prevent, rather than by the guard's own refusal.
+The exit-code assertion cannot tell those two causes apart.
+Only the message assertion, plus a check that `novel-nesting` does not appear in the unmutated output, turned red.
+This is a third route to "a case passing for the wrong reason", alongside the pre-existing-needle and earlier-rejection-stage routes above, and it needs the same remedy the `Do` line already states: designate, per mutation, the one assertion that must fail, and score the mutation on that assertion rather than on whether any assertion in the test changed.
+
+- **Do:** when a test carries more than one assertion on a single mutation, name the discriminating assertion before running the mutation, and score on that assertion alone.
+- **Don't:** read a test as having caught a mutation because the test as a whole failed;
+  an exit code a different, unrelated failure path can also produce is not evidence about the removed clause.
+
+(Measured 2026-09-09: a guard refusing an empty `--reference` document was pinned by an `rc == 1` assertion and a message assertion.
+Removing the guard left `rc == 1` true either way, and only the message assertion --- together with the absence of `novel-nesting` in the mutant's output --- discriminated the mutation.)
 
 **Generalize past mutation: a harness needs a self-check against a quantity it
 did not compute.**

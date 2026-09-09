@@ -201,6 +201,93 @@ When a brief, an issue body, or a review finding asserts what a repository says,
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale branch read that produced two issues and a config edit".
 
+## A mechanism's prose is not the mechanism's definition
+
+A hook's comment, a skill's description, a docstring: each one explains a
+mechanism, and each is written by someone who had a specific case in mind
+while writing it.
+That case becomes the prose's running example, and the example is narrower
+than the mechanism it illustrates almost by construction --- a comment
+motivates a design decision by pointing at the situation that forced it, not
+by re-deriving the mechanism's full scope from nothing.
+
+Reading the prose and concluding the mechanism is scoped to the example is
+this fragment's substitution again, in a form the four shapes do not name:
+the artifact you read (the prose) is real, and the claim you draw from it (the
+mechanism's boundary) is about a different artifact --- the mechanism's own,
+separately-recorded definition, which the prose was never trying to state
+exhaustively.
+
+This differs from ["A summary read as its
+source"](verify-the-right-artifact.cases.md) in what goes missing.
+A summary drops a source document's hedges and caveats in the act of
+restating it, so the fix is to open the source it claims to restate.
+Here there may be no single document being restated at all --- the prose
+motivates a design by its launching case, and the mechanism's actual boundary
+lives in a separate, independently-queryable artifact (a label's own
+description, a config file, a schema) that the prose never claims to
+reproduce.
+The fix is not to read the prose more carefully; it is to query the
+mechanism directly.
+
+Two measured instances, one on each side of the substitution:
+
+**A guard's comment framed an exemption around its launching case, and the
+label's own definition was broader.**
+`hooks/no-unreviewed-pr.py`'s comment introduces `EXEMPT_LABEL = "no-ai-review"`
+while discussing a redaction PR, and pairs it with an env var literally named
+`ALLOW_UNREVIEWED_REDACTION_PR`.
+Reading only the comment, applying the label to a non-redaction PR reads as
+inventing an exemption the label was never meant to cover, and three separate
+attempts to use it were refused on that reading.
+The label's own description, on the repository, says otherwise:
+
+```
+$ gh label list -R Morrison-Lab/ai-config --json name,description \
+    --jq '.[] | select(.name == "no-ai-review")'
+{"name":"no-ai-review","description":"AI code review deliberately withheld on this PR; see the PR comment for the reason"}
+```
+
+General, and silent about redaction.
+Redaction is the comment's motivating case, not the label's scope, and the one
+command above settles which of the two governs.
+(Morrison-Lab/ai-config#3304, 2026-09-06/07.)
+
+**A written verification step tested a reconstruction of a string, not the
+string a file actually contains.**
+A memory entry claimed a single backslash in some source text makes a
+substring check return `False`, and the claim was "verified" by rebuilding the
+intended string with `chr(92)` and running the check against that
+reconstruction.
+That confirms the check behaves as expected on the string you *meant* to
+write.
+It says nothing about the string the file *actually holds*, because a
+non-raw Python string literal has its escapes decoded by the parser before the
+check ever sees it --- `"a\b"` in source is the two characters `a` and a
+literal backslash-b sequence only if the parser reads it as written, and
+pasting the file's real text and evaluating it in place (rather than
+reconstructing what it "should" contain) is the only read that reports the
+actual behaviour.
+The general form: when the object under test is "does this file's text trip
+this check", read the file's text, not a hand-rebuilt stand-in for it, however
+carefully the stand-in is constructed.
+(Measured in the same 2026-09-06/07 session as the label instance above,
+while drafting a `memories/mistake-patterns.md` entry; caught before that
+entry was committed, so no PR or issue number attaches to it.)
+
+- **Do:** query a mechanism's own recorded definition (a label's description,
+  a config's schema, a constant's value) before concluding its scope from a
+  comment's motivating example.
+- **Do:** evaluate a check against the artifact's actual bytes --- extracted
+  from the file, not reconstructed from what you believe it should contain
+  --- when the claim is about what that artifact's text does.
+- **Don't:** read a comment's launching case as a boundary on the mechanism
+  it explains; a comment motivates, it does not define.
+- **Don't:** treat "I rebuilt the string and the check passed" as evidence
+  about a file's own text; rebuilding tests the intent, not the artifact.
+
+See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A guard's comment and a label's own description disagreed about scope".
+
 ## A comparison's base is an artifact too, and it moves the scope in both directions
 
 Every shape above concerns an artifact you **read**.
@@ -1112,3 +1199,92 @@ Neither tells you which branch this run took.
 Only running the reader against the exact artifact does, and
 [`mistake-patterns`](../../memories/mistake-patterns.md) Pattern 17 names that move ---
 which is worth stating twice, because it was cited in the same change that failed to perform it.)
+
+## A content diff verifies WHAT CHANGED, not whether the markup is valid
+
+[`memories/office-open-xml.md`](../../memories/office-open-xml.md)'s "Two pandoc diffs verify a redlined docx" section already gives the standard content-level check for a tracked edit: diff the accept/reject conversions, and treat a clean pair as evidence the edit is right.
+That is a check applied correctly and answering a narrower question than it looks like it answers -- related to the ninth shape above (a lossy conversion) and still distinct from it.
+The ninth shape is about a conversion that *drops information it cannot carry*, such as a hyperlink target.
+This is about a conversion that reports success over markup that is *outright invalid* -- the derived text comes out looking exactly right, and the file that produced it does not open.
+
+The mechanism is specific to any format where an annotation is supposed to **gate** whether some content counts as present.
+A tracked-change marker in OOXML gates a run's text under accept versus reject.
+When the marker itself is malformed -- written as an empty child of a run's properties instead of wrapping those properties and the text (see `memories/office-open-xml.md`'s "Writing a NEW OMML tracked-change marker..." entry) -- a walker that simulates accept/reject has nothing to gate: the malformed marker sits *beside* the text rather than *around* it, so the same text is emitted whichever mode the walker simulates, and the diff between the edited file and the original comes out exactly as intended.
+The check passes not because the markup is valid, but because content identity and markup validity are two different properties, and the check was only ever measuring the first.
+A namespace defect can be just as invisible to the same diff for an unrelated reason: a part whose `mc:Ignorable` attribute names a prefix that part no longer declares (the same manuscript's second, independent defect) changes nothing about any run's text at all, so a text-level diff has no way to notice it regardless of how carefully it is read.
+
+That is [`The test`](#the-test) above, applied to a check rather than to a claim: what would have to be true for this diff to be non-empty, and could a genuinely malformed file ever produce that?
+For both defects here, no.
+The malformed marker is symmetric under both readings, and the namespace defect touches no text a diff examines, so the diff cannot distinguish "the edit is correct" from "the edit corrupted the file's markup while leaving its rendered text (or its namespace-unrelated content) alone" -- the two states produce an identical diff.
+
+- **Do:** run a structural/schema-level check (parse every part;
+  verify the shapes an annotation is allowed to take;
+  verify a prefix-list attribute against what is actually declared) *in addition to* a content diff, on any edit to a format where an annotation can be malformed without changing the content it annotates.
+- **Do:** treat a clean content diff as evidence about content only, never as evidence that the file is well-formed or that its consuming application will open it.
+- **Don't:** infer markup validity from a passing accept/reject (or any other rendered-content) comparison -- a malformed gate and a working one can render identically, and a namespace defect can sit entirely outside what the comparison looks at.
+- **Don't:** trust a hand-rolled accept/reject walker's silence as confirmation;
+  per [`memories/office-open-xml.md`](../../memories/office-open-xml.md)'s
+  "A hand-built accept/reject simulator is itself an unverified instrument..."
+  section, run it against a document you know is malformed and confirm it actually flags something, not only against documents you expect to pass.
+
+(Measured 2026-09-09: a repair pass on a manuscript's tracked-change OMML equations swapped a `w:ins`/`w:del` marker from an invalid child-of-`w:rPr` position to the valid wrapping position across five successive delivered copies, while the verification in use throughout was `word/document.xml`'s accept/reject text diff (comparing paragraph text under each mode).
+That diff reported the documents clean at every delivery -- the malformed marker was an empty element with no children, so neither the accept walk nor the reject walk treated it as gating anything, and the run's text simply always appeared.
+A second, unrelated defect in the same manuscript -- `word/comments.xml`'s `mc:Ignorable` naming ten namespace prefixes it no longer declared, after a generic XML library re-serialized the part -- was equally invisible to the same text diff, for the unrelated reason that it touches no run text at all.
+[`scripts/check-docx-tracked-changes.py`](../../scripts/check-docx-tracked-changes.py) in this repo is the structural check that would have caught both: it parses the actual XML and flags a `w:ins`/`w:del` sitting as a `w:rPr` child outside the one legal `w:pPr` exception, and a `mc:Ignorable` prefix with no matching namespace declaration in scope -- exactly the two properties a content diff cannot see.)
+
+## A scripted edit's own PRINT and exit status, standing in for the file it changed
+
+A heredoc'd or one-off patch script reports success two ways that are neither of them the artifact it was supposed to change: its exit status, and an `assert` or print statement it writes about its own progress.
+Both describe the SCRIPT's control flow.
+Neither describes the file on disk, because the write step, the encoding, or the target string the script matched against can each be wrong in a way that leaves the script's own report satisfied while the file is unchanged or corrupted.
+
+Two heredoc'd Python patch scripts in one session printed a completion message and exited 0 while a re-grep of the target file immediately afterward showed the intended text unchanged.
+The specific point of failure inside either script was never established --- only that the script's own report and the file's actual content disagreed, which is the fact this section is about regardless of which particular bug produced it in either case.
+
+A third, in the same session, produced a more dangerous silence.
+It replaced a one-line triple-quoted Python docstring, `"""..."""`, with replacement text that opened a new triple-quote delimiter without closing it.
+The `str.replace` call itself succeeded exactly as instructed: the target string was found, and the swap at that one line looked sane on its own, since a single-line docstring edit is not the kind of change that reads as alarming.
+What went wrong was not local to the edited line.
+Every character of the file from that unclosed delimiter onward -- roughly 100 lines, an unrelated function among them -- silently became part of one Python string literal, until the next `"""` anywhere in the file happened to close it.
+Counting quote marks would not have caught it either, since three triple-quote delimiters (balanced) is exactly what an *unclosed-then-reclosed-elsewhere* swallow also produces.
+What caught it was `py_compile` raising at the point the file actually stopped parsing, together with a targeted re-grep for code that should have appeared in the swallowed region and did not.
+
+- **Do:** after any scripted edit, verify from the artifact rather than from the script's own report -- grep the file for the new text and confirm the old text is gone, run a parser or compiler over it (`py_compile`, an R `parse()` call, the language's own syntax check), and run the relevant tests, before trusting that the change landed.
+- **Do:** when a scripted edit replaces a delimited region (a docstring, a fenced block, a quoted string), verify the delimiters on both sides of the substitution are still balanced in context, not only that the substring search matched -- a replacement that opens a delimiter without closing it can leave the file syntactically parseable right up to the point it silently is not, with nothing at the edit site itself looking wrong.
+- **Don't:** trust a script's own `assert`, print, or exit status as evidence the target file changed -- an assert can pass against the string it was handed without that string ever having matched the live file, and an exit 0 says only that the script's own control flow completed.
+- **Don't:** read "the diff at the edit site looks fine" as sufficient for a delimiter-swap edit;
+  the corruption in this shape is not local to the edited line, it is everything between the newly opened delimiter and wherever the file next happens to close one.
+
+(Measured 2026-09-09: three heredoc'd Python patch scripts applied during one manuscript-review session.
+Two reported success with the file unchanged on re-grep, cause unestablished.
+The third swallowed roughly 100 lines of an unrelated function into a docstring by leaving a replacement's opening triple-quote unclosed;
+`py_compile` and a targeted re-grep for the swallowed code were what caught it, not the script's own output.)
+
+## A tracked-change DISPLAY VIEW, standing in for the resolved document a finding means
+
+[`memories/office-open-xml.md`](../../memories/office-open-xml.md)'s "Two pandoc diffs verify a redlined docx" section already gives the producer-side use of accept/reject extraction: verify your own edit against both.
+This is the same mechanism read from the other side --- a reviewer's finding, rather than an author's self-check --- and it is a different substitution from the ninth shape above.
+The ninth shape is about a conversion that DROPS content it cannot carry.
+This is about a rendering mode that SHOWS content that will not survive: Word's "All Markup" view (or an equivalent raw read of `word/document.xml` with no accept/reject simulation applied) displays a tracked insertion and the tracked deletion it replaces at once, stacked in the same place, which is exactly what a genuine stray duplicate would also look like.
+
+Two review comments drafted for a manuscript told the author to repair a stray equation object and a doubled symbol.
+Both were visible only in that display mode.
+One sat inside a `<w:del>` the author had already used to remove it;
+the other was the old half of a `<w:ins>`/`<w:del>` pair from an edit that replaced one symbol with another.
+Extracting the resolved (accept-mode) text -- the same pandoc extraction the producer-side section already uses -- showed neither object survives: the equation and the doubled symbol are both absent once the tracked changes are resolved, and the finding was wrong.
+
+The general shape: a display mode that shows pending edits inline is a genuine, CURRENT artifact of the file.
+It is not stale, and it is not lossy in the ninth shape's sense.
+It still is not the document a finding about "the document" is ordinarily understood to be about.
+A reader who has not resolved the tracked changes is reading the union of two document states -- before the edits and after them -- and a finding drawn from that union has to say which state it is about before it means anything.
+
+- **Do:** before reporting a finding about a redlined document, extract or view the RESOLVED (accept-mode) text and confirm the finding still holds there, not only in a display mode that shows pending changes inline.
+- **Do:** when a finding is genuinely about the pre-edit or in-progress state -- a comment on the edit itself, not on its outcome -- say so explicitly ("in All Markup view", "before this deletion is accepted"), so the two states are never conflated silently.
+- **Don't:** treat what an "All Markup" screen shows as the document a reader will eventually see;
+  it is the union of two states, and "the document" defaults to the one a reader gets once changes are resolved.
+- **Don't:** assume a stray-looking object or a doubled symbol found this way is a defect without first checking whether it is the visible half of a change the author already made.
+
+(Measured 2026-09-09: two draft review comments for a manuscript resubmission named a stray equation object and a doubled symbol, both visible only in Word's "All Markup" display.
+Extracting accept-mode and reject-mode text separately showed both were already-deleted tracked changes, and the accept-mode text was clean.
+`memories/office-open-xml.md`'s "Two pandoc diffs verify a redlined docx" section gives the identical two extractions for a self-check on an edit;
+this is the same mechanism applied to a finding about someone else's edit instead.)

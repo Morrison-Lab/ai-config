@@ -202,6 +202,39 @@ explains `blocked`, and it clears on its own once they finish. Only dig into
 branch-protection settings if `blocked` persists after every check is
 `completed`.
 
+**"Persists after every check is `completed`" still needs one more caveat:
+when the same check *name* ran more than once on the same head SHA, GitHub's
+"latest" for that name is decided by `completed_at`, not by which run was
+*triggered* first, last, or most recently.**
+A run dispatched earlier (say, automatically on push) can finish **after** two
+later, label-triggered re-runs of the same check both passed --- and GitHub
+then reports the earlier-triggered-but-later-completing failing run as the
+current result for that check name, leaving the PR `blocked` even though the
+two more recent triggers both came back green.
+Reading "two newer runs passed" as superseding the older one is the wrong
+question: trigger order and completion order are independent, and only
+completion order decides which run's conclusion GitHub currently uses.
+
+Measured on `UCD-SERG/serocalculator#691`, 2026-09-09: three `version-check`
+runs shared one head SHA.
+The two label-triggered re-runs (dispatched 02:11:16Z) both completed and
+passed by 02:11:23Z; the push-triggered run, dispatched 7 seconds earlier
+at 02:11:09Z, did not complete until 02:11:56Z --- 33-35 seconds after the
+two later-triggered runs had already gone green --- and it had failed.
+The PR read `blocked` on that failing run throughout the gap, and only
+cleared once a new head commit fired a fresh `synchronize` event.
+GitHub does not document this tie-break rule anywhere the entries above
+could cite, so treat it as derived from this one observation: re-check
+`completed_at` on a fresh case rather than recalling this paragraph, per
+[`timestamp-volatile-claims`](../shared/writing/timestamp-volatile-claims.md).
+
+- **Do:** when several runs share a check name on one head SHA, sort by each
+  run's own `completed_at` (from `get_check_runs`/`actions_get`) before
+  deciding which one is authoritative --- never by trigger event or listing
+  order.
+- **Don't:** call a failing run "superseded" because two runs that started
+  later already passed; check whether it also *finished* later.
+
 ## A CI job that STALLS looks identical to one that's merely slow -- diff the log twice, don't judge from one sample
 
 - Signature: a required check sits `in_progress` far past its normal

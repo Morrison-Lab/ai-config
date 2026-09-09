@@ -262,7 +262,7 @@ and buries the redlining verdict you were actually asking for.
 
 ## A tracked change's `w:author` decides who made it, not the size of the diff
 
-Reviewing a redlined document written by more than one person,
+In a redlined document written by more than one person,
 measuring how much text changed in a paragraph is not the same claim as
 measuring who changed it --- and it is easy to conflate the two, because a
 paragraph carrying insertions and deletions reads as "edited", and the

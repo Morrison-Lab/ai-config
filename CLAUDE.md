@@ -1509,6 +1509,7 @@ The remedy is to replace the pronoun with the noun, not to reword around it.
 [shared/writing/ambiguous-reference.md](shared/writing/ambiguous-reference.md)
 
 This is distinct from [`challenge-ambiguous-terminology`](shared/workflow/challenge-ambiguous-terminology.md), which governs a word whose **meaning** is unresolved rather than a word whose **antecedent** is.
+Apply it wherever `code-review`/`ard`/`ardi` already reviews a prose diff, alongside the other prose-review rules in this file.
 
 ## Writing style: don't build a model only to retract it
 
@@ -1527,7 +1528,9 @@ the **reader** already holds the wrong model and the passage exists to
 correct it, in which case presenting it first is the point.
 
 [shared/writing/no-rug-pulls.md](shared/writing/no-rug-pulls.md)
-Apply it wherever `code-review`/`ard`/`ardi` already reviews a prose diff, alongside the other prose-review rules in this file.
+
+Check this at composition time as much as in review: the order is fixed while drafting,
+and a read-through inspects each sentence rather than the sequence.
 
 ## Writing style: semantic line breaks in prose
 

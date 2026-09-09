@@ -21,13 +21,14 @@ CLAUDE.md's "Tool transport collapses doubled backslashes" section records
 the rule and its remedy (build the character with `chr(92)` rather than
 typing it, print `repr()` before writing). Re-reading that prose at load time
 does not prevent the mistake: the violation happens at composition time,
-inside a heredoc body, where the rule is not being actively consulted. Ai-
-config#3362 is the recurrence that prompted mechanizing it -- broken twice in
-one session on 2026-09-08, once in a `printf` line whose newline escape,
-written into a markdown snippet through a heredoc, collapsed to a literal
-newline in the emitted snippet, and once in a Python-heredoc edit whose
-doubled-backslash escapes, written into a test fixture, likewise collapsed
-to literal newlines and yielded a SyntaxError pushed before being caught.
+inside a heredoc body, where the rule is not being actively consulted.
+ai-config#3362 is the recurrence that prompted mechanizing it -- broken
+twice in one session on 2026-09-08, once in a `printf` line whose newline
+escape, written into a markdown snippet through a heredoc, collapsed to a
+literal newline in the emitted snippet, and once in a Python-heredoc edit
+whose doubled-backslash escapes, written into a test fixture, likewise
+collapsed to literal newlines and yielded a SyntaxError pushed before being
+caught.
 
 ## Why this warns rather than blocks
 
@@ -63,10 +64,28 @@ import sys
 # non-greedy so a command with multiple heredocs matches each one separately
 # rather than swallowing everything between the first opener and the last
 # closer.
+#
+# The closer requires the delimiter to be the WHOLE line, modulo leading/
+# trailing horizontal whitespace: `[ \t]*(?P=delim)[ \t]*` followed by a
+# lookahead on `\n` or end of string, rather than the old bare `\b` word
+# boundary. Bash's own rule is stricter still and depends on which form
+# opened the heredoc -- a plain `<<DELIM` terminator may carry NO leading
+# whitespace at all, while `<<-DELIM` strips leading TABS only, never
+# spaces -- but this hook does not distinguish the two forms for the
+# indent character class; both are matched by the shared `[ \t]*`
+# approximation. That approximation only ever widens what counts as a
+# closer line (accepting some indentation bash itself would reject), never
+# narrows it, so the risk stays on the safe side for a warn-only scan: at
+# worst it stops a body one line short of where bash truly would, never
+# the reverse. What it DOES reject, which the old `\b` boundary did not, is
+# a line carrying trailing content after the delimiter -- `EOF # comment`
+# is no longer mistaken for the terminator, since anything other than
+# trailing whitespace before the newline fails the lookahead and the
+# search continues past it to the real closer.
 _HEREDOC_RE = re.compile(
     r"<<-?\s*(?P<q>['\"]?)(?P<delim>\w+)(?P=q)[^\n]*\n"
     r"(?P<body>.*?)"
-    r"\n[ \t]*(?P=delim)\b",
+    r"\n[ \t]*(?P=delim)[ \t]*(?=\n|\Z)",
     re.S,
 )
 

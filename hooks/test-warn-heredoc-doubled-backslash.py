@@ -66,6 +66,17 @@ SHOULD_WARN = [
      "match must name the offending one, not the first"),
     ("W6", "cat " + heredoc("EOF", "line one\nline two " + B * 2 + " more\nline three"),
      "the doubled backslash sits on a line other than the first body line"),
+    ("W7",
+     "cat " + heredoc("EOF", "first line\nEOF # not the end\na" + B * 2 + "b"),
+     "a body line reading `EOF # not the end` must NOT be mistaken for the "
+     "closer -- Bash requires the terminator line to be exactly the "
+     "delimiter, so the doubled backslash on the line after the fake "
+     "terminator must still be found"),
+    ("W8",
+     "<<-'EOF'\na" + B * 2 + "b\n\tEOF\n",
+     "<<- (dash form) whose terminator line is indented with a tab -- Bash "
+     "strips leading tabs for <<- only, and the closer must still "
+     "recognize it"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -223,12 +234,12 @@ MUTATIONS = {
         [("(?P<delim>" + B + "w+)", "(?P<delim>ZZZNEVERMATCHESZZZ)")],
         # disabling delimiter capture entirely makes every WARN case go
         # silent (no heredoc is ever recognized)
-        {"W1", "W2", "W3", "W4", "W5", "W6"},
+        {"W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8"},
     ),
     "M3_dash_form_recognized": (
         "<<-DELIM must be recognized the same as <<DELIM",
         [("<<-?", "<<")],
-        {"W3"},
+        {"W3", "W8"},
     ),
 }
 

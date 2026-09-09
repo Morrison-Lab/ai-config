@@ -51,7 +51,7 @@ Nothing in this fragment fires on that, because there is no wrong object to name
 So when a check of yours came back clean and the claim still feels under-supported, ask which of the two is happening: whether you read the wrong thing, or read the right thing and then took a step.
 
 - **Do:** send a claim to that section instead of this one when the artifact is the correct one and the doubt is about the step taken from it.
-- **Don't:** read a shape here failing to match as evidence the claim is supported --- the four shapes below cover substitutions only.
+- **Don't:** read a shape here failing to match as evidence the claim is supported --- every substitution shape in this fragment covers substitutions only.
 
 One case sits between the two, and has its own section below --- "A measurement of the right artifact can still be scoped narrower than the claim made from it": the artifact is right, the reading is right, and the claim is the *same* proposition at a wider scope than the measurement covered.
 That is not a step taken from the measurement, so it is not the neighbouring rule either.

@@ -429,6 +429,7 @@ The payload gaps that remain and the per-guard status are in
 | `no-offer-to-file.py` | `Stop` | blocks a reply that *offers* to file or record instead of doing it |
 | `no-empty-promise.py` | `Stop` | blocks a reply committing to future behaviour when the same turn shipped no mechanism: a rule ("going forward, I will/won't") needs a durable write, an owed action ("I owe #N the ARDI loop") needs that or an armed timer/watcher |
 | `no-unfiled-finding.py` | `Stop` | blocks the *declarative* "worth its own issue" that leaves no filing behind |
+| `flag-unfiled-issue.py` | `Stop` | warns, never blocks, when a reply reports a known gap as "is/was still unfiled", "hasn't been filed", or similar RETROSPECTIVE status wording, with no issue-create or issue-comment call after it; distinct from `no-unfiled-finding.py`'s forward "worth an issue" phrasing, which this misses entirely --- reporting the gap again is not tracking it, however many replies it gets repeated across |
 | `no-stale-pr-status.py` | `Stop` | blocks a reply asserting a PR's check state from a reading older than the last push |
 | `no-incomplete-check-enumeration.py` | `Stop` | blocks a reply declaring a PR clean when the only reading is `gh pr checks` or `statusCheckRollup` (short surfaces, not the complete instrument) |
 | `remind-ums-after-error.py` | `UserPromptSubmit` | reminds, never blocks, when an admitted error has no recorded learning after it |

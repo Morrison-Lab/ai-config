@@ -52,9 +52,9 @@ what a run does once it starts, split at the 1200-line gate.
   non-bot `OWNER`/`MEMBER`/`COLLABORATOR` --- a local mention path added because
   the agent being off left every `@claude review` unanswered
   (serodynamics#285).
-  Derive all of this with the [`for f in .github/workflows/*.yml`
-  loop](#derive-it-rather-than-recalling-it) below, rather than probing two
-  filenames, and read its comment-stripping caveat before trusting a row.
+  Derive all of this with the `for f in .github/workflows/*.yml` loop this
+  file gives under "Derive it rather than recalling it", rather than probing
+  two filenames, and read its comment-stripping caveat before trusting a row.
   The loop is what makes the answer right for `Morrison-Lab/gha`, where the
   trigger lives in the caller stub `claude-review.yml` and
   `claude-code-review.yml` is the reusable workflow with no `pull_request:` key

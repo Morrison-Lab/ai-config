@@ -1509,6 +1509,24 @@ The remedy is to replace the pronoun with the noun, not to reword around it.
 [shared/writing/ambiguous-reference.md](shared/writing/ambiguous-reference.md)
 
 This is distinct from [`challenge-ambiguous-terminology`](shared/workflow/challenge-ambiguous-terminology.md), which governs a word whose **meaning** is unresolved rather than a word whose **antecedent** is.
+
+## Writing style: don't build a model only to retract it
+
+A "rug-pull" presents a model, claim, or picture and a sentence or two later
+retracts or replaces it --- "X.
+However, the implementation actually Y."
+Every sentence can be individually true and cited; the defect is in the
+order, which no fact-check or read-through inspects.
+It is also the natural shape to write when the facts were discovered in
+that order, which is why it survives self-review: the prose narrates the
+author's own path rather than exposing the subject to a reader who never
+walked it.
+Lead with what is actually the case, and present an idealization or a
+prior approach afterward as an extension, not a correction --- except when
+the **reader** already holds the wrong model and the passage exists to
+correct it, in which case presenting it first is the point.
+
+[shared/writing/no-rug-pulls.md](shared/writing/no-rug-pulls.md)
 Apply it wherever `code-review`/`ard`/`ardi` already reviews a prose diff, alongside the other prose-review rules in this file.
 
 ## Writing style: semantic line breaks in prose

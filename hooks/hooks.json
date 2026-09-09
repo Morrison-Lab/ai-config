@@ -624,6 +624,14 @@
               "several PRs, which is why undischargeable_requests returns a LIST at",
               "all, so a blocking guard would refuse a real shape."
             ]
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unchanged-test-sibling.py\"",
+            "timeout": 10,
+            "if": "Bash(git commit *)",
+            "script": "flag-unchanged-test-sibling.py",
+            "why": "Warns when a commit stages a file whose conventionally-named test sibling is left unstaged, so the suite gets opened rather than reasoned about (ai-config#3419)."
           }
         ]
       },

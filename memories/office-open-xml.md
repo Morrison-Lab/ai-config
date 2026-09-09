@@ -144,21 +144,38 @@ simulation over `word/document.xml` reported that a tracked edit had inverted
 an equation, when re-checking with `xml.etree.ElementTree` showed the edit was
 correct all along.
 
-The cause is specific to math.
+The cause is specific to math, and it is worse than a single missed shape:
+**two different nestings both occur**, and a document is free to use either.
 Outside a math run, Word marks a deletion by **wrapping** the run in a
 `<w:del>` element, which is exactly the shape a regex can match.
-Inside an OMML (`<m:oMath>`) region, a deletion is instead marked in the
-run's **properties** --- a `<w:del>` child sitting inside `<w:rPr>`, not around
-the run --- so a wrapper-matching regex either misses it entirely or, worse,
-matches an unrelated enclosing element and swallows an arbitrary span.
+Inside an OMML (`<m:oMath>`) region, the marker can sit in either of two
+places.
+Measured 2026-09-09 on a real redlined manuscript: 54 `<w:del>` and 53
+`<w:ins>` elements inside `m:oMath`, every one an **empty** element on the
+path `w:del < w:rPr < m:r < m:oMath` --- a deletion flagged in the run's own
+**properties**, a sibling of `m:t` rather than a wrapper around it.
+[`plutext/docx4j` issue #348](https://github.com/plutext/docx4j/issues/348)
+documents the other shape for the parallel case (`w:ins`, which OOXML always
+treats as `w:del`'s sibling in the same content-model choice): a **wrapper**
+element, itself a child of `m:r`, enclosing both `<w:rPr>` and `<m:t>` ---
+`<m:r><w:ins w:id="1" w:author="..." w:date="...">`
+`<w:rPr>...</w:rPr><m:t>A=π</m:t></w:ins></m:r>` in that issue's own
+example, which docx4j's then-current unmarshaller did not expect and dropped
+entirely, leaving an empty `<m:r/>`.
+So the same deletion can be marked by an empty flag inside the run
+properties, or by a wrapper that contains the run properties and the text --
+and which one a given document uses is not predictable from outside.
+A wrapper-matching regex misses the properties-flag shape entirely, or,
+worse, matches an unrelated enclosing element in the wrapper shape and
+swallows an arbitrary span.
 Nothing about the regex's failure looks like a failure: it returns a
 plausible span either way.
 
 The general point is not "write a better regex".
-A regex matches **strings**; OMML's deletion marker is a **structural**
-fact about which element a child sits under, which only a real XML parser
-can answer correctly regardless of how the surrounding markup happens to be
-formatted.
+A regex matches **strings**; which of the two OMML nestings marks a given
+deletion is a **structural** fact about which element sits under, or wraps,
+which -- and a parser has to check both shapes, since neither markup nor a
+regex can tell you in advance which one a document chose.
 This is [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)'s
 argument in the specific shape it takes for a serialized format: a
 hand-rolled simulation of the format's rules is an adjacent artifact to the
@@ -168,9 +185,10 @@ wrong thing.
 - **Do:** parse `document.xml` with a real XML library
   (`xml.etree.ElementTree`, `defusedxml`) before drawing any conclusion about
   what a tracked change does, math content included.
-- **Do:** check `<w:rPr>` for a `<w:del>`/`<w:ins>` child specifically when the
-  run sits inside `<m:oMath>`, rather than assuming every deletion wraps the
-  run.
+- **Do:** check for a `<w:del>`/`<w:ins>` in **both** shapes when the run sits
+  inside `<m:oMath>` --- an empty one as a `<w:rPr>` child, and a wrapper one
+  enclosing `<w:rPr>`/`<m:t>` --- rather than assuming a document uses only
+  one.
 - **Don't:** treat a regex-based accept/reject simulation as a substitute for
   a parse, however well it matches on ordinary prose --- it is verified only
   against prose, not against math.
@@ -241,6 +259,131 @@ and buries the redlining verdict you were actually asking for.
 - **Do:** run both the accept-diff and the reject-diff,
   and baseline `validate.py` against the original before reading its output.
 - **Don't:** read a `validate.py` failure as caused by your edits without that baseline.
+
+## A tracked change's `w:author` decides who made it, not the size of the diff
+
+In a redlined document written by more than one person,
+measuring how much text changed in a paragraph is not the same claim as
+measuring who changed it --- and it is easy to conflate the two, because a
+paragraph carrying insertions and deletions reads as "edited", and the
+nearest edit session in memory is the available explanation for whose it was.
+That is [`metacognitive-monitoring`](../shared/workflow/metacognitive-monitoring.md)'s
+**cause** claim type in a docx-specific shape: proximity to the observed
+effect stands in for a check of what actually produced it.
+
+Measured 2026-09-09: tallying inserted and deleted characters per paragraph
+in a redlined supplement showed heavy edit density in one section, and the
+paragraph having many edits was read as evidence of having authored them.
+Reading the `w:author` attribute on the `<w:ins>`/`<w:del>` elements in that
+same section showed every one of those insertions carried a different name
+and a date three weeks earlier --- the document's own student author, in
+a paragraph the reviewing edits never touched.
+"This paragraph contains insertions" and "I made those insertions" are
+different claims, and only `w:author` (with `w:date` for a tie-break when
+two authors both touched a run) settles the second, in a document more than
+one person has edited.
+
+The check is a query rather than a diff: tally `(tag, author, date)` per
+paragraph --- `<w:ins>`/`<w:del>` count grouped by `w:author` --- rather than
+a paragraph-level character count with no author dimension at all.
+
+```python
+import defusedxml.ElementTree as ET
+
+W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+tree = ET.parse("word/document.xml")
+for p in tree.iter(f"{W}p"):
+    for tag in (f"{W}ins", f"{W}del"):
+        for el in p.iter(tag):
+            print(tag, el.get(f"{W}author"), el.get(f"{W}date"))
+```
+
+- **Do:** tally tracked-change elements by `(tag, author, date)` before
+  attributing a paragraph's edits to yourself or to anyone else.
+- **Do:** treat a character-count or edit-density measurement as evidence
+  that a paragraph changed, never as evidence of who changed it.
+- **Don't:** offer to revert, or otherwise act on, content whose authorship
+  you inferred from proximity rather than read from `w:author`.
+
+## A hand-built accept/reject simulator is itself an unverified instrument until it passes a negative control
+
+The two pandoc diffs above work because pandoc is a real, independently
+tested parser of the format.
+Writing your own accept/reject renderer --- to check a specific structural
+question pandoc's plain-text output can't answer, say --- forfeits that, and
+the replacement needs the same scrutiny any new instrument does per
+[`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md): a
+freshly built checker is exactly as trustworthy as its own testing, and
+"trustworthy because I wrote it carefully" is not testing.
+
+Measured 2026-09-09: a renderer built to simulate accept and reject over
+`word/document.xml` collected every `<w:t>` node in one pass and every
+`<w:delText>` node in a second pass, then reassembled each in document
+order **within its own pass** --- so on the reject path, every deleted
+string was appended after every kept string, landing at the end of the
+paragraph instead of back in its original position.
+The output looked exactly like real data loss: a sentence reassembled as
+"terms: the participant-level log-likelihoods to be summed.
+ach biomarker retains..." with the deleted text relocated and mangled to
+look like a missing fragment.
+The document was fine.
+The instrument was broken, and its false report was nearly acted on as a
+finding.
+
+The general shape is worth carrying past this one bug: a checker's false
+**negative** here --- reporting a defect that is not there --- is not the
+safe direction the way it usually is.
+It reads as a rigorous, structural finding rather than a guess, so it invites
+a "fix" to already-correct content, which is strictly worse than the false
+positive (a real problem missed) everyone instinctively worries about.
+
+What would have caught it immediately is the negative control this corpus
+already prescribes for any new instrument: run the harness against the
+document's own **known-good prior version** and require a clean result
+before trusting anything it reports on the version under test.
+Rewriting the renderer to walk `document.xml`'s children in document order,
+rather than collecting node types in separate passes, made reject
+byte-identical to the original --- which is what a working instrument looks
+like on a negative control, and the reading the broken one had been
+imitating.
+
+- **Do:** run a hand-built docx verification harness against a known-good
+  document first, and require a clean (no-op) result, before trusting any
+  finding it reports on a document under test.
+- **Do:** prefer pandoc's own accept/reject conversion (the section above)
+  whenever it can answer the question, since it needs no such control of
+  your own.
+- **Don't:** treat a harness's own careful construction as a substitute for
+  testing it --- an instrument built to check an artifact is itself an
+  unchecked artifact.
+- **Don't:** act on a structural-looking finding (a harness's reject-diff,
+  a parser's reported span) before confirming the harness itself is sound.
+
+## Read `word/comments.xml` before proposing a new review comment
+
+Proposing to add a review comment without first reading the document's
+**existing** comments is the same dupe-check gap
+[`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md) and
+[`issue-first`](../shared/workflow/issue-first.md) describe for a memory
+entry or a tracker issue, in a docx-specific shape: a document's
+`word/comments.xml` is the population to search before authoring new
+content, not just the paragraph text you happen to be looking at.
+
+Measured 2026-09-09: after telling a document's author that a new comment
+would be added raising three concerns about a confidence-interval
+construction, opening `word/comments.xml` showed comment id 209, already
+present from an earlier review pass on the same document, raising the same
+three concerns in more specific terms --- citing an issue number and noting
+that both manuscript intervals came from two-biomarker fits.
+The corpus-wide dupe-check had been run diligently in the same session;
+the document-local one, over an artifact already open, had not.
+
+- **Do:** read `word/comments.xml` (or the skill's comment-listing helper)
+  before proposing or drafting a new comment on a document already carrying
+  review history.
+- **Don't:** treat "I have not seen this concern in the paragraph text" as
+  having checked whether it was already raised --- a comment lives in
+  `comments.xml`, not in the run you are reading.
 
 ## An edit that writes cleanly can still be silently dropped
 

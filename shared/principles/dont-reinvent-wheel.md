@@ -461,9 +461,12 @@ authored.
 The maintainer's answer was "don't make excuses, install the packages needed"
 and "fix the CI job".)
 
-**2nd occurrence, `UCD-SERG/serocalculator` commit `0828673`, dated after the
-bcs#641 case above: a single hand-rolled helper this time, not thirty, and the
-DRW miss looks identical.**
+**2nd occurrence, [`UCD-SERG/serocalculator#688`](https://github.com/UCD-SERG/serocalculator/pull/688)
+at commit `0828673`, dated after the bcs#641 case above: a single hand-rolled
+helper this time, not thirty, and the DRW miss looks identical.**
+At the time of writing that commit lives only on the PR's branch and `main`
+does not carry it, so cite the PR rather than the bare SHA --- the same
+fragility the `b000014e` citation this corpus once carried was fixed for.
 `data-raw/compare-backward-recurrence-densities.R` carried a ~16-line
 `with_seed()` that saved and restored `.Random.seed` in `globalenv()`.
 `withr` was already in the package's `DESCRIPTION` `Suggests`, and

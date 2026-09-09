@@ -1520,4 +1520,26 @@ Where the routes differ but the observable defect is identical, say so: pre-exis
 - **Don't:** treat an admission as exempt from the cause check --- candour is a property of the tone, not of the evidence.
 - **Don't:** accept a reviewer's attribution, in either direction, without the same counterfactual you would demand of your own.
 
+**2nd occurrence, a different domain: a multi-author document rather than a
+commit history, and the counterfactual is a different attribute rather than
+a different checkout.**
+The candidate here was not "my change broke this code" but "my edit produced
+these tracked changes" --- read off a paragraph's edit density, in a document
+another author had also edited.
+Proximity did the same work it does for a commit: the reviewing edits sat in
+the same document, so they were the available explanation for insertions
+found nearby.
+The counterfactual is not a `git show <parent>:<path>` here, because there is
+no prior version to check out --- the authoritative record sits inside the
+same artifact, as the `w:author` attribute on each `<w:ins>`/`<w:del>`
+element.
+Reading it showed a different author's name and a date three weeks earlier.
+[`memories/office-open-xml.md`](../../memories/office-open-xml.md)'s "A
+tracked change's `w:author` decides who made it, not the size of the diff"
+carries the mechanics and the query.
+The transferable point is the same one this section already makes: a cause
+claim about your own most recent action needs its authoritative record
+checked, whatever form that record takes in the artifact at hand, and
+"the effect sits near where I was working" is proximity, not that record.
+
 See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md), "A defect attributed to the fix that merely sits beside it".

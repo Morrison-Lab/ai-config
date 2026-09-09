@@ -215,6 +215,19 @@ Reading "two newer runs passed" as superseding the older one is the wrong
 question: trigger order and completion order are independent, and only
 completion order decides which run's conclusion GitHub currently uses.
 
+Measured on `UCD-SERG/serocalculator#691`, 2026-09-09: three `version-check`
+runs shared one head SHA.
+The two label-triggered re-runs (dispatched 02:11:16Z) both completed and
+passed by 02:11:23Z; the push-triggered run, dispatched 7 seconds earlier
+at 02:11:09Z, did not complete until 02:11:56Z --- 33-35 seconds after the
+two later-triggered runs had already gone green --- and it had failed.
+The PR read `blocked` on that failing run throughout the gap, and only
+cleared once a new head commit fired a fresh `synchronize` event.
+GitHub does not document this tie-break rule anywhere the entries above
+could cite, so treat it as derived from this one observation: re-check
+`completed_at` on a fresh case rather than recalling this paragraph, per
+[`timestamp-volatile-claims`](../shared/writing/timestamp-volatile-claims.md).
+
 - **Do:** when several runs share a check name on one head SHA, sort by each
   run's own `completed_at` (from `get_check_runs`/`actions_get`) before
   deciding which one is authoritative --- never by trigger event or listing

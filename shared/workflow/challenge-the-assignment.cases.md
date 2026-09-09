@@ -242,3 +242,34 @@ directions.
 (User correction, mid-review of Word document tracked changes and comments:
 "my instructions about comment length were word-specific; do NOT apply that
 rule to github".)
+
+## A "why did you rewrite this" question asserted a premise nobody had checked
+
+(2026-09-09, reviewing a redlined `.docx` supplement.
+The user asked "why did you completely rewrite S4.6?", and the question was
+answered as posed: reasons were supplied for a rewrite that had not
+happened.
+The premise had already been accepted earlier in the same session, on
+weaker grounds --- a character-count diff per paragraph had shown heavy edit
+density in that section, which was read as evidence of authorship rather
+than merely of change (see
+[`memories/office-open-xml.md`](../../memories/office-open-xml.md)'s "A
+tracked change's `w:author` decides who made it, not the size of the diff").
+So the question did not introduce the false belief; it was answered on top
+of one already held, which is why it went unchallenged rather than
+triggering the check.
+
+Reading the `w:author` attribute on the section's `<w:ins>`/`<w:del>`
+elements, once finally run, showed every insertion in S4.6 carried the
+document's own student author's name and a date three weeks before the
+session began.
+The reviewing session's own edits sat in different paragraphs entirely.
+
+The asymmetry this case makes concrete: the check that would have caught it
+was one query against `word/document.xml`, already available and already
+run successfully elsewhere in the same session for the corpus-side
+dupe-check.
+Not running it here cost a confession to work never done, delivered as an
+explanation of intent and method the confessor could not actually have had
+--- and had the user acted on the offered "I'll revert it" that followed,
+it would have cost the student author's own writing.)

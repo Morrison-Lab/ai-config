@@ -210,6 +210,190 @@ NAMESPACE_ONLY_NOVELTY = (
 )
 
 
+# -- orphaned math structures (empty placeholder boxes) --------------------
+#
+# A math structure Word renders slot-by-slot (m:sSup's base m:e and
+# exponent m:sup) whether or not a slot has content. Its own m:sSupPr/
+# m:ctrlPr must carry the direction's mark for the whole structure to
+# disappear along with its deleted/inserted text; otherwise it survives as
+# an empty box. See check-docx-tracked-changes.py's module docstring.
+
+# m:sSup whose base and exponent are entirely w:del'd, but whose own
+# m:ctrlPr carries no w:del -- the defect, under ACCEPT.
+ORPHANED_SSUP_ACCEPT = (
+    DOC_HEADER
+    + f"""<w:p><m:oMath>
+  <m:sSup>
+    <m:sSupPr><m:ctrlPr><w:rPr/></m:ctrlPr></m:sSupPr>
+    <m:e><m:r><w:del w:id="101" w:author="A" w:date="2026-01-01T00:00:00Z">
+      <w:rPr/><m:t>x</m:t></w:del></m:r></m:e>
+    <m:sup><m:r><w:del w:id="102" w:author="A" w:date="2026-01-01T00:00:00Z">
+      <w:rPr/><m:t>2</m:t></w:del></m:r></m:sup>
+  </m:sSup>
+</m:oMath></w:p>
+"""
+    + DOC_FOOTER
+)
+
+# Same shape, but the structure's own ctrlPr IS marked w:del -- Word deletes
+# the whole box along with its text, so this must NOT be flagged.
+CLEAN_SSUP_ACCEPT = (
+    DOC_HEADER
+    + f"""<w:p><m:oMath>
+  <m:sSup>
+    <m:sSupPr><m:ctrlPr><w:del w:id="100" w:author="A" w:date="2026-01-01T00:00:00Z">
+      <w:rPr/></w:del></m:ctrlPr></m:sSupPr>
+    <m:e><m:r><w:del w:id="101" w:author="A" w:date="2026-01-01T00:00:00Z">
+      <w:rPr/><m:t>x</m:t></w:del></m:r></m:e>
+    <m:sup><m:r><w:del w:id="102" w:author="A" w:date="2026-01-01T00:00:00Z">
+      <w:rPr/><m:t>2</m:t></w:del></m:r></m:sup>
+  </m:sSup>
+</m:oMath></w:p>
+"""
+    + DOC_FOOTER
+)
+
+# The mirror case: m:sSub built entirely from w:ins runs, ctrlPr not marked
+# w:ins -- the defect, under REJECT (rejecting drops the w:ins'd text).
+ORPHANED_SSUB_REJECT = (
+    DOC_HEADER
+    + f"""<w:p><m:oMath>
+  <m:sSub>
+    <m:sSubPr><m:ctrlPr><w:rPr/></m:ctrlPr></m:sSubPr>
+    <m:e><m:r><w:ins w:id="201" w:author="A" w:date="2026-01-01T00:00:00Z">
+      <w:rPr/><m:t>y</m:t></w:ins></m:r></m:e>
+    <m:sub><m:r><w:ins w:id="202" w:author="A" w:date="2026-01-01T00:00:00Z">
+      <w:rPr/><m:t>i</m:t></w:ins></m:r></m:sub>
+  </m:sSub>
+</m:oMath></w:p>
+"""
+    + DOC_FOOTER
+)
+
+# Same shape, ctrlPr correctly marked w:ins -- rejecting removes the whole
+# box, so this must NOT be flagged.
+CLEAN_SSUB_REJECT = (
+    DOC_HEADER
+    + f"""<w:p><m:oMath>
+  <m:sSub>
+    <m:sSubPr><m:ctrlPr><w:ins w:id="200" w:author="A" w:date="2026-01-01T00:00:00Z">
+      <w:rPr/></w:ins></m:ctrlPr></m:sSubPr>
+    <m:e><m:r><w:ins w:id="201" w:author="A" w:date="2026-01-01T00:00:00Z">
+      <w:rPr/><m:t>y</m:t></w:ins></m:r></m:e>
+    <m:sub><m:r><w:ins w:id="202" w:author="A" w:date="2026-01-01T00:00:00Z">
+      <w:rPr/><m:t>i</m:t></w:ins></m:r></m:sub>
+  </m:sSub>
+</m:oMath></w:p>
+"""
+    + DOC_FOOTER
+)
+
+# An m:sSup with no m:t anywhere in it -- a blank placeholder already in
+# the source. Must be a NOTE, never a finding, under either direction.
+BLANK_SSUP = (
+    DOC_HEADER
+    + f"""<w:p><m:oMath>
+  <m:sSup>
+    <m:sSupPr><m:ctrlPr><w:rPr/></m:ctrlPr></m:sSupPr>
+    <m:e><m:r><w:rPr/></m:r></m:e>
+    <m:sup><m:r><w:rPr/></m:r></m:sup>
+  </m:sSup>
+</m:oMath></w:p>
+"""
+    + DOC_FOOTER
+)
+
+# m:sSup whose base is w:del'd but whose exponent is plain (undeleted)
+# text -- SOME text survives accept, so this is not an empty box and must
+# NOT be flagged even though the ctrlPr is unmarked.
+PARTIAL_SURVIVAL_SSUP = (
+    DOC_HEADER
+    + f"""<w:p><m:oMath>
+  <m:sSup>
+    <m:sSupPr><m:ctrlPr><w:rPr/></m:ctrlPr></m:sSupPr>
+    <m:e><m:r><w:del w:id="301" w:author="A" w:date="2026-01-01T00:00:00Z">
+      <w:rPr/><m:t>x</m:t></w:del></m:r></m:e>
+    <m:sup><m:r><w:rPr/><m:t>2</m:t></m:r></m:sup>
+  </m:sSup>
+</m:oMath></w:p>
+"""
+    + DOC_FOOTER
+)
+
+# An m:d wrapping an m:sSup, both entirely w:del'd. The OUTER structure's
+# own ctrlPr IS marked w:del (correct); the INNER m:sSup's own ctrlPr is
+# NOT (the defect). Pins that ctrl_marks_of() reads a structure's OWN
+# m:<tag>Pr child rather than a descendant's -- the outer being marked
+# must not excuse the inner, and vice versa.
+NESTED_OUTER_MARKED_INNER_NOT = (
+    DOC_HEADER
+    + f"""<w:p><m:oMath>
+  <m:d>
+    <m:dPr><m:ctrlPr><w:del w:id="400" w:author="A" w:date="2026-01-01T00:00:00Z">
+      <w:rPr/></w:del></m:ctrlPr></m:dPr>
+    <m:e>
+      <m:sSup>
+        <m:sSupPr><m:ctrlPr><w:rPr/></m:ctrlPr></m:sSupPr>
+        <m:e><m:r><w:del w:id="401" w:author="A" w:date="2026-01-01T00:00:00Z">
+          <w:rPr/><m:t>x</m:t></w:del></m:r></m:e>
+        <m:sup><m:r><w:del w:id="402" w:author="A" w:date="2026-01-01T00:00:00Z">
+          <w:rPr/><m:t>2</m:t></w:del></m:r></m:sup>
+      </m:sSup>
+    </m:e>
+  </m:d>
+</m:oMath></w:p>
+"""
+    + DOC_FOOTER
+)
+
+# The mirror of NESTED_OUTER_MARKED_INNER_NOT: the INNER m:sSup's own
+# ctrlPr IS marked w:del (correct), but the OUTER m:d's own ctrlPr is NOT.
+# A ctrl-marks reader that searches descendants rather than only the
+# structure's own Pr child would wrongly let the inner's mark excuse the
+# outer -- this fixture is what catches that specific bug, which
+# NESTED_OUTER_MARKED_INNER_NOT cannot (its inner mark set is empty, so a
+# descendant-scanning bug there merges in nothing extra).
+NESTED_INNER_MARKED_OUTER_NOT = (
+    DOC_HEADER
+    + f"""<w:p><m:oMath>
+  <m:d>
+    <m:dPr><m:ctrlPr><w:rPr/></m:ctrlPr></m:dPr>
+    <m:e>
+      <m:sSup>
+        <m:sSupPr><m:ctrlPr><w:del w:id="600" w:author="A" w:date="2026-01-01T00:00:00Z">
+          <w:rPr/></w:del></m:ctrlPr></m:sSupPr>
+        <m:e><m:r><w:del w:id="601" w:author="A" w:date="2026-01-01T00:00:00Z">
+          <w:rPr/><m:t>x</m:t></w:del></m:r></m:e>
+        <m:sup><m:r><w:del w:id="602" w:author="A" w:date="2026-01-01T00:00:00Z">
+          <w:rPr/><m:t>2</m:t></w:del></m:r></m:sup>
+      </m:sSup>
+    </m:e>
+  </m:d>
+</m:oMath></w:p>
+"""
+    + DOC_FOOTER
+)
+
+# m:t gated out by an ANCESTOR w:del two levels up rather than its direct
+# parent -- pins that text_survives() walks the whole parent chain rather
+# than checking only the immediate wrapper. Not a claim about legal OOXML
+# nesting, only about how far up the walk looks.
+ANCESTOR_TWO_LEVELS_UP = (
+    DOC_HEADER
+    + f"""<w:p><m:oMath>
+  <m:sSup>
+    <m:sSupPr><m:ctrlPr><w:rPr/></m:ctrlPr></m:sSupPr>
+    <m:e><w:del w:id="501" w:author="A" w:date="2026-01-01T00:00:00Z">
+      <m:r><w:rPr/><m:t>x</m:t></m:r></w:del></m:e>
+    <m:sup><w:del w:id="502" w:author="A" w:date="2026-01-01T00:00:00Z">
+      <m:r><w:rPr/><m:t>2</m:t></m:r></w:del></m:sup>
+  </m:sSup>
+</m:oMath></w:p>
+"""
+    + DOC_FOOTER
+)
+
+
 with __import__("tempfile").TemporaryDirectory() as tmp:
     tmp_path = Path(tmp)
 
@@ -361,6 +545,117 @@ with __import__("tempfile").TemporaryDirectory() as tmp:
     check(
         "the novel-nesting finding names the namespace prefix, not a bare local name",
         "<w:r>" in out or "<m:oMath>" in out,
+    )
+
+    # -- orphaned math structures ---------------------------------------------
+    orphaned_ssup = make_docx(tmp_path, "orphaned-ssup.docx", ORPHANED_SSUP_ACCEPT)
+    rc, out = run_check([orphaned_ssup])
+    check(
+        "an m:sSup fully w:del'd with an unmarked ctrlPr fails the run",
+        rc == 1,
+    )
+    check(
+        "finding names the orphaned-math kind and the sSup tag",
+        "orphaned-math" in out and "m:sSup" in out,
+    )
+    check(
+        "the finding names the accept direction, not reject",
+        "under accept" in out and "under reject" not in out,
+    )
+    check(
+        "the run reports math zones and structures examined",
+        "1 math zone" in out and "1 math structure" in out,
+    )
+
+    clean_ssup = make_docx(tmp_path, "clean-ssup.docx", CLEAN_SSUP_ACCEPT)
+    rc, out = run_check([clean_ssup])
+    check(
+        "an m:sSup fully w:del'd WITH a matching w:del ctrlPr is not flagged",
+        rc == 0 and "orphaned-math" not in out,
+    )
+
+    orphaned_ssub = make_docx(tmp_path, "orphaned-ssub.docx", ORPHANED_SSUB_REJECT)
+    rc, out = run_check([orphaned_ssub])
+    check(
+        "an m:sSub fully w:ins'd with an unmarked ctrlPr fails the run",
+        rc == 1,
+    )
+    check(
+        "finding names the orphaned-math kind and the sSub tag",
+        "orphaned-math" in out and "m:sSub" in out,
+    )
+    check(
+        "the finding names the reject direction, not accept",
+        "under reject" in out and "under accept" not in out,
+    )
+
+    clean_ssub = make_docx(tmp_path, "clean-ssub.docx", CLEAN_SSUB_REJECT)
+    rc, out = run_check([clean_ssub])
+    check(
+        "an m:sSub fully w:ins'd WITH a matching w:ins ctrlPr is not flagged",
+        rc == 0 and "orphaned-math" not in out,
+    )
+
+    blank_ssup = make_docx(tmp_path, "blank-ssup.docx", BLANK_SSUP)
+    rc, out = run_check([blank_ssup])
+    check(
+        "a structure with no m:t at all is clean (a blank placeholder, not a defect)",
+        rc == 0 and "orphaned-math" not in out,
+    )
+    check(
+        "the blank structure is still reported, as an informational note",
+        "blank-math" in out and "m:sSup" in out,
+    )
+
+    partial = make_docx(tmp_path, "partial.docx", PARTIAL_SURVIVAL_SSUP)
+    rc, out = run_check([partial])
+    check(
+        "a structure where SOME text survives accept is not flagged",
+        rc == 0 and "orphaned-math" not in out,
+    )
+
+    nested = make_docx(tmp_path, "nested.docx", NESTED_OUTER_MARKED_INNER_NOT)
+    rc, out = run_check([nested])
+    check(
+        "a nested structure's OWN unmarked ctrlPr is flagged even though "
+        "its marked outer wrapper is not",
+        rc == 1 and "orphaned-math" in out,
+    )
+    check(
+        "the finding names the inner sSup, not the correctly-marked outer m:d",
+        "m:sSup" in out,
+    )
+    # The outer m:d is correctly marked, so it alone must not produce a
+    # second finding -- count the occurrences of the kind marker rather
+    # than assuming "at least one" is "exactly the inner one".
+    check(
+        "only the inner structure is flagged, not the outer m:d as well",
+        out.count("[orphaned-math]") == 1,
+    )
+
+    nested2 = make_docx(tmp_path, "nested2.docx", NESTED_INNER_MARKED_OUTER_NOT)
+    rc, out = run_check([nested2])
+    check(
+        "an unmarked OUTER structure is flagged even though its marked "
+        "inner descendant is not -- an inner mark must not excuse an "
+        "outer structure that never carried its own",
+        rc == 1 and "orphaned-math" in out,
+    )
+    check(
+        "the finding names the outer m:d, not the correctly-marked inner sSup",
+        "<m:d>" in out,
+    )
+    check(
+        "only the outer structure is flagged, not the inner sSup as well",
+        out.count("[orphaned-math]") == 1,
+    )
+
+    ancestor = make_docx(tmp_path, "ancestor.docx", ANCESTOR_TWO_LEVELS_UP)
+    rc, out = run_check([ancestor])
+    check(
+        "text gated by a w:del two levels above m:t (not the direct parent) "
+        "is still read as gone, so the unmarked ctrlPr is flagged",
+        rc == 1 and "orphaned-math" in out,
     )
 
 print(f"\n{passes} passed, {failures} failed")

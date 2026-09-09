@@ -71,6 +71,34 @@ PERM_RANK: dict[str | None, int] = {
     "write": 3,
 }
 
+# The shorthand forms rank on the same scale: `read-all` grants read on every
+# permission key, `write-all` grants write on every key.
+SHORTHAND_RANK: dict[str, int] = {
+    "read-all": PERM_RANK["read"],
+    "write-all": PERM_RANK["write"],
+}
+
+
+# Keys a shorthand does NOT grant at its own level, so the floor must not
+# apply to them. `id-token` accepts only `write` or `none` and never `read`
+# (GitHub's workflow-syntax reference), so `read-all` provably cannot grant
+# it, and whether `write-all` does is documented nowhere. A guard that cannot
+# rank a scope must compare it against zero rather than assume coverage.
+SHORTHAND_UNCOVERED_KEYS = frozenset({"id-token"})
+
+
+def _shorthand_floor(old_scope: dict[str, str] | str | None, key: str) -> int:
+    """Rank the level a baseline already grants on `key`.
+
+    A shorthand string raises the floor for the keys it covers, but not for
+    the ones in SHORTHAND_UNCOVERED_KEYS. A dict grants nothing on the keys
+    it omits, and the full key set GitHub defines is not enumerable here, so
+    its floor stays 0.
+    """
+    if isinstance(old_scope, str) and key not in SHORTHAND_UNCOVERED_KEYS:
+        return SHORTHAND_RANK.get(old_scope.strip(), 0)
+    return 0
+
 
 def _extract_permissions_from_data(data: dict) -> dict[str, dict[str, str] | str]:
     """Extract workflow-level and job-level permissions from parsed YAML data."""
@@ -121,12 +149,31 @@ def _find_added_permissions(
     old_perms: dict[str, dict[str, str] | str],
     new_perms: dict[str, dict[str, str] | str],
 ) -> list[tuple[str, str]]:
-    """Return list of (scope, perm_str) for any permissions added or escalated."""
+    """Return list of (scope, perm_str) for any permissions added or escalated.
+
+    Both the shorthand form (``read-all`` / ``write-all``) and the explicit
+    dict form are ranked, so a strict downgrade is never reported as an
+    addition. A shorthand grants its level on the permission keys it covers,
+    so for those it acts as a floor when it is the baseline and always widens
+    when it replaces a dict. It does not cover SHORTHAND_UNCOVERED_KEYS, which
+    keep a zero floor and so stay reportable.
+    """
     added: list[tuple[str, str]] = []
     for scope, perms in new_perms.items():
         old_scope = old_perms.get(scope)
         if isinstance(perms, str):
-            if old_scope != perms:
+            new_shorthand = perms.strip()
+            if not isinstance(old_scope, str):
+                # A dict or absent baseline grants nothing on the keys it
+                # omits, so any shorthand widens the set of granted scopes.
+                added.append((scope, perms))
+            elif new_shorthand not in SHORTHAND_RANK:
+                # Unrecognized shorthand: report it rather than rank it, so
+                # the guard fails toward denying an unknown grant.
+                added.append((scope, perms))
+            elif SHORTHAND_RANK[new_shorthand] > SHORTHAND_RANK.get(
+                old_scope.strip(), 0
+            ):
                 added.append((scope, perms))
         elif isinstance(perms, dict):
             old_dict = old_scope if isinstance(old_scope, dict) else {}
@@ -134,7 +181,10 @@ def _find_added_permissions(
                 old_val = old_dict.get(key)
                 clean_old = old_val.strip() if isinstance(old_val, str) else old_val
                 clean_new = val.strip() if isinstance(val, str) else val
-                if PERM_RANK[clean_new] > PERM_RANK[clean_old]:
+                old_rank = max(
+                    PERM_RANK[clean_old], _shorthand_floor(old_scope, key)
+                )
+                if PERM_RANK[clean_new] > old_rank:
                     added.append((scope, f"{key}: {val}"))
     return added
 

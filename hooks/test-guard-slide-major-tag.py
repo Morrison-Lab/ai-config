@@ -675,6 +675,81 @@ def main() -> int:
             f"got stderr={(e11d or '')!r}",
         )
 
+        # 11e. Shorthand forms (read-all / write-all) rank on the same scale.
+        # A strict downgrade must not be reported as an addition, in either
+        # direction across the shorthand/dict boundary.
+        shorthand_allowed = [
+            ("write-all->read-all", "write-all", "read-all"),
+            ("write-all->write-all", "write-all", "write-all"),
+            ("read-all->read-all", "read-all", "read-all"),
+            ("write-all->{contents: read}", "write-all", {"contents": "read"}),
+            ("write-all->{contents: write}", "write-all", {"contents": "write"}),
+            ("read-all->{contents: read}", "read-all", {"contents": "read"}),
+        ]
+        for name, old_v, new_v in shorthand_allowed:
+            res_sa = guard_mod._find_added_permissions(
+                {"job:review": old_v}, {"job:review": new_v}
+            )
+            check(
+                res_sa == [],
+                f"shorthand rank: {name} allowed",
+                f"expected [], got {res_sa}",
+            )
+
+        shorthand_denied = [
+            ("read-all->write-all", "read-all", "write-all"),
+            ("read-all->{contents: write}", "read-all", {"contents": "write"}),
+            ("{contents: write}->read-all", {"contents": "write"}, "read-all"),
+            # id-token is NOT covered by either shorthand: it accepts only
+            # `write` or `none`, never `read`, so read-all provably cannot
+            # grant it and write-all's coverage is documented nowhere. An
+            # explicit grant must stay reportable, or a slide that adds
+            # id-token: write to a write-all job passes the guard silently
+            # and startup-fails every consumer that has not granted it.
+            ("write-all->{id-token: write}", "write-all", {"id-token": "write"}),
+            ("read-all->{id-token: write}", "read-all", {"id-token": "write"}),
+        ]
+        for name, old_v, new_v in shorthand_denied:
+            res_sd = guard_mod._find_added_permissions(
+                {"job:review": old_v}, {"job:review": new_v}
+            )
+            check(
+                res_sd != [],
+                f"shorthand rank: {name} detected as escalation",
+                f"expected a finding, got {res_sd}",
+            )
+
+        # 11e-bis. The uncovered-key carve-out is scoped to that key alone:
+        # a COVERED key at the shorthand's own rank stays allowed, so the
+        # exemption cannot be widened into "ignore the floor entirely".
+        res_cov = guard_mod._find_added_permissions(
+            {"job:review": "write-all"}, {"job:review": {"contents": "write"}}
+        )
+        check(
+            res_cov == [],
+            "shorthand rank: covered key at the shorthand's own rank allowed",
+            f"expected [], got {res_cov}",
+        )
+
+        # 11f. A scope absent from the baseline gains a shorthand grant.
+        res_sf = guard_mod._find_added_permissions({}, {"job:review": "read-all"})
+        check(
+            res_sf == [("job:review", "read-all")],
+            "shorthand rank: absent->read-all detected as escalation",
+            f"expected [('job:review', 'read-all')], got {res_sf}",
+        )
+
+        # 11g. An unrecognized shorthand is reported rather than ranked, so the
+        # guard fails toward denying a grant it cannot interpret.
+        res_sg = guard_mod._find_added_permissions(
+            {"job:review": "read-all"}, {"job:review": "admin-all"}
+        )
+        check(
+            res_sg == [("job:review", "admin-all")],
+            "shorthand rank: unrecognized shorthand reported",
+            f"expected [('job:review', 'admin-all')], got {res_sg}",
+        )
+
         # 12a. End-to-end: job-level checks: none -> checks: read denies slide-major-tag
         repo12a = _make_repo(
             permissions_block="    permissions:\n      contents: none\n      checks: none\n"

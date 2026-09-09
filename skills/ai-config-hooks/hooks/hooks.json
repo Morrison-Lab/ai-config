@@ -376,6 +376,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-heredoc-doubled-backslash.py\"'",
+            "timeout": 20,
+            "script": "warn-heredoc-doubled-backslash.py",
+            "why": "CLAUDE.md 'Tool transport collapses doubled backslashes'. On this Windows/MINGW64 transport a doubled backslash typed inside a Bash-tool heredoc body -- even with a quoted delimiter, which should be fully literal -- can arrive at the interpreter as a single backslash (measured 2026-08-22, ai-config#1923). It fails silently and plausibly: a match/assert reads as a slightly-wrong anchor, or a regex/escape sequence written this way is corrupted with no syntax error and a still-green suite. Recurred twice in one session on 2026-09-08 (ai-config#3362): a printf format string's `\\n` collapsed to a literal newline in an emitted snippet, and a Python-heredoc edit writing `\\\\n` escapes into a test fixture produced literal newlines and a pushed SyntaxError. WARNS, never blocks: a doubled backslash inside a heredoc body is not always the mistake (content destined for a regex that will itself be re-escaped downstream is a legitimate exception this hook cannot distinguish), so it only ever adds context naming the offending line and the remedy (build the character with chr(92) rather than typing it doubled; print repr() before writing). Tracked as #3362."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-commit-chained-to-push.py\"'",
             "timeout": 10,
             "script": "no-commit-chained-to-push.py",

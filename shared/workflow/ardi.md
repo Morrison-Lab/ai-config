@@ -638,57 +638,6 @@ over, and re-reading it cannot catch a wrong number.**
 See [`ardi.cases.md`](ardi.cases.md), "A verification table in the PR body going
 stale as rounds change the diff".
 
-**A verification transcript is the same defect in a form that resists its own
-remedy, because there is no count in it to re-derive.**
-
-A table's figures are wrong or stale; a pasted block of live command output
---- a redirect trace, a curl response, a rendered page's contents --- makes the
-same claim about a **behavior or configuration** instead of a number, and it
-goes stale the identical way: honestly captured against a diff that a later
-round then changes underneath it.
-"Re-derive every count" has nothing to act on here.
-The only check is to re-run the exact command the transcript shows and
-compare its current output against what is printed.
-
-That absence of a re-derivable number is also what makes a transcript
-outlive a table's own staleness.
-Its evidentiary weight comes from being real output rather than an assertion,
-so it reads as **more** rigorous than an unverified claim would --- and that
-is exactly what suppresses the impulse to re-run it.
-A reader has less reason to doubt genuine command output than a bare
-sentence, so the artifact that most needs re-running is the one least likely
-to get it.
-
-- **Do:** treat a pasted command-output block in a PR body as a claim with the
-  same shelf life as a count, and re-run the exact command at push time before
-  reporting the PR ready.
-- **Do:** read a later round that changes the config, file, or behavior a
-  transcript demonstrates as invalidating that transcript, even when the
-  round's own findings have nothing to do with it.
-- **Don't:** let a transcript's realism substitute for re-running it --- the
-  same honesty that made it true when captured is what makes a reader trust it
-  after it stops being true.
-- **Don't:** assume an unverified prose claim is the riskier artifact in a
-  body; a measured transcript decays identically and reads as more
-  trustworthy while doing it.
-
-Whether this is mechanizable splits in two.
-The general case --- does a body's transcript still describe the diff's
-current behavior --- is not lexically decidable: answering it means re-running
-arbitrary shown commands and judging the output semantically, which is a
-job for a reader rather than a pattern match.
-A narrower slice is decidable as a **flag**, not a verifier: a PR body
-containing a fenced block shaped like command output, on a PR whose
-config-shaped paths changed in a commit after the body was last edited.
-That reaches the shape of this case without executing anything the body
-contains, which running the transcript's own command would require.
-No such check exists yet; naming the boundary here is the record of that gap,
-per `gha`'s CLAUDE.md precedent that a judgment not to mechanize belongs in
-the corpus as plainly as a mechanism does.
-
-See [`ardi.cases.md`](ardi.cases.md), "A verification transcript in the PR
-body outlived the config it demonstrated".
-
 **A reviewer's round-one confirmation of that table does not expire when the
 diff moves, and the confirmation is what makes the stale figure dangerous.**
 
@@ -786,6 +735,57 @@ unchanged --- a revert-and-restore returns the tree to an object it already had,
 measurement is a function of the tree rather than the commit.
 [`dont-incur-technical-debt`](../principles/dont-incur-technical-debt.md)'s
 "The one exception" section carries that mechanic, and the deferral it licenses.
+
+**A verification transcript is the same defect in a form that resists its own
+remedy, because there is no count in it to re-derive.**
+
+A table's figures are wrong or stale; a pasted block of live command output
+--- a redirect trace, a curl response, a rendered page's contents --- makes the
+same claim about a **behavior or configuration** instead of a number, and it
+goes stale the identical way: honestly captured against a diff that a later
+round then changes underneath it.
+"Re-derive every count" has nothing to act on here.
+The only check is to re-run the exact command the transcript shows and
+compare its current output against what is printed.
+
+That absence of a re-derivable number is also what makes a transcript
+outlive a table's own staleness.
+Its evidentiary weight comes from being real output rather than an assertion,
+so it reads as **more** rigorous than an unverified claim would --- and that
+is exactly what suppresses the impulse to re-run it.
+A reader has less reason to doubt genuine command output than a bare
+sentence, so the artifact that most needs re-running is the one least likely
+to get it.
+
+- **Do:** treat a pasted command-output block in a PR body as a claim with the
+  same shelf life as a count, and re-run the exact command at push time before
+  reporting the PR ready.
+- **Do:** read a later round that changes the config, file, or behavior a
+  transcript demonstrates as invalidating that transcript, even when the
+  round's own findings have nothing to do with it.
+- **Don't:** let a transcript's realism substitute for re-running it --- the
+  same honesty that made it true when captured is what makes a reader trust it
+  after it stops being true.
+- **Don't:** assume an unverified prose claim is the riskier artifact in a
+  body; a measured transcript decays identically and reads as more
+  trustworthy while doing it.
+
+Whether this is mechanizable splits in two.
+The general case --- does a body's transcript still describe the diff's
+current behavior --- is not lexically decidable: answering it means re-running
+arbitrary shown commands and judging the output semantically, which is a
+job for a reader rather than a pattern match.
+A narrower slice is decidable as a **flag**, not a verifier: a PR body
+containing a fenced block shaped like command output, on a PR whose
+config-shaped paths changed in a commit after the body was last edited.
+That reaches the shape of this case without executing anything the body
+contains, which running the transcript's own command would require.
+No such check exists yet; naming the boundary here is the record of that gap,
+per `gha`'s CLAUDE.md precedent that a judgment not to mechanize belongs in
+the corpus as plainly as a mechanism does.
+
+See [`ardi.cases.md`](ardi.cases.md), "A verification transcript in the PR
+body outlived the config it demonstrated".
 
 **The read side of that comparison can lag a push by a few seconds, so test
 the two *local* refs against each other before concluding anything failed.**

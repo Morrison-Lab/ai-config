@@ -1084,6 +1084,9 @@ A reviewer that does not notice -- one that trusts a plain file read over a long
 (Measured 2026-08-27, `Morrison-Lab/gha`: the orchestrating session ran `git checkout <other-branch>` in its own worktree to address a different PR's review finding while a dispatched read-only reviewer subagent was mid-review of the previous branch in that same directory.
 The reviewer noticed the tree had changed mid-flight and fell back to `git show <pinned-sha>:<path>` reads to finish the round.)
 
+**Second occurrence, 2026-09-09: the trigger is any write to the tree, not `git checkout`.**
+Recorded in [`shared/workflow/adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md), since the rule it yields binds the dispatcher rather than the worktree.
+
 ## `git push -u origin HEAD` from a worktree publishes the worktree's own branch name
 
 `pr-on-claim`'s mechanics block ends with `git push -u origin HEAD`, which is

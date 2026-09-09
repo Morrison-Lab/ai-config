@@ -260,6 +260,10 @@ and buries the redlining verdict you were actually asking for.
   and baseline `validate.py` against the original before reading its output.
 - **Don't:** read a `validate.py` failure as caused by your edits without that baseline.
 
+**The same accept-diff also settles a reviewer's finding, not only an author's self-check.**
+Word's "All Markup" display shows a tracked insertion and the deletion it replaces at once, which reads exactly like a stray duplicate to a reviewer who has not resolved the changes --- run the accept-mode extraction before reporting a finding about content that shows up only in that view.
+[`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)'s "A tracked-change DISPLAY VIEW, standing in for the resolved document a finding means" section carries the general shape and a measured case.
+
 ## A tracked change's `w:author` decides who made it, not the size of the diff
 
 In a redlined document written by more than one person,

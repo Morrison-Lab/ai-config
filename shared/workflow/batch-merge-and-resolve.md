@@ -679,6 +679,43 @@ Note that `git show :<path>` reads stage 0, which holds *your* staged content
 once you have staged anything, so it is a record of what you did rather than of
 what git computed.
 
+**The conflict stages exist only for a CONFLICTED path, so the count-delta instrument above cannot read its inputs that way for a file git merged cleanly.**
+This is the trap the two sections meet in.
+The count delta is prescribed for exactly the silent, cleanly-resolved loss that has nothing red to point at, and the stage refs are the obvious place to get its three inputs --- but a path git resolved on its own has no stage 1, 2 or 3 at all.
+
+What makes it a trap rather than an error is the failure shape.
+`git show :1:<path>` on such a file does not report that the stage is missing;
+piped into a counter it yields a plausible number, and the check then reports a mismatch or a row of zeroes.
+Measured 2026-09-08 while syncing a PR: a `## ` heading count over a cleanly auto-merged `CLAUDE.md` came back `base=0 ours=0 theirs=0 merged=136`, which reads as catastrophic loss and is in fact a count of nothing at all.
+The absurdity is what caught it;
+a subtler file would have produced a wrong number that looked ordinary.
+
+For a cleanly merged path take the three inputs from the COMMITS instead, which works whether or not the path conflicted:
+
+```bash
+BASE=$(git merge-base HEAD MERGE_HEAD)   # mid-merge: HEAD is ours, MERGE_HEAD theirs
+cnt() { git show "$1:$FILE" | grep -c '^## '; }
+echo "base=$(cnt $BASE) ours=$(cnt HEAD) theirs=$(cnt MERGE_HEAD) merged=$(grep -c '^## ' $FILE)"
+```
+
+Pair it with a set difference, which localizes what a bare count cannot: every heading present in ours or theirs must appear in the merged file.
+A count delta and a set difference fail on different things --- a count survives one line dropped and one added, and the set difference names which line went.
+
+- **Do:** take the count-delta inputs from `merge-base`/`HEAD`/`MERGE_HEAD` for any path git resolved without a conflict.
+- **Do:** run a set difference beside the count, so a dropped entry is named rather than merely implied.
+- **Don't:** read a zero from a stage ref as a measurement --- on a cleanly-merged path it means the stage does not exist.
+
+**A GENERATED file in a conflict is regenerated, never merged.**
+Resolving it by hand is doing by eye what a generator already computes, and the hand result is only accidentally right.
+The tell is a mirror pair whose two halves are edited together in every commit;
+the repository usually ships both the generator and a `--check` mode that CI runs, so the correct resolution is to fix the canonical file, run the generator, and let `--check` confirm.
+Measured 2026-09-08: `skills/ai-config-hooks/hooks/hooks.json` is `scripts/gen-hooks-plugin.py`'s output, and a conflict there was hand-resolved before the file was recognized as generated.
+The hand-merge happened to match the generator byte for byte, which is the point --- nothing in the diff, the tests, or the review would have said otherwise had it not.
+
+- **Do:** ask whether a conflicted file is generated before resolving it, and regenerate rather than merge when it is.
+- **Do:** run the generator's `--check` mode afterwards, since that is the check CI runs.
+- **Don't:** treat a hand-merge that agrees with the generator as evidence the hand-merge was sound --- agreement was luck, and the next one is not owed it.
+
 **A wholesale restore also reinstates every claim the file made at the old
 commit**, and those claims are stale by construction, since something about
 the file changed in between or you would not be restoring it.

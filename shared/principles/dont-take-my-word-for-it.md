@@ -28,8 +28,17 @@ Several cognitive and structural pressures drive it:
   embedded in a convention document, brief, or issue body, it creates the false
   impression that someone has already verified it.
   Often, the author merely remembered or inherited the claim unchecked.
-  A **reviewer's own counter-test** creates the identical illusion from the other side: a real command that genuinely ran feels categorically more solid than an argument, so the claim built on it inherits a confidence the command's actual scope does not license --- see [`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md)'s "A reviewer's counter-measurement needs the same check the claim it rebuts would have needed".
-  A reviewer's finding is a claim too, not an audit result exempt from re-derivation: accepting *or* rebutting a finding both require re-measuring, and "the reviewer ran a command" is not the same as "the reviewer ran the command that could show the claim false".
+  A **reviewer's own counter-test** creates the identical illusion from the
+  other side: a real command that genuinely ran feels categorically more
+  solid than an argument, so the claim built on it inherits a confidence the
+  command's actual scope does not license --- see
+  [`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md)'s
+  "A reviewer's counter-measurement needs the same check the claim it rebuts
+  would have needed".
+  A reviewer's finding is a claim too, not an audit result exempt from
+  re-derivation: accepting *or* rebutting a finding both require
+  re-measuring, and "the reviewer ran a command" is not the same as "the
+  reviewer ran the command that could show the claim false".
 - **AI-to-AI hallucination loops.**
   AI subagents and peer models generate plausible, fluently phrased claims that
   may have no grounding in the repository.

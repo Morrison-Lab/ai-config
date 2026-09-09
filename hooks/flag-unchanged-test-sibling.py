@@ -25,13 +25,24 @@ WHY THE SEPARATORS MATTER MORE THAN THEY LOOK
 ---------------------------------------------
 The naming list is the whole risk: too narrow and this guard reproduces the
 miss it exists to catch. So it was derived from the corpus rather than
-assumed. Of this repo's test files, 61 are `test_<stem>` and 55 are
-`test-<stem>`, and 58 of the 59 checked sit in the same directory as their
-subject. Crucially, `scripts/test_validate_skills.py` tests
-`scripts/validate-skills.py` -- an underscore test naming a hyphen subject,
-which is the same mismatch that defeated the original search. Comparing stems
-without normalizing the separators would therefore miss real pairs, so this
-compares them with `-` and `_` folded together.
+assumed, over every tracked `.py`, `.sh` and `.bash` file:
+
+    for each such file, take its basename without the extension;
+    count those matching `test[-_]<stem>` and those matching `<stem>[-_]test`;
+    for each, look for a file in the SAME directory whose own stem equals
+    <stem> once `-` and `_` are folded, and count how many of those pairs
+    spell the separator differently on the two sides.
+
+Measured 2026-09-09 over 308 files: 142 leading-form test files, 1 trailing,
+118 of which pair with a subject in their own directory -- and 43 of those
+118 pairs spell the separator differently. `scripts/test_validate_skills.py`
+tests `scripts/validate-skills.py`, and 42 others do the same.
+
+So comparing stems literally would miss more than a third of this repo's real
+test-to-subject pairs, which is why they are compared with `-` and `_`
+folded. An earlier revision of this docstring quoted counts taken from a
+listing silently truncated at 200 files; they did not reproduce, and a
+reviewer caught it.
 
 It warns and never blocks. A change genuinely confined to a comment does not
 owe its test anything, and a blocking guard on that judgment would be switched

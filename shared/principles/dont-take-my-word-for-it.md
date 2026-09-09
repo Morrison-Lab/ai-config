@@ -33,6 +33,17 @@ Several cognitive and structural pressures drive it:
   may have no grounding in the repository.
   When downstream agents accept those summaries as established facts, errors
   compound rapidly across multi-agent workflows.
+  This cuts both ways: a **reviewer's** finding is a claim too, not an audit
+  result exempt from re-derivation.
+  A reviewer can run a real command, reason validly from it, and still be
+  wrong because the command omitted a precondition the original claim
+  depended on --- see
+  [`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md)'s
+  "A reviewer's counter-measurement needs the same check the claim it rebuts
+  would have needed".
+  Accepting *or* rebutting a finding both require re-measuring; "the
+  reviewer ran a command" is not the same as "the reviewer ran the command
+  that could show the claim false".
 - **Human slip-ups and stale mental models.**
   Humans make typos, conflate branch names, misremember file paths, confuse
   similar APIs, or operate from assumptions that were true in an earlier

@@ -8,7 +8,7 @@
 # Resource overrides (env):
 #   ALLOC_CPUS       cores      (default 8 hwthreads = 4 physical)
 #   ALLOC_MEM        memory     (default 32G -- MUST be set on shiva, see below)
-#   ALLOC_TIME       walltime   (default 48:00:00; see the walltime note below)
+#   ALLOC_TIME       walltime   (default 7-00:00:00; see the walltime note)
 #   ALLOC_CONDA_ENV  conda env to activate inside the slice (default: none).
 #                    e.g. ALLOC_CONDA_ENV=bcs claude-alloc  (for bcs repo work)
 #
@@ -20,22 +20,33 @@
 #     set memory.
 #   - c1 is the GPU node; excluded by default for these CPU-only sessions.
 #   - Walltime: partition `normal` has MaxTime=UNLIMITED, so the default here
-#     is a courtesy limit, not a cluster constraint. It has been raised twice
-#     for the same reason, and the failure is worth stating because it is not
-#     the one a walltime usually causes: the slice dying takes down everything
-#     running INSIDE it, including the agent's background monitors and any
-#     watcher polling a long job, so the session loses its observability
-#     rather than its work. It was 12h, which expired mid-session during a
-#     long working day. 24h then expired at 2026-08-06T11:40:33 on a session
-#     that had been running exactly 1-00:00:26 -- a full overnight ARDIA pass
-#     with SLURM jobs and PR watchers still in flight. Hence 48h: two working
-#     days, so an overnight run plus the following day fits inside one slice.
+#     is a courtesy limit, not a cluster constraint. It has now been raised
+#     three times for the same reason, and the failure is worth stating
+#     because it is not the one a walltime usually causes: the slice dying
+#     takes down everything running INSIDE it, including the agent's
+#     background monitors and any watcher polling a long job, so the session
+#     loses its observability rather than its work.
+#     It was 12h, which expired mid-session during a long working day. 24h
+#     then expired at 2026-08-06T11:40:33 on a session that had been running
+#     exactly 1-00:00:26 -- a full overnight ARDIA pass with SLURM jobs and PR
+#     watchers still in flight. 48h expired in turn at 2026-09-08T21:25:46
+#     after 2-00:00:13, on a deadline-bound session with three stratum arrays
+#     running and a PR mid-review; its next monitoring wakeup was armed for
+#     21:31 and never fired, and the session sat idle for about three and a
+#     half hours before a human noticed.
+#     Each of the three expired at essentially its limit, which is the point:
+#     the number has never been the binding constraint on how long a session
+#     runs, so setting it by estimating session length has failed three times
+#     running. Hence 7 days -- long enough that a working week's session ends
+#     because the work ended.
 #     Raise it per invocation with ALLOC_TIME if you need longer.
 #     Do not treat a bigger number as free: the slice holds its cores and
 #     memory for its whole life even while idle, on a 4-node cluster, so exit
 #     the session when you are done rather than letting a long allocation sit.
-#     That caution matters more at 48h than it did at 24h, since an abandoned
-#     slice now idles for twice as long before SLURM reclaims it.
+#     That caution matters more at a week than it did at 48h, since an
+#     abandoned slice now idles for three and a half times as long before
+#     SLURM reclaims it -- and the expiry is silent, so the first symptom is a
+#     loop that stopped firing, which looks like a session with nothing to do.
 #   - Long compute belongs in a detached `sbatch` job, not in this slice. A
 #     batch job survives the slice expiring; work running inside the slice
 #     does not.
@@ -74,7 +85,7 @@ exec salloc \
   --nodes=1 --ntasks=1 \
   --cpus-per-task="${ALLOC_CPUS:-8}" \
   --mem="${ALLOC_MEM:-32G}" \
-  --time="${ALLOC_TIME:-48:00:00}" \
+  --time="${ALLOC_TIME:-7-00:00:00}" \
   --exclude=c1 \
   "$@" \
   srun --pty env \

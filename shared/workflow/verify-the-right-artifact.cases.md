@@ -341,3 +341,35 @@ It was accurate about the case it was written to explain.
 The error was reading a launching example as a boundary, which is a claim
 about a different artifact (the mechanism's actual scope) than the one being
 read (the prose that motivates one instance of it).
+
+## A Stop hook's block wording was read as the request having failed, when the defect was in attribution
+
+Morrison-Lab/ai-config#3403/#3408, 2026-09-09.
+
+A Copilot review request went out as:
+
+```
+gh api ".../requested_reviewers" -X POST -f 'reviewers[]=...' --jq '.number' 2>&1 | tail -3
+```
+
+It succeeded, and a Copilot review landed on the PR.
+`hooks/no-unreviewed-pr.py` kept blocking at `Stop` anyway, with *"no SUCCESSFUL reviewer request follows for it."*
+The wording reads as a claim about the request: it failed, so send it again.
+That happened twice more, in the identical shape.
+
+The claim was about a different artifact than the one being read.
+The block's text is a report of the hook's own attribution logic, not a report of GitHub's state --- `no-unreviewed-pr.py` credits a request by the **whole Bash call's exit status**, so a request piped into `tail` is not the call's last command and cannot be credited to it, whatever GitHub did with the POST.
+[`pr-on-claim.rationale.md`](pr-on-claim.rationale.md)'s "Run that `requested_reviewers` POST as the sole command in its Bash call" section carries the full mechanism;
+this entry is the corrected-belief record of hitting it live.
+
+Reading the hook's source settled it in one look, the same remedy [`get-under-the-hood`](../principles/get-under-the-hood.md)'s "A guard's refusal message goes unread" section already names for a sibling case against the same hook (2026-09-02/03, a different attempt count and a different unread qualifier).
+Running the POST bare, with nothing chained after it, discharged on the first try.
+[Morrison-Lab/ai-config#3408](https://github.com/Morrison-Lab/ai-config/pull/3408) proposes a warning hook (`flag-unattributable-reviewer-request.py`) that would have named this at composition time rather than at `Stop`;
+it is open, not merged, as of this entry.
+
+- **Do:** read a Stop-hook block as a claim about the hook's own logic first, and check whether the underlying condition it reports on (here, whether GitHub actually has the request) independently holds.
+- **Do:** open the hook's source the first time its wording does not resolve the question, rather than re-running the blocked command --- the source read is bounded, and the re-run is not.
+- **Don't:** read a block's wording as the state of the world it is nominally about;
+  it can be exactly wrong about that state while being exactly right about its own trigger.
+- **Don't:** treat a second identical block as evidence the underlying action failed twice;
+  check the world (here: did a review land) before repeating the action.

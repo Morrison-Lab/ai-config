@@ -1021,6 +1021,19 @@ unrelated case flips and the row reports caught.
   is a fact about the rows, and only the identity check makes it one about the
   clauses.
 
+**A third mechanism lands on the same shape from neither side named above: a test's own assertions can differ in sensitivity to one mutation, and the insensitive one is satisfied by a DIFFERENT failure the mutant produces, not by a pre-existing needle or an earlier rejection stage.**
+
+Removing an empty-`--reference`-document guard left one of the test's two assertions unchanged: `rc == 1` still holds, because a run with no guard still exits 1 --- now by flagging every nesting triple in the document as novel, which is exactly the false-positive flood the guard exists to prevent, rather than by the guard's own refusal.
+The exit-code assertion cannot tell those two causes apart.
+Only the message assertion, plus a check that `novel-nesting` does not appear in the unmutated output, turned red.
+This is a third route to "a case passing for the wrong reason", alongside the pre-existing-needle and earlier-rejection-stage routes above, and it needs the same remedy the `Do` line already states: designate, per mutation, the one assertion that must fail, and score the mutation on that assertion rather than on whether any assertion in the test changed.
+
+- **Do:** when a test carries more than one assertion on a single mutation, name the discriminating assertion before running the mutation, and score on that assertion alone.
+- **Don't:** read a test as having caught a mutation because the test as a whole failed; an exit code a different, unrelated failure path can also produce is not evidence about the removed clause.
+
+(Measured 2026-09-09: a guard refusing an empty `--reference` document was pinned by an `rc == 1` assertion and a message assertion.
+Removing the guard left `rc == 1` true either way, and only the message assertion --- together with the absence of `novel-nesting` in the mutant's output --- discriminated the mutation.)
+
 **Generalize past mutation: a harness needs a self-check against a quantity it
 did not compute.**
 

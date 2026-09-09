@@ -1084,6 +1084,20 @@ A reviewer that does not notice -- one that trusts a plain file read over a long
 (Measured 2026-08-27, `Morrison-Lab/gha`: the orchestrating session ran `git checkout <other-branch>` in its own worktree to address a different PR's review finding while a dispatched read-only reviewer subagent was mid-review of the previous branch in that same directory.
 The reviewer noticed the tree had changed mid-flight and fell back to `git show <pinned-sha>:<path>` reads to finish the round.)
 
+**Second occurrence, 2026-09-09, and the mutating action this time is a plain edit rather than a checkout, which is what generalizes the rule.**
+The dispatcher was fixing review findings in a tracked file while an adversarial-reviewer subagent was mid-review of that same working tree, with no branch switch anywhere in the sequence.
+The reviewer reported that its target "began changing under me (uncommitted)" partway through its read, then handled it exactly as the first occurrence's reviewer did: it compared `git show HEAD:<path>` against a copy of the file it had captured earlier in its own read, rather than trusting the drifting working-tree copy, and said so in its report.
+
+The lesson the title above does not yet state is that the trigger is not `git checkout` specifically.
+An ordinary in-place edit to a tracked file moves the ground under a live reviewer exactly as a branch switch does --- same worktree, same paths, different bytes underneath them mid-read --- so "hold branch switches until every dispatched reader has reported back" is too narrow a remedy on its own.
+The dispatcher must not write to the shared tree at all while a review of it is in flight, whatever the specific git operation, and the fix on the dispatching side is procedural rather than git-level: finish dispatching the review, then wait for it to report back, before touching the files it is reading.
+
+- **Do:** treat "don't touch the tree under review" as covering every write to it --- an edit, a `git add`, a formatter run, a generated-file rewrite --- not only a `git checkout`.
+- **Don't:** assume a live reviewer is safe from ordinary editing just because no branch switch occurred; the reviewer has no way to tell the difference from inside its own read.
+
+(Measured 2026-09-09, `Morrison-Lab/ai-config`: an adversarial-reviewer subagent reading `scripts/check-docx-tracked-changes.py` reported the file changing under it while the dispatching session was concurrently applying fixes to the same working tree.
+The reviewer's own recovery --- comparing the committed blob against a copy it had saved at the start of its read --- is what surfaced the drift; a reviewer that trusts a plain file read for the length of a long review would have silently reviewed a mix of two states with no error at all.)
+
 ## `git push -u origin HEAD` from a worktree publishes the worktree's own branch name
 
 `pr-on-claim`'s mechanics block ends with `git push -u origin HEAD`, which is

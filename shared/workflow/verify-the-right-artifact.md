@@ -356,6 +356,45 @@ It has no fetch-based discharge on purpose: [`keep-checkouts-fresh`](keep-checko
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale local base that nearly quadrupled a review diff's file count".
 
+## A measurement of the right artifact can still be scoped narrower than the claim made from it
+
+Every shape above is a *substitution*: the thing read is not the thing the claim is about.
+This one is subtler, because the thing read genuinely is the right artifact --- the claim is just wider than what got measured.
+Nothing about that feels like guessing, because the number really was derived, from the real object, by a real command.
+It just answered a narrower question than the one the prose then asked.
+
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "A sound measurement does not license the claim standing next to it" already names the general gap between a measurement and a neighbouring claim, including cases where the claim is about a different proposition entirely.
+What follows is the narrow case where the claim is about the *same* proposition as the measurement, just at a wider scope along one identifiable axis --- build path, ref, math subset, package set --- so the fix is naming that one axis rather than restating the whole claim.
+
+Four instances from one session, all against the same PR, none of which felt like a guess at the time:
+
+- **A build path that bypasses the real pipeline.**
+  A harness extracted `$$...$$` math blocks from a `.qmd` chapter and ran `pdflatex` on them directly, to check whether the chapter's math compiles.
+  The book never builds that way --- Pandoc reads the source, expands the `macros.qmd` LaTeX macros the chapter actually uses, and only then hands TeX to the renderer.
+  Compiling the raw source with `pdflatex` measures an artifact the build never produces, so "the chapter's math does not compile" was a claim about a document nobody ships.
+  Two issues were filed on that premise before the mismatch surfaced.
+- **A submodule path read through `git show`, silently empty.**
+  The same harness fetched the comparison baseline's macros with `git show <ref>:latex-macros/macros.qmd`.
+  `latex-macros` is a submodule, so that path is a gitlink in `<ref>`'s tree, not a blob --- `git show` returns nothing, and nothing about an empty string looks like an error.
+  The baseline arm silently compiled with zero macros defined, inflating every comparison figure against it (a "153pt worst case" that was really 47pt once the real baseline macros were loaded).
+- **Display math measured, inline math assumed included.**
+  An overfull-box measurement scanned only `$$...$$` display blocks and was reported as covering "the chapter" --- it never touched the inline `$...$` math in the parent file, some of which also overflowed.
+- **A required package left out of the harness, silently changing the answer.**
+  The same overfull-box measurement ran without `microtype` loaded, reporting 0 overfull boxes where the real, `microtype`-loaded render had 1 --- `microtype` changes line-breaking, so the count is not a rounding difference, it is a different measurement wearing the same label.
+
+The shared shape: a scope decision --- which build path, which ref, which subset of the math, which packages --- gets made once while setting up the measurement, and then the sentence that reports the result names the whole claim ("the chapter's math", "the worst case", "0 overfull boxes") rather than the slice that was actually run.
+"The test" section above already supplies the fix for a substituted artifact;
+the fix here is a stricter version of the same falsifying-question test, aimed at scope rather than identity: **what does this measurement cover, and is that the same thing the claim names?**
+
+- **Do:** state a measurement's scope in the same sentence as its number --- which build path, which ref, which subset, which flags --- rather than in a paragraph the reader has to reconstruct.
+- **Do:** confirm the artifact measured is produced by the same path the real system uses, not a hand-rolled shortcut that happens to consume the same source file (a submodule path read with `git show` is the sharpest case: empty is a silent success, not an error).
+- **Don't:** report a subset measurement ("display math", "one package configuration") under the claim's full name ("the chapter's math", "the worst case") without naming the subset.
+- **Don't:** trust a comparison baseline's absolute number without confirming its own inputs loaded --- an empty or under-configured baseline arm inflates every relative claim built on it.
+
+(d-morrison/rme#1138, 2026-09-09: all four measured in one long session on the same PR.
+The Pandoc-bypass and the empty-submodule-baseline are also written up in that PR's own thread and in d-morrison/rme#1154's "Two instrument traps" section;
+the bypass produced a wrong "fix" and two issues filed on the false "math does not compile" premise, one of them d-morrison/macros#85, closed not-planned once the Pandoc-expansion mistake was found.)
+
 ## A summary is another shape, and the auto-loaded copy is the one you read
 
 [`fact-check-prose`](../writing/fact-check-prose.md)'s "any condensation

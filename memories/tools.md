@@ -831,6 +831,23 @@ The repair it prescribes is already satisfied, and the answer is still misread, 
 (2026-08-06, drafting `Morrison-Lab/ai-config#1224`: a citation style was reported as having "9 existing instances" from a listing showing 9 distinct paths, several of which occurred more than once.
 The real total was 17.)
 
+**Plain `grep -c` has the identical failure with no dedup step in sight, and it undercounts even before any file-level deduplication happens.**
+The paragraphs above start from `-l`/`uniq -c`, where a deliberate deduplication step is what collapses repeats into categories.
+`grep -c` needs no such step: it counts **matching lines** (or, run with `-r`, matching lines per file), and a line carrying the pattern twice still counts once.
+So a `grep -c` reading undercounts by exactly the number of lines with more than one match, the same silent, plausible-looking shortfall as the dedup case, and it is easy to miss precisely because no dedup command is visible to raise suspicion.
+
+Three miscounts from one PR, same command, same failure: "nine remaining raw `\hat` sites" was 9 lines and 10 occurrences;
+"the 17 remaining raw `e^{...}`" was 18 lines and 22 occurrences;
+"all 103 `\sb` uses across 37 files" was 110 occurrences across 38 files.
+Two of the three reached public issue bodies before being corrected.
+Use `grep -o 'PATTERN' file | wc -l` (or `grep -ro` summed across files) for a true occurrence count, the same fix the section above gives for the dedup case.
+
+- **Do:** use `grep -o` (not `-c`) whenever the number being reported is described with an occurrence noun --- "sites", "uses", "occurrences", "instances".
+- **Don't:** trust `grep -c` as an occurrence count just because no `-l`/`uniq -c` dedup step is visible --- the same line-vs-occurrence gap applies to plain `-c` on its own.
+
+(d-morrison/rme#1138, 2026-09-09.
+A guard for this is drafted as `hooks/warn-grep-c-counts-lines.py` on branch `hook/grep-c-counts-lines` in this repo, not yet opened as a PR --- check that branch before re-deriving the hook.)
+
 ## A hand-rolled verification check is worth nothing until it has caught something
 
 Two ad-hoc pre-push checks failed in one session, in opposite directions,

@@ -178,7 +178,7 @@ This one is narrower, and it is the case most likely to be met while working thr
 
 A hook's block message states its trigger so the blocked reply can be fixed.
 `hooks/no-unfiled-finding.py` fires on a message that names a finding as worth an `<issue-shaped word>` and files nothing;
-its remedy text tells the reply what phrase tripped it and what to do next. (The angle-bracketed placeholder here is deliberate, per the parent section's own remedy: this entry names the trigger closely enough that spelling it out live, rather than as a placeholder, risks retriggering the same hook if it is ever quoted back into a reply.)
+its remedy text tells the reply what phrase tripped the hook and what to do next. (The angle-bracketed placeholder here is deliberate, per the parent section's own remedy: this entry names the trigger closely enough that spelling it out live, rather than as a placeholder, risks retriggering the same hook if it is ever quoted back into a reply.)
 Comply, then describe the compliance in a later reply --- "I filed the thing the hook flagged" --- and the description restates the same words the hook matches, because restating them precisely is what makes the report accurate.
 The hook fires again, on a reply that did exactly what it asked.
 
@@ -195,9 +195,9 @@ This differs from the negation and quotation cases in what kind of fact would re
 A negation is a property of the sentence's meaning, read in isolation.
 A quotation is a property of who is speaking, read in isolation.
 A compliance report needs a fact **outside** the message being scanned --- whether the obligation was already discharged earlier in the transcript --- so no rewording of the message under scrutiny can fix it on its own;
-the fix has to look elsewhere in the transcript, or accept the false positive as this file's "safe direction is not free" bullet already prices in.
+the fix has to look elsewhere in the transcript, or accept the false positive, per the parent section's point that a safe failure direction is not the same as a cheap one.
 
-- **Do:** expect an accurate report of complying with a hook to restate the hook's own trigger vocabulary, since that is what makes the report accurate.
+- **Do:** treat a hook firing on a reply that restates its own trigger vocabulary as a candidate false positive, and check the transcript for a discharge, rather than assuming the report itself was wrong.
 - **Do:** treat a repeat firing on identical wording as evidence the fix needs a behavioural discriminator (an earlier discharging action in the transcript), not a narrower or wider phrase match.
 - **Do:** verify the discharge independently (the issue number exists, was created before the blocked reply) rather than trusting the transcript's own narrative of it.
 - **Don't:** treat a second firing on the same phrase as proof the first one was also wrong --- the two can be a true positive and a false positive on identical text.

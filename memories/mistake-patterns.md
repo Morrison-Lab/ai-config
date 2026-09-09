@@ -1208,3 +1208,58 @@ blindness in a different code shape: there a raw-text subsumption proof was
 used to DELETE a parser branch, here a raw-text scan is used to decide the
 parser never RUNS.
 Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
+
+## Pattern 54: A Briefed "Measured" Claim Ships Unverified Because It Already Sounds Checked
+
+- **Mistake**: publishing a technical claim into a memory file because a task
+  brief stated it as already "measured tonight", instead of independently
+  reproducing it before it ships.
+  A claim arriving pre-labelled as verified reads as settled input rather
+  than as an assertion to check, which is exactly
+  [`dont-take-my-word-for-it.md`](../shared/principles/dont-take-my-word-for-it.md)'s
+  "illusion of prior verification" --- confidence and a stated measurement
+  substituting for the reader's own derivation.
+- **Direction of failure**: fail-open into the corpus itself.
+  The false claim was not a passing detail; it was the entry's whole thesis
+  (`Summary: 0 issues in 0 files` supposedly meaning an empty match),
+  so shipping it unverified would have taught every future reader the wrong
+  lesson from a named, dated "reproduction" that never happened.
+- **Example**: 2026-09-09, `Morrison-Lab/ai-config` PR
+  [#3379](https://github.com/Morrison-Lab/ai-config/pull/3379).
+  The brief asserted a `MODULE_NOT_FOUND` -> unpinned-`npx` -> empty-match
+  mechanism as already measured.
+  Direct reproduction on the repo's own tree disproved it outright: an
+  unpinned invocation matches every file exactly as a pinned one does, and
+  `Summary: 0 issues in 0 files` / `Summary: 0 error(s)` are simply two
+  markdownlint-cli2 *versions'* wording for an identical clean verdict ---
+  confirmed by running both wordings against a real 752-file corpus and
+  against a genuinely empty match and finding the same summary string in
+  both populations, in both versions.
+  The entry was rewritten before it ever reached a reviewer.
+- **A second, narrower miss rode along in the same incident**: the dupe-check
+  for the corrected entry grepped only two files
+  (`memories/markdownlint.md`, `memories/tools.md`) for the exact string,
+  rather than the whole corpus --- missing two pre-existing sections
+  (`shared/principles/fail-fast.rationale.md`,
+  `memories/nested-worktree-instrument-inflation.md`) that already stated
+  the entry's core lesson.
+  A reviewer caught it; [`grep-is-not-coverage.md`](../shared/workflow/grep-is-not-coverage.md)
+  already names the general shape (a grep's silence is not evidence of a
+  corpus gap) --- the miss here was scoping the query to the two files the
+  brief happened to name instead of the whole tree.
+- **Fix**: treat "measured" in a brief as a claim to re-measure, not a fact
+  to cite --- especially when the claim is the mechanism the whole entry
+  rests on.
+  Scope a dupe-check grep to the corpus, not to the files a brief names.
+
+- **Do:** reproduce a brief's own "measured" claim directly before writing it
+  into a memory file, the same way any other unverified assertion is
+  checked.
+- **Do:** run a dupe-check grep across the whole corpus, not only the files
+  the task happens to name.
+- **Don't:** read a stated measurement, a date, or confident phrasing as
+  evidence the claim was actually checked --- those are exactly the signals
+  [`dont-take-my-word-for-it.md`](../shared/principles/dont-take-my-word-for-it.md)
+  says to distrust.
+- **Don't:** let a narrow, brief-scoped dupe-check stand in for a corpus-wide
+  one merely because it returned zero hits.

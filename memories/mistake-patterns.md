@@ -925,10 +925,11 @@ A clean automated review from every available provider evaluating the current HE
 - **Algorithmatizable?**
   Partially.
   [#2544](https://github.com/Morrison-Lab/ai-config/issues/2544)'s suggested fix 3 --- have the hook's refusal message name a user-approvable permission rule for the override --- would have resolved the measured session in one step, and remains open under [#2899](https://github.com/Morrison-Lab/ai-config/issues/2899).
-  The new symptom above suggests a session-level mitigation too: once a
-  denial has occurred, retry the identical command once before rephrasing
-  or escalating to the user, since an identical retry recovered every time
-  it was measured.
+  The 3rd occurrence's new symptom, recorded in
+  [`mistake-patterns.cases.md`](mistake-patterns.cases.md), suggests a
+  session-level mitigation too: once a denial has occurred, retry the identical
+  command once before rephrasing or escalating to the user, since an identical
+  retry recovered every time it was measured.
 
 ## Pattern 44: `pgrep -f` Self-Matching in Background Waiters and Process Status Pollers
 - **Do**: When monitoring background tasks or long-running scripts,

@@ -53,7 +53,7 @@ So when a check of yours came back clean and the claim still feels under-support
 - **Do:** send a claim to that section instead of this one when the artifact is the correct one and the doubt is about the step taken from it.
 - **Don't:** read a shape here failing to match as evidence the claim is supported --- the four shapes below cover substitutions only.
 
-One case sits between the two, and has its own section at the end of this file: the artifact is right, the reading is right, and the claim is the *same* proposition at a wider scope than the measurement covered.
+One case sits between the two, and has its own section below --- "A measurement of the right artifact can still be scoped narrower than the claim made from it": the artifact is right, the reading is right, and the claim is the *same* proposition at a wider scope than the measurement covered.
 That is not a step taken from the measurement, so it is not the neighbouring rule either.
 
 ## The four shapes
@@ -395,14 +395,16 @@ Four instances from one session, all against the same PR, none of which felt lik
   The same overfull-box measurement ran without `microtype` loaded, reporting 0 overfull boxes where the `microtype`-loaded run of the same document reported 1 --- `microtype` changes line-breaking, so the count is not a rounding difference, it is a different measurement wearing the same label.
   Measured in-session on `d-morrison/rme#1138` rather than in a filed artifact, unlike the figures above: rme#1154 carries the corrected overfull table but records nothing about package configuration, so this arm is anchored here and nowhere else.
 
-The shared shape: a scope decision --- which build path, which ref, which subset of the math, which packages --- gets made once while setting up the measurement, and then the sentence that reports the result names the whole claim ("the chapter's math", "the worst case", "0 overfull boxes") rather than the slice that was actually run.
+The shared shape: a scope decision --- which build path, which ref, which subset of the math, which packages --- gets made once while setting up the measurement, and then the sentence that reports the result names the whole claim ("the chapter's math", "0 overfull boxes") rather than the slice that was actually run --- or, where the slice was a comparison baseline, reports a difference against it ("a 153pt worst case") as though the baseline had loaded.
 "The test" section above already supplies the fix for a substituted artifact;
 the fix here is a stricter version of the same falsifying-question test, aimed at scope rather than identity: **what does this measurement cover, and is that the same thing the claim names?**
 
 - **Do:** state a measurement's scope in the same sentence as its number --- which build path, which ref, which subset, which flags --- rather than in a paragraph the reader has to reconstruct.
 - **Do:** confirm the artifact measured is produced by the same path the real system uses, not a hand-rolled shortcut that happens to consume the same source file.
-- **Do:** check a read's exit status, not just whether it returned bytes --- every empty read in these four instances was accompanied by a non-zero status and a message the harness discarded.
-- **Don't:** report a subset measurement ("display math", "one package configuration") under the claim's full name ("the chapter's math", "the worst case") without naming the subset.
+- **Do:** check a read's exit status, not just whether it returned bytes --- the one empty read among these four instances carried a non-zero status and a `fatal:` message, both of which the harness discarded.
+- **Don't:** report a subset measurement under the claim's full name without naming the subset.
+  Display blocks only, reported as "the chapter's math".
+  One package configuration, reported as "0 overfull boxes".
 - **Don't:** trust a comparison baseline's absolute number without confirming its own inputs loaded --- an empty or under-configured baseline arm inflates every relative claim built on it.
 
 (d-morrison/rme#1138, 2026-09-09: all four measured in one long session on the same PR.

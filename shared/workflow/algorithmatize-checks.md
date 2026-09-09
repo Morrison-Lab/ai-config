@@ -468,8 +468,8 @@ discriminating input and look at the intermediate state, not just the output.
 
 The distinction matters beyond the test, because a survivor of this kind
 usually means a comment somewhere overstates what the mutated line does.
-That comment is a claim-bearing artifact by the section below, so it wants
-correcting in the same commit as the test.
+That comment is itself a claim-bearing artifact, so it wants correcting in the
+same commit as the test.
 
 - **Do:** print the intermediate state under the mutation before writing a
   test for it.

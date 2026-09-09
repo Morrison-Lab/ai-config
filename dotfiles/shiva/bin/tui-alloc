@@ -27,20 +27,20 @@
 #     background monitors and any watcher polling a long job, so the session
 #     loses its observability rather than its work.
 #     The expiry is also silent. Nothing announces it, so the first symptom
-#     is a monitoring loop that stopped firing, which is indistinguishable
-#     from a session that simply had nothing left to do.
+#     is a monitoring loop that stopped firing, which at a glance reads as a
+#     session with nothing left to do.
 #     It was 12h, which expired mid-session during a long working day. 24h
 #     then expired at 2026-08-06T11:40:33 on a session that had been running
 #     exactly 1-00:00:26 -- a full overnight ARDIA pass with SLURM jobs and PR
 #     watchers still in flight. 48h expired in turn at 2026-09-08T21:25:46
 #     after 2-00:00:13, while three stratum arrays were running and a PR was
-#     mid-review; the next monitoring wakeup was armed for 21:31, never
-#     fired, and roughly three and a half hours passed before a human
-#     restarted the work by hand.
-#     Each of those three defaults expired while its own session still had
-#     work in flight, which is the point: the walltime, never the work, is
-#     what ended every one of them. A number picked by estimating how long a
-#     session will run has now been wrong three times, so 7 days is chosen as
+#     mid-review; the next monitoring wakeup was armed for 21:31 and never
+#     fired. The arrays kept running, as detached jobs do, but nothing was
+#     watching them for about three and a half hours.
+#     All three defaults expired while their sessions still had work in
+#     flight, which is the point: what ended those sessions was the walltime
+#     rather than the work. A number picked by estimating how long a session
+#     will run has now been wrong three times, so 7 days is chosen as
 #     headroom rather than as a better estimate. It is still a hard cutoff: a
 #     session outliving it dies the same silent death.
 #     Raise it per invocation with ALLOC_TIME if you need longer.

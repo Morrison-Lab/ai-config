@@ -648,12 +648,27 @@ deliverable.**
 - **Don't:** treat this as grounds to reject the finding --- the conclusion
   usually stands, and only its reason needs strengthening.
 
-**The dismissal is a claim too, and it is the one the verification reflex
-skips: a reviewer that raises a finding and then rebuts its own finding is
-making a factual assertion in that rebuttal, and it can be false.**
+**And the mirror case: a finding can be wrong on its stated grounds while
+still pointing at something real.**
+
+**A third direction, which evades the verification reflex rather than lacking
+a rule: agreeing with a finding and then escalating it.**
+
+- **Do:** verify an escalation against the full scope it claims, which is
+  wider than the scope the finding reported, and which the finding's own
+  instrument may already cover.
+- **Do:** post the correction to the thread that carried the escalation.
+- **Don't:** treat agreeing-and-extending as exempt from the checks a rebuttal
+  gets, since agreement suppresses the reflex that disagreement triggers.
+- **Don't:** report a finding as understated on a measurement you have not
+  shown covers the whole field set.
+
+**A fourth direction, and the one the verification reflex skips entirely:
+the reviewer raises a finding and then rebuts its own finding.
+That rebuttal is a factual assertion, and it can be false.**
 
 Every rule above governs a finding you are deciding whether to *accept* ---
-its evidence, its fix, its reason, its scope.
+its evidence, its fix, its reason, its scope, an escalation of it.
 None of them fires on a finding the reviewer has already dismissed, because
 by the time you read the dismissal the question feels settled.
 It reads as the reviewer having done your checking for you, which is exactly
@@ -696,21 +711,6 @@ running it against `$'evil\nSOMETHING=injected'`, which appended a second,
 real assignment.
 The disposition flipped from Rebut to Address on the strength of the query
 alone.)
-
-**And the mirror case: a finding can be wrong on its stated grounds while
-still pointing at something real.**
-
-**A third direction, which evades the verification reflex rather than lacking
-a rule: agreeing with a finding and then escalating it.**
-
-- **Do:** verify an escalation against the full scope it claims, which is
-  wider than the scope the finding reported, and which the finding's own
-  instrument may already cover.
-- **Do:** post the correction to the thread that carried the escalation.
-- **Don't:** treat agreeing-and-extending as exempt from the checks a rebuttal
-  gets, since agreement suppresses the reflex that disagreement triggers.
-- **Don't:** report a finding as understated on a measurement you have not
-  shown covers the whole field set.
 
 **When a finding cites a source, read the cited source before reproducing
 anything -- it is the cheaper instrument, and it is the one that can show the

@@ -26,9 +26,9 @@ This is a CANDIDATE finder, not a decider.  It flags a sentence; a human
 (or a further pass) still has to read each flagged pronoun against its
 nearest antecedent and judge whether that antecedent is the intended one --
 exactly the grammatical check the fragment describes.  Advisory only:
-always exits 0, and is not wired into CI.  Run it by hand after drafting
-prose, the way `scripts/check-user-quote.py` is run by hand rather than
-gated.
+always exits 0, and is never run against the corpus in CI.  Its tests do
+run there, pinning the measured incident; the checker itself is run by
+hand after drafting prose, the way `scripts/check-user-quote.py` is.
 
 Usage:
   python3 scripts/check-ambiguous-referents.py <file> [<file> ...]

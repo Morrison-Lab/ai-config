@@ -493,7 +493,22 @@ and each failed CI on a check that was never in that subset --- first
 regex character class; then `gen-hooks-plugin.py --check`, over the
 generated plugin mirror left stale after registering that hook.
 `scripts/run-local-validation.py` derives the full step list from
-`validate.yml` and was available the whole time.)
+`validate.yml` and was available the whole time.
+
+That availability is the sharp part.
+[ai-config#1940](https://github.com/Morrison-Lab/ai-config/issues/1940),
+the issue that built the script, records three occurrences of this same
+hand-picking failure in a single session on 2026-08-22, and diagnoses one
+of them in terms that apply unchanged here: the rule "existed, was loaded,
+and did not fire".
+The two failures above are the fourth and fifth, and they happened after
+the instrument written in response to the first three already shipped.
+So a further rule is not what this needs.
+Read it instead as the case `deterministic-tools` names: once an
+instrument exists, the remaining failure is not knowing the rule but
+reaching for the instrument, and the only fix that generalizes is to make
+the derived run the default pre-push action rather than a thing to
+remember.)
 
 ## In review
 

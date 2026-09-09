@@ -65,36 +65,48 @@ so a caller whose argv carries the pattern is itself a match ---
 and its working directory is your worktree by construction,
 which is exactly what such a filter accepts.
 Run this from one of two throwaway directories standing in for worktrees,
-with a long-running process started in each:
+with a long-running process carrying `$pattern` started in each:
 
 ```bash
-for pid in $(pgrep -f "$pattern"); do
-  printf 'pid=%s cwd=%s self=%s\n' "$pid" "$(readlink /proc/$pid/cwd)" \
+loop='for pid in $(pgrep -f "$pattern"); do
+  printf "pid=%s cwd=%s self=%s\n" "$pid" "$(readlink /proc/$pid/cwd)" \
     "$( [ "$pid" = "$$" ] && echo YES || echo no )"
-done
+done'
+
+# A: the pattern reaches the caller through the environment
+( cd /tmp/wtA && pattern="$PAT" bash -c "$loop" )
+
+# B: the pattern is expanded into the command text itself
+( cd /tmp/wtA && bash -c "pattern='$PAT'; $loop" )
 ```
 
-Invoked as `bash -c '<the script above>'` from `/tmp/wtDemoA`:
-
 ```
-pid=19236 cwd=/tmp/wtDemoB self=no     <- peer, correctly excluded by cwd
-pid=19238 cwd=/tmp/wtDemoA self=no     <- the intended target
-pid=19240 cwd=/tmp/wtDemoA self=YES    <- the caller, wrongly accepted
+A: pid=777 cwd=/tmp/wtB self=no
+   pid=781 cwd=/tmp/wtA self=no
+
+B: pid=777 cwd=/tmp/wtB self=no
+   pid=781 cwd=/tmp/wtA self=no
+   pid=788 cwd=/tmp/wtA self=YES    <- the caller, wrongly accepted by a cwd filter
 ```
 
-`pgrep -A`/`--ignore-ancestors` drops the third row and keeps the first two.
+**The caller matches only when the pattern's literal text sits in its own command line**,
+which is the whole of the rule and is easy to state wrongly.
+In A the caller's argv holds the eight characters `$pattern`, never the value,
+so `pgrep -f` cannot match it and no `self=YES` row appears.
+In B the shell expanded the value into the command before `bash` ever saw it,
+so the caller carries the pattern and matches.
+Invocation *form* is a consequence rather than the rule:
+`sh script.sh` and a script on stdin keep the pattern out of argv for the same reason A does,
+and a `bash -c` whose pattern is interpolated puts it in.
+So one clean test proves nothing about the next invocation,
+and the safe assumption is that the caller may be in the list.
+
+`pgrep -A`/`--ignore-ancestors` drops row B's third line and keeps the first two.
 BSD and macOS document the opposite default:
 `pkill.1` in both `freebsd/freebsd-src` and `apple-oss-distributions/adv_cmds`
 states, under `-a`, that "the current pgrep or pkill process and all of its ancestors are excluded".
 So confirm which polarity your platform has
 rather than carrying either assumption across.
-
-**Whether the caller matches at all depends on how it was invoked**,
-which is why one clean test proves little.
-A `bash -c '<script>'` caller carries the pattern in its own argv and matches.
-`sh script.sh` does not, since its argv is the interpreter and a path.
-A script fed on stdin does not either, and for a stronger reason:
-its argv is just `bash`, with no path in it at all.
 
 **A report that a kill happened is a state claim about someone else's process.**
 The natural follow-up to "I may have killed your run" is to tell the peer to re-run,
@@ -102,10 +114,12 @@ and acting on that without checking is backwards:
 if the run survived, the advice destroys it.
 Re-read the peer's process table before recommending or acting on any such remediation.
 
-- **Do:** pair a `/proc/<pid>/cwd` filter with `pgrep -A`, or with an explicit `$$`-and-ancestors exclusion.
+- **Do:** pair a `/proc/<pid>/cwd` filter with `pgrep -A`,
+  or with an explicit `$$`-and-ancestors exclusion.
 - **Do:** re-query a peer's process state before acting on any report that a kill succeeded, including your own.
 - **Don't:** run `pkill -f` against a script path more than one worktree can run.
-- **Don't:** conclude the caller is safe from one test --- an invocation whose argv omits the pattern hides the hazard rather than ruling it out.
+- **Don't:** conclude the caller is safe from one test ---
+  an invocation whose argv omits the pattern hides the hazard rather than ruling it out.
 
 (Measured 2026-09-09 on `Morrison-Lab/ai-config`, three worktrees deep:
 an agent ran `pkill -f "scripts/run-local-validation.py"` to clear its own stale run

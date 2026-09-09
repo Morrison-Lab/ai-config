@@ -138,6 +138,24 @@ WARN_CASES = [
     (DELETE_REPLY, ("ls -la ~/.claude/hooks", "wc -l ~/.claude/hooks/a.py"),
      "listing and counting the files is NOT a reference check -- staleness is "
      "a property of the file, safety-to-delete a property of the graph"),
+    # ai-config#3126: the boundary the lexical approach could not reach. A
+    # quoted pattern DEQUOTES into an argv element indistinguishable from a
+    # path, so only its POSITION says it opens nothing.
+    (DELETE_REPLY, ("grep -rn '~/.claude/settings.json' README.md",),
+     "a quoted pattern spelling a whole manifest path opens no config file: "
+     "the first positional of a grep is the PATTERN, not a file operand"),
+    (DELETE_REPLY, ("rg '~/.claude/config.json' docs/",),
+     "the same shape under rg, whose first positional is a pattern too"),
+    (DELETE_REPLY, ("grep -e '~/.claude/settings.json' README.md",),
+     "`-e` supplies the pattern, so the path here is that option's VALUE and "
+     "the only file operand is README.md"),
+    (DELETE_REPLY, ("(cd ~/.claude) && cat settings.json",),
+     "a cd inside a subshell moves that subshell, not the parent, so the "
+     "later relative read resolves nowhere near the root"),
+    (DELETE_REPLY, ("awk -f ~/.claude/settings.json README.md",),
+     "the manifest is the awk PROGRAM file, and README.md is what is read; "
+     "crediting the root here would discharge on a command that opens the "
+     "manifest as code rather than checking it for references"),
 ]
 
 SILENT_CASES = [
@@ -178,6 +196,29 @@ SILENT_CASES = [
      "naming a config path without proposing deletion"),
     ("Use `git clean -fd` in the worktree.", (),
      "a destructive verb with no config-root operand"),
+    # ai-config#3126: reads the lexical approach could not credit, so the
+    # guard warned while the author was complying.
+    (DELETE_REPLY, ("cd ~/.claude/hooks && cat ../settings.json",),
+     "a cd into a SUBdirectory then a relative `..` read: the path resolves "
+     "under the root, which only a path join can see"),
+    (DELETE_REPLY, ("sed -n '1,5p' ~/.claude/settings.json",),
+     "`sed -n` is --quiet and takes no value: a shared value-option set would "
+     "eat the script and drop the manifest as the pattern positional"),
+    (DELETE_REPLY, ("grep -f patterns.txt ~/.claude/settings.json",),
+     "`-f` supplies the pattern from a file, so the first positional IS the "
+     "file operand and the manifest is genuinely read"),
+    (DELETE_REPLY, ("grep -A 3 hooks ~/.claude/settings.json",),
+     "a context option's value must be skipped, or it becomes the pattern "
+     "positional and the real pattern shadows the manifest"),
+    (DELETE_REPLY, ('cat "$HOME/.claude/settings.json"',),
+     "shlex dequotes the operand, so the quoting a shell strips no longer "
+     "has to be modelled by the pattern"),
+    (DELETE_REPLY, ("sudo cat ~/.claude/settings.json",),
+     "a command wrapper is peeled before argv[0] is read, so the verb is "
+     "`cat` rather than `sudo`"),
+    (DELETE_REPLY, ("grep -o 'hooks ~/.claude/settings.json",),
+     "an unbalanced quote makes shlex raise: the fallback is the lexical "
+     "path, not silence, so behaviour is unchanged rather than lost"),
 ]
 
 total = wrong = 0
@@ -284,6 +325,51 @@ print("%-7s the discharge example matches the command the hook recommends"
 if not _ok:
     print("          example    : %r" % (_example,))
     print("          recommended: %r" % (_recommended,))
+
+# Root ATTRIBUTION, read straight off `read_roots` rather than through a
+# reply. The end-to-end cases above can only say warn or silent, so a command
+# crediting the WRONG root and one crediting nothing look identical there --
+# `grep -rn '~/.claude' ~/.codex/config.toml` warns either way. These pin the
+# set itself. Run in-process because the question is about one function.
+print("\n--- root attribution (read_roots)")
+_HOME = os.path.expanduser("~")
+_ATTRIBUTION_CASES = [
+    ("grep -rn '~/.claude' ~/.codex/config.toml", {"codex"},
+     "the pattern names claude and the OPERAND is codex's manifest"),
+    ("grep -rn '~/.claude/settings.json' README.md", set(),
+     "a whole path as the pattern credits nothing"),
+    ("cd ~/.claude && cat settings.json", {"claude"},
+     "the shell supplies the prefix, so the operand resolves under the root"),
+    ("cd ~/.claude/hooks && cat ../settings.json", {"claude"},
+     "a relative `..` still lands under the root"),
+    ("jq . ~/.claude/settings.json ~/.codex/config.toml", {"claude", "codex"},
+     "EVERY file operand is examined, so one command can discharge a "
+     "two-root reply -- the lexical scan credited only the first"),
+    ("cat '" + os.path.join(_HOME, ".claude", "settings.json") + "'",
+     {"claude"},
+     "an already-expanded absolute path resolves now, a limit the docstring "
+     "used to list under DISCHARGE"),
+    ("cat ~/.claudex/settings.json", set(),
+     "`~/.claudex` is not `~/.claude`: the root must end at a path boundary"),
+    ("cat ~/.config-notes/settings.json", set(),
+     "the same boundary on the root most exposed to it"),
+    ("cat $CONFIG_DIR/settings.json", set(),
+     "an unexpanded variable is indeterminate, not a root"),
+    ("locate ~/.claude/settings.json", set(),
+     "argv[0] membership, so the `cat` inside `locate` cannot match"),
+    ("sbatch ~/.claude/config.json", set(),
+     "the `bat` inside `sbatch`, the other front-anchoring case"),
+]
+print("(argv parse active: %s)" % (_ns["simple_commands_with_scope"] is not None))
+for _command, _expected, _desc in _ATTRIBUTION_CASES:
+    _got = _ns["read_roots"](_command)
+    total += 1
+    _ok = _got == _expected
+    wrong += not _ok
+    print("%-7s %s" % ("ok" if _ok else "FAIL", _desc))
+    if not _ok:
+        print("          %r -> %s, expected %s"
+              % (_command, sorted(_got), sorted(_expected)))
 
 print("\n--- fail-open")
 _proc = subprocess.run([sys.executable, HOOK], input="not json",

@@ -29,26 +29,36 @@ missed --- see its branch.
 OVER: the guard cannot tell a recommendation from a mention, so a reply that
 QUOTES a destructive command in order to warn against it still fires --- this
 file's own message text included. The sentinel bounds that to one warning per
-message. A quoted search pattern that spells a full manifest path discharges
-even though it opens nothing, for the same lack of argument-position parsing.
-That one is the residue of a lexical approach: a regex has no notion of
-argument position, so each narrowing trades one boundary case for another.
-Parsing the command with `shlex` and asking whether a read verb's argv holds
-a manifest under a targeted root would make the whole class structurally
-impossible; it is filed as ai-config#3126 rather than done here.
+message.
 
-DISCHARGE: a real manifest read can fail to clear the guard, which warns while
-the author is complying. A verb outside the read list (`tail`, `wc`), an
-already-expanded absolute path (`/Users/me/.claude/settings.json`), a `cd` into
-a SUBdirectory then `../settings.json`, a verb-to-path gap over 120 characters,
-a separator character (`|`, `;`, `&`) inside a QUOTED argument before the path,
-since the gap excludes them lexically and `jq -r '.hooks|keys[]'` is the
-idiomatic way to inspect a manifest, and --- most likely in this harness --- a
-manifest opened with the Read tool rather than Bash, since only Bash commands
-are scanned.
-A command reading two manifests at once credits only the first, so a two-root
-deletion needs two reads. Each is a warning to
-answer in one sentence, not a block.
+THE DISCHARGE SIDE IS PARSED, NOT MATCHED (ai-config#3126). Whether an earlier
+command READ a manifest is a parsing question --- "is this path the operand of
+a reading command?" --- and a regex has no notion of argument position, so each
+narrowing traded one boundary case for another over eight rounds on #3101. The
+question is now asked of an argv: `scripts/lib/shellcmd.py` splits the command
+into simple commands, `read_operands` drops each verb's options and its
+pattern/script argument, and a discharge needs a FILE operand that both
+resolves under a targeted root and is named like a manifest. `argv[0]`
+membership replaces front-anchoring, so `locate` cannot match through `cat`; a
+quoted pattern is a distinct argv element from the file operand, so
+`grep -rn '~/.claude/settings.json' README.md` opens nothing and discharges
+nothing; and the split means a verb and an operand in different commands cannot
+pair.
+
+The lexical path below is kept as the FALLBACK, not as the decision. `shlex`
+raises on unbalanced quotes, and a command substitution or a heredoc body does
+not parse into the operands the shell would pass, so those fall back to the
+regex rather than to silence.
+
+DISCHARGE: a real manifest read can still fail to clear the guard, which warns
+while the author is complying. A verb outside `READ_VERBS` (`tail`, `wc`), a
+path held in a variable, a `cd` whose target is indeterminate (`cd -`, `popd`),
+and --- most likely in this harness --- a manifest opened with the Read tool
+rather than Bash, since only Bash commands are scanned. Two limits the argv
+parse RETIRED: an already-expanded absolute path under the home directory now
+resolves, and so does `cd <root>/hooks && cat ../settings.json`.
+A command reading two manifests at once now credits both, since every file
+operand is examined rather than only the first match.
 Fires once per distinct message (sentinel keyed by content hash).
 """
 import hashlib
@@ -57,6 +67,25 @@ import os
 import re
 import sys
 import tempfile
+
+try:
+    # `globals().get` rather than a bare `__file__`, because the test suite
+    # `exec`s this module to read `REASON` and to time the regexes, and in
+    # that namespace `__file__` is unbound -- so a bare reference reported a
+    # broken install on every run of a suite whose subject imports fine.
+    _SELF = globals().get("__file__") or sys.argv[0]
+    _LIB = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.realpath(_SELF))),
+        "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from shellcmd import (resolve_cd_target, simple_commands_with_scope,
+                          strip_env)
+except Exception as _exc:  # broken install; fall back to the lexical path
+    print("flag-config-deletion-without-ref-check: cannot load "
+          "scripts/lib/shellcmd.py ({0}); using the lexical fallback"
+          .format(_exc), file=sys.stderr)
+    resolve_cd_target = simple_commands_with_scope = strip_env = None
 
 # Configuration roots whose files are typically referenced by a manifest rather
 # than discovered by scanning. Deleting one here unregisters behaviour.
@@ -106,6 +135,12 @@ _DESTRUCTIVE_PARTS = [
 ]
 RX_DESTRUCTIVE = re.compile("(?:" + "|".join(_DESTRUCTIVE_PARTS) + ")")
 
+# FALLBACK ONLY, since ai-config#3126. Everything from here to `RX_REF_CHECK`
+# is the lexical approximation the argv parse below replaced; it still runs
+# when `shlex` cannot parse the command, or when a command substitution or a
+# heredoc means the argv is not what the shell would pass. Read its comments as
+# a record of which boundary each narrowing bought, not as the live decision.
+#
 # Evidence the author looked for references before proposing removal: an
 # earlier command that read a manifest AND named a config root in the same
 # command, in either order. Requiring both is what makes the comment true: an
@@ -164,6 +199,204 @@ _REF_ORDERS = [
 ]
 RX_REF_CHECK = re.compile("(?:" + "|".join(_REF_ORDERS) + ")")
 
+# ---------------------------------------------------------------------------
+# The argv path (ai-config#3126). Everything below decides "is this manifest
+# path the operand of a reading command?" from argument position rather than
+# from the shape of the surrounding text.
+# ---------------------------------------------------------------------------
+
+# Programs that OPEN their file operands. Membership is tested on
+# `os.path.basename(argv[0])`, which is what retires the front-anchoring the
+# `_READ` pattern needed: `locate` is simply not in this set, so the `cat`
+# inside its name can never match.
+READ_VERBS = frozenset({
+    "grep", "egrep", "fgrep", "rg", "jq", "yq", "cat", "sed", "awk", "gawk",
+    "mawk", "python", "python3", "head", "less", "bat", "xxd",
+})
+# `egrep`/`fgrep`/`gawk` take the option grammar of the program they alias.
+VERB_ALIASES = {"egrep": "grep", "fgrep": "grep", "gawk": "awk",
+                "mawk": "awk", "yq": "jq"}
+
+# Verbs whose FIRST positional argument is a PATTERN or a SCRIPT rather than a
+# file. Dropping it is what stops `grep -rn '~/.claude/settings.json' README.md`
+# discharging: `shlex` dequotes the pattern into an argv element that looks
+# exactly like a path, and only its POSITION says it is not one.
+PATTERN_FIRST_VERBS = frozenset({"grep", "rg", "jq", "sed", "awk"})
+
+# Options that supply the pattern or script separately, so the first positional
+# IS a file: `grep -e PAT file`, `awk -f prog.awk file`, `jq -f filter file`.
+PATTERN_OPTS = frozenset({"-e", "--regexp", "-f", "--file", "--expression",
+                          "--from-file"})
+
+# Options taking the NEXT token as their value, per verb. Per verb rather than
+# shared, because the same spelling means different things: `sed -n` is
+# `--quiet` and takes nothing, while `head -n` takes a line count. A shared set
+# would consume `sed -n '1,5p' <manifest>`'s script as `-n`'s value, leaving the
+# manifest as the dropped first positional and losing a real discharge.
+VALUE_OPTS = {
+    "grep": frozenset({
+        "-e", "--regexp", "-f", "--file", "-m", "--max-count",
+        "-A", "--after-context", "-B", "--before-context", "-C", "--context",
+        "--include", "--exclude", "--exclude-dir", "--exclude-from", "--label",
+        "-d", "--directories", "-D", "--devices", "--binary-files",
+        "--color", "--colour",
+    }),
+    "rg": frozenset({
+        "-e", "--regexp", "-f", "--file", "-m", "--max-count",
+        "-A", "--after-context", "-B", "--before-context", "-C", "--context",
+        "-g", "--glob", "-t", "--type", "-T", "--type-not", "--color",
+        "--colors", "-M", "--max-columns", "--max-depth", "--iglob",
+    }),
+    "sed": frozenset({"-e", "--expression", "-f", "--file",
+                      "-l", "--line-length"}),
+    "awk": frozenset({"-f", "--file", "-v", "--assign",
+                      "-F", "--field-separator"}),
+    "jq": frozenset({"-f", "--from-file", "--arg", "--argjson", "--slurpfile",
+                     "--rawfile", "--indent", "--jsonargs"}),
+    "head": frozenset({"-n", "--lines", "-c", "--bytes"}),
+    "xxd": frozenset({"-l", "-s", "-c", "-g"}),
+}
+
+# The basenames that count as a manifest. Compared with `==` against a resolved
+# path's basename, which is what retires `_MANIFEST`'s lookbehind: nothing can
+# match `tsconfig.json` or `webpack.config.json` as a suffix.
+MANIFEST_NAMES = frozenset({"settings.json", "config.toml", "config.json",
+                            "mcp.json", ".mcp.json"})
+
+# Directory-changing builtins, whose effect on later operands the scan tracks.
+CD_VERBS = frozenset({"cd", "pushd", "popd"})
+
+# Constructs whose argv is not what the shell would pass: the value of a
+# command substitution is unknown here, and a heredoc BODY is blanked by
+# `shellcmd._heredoc_free` before `shlex` ever sees it. Union the argv verdict
+# with the lexical one for these, per the issue's "fall back to the lexical
+# path rather than to silence".
+RX_UNPARSEABLE = re.compile(r"[$][(]|`|<<")
+
+HOME = os.path.expanduser("~")
+
+
+def config_root_of(abs_path):
+    """The config root `abs_path` lies under, or `None`.
+
+    An exact match or a `<root>/...` prefix only, so `~/.config-notes` is not
+    under `~/.config` --- the same boundary `RX_ROOT_NAME`'s lookahead draws,
+    here as a path comparison rather than a character class.
+    """
+    for name in CONFIG_ROOTS:
+        root = os.path.normpath(os.path.join(HOME, "." + name))
+        if abs_path == root or abs_path.startswith(root + os.sep):
+            return name
+    return None
+
+
+def expand_path(path, cwd):
+    """`path` as a normalized absolute path, or `None` when indeterminate.
+
+    `~`, `$HOME` and `${HOME}` expand; any other `$` or a backtick makes the
+    value unknowable without running the shell, and `None` means exactly that
+    rather than "no root". A relative path needs a known `cwd`, which is why
+    `cat config.json` after an untracked `cd` credits nothing.
+    """
+    if not path:
+        return None
+    if path == "~":
+        path = HOME
+    elif path.startswith("~/"):
+        path = os.path.join(HOME, path[2:])
+    elif path in ("$HOME", "${HOME}"):
+        path = HOME
+    elif path.startswith("$HOME/"):
+        path = os.path.join(HOME, path[len("$HOME/"):])
+    elif path.startswith("${HOME}/"):
+        path = os.path.join(HOME, path[len("${HOME}/"):])
+    elif "$" in path or "`" in path or path.startswith("~"):
+        return None
+    if not os.path.isabs(path):
+        if cwd is None:
+            return None
+        path = os.path.join(cwd, path)
+    return os.path.normpath(path)
+
+
+def read_operands(argv):
+    """The FILE operands of a reading command, or `None` when argv is not one.
+
+    Options are dropped, an option's separate value is skipped, and a
+    pattern-first verb loses its first positional unless an `-e`/`-f`-style
+    option already supplied the pattern. What is left is the set of paths the
+    command actually opens.
+    """
+    if not argv:
+        return None
+    verb = os.path.basename(argv[0])
+    verb = VERB_ALIASES.get(verb, verb)
+    if verb not in READ_VERBS:
+        return None
+    value_opts = VALUE_OPTS.get(verb, frozenset())
+    positional = []
+    pattern_supplied = False
+    end_of_opts = False
+    index = 1
+    while index < len(argv):
+        token = argv[index]
+        if not end_of_opts and token == "--":
+            end_of_opts = True
+            index += 1
+            continue
+        if not end_of_opts and token.startswith("-") and token != "-":
+            name = token.split("=", 1)[0]
+            if name in PATTERN_OPTS:
+                pattern_supplied = True
+            index += 2 if "=" not in token and name in value_opts else 1
+            continue
+        positional.append(token)
+        index += 1
+    if verb in PATTERN_FIRST_VERBS and not pattern_supplied and positional:
+        positional = positional[1:]
+    return positional
+
+
+def scope_cwd(cwd_by_scope, scope):
+    """The directory a command in `scope` runs in, inherited from its parents.
+
+    A subshell starts where its parent stood, so the lookup walks outward from
+    the command's own scope. A sibling subshell carries a different id, which
+    is what keeps `(cd ~/.claude) && cat settings.json` from crediting a read.
+    """
+    for depth in range(len(scope), 0, -1):
+        key = scope[:depth]
+        if key in cwd_by_scope:
+            return cwd_by_scope[key]
+    return None
+
+
+def argv_read_roots(command):
+    """Roots whose manifest `command` reads, or `None` when it cannot parse."""
+    parsed = simple_commands_with_scope(command)
+    if parsed is None:
+        return None
+    found = set()
+    cwd_by_scope = {}
+    for scope, argv in parsed:
+        cwd = scope_cwd(cwd_by_scope, scope)
+        _env, rest = strip_env(argv)
+        if not rest:
+            continue
+        if os.path.basename(rest[0]) in CD_VERBS:
+            cwd_by_scope[scope] = resolve_cd_target(rest, cwd)
+            continue
+        for operand in read_operands(rest) or ():
+            resolved = expand_path(operand, cwd)
+            if resolved is None:
+                continue
+            if os.path.basename(resolved) not in MANIFEST_NAMES:
+                continue
+            root = config_root_of(resolved)
+            if root:
+                found.add(root)
+    return found
+
 
 def transcript_records(path):
     try:
@@ -185,11 +418,11 @@ def roots_in(text):
     return {m.group(1) for m in RX_ROOT_NAME.finditer(text or "")}
 
 
-def read_roots(command):
-    """The roots whose manifest a command actually READS.
+def lexical_read_roots(command):
+    """`read_roots`'s fallback: the roots `RX_REF_CHECK` credits.
 
-    Scoped to each `RX_REF_CHECK` match rather than the whole command, for the
-    same reason `targeted_roots` is scoped to the deletions: in
+    Scoped to each match rather than the whole command, for the same reason
+    `targeted_roots` is scoped to the deletions: in
     `grep -rn '~/.claude' ~/.codex/config.toml` the `~/.claude` is the search
     PATTERN and `~/.codex` is the file opened, so a whole-command scan credits
     the read to the wrong root and discharges a `~/.claude` deletion.
@@ -201,6 +434,25 @@ def read_roots(command):
             if hit:
                 found |= roots_in(hit)
     return found
+
+
+def read_roots(command):
+    """The roots whose manifest a command actually READS.
+
+    The argv parse decides, and the lexical scan is consulted only where the
+    argv cannot be trusted: a `shlex` failure returns `None` here, and a
+    command substitution or heredoc means the tokens are not the ones the shell
+    would pass. Unioning in those two cases keeps the guard's behaviour where
+    it was rather than dropping to silence, which for a DISCHARGE test is the
+    fail-open direction a warn-only guard wants.
+    """
+    command = command or ""
+    parsed = argv_read_roots(command) if simple_commands_with_scope else None
+    if parsed is None:
+        return lexical_read_roots(command)
+    if RX_UNPARSEABLE.search(command):
+        return parsed | lexical_read_roots(command)
+    return parsed
 
 
 def targeted_roots(text):
@@ -241,11 +493,15 @@ def ref_check_ran(path, wanted=None):
             if block.get("name") not in {"Bash", "bash", "run_command"}:
                 continue
             command = str((block.get("input") or {}).get("command") or "")
-            if not RX_REF_CHECK.search(command):
+            # A read is now DEFINED by the roots it credits, so the separate
+            # `RX_REF_CHECK.search` gate this replaced would have re-admitted
+            # every case the argv parse exists to reject.
+            roots = read_roots(command)
+            if not roots:
                 continue
             if not wanted:
                 return True
-            covered |= read_roots(command) & wanted
+            covered |= roots & wanted
             if wanted <= covered:
                 return True
     return False

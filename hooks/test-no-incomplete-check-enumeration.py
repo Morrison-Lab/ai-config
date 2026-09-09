@@ -296,6 +296,13 @@ CONTENT_CASES = [
      "push and complete read in one turn: every `>` guard is false, so "
      "without a tie reason the WARN ships an empty explanation -- and it "
      "must not blame the subagent, since a complete read did happen"),
+    ([PARTIAL,
+      say("#100 was closed as a duplicate. #200 is green, awaiting your "
+          "merge.")],
+     "#200",
+     "about #100",
+     "a message naming two PRs must label the claim with the one the claim "
+     "is about, not the first reference in the message"),
     ([PARTIAL, PUSH,
       say("#100 is good to merge whenever you're ready.")],
      "no complete instrument read appears anywhere",

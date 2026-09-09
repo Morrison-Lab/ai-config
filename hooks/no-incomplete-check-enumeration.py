@@ -297,7 +297,26 @@ def already_fired(text):
     return False
 
 
-def _pr_label(text):
+def _pr_label(text, hit=None):
+    """Name the PR the CLAIM is about, not the first one in the message.
+
+    A message routinely mentions several PRs -- "#100 was closed as a
+    duplicate. #200 is green, awaiting your merge." -- and the first
+    reference is very often not the subject of the terminal claim. The
+    payload's remediation command carries this label, so getting it wrong
+    points the user's instrument run at the wrong PR (#3475 round 5).
+
+    Prefers the nearest reference at or before the claim phrase, since a
+    claim's subject usually precedes it, then the nearest one after.
+    """
+    if hit is not None:
+        pos = hit.start()
+        before = [m for m in RX_PR_REF.finditer(text) if m.start() <= pos]
+        if before:
+            return before[-1].group(0)
+        after = RX_PR_REF.search(text, pos)
+        if after:
+            return after.group(0)
     m = RX_PR_REF.search(text)
     return m.group(0) if m else "the PR you named"
 
@@ -366,7 +385,7 @@ def main() -> int:
     if already_fired(text):
         return 0
 
-    pr_label = _pr_label(text)
+    pr_label = _pr_label(text, hit)
 
     # BLOCK only the narrow, original case this hook has always covered:
     # original clean-claim vocabulary, a partial CI reading in play, no

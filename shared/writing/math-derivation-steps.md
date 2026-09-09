@@ -2,7 +2,7 @@ When writing or reviewing a mathematical derivation --- an algebraic
 manipulation, a proof, a statistical argument --- hold it to a stricter
 completeness bar than ordinary prose reasoning.
 
-This fragment covers two axes.
+This fragment covers three axes.
 The first is **between** displayed lines: how much happens from one line to
 the next.
 The second is **within** a single line: how much structure is packed inside
@@ -10,6 +10,7 @@ one expression.
 That second axis applies to any displayed equation, a standalone definition
 included, not only to a line inside a running derivation, and its remedy
 reaches document scope even though the defect shows up in one line.
+The third is **whether** a line is displayed at all: display versus inline, a decision that is usually never made on purpose rather than made wrongly.
 
 ## Writing: don't skip steps
 
@@ -413,12 +414,7 @@ The stopping rule came out of a follow-up exchange on the same example, from
 the question of whether the atoms of statistical notation are essentially
 always single probability expressions, and the user approved encoding the
 answer.
-It is stated here as a test rather than as a taxonomy because complication 3
-is real and checkable in this very document: `@prp-marginal-likelihood` at
-:746 unfolds `$\dens(Y=y)$` into `$\int_0^a \dens(Y=y\mid
-T=t)\,\lambda\expf{-\lambda t}\,dt$` plus a never-infected term, so the
-expression that is the floor in the sandwich-variance section is composite
-two propositions earlier.)
+It is stated here as a test rather than as a taxonomy because complication 3 is real and checkable in this very document: `@prp-marginal-likelihood` at :746 unfolds `$\dens(Y=y)$` into `$\int_0^a \dens(Y=y\mid T=t)\,\lambda\expf{-\lambda t}\,dt$` plus a never-infected term, so the expression that is the floor in the sandwich-variance section is composite two propositions earlier.)
 
 ## Choose display or inline, deliberately
 
@@ -436,7 +432,7 @@ A named quantity that is never cited again does not automatically earn this: the
 
 **Inline marks an equation that is a grammatical constituent of its own sentence.**
 "the density $f(t)$ is decreasing on $(0, a)$" reads as one sentence with a symbol standing in for a noun phrase;
-setting $f(t)$ on its own display line breaks that sentence in two for no reason the reader can find, and running prose directly into a display line on either side is the specific defect this default produces.
+setting $f(t)$ on its own display line breaks that sentence in two for no reason the reader can find, and running prose directly into a display line on either side is the specific defect that neighbour-copying habit produces.
 If removing the equation and reading the sentence aloud with a plain noun phrase in its place still parses, the equation belongs inline.
 
 **Two equations meant to be compared must be given the same form as each other.**
@@ -464,7 +460,7 @@ The decision is the same question on every authoring surface this corpus touches
 
 ### In review: display versus inline
 
-A display equation running directly into the sentence that introduces it, with no separating punctuation or paragraph break, is a symptom rather than a diagnosis, and it is ambiguous between two causes with opposite remedies.
+A display equation running directly into the sentence that introduces it, with no separating punctuation or paragraph break, is a symptom rather than a diagnosis, and that symptom is ambiguous between two causes with opposite remedies.
 Either the display/inline choice was wrong and the equation should be inline, or the choice was right and the display mechanics are incomplete --- in Quarto/LaTeX a missing blank line around `$$...$$`, in Word/OOXML a missing `w:br` (see the Word/OOXML bullet above).
 **Check the underlying markup before changing anything.**
 Converting a correctly-display equation to inline because it looks glued to its introducing sentence removes the display form the argument actually needed, and does not fix the missing break that caused the symptom.

@@ -107,6 +107,36 @@ def local(tag: str) -> str:
     return tag.rsplit("}", 1)[-1] if "}" in tag else tag
 
 
+# Prefixes for rendering a fully-qualified tag in the spelling a reader of the
+# XML would recognize. Display only: comparison keeps the full "{uri}local"
+# tag, per qualified() below.
+NS_PREFIXES = {
+    "http://schemas.openxmlformats.org/wordprocessingml/2006/main": "w",
+    "http://schemas.openxmlformats.org/officeDocument/2006/math": "m",
+    "http://schemas.openxmlformats.org/markup-compatibility/2006": "mc",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships": "r",
+    "http://schemas.microsoft.com/office/word/2010/wordml": "w14",
+    "http://schemas.microsoft.com/office/word/2012/wordml": "w15",
+    "http://schemas.microsoft.com/office/word/2016/wordml/cid": "w16cid",
+    "http://schemas.microsoft.com/office/word/2018/wordml/cex": "w16cex",
+}
+
+
+def qualified(tag: str) -> str:
+    """Render a tag for a reader without discarding its namespace.
+
+    Comparison keys keep the full "{uri}local" form deliberately. An OMML
+    m:r and a WordprocessingML w:r are different elements, and telling that
+    pair apart is what this checker is for, so collapsing a tag to its local
+    name would let a novel math shape hide behind an ordinary text one.
+    """
+    if not tag.startswith("{"):
+        return tag
+    uri, name = tag[1:].split("}", 1)
+    prefix = NS_PREFIXES.get(uri)
+    return f"{prefix}:{name}" if prefix else f"{{{uri}}}{name}"
+
+
 class Finding:
     def __init__(self, kind: str, part: str, detail: str) -> None:
         self.kind = kind
@@ -130,7 +160,11 @@ def parent_map_of(root: ET.Element) -> dict:
 
 
 def nesting_triples(root: ET.Element) -> set:
-    """(grandparent-local, parent-local, child-local) for every non-root element."""
+    """(grandparent, parent, child) tags for every non-root element.
+
+    The tags are fully qualified; see qualified() for why the namespace is
+    load-bearing here rather than noise.
+    """
     parents = parent_map_of(root)
     triples = set()
     for elem in root.iter():
@@ -138,8 +172,8 @@ def nesting_triples(root: ET.Element) -> set:
         if parent is None:
             continue  # elem is the part's document root
         grandparent = parents.get(parent)
-        gp_local = local(grandparent.tag) if grandparent is not None else None
-        triples.add((gp_local, local(parent.tag), local(elem.tag)))
+        gp_tag = grandparent.tag if grandparent is not None else None
+        triples.add((gp_tag, parent.tag, elem.tag))
     return triples
 
 
@@ -337,13 +371,13 @@ def check_against_reference(
     reference. Returns the number of triples checked (i.e. len(edited_triples))."""
     novel = edited_triples - reference_triples
     for gp, p, c in sorted(novel, key=lambda t: (t[1], t[2], t[0] or "")):
-        gp_desc = gp if gp is not None else "(root)"
+        gp_desc = qualified(gp) if gp is not None else "(root)"
         findings.append(
             Finding(
                 "novel-nesting",
                 "(reference comparison)",
-                f"<{gp_desc}> > <{p}> > <{c}> does not occur anywhere in the "
-                "reference document",
+                f"<{gp_desc}> > <{qualified(p)}> > <{qualified(c)}> does not "
+                "occur anywhere in the reference document",
             )
         )
     return len(edited_triples)
@@ -381,7 +415,13 @@ def main(argv: list) -> int:
     reference_triples = None
     reference_examined = 0
     if args.reference is not None:
-        ref_findings, ref_stats, reference_triples = check_document(args.reference)
+        try:
+            ref_findings, ref_stats, reference_triples = check_document(
+                args.reference
+            )
+        except (zipfile.BadZipFile, OSError) as exc:
+            print(f"ERROR: reference {args.reference} could not be opened: {exc}")
+            return 1
         reference_examined = ref_stats["triples_examined"]
         print(f"== reference: {args.reference} ==")
         print(
@@ -398,7 +438,7 @@ def main(argv: list) -> int:
     for docx_path in args.docx:
         try:
             findings, stats, triples = check_document(docx_path)
-        except (zipfile.BadZipFile, FileNotFoundError) as exc:
+        except (zipfile.BadZipFile, OSError) as exc:
             print(f"== {docx_path} ==")
             print(f"  ERROR: could not open as a zip package: {exc}")
             any_findings = True

@@ -194,6 +194,22 @@ NOVEL_STRUCTURE = (
 )
 
 
+# Same LOCAL names as REFERENCE_CLEAN throughout, different namespaces: a
+# WordprocessingML run where the reference has an OMML one. Collapsing a tag
+# to its local name makes this indistinguishable from the reference, which is
+# the one confusion this checker exists to prevent.
+NAMESPACE_ONLY_NOVELTY = (
+    DOC_HEADER
+    + f"""<w:p><m:oMath>
+  <w:r><w:del w:id="9" w:author="A" w:date="2026-01-01T00:00:00Z">
+    <w:rPr><w:rFonts w:ascii="Cambria Math"/></w:rPr><w:t>x</w:t>
+  </w:del></w:r>
+</m:oMath></w:p>
+"""
+    + DOC_FOOTER
+)
+
+
 with __import__("tempfile").TemporaryDirectory() as tmp:
     tmp_path = Path(tmp)
 
@@ -306,6 +322,26 @@ with __import__("tempfile").TemporaryDirectory() as tmp:
     rc, out = run_check([tmp_path / "does-not-exist.docx"])
     check("a missing file is reported as an error and fails the run", rc == 1)
     check("the error names the problem rather than reporting clean", "ERROR" in out)
+
+    # A directory raises IsADirectoryError, which is an OSError and not a
+    # FileNotFoundError, so a narrower except clause lets it escape as a
+    # traceback -- which reads as the checker being broken rather than as the
+    # path being wrong.
+    rc, out = run_check([tmp_path])
+    check("a directory is reported as an error rather than raising", rc == 1)
+    check("the directory error is the checker's own message", "ERROR" in out)
+
+    # -- the nesting diff compares namespaces, not just local names ----------
+    ns_novel = make_docx(tmp_path, "ns-novel.docx", NAMESPACE_ONLY_NOVELTY)
+    rc, out = run_check([ns_novel], reference=reference)
+    check(
+        "a shape differing from the reference only by namespace is novel",
+        "novel-nesting" in out and rc == 1,
+    )
+    check(
+        "the novel-nesting finding names the namespace prefix, not a bare local name",
+        "<w:r>" in out or "<m:oMath>" in out,
+    )
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

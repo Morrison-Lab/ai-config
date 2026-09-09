@@ -435,12 +435,14 @@ Re-running with the precondition restored (a document that actually defines `\v`
 
 The reviewer had measured the top row and read it as the whole truth table.
 The middle row is the bug's actual signature --- only `\v1` expands, because a delimited `\def\v1` survived as the last definition of `\v` --- and the bottom row is the fix.
-Nothing in the reviewer's transcript was fabricated; the precondition the original claim depended on was simply never in the reviewer's own test.
+Nothing in the reviewer's transcript was fabricated;
+the precondition the original claim depended on was simply never in the reviewer's own test.
 
 **Two things follow, and both are needed --- one about re-measuring a finding, one about where the fix belongs.**
 
 First: a rebuttal is a claim like any other, so the *rebutter* re-measures before publishing it, not only the party being rebutted.
-[`address-every-comment`](address-every-comment.md)'s Rebut disposition already lets an author push back on a reviewer's finding; the mirror obligation belongs to the reviewer before the finding is filed --- confirm the counter-test actually carries the precondition the original claim relied on, not merely a test that superficially exercises the same mechanism.
+[`address-every-comment`](address-every-comment.md)'s Rebut disposition already lets an author push back on a reviewer's finding;
+the mirror obligation belongs to the reviewer before the finding is filed --- confirm the counter-test actually carries the precondition the original claim relied on, not merely a test that superficially exercises the same mechanism.
 
 Second: the fix is not to win the rebuttal in a PR comment where it dies with the thread.
 The original message's vagueness --- "verified through `pandoc -t latex`", true and giving the reader nothing to check --- is what invited a plausible wrong finding in the first place.
@@ -451,9 +453,11 @@ A durable artifact that states its own discriminator is [`quotable-findings`](qu
 - **Do:** when rebutting a finding, name the precondition the original claim relied on and confirm the counter-test carried it, rather than arguing from the counter-test's bare output.
 - **Do:** write the discriminating measurement --- including the null case that shows what a non-discriminating test looks like --- into the durable artifact (commit message, PR body) rather than only into a comment thread.
 - **Don't:** read "the reviewer ran a command" as equivalent to "the reviewer ran the command that could have shown the claim false" --- a command that cannot exhibit the failure mode has not tested the claim, however real its output is.
-- **Don't:** leave a verification claim as a bare tool invocation ("verified through X") with no stated discriminator; that vagueness is what makes a plausible-but-wrong counter-finding possible in the first place.
+- **Don't:** leave a verification claim as a bare tool invocation ("verified through X") with no stated discriminator;
+  that vagueness is what makes a plausible-but-wrong counter-finding possible in the first place.
 
-(Measured 2026-09-09 on d-morrison/macros#87: the reviewer's counter-test and its null-case conclusion are the measured half; the general rule that a rebuttal is itself a claim requiring re-derivation, and that the fix belongs in the durable artifact rather than a comment, is the inferred half, extending [`address-every-comment`](address-every-comment.md)'s Rebut disposition to the reviewer's own side of it.)
+(Measured 2026-09-09 on d-morrison/macros#87: the reviewer's counter-test and its null-case conclusion are the measured half;
+the general rule that a rebuttal is itself a claim requiring re-derivation, and that the fix belongs in the durable artifact rather than a comment, is the inferred half, extending [`address-every-comment`](address-every-comment.md)'s Rebut disposition to the reviewer's own side of it.)
 
 ## A summary is another shape, and the auto-loaded copy is the one you read
 

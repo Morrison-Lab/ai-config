@@ -190,6 +190,54 @@ committed pass.
      and a +5-line append reddened `validate`);
      `shared/writing/semantic-line-breaks.md` ai-config#1291;
      `shared/workflow/review-verdict-pitfalls.md` ai-config#811).
+   - **When the file to split enforces its own numbering invariant,
+     "move whole sections" is not automatic.**
+     `memories/mistake-patterns.md`'s `## Pattern N:` headings are checked
+     by `scripts/check-mistake-patterns.py`,
+     which requires the integers to run `1..K` in file order with no gap
+     (a lettered sub-pattern like `5c` follows its base entry
+     and advances by letter).
+     Lifting a non-contiguous subset out ---
+     exactly what ai-config#3340 proposes
+     (Patterns 21, 43, 50, 51, 52, 55) ---
+     opens a gap the checker rejects
+     unless every later heading is renumbered,
+     or the lifted headings are kept as stub pointers in place.
+     Every citation by number then needs the same repoint:
+     at least 27 files outside `memories/mistake-patterns.md` itself
+     cite a pattern by number
+     (`grep -rlE 'Pattern [0-9]+[a-z]?\b' --include='*.md' --include='*.py' .`,
+     filtered for two unrelated numbered-list false positives ---
+     `skills/cli/references/conditions.md`'s own "Pattern 1/2/3/4"
+     and `skills/detect-informal-definitions/SKILL.md`'s
+     "Pattern 1"/"Pattern 2" ---
+     and one synthetic test fixture,
+     `scripts/test_check_mistake_patterns.py`,
+     which types pattern numbers that never existed to exercise the regex).
+     The file also carries its own in-file directional cross-references
+     ("Pattern 25 above" at line 544, "Pattern 20 below" at line 451,
+     seven total)
+     that a move falsifies without breaking any link a grep would catch.
+     - **Do:** before moving any `## Pattern N:` section out of
+       `mistake-patterns.md`,
+       grep the whole repo for `Pattern N`
+       and repoint every genuine hit, including in-file "above"/"below" wording,
+       after excluding unrelated numbered-list prose
+       by reading each match rather than trusting the grep's raw file count.
+     - **Do:** either renumber every heading after a lifted gap
+       so `check-mistake-patterns.py` still reads `1..K` with no gap,
+       or leave a stub `## Pattern N:` heading pointing at the new file,
+       rather than deleting the number outright.
+     - **Don't:** move a non-contiguous subset of patterns to a satellite file
+       on the strength of `check-memory-file-size.py`'s own generic
+       "move whole sections, repoint inbound references" advice ---
+       that advice is about the size gate alone
+       and says nothing about the separate contiguity gate
+       `check-mistake-patterns.py` enforces.
+     - **Don't:** treat a raw `grep -rl` file count as the citation count to repoint ---
+       a numbered-heading pattern like `Pattern N` recurs in unrelated prose
+       elsewhere in the repo,
+       and counting those inflates the sweep without finding anything to fix.
    - **When step 2 routed the item to a repo other than ai-config, grep both
      corpora.**
      The query above searches an ai-config checkout,

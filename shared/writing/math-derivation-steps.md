@@ -451,7 +451,7 @@ The decision is the same question on every authoring surface this corpus touches
 - **Word/OOXML**: `<m:oMath>` in a normal run for inline, `<m:oMathPara>` wrapping the `<m:oMath>` for display.
   The two are structurally distinct elements rather than a style applied to one element, so converting between them means moving the equation into (or out of) the paragraph-level wrapper, not toggling an attribute.
 
-### Do and don't
+### Do and don't: display versus inline
 
 - **Do:** ask "display or inline?" explicitly for every equation you author or edit, rather than copying the form of the nearest neighbouring equation.
 - **Do:** make an equation display, and label it, when the prose returns to it or when it carries the step the argument is making.
@@ -461,7 +461,7 @@ The decision is the same question on every authoring surface this corpus touches
 - **Don't:** treat "it renders correctly" as evidence the display/inline choice was made deliberately --- a correct render is fully compatible with the form having never been decided at all.
 - **Don't:** compare two equations set at different scales and expect the reader to do the normalizing.
 
-### In review
+### In review: display versus inline
 
 Flag an equation whose display/inline form reads as inherited rather than decided: a display equation running directly into the sentence that introduces it, with no separating punctuation or paragraph break, is display markup wrapped around what reads as an inline clause.
 Flag the inverse too --- an equation the prose cites again later, written inline with no way to reference it.

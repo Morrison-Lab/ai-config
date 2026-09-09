@@ -845,8 +845,18 @@ Use `grep -o 'PATTERN' file | wc -l` (or `grep -ro` summed across files) for a t
 - **Do:** use `grep -o` (not `-c`) whenever the number being reported is described with an occurrence noun --- "sites", "uses", "occurrences", "instances".
 - **Don't:** trust `grep -c` as an occurrence count just because no `-l`/`uniq -c` dedup step is visible --- the same line-vs-occurrence gap applies to plain `-c` on its own.
 
-(d-morrison/rme#1138, 2026-09-09.
-A guard for this is drafted as `hooks/warn-grep-c-counts-lines.py` on branch `hook/grep-c-counts-lines` in this repo, not yet opened as a PR --- check that branch before re-deriving the hook.)
+(d-morrison/rme#1138, 2026-09-09: three miscounts in one PR, two of which
+reached public issue bodies --- "nine \hat sites" were 10, "17 raw e^{" were
+18 lines carrying 22 occurrences, "103 \sb uses" were 110.
+A `Stop`-hook guard was written and then deliberately not shipped: an
+adversarial review found its transcript walk excluded every tool call,
+because Claude Code stores tool results as `type: "user"` entries, so the
+19 passing tests had validated a transcript shape the harness never emits.
+The damage also lands in commit messages and issue bodies, turns after the
+`grep -c` runs, which a one-turn `Stop` hook cannot reach.
+ai-config#3450 carries that evidence and the redesign --- a `PreToolUse`
+guard on the publishing commands, modelled on
+`hooks/flag-unmeasured-timestamp.py`.)
 
 ## A hand-rolled verification check is worth nothing until it has caught something
 

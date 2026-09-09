@@ -282,6 +282,8 @@ so the absence of the first two is no evidence about the third.
   established it; a claim that ends the inquiry can never be contradicted by
   it.
 
+### The route via a true measurement, over-generalized
+
 **The claim is more durable when a real measurement sits under it, and that
 is the route this section does not name.**
 Everything above treats the limitation as inferred from the *shape of the tool

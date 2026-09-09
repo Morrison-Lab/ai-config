@@ -916,6 +916,18 @@
         ]
       },
       {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/flag-aborted-patch-script.py\"'",
+            "timeout": 10,
+            "script": "flag-aborted-patch-script.py",
+            "why": "Warns before a commit when a file-writing script in the same window ended in a traceback: edits after the raise silently did not apply, and leave no trace for any later check to find."
+          }
+        ]
+      },
+      {
         "matcher": "Agent",
         "hooks": [
           {

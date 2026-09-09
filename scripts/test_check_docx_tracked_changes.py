@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Regression tests for check-docx-tracked-changes.py.
 
-Every fixture is a minimal .docx built in a tmpdir at run time, per
-memories/office-open-xml.md's "generate at runtime; don't commit" precedent
-for docx-shaped fixtures (a committed one gets swept into this repo's own
-`bib`/`phi`-shaped scans in a consuming repo, and there is no reason to carry
-binary fixtures here at all when a few lines of XML build one).
+Every fixture is a minimal .docx built in a tmpdir at run time rather than
+committed.  That is this suite's own choice, not a rule quoted from
+elsewhere: a committed binary fixture is invisible to review, it gets swept
+into whatever content scans the repo runs, and a few lines of XML build one
+anyway.
 
 The load-bearing cases are the negative controls: a well-formed document
 with legal markup produces zero findings (so a run isn't reporting "clean"

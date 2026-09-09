@@ -737,3 +737,15 @@ the author had already read the same file twice without finding it.)
 - A companion rule on **posing** non-exclusive options as alternatives lives in
   [`avoid-false-dichotomies`](avoid-false-dichotomies.md); read that for the asking side and
   this for the answering side.
+- `CLAUDE.md`'s "Generalize instructions to every AI agent by default" governs
+  a different axis than this fragment's own "the check the assignment's
+  author owes" bullet.
+  That section says an instruction unscoped by *agent* (Claude, Codex,
+  Gemini) carries to every agent absent an explicit restriction.
+  It says nothing about carrying an instruction across *surfaces* --- a rule
+  about Word document comments does not transfer to GitHub comments merely
+  because both are called "comments".
+  Assuming it does is exactly this fragment's unexamined-default failure,
+  applied to a prior instruction's scope rather than to a brief's premise.
+  See [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md),
+  "A Word-comment-length instruction generalized to GitHub comments".

@@ -133,6 +133,51 @@ that has to be got right and kept right.
 - **Don't:** collect overlapping `(start, end)` span edits
   and rely on sort order to keep them disjoint.
 
+## A regex simulating accept/reject over `document.xml` is not a parser of the format, and OMML deletes prove it
+
+Verifying *existing* tracked changes (ones you did not make, and want to
+confirm the effect of) by writing a regex that matches `<w:ins>`/`<w:del>`
+wrappers and simulates stripping or keeping them is a plausible-looking
+shortcut around the pandoc conversions below.
+It produced a confident, wrong conclusion once: a regex-based accept/reject
+simulation over `word/document.xml` reported that a tracked edit had inverted
+an equation, when re-checking with `xml.etree.ElementTree` showed the edit was
+correct all along.
+
+The cause is specific to math.
+Outside a math run, Word marks a deletion by **wrapping** the run in a
+`<w:del>` element, which is exactly the shape a regex can match.
+Inside an OMML (`<m:oMath>`) region, a deletion is instead marked in the
+run's **properties** --- a `<w:del>` child sitting inside `<w:rPr>`, not around
+the run --- so a wrapper-matching regex either misses it entirely or, worse,
+matches an unrelated enclosing element and swallows an arbitrary span.
+Nothing about the regex's failure looks like a failure: it returns a
+plausible span either way.
+
+The general point is not "write a better regex".
+A regex matches **strings**; OMML's deletion marker is a **structural**
+fact about which element a child sits under, which only a real XML parser
+can answer correctly regardless of how the surrounding markup happens to be
+formatted.
+This is [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)'s
+argument in the specific shape it takes for a serialized format: a
+hand-rolled simulation of the format's rules is an adjacent artifact to the
+format's actual rules, and simulating it thoroughly is still simulating the
+wrong thing.
+
+- **Do:** parse `document.xml` with a real XML library
+  (`xml.etree.ElementTree`, `defusedxml`) before drawing any conclusion about
+  what a tracked change does, math content included.
+- **Do:** check `<w:rPr>` for a `<w:del>`/`<w:ins>` child specifically when the
+  run sits inside `<m:oMath>`, rather than assuming every deletion wraps the
+  run.
+- **Don't:** treat a regex-based accept/reject simulation as a substitute for
+  a parse, however well it matches on ordinary prose --- it is verified only
+  against prose, not against math.
+- **Don't:** trust a regex-derived verdict about a tracked change without
+  cross-checking it against the pandoc conversions in the next section, which
+  read the format through its own real parser.
+
 ## Two pandoc diffs verify a redlined docx, and they answer different questions
 
 Run both on every redlined document, against the original and the output:
@@ -150,6 +195,33 @@ which recommends `validate.py --author` for the same failure mode instead.
 Treat the two as independent checks rather than ranking them:
 the reject-diff is format-level and keeps working when the validator fails for an unrelated reason,
 which is exactly the situation the next paragraph describes.
+
+**2nd occurrence of the missing-wrapper failure, this time authored by an edit
+rather than found in one already there --- confirming the reject-diff is the
+check that catches it, not just a hypothetical.**
+An edit split a run with `run_text.split(anchor, 1)` and wrote back only the
+head plus the new `<w:ins>` insertion, silently dropping the tail instead of
+wrapping it in a `<w:del>`.
+The accept-diff looked perfect, because the accepted view never shows what a
+deletion removed.
+Simulating **reject** is what exposed it: the original sentence was gone from
+both conversions, unrecoverable, and the mangled remnant read
+"It is the product**t** (the incidence rate...)" --- so the reject-diff was
+non-empty exactly as this section's bullet predicts, and that is the one
+comparison a forward-only (accept-only) check cannot perform.
+
+The transferable shape, beyond this format: for any mechanism that is
+supposed to be reversible --- tracked changes, a migration's down step, a
+feature flag's off path --- the forward direction is the one a normal test
+run exercises, so the reverse direction is where silent data loss hides.
+Verifying the forward result looking right says nothing about whether the
+reverse path still recovers the original; only running the reverse path does.
+
+- **Do:** simulate the reverse path of any reversible edit before trusting
+  the forward result, not only when the forward result looks suspicious.
+- **Don't:** read a clean accept-diff as evidence the edit is
+  non-destructive --- an accept-diff cannot see content a `<w:del>` never
+  wrapped, because there is nothing there for accept to keep.
 
 Run that validator too, and **baseline it against the original first**.
 Measured 2026-09-01: on this manuscript it reported 5 ID-uniqueness violations

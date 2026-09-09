@@ -642,7 +642,9 @@ The unfiltered listing comes first: the state filter answers only whether a revi
 See [`CLAUDE.cases.md`](CLAUDE.cases.md), "A bot's `COMMENTED` review is the same blind spot".
 
 **The review's own required check run can itself read green over a `NOT_CLEAN` verdict --- a distinct failure from "CI green isn't the review verdict".**
-The paragraph above treats `statusCheckRollup` and the verdict as two signals that both need checking; this one says the review's *own* gate, e.g. `review / require-clean-verdict`, does not always track the outcome it is named for.
+The paragraph above treats `statusCheckRollup` and the verdict as two signals that both need checking.
+This one says the review's *own* gate, e.g. `review / require-clean-verdict`,
+does not always track the outcome it is named for.
 [`review-verdict-pitfalls`](shared/workflow/review-verdict-pitfalls.md) carries the measured case and the analysis, and is where further cases go.
 
 - **Do:** treat a green review-gating check run as unverified until the latest review comment's own verdict field confirms it, even when that check run's name implies it enforces the verdict directly.

@@ -97,7 +97,8 @@ An earlier draft of this entry said "not `d-morrison/macros`", which
 read as a claim that these are two unrelated macro libraries.
 A sweep pattern-matching only `\newcommand{...}`/`\providecommand{...}` reported `\vX` and `\vbeta` as undefined; both are `\def`-defined.
 Widening the grep to all four forms above found 30 distinct `v`-prefixed names
-defined in that library --- counting definitions, not uses, and including
+defined in that library --- counting distinct defined names rather than uses
+(the definition *sites* number 32, since `\v` is defined three times), and including
 non-vector names such as `\var` and `\violet` that share the prefix ---
 and exactly 2 genuinely undefined (`\vL`, `\vl`).
 Same class as the built-in-shadowing case this step already names --- a definition-site grep is only as complete as its list of definition mechanisms, and any macros file mixing TeX primitives can use all four.

@@ -225,13 +225,13 @@ since each fails silently in its own way.
 
 **Recurrence, 2026-09-06 (`d-morrison/rme` ardia sweep).**
 `agy --print --model X < file` fails with `--print took --model as its prompt`.
-Three things in that one line are not covered above.
-The trap fires on `--model`, so it is not specific to `--effort`.
+Two things in that one line are not covered above.
 `--print-timeout` is a further flag, absent from the `--effort`/`--model`/`--sandbox`
 list this file gives for the CLI's shape.
 And the prompt here arrives on **stdin**, which the unconsumed-positional mechanism
-above does not describe --- note that piping without `--print` is the working route
-this file documents separately.
+above does not describe --- note that the stdin route documented earlier for the
+Windows command-line length limit supplies the prompt with no `--print` flag at all,
+so it does not collide with this trap.
 The confirmed working invocation:
 `agy --model X --print-timeout 8m --print="$(cat prompt.txt)"`.
 

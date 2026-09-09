@@ -482,14 +482,14 @@ skipped for a helper written inside a script whose dependency the project
 `rlang` and `foodwebr` were already in `Imports`/`Suggests` in the first case;
 `withr` was already in `Suggests` in the second.
 A declared-but-locally-unused dependency is therefore the highest-probability
-place a reinvention is hiding, and it is checkable in one command before
-writing a helper:
-
-```r
-# From the package root -- lists dependencies never referenced via `::` or a
-# bare call after `library()`, the two case's affected files were both.
-desc::desc_get_deps()$package
-```
+place a reinvention is hiding, and `DESCRIPTION`'s own `Imports`/`Suggests`
+list is where to check first, before writing a helper.
+`desc::desc_get_deps()$package` lists every declared dependency in one
+command --- confirmed against the `r-lib/desc` source, it only parses
+`DESCRIPTION`'s fields and never inspects `R/`/`data-raw/` for `::` or
+`library()` usage --- so its output still has to be cross-checked by hand
+against the script being written, rather than trusted as the filtered list
+of unreferenced packages.
 
 - **Do:** grep `DESCRIPTION`'s `Imports`/`Suggests` for a package that already
   does what the helper you are about to write would do, before searching

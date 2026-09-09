@@ -819,6 +819,11 @@ See
 was wrong" for the general form this instance is one of three of, all
 on the same PR.)
 
+(Measured 2026-09-09 on [ai-config#3346](https://github.com/Morrison-Lab/ai-config/pull/3346), an adversarial review of a fix already under review.
+A KaTeX-error detector (`_katex_error` in `scripts/check-rendered-page.py`) had to read raw HTML rather than the shared `_visible_text` parser, because it needs a `class=` attribute the parser discards --- so it also lost that parser's `<code>`/`<pre>` exclusion, and a page merely quoting the checker's own error patterns inside a code block scored itself broken.
+The fix (`_StripCode`, a narrow HTML parser stripping only `<code>`/`<pre>`) was mutation-tested in both directions named above: reverting the strip reddened the two code-quoting fixtures (revert, under-inclusive), and widening `_StripCode.DROP` to include `span` reddened the two genuine-error fixtures (over-broaden, over-inclusive) --- the second direction is exactly the one a revert-only mutation run cannot see, since a wider strip would have silenced a real KaTeX error the same way the pre-fix code silenced a real citation.
+See [`check-purpose-before-reusing`](../workflow/check-purpose-before-reusing.md)'s "mirror failure" section for the sibling lesson from the same review: which of `_visible_text`'s other guarantees a detector forfeits when it opts out of the shared helper for one specific reason.)
+
 ### Three ways an assertion passes without ever seeing the value it names
 
 The vacuous modes above concern an assertion evaluated against an empty or self-satisfying collection.

@@ -736,8 +736,8 @@ measurement is a function of the tree rather than the commit.
 [`dont-incur-technical-debt`](../principles/dont-incur-technical-debt.md)'s
 "The one exception" section carries that mechanic, and the deferral it licenses.
 
-**A verification transcript is the same defect in a form that resists its own
-remedy, because there is no count in it to re-derive.**
+**A verification transcript carries the table's staleness defect in a form
+that resists its own remedy, because there is no count in it to re-derive.**
 
 A table's figures are wrong or stale; a pasted block of live command output
 --- a redirect trace, a curl response, a rendered page's contents --- makes the

@@ -68,3 +68,47 @@ The endpoints are recorded in
 The false claim was load-bearing rather than incidental: it is what put the
 "a human has to check this" note into two deliverables, so the cost was not a
 mistaken sentence in chat but a premise shipped to later readers.)
+
+## "A limitation you never tested" --- an R toolchain declared absent from a probe of five packages
+
+Measured 2026-09-08 on [`UCD-SERG/serocalculator#685`](https://github.com/UCD-SERG/serocalculator/pull/685).
+
+`requireNamespace()` returned `FALSE` for a handful of R packages.
+That is a true measurement about those packages.
+What got written down was a claim about the environment: "R 4.6.1 with about 30
+base packages --- no `devtools`, no `testthat`, no `spelling`, no `lintr`, no
+`roxygen2`", so `devtools::check()`, `devtools::test()`,
+`spelling::spell_check_package()` and `lintr::lint_package()` "could not be
+run".
+It went into commit messages, a PR body, and PR comments, and held for several
+hours.
+
+`options(repos = c(P3M = "https://packagemanager.posit.co/cran/__linux__/noble/latest")); available.packages()`
+returned a full CRAN index on the first attempt.
+About ninety packages installed from binaries in a few minutes, and the package
+compiled and loaded.
+
+What the untested claim cost, all of it downstream of the same premise:
+
+- **Three failed spellcheck CI rounds**, each "fixed" by guessing which word a
+  dictionary would reject, because `spelling::spell_check_package()` was
+  believed unavailable.
+  It ran clean on the first real invocation.
+- **A testthat snapshot reconstructed by hand**, column widths and pillar
+  padding worked out on paper because `tibble` was believed unavailable.
+  It turned out byte-exact, which is the unlucky outcome:
+  it made the method look sound.
+- **Two `expect_snapshot_value(style = "serialize")` payloads missed
+  entirely.**
+  A hand edit cannot regenerate base64, so they were left stale and shipped to
+  CI red.
+  No local test could run to fail on them, which is the mechanism this section
+  names --- an untested limitation removes the very instrument that would
+  contradict it.
+- **A PR body of "could not be verified" claims** that had to be publicly
+  retracted once the same checks ran green.
+
+The generalization is what made it durable.
+A guess invites a check; a claim with a real `requireNamespace()` result behind
+it feels already checked, so re-testing reads as redundant rather than as the
+one thing never done.

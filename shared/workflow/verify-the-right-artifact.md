@@ -51,7 +51,10 @@ Nothing in this fragment fires on that, because there is no wrong object to name
 So when a check of yours came back clean and the claim still feels under-supported, ask which of the two is happening: whether you read the wrong thing, or read the right thing and then took a step.
 
 - **Do:** send a claim to that section instead of this one when the artifact is the correct one and the doubt is about the step taken from it.
-- **Don't:** read a shape here failing to match as evidence the claim is supported --- these shapes cover substitutions only.
+- **Don't:** read a shape here failing to match as evidence the claim is supported --- every substitution shape in this fragment covers substitutions only.
+
+One case sits between the two, and has its own section below --- "A measurement of the right artifact can still be scoped narrower than the claim made from it": the artifact is right, the reading is right, and the claim is the *same* proposition at a wider scope than the measurement covered.
+That is not a step taken from the measurement, so it is not the neighbouring rule either.
 
 ## The four shapes
 
@@ -355,6 +358,58 @@ It warns and never blocks, because a bare local base is entirely correct for an 
 It has no fetch-based discharge on purpose: [`keep-checkouts-fresh`](keep-checkouts-fresh.md) mandates a fetch at session start, so keying on one would silence the hook in exactly the sessions that follow the corpus.
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale local base that nearly quadrupled a review diff's file count".
+
+## A measurement of the right artifact can still be scoped narrower than the claim made from it
+
+Every shape above is a *substitution*: the thing read is not the thing the claim is about.
+This one is about the **sentence** rather than the object: whatever was measured, the claim reported covers more than the measurement did.
+Nothing about it feels like guessing, because the number really was derived by a real command.
+
+The two failures overlap, and the four instances below show it.
+Two are substitutions as well --- a build path the system never uses, and a baseline read that returned nothing --- so the shapes above would have caught them had anyone asked.
+Two are not: the display-math and `microtype` cases read exactly the right document, and only the sentence overreached.
+What they share is the tell, not the mechanism: a scope decision made once during setup, and never repeated in the sentence that reports the result.
+
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "A sound measurement does not license the claim standing next to it" already names the general gap between a measurement and a neighbouring claim, including cases where the claim is about a different proposition entirely.
+What follows is the narrow case where the claim is about the *same* proposition as the measurement, just at a wider scope along one identifiable axis --- build path, ref, math subset, package set --- so the fix is naming that one axis rather than restating the whole claim.
+
+Four instances from one session, all against the same PR, none of which felt like a guess at the time:
+
+- **A build path that bypasses the real pipeline.**
+  A harness extracted `$$...$$` math blocks from a `.qmd` chapter and ran `pdflatex` on them directly, to check whether the chapter's math compiles.
+  The book never builds that way --- Pandoc reads the source, expands the `macros.qmd` LaTeX macros the chapter actually uses, and only then hands TeX to the renderer.
+  Compiling the raw source with `pdflatex` measures an artifact the build never produces, so "the chapter's math does not compile" was a claim about a document nobody ships.
+  Two issues were filed on that premise before the mismatch surfaced.
+- **A submodule path read through `git show`, with the error thrown away.**
+  The same harness fetched the comparison baseline's macros with `git show <ref>:latex-macros/macros.qmd`.
+  `latex-macros` is a submodule, so that path is a gitlink in `<ref>`'s tree rather than a blob.
+  Git says so, loudly: measured `rc=128` and
+  `fatal: path 'latex-macros/macros.qmd' exists on disk, but not in 'HEAD'` on stderr.
+  Only *stdout* was empty --- and the harness read stdout alone, discarding both the status and stderr,
+  so the baseline arm compiled with zero macros defined and inflated every figure built against it
+  (a "153pt worst case" that was really 47pt once the real baseline macros loaded).
+  The lesson is the harness's, not git's: an empty read is only silent if you silence it.
+- **Display math measured, inline math assumed included.**
+  An overfull-box measurement scanned only `$$...$$` display blocks and was reported as covering "the chapter" --- it never touched the inline `$...$` math in the parent file, some of which also overflowed.
+- **A required package left out of the harness, silently changing the answer.**
+  The same overfull-box measurement ran without `microtype` loaded, reporting 0 overfull boxes where the `microtype`-loaded run of the same document reported 1 --- `microtype` changes line-breaking, so the count is not a rounding difference, it is a different measurement wearing the same label.
+  Measured in-session on `d-morrison/rme#1138` rather than in a filed artifact, unlike the figures above: rme#1154 carries the corrected overfull table but records nothing about package configuration, so this arm is anchored here and nowhere else.
+
+The shared shape: a scope decision --- which build path, which ref, which subset of the math, which packages --- gets made once while setting up the measurement, and then the sentence that reports the result names the whole claim ("the chapter's math", "0 overfull boxes") rather than the slice that was actually run --- or, where the slice was a comparison baseline, reports a difference against it ("a 153pt worst case") as though the baseline had loaded.
+"The test" section above already supplies the fix for a substituted artifact;
+the fix here is a stricter version of the same falsifying-question test, aimed at scope rather than identity: **what does this measurement cover, and is that the same thing the claim names?**
+
+- **Do:** state a measurement's scope in the same sentence as its number --- which build path, which ref, which subset, which flags --- rather than in a paragraph the reader has to reconstruct.
+- **Do:** confirm the artifact measured is produced by the same path the real system uses, not a hand-rolled shortcut that happens to consume the same source file.
+- **Do:** check a read's exit status, not just whether it returned bytes --- the one empty read among these four instances carried a non-zero status and a `fatal:` message, both of which the harness discarded.
+- **Don't:** report a subset measurement under the claim's full name without naming the subset.
+  Display blocks only, reported as "the chapter's math".
+  One package configuration, reported as "0 overfull boxes".
+- **Don't:** trust a comparison baseline's absolute number without confirming its own inputs loaded --- an empty or under-configured baseline arm inflates every relative claim built on it.
+
+(d-morrison/rme#1138, 2026-09-09: all four measured in one long session on the same PR.
+The Pandoc-bypass and the empty-submodule-baseline are also written up in that PR's own thread and in d-morrison/rme#1154's "Two instrument traps" section;
+the bypass produced a wrong "fix" and two issues filed on the false "math does not compile" premise, one of them d-morrison/macros#85, closed not-planned once the Pandoc-expansion mistake was found.)
 
 ## A summary is another shape, and the auto-loaded copy is the one you read
 

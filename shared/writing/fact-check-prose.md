@@ -863,6 +863,57 @@ This entry's own first draft then quoted that `err()` line as
 script --- caught in this fragment's own review, the failure mode illustrating
 itself.)
 
+**3rd occurrence, and the one that generalizes the rule past "program
+output": the same failure hits a quoted line from a tracked *source* file
+used as illustrative evidence in prose, not only a block claiming to be a
+command's stdout.**
+`Morrison-Lab/ai-config`'s own `memories/claude-review-dispatch.md` carries a
+section titled "Derive it rather than recalling it", arguing that a
+per-repo trigger fact must come from a live command rather than from memory.
+A paragraph inside that very section, illustrating why the derivation loop
+strips comments before grepping, quoted a commented-out workflow trigger line
+as `` `#   pull_request:` `` (three spaces after the `#`).
+The real line, in both repos cited, is `` `  # pull_request:` `` --- two spaces
+of indent, then `#`, then one space --- verified with `od -c` against each
+repo's `claude-code-review.yml`.
+An adversarial reviewer caught it; no check did, because none of this corpus's
+prose checkers (markdownlint, `check-links.py`,
+[`check-ascii-punctuation.py`](../../scripts/check-ascii-punctuation.py)) know
+what a quoted code span is supposed to be a quote *of* --- each passes a
+mis-quoted span exactly as it passes a correct one.
+
+The claim the paragraph made was true and reproducible under either spelling;
+only the copy-pasteable artifact supporting it was wrong.
+That is what makes this a case of the rule stated above rather than an
+unrelated typo: a quoted artifact is a separate assertion from the claim it
+supports, so verifying the claim does not verify the quote, and the section
+this happened inside exists specifically to make that distinction for facts
+derived from repo state.
+Writing the rule and applying it to your own prose are different acts, the
+same gap [`challenge-the-assignment`](../workflow/challenge-the-assignment.md)
+names for an assignment's author.
+
+- **Do:** when prose quotes a specific line from a file (not just a claimed
+  command's output), derive that quote from the file in the same command that
+  writes it into the doc, rather than typing it from an earlier read --- the
+  same shape `CLAUDE.md`'s clock-timestamp rule uses for a time written into a
+  file.
+- **Don't:** treat "I already read this file today" as license to retype a
+  line from memory; the read and the transcription are separate acts, and
+  only a fresh derivation in the writing command catches drift between them.
+
+(`Morrison-Lab/ai-config`, 2026-09-09, fixed in
+[#3378](https://github.com/Morrison-Lab/ai-config/pull/3378), which
+squash-merged to `main` as `d482b528`.
+Whether an instrument could catch this --- something that finds fenced or
+code-span content attributed to a named `file:line` and diffs it against that
+file --- is worth asking, per
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md); filed as
+[ai-config#3380](https://github.com/Morrison-Lab/ai-config/issues/3380)
+rather than built here, since this corpus rarely attributes a quote to a
+specific line and a general-purpose version would need to parse several
+citation shapes.)
+
 ## A contrast sentence imports the neighbouring rule's parameters
 
 [`Check a general claim against the concrete numbers in the same

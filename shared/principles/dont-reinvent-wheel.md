@@ -461,6 +461,45 @@ authored.
 The maintainer's answer was "don't make excuses, install the packages needed"
 and "fix the CI job".)
 
+**2nd occurrence, `UCD-SERG/serocalculator` commit `0828673`, dated after the
+bcs#641 case above: a single hand-rolled helper this time, not thirty, and the
+DRW miss looks identical.**
+`data-raw/compare-backward-recurrence-densities.R` carried a ~16-line
+`with_seed()` that saved and restored `.Random.seed` in `globalenv()`.
+`withr` was already in the package's `DESCRIPTION` `Suggests`, and
+`withr::with_seed(seed, code)` is the documented replacement --- the exact
+example [`prefer-packaged-functions`](../coding/prefer-packaged-functions.md)
+already cites for this fragment's general rule.
+No DRW pass caught it either; a human noticed only because an unrelated
+question ("why not put the functions into the package?") turned attention to
+the file.
+
+The transferable heuristic both occurrences share, and the reason a second
+case earns its own paragraph rather than a footnote on the first: the DRW
+search is habitually run against a dependency you are about to **add**, and
+skipped for a helper written inside a script whose dependency the project
+**already declares**.
+`rlang` and `foodwebr` were already in `Imports`/`Suggests` in the first case;
+`withr` was already in `Suggests` in the second.
+A declared-but-locally-unused dependency is therefore the highest-probability
+place a reinvention is hiding, and `DESCRIPTION`'s own `Imports`/`Suggests`
+list is where to check first, before writing a helper.
+`desc::desc_get_deps()$package` lists every declared dependency in one
+command --- confirmed against the `r-lib/desc` source, it only parses
+`DESCRIPTION`'s fields and never inspects `R/`/`data-raw/` for `::` or
+`library()` usage --- so its output still has to be cross-checked by hand
+against the script being written, rather than trusted as the filtered list
+of unreferenced packages.
+
+- **Do:** grep `DESCRIPTION`'s `Imports`/`Suggests` for a package that already
+  does what the helper you are about to write would do, before searching
+  anywhere else.
+- **Don't:** read "this is a `data-raw/` script, not package code" as a reason
+  the DRW pass doesn't apply --- a script's dependencies are declared exactly
+  like a function's, and `data-raw/`'s exemption from `R CMD check` (see
+  [`ascii-punctuation-in-source`](../coding/ascii-punctuation-in-source.md))
+  is what let this one ship unnoticed.
+
 ## In review
 
 For each new function or feature a diff adds, ask whether that

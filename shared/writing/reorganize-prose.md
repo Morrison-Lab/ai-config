@@ -69,6 +69,13 @@ grants the move, it does not exempt it from what a move costs.
   "A defect whose surface form varies defeats a phrase grep", for the case
   this generalizes from --- a quoted-heading grep sweep still left two more
   rounds' worth of differently-worded instances for reviewers to find.
+- **A downstream count or position reference can silently break**, even
+  though you touched neither its sentence nor its file.
+  [`forward-references.md`](forward-references.md)'s "Inserting prose makes a
+  downstream back-reference stale" section covers the mechanism: content
+  inserted or removed ahead of a count-based pointer ("the two sections
+  above", "the previous chapter") changes what that pointer resolves to.
+  Prefer naming a target over counting to it, in prose you touch either way.
 - **A relocation can hand a reference a new, closer, wrong antecedent,
   without the original target moving or vanishing at all.**
   The two checks above both ask whether a reference still resolves, which is
@@ -102,13 +109,6 @@ grants the move, it does not exempt it from what a move costs.
   of what it meant, even though the entry's real referent sat unmoved several
   entries earlier and every mechanical check --- an identical sorted line
   multiset, all five repo checks --- was clean.)
-- **A downstream count or position reference can silently break**, even
-  though you touched neither its sentence nor its file.
-  [`forward-references.md`](forward-references.md)'s "Inserting prose makes a
-  downstream back-reference stale" section covers the mechanism: content
-  inserted or removed ahead of a count-based pointer ("the two sections
-  above", "the previous chapter") changes what that pointer resolves to.
-  Prefer naming a target over counting to it, in prose you touch either way.
 - **Line-level checks are diff-scoped, so a moved line is a line you just
   wrote.**
   [`ascii-punctuation-in-source.md`](../coding/ascii-punctuation-in-source.md)

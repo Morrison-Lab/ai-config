@@ -28,30 +28,38 @@ Split out of [`tools.md`](tools.md) on 2026-09-01 when that file crossed the 125
   **Do:** run it before pushing markdown, and say which of the four checks it covered.
   **Don't:** read a clean markdownlint run as the `lint-markdown` job passing.
   (Morrison-Lab/ai-config#3060, 2026-09-03.)
-- **`Summary: 0 issues in 0 files` means the run matched no files, not that it
-  ran clean --- a real clean run instead reports `Summary: 0 error(s)`.**
-  The two verdicts read alike at a glance and mean opposite things: one says
-  the linter never examined this repo's markdown, the other says it examined
-  the repo and found nothing.
-  Reaching that empty-match state is easy to trigger by accident, because
-  `Morrison-Lab/gha`'s own `lint-markdown/` capability derives the pinned
-  version via `node -p "require('./lint-markdown/package.json')..."`, and this
-  repo carries no `lint-markdown/` directory at all --- copying that idiom in
-  here throws `MODULE_NOT_FOUND`, `npx` falls through to an unpinned
-  invocation with no `--config`, that invocation matches nothing, and the run
-  prints `Summary: 0 issues in 0 files` looking exactly like success.
-  **Do:** read the summary line's exact wording as part of confirming the
-  check ran, and treat `0 issues in 0 files` as a run that examined nothing.
-  **Don't:** copy a version-derivation command from another repo's tooling
-  (`gha`'s `lint-markdown/package.json` path included) without checking that
-  the path it reads actually exists in this repo.
-  (Morrison-Lab/ai-config#3377, 2026-09-09: `npx markdownlint-cli2@0.23.0
-  --config .markdownlint-cli2.jsonc shared/workflow/ardi.md` reported
-  `Linting: 752 file(s)` / `Summary: 0 error(s)`, after an unpinned fallback
-  invocation had reported the empty-match form.
-  `Morrison-Lab/gha`'s CLAUDE.md records the same distinction for its own
-  paths; ai-config#3060 above documents this repo's own local-run command
-  but not this failure mode.)
+- **`Summary: 0 issues in 0 files` and `Summary: 0 error(s)` are the same
+  clean verdict in two different markdownlint-cli2 output formats, not a
+  signal about whether any files were examined.**
+  The newer format (0.23.2, whatever an unpinned `npx` resolves to) prints
+  `N issues in M files`; the version this repo pins (0.23.0) prints
+  `N error(s)`.
+  Neither wording distinguishes a real clean pass over hundreds of files from
+  a genuinely empty match --- both are reproducible on this repo's own tree:
+  `npx markdownlint-cli2@0.23.2 --config .markdownlint-cli2.jsonc` printed
+  `Linting: 752 files` / `Summary: 0 issues in 0 files` over the whole
+  corpus, and running the identical command in an empty directory against a
+  glob matching nothing printed `Linting: 0 files` / `Summary: 0 issues in 0
+  files` too --- same summary line, opposite population.
+  0.23.0 shows the identical pattern under its own wording (`752 file(s)` /
+  `0 error(s)` versus `0 file(s)` / `0 error(s)`).
+  The line that actually says whether anything was examined is `Linting: N
+  file(s)`/`N files`, directly above the summary, in either version.
+  **Do:** read the `Linting:` line's file count to confirm the run examined
+  what you expected, and pin the markdownlint-cli2 version so the wording
+  matches what CI reports and the rule set stays the one CI actually runs.
+  **Don't:** read `Summary: 0 issues in 0 files` as evidence the run matched
+  nothing, or `Summary: 0 error(s)` as evidence it matched something --- both
+  strings appear on a genuine clean pass and on a genuine empty match alike.
+  (Morrison-Lab/ai-config#3377, 2026-09-09.
+  `Morrison-Lab/gha`'s CLAUDE.md cites this same wording difference from
+  gha#744, correctly, as evidence an unpinned run resolved a different tool
+  version with potentially different rule behavior --- "the same verdict
+  through a different output contract" --- not as an empty-match signal;
+  an earlier draft of this entry mistook the wording difference itself for
+  that signal, which direct reproduction (above) disproved before it shipped.
+  ai-config#3060 above documents this repo's own local-run command but not
+  this wording variance.)
 - **Don't tag a non-shell CLI block `bash`/`sh` (MD040).**
   MD040 wants a language on every fence, which invites tagging anything command-shaped as `bash`.
   Claude slash commands (`/ums`, `/plugin`, `/also`) and other application-level directives are not shell-executable, so `bash` implies a reader can run them and they fail when someone tries.

@@ -675,7 +675,7 @@ the only check is reading the fragment's current text and comparing it against w
 (Measured 2026-09-09: a wrong count in [`shared/writing/math-derivation-steps.md`](../writing/math-derivation-steps.md) was corrected in the diff of the PR that introduced it, while that PR's own body kept the same wrong table describing the fragment's content.
 Caught immediately before merge;
 merging would have published a description contradicting its own diff.
-Related to [`check-the-renders`](check-the-renders.md)'s source-versus- published-artifact shape, but distinct from it: that fragment is about a *rendered page* diverging from the *source* that built it, through a caching mechanism neither party edited by hand.
+Related to [`check-the-renders`](check-the-renders.md)'s source-versus-published-artifact shape, but distinct from it: that fragment is about a *rendered page* diverging from the *source* that built it, through a caching mechanism neither party edited by hand.
 Here both the fragment and the body are hand-edited prose in the same push, and the divergence is that one of the two edits did not happen, not that a build step served stale content.)
 
 **A reviewer's round-one confirmation of that table does not expire when the

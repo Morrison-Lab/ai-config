@@ -554,4 +554,4 @@ The equation is still correctly display either way, so "this equation runs into 
 (Measured 2026-09-09, same manuscript and session as the OMML entries above.
 Three new equations, each correctly authored as display, were missing one or both of these breaks;
 two further equations elsewhere in the same document had the identical gap, unnoticed until a per-file checker counted display equations against their break requirements.
-See [`shared/writing/math-derivation-steps.md`](../shared/writing/math-derivation-steps.md)'s "Choose display or inline, deliberately" section for the display-versus-inline decision this defect is easy to mistake for.)
+Five equations in total, missing seven breaks between them (three missing one side, two missing both) --- the same tally [`shared/writing/math-derivation-steps.md`](../shared/writing/math-derivation-steps.md)'s "Choose display or inline, deliberately" section records, which also carries the display-versus-inline decision this defect is easy to mistake for.)

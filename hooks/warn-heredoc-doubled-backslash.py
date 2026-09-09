@@ -3,18 +3,19 @@
 
 ## The transport hazard
 
-On this Windows/MINGW64 transport, a doubled backslash `\\` typed inside a
+On this Windows/MINGW64 transport, a doubled backslash `\\\\` typed inside a
 Bash-tool heredoc body -- even with a QUOTED delimiter (`<<'EOF'`), which
-should be fully literal -- arrives at the interpreter as a single `\`. A
-single `\` survives intact. So one level of unescaping is applied somewhere
+should be fully literal -- arrives at the interpreter as a single `\\`. A
+single `\\` survives intact. So one level of unescaping is applied somewhere
 in transport (measured 2026-08-22, ai-config#1923).
 
 It fails silently and plausibly. A patch script's `assert target in s` fails,
 which reads as a slightly-wrong anchor string -- the natural response is to
 re-dump the region and retype the anchor, which fails identically. The tell
 only appears on printing `repr()` of the constructed string. Worse: a heredoc
-that *writes* `\\d` into a regex emits `\d` with no syntax error and a still-
-green suite -- a corrupted matcher, not a crash.
+that writes a doubled-backslash regex escape emits a single-backslash one
+instead, with no syntax error and a still-green suite -- a corrupted
+matcher, not a crash.
 
 CLAUDE.md's "Tool transport collapses doubled backslashes" section records
 the rule and its remedy (build the character with `chr(92)` rather than
@@ -22,11 +23,11 @@ typing it, print `repr()` before writing). Re-reading that prose at load time
 does not prevent the mistake: the violation happens at composition time,
 inside a heredoc body, where the rule is not being actively consulted. Ai-
 config#3362 is the recurrence that prompted mechanizing it -- broken twice in
-one session on 2026-09-08, once in a `printf "...\\n"` line written into a
-markdown snippet (the `\n` became a literal newline in the emitted snippet),
-and once in a Python-heredoc edit writing `"\\\\n"` escapes into a test
-fixture (the escapes became literal newlines, yielding a SyntaxError pushed
-before being caught).
+one session on 2026-09-08, once in a `printf` line whose newline escape,
+written into a markdown snippet through a heredoc, collapsed to a literal
+newline in the emitted snippet, and once in a Python-heredoc edit whose
+doubled-backslash escapes, written into a test fixture, likewise collapsed
+to literal newlines and yielded a SyntaxError pushed before being caught.
 
 ## Why this warns rather than blocks
 

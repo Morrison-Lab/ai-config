@@ -619,6 +619,27 @@ The corrected body now shows the base, head and delta per group, states the
 `ast.parse` derivation, and keeps the wrong figures on the record rather than
 silently overwriting them, since the review thread refers to them.)
 
+## A verification transcript in the PR body outlived the config it demonstrated
+
+(UCD-SERG/serocalculator#685, 2026-09-09.
+An early round's PR body carried a "Verified by ..." block of real command
+output, showing a redirect resolving to `/latest-tag/...`.
+A later, adversarial round changed the shipped config to target `/v1.4.1/`
+instead.
+A second paragraph in the same body, claiming two `inst/extdata` fixture
+files were "deliberately unchanged --- hand-maintained fixtures" and stayed
+at a stated byte size, was likewise reversed by a still-later round that
+edited those files.
+Neither paragraph was revisited: the PR reached fully clean carrying a
+measured, honest-looking transcript and a specific figure as evidence for a
+configuration and a file state the diff no longer contained.
+CI read the diff and not the body, and reviewers who had already read and
+passed that paragraph in an earlier round had no reason to reopen it, so
+nothing in the loop re-ran the command or re-read the claim once it was
+falsified.
+Caught only when the body was reread against the current diff before
+reporting the PR ready.)
+
 ## A round-one confirmation laundering a body the next round contradicts
 
 (`Morrison-Lab/ai-config#1522`, 2026-08-16, merged as `bc89ec93`.

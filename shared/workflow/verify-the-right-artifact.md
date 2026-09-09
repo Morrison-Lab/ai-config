@@ -414,7 +414,7 @@ the bypass produced a wrong "fix" and two issues filed on the false "math does n
 ## A reviewer's counter-measurement needs the same check the claim it rebuts would have needed
 
 The section above is about the same artifact measured at a narrower scope than the claim names.
-This one is a plain substitution --- shape 1 from the top of this fragment, a different document standing in for the one the claim is about --- and it is worth its own entry only because of *who* commits it: a **reviewer** refuting someone else's claim rather than an author supporting their own.
+This one is a plain substitution, the kind the four shapes above describe --- a different document standing in for the one the claim is about --- and it is worth its own entry only because of *who* commits it: a **reviewer** refuting someone else's claim rather than an author supporting their own.
 That is easy to miss, because a rebuttal reads as skepticism rather than as an assertion --- "I tested this and it isn't true" sounds like diligence applied, not like a new claim that itself owes [`dont-take-my-word-for-it`](../principles/dont-take-my-word-for-it.md).
 A finding backed by a real command is not thereby a finding backed by the *right* command, and nothing about the reviewer's own confidence distinguishes the two.
 

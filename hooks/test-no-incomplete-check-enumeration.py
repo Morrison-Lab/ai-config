@@ -85,6 +85,19 @@ UNRELATED_AGENT_DISPATCH = {"type": "assistant", "message": {"content": [
 UNRELATED_AGENT_REPORT = {"type": "user", "message": {"content": [
     {"type": "tool_result", "tool_use_id": "agentX", "content": "done with #9999"}]}}
 
+# Finding 1, second half (ai-config#3472 review round 2): the OTHER arm of
+# `_relevant_last_subagent`. A subagent dispatched about the SAME PR as the
+# claim, landing BEFORE any CI reading, is outside the timing window yet is
+# plainly part of this claim's evidence chain -- so `matches_target` must
+# carry it. Without a case that isolates this arm, deleting the branch
+# entirely left the whole suite passing.
+SAME_PR_AGENT_DISPATCH = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "agentY", "name": "Agent",
+     "input": {"prompt": "drive #651 to a clean verdict and report back"}}]}}
+SAME_PR_AGENT_REPORT = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "agentY",
+     "content": "#651 is clean: CI green, review CLEAN"}]}}
+
 # Finding 2 (ai-config#3472): a relevant subagent report whose index is
 # BEFORE the last complete read, but where a later PUSH (not the subagent)
 # is what actually leaves the reading needed -- the old, independent
@@ -189,6 +202,12 @@ CASES = [
       say("#651 is fully clean at a5f4f3f2.")], "warn",
      "the same unrelated dispatch, but landing AFTER the CI reading, is in "
      "the claim's evidence window and DOES count (timing-based, per spec)"),
+    ([SAME_PR_AGENT_DISPATCH, SAME_PR_AGENT_REPORT, PARTIAL,
+      say("#651 is fully clean at a5f4f3f2.")], "warn",
+     "a subagent dispatched about the SAME PR, before the CI reading, is "
+     "outside the timing window but matches the claim's target -- the "
+     "matches_target arm must carry it (compare the unrelated-#9999 case "
+     "directly above, identical in shape, which blocks)"),
 
     # --- Finding 4 regression (ai-config#3472): merge-readiness vocabulary
     # needs a PR/git anchor, not just the bare phrase ---

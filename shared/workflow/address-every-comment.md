@@ -663,6 +663,55 @@ a rule: agreeing with a finding and then escalating it.**
 - **Don't:** report a finding as understated on a measurement you have not
   shown covers the whole field set.
 
+**A fourth direction, and the one the verification reflex skips entirely:
+the reviewer raises a finding and then rebuts its own finding.
+That rebuttal is a factual assertion, and it can be false.**
+
+Every rule above governs a finding you are deciding whether to *accept* ---
+its evidence, its fix, its reason, its scope, an escalation of it.
+None of them fires on a finding the reviewer has already dismissed, because
+by the time you read the dismissal the question feels settled.
+It reads as the reviewer having done your checking for you, which is exactly
+what makes it persuasive and exactly why nothing checks it.
+
+The dismissal that needs checking hardest is the one of the form **"this
+matches existing convention"** or **"this is not a regression"**, because
+that is a claim about the *repository*, not about the diff --- so the diff
+in front of you contains no evidence either way, and the reviewer's own
+thoroughness on the finding transfers to it unearned.
+
+Derive the population the claim is about.
+A convention is a set of existing sites; if the set is empty, the change is
+*establishing* the convention rather than following it, which inverts the
+dismissal.
+
+- **Do:** treat "non-blocking because <claim about the repo>" as a finding
+  about the repo, and run the query that settles it.
+- **Do:** state in the reply which half of the reviewer's comment you took
+  and which you rejected, so a disposition that flipped from Rebut to
+  Address is visible as deliberate.
+- **Don't:** let a reviewer's demonstrated rigour on the finding carry over
+  to its dismissal --- they are separate claims, the same way a comment's
+  thoroughness does not transfer to its snippet.
+- **Don't:** read "not a regression relative to existing conventions" as
+  established merely because it is specific; specificity is not evidence.
+
+(Measured 2026-09-08 on `Morrison-Lab/gha#847`.
+The reviewer flagged a caller-supplied string written to `$GITHUB_ENV` as
+`KEY=value`, then dismissed it: "no other `inputs.*` string in this file is
+heredoc-guarded when written to `$GITHUB_ENV` either, so this isn't a
+regression relative to the file's existing conventions."
+Grepping every `>> "$GITHUB_ENV"` in that workflow found only literals ---
+`dev`, `latest-tag`, `stable-source`, `true`, `false` --- and across all of
+`.github/workflows/` the sole other shell-variable write was a
+`git rev-parse HEAD` SHA.
+There was no such convention; the line was the first of its kind.
+Reproduced by extracting the step's `run` body from the parsed YAML and
+running it against `$'evil\nSOMETHING=injected'`, which appended a second,
+real assignment.
+The disposition flipped from Rebut to Address on the strength of the query
+alone.)
+
 **When a finding cites a source, read the cited source before reproducing
 anything -- it is the cheaper instrument, and it is the one that can show the
 finding backwards rather than merely unsupported.**

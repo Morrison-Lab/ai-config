@@ -936,33 +936,56 @@ NOT clean over a clean verdict.**
 - **Don't:** treat a `contains findings (matched pattern ...)` line as a real
   finding without reading the verdict body it matched.
 
-**One shape of that false positive is deliberate, and the fix for it is on the
-reviewer's side: a resolution log filed under a `Findings` heading.**
+**That shape used to be a deliberate exception, and it no longer is: a
+well-formed `review-data` payload now decides directly, superseding the
+prose scan entirely.**
 A confirming review that writes
 `### Findings --- all three from the prior rounds are now resolved` and lists
-`1. **Previously: X.** Now fixed --- <explanation of the fix>` scores as open
-findings, because the explanation after the verb is free prose and no lexical
-rule can tell "Now fixed; the pathspec is quoted" from "Now fixed; the query
-leaks memory on every call".
-The same comment's structured `CLEAN` payload does not change that, since it is
-the same author's verdict line in JSON, and the rule above says findings win.
-Two narrowing attempts, a caveat word-list and a payload gate, were withdrawn
-in [#2950](https://github.com/Morrison-Lab/ai-config/pull/2950); the tests
-that pin the safe behaviour are in `scripts/test_check_pr_fully_clean.py`
-([#2945](https://github.com/Morrison-Lab/ai-config/issues/2945)).
-What reads clean today is the format the checker was built for: resolved
-prior findings under a heading that is not a `Findings` heading
-(`### Resolved since the last round`), and `### Findings` reporting `None.`
-A resolution whose whole disposition closes the line
-(`**Previously: X.** Now fixed in abc1234.`) also resolves, provided the
-`Findings` heading itself is marked resolved or non-blocking; under a bare
-`### Findings` heading even a closing-line item stays open, since the heading
-is what admits the section to the item test.
+`1. **Previously: X.** Now fixed --- <explanation of the fix>` used to score
+as open findings even with a same-comment `CLEAN` payload attached, because
+the explanation after the verb is free prose and no lexical rule can tell
+"Now fixed; the pathspec is quoted" from "Now fixed; the query leaks memory
+on every call" -- so the rule was "findings win" over the payload.
+Two narrowing attempts at trusting the payload for exactly this shape, a
+caveat word-list and a payload gate, were withdrawn in
+[#2950](https://github.com/Morrison-Lab/ai-config/pull/2950), on the
+reasoning above.
 
-- **Do:** when a review of yours must recount resolved prior findings, file
-  them under a non-`Findings` heading and keep `### Findings` for open ones.
-- **Don't:** ask the checker to read a free-prose explanation as a resolution;
-  the human reading the verdict body is the fallback the rule above names.
+[ai-config#3054](https://github.com/Morrison-Lab/ai-config/issues/3054)
+reverses that call, deliberately and by name.
+Three measured false positives on `d-morrison/rme` (#1128, #1130, #1132) and
+one each on `Lacaedemon/sparta` (#1547, #1553) and `ucdavis/bcs` (#884) share
+a shape #2950's local fix could not reach: a well-formed payload
+(`schema_version` present, `"verdict": "CLEAN", "findings": []`) held
+NOT clean by a phrase match on ordinary retrospective or negated prose --- a
+"blocking issue ... now fixed", a "don't block merge", a heading whose own
+parenthetical says "(all clean)" -- none of it the ambiguous resolution-log
+shape #2950 was written against, but the same PHRASE SCAN mechanism produced
+every one of them, and #2945's own resolution-log false positive is on that
+same list of cases the new rule subsumes.
+`classify_verdict` and `_unresolved_finding_pattern` in
+`scripts/check-pr-fully-clean.py` now both trust a `schema_version`-carrying
+payload directly: `NOT_CLEAN` blocks, and `CLEAN` with a confirmed-empty
+`findings` list clears, in both cases skipping the prose scan for that
+comment entirely.
+A `CLEAN` payload with a non-empty or malformed `findings` list is treated
+as blocking by `payload_is_blocking`, without consulting the prose, since
+that combination is self-contradicting on its face regardless of what the
+prose says.
+The trust boundary moved from "does the prose agree with the payload" to "is
+the payload well-formed" --- a well-formed payload whose own comment's prose
+contradicts it (the #2913/#2945 shape, hypothetically) is now taken at its
+word, which is the tradeoff #2950 explicitly declined to make and #3054
+explicitly re-argues.
+A payload that contradicts itself, `CLEAN` beside a non-empty or malformed
+`findings` list, is still not trusted.
+
+- **Do:** trust a `schema_version`-carrying payload's own `CLEAN`/`NOT_CLEAN`
+  verdict directly, and treat a `CLEAN` payload with non-empty or malformed
+  `findings` as still not trusted.
+- **Don't:** read a `contains findings` or `NOT clean` line as authoritative
+  when the same comment carries a well-formed payload that says otherwise ---
+  the payload wins now, not the prose.
 
 **Calling the checker is not consuming it: grepping its PROSE instead of
 reading its EXIT STATUS re-opens the whole failure one layer up.**

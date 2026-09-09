@@ -28,6 +28,39 @@ Split out of [`tools.md`](tools.md) on 2026-09-01 when that file crossed the 125
   **Do:** run it before pushing markdown, and say which of the four checks it covered.
   **Don't:** read a clean markdownlint run as the `lint-markdown` job passing.
   (Morrison-Lab/ai-config#3060, 2026-09-03.)
+- **The `Summary:` line's exact wording changes between markdownlint-cli2
+  versions, so pin the version rather than reading CI's wording as a
+  property of the check itself.**
+  [`fail-fast.rationale.md`](../shared/principles/fail-fast.rationale.md)'s
+  "A zero-shaped summary can be sound, and the scope line is what decides
+  it" already covers the wording ambiguity this format creates --- read that
+  section for why `Summary: 0 issues in 0 files` is not itself evidence
+  about scope, and the `Linting: N file(s)` line above it is.
+  What that section doesn't name is that the wording is **version-dependent**:
+  the newer format (0.23.2, whatever an unpinned `npx` resolves to) prints
+  `N issues in M files`; the version this repo pins (0.23.0) prints
+  `N error(s)`.
+  Reproduced on this repo's own tree: `npx markdownlint-cli2@0.23.2 --config
+  .markdownlint-cli2.jsonc` printed `Linting: 752 files` / `Summary: 0 issues
+  in 0 files` over the whole corpus, and the identical command against a
+  genuinely empty match printed `Linting: 0 files` / `Summary: 0 issues in 0
+  files` too --- same summary, opposite population, confirming the section
+  above holds for this version as well as the one it measured.
+  **Do:** pin the markdownlint-cli2 version so local runs match CI's wording
+  and rule set, and read `fail-fast.rationale.md`'s zero-shaped-summary
+  section for why the `Linting:` line is the one that matters.
+  **Don't:** re-derive "the summary line doesn't show scope" from scratch ---
+  it's already recorded there and in
+  [`nested-worktree-instrument-inflation.md`](nested-worktree-instrument-inflation.md).
+  (Morrison-Lab/ai-config#3377, 2026-09-09.
+  `Morrison-Lab/gha`'s CLAUDE.md cites this same version-wording difference
+  from gha#744, correctly, as evidence an unpinned run resolved a different
+  tool version with potentially different rule behavior --- "the same
+  verdict through a different output contract" --- not as an empty-match
+  signal; an earlier draft of this entry mistook the wording difference
+  itself for an empty-match signal, which direct reproduction disproved, and
+  a review round then caught the entry substantially duplicating the
+  already-on-main sections cited above.)
 - **Don't tag a non-shell CLI block `bash`/`sh` (MD040).**
   MD040 wants a language on every fence, which invites tagging anything command-shaped as `bash`.
   Claude slash commands (`/ums`, `/plugin`, `/also`) and other application-level directives are not shell-executable, so `bash` implies a reader can run them and they fail when someone tries.

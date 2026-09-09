@@ -1393,7 +1393,7 @@ Pairing a body fetched now with a timestamp fetched earlier is the same class of
 - **Don't:** read "I measured this" as covering the operands --- it usually covers only the clock.
 
 (Tracked as [#3455](https://github.com/Morrison-Lab/ai-config/issues/3455), which proposes extending `hooks/no-unmeasured-clock-claim.py` to relative-age claims keyed on a timestamp read in the same turn.
-That hook currently matches absolute Pacific times only, so it guards "as of 04:37 PDT" and not "46 minutes ago" --- the harder of the two, since only the second requires arithmetic.)
+That hook currently matches absolute Pacific times only, so it guards "as of 04:37 PDT" and not "45 minutes ago" --- the harder of the two, since only the second requires arithmetic.)
 
 ## An instrument named in a rule must be one that exists
 

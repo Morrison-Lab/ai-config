@@ -708,6 +708,23 @@ def main() -> int:
             # and startup-fails every consumer that has not granted it.
             ("write-all->{id-token: write}", "write-all", {"id-token": "write"}),
             ("read-all->{id-token: write}", "read-all", {"id-token": "write"}),
+            # vulnerability-alerts is read|none, not read|write|none, so it is
+            # not covered either. GitHub added it after the first draft of this
+            # carve-out was written, which is the whole argument for listing
+            # what IS covered rather than what is not.
+            (
+                "write-all->{vulnerability-alerts: read}",
+                "write-all",
+                {"vulnerability-alerts": "read"},
+            ),
+            # A scope this list has never heard of must fail toward reporting.
+            # This is the regression test for the exclusion-list direction: an
+            # allowlist of UNCOVERED keys silently covers this input.
+            (
+                "write-all->{unknown-future-scope: write}",
+                "write-all",
+                {"unknown-future-scope": "write"},
+            ),
         ]
         for name, old_v, new_v in shorthand_denied:
             res_sd = guard_mod._find_added_permissions(
@@ -729,6 +746,18 @@ def main() -> int:
             res_cov == [],
             "shorthand rank: covered key at the shorthand's own rank allowed",
             f"expected [], got {res_cov}",
+        )
+
+        # 11e-ter. An unrecognized shorthand identical to the baseline is a
+        # no-op, not an addition -- the unrecognized-value branch must not
+        # report a value that did not change.
+        res_noop = guard_mod._find_added_permissions(
+            {"job:review": "admin-all"}, {"job:review": "admin-all"}
+        )
+        check(
+            res_noop == [],
+            "shorthand rank: unrecognized shorthand unchanged is a no-op",
+            f"expected [], got {res_noop}",
         )
 
         # 11f. A scope absent from the baseline gains a shorthand grant.

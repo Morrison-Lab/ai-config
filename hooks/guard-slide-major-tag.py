@@ -79,23 +79,50 @@ SHORTHAND_RANK: dict[str, int] = {
 }
 
 
-# Keys a shorthand does NOT grant at its own level, so the floor must not
-# apply to them. `id-token` accepts only `write` or `none` and never `read`
-# (GitHub's workflow-syntax reference), so `read-all` provably cannot grant
-# it, and whether `write-all` does is documented nowhere. A guard that cannot
-# rank a scope must compare it against zero rather than assume coverage.
-SHORTHAND_UNCOVERED_KEYS = frozenset({"id-token"})
+# Scopes GitHub documents as accepting the full `read|write|none` range, so a
+# read-all/write-all shorthand does grant them at its own level.
+#
+# The membership test runs THIS way round deliberately. A list of EXCLUSIONS
+# silently covers any scope nobody has added to it yet, so a scope GitHub
+# introduces after this file was written would inherit a full floor and its
+# explicit grant would stop being reported -- a silent allow, which is the
+# direction a permission guard must never fail in. Listing what IS covered
+# makes the unknown case a zero floor instead: an unlisted scope stays
+# reportable, and the cost of a new scope is a spurious deny that names
+# itself rather than an escalation that says nothing.
+#
+# Known scopes deliberately absent, both restricted rather than full-range:
+# `id-token` (write|none, so read-all cannot grant it) and
+# `vulnerability-alerts` (read|none).
+#
+# Source: github/docs, data/reusables/actions/github-token-available-permissions.md
+SHORTHAND_COVERED_KEYS = frozenset({
+    "actions",
+    "artifact-metadata",
+    "attestations",
+    "checks",
+    "code-quality",
+    "contents",
+    "deployments",
+    "discussions",
+    "issues",
+    "packages",
+    "pages",
+    "pull-requests",
+    "security-events",
+    "statuses",
+})
 
 
 def _shorthand_floor(old_scope: dict[str, str] | str | None, key: str) -> int:
     """Rank the level a baseline already grants on `key`.
 
-    A shorthand string raises the floor for the keys it covers, but not for
-    the ones in SHORTHAND_UNCOVERED_KEYS. A dict grants nothing on the keys
-    it omits, and the full key set GitHub defines is not enumerable here, so
-    its floor stays 0.
+    A shorthand string raises the floor only for the keys in
+    SHORTHAND_COVERED_KEYS. A dict grants nothing on the keys it omits, and
+    the full key set GitHub defines is not enumerable here, so its floor
+    stays 0 -- as does any scope this list does not name.
     """
-    if isinstance(old_scope, str) and key not in SHORTHAND_UNCOVERED_KEYS:
+    if isinstance(old_scope, str) and key in SHORTHAND_COVERED_KEYS:
         return SHORTHAND_RANK.get(old_scope.strip(), 0)
     return 0
 
@@ -155,14 +182,17 @@ def _find_added_permissions(
     dict form are ranked, so a strict downgrade is never reported as an
     addition. A shorthand grants its level on the permission keys it covers,
     so for those it acts as a floor when it is the baseline and always widens
-    when it replaces a dict. It does not cover SHORTHAND_UNCOVERED_KEYS, which
-    keep a zero floor and so stay reportable.
+    when it replaces a dict. Scopes outside SHORTHAND_COVERED_KEYS keep a zero
+    floor and so stay reportable.
     """
     added: list[tuple[str, str]] = []
     for scope, perms in new_perms.items():
         old_scope = old_perms.get(scope)
         if isinstance(perms, str):
             new_shorthand = perms.strip()
+            if isinstance(old_scope, str) and new_shorthand == old_scope.strip():
+                # Unchanged, recognized or not: a no-op is never an addition.
+                continue
             if not isinstance(old_scope, str):
                 # A dict or absent baseline grants nothing on the keys it
                 # omits, so any shorthand widens the set of granted scopes.

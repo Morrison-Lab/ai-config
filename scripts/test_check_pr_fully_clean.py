@@ -5086,7 +5086,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     # A well-formed review-data payload (schema_version present) with an
     # exact CLEAN or NOT_CLEAN verdict decides directly, and the prose
     # phrase scan never runs for that comment. CLEAN with a non-empty
-    # findings list is NOT trusted and falls through to the old behaviour.
+    # findings list is NOT trusted and is treated as blocking by payload_is_blocking.
 
     # (1) CLEAN payload + prose mentioning a retrospectively-resolved
     # "blocking" phrase -> clean. This is the live shape measured on
@@ -5244,6 +5244,44 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     ok, notes = checker.check_latest_verdict(payload_decided_items)
     check("check_latest_verdict: reports a NOTE when the verdict came from the payload (#3054)",
           ok and any("came from its review-data payload" in n for n in notes))
+
+    # The NOT_CLEAN half of the same NOTE. This was the case that used to be
+    # silently dropped: a blocking payload makes _unresolved_finding_pattern
+    # return its "structured blocking verdict" string, and the NOTE block was
+    # gated on that pattern being empty (review finding, PR #3359).
+    not_clean_payload_body = (
+        "**Claude finished review**
+
+"
+        "### Verdict
+**Needs more work**
+
+"
+        "<!-- review-data:
+"
+        "{
+"
+        '  "schema_version": "1.1",
+'
+        '  "reviewer": "claude",
+'
+        '  "commit_sha": "0123456789abcdef0123456789abcdef01234567",
+'
+        '  "verdict": "NOT_CLEAN",
+'
+        '  "findings": [{"severity": "blocker", "title": "x"}]
+'
+        "}
+"
+        "-->
+"
+    )
+    not_clean_items = [
+        ("comment", "2026-09-09T00:00:00Z", not_clean_payload_body, "", "COMMENT", "claude[bot]"),
+    ]
+    ok_nc, notes_nc = checker.check_latest_verdict(not_clean_items)
+    check("check_latest_verdict: reports the payload NOTE for a NOT_CLEAN payload too, and stays not clean (#3359)",
+          (not ok_nc) and any("came from its review-data payload" in n for n in notes_nc))
 
     # Review finding on PR #3359: the payload-first fast path must recognize
     # every CLEAN_VERDICTS/NOT_CLEAN_VERDICTS synonym this file already

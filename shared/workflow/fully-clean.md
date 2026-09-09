@@ -968,9 +968,10 @@ same list of cases the new rule subsumes.
 payload directly: `NOT_CLEAN` blocks, and `CLEAN` with a confirmed-empty
 `findings` list clears, in both cases skipping the prose scan for that
 comment entirely.
-Only a `CLEAN` payload with a non-empty or malformed `findings` list falls
-through to the old behaviour, since that combination is self-contradicting
-on its face regardless of what the prose says.
+A `CLEAN` payload with a non-empty or malformed `findings` list is treated
+as blocking by `payload_is_blocking`, without consulting the prose, since
+that combination is self-contradicting on its face regardless of what the
+prose says.
 The trust boundary moved from "does the prose agree with the payload" to "is
 the payload well-formed" --- a well-formed payload whose own comment's prose
 contradicts it (the #2913/#2945 shape, hypothetically) is now taken at its

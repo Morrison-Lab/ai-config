@@ -279,6 +279,32 @@ The second case is the one that does not transfer.
 
 (`UCD-SERG/serocalculator#668`, 2026-09-01.)
 
+**A shared helper often bundles several guards behind one call, and opting out of it for one of them forfeits every other guard it carried too --- not only the one you meant to leave.**
+
+Every case above is about a caller that never went through the sibling's helper.
+This one is the caller that used to, and had a real reason to stop: it needs something the shared helper's own abstraction discards, so it drops down to a lower-level input the helper never accepted.
+The guard it meant to leave behind is visible --- that is the whole reason for opting out.
+The guards it did not mean to leave are not, because nothing marks a helper's OTHER protections as riding along with the one just abandoned.
+
+The loss is silent for the same reason the mirror failure above is: the opted-out detector still runs, and it still finds real cases, so it reads as working.
+What it also does is re-open every false positive the shared helper used to suppress for everyone, on the one caller that stopped asking for suppression.
+
+So the check is the same clause-by-clause diff this section already prescribes, run in the other direction: for a detector that opts OUT of a shared helper, enumerate every guard that helper provided and decide, for each, whether this detector still needs it.
+The fix is not to reuse the whole helper (the original reason for opting out is usually still true, and reusing it can reintroduce the exact problem the opt-out solved) and not to rebuild nothing (that is the bug) --- it is a narrower replacement carrying only the subset still needed, confirmed against a fixture for each guard it restores.
+
+- **Do:** when a detector opts out of a shared helper for one specific reason, list every OTHER guarantee that helper provided and decide whether the opted-out detector still needs each one.
+- **Do:** build a narrow replacement that restores only the guards still needed --- not the full shared helper, which can reintroduce the problem the opt-out exists to solve.
+- **Don't:** assume an opted-out caller keeps a sibling's guards merely because both call variants of "the same" helper family;
+  an opt-out inherits nothing until checked clause by clause, the same as a from-scratch sibling.
+- **Don't:** read "the detector still finds real cases" as evidence it kept the shared guards --- a false positive is invisible from inside the detector that produces it.
+
+(Morrison-Lab/ai-config#3346, 2026-09-09, adversarial review of a fix already under review.
+`scripts/check-rendered-page.py`'s five detectors funnel through `_visible_text`, whose `SKIP_TAGS`/`SKIP_CLASS` excludes `<code>`/`<pre>` content among other things.
+`_katex_error` could not use it --- the signal it needs is a `class=` attribute, which `_visible_text` discards by design --- so it read raw HTML directly, and with that call went the `<code>`/`<pre>` exclusion nobody had asked it to give up.
+A page documenting the checker's own patterns, with a sample error quoted inside a code block, scored itself broken.
+The fix was a second, narrow parser (`_StripCode`) that strips only `<code>`/`<pre>` and nothing else --- reusing the full `SKIP_CLASS` would have reintroduced a version of the original bug, since it also excludes `katex`/`math`, the very wrappers a real error sits inside.
+See [`fact-check-code-logic`](../coding/fact-check-code-logic.md)'s "predicate needs mutation in both directions" section for how the replacement itself was verified, from the same review.)
+
 ## Reusing a CLAIM: its truth conditions travel with the question, not the sentence
 
 Every section above reuses a **structure** --- a template, a directory tree, a

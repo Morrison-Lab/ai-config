@@ -77,6 +77,19 @@ SHOULD_WARN = [
      "<<- (dash form) whose terminator line is indented with a tab -- Bash "
      "strips leading tabs for <<- only, and the closer must still "
      "recognize it"),
+    ("W9", "cat " + heredoc("END-MSG", "a" + B * 2 + "b"),
+     "a HYPHENATED delimiter (`END-MSG`) is an ordinary shell word, not a "
+     "`\\w+` match -- the opener must still be recognized"),
+    ("W10", "cat " + heredoc("EOF.1", "a" + B * 2 + "b"),
+     "a DOTTED delimiter (`EOF.1`) is likewise an ordinary shell word and "
+     "must not go unrecognized"),
+    ("W11",
+     "cat <<< " + chr(34) + "a" + B + "b" + chr(34)
+     + " && cat " + heredoc("EOF", "c" + B * 2 + "d"),
+     "a `<<<` here-string (no heredoc body of its own) followed by a REAL "
+     "heredoc elsewhere in the same command -- the here-string must not be "
+     "mistaken for an opener, and the real heredoc's doubled backslash "
+     "must still be found"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -91,6 +104,18 @@ SHOULD_STAY_SILENT = [
      "a heredoc with no backslashes whatsoever"),
     ("S4", "git commit -m " + chr(39) + "see a" + B * 2 + "nb in the diff" + chr(39),
      "a doubled backslash inside a quoted argument, not a heredoc"),
+    ("S5", "cat <<< " + chr(34) + "a" + B * 2 + "nb" + chr(34),
+     "a `<<<` here-string carrying a doubled backslash and NO heredoc "
+     "anywhere in the command -- the here-string's third `<` must not be "
+     "mistaken for a `<<` opener that then reads the rest of the command "
+     "as a (nonexistent) heredoc body"),
+    ("S6",
+     "<<-'EOF'\nbody\n\tEOF\necho " + chr(34) + "a" + B * 2 + "nb" + chr(34) + "\n",
+     "a properly-closed `<<-` heredoc (tab-indented terminator) followed "
+     "by a doubled backslash OUTSIDE the heredoc, in a later command -- "
+     "the indent-tolerant closer must find the tab-indented terminator "
+     "and stop the body there, not sweep the trailing command in as body "
+     "text just because the terminator went unrecognized"),
 ]
 
 # Two non-command / non-Bash payload shapes that must fail open silently,
@@ -228,18 +253,33 @@ MUTATIONS = {
         # case with any backslash warn, including S1 (single backslash only)
         {"S1"},
     ),
-    "M2_heredoc_body_scoping": (
-        "only text INSIDE a heredoc body may be scanned -- a doubled "
-        "backslash in a plain argument must not warn",
-        [("(?P<delim>" + B + "w+)", "(?P<delim>ZZZNEVERMATCHESZZZ)")],
-        # disabling delimiter capture entirely makes every WARN case go
-        # silent (no heredoc is ever recognized)
-        {"W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8"},
+    "M2_heredoc_opener_recognized": (
+        "only text INSIDE a recognized heredoc body may be scanned -- "
+        "breaking the shared opener import makes every heredoc go "
+        "unrecognized, same as a doubled backslash in a plain argument "
+        "that must not warn",
+        [("from shellcmd import RX_HEREDOC_OPEN",
+          "from shellcmd import RX_HEREDOC_OPEN_MISSING")],
+        # an unresolvable import leaves RX_HEREDOC_OPEN None, so no heredoc
+        # is ever recognized and every WARN case goes silent
+        {"W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10", "W11"},
     ),
-    "M3_dash_form_recognized": (
-        "<<-DELIM must be recognized the same as <<DELIM",
-        [("<<-?", "<<")],
-        {"W3", "W8"},
+    "M3_closer_indent_approximation": (
+        "the closer's `[ \\t]*` indent tolerance must accept a `<<-` "
+        "terminator's leading tab, even though it is a known, deliberate "
+        "approximation (see the module docstring) that can also cut a "
+        "body short on an indented delimiter-lookalike line",
+        [(r'r"^[ \t]*" + re.escape(delim) + r"[ \t]*(?=\n|\Z)"',
+          r'r"^" + re.escape(delim) + r"[ \t]*(?=\n|\Z)"')],
+        # W8's own offending line sits BEFORE its tab-indented terminator,
+        # so losing the terminator only widens W8's captured body (it still
+        # runs to end-of-input and still contains the offense) -- WARN
+        # either way, no flip. S6 is what actually exercises this clause:
+        # its heredoc is properly closed by a tab-indented terminator, and
+        # the doubled backslash sits AFTER it, outside the heredoc. Losing
+        # the terminator sweeps that trailing command into the (now
+        # unterminated) body and flips S6 from silent to WARN.
+        {"S6"},
     ),
 }
 
@@ -256,7 +296,14 @@ for clause, (statement, edits, expected_flips) in MUTATIONS.items():
                      f"the anchor.\n---\n{find}\n---")
         mutated = mutated.replace(find, replace)
 
-    fd, path = tempfile.mkstemp(suffix=".py")
+    # The mutated copy must live NEXT TO the real hook, not in the OS temp
+    # directory. The hook resolves `scripts/lib/shellcmd.py` relative to its
+    # own `__file__` (two directories up), so a mutated copy dropped
+    # elsewhere silently fails that import -- RX_HEREDOC_OPEN becomes None,
+    # every heredoc goes unrecognized, and every WARN case flips to silent
+    # regardless of which clause was actually mutated. That reads as every
+    # clause being load-bearing, which is not what the mutation is testing.
+    fd, path = tempfile.mkstemp(suffix=".py", dir=os.path.dirname(HOOK))
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         handle.write(mutated)
     try:

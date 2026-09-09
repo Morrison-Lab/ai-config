@@ -57,45 +57,88 @@ import os
 import re
 import sys
 
-# Matches `<<` or `<<-`, an optional quoted OR unquoted delimiter, up to the
-# end of that line (the heredoc "opener"), then captures everything up to a
-# line consisting solely of the delimiter (optionally indented, for `<<-`).
-# `re.S` lets `.` cross newlines inside the body; the body itself is
-# non-greedy so a command with multiple heredocs matches each one separately
-# rather than swallowing everything between the first opener and the last
-# closer.
-#
-# The closer requires the delimiter to be the WHOLE line, modulo leading/
-# trailing horizontal whitespace: `[ \t]*(?P=delim)[ \t]*` followed by a
-# lookahead on `\n` or end of string, rather than the old bare `\b` word
-# boundary. Bash's own rule is stricter still and depends on which form
-# opened the heredoc -- a plain `<<DELIM` terminator may carry NO leading
-# whitespace at all, while `<<-DELIM` strips leading TABS only, never
-# spaces -- but this hook does not distinguish the two forms for the
-# indent character class; both are matched by the shared `[ \t]*`
-# approximation. That approximation only ever widens what counts as a
-# closer line (accepting some indentation bash itself would reject), never
-# narrows it, so the risk stays on the safe side for a warn-only scan: at
-# worst it stops a body one line short of where bash truly would, never
-# the reverse. What it DOES reject, which the old `\b` boundary did not, is
-# a line carrying trailing content after the delimiter -- `EOF # comment`
-# is no longer mistaken for the terminator, since anything other than
-# trailing whitespace before the newline fails the lookahead and the
-# search continues past it to the real closer.
-_HEREDOC_RE = re.compile(
-    r"<<-?\s*(?P<q>['\"]?)(?P<delim>\w+)(?P=q)[^\n]*\n"
-    r"(?P<body>.*?)"
-    r"\n[ \t]*(?P=delim)[ \t]*(?=\n|\Z)",
-    re.S,
-)
+# The OPENER is `scripts/lib/shellcmd.py`'s own `RX_HEREDOC_OPEN`, reused
+# rather than duplicated. Its delimiter class is not `\w+` -- a shell
+# delimiter is an ordinary word, so `END-MSG` and `EOF.1` are legal and
+# common, and `\w` matches neither, which left such a heredoc's opener
+# unrecognized and its body scanned as plain (non-heredoc) text. Its
+# `(?<!<)` lookbehind is what tells a heredoc from a HERE-STRING: `cat <<<
+# word` carries no body, but a naive `<<` match takes the here-string's
+# second `<` as an opener and (mis)reads the rest of the command as heredoc
+# body. See `scripts/lib/shellcmd.py` for the derivation of both.
+try:
+    _LIB = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+        "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from shellcmd import RX_HEREDOC_OPEN
+except Exception as _exc:  # broken install; fail open and say so
+    print(f"warn-heredoc-doubled-backslash: cannot load "
+          f"scripts/lib/shellcmd.py ({_exc}); not evaluating",
+          file=sys.stderr)
+    RX_HEREDOC_OPEN = None
 
 _DOUBLED_BACKSLASH = re.compile(r"\\\\")
 
 
 def _heredoc_bodies(command):
-    """Yield (delimiter, body_text) for every heredoc in COMMAND."""
-    for m in _HEREDOC_RE.finditer(command):
-        yield m.group("delim"), m.group("body")
+    """Yield (delimiter, body_text) for every heredoc in COMMAND.
+
+    Two-phase, mirroring `scripts/lib/shellcmd.py`'s own `_heredoc_free`:
+    find the next opener with the shared `RX_HEREDOC_OPEN`, then search for
+    that heredoc's own closer starting right after the opener's line.
+
+    THE CLOSER REQUIRES THE DELIMITER TO BE THE WHOLE LINE, modulo leading/
+    trailing horizontal whitespace: `[ \t]*<delim>[ \t]*` followed by a
+    lookahead on `\n` or end of string, rather than a bare `\b` word
+    boundary -- `EOF # comment` is not mistaken for the terminator, since
+    anything other than trailing whitespace before the newline fails the
+    lookahead and the search continues past it to the real closer.
+
+    That indentation class is a KNOWN, DELIBERATE approximation, and it can
+    produce a false NEGATIVE, not just a false positive. Bash's own rule is
+    stricter and depends on which form opened the heredoc: a plain
+    `<<DELIM` terminator carries NO leading whitespace at all, while
+    `<<-DELIM` strips leading TABS only, never spaces -- but this hook uses
+    the same permissive `[ \t]*` for both forms rather than distinguishing
+    them. Widening what counts as a closer line this way means a BODY line
+    that merely LOOKS like an indented delimiter (leading spaces or tabs
+    bash would treat as body content, followed by exactly the delimiter
+    text and nothing else) can be mistaken for the real terminator and cut
+    the captured body short -- silently dropping every body line after it,
+    including one that carries the doubled backslash this hook exists to
+    catch. That gap is accepted rather than fixed: closing it needs a real
+    per-form parser (this hook does not have bash's `<<` vs `<<-` state to
+    draw on at match time), and a heredoc body containing a line that is
+    exactly its own delimiter, differently indented, is rare. It stays a
+    named risk, not a silent one.
+    """
+    if RX_HEREDOC_OPEN is None:
+        return
+    pos = 0
+    while True:
+        m = RX_HEREDOC_OPEN.search(command, pos)
+        if m is None:
+            return
+        delim = m.group(3)
+        line_end = command.find("\n", m.end())
+        if line_end == -1:
+            return  # opener with nothing after it on the line -- no body
+        body_start = line_end + 1
+        term = re.compile(
+            r"^[ \t]*" + re.escape(delim) + r"[ \t]*(?=\n|\Z)", re.M)
+        hit = term.search(command, body_start)
+        if hit is None:
+            # Unterminated heredoc runs to the end of the input, as the
+            # shell reads it.
+            yield delim, command[body_start:]
+            return
+        body_end = hit.start()
+        if body_end > body_start and command[body_end - 1] == "\n":
+            body_end -= 1
+        yield delim, command[body_start:body_end]
+        pos = hit.end()
 
 
 def find_offenses(command):

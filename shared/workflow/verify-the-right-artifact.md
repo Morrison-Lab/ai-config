@@ -380,7 +380,8 @@ Four instances from one session, all against the same PR, none of which felt lik
 - **Display math measured, inline math assumed included.**
   An overfull-box measurement scanned only `$$...$$` display blocks and was reported as covering "the chapter" --- it never touched the inline `$...$` math in the parent file, some of which also overflowed.
 - **A required package left out of the harness, silently changing the answer.**
-  The same overfull-box measurement ran without `microtype` loaded, reporting 0 overfull boxes where the real, `microtype`-loaded render had 1 --- `microtype` changes line-breaking, so the count is not a rounding difference, it is a different measurement wearing the same label.
+  The same overfull-box measurement ran without `microtype` loaded, reporting 0 overfull boxes where the `microtype`-loaded run of the same document reported 1 --- `microtype` changes line-breaking, so the count is not a rounding difference, it is a different measurement wearing the same label.
+  Measured in-session on `d-morrison/rme#1138` rather than in a filed artifact, unlike the figures above: rme#1154 carries the corrected overfull table but records nothing about package configuration, so this arm is anchored here and nowhere else.
 
 The shared shape: a scope decision --- which build path, which ref, which subset of the math, which packages --- gets made once while setting up the measurement, and then the sentence that reports the result names the whole claim ("the chapter's math", "the worst case", "0 overfull boxes") rather than the slice that was actually run.
 "The test" section above already supplies the fix for a substituted artifact;

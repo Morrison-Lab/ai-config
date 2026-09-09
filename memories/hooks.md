@@ -295,7 +295,9 @@ When authoring a new hook:
 
 ## 5.5 A hook test that invokes the real hook is not hermetic against live git state
 
-`hooks/test-<name>.py` runs the real script as a subprocess (`run_hook()`), which is the right design for testing what the hook actually emits --- but when the hook itself branches on live repository state (current branch, dirty/unpushed status), a test fixture covering only one branch of that decision fails, in its ordinary and correct way, the moment the checkout is on the other branch.
+A test that runs the real script as a subprocess is the right design for testing what the hook actually emits --- but when the hook branches on live repository state (current branch, dirty/unpushed status), a fixture covering only one branch of that decision fails, in its ordinary and correct way, the moment the checkout is on the other branch.
+The defect sits in the *shared* dry-run suite rather than in the per-hook file: `test_flag_unassigned_worktree` lives at `scripts/test_pretooluse_dry_run.py:179`, which invokes each hook once against whatever checkout it happens to run in.
+The dedicated `hooks/test-flag-unassigned-worktree.py` is not the offender --- it already builds scratch repos with a real `origin`, branch, and dirty/clean state, which is exactly the hermetic construction this section argues for.
 This is not a flake: it is the hook doing exactly what it was written to do, against a checkout the test never controlled.
 
 `flag-unassigned-worktree.py` warns on a default-branch, clean checkout and denies on a non-default-branch checkout carrying uncommitted or unpushed work.
@@ -315,11 +317,10 @@ A failure that survives it is not --- it is a real gap in what the test covers, 
   that reasoning explains away a real defect exactly as easily as a contaminated one.
 - **Don't:** write a test for a git-state-branching hook that exercises only the branch whichever checkout you happened to test from was on.
 
-(Measured 2026-09-09 on `Morrison-Lab/ai-config` PR #3426's worktree: three separate `run-local-validation.py` runs hit `test_flag_unassigned_worktree`'s failure.
-Two were later attributed to concurrent editing elsewhere in the repo;
-the third, run against a fully committed and otherwise-quiet tree with `git status --short` confirmed empty immediately beforehand, was not contamination --- it was `flag-unassigned-worktree.py` correctly returning `deny` against a test fixture that only ever constructed the `warn` case.
-Filed as [ai-config#3431](https://github.com/Morrison-Lab/ai-config/issues/3431).
-Without the quiet-tree run as a control, all three would have been dismissed as contamination and the real gap would have gone unfiled.)
+(Measured 2026-09-09 on `Morrison-Lab/ai-config` PR #3426's worktree: three consecutive `run-local-validation.py` runs hit `test_flag_unassigned_worktree`'s failure.
+The natural reading was contamination from the several worktrees active at once, and [ai-config#3431](https://github.com/Morrison-Lab/ai-config/issues/3431) rules that out for all three: the failure text varied only between "uncommitted tracked changes" and "unpushed commits", tracking whichever pending-work condition held at that moment, and "both are real, live facts about the checkout, not stale or racing state."
+Every run was `flag-unassigned-worktree.py` correctly returning `deny` against a fixture that only ever constructed the `warn` case.
+The quiet-tree run is what makes that distinguishable: without a control run on a committed, unedited tree, "several worktrees were active" explains a real defect exactly as comfortably as a contaminated one.)
 
 ## 6. A guard that keeps firing after you satisfied it: stop, and read the copy that runs
 

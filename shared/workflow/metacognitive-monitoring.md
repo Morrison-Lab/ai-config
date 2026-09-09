@@ -1184,6 +1184,9 @@ A coordinator caught it by reading the accused PR's own text.)
 - **Do:** treat a claim about *who said what* as a separate claim from the fact it stands beside, needing its own check even when the fact is solid.
 - **Don't:** infer a document's own wording from a brief, a memory, or a sibling document that describes it --- each of those is a copy, and a copy is not the source.
 
+Those three rules belong to this case alone, in the same way the sets above it do;
+the section's standing Do/Don't list resumes below.
+
 - **Do:** write what the measurement establishes and what you are claiming as
   two separate sentences, and confirm the second does not reach past the first.
 - **Do:** measure the illustrating instance separately whenever a verified

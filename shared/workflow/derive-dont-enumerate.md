@@ -432,7 +432,7 @@ a static specification --- a schema's set of element names, a config's list of v
 Both are closed in the sense the test above means (nothing adds a member while the work runs), and both fail the same way: the enumeration was simply incomplete *when written*, the recipient has no way to tell a complete list from a truncated one, and every artifact built on it inherits the gap.
 
 A brief listing 18 OOXML math structure tags, meant as the complete set an implementation had to handle, omitted `m:m`.
-The list originated in scratch tooling that had never been checked against the schema itself, and it was carried faithfully from there into the brief, into an issue filed as the specification, and into an implementation that handled exactly the 18 tags named and no others --- four artifacts agreeing, because each one inherited the same source rather than checking it.
+The list originated in scratch tooling that had never been checked against the schema itself, and was carried faithfully from there into an issue filed as the specification, and from there into an implementation that handled exactly the 18 tags named and no others --- each artifact agreeing with the one before it, because each inherited that source rather than checking it.
 The fix that worked was not adding `m:m` to the list;
 it was telling the recipient to re-derive the tag set from the schema instead of from the list, which turned up a second gap nobody had found by reading the list at all.
 

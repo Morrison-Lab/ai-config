@@ -656,6 +656,19 @@ A distribution beats a pass/fail here: a property's *signature* is visible in a 
 
 See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md), "A citation to a check that answers the same on every tree, and two retractions of it".
 
+**A corollary, measured on [ai-config#3395](https://github.com/Morrison-Lab/ai-config/pull/3395), where the rule above was loaded and the citation was made anyway.**
+
+**Re-enabling the disabled rule is the wrong remedy.**
+The bullets above say to read the configuration, and to measure the property directly when no gate discriminates;
+neither names the move that finding a disabled rule actually invites, and that move makes things worse.
+A rule is disabled repo-wide precisely because the corpus already violates it at scale, so turning it back on floods every future diff with that drift and the disable returns within a release.
+The substitute is a scan over **added lines only**, which is what the disable exists to permit --- the same scoping argument `validate.yml`'s own `check-new-line-breaks` comment makes for `MD013`.
+Measured: `markdownlint-cli2` reported `753 file(s)` and `0 error(s)` over a diff carrying a blanks-around-lists defect, since `.markdownlint-cli2.jsonc` sets `MD032` false;
+an added-lines scan for the same shape found it immediately.
+
+- **Do:** write a diff-scoped scan for the property when the rule is disabled, rather than re-enabling it.
+- **Don't:** re-enable a repo-wide disable to close the gap --- that reflags the drift the disable exists to tolerate.
+
 ## Widening an instrument invalidates every figure it produced, not only the one that exposed it
 
 The section above ends where the control finally catches something.

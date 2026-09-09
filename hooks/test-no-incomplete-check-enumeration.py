@@ -283,6 +283,13 @@ CONTENT_CASES = [
      "push and complete read in one turn: every `>` guard is false, so "
      "without a tie reason the WARN ships an empty explanation -- and it "
      "must not blame the subagent, since a complete read did happen"),
+    ([AGENT_DISPATCH, AGENT_REPORT, PARTIAL,
+      say("#3468 is ready to merge.")],
+     "SHORT CI surface",
+     "dispatched subagent's OWN report",
+     "a partial reading AFTER the subagent's report is the newest evidence, "
+     "so the message must name the short CI surface and must not claim the "
+     "subagent's report is the most recent thing in the transcript"),
 ]
 
 

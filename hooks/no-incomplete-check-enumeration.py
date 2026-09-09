@@ -426,16 +426,36 @@ def main() -> int:
     # construction means `(not hit_core) or (last_subagent >= 0)`, so at
     # least one of the two branches below always applies, and both apply
     # when both reasons are in play.
+    # Derive the explanation TOTALLY, from which evidence is actually the
+    # newest, rather than from independent predicates. Three review rounds
+    # of #3475 each found another transcript where the independent form
+    # emitted a false sentence or no sentence at all: a push blamed on a
+    # subagent, a tie yielding an empty note, and a fresher partial reading
+    # while the message still blamed the subagent. An argmax cannot have
+    # that shape -- every reachable state names the evidence it found.
+    evidence = [
+        (last_subagent, "subagent"),
+        (last_partial, "partial"),
+        (last_push, "push"),
+        (last_complete, "complete"),
+    ]
+    newest = max(v for v, _ in evidence)
+    kinds = {k for v, k in evidence if v == newest and v >= 0}
+
     reasons = []
-    # Only name the subagent when it is actually WHY the claim is
-    # uncovered. If a complete instrument read happened after the
-    # subagent's report, the session did run the instrument, and a
-    # later push is what left the claim stale -- saying otherwise is
-    # a false statement from a hook whose job is grounding claims in
-    # what the transcript shows (#3475 finding 1).
-    if last_subagent >= 0 and last_subagent > last_complete:
+    if "complete" in kinds and len(kinds) > 1:
+        # A complete read shares the newest index with something it would
+        # have to postdate. Same turn, so the transcript cannot order them.
         reasons.append(
-            "The most recent evidence in this transcript for that claim is a "
+            "A complete instrument read and the push (or subagent report) it "
+            "would have to postdate are in the SAME turn, so the transcript "
+            "cannot say which came first. Re-run the instrument in a turn of "
+            "its own, so the reading is unambiguously the later one."
+        )
+    else:
+        if "subagent" in kinds:
+            reasons.append(
+                "The most recent evidence in this transcript for that claim is a "
             "dispatched subagent's OWN report, not a reading you ran yourself. "
             "A subagent's report is a claim, not an instrument, and it is stale "
             "by construction: the agent stops, and then reviews and checks keep "
@@ -444,27 +464,22 @@ def main() -> int:
             "write-up): a subagent reported \"status: CLEAN / MERGEABLE\", and "
             "`check-pr-fully-clean.py` later exited 1 because a verdict-bearing "
             "review landed AFTER the subagent finished."
-        )
-    if last_push > last_complete >= 0:
-        reasons.append(
-            "A complete instrument read is in this transcript, but a "
+            )
+        if "partial" in kinds:
+            reasons.append(
+                "The most recent reading in this transcript is a SHORT CI surface -- "
+            "`gh pr checks`, `statusCheckRollup`, a paginated check-runs "
+            "read. A short list and a clean list look identical, and none of "
+            "them carries a review verdict at all, so none can authorize a "
+            "terminal claim."
+            )
+        if "push" in kinds:
+            reasons.append(
+                "A complete instrument read is in this transcript, but a "
             "`git push` landed after it, so it describes a head that is "
             "no longer this PR's. A verdict covers the commit it named; "
             "re-run the instrument against what you just pushed."
-        )
-    # The tie. A push and a complete read in the SAME turn -- two tool_use
-    # blocks, or one `git push && check-pr-fully-clean.py` command -- give
-    # both the same transcript index, and nothing in the transcript says
-    # which ran first. Neither `>` guard above fires, so without this the
-    # reason list comes out empty and the message explains nothing
-    # (#3475 round 2).
-    if last_complete >= 0 and last_complete == max(last_push, last_subagent):
-        reasons.append(
-            "A complete instrument read and the push (or subagent report) it "
-            "would have to postdate are in the SAME turn, so the transcript "
-            "cannot say which came first. Re-run the instrument in a turn of "
-            "its own, so the reading is unambiguously the later one."
-        )
+            )
     if not hit_core:
         reasons.append(
             "This phrasing (\"awaiting merge\", \"good to merge\", \"just needs "
@@ -476,6 +491,15 @@ def main() -> int:
             "merge\" was repeated across four separate messages, and "
             "`check-pr-fully-clean.py` found no automated review had ever run "
             "on the PR at all."
+        )
+    if not reasons:
+        # Unreachable by the argmax above (the guard earlier guarantees at
+        # least one of last_partial / last_subagent is non-negative), but a
+        # guard against a claim with no stated basis is cheaper than the
+        # empty explanation #3475 round 2 shipped.
+        reasons.append(
+            "No reading in this transcript postdates the evidence this claim "
+            "rests on. Run the instrument and report from its exit status."
         )
     source_note = "\n\n".join(reasons)
 

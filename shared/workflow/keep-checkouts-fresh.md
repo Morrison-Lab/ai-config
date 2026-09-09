@@ -13,6 +13,29 @@ In every session --- at session start, and again periodically during long sessio
 2. **The `~/.claude` consumer install.**
    Claude Code and Cursor no longer read this repo's `skills/`/`commands/` as a symlinked copy under `~/.claude` at all --- they install this repo as a native plugin, which auto-updates at session start (see README's *Verify the install*), so the served copy needs no freshness check.
    That is a claim about what is **served**, and not about what is **left over**.
+
+   **"Auto-updates at session start" is a claim about the plugin cache, and that claim itself needs a freshness check, separate from "enabled and not doubled" above.**
+   `installed_plugins.json`'s `lastUpdated` field records when the pin was last written, not how far behind the pin currently sits, so a session that only confirms the plugin is enabled and not doubled can still be running hooks and skills that are weeks and hundreds of commits stale.
+
+   Measured on this Windows machine, 2026-09-09: the pinned commit's `lastUpdated` read 2026-08-27T18:33:12Z, 13 days before the session that read it, and `git rev-list --count <pinned-commit>..HEAD` in a fresh ai-config checkout counted 459 commits ahead of that pin.
+   The gap included a targeted hook fix (`hooks/no-placeholder-reply.py`, #2964) whose absence let a placeholder reply through unblocked --- see ai-config#3437.
+
+   Check it by comparing the plugin cache's newest directory date, or by grepping the cache for a phrase from a recent `main` commit, against the checkout's own `main`:
+
+   ```bash
+   ls -lt ~/.claude/plugins/cache/Morrison-Lab/ai-config/ | head -3
+   git -C <ai-config checkout> log -1 --format=%cI origin/main
+   ```
+
+   A cache directory dated well before that `log` timestamp is stale, whatever `installed_plugins.json`'s own `lastUpdated` claims.
+
+   `claude plugin update <plugin>` (verified present in `claude plugin --help` output on this machine) is the remedy once staleness is confirmed --- run it per scope (`claude plugin update ai-config@Morrison-Lab`, and `claude plugin update --scope project ai-config@Morrison-Lab` from each affected project/worktree), then restart the session to pick up the refreshed cache path. ai-config#2439 tracks making this check itself part of the session-start sweep rather than something a session discovers by symptom.
+
+   - **Do:** compare the plugin cache's newest directory date (or a content grep) against the checkout's own `main`, not just whether the plugin is enabled and undoubled.
+   - **Do:** run `claude plugin update` (per scope) once staleness is confirmed, and restart to apply it.
+   - **Don't:** read "auto-updates at session start" as meaning the currently-running session is already current --- that is exactly the claim this check tests.
+   - **Don't:** treat `installed_plugins.json`'s `lastUpdated` field as the pin's age; it is only when the pin was last written, not how far behind it now sits.
+   - **Don't:** assume no CLI update path exists without checking `claude plugin --help` on the machine in question --- an earlier draft of this entry asserted that and was wrong.
    `shared/`, `hooks/`, and `memories/` have no plugin-equivalent replacement yet ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), so anyone relying on `~/.claude/shared`, `~/.claude/hooks`, or `~/.claude/memories` today is on a symlink or copy placed by an install predating that change, or by a manual step --- `bootstrap.sh` no longer places any of them.
    **`skills/` belongs in that sweep too, and the plugin serving them is not a reason to skip it.**
    A leftover `~/.claude/skills` from a pre-plugin install loads alongside the plugin, listing every skill twice --- bare `ums` beside `ai-config:ums` --- which crowds the skill listing and can cost entries their descriptions, the text routing selects on.

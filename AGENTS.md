@@ -668,16 +668,23 @@ It never licenses a later wake to self-merge a different head.
 - **Do:** after every push, actively query the current head's CI/pipeline and review state with `gh` or `glab` until that round is terminal.
 - **Don't:** treat a subscription or a one-shot poll as watching, treat event-triggered automation as evidence of completion, or refuse to start a loop because the latest message only asked about status.
 
-## Monitor every open PR and MR
+## Monitor scoped open PRs and MRs
 
-Continuously derive and monitor every open pull request and merge request
-in repositories the agent can access,
-including work opened by people or other agents.
-Do not limit monitoring to items the current session created, pushed,
-or was explicitly handed.
+Continuously derive and monitor open pull requests and merge requests
+in repositories the agent is actively working in.
+Do not sweep every repository the agent can access.
+Within an active repository, monitor
+only items that pass [`memories/reviewing-prs.md`](memories/reviewing-prs.md)'s
+scope test, including items the agent opened, pushed to, or was explicitly
+handed to drive.
+A repository is active only while the current session has a user-requested
+task there or is driving a scoped PR/MR there.
+Repository access or a checked-out worktree alone does not make a repository active.
+A cross-repository task explicitly requested by the user
+makes each named repository active for that task.
 
 After each state-changing action and at every available wake,
-re-query the open set and inspect each item's mergeability, current-head CI,
+re-query the scoped open set and inspect each item's mergeability, current-head CI,
 and review state.
 When an item is terminally failed or has actionable feedback,
 drive the appropriate repair, review, and verification cycle
@@ -689,15 +696,16 @@ or the user explicitly releases the agent from it.
 Queued, pending, or `waiting_for_resource` work is in progress,
 not an endpoint.
 
-- **Do:** derive the open PR/MR set from the forge at each monitoring pass
-  and start or re-arm a persistent monitoring loop using the session's available
-  wake mechanism (see "Always arm a persistent PR loop" above).
+- **Do:** derive the scoped open PR/MR set in each repository the agent is
+  actively working in at every monitoring pass, and start or re-arm a
+  persistent monitoring loop using the session's available wake mechanism
+  (see "Always arm a persistent PR loop" above).
 - **Do:** act on terminal CI failures, merge conflicts, and new review findings
   without waiting for a status prompt when repository membership is verified
   and the item passes [`memories/reviewing-prs.md`](memories/reviewing-prs.md)'s scope test.
-- **Don't:** stop monitoring because a PR/MR was opened by someone else,
-  because a job is queued,
-  or because the latest action only started CI or review.
+- **Don't:** sweep or monitor every repository the agent can access, stop
+  monitoring a scoped PR/MR because it was opened by someone else, because a
+  job is queued, or because the latest action only started CI or review.
 
 ## Request review and drive every started PR to clean
 

@@ -1,6 +1,6 @@
 # `pkill -f <script>` on a path shared across worktrees kills every worktree's run, not just yours
 
-A satellite of [`git-worktrees.md`](git-worktrees.md) (ai-config#694 pattern), written here rather than appended there because that file already sits at the 1250-line gate.
+A satellite of [`git-worktrees.md`](git-worktrees.md) (ai-config#694 pattern), written here rather than appended there because that file stands at 1249 lines against `scripts/check-memory-file-size.py`'s 1250-line cap, leaving no room for this entry.
 Nothing was moved out of it, so it carries no "Moved to" stub back to this file and discoverability rests on the [`MEMORY.md`](MEMORY.md) index row alone (ai-config#3449).
 
 Three worktrees of this repo can each run the identical validation script (`scripts/run-local-validation.py`) from the identical relative path, in parallel, in their own separate working directories.
@@ -23,17 +23,40 @@ Keep the PID from the launch (`nohup ... & pid=$!`, or an equivalent capture of 
 Or, when the PID was not captured, resolve candidates with `pgrep -f <pattern>` and filter each one on its actual working directory before killing it --- `readlink /proc/<pid>/cwd` (or the platform equivalent) compared against your own worktree path, killing only a match.
 
 **That working-directory filter is necessary and not sufficient, and the case it misses is your own caller.**
-`pgrep` excludes its own PID and no other, so the shell running the `pgrep` is itself a candidate: that shell's command line contains the pattern, because the pattern was typed into it.
+`pgrep` excludes its own PID and no other, so the shell running the `pgrep` can itself be a candidate: that shell's command line may contain the pattern, because the pattern was typed into it.
 Its working directory is your worktree by construction, which is exactly what the filter is told to accept.
 So the filter protects a peer correctly --- a peer's run has a different working directory and is excluded --- while admitting the one process whose death costs you the operation in progress.
-Measured directly, in a plain `bash -c` invocation with no agent harness involved:
+
+Reproduce it with two throwaway directories standing in for two worktrees, a `sleep` in each carrying a unique pattern, and this listing run from the first:
+
+```bash
+for pid in $(pgrep -f "$pattern"); do
+  printf 'pid=%s cwd=%s self=%s\n' "$pid" "$(readlink /proc/$pid/cwd)" \
+    "$( [ "$pid" = "$$" ] && echo YES || echo no )"
+done
+```
+
+Run as `bash -c '<that script>'` from `/tmp/wtDemoA`, with a peer's process in `/tmp/wtDemoB`:
 
 ```
-pid=9204 cwd=/tmp/pkilltest selfpid=9204 match_self=YES
-pid=9205 cwd=/tmp/pkilltest selfpid=9204 match_self=no
+pid=19236 cwd=/tmp/wtDemoB self=no
+pid=19238 cwd=/tmp/wtDemoA self=no
+pid=19240 cwd=/tmp/wtDemoA self=YES
 ```
+
+Three matches: the peer's process, the genuine stale target, and the caller.
+The working-directory filter accepts rows two and three and rejects only the peer, so the caller dies alongside the target.
+Adding `-A` leaves `19236` and `19238` and drops `19240`.
+
+**Whether the caller appears at all depends on how the caller was invoked, which is why testing this once is not enough to conclude you are safe.**
+`pgrep -f` matches a command *line*.
+A `bash -c '<script>'` caller carries the pattern in its own argv and matches;
+the same script fed to `bash` on **stdin** does not, because its argv is just the shell.
+Re-running the same listing that way returns only `19236` and `19238`, with no `self=YES` row.
+So a reader who tests the stdin form, sees no self-match, and concludes the hazard is imaginary has tested the one shape that hides it.
 
 Pass `pgrep -A`/`--ignore-ancestors`, or drop `$$` and its ancestors from the candidate list, before killing anything the working-directory filter accepted.
+`-A` is procps-ng's, so on a `pgrep` that lacks it (BSD, macOS, busybox) the manual ancestor walk is the portable form --- the same caveat the `/proc/<pid>/cwd` read above already carries.
 The general shape: a kill with any peer-visible side effect needs a scoping predicate the pattern itself does not supply, because the pattern is necessarily identical across every worktree running the same script.
 It does not matter how confident you are that only your own run is stale --- the pattern cannot tell your worktree's process from a peer's.
 
@@ -51,6 +74,7 @@ The same remedy applies one step earlier here, before concluding a peer's proces
 - **Do:** capture the PID at launch and kill that PID, or filter `pgrep -f` candidates by `/proc/<pid>/cwd` against your own worktree *and* drop `$$` and its ancestors (`pgrep -A`) before killing any of them.
 - **Don't:** run `pkill -f` against a script path that more than one worktree can run.
 - **Don't:** reach for `killall` as the narrower alternative --- it has no full-command-line mode at all, so it cannot match a script path, and `killall python3` instead kills every `python3` on the machine.
+- **Don't:** conclude the caller is safe because one test showed no `self=YES` row --- a shell reading its script on stdin never matches, so that shape hides the hazard rather than ruling it out.
 - **Don't:** treat your own report of an attempted kill as confirmation of its effect, and don't pass a "you should re-run" recommendation to a peer without that check --- the recommendation itself can cause the damage the report only suspected.
 
 (Measured 2026-09-09, `Morrison-Lab/ai-config`: three worktrees of this repo each ran `scripts/run-local-validation.py`.

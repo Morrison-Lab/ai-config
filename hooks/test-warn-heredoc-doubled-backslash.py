@@ -90,6 +90,13 @@ SHOULD_WARN = [
      "heredoc elsewhere in the same command -- the here-string must not be "
      "mistaken for an opener, and the real heredoc's doubled backslash "
      "must still be found"),
+    ("W12",
+     "cat <<'A' <<'B'\na" + B + "b\nA\nc" + B * 2 + "d\nB\n",
+     "TWO heredocs queued on ONE opener line (`cat <<'A' <<'B'`), where "
+     "only the SECOND body carries a doubled backslash -- B's opener sits "
+     "before A's terminator, so a scanner that finds one opener at a time "
+     "and resumes after A's closer never sees B and silently skips its "
+     "body"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -262,7 +269,8 @@ MUTATIONS = {
           "from shellcmd import RX_HEREDOC_OPEN_MISSING")],
         # an unresolvable import leaves RX_HEREDOC_OPEN None, so no heredoc
         # is ever recognized and every WARN case goes silent
-        {"W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10", "W11"},
+        {"W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10", "W11",
+         "W12"},
     ),
     "M3_closer_indent_approximation": (
         "the closer's `[ \\t]*` indent tolerance must accept a `<<-` "
@@ -280,6 +288,17 @@ MUTATIONS = {
         # the terminator sweeps that trailing command into the (now
         # unterminated) body and flips S6 from silent to WARN.
         {"S6"},
+    ),
+    "M4_all_openers_on_one_line": (
+        "every heredoc opened on ONE opener line must get its body scanned, "
+        "in opener order -- collecting only the first opener per line and "
+        "resuming after its closer leaves the later opener behind the "
+        "cursor, never re-found",
+        [("            m = RX_HEREDOC_OPEN.search(command, m.end())",
+          "            m = None")],
+        # only W12 queues two heredocs on one line; W5's two heredocs each
+        # open on their own line, so it is unaffected
+        {"W12"},
     ),
 }
 

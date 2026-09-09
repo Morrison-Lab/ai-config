@@ -86,8 +86,9 @@ def _heredoc_bodies(command):
     """Yield (delimiter, body_text) for every heredoc in COMMAND.
 
     Two-phase, mirroring `scripts/lib/shellcmd.py`'s own `_heredoc_free`:
-    find the next opener with the shared `RX_HEREDOC_OPEN`, then search for
-    that heredoc's own closer starting right after the opener's line.
+    find every opener on the next opener line with the shared
+    `RX_HEREDOC_OPEN`, then consume their bodies in opener order, each
+    body's closer searched from where the previous body ended.
 
     THE CLOSER REQUIRES THE DELIMITER TO BE THE WHOLE LINE, modulo leading/
     trailing horizontal whitespace: `[ \t]*<delim>[ \t]*` followed by a
@@ -121,24 +122,40 @@ def _heredoc_bodies(command):
         m = RX_HEREDOC_OPEN.search(command, pos)
         if m is None:
             return
-        delim = m.group(3)
         line_end = command.find("\n", m.end())
         if line_end == -1:
             return  # opener with nothing after it on the line -- no body
-        body_start = line_end + 1
-        term = re.compile(
-            r"^[ \t]*" + re.escape(delim) + r"[ \t]*(?=\n|\Z)", re.M)
-        hit = term.search(command, body_start)
-        if hit is None:
-            # Unterminated heredoc runs to the end of the input, as the
-            # shell reads it.
-            yield delim, command[body_start:]
-            return
-        body_end = hit.start()
-        if body_end > body_start and command[body_end - 1] == "\n":
-            body_end -= 1
-        yield delim, command[body_start:body_end]
-        pos = hit.end()
+        # ONE LINE MAY OPEN SEVERAL HEREDOCS (`cat <<A <<B`, or `cat <<A > f1
+        # && cat <<B > f2`), and tracking only the first was a false
+        # NEGATIVE: advancing past A's terminator before re-searching left
+        # B's opener behind the cursor, never re-found, so B's body was never
+        # scanned. The shell reads the queued bodies back to back after the
+        # opener line's newline, in opener order -- the same rule
+        # `scripts/lib/shellcmd.py`'s `_heredoc_free` applies -- so collect
+        # every delimiter on the opener line first, then consume the bodies
+        # in that order.
+        delims = []
+        while m is not None and m.start() < line_end:
+            delims.append(m.group(3))
+            m = RX_HEREDOC_OPEN.search(command, m.end())
+        pos = line_end + 1
+        for delim in delims:
+            term = re.compile(
+                r"^[ \t]*" + re.escape(delim) + r"[ \t]*(?=\n|\Z)", re.M)
+            hit = term.search(command, pos)
+            if hit is None:
+                # Unterminated heredoc runs to the end of the input, as the
+                # shell reads it.
+                yield delim, command[pos:]
+                return
+            body_end = hit.start()
+            if body_end > pos and command[body_end - 1] == "\n":
+                body_end -= 1
+            yield delim, command[pos:body_end]
+            # The closer's lookahead leaves `hit.end()` ON the terminator's
+            # newline; the next body (or the next opener line) starts after
+            # it.
+            pos = min(hit.end() + 1, len(command))
 
 
 def find_offenses(command):

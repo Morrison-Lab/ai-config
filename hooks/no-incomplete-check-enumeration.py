@@ -443,7 +443,12 @@ def main() -> int:
     kinds = {k for v, k in evidence if v == newest and v >= 0}
 
     reasons = []
-    if "complete" in kinds and len(kinds) > 1:
+    # `complete` can never be the SOLE newest kind here: the early return
+    # above fires when it strictly exceeds both push and subagent, so
+    # reaching this line with `complete` newest means it is tied with
+    # something. A `len(kinds) > 1` conjunct would be inert -- confirmed by
+    # exhaustive enumeration over the 920 reachable states (#3475 round 4).
+    if "complete" in kinds:
         # A complete read shares the newest index with something it would
         # have to postdate. Same turn, so the transcript cannot order them.
         reasons.append(
@@ -473,12 +478,19 @@ def main() -> int:
             "them carries a review verdict at all, so none can authorize a "
             "terminal claim."
             )
-        if "push" in kinds:
+        if "push" in kinds and last_complete >= 0:
             reasons.append(
                 "A complete instrument read is in this transcript, but a "
             "`git push` landed after it, so it describes a head that is "
             "no longer this PR's. A verdict covers the commit it named; "
             "re-run the instrument against what you just pushed."
+            )
+        if "push" in kinds and last_complete < 0:
+            reasons.append(
+                "A `git push` is the newest thing in this transcript, and no "
+                "complete instrument read appears anywhere in it -- only a "
+                "short CI surface, which the push has now outdated as well. "
+                "Run the instrument against the head you just pushed."
             )
     if not hit_core:
         reasons.append(

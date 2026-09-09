@@ -55,6 +55,14 @@ PUSH_AND_CHECKER_SAME_TURN = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "python3 scripts/check-pr-fully-clean.py 3468 "
                    "-R Morrison-Lab/ai-config"}}]}}
+# An unrelated subagent's report and a partial CI reading returned together
+# in ONE turn -- parallel tool calls, results batched. They share a transcript
+# index, so `_relevant_last_subagent`'s strict `idx > last_partial` excludes
+# the report from the window (#3475 round 4: this boundary decides BLOCK vs
+# WARN and was pinned by nothing).
+SAME_INDEX_REPORT_AND_PARTIAL = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "agentX", "content": "done with #9999"},
+    {"type": "tool_use", "input": {"command": "gh pr checks 651"}}]}}
 ENDPOINT = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "gh api repos/ucdavis/bcs/commits/a5f4f3f2/check-runs?per_page=100 --paginate"}}]}}
@@ -241,6 +249,11 @@ CASES = [
     # inert in exactly the transcripts that have no partial reading at all,
     # re-admitting the whole transcript through the branch written to stop it.
 
+    ([UNRELATED_AGENT_DISPATCH, SAME_INDEX_REPORT_AND_PARTIAL,
+      say("#651 is fully clean at a5f4f3f2.")], "block",
+     "an unrelated subagent report sharing a turn with a partial reading is "
+     "NOT after it, so it stays outside the window and the original case "
+     "still blocks -- the strict `>` boundary, which nothing else pins"),
     ([UNRELATED_AGENT_DISPATCH, UNRELATED_AGENT_REPORT,
       say("#123 is fully clean.")], "allow",
      "no CI reading anywhere: an unrelated dispatch must not make a claim "
@@ -283,6 +296,12 @@ CONTENT_CASES = [
      "push and complete read in one turn: every `>` guard is false, so "
      "without a tie reason the WARN ships an empty explanation -- and it "
      "must not blame the subagent, since a complete read did happen"),
+    ([PARTIAL, PUSH,
+      say("#100 is good to merge whenever you're ready.")],
+     "no complete instrument read appears anywhere",
+     "A complete instrument read is in this transcript",
+     "a push after a partial reading, with no complete read ever -- the "
+     "message must not claim a complete read exists"),
     ([AGENT_DISPATCH, AGENT_REPORT, PARTIAL,
       say("#3468 is ready to merge.")],
      "SHORT CI surface",

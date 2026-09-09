@@ -46,6 +46,15 @@ CHECKER_3468 = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "python3 scripts/check-pr-fully-clean.py 3468 "
                    "-R Morrison-Lab/ai-config"}}]}}
+# One turn carrying BOTH a push and a complete read -- two tool_use blocks in
+# a single message, the shape a real session produces when it pushes and then
+# verifies. Both land on the SAME transcript index, so neither `last_push >
+# last_complete` nor `last_subagent > last_complete` can fire (#3475 round 2).
+PUSH_AND_CHECKER_SAME_TURN = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "git push -q origin HEAD"}},
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 3468 "
+                   "-R Morrison-Lab/ai-config"}}]}}
 ENDPOINT = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "gh api repos/ucdavis/bcs/commits/a5f4f3f2/check-runs?per_page=100 --paginate"}}]}}
@@ -223,6 +232,10 @@ CASES = [
      "same data-merge sentence, but 'branch' anchors it as PR-readiness "
      "vocabulary within the window"),
 
+    ([PARTIAL, say("#87 is yours now -- your call to merge.")], "warn",
+     "'your call to merge' is in the merge-ready vocabulary and was "
+     "otherwise untested"),
+
     # --- #3475 finding 2: with NO CI reading anywhere, `idx > last_partial`
     # was `idx > -1`, true for every event -- so the scoping fix was silently
     # inert in exactly the transcripts that have no partial reading at all,
@@ -263,6 +276,13 @@ CONTENT_CASES = [
      "a `git push` landed after it",
      "with the subagent's report as the LAST evidence, the subagent reason "
      "is the true one and the push reason must not appear"),
+    ([AGENT_DISPATCH, AGENT_REPORT, PUSH_AND_CHECKER_SAME_TURN,
+      say("#3468 is fully clean.")],
+     "SAME turn",
+     "not a reading you ran yourself",
+     "push and complete read in one turn: every `>` guard is false, so "
+     "without a tie reason the WARN ships an empty explanation -- and it "
+     "must not blame the subagent, since a complete read did happen"),
 ]
 
 

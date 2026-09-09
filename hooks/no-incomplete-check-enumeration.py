@@ -374,7 +374,9 @@ def main() -> int:
     # broader merge-readiness vocabulary, or a subagent's report as the
     # only evidence -- WARNS instead. See the module docstring's EXTENSION
     # section for why.
-    is_original_ci_case = bool(hit_core) and last_subagent < 0 and last_partial >= 0
+    # `last_partial >= 0` is implied here: the guard above returned when
+    # both were negative, so `last_subagent < 0` already forces it.
+    is_original_ci_case = bool(hit_core) and last_subagent < 0
 
     if is_original_ci_case:
         print(json.dumps({
@@ -443,12 +445,25 @@ def main() -> int:
             "`check-pr-fully-clean.py` later exited 1 because a verdict-bearing "
             "review landed AFTER the subagent finished."
         )
-    if last_push > last_complete >= 0 and last_complete >= last_subagent:
+    if last_push > last_complete >= 0:
         reasons.append(
             "A complete instrument read is in this transcript, but a "
             "`git push` landed after it, so it describes a head that is "
             "no longer this PR's. A verdict covers the commit it named; "
             "re-run the instrument against what you just pushed."
+        )
+    # The tie. A push and a complete read in the SAME turn -- two tool_use
+    # blocks, or one `git push && check-pr-fully-clean.py` command -- give
+    # both the same transcript index, and nothing in the transcript says
+    # which ran first. Neither `>` guard above fires, so without this the
+    # reason list comes out empty and the message explains nothing
+    # (#3475 round 2).
+    if last_complete >= 0 and last_complete == max(last_push, last_subagent):
+        reasons.append(
+            "A complete instrument read and the push (or subagent report) it "
+            "would have to postdate are in the SAME turn, so the transcript "
+            "cannot say which came first. Re-run the instrument in a turn of "
+            "its own, so the reading is unambiguously the later one."
         )
     if not hit_core:
         reasons.append(
@@ -468,7 +483,8 @@ def main() -> int:
         "systemMessage": (
             f"Your message makes a terminal merge-readiness claim about {pr_label} "
             f"-- \"{hit.group(0).strip()}\" -- with no `check-pr-fully-clean.py` run "
-            "in this transcript since the most recent push or subagent report.\n\n"
+            "in this transcript that postdates the most recent push or subagent "
+            "report.\n\n"
             f"{source_note}\n\n"
             f"Before relaying this, run and read the instrument yourself:\n\n"
             f"    python3 scripts/check-pr-fully-clean.py <PR> -R <owner>/<repo>\n\n"

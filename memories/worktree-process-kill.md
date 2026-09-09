@@ -16,14 +16,12 @@ So either the `pkill` missed that run on timing, or it killed an earlier run tha
 The *mechanism* --- that the pattern cannot distinguish worktrees --- is confirmed regardless of which of those happened.
 The *damage on this specific occasion* is not established, and asserting it occurred would be exactly the failure the second half of this section exists to name.
 
-**Do: scope a process kill by identity or working directory, never by a script path shared across worktrees.**
+**Scope a process kill by identity or working directory, never by a script path shared across worktrees.**
 Two safe forms exist.
 Keep the PID from the launch (`nohup ... & pid=$!`, or an equivalent capture of `$!`) and `kill "$pid"` against that specific number.
 Or, when the PID was not captured, resolve candidates with `pgrep -f <pattern>` and filter each one on its actual working directory before killing it --- `readlink /proc/<pid>/cwd` (or the platform equivalent) compared against your own worktree path, killing only a match.
 The general shape: a kill with any peer-visible side effect needs a scoping predicate the pattern itself does not supply, because the pattern is necessarily identical across every worktree running the same script.
-
-**Don't: run `pkill -f` (or `killall`) against a script's relative path in a repo where more than one worktree can run that script.**
-The pattern cannot tell your worktree's process from a peer's, so it does not matter how confident you are that only your own run is stale.
+It does not matter how confident you are that only your own run is stale --- the pattern cannot tell your worktree's process from a peer's.
 
 **A report about another process's or another agent's state is a state claim, and it gets re-queried before anyone acts on it --- including a report you just wrote about your own action.**
 The natural next step after "I may have killed your run" is to tell the peer so, and the natural remediation to suggest is "re-run validation there."

@@ -26,29 +26,30 @@
 #     takes down everything running INSIDE it, including the agent's
 #     background monitors and any watcher polling a long job, so the session
 #     loses its observability rather than its work.
+#     The expiry is also silent. Nothing announces it, so the first symptom
+#     is a monitoring loop that stopped firing, which is indistinguishable
+#     from a session that simply had nothing left to do.
 #     It was 12h, which expired mid-session during a long working day. 24h
 #     then expired at 2026-08-06T11:40:33 on a session that had been running
 #     exactly 1-00:00:26 -- a full overnight ARDIA pass with SLURM jobs and PR
 #     watchers still in flight. 48h expired in turn at 2026-09-08T21:25:46
-#     after 2-00:00:13, on a deadline-bound session with three stratum arrays
-#     running and a PR mid-review; its next monitoring wakeup was armed for
-#     21:31 and never fired, and the session sat idle for about three and a
-#     half hours before a human noticed.
-#     Each of the three ended at essentially its limit, which is the point:
-#     the limit stopped the session every time, and the work was never what
-#     finished first. A number picked by estimating how long a session will
-#     run has now been wrong three times, so 7 days is chosen as headroom
-#     rather than as a better estimate. It is still a hard cutoff: a session
-#     that outlives it dies the same silent death.
+#     after 2-00:00:13, while three stratum arrays were running and a PR was
+#     mid-review; the next monitoring wakeup was armed for 21:31, never
+#     fired, and roughly three and a half hours passed before a human
+#     restarted the work by hand.
+#     Each of those three defaults expired while its own session still had
+#     work in flight, which is the point: the walltime, never the work, is
+#     what ended every one of them. A number picked by estimating how long a
+#     session will run has now been wrong three times, so 7 days is chosen as
+#     headroom rather than as a better estimate. It is still a hard cutoff: a
+#     session outliving it dies the same silent death.
 #     Raise it per invocation with ALLOC_TIME if you need longer.
 #     Do not treat a bigger number as free: the slice holds its cores and
 #     memory for its whole life even while idle, on a 4-node cluster, so exit
 #     the session when you are done rather than letting a long allocation sit.
 #     That caution matters more at a week than it did at 48h: measured in
-#     elapsed wall-clock hours rather than working days, 168 against 48, an
-#     abandoned slice now idles three and a half times as long before SLURM
-#     reclaims it. And the expiry is silent, so the first symptom is a loop
-#     that stopped firing, which looks like a session with nothing to do.
+#     elapsed wall-clock hours, 168 against 48, an abandoned slice now ties
+#     up its cores three and a half times as long before SLURM reclaims it.
 #   - Long compute belongs in a detached `sbatch` job, not in this slice. A
 #     batch job survives the slice expiring; work running inside the slice
 #     does not.

@@ -1288,3 +1288,68 @@ A reader who has not resolved the tracked changes is reading the union of two do
 Extracting accept-mode and reject-mode text separately showed both were already-deleted tracked changes, and the accept-mode text was clean.
 `memories/office-open-xml.md`'s "Two pandoc diffs verify a redlined docx" section gives the identical two extractions for a self-check on an edit;
 this is the same mechanism applied to a finding about someone else's edit instead.)
+
+## A correction's baseline is another artifact, and the nearest one in view is not it
+
+["A drift claim is relational, so one read cannot settle it"](#a-drift-claim-is-relational-so-one-read-cannot-settle-it)
+above already names the shape: a claim about two artifacts at once needs two
+reads, and reading only one leaves the sentence feeling complete anyway.
+Naming something a correction, a fix, a patch, or a workaround is that same
+two-place claim, in the shape it takes most often in ordinary technical
+writing rather than in an install or a config.
+It names what changed AND what the change is against, and the artifact in
+front of you, the corrected form, only ever supplies the first half.
+The baseline lives somewhere else: an earlier paper, an earlier revision of
+the same document, the pre-fix branch, last quarter's release.
+
+That is what lets the failure survive careful reading.
+The natural verification move is to reread the artifact you have, and doing
+so genuinely confirms what the correction IS, its formula, its scope, its
+effect.
+It says nothing about what it corrects, because the document in hand was
+never the baseline.
+The nearest candidate actually in view, your own document's earlier draft, a
+neighbouring equation, whatever you last edited, gets silently substituted
+for the real one, because it is available and the real one takes a separate
+retrieval to reach.
+
+The check: before writing "X corrects/fixes/omits Y", name Y explicitly, say
+where Y is written down, and read Y there.
+If Y is not retrievable, describe what X does rather than what it corrects.
+
+- **Do:** name the baseline a correction claim is against, cite where it is
+  written down, and read it there before asserting the relationship.
+- **Do:** describe what a correction term does, on its own, when the
+  baseline it is said to correct cannot be retrieved and confirmed.
+- **Don't:** confirm a correction's own content and treat that as having
+  confirmed what it corrects.
+- **Don't:** let the nearest document in view, your own earlier draft, a
+  neighbouring section, stand in for a baseline a source names explicitly
+  elsewhere.
+
+(Measured 2026-09-09, in the same manuscript-resubmission session as the
+shape above.
+A response-to-reviewers letter and the manuscript's own supplement each
+misnamed the baseline for a "correction term" in a cited paper (Teunis and
+van Eijkeren, 2020, *Statistics in Medicine* 39:2799-2814).
+That paper's "age dependent correction term" (p. 2801) corrects the age-free
+density of an earlier 2012 Teunis et al. paper.
+The letter instead said the term corrected an omission in the supplement's
+own prior equation, which already carried the age restriction, an Iverson
+indicator confining the relevant interval to the participant's age;
+what that equation actually lacked was a different pair of factors.
+The supplement separately mislabelled a term in the same formula: it called
+one factor "the age-truncation term", when the truncation is a distinct
+Iverson bracket and the named factor is instead the contribution of
+inter-event intervals longer than the participant's age, vanishing as that
+age grows.
+Rereading the supplement, however closely, could confirm only what the
+formula does; it could not show which paper's baseline the cited correction
+was against, since that fact lives in the cited paper rather than in the
+supplement.
+Both were caught by the user asking "are you sure about that?", not by a
+reread, which is the same discovery path
+[`run-ums-proactively.cases.md`](run-ums-proactively.cases.md)'s "Are you
+sure about that?" case record already names as invisible to a hook keyed on
+a first-person admission: the wrongness surfaced as an answer to a question,
+with no admission attached.)

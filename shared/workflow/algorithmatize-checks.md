@@ -427,6 +427,69 @@ as of this writing.
 The corruption was caught and mutation-tested by a later adversarial-review
 round within that same PR, before it ever reached `main`.)
 
+### Confirm a mutation reached the file by its CONTENT, and never by `git diff`
+
+A mutation applied by string replacement can silently fail to match, so the
+sweep has to check that the file changed before reading the suite's verdict.
+`git diff --quiet` is the reflex for that and is wrong for the commonest
+case: it reports no change for an **untracked** file, whatever you wrote into
+it.
+
+The false "did not apply" is not the expensive half.
+A harness that skips the suite on that reading usually skips the **restore**
+with it, so the mutation stays in the file and the next one is applied on top.
+Three mutations then accumulate, every later result is meaningless, and the
+run ends with a broken file and a green-looking log.
+Compare a hash, or the anchor string's presence, instead.
+
+- **Do:** hash the file before and after, and treat an unchanged hash as a
+  harness failure rather than as a finding about the test.
+- **Do:** restore from a pristine copy on every path, including the
+  did-not-apply path.
+- **Don't:** use `git diff` to confirm a mutation on a file the branch has not
+  committed yet --- which is exactly when a new instrument is being mutated.
+
+(Measured 2026-09-08 while adding `scripts/resolve-equation-anchors.py`:
+three mutations of a new, still-untracked script all read as "did not apply",
+all three had in fact applied, and none was restored.
+The suite's final run was against a file carrying all three.)
+
+### A surviving mutation is a question before it is a coverage gap
+
+The natural reading of a mutation nothing catches is that the suite is thin
+there, and the natural fix is another test.
+Both can be wrong at once, and writing the test first hides which.
+
+A mutation also survives when a **second mechanism masks its effect**, and
+then the test you add to kill it either passes vacuously or asserts on the
+wrong observable.
+Diagnose the survivor before treating it: run the mutated code on the
+discriminating input and look at the intermediate state, not just the output.
+
+The distinction matters beyond the test, because a survivor of this kind
+usually means a comment somewhere overstates what the mutated line does.
+That comment is itself a claim-bearing artifact, so it wants correcting in the
+same commit as the test.
+
+- **Do:** print the intermediate state under the mutation before writing a
+  test for it.
+- **Do:** assert on whatever the mutation actually changes, which may be a
+  structure rather than the reported result.
+- **Do:** correct the mutated line's own comment when the diagnosis shows it
+  claimed more than the line does.
+- **Don't:** add a test that pins the output when the output is provably
+  identical either way --- it passes under the mutation and reads as coverage.
+
+(Measured 2026-09-08, same script.
+Removing a void-element guard from an HTML tree builder changed no reported
+anchor, so the guard looked dead.
+It is not: it keeps the tree faithful.
+The effect was masked because a generated `eq-anchor-N` id itself begins with
+`eq-`, so the next equation's ancestor-walk found it and reused it whether or
+not the void tag had reparented anything.
+The first replacement test asserted on anchors and passed under the mutation;
+the one that discriminates asserts on parents.)
+
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 
 "Test the instrument against the incident that prompted it, verbatim"'s closing **Don't** governs a comment claiming *what* a matcher matches.

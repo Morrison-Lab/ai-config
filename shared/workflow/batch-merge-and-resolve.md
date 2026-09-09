@@ -683,27 +683,55 @@ what git computed.
 This is the trap the two sections meet in.
 The count delta is prescribed for exactly the silent, cleanly-resolved loss that has nothing red to point at, and the stage refs are the obvious place to get its three inputs --- but a path git resolved on its own has no stage 1, 2 or 3 at all.
 
-What makes it a trap rather than an error is the failure shape.
-`git show :1:<path>` on such a file does not report that the stage is missing;
-piped into a counter it yields a plausible number, and the check then reports a mismatch or a row of zeroes.
-Measured 2026-09-08 while syncing a PR: a `## ` heading count over a cleanly auto-merged `CLAUDE.md` came back `base=0 ours=0 theirs=0 merged=136`, which reads as catastrophic loss and is in fact a count of nothing at all.
+**Git says so, loudly, and the check is what throws the message away.**
+This is the part worth getting right, because the obvious reading blames the wrong component.
+`git show :1:path/to/file.md` on such a path exits **128** and prints:
+
+```text
+fatal: path 'path/to/file.md' is in the index, but not at stage 1
+hint: Did you mean ':0:path/to/file.md'?
+```
+
+Nothing about that is quiet.
+What silences it is the counter wrapped around it: the fatal goes to **stderr**, a `2>/dev/null` in the helper discards it outright, and without `pipefail` the pipeline reports `grep`'s status rather than `git show`'s.
+So the diagnostic is destroyed by the measurement, which is [`fail-fast`](../principles/fail-fast.md)'s no-silent-failures rule pointed at one's own instrument rather than at the code under test.
+Measured 2026-09-08 while syncing a PR: a `## ` heading count over a cleanly auto-merged `CLAUDE.md` came back `base=0 ours=0 theirs=0 merged=136`, which reads as catastrophic loss and is a count of nothing at all --- and the helper that produced it carried exactly that `2>/dev/null`.
 The absurdity is what caught it;
 a subtler file would have produced a wrong number that looked ordinary.
 
-For a cleanly merged path take the three inputs from the COMMITS instead, which works whether or not the path conflicted:
+Take the three inputs from the COMMITS instead, which works whether or not the path conflicted:
 
 ```bash
-BASE=$(git merge-base HEAD MERGE_HEAD)   # mid-merge: HEAD is ours, MERGE_HEAD theirs
-cnt() { git show "$1:$FILE" | grep -c '^## '; }
-echo "base=$(cnt $BASE) ours=$(cnt HEAD) theirs=$(cnt MERGE_HEAD) merged=$(grep -c '^## ' $FILE)"
+FILE=path/to/file.md                     # the merged path being counted
+
+# While the merge is still UNCOMMITTED, MERGE_HEAD names theirs.
+BASE=$(git merge-base HEAD MERGE_HEAD)
+THEIRS=MERGE_HEAD
+
+# Once the merge has COMMITTED, MERGE_HEAD is gone -- see below.
+# BASE=$(git merge-base 'HEAD^1' 'HEAD^2'); THEIRS='HEAD^2'; OURS='HEAD^1'
+
+cnt() { git show "$1:$FILE" | grep -c '^## '; }   # no 2>/dev/null: let it fail loudly
+echo "base=$(cnt "$BASE") ours=$(cnt HEAD) theirs=$(cnt "$THEIRS") merged=$(grep -c '^## ' "$FILE")"
 ```
 
-Pair it with a set difference, which localizes what a bare count cannot: every heading present in ours or theirs must appear in the merged file.
+Define `FILE` before running it.
+An unset one is not an error you will see: `git show "HEAD:"` succeeds, prints a **tree listing**, and `grep -c` returns 0 for every call --- reproducing the very row of zeroes this passage exists to warn about, from the snippet meant to cure it.
+
+**`MERGE_HEAD` exists only while the merge is uncommitted, which is narrower than it sounds.**
+A merge with no conflict ANYWHERE commits itself immediately and deletes the ref, so `git merge-base HEAD MERGE_HEAD` then fails with `fatal: Not a valid object name MERGE_HEAD`.
+The mid-merge form therefore applies when some OTHER path in the same merge conflicted and is holding the merge open --- which is the common case for this instrument, since you are usually here resolving a batch.
+After the merge commits, the merge commit's own parents carry the same information: `HEAD^1` is ours, `HEAD^2` is theirs, and their merge-base is the base.
+Both forms are in the snippet above.
+
+Pair the count with a set difference, which localizes what a bare count cannot: every heading present in ours or theirs must appear in the merged file.
 A count delta and a set difference fail on different things --- a count survives one line dropped and one added, and the set difference names which line went.
 
-- **Do:** take the count-delta inputs from `merge-base`/`HEAD`/`MERGE_HEAD` for any path git resolved without a conflict.
+- **Do:** take the count-delta inputs from the commits --- `merge-base`/`HEAD`/`MERGE_HEAD` mid-merge, or `HEAD^1`/`HEAD^2` once it has committed.
+- **Do:** let `git show` fail loudly in a measuring helper, rather than wrapping it in `2>/dev/null`.
 - **Do:** run a set difference beside the count, so a dropped entry is named rather than merely implied.
-- **Don't:** read a zero from a stage ref as a measurement --- on a cleanly-merged path it means the stage does not exist.
+- **Don't:** read a zero from a stage ref as a measurement --- on a cleanly-merged path the stage does not exist, and git said so on stderr.
+- **Don't:** leave the path variable unset --- `git show "<rev>:"` lists a tree instead of failing, so every count silently returns zero.
 
 **A GENERATED file in a conflict is regenerated, never merged.**
 Resolving it by hand is doing by eye what a generator already computes, and the hand result is only accidentally right.

@@ -223,12 +223,17 @@ since each fails silently in its own way.
   Quota and a working invocation are separate facts,
   and the second took five probes plus a review round to establish.
 
-**Recurrence, 2026-09-06 (`d-morrison/rme` ardia sweep), same trap with a different flag: `agy --print --model X < file` fails with `--print took --model as its prompt`.**
-Identical mechanism to the `--effort` case above, just demonstrated with `--model` this time, plus one new flag: `--print-timeout`.
-The confirmed working form binds the prompt with `=` last, after every other flag:
+**Recurrence, 2026-09-06 (`d-morrison/rme` ardia sweep).**
+`agy --print --model X < file` fails with `--print took --model as its prompt`.
+Two things in that one line are not covered above.
+`--print-timeout` is a further flag, absent from the `--effort`/`--model`/`--sandbox`
+list this file gives for the CLI's shape.
+And the prompt here arrives on **stdin**, which the unconsumed-positional mechanism
+above does not describe --- note that the stdin route documented earlier for the
+Windows command-line length limit supplies the prompt with no `--print` flag at all,
+so it does not collide with this trap.
+The confirmed working invocation:
 `agy --model X --print-timeout 8m --print="$(cat prompt.txt)"`.
-- **Do:** put every other flag (`--model`, `--print-timeout`, `--effort`, ...) before `--print`, and bind the prompt to `--print` with `=` as the final token.
-- **Don't:** assume this trap is specific to `--effort` --- it fires on any flag placed between `--print` and the prompt.
 
 Stated 2026-07-02 ("exhaust its tokens before using our own"),
 reaffirmed 2026-07-06 ("always use codex first

@@ -2059,8 +2059,11 @@ def classify_verdict(body: str, state: str = "") -> str:
     stating it -- the #1202 false positive, one surface over.
 
     A well-formed ``review-data`` payload -- one carrying a ``schema_version``
-    key, the contract's own version marker -- decides directly and the prose
-    scan below never runs for that comment (ai-config#3054). Three measured
+    key, the contract's own version marker -- decides directly whenever
+    ``payload_is_blocking`` or ``payload_is_clean`` applies to it, and the
+    prose scan below never runs for that comment (ai-config#3054); a payload
+    that is neither (a clean verdict with the ``findings`` key missing, say)
+    still falls to the prose scan. Three measured
     false positives (d-morrison/rme#1128, #1130, #1132) and a fourth on the
     gha side (Lacaedemon/sparta#1547) each carried a payload of
     ``"verdict": "CLEAN", "findings": []`` that flatly contradicted a phrase

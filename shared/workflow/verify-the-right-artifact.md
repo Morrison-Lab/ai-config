@@ -413,8 +413,9 @@ the bypass produced a wrong "fix" and two issues filed on the false "math does n
 
 ## A reviewer's counter-measurement needs the same check the claim it rebuts would have needed
 
-Every instance above is an author verifying their own claim.
-The identical substitution reaches a **reviewer** refuting someone else's, and it is easier to miss there, because a rebuttal reads as skepticism rather than as an assertion --- "I tested this and it isn't true" sounds like diligence applied, not like a new claim that itself owes [`dont-take-my-word-for-it`](../principles/dont-take-my-word-for-it.md).
+The section above is about the same artifact measured at a narrower scope than the claim names.
+This one is a plain substitution --- shape 1 from the top of this fragment, a different document standing in for the one the claim is about --- and it is worth its own entry only because of *who* commits it: a **reviewer** refuting someone else's claim rather than an author supporting their own.
+That is easy to miss, because a rebuttal reads as skepticism rather than as an assertion --- "I tested this and it isn't true" sounds like diligence applied, not like a new claim that itself owes [`dont-take-my-word-for-it`](../principles/dont-take-my-word-for-it.md).
 A finding backed by a real command is not thereby a finding backed by the *right* command, and nothing about the reviewer's own confidence distinguishes the two.
 
 A commit fixing a broken macro (`\def\v0`/`\def\v1` silently overriding `\renewcommand{\v}`) said only that it was "verified through `pandoc -t latex`" --- true, and unfalsifiable-looking to a reader with no further detail.
@@ -429,7 +430,7 @@ Re-running with the precondition restored (a document that actually defines `\v`
 
 | | `\v0` | `\v1` | `\v{x}` |
 | --- | --- | --- | --- |
-| no definitions present | `\v0` | `\v1` | (absent) |
+| no definitions present | `\v0` | `\v1` | `\v{x}` |
 | `macros.qmd` before the fix | `\v0` | `\tilde{1}` | `\v{x}` |
 | `macros.qmd` after the fix | `\tilde{0}` | `\tilde{1}` | `\tilde{x}` |
 
@@ -450,9 +451,11 @@ Amending the commit message to carry the three-row table above did both jobs at 
 A durable artifact that states its own discriminator is [`quotable-findings`](quotable-findings.md)'s standard turned around --- a claim that names the exact measurement that would falsify it is the one nobody can plausibly misread.
 
 - **Do:** treat a reviewer's own counter-test as a claim requiring the same re-derivation any other claim does, whichever side of the finding you are on.
-- **Do:** when rebutting a finding, name the precondition the original claim relied on and confirm the counter-test carried it, rather than arguing from the counter-test's bare output.
-- **Do:** write the discriminating measurement --- including the null case that shows what a non-discriminating test looks like --- into the durable artifact (commit message, PR body) rather than only into a comment thread.
 - **Don't:** read "the reviewer ran a command" as equivalent to "the reviewer ran the command that could have shown the claim false" --- a command that cannot exhibit the failure mode has not tested the claim, however real its output is.
+- **Do:** when rebutting a finding, name the precondition the original claim relied on and confirm the counter-test carried it.
+- **Don't:** rebut by re-asserting the original claim against the counter-test's bare output;
+  that answers confidence with confidence and settles nothing --- name the specific precondition the counter-test dropped.
+- **Do:** write the discriminating measurement --- including the null case that shows what a non-discriminating test looks like --- into the durable artifact (commit message, PR body) rather than only into a comment thread.
 - **Don't:** leave a verification claim as a bare tool invocation ("verified through X") with no stated discriminator;
   that vagueness is what makes a plausible-but-wrong counter-finding possible in the first place.
 

@@ -51,7 +51,7 @@ It takes a PR-preview URL, a published URL, or a local `_site/` file, so the sam
 
 Run it on the pages your diff can reach, which for an edited subfile means the chapter that includes it, not the subfile.
 
-## Three findings worth carrying, each measured by getting it wrong
+## Five findings worth carrying, each measured by getting it wrong
 
 **The commonest shape of a bug is rarely the one you first write the detector for.**
 The broken-list check began anchored at the start of a paragraph, which catches a list with nothing before it.
@@ -62,6 +62,18 @@ Get real output from the renderer before deciding what to match.
 **A false-positive rate sinks a checker faster than a gap does.**
 A text-level scan for `word?` as an unresolved citation matched ordinary English --- `plausible?`, `measurement?` --- eleven times on a page with no citation problem at all, and a regex strip of KaTeX reported twenty unexpanded macros on the same clean page, because KaTeX nests spans several deep and a non-greedy `<span class=katex>.*?</span>` stops at the first inner close.
 Both needed structural answers: a parser for the math, and markup matching for the citation.
+
+**A third instance of the same class, found in review rather than by running the checker.**
+The unexpanded-macro detector was `\[a-zA-Z]{2,}` --- any backslash followed by two or more letters --- which matches every segment of a Windows path, so a page whose prose says `C:\Users\Documents\myfile` reported three unexpanded macros.
+Structure is no help here, because a path and a control sequence are the same characters; what separates them is the character BEFORE the backslash.
+A macro follows whitespace, `$`, `{` or start-of-text, while a path segment follows a drive letter, a colon, or the previous segment's name, so a negative lookbehind over that class is the discriminator.
+It costs one gap on purpose: the second macro of `$\hat\beta$` is preceded by a letter and goes unreported, while the first still fires --- so a count is lost and never a verdict.
+
+**A detector wide enough to match a sibling's defect misclassifies rather than misses.**
+The `?@` citation scan had no shape restriction, so `?@fig-missing` was reported as an unresolved CITATION and an unresolved CROSSREF at once.
+Nothing is scored falsely clean by that, which is why it reads as cosmetic; the cost is that it names the wrong defect kind and sends the reader to the bibliography over a crossref problem.
+The crossref prefixes now live in one constant that the crossref check matches and the citation check subtracts, since two copies of that list drift silently --- a prefix in one and missing from the other restores the double-report for exactly that type.
+The subtraction keys on the prefix plus a hyphen rather than the whole key, so a bibtex key that merely begins with one (`?@defoe1990`) is still reported; swallowing that would be a false CLEAN, the one direction this checker must not fail in.
 
 **Suppressing noise by excluding a class can silence the defect itself.**
 The obvious fix for the citation noise is to skip `class="citation"`.

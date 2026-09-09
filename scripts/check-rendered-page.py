@@ -126,7 +126,7 @@ def _visible_text(s):
         p.feed(s)
     except Exception:
         return html.unescape(re.sub(r"<[^>]+>", " ", s))
-    return " ".join(self_out for self_out in p.out)
+    return " ".join(p.out)
 
 
 # Each check is (label, finder). A finder returns a list of offending strings.
@@ -174,9 +174,79 @@ def _list_failed(s):
     return out
 
 
+class _StripCode(HTMLParser):
+    """Re-emit raw MARKUP with `<code>` and `<pre>` subtrees removed.
+
+    `_katex_error` is the one check that cannot route through
+    `_visible_text`, for two independent reasons. Its signal is a `class=`
+    attribute, which the visible-text parser discards by design; and
+    `SKIP_CLASS` carries `katex` and `math`, which are the very wrappers a
+    KaTeX error span sits inside, so reusing it would silence every genuine
+    hit rather than only the noise.
+
+    What the check does still need is the `<code>`/`<pre>` exclusion its four
+    siblings get, so a page QUOTING `class="katex-error"` or the words
+    `Undefined control sequence` inside a code block is not reported as
+    having a KaTeX error -- a page documenting this checker is exactly such a
+    page. This parser supplies that exclusion and nothing else.
+
+    A regex strip was rejected for the reason `_Visible`'s own docstring
+    gives: a non-greedy `<pre>.*?</pre>` stops at the first inner close, so
+    it mis-handles the nesting pandoc actually emits (`<pre><code>`).
+    """
+
+    DROP = {"code", "pre"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self.out = []
+        self.depth = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self.DROP:
+            self.depth += 1
+        elif not self.depth:
+            self.out.append(self.get_starttag_text() or "")
+
+    def handle_startendtag(self, tag, attrs):
+        if not self.depth and tag not in self.DROP:
+            self.out.append(self.get_starttag_text() or "")
+
+    def handle_endtag(self, tag):
+        if tag in self.DROP:
+            self.depth = max(0, self.depth - 1)
+        elif not self.depth:
+            self.out.append("</" + tag + ">")
+
+    def handle_data(self, d):
+        if not self.depth:
+            self.out.append(d)
+
+    def handle_entityref(self, name):
+        if not self.depth:
+            self.out.append("&" + name + ";")
+
+    def handle_charref(self, name):
+        if not self.depth:
+            self.out.append("&#" + name + ";")
+
+
+def _markup_without_code(s):
+    p = _StripCode()
+    p.feed(s)
+    p.close()
+    return "".join(p.out)
+
+
 def _katex_error(s):
-    out = re.findall(r'class="[^"]*katex-error[^"]*"[^>]*>([^<]{0,80})', s)
-    out += re.findall(r'(Undefined control sequence[^<]{0,60})', s)
+    """KaTeX / LaTeX errors, read from MARKUP with code blocks removed.
+
+    See `_StripCode` for why this check reads markup rather than visible
+    text, and why it cannot reuse `SKIP_CLASS`.
+    """
+    m = _markup_without_code(s)
+    out = re.findall(r'class="[^"]*katex-error[^"]*"[^>]*>([^<]{0,80})', m)
+    out += re.findall(r'(Undefined control sequence[^<]{0,60})', m)
     return [html.unescape(x) for x in out]
 
 # Pandoc's unresolved-citation rendering, structurally: a doc-biblioref link
@@ -184,6 +254,33 @@ def _katex_error(s):
 # rather than on prose, because the same `word?` shape in ordinary English is
 # indistinguishable once tags are stripped -- an earlier text-level version
 # reported eleven hits on a page with no citation problem at all.
+# Quarto's crossref key prefixes. One source of truth: `_bad_crossref` matches
+# them, and `_bad_citation` subtracts them so a single unresolved crossref is
+# not also reported as an unresolved CITATION. Two copies of this list would
+# drift, and the drift is silent -- a prefix present in one and missing from
+# the other resurfaces the double-report for exactly that type.
+XREF_PREFIXES = ("fig", "tbl", "sec", "eq", "thm", "def", "exm", "exr",
+                 "lem", "cor", "prp", "rem", "sol", "cnj")
+_XREF_ALT = "|".join(XREF_PREFIXES)
+RX_UNRESOLVED_XREF = re.compile(r'\?@(?:' + _XREF_ALT + r')-[\w-]+')
+# Matches the PREFIX only, so it also subtracts a key whose tail carries a
+# character `RX_UNRESOLVED_XREF` stops at (`?@fig-a.b`). Anchoring on the full
+# key would let that shape slip back into the citation list.
+RX_XREF_KEY_HEAD = re.compile(r'\?@(?:' + _XREF_ALT + r')-')
+
+# A LaTeX control sequence that failed to expand, EXCLUDING a backslash that
+# sits in a path-like context. `\[a-zA-Z]{2,}` alone matches every segment of
+# `C:\Users\Documents\myfile`, so any page whose prose mentions a Windows path
+# scored itself not-clean -- the false-positive rate this checker's own
+# docstring calls disqualifying.
+#
+# The lookbehind is what draws the line: a real macro follows whitespace, `$`,
+# `{` or start-of-text, while a path segment follows a drive letter, a colon or
+# the previous segment's name. It costs one gap, deliberately: the second macro
+# of `$\hat\beta$` is preceded by a letter and so is not reported. The FIRST
+# one still is, so the page is still flagged -- a count is lost, never a verdict.
+RX_RAW_MACRO = re.compile(r'(?<![A-Za-z0-9:._/\\-])\\[a-zA-Z]{2,}')
+
 RX_UNRESOLVED_CITE = re.compile(
     r'role="doc-biblioref"[^>]*>\s*(?:<strong>)?\s*([\w:.-]+\?)\s*(?:</strong>)?\s*</a>',
     re.I)
@@ -208,7 +305,8 @@ def _bad_citation(s):
     the `?@` scan reads visible text and therefore can be silenced. That is
     why `citation` must stay OUT of `SKIP_CLASS` -- see the note there.
     """
-    out = re.findall(r'\?@[\w:.-]+', _visible_text(s))
+    out = [m for m in re.findall(r'\?@[\w:.-]+', _visible_text(s))
+           if not RX_XREF_KEY_HEAD.match(m)]
     out += sorted(set(RX_UNRESOLVED_CITE.findall(s)))
     return out
 
@@ -220,9 +318,7 @@ def _bad_crossref(s):
     -- which is how this corpus's own fragment documents the failure, so a
     page explaining Quarto crossrefs would score itself not-clean.
     """
-    return [html.unescape(m) for m in
-            re.findall(r'\?@(?:fig|tbl|sec|eq|thm|def|exm|exr|lem|cor|prp|rem|sol|cnj)-[\w-]+',
-                       _visible_text(s))]
+    return [html.unescape(m) for m in RX_UNRESOLVED_XREF.findall(_visible_text(s))]
 
 def _raw_macro(s):
     """A backslash macro surviving into rendered PROSE.
@@ -231,7 +327,7 @@ def _raw_macro(s):
     using KaTeX reports its own math source as an unexpanded macro -- twenty
     hits on a clean page, which is worse than no check.
     """
-    return re.findall(r'\\[a-zA-Z]{2,}', _visible_text(s))[:20]
+    return RX_RAW_MACRO.findall(_visible_text(s))[:20]
 
 CHECKS = [
     ("list rendered as a paragraph (missing blank line before it)", _list_failed),

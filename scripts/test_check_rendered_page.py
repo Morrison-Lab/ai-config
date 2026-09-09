@@ -146,12 +146,71 @@ CASES = [
     ("a dash inside ordinary prose is not a list",
      '<p>the range a - b is inclusive</p>',
      "list rendered as a paragraph", False),
+    # The point of this case is that `citation` stays OUT of `SKIP_CLASS`, so a
+    # `?@` inside a citation span is not silenced. Its payload used to be
+    # `?@fig-x`, which is crossref-shaped -- so it pinned the SKIP_CLASS
+    # behaviour through whichever detector happened to fire. A citation-shaped
+    # key pins it through the CITATION detector specifically, which is the one
+    # the `SKIP_CLASS` note is about; the crossref-shaped payload gets its own
+    # pair of cases below.
     ("a literal ?@ inside a citation span is still caught",
-     '<span class="citation" data-cites="fig-x">?@fig-x</span>',
+     '<span class="citation" data-cites="smith2020">?@smith2020</span>',
      "unresolved citation key", True),
+    # A crossref-shaped key in a citation span is still caught, and now under
+    # the label naming what it actually is. Both halves are asserted: firing
+    # under `crossref`, and NOT also firing under `citation`. Only the second
+    # fails if the de-duplication is removed, so it is the load-bearing one.
+    ("a crossref-shaped key in a citation span is caught as a crossref",
+     '<span class="citation" data-cites="fig-x">?@fig-x</span>',
+     "unresolved crossref", True),
+    ("a crossref-shaped key is NOT also reported as a citation",
+     '<span class="citation" data-cites="fig-x">?@fig-x</span>',
+     "unresolved citation key", False),
+    # A bibtex key may legitimately BEGIN with a crossref prefix -- `defoe1990`
+    # starts with `def`. The subtraction keys on the prefix plus a hyphen, so
+    # this must still be reported. Without the hyphen the guard would swallow a
+    # real unresolved citation, which is a false CLEAN.
+    ("a citation key merely starting with a crossref prefix still reports",
+     '<p>See ?@defoe1990 for details.</p>',
+     "unresolved citation key", True),
+    # Finding 1: `\\[a-zA-Z]{2,}` matched every segment of a Windows path, so
+    # any page whose prose mentioned one scored itself not-clean.
+    ("a Windows path in prose is not an unexpanded macro",
+     '<p>Install it at C:\\Users\\Documents\\myfile and run.</p>',
+     "unexpanded macro in rendered text", False),
+    ("a UNC path in prose is not an unexpanded macro",
+     '<p>Use \\\\server\\share for it.</p>',
+     "unexpanded macro in rendered text", False),
+    # The counterweight: the exclusion must not silence a genuine macro. Three
+    # preceding contexts, because the lookbehind is what decides each one.
+    ("a macro after whitespace is still flagged",
+     '<p>See \\emph{this} word.</p>',
+     "unexpanded macro in rendered text", True),
+    ("a macro at the start of a paragraph is still flagged",
+     '<p>\\textbf{bold} leads here</p>',
+     "unexpanded macro in rendered text", True),
+    ("a macro after an opening brace is still flagged",
+     '<p>text {\\alpha} braced</p>',
+     "unexpanded macro in rendered text", True),
     ("the bibliography's raw keys are not flagged",
      '<div class="csl-entry" id="ref-x">Author. ?@notacite</div>',
      "unresolved citation key", False),
+    # `_katex_error` reads MARKUP, so the `<code>`/`<pre>` exclusion its four
+    # siblings get from `_visible_text` has to be supplied separately. Without
+    # it, a page documenting this very checker reports itself as broken.
+    ("a code span quoting the katex-error class is not flagged",
+     '<p>It looks for <code>class="katex-error"</code> spans.</p>',
+     "KaTeX / LaTeX error", False),
+    ("a code block quoting the undefined-control-sequence text is not flagged",
+     '<pre><code>Undefined control sequence \\vL example</code></pre>',
+     "KaTeX / LaTeX error", False),
+    # The counterweight. `SKIP_CLASS` holds `katex` and `math`, which are the
+    # wrappers a real error span sits inside, so an exclusion built on it would
+    # silence every genuine hit. This case fails if that shortcut is taken.
+    ("a real katex error nested in math/katex wrappers is still flagged",
+     '<span class="math inline"><span class="katex">'
+     '<span class="katex-error" title="x">bad</span></span></span>',
+     "KaTeX / LaTeX error", True),
     ("a code block quoting a macro is not flagged",
      "<pre><code>\\vL and \\eqdef appear here</code></pre>",
      "unexpanded macro in rendered text", False),

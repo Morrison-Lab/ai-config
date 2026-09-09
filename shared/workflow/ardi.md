@@ -657,6 +657,27 @@ over, and re-reading it cannot catch a wrong number.**
 See [`ardi.cases.md`](ardi.cases.md), "A verification table in the PR body going
 stale as rounds change the diff".
 
+**The "stale description" half of the Don't above still needs re-reading run, and fixing the file it describes is not the same act as re-reading the body.**
+The rule just above names the remedy for a stale description without a worked case: re-reading, not re-deriving, is the right instrument for it.
+The gap this fills is that fixing the underlying content --- editing the fragment a table describes, correcting a count inside the file itself --- is the diff-side half of a push, and the body-side half is a separate act that the diff-side fix does not automatically perform.
+A push that corrects a wrong count in a fragment file, while leaving the PR body's own table describing that fragment unchanged, ships a description that contradicts its own diff: the merged commit would have fixed the file and published a body that still states the pre-fix table.
+
+This is not the numeric-verification-table case above, where the number is a command's output pasted into the body.
+Here the body's table is a hand-written restatement of the fragment's content --- prose describing prose --- so no command re-derives it;
+the only check is reading the fragment's current text and comparing it against what the body says the fragment says, the same way [`check-the-renders`](check-the-renders.md) reads a rendered page against the diff that changed its source rather than trusting the diff alone.
+
+- **Do:** after editing a fragment's content, re-read the PR body's own description of that fragment and confirm it still matches the file as it now stands, not as it stood when the body was first written.
+- **Do:** treat a content fix inside the diff as a trigger to re-check the body's description of that same content, exactly as a numeric fix triggers re-deriving the body's counts.
+- **Don't:** treat "I corrected the file" as having corrected what the body says about the file --- those are two separate edits, and only one of them touches the diff.
+- **Don't:** assume a hand-written description needs no check because it carries no command to re-run;
+  the check for prose is reading it, not skipping it because there is nothing to execute.
+
+(Measured 2026-09-09: a wrong count in [`shared/writing/math-derivation-steps.md`](../writing/math-derivation-steps.md) was corrected in the diff of the PR that introduced it, while that PR's own body kept the same wrong table describing the fragment's content.
+Caught immediately before merge;
+merging would have published a description contradicting its own diff.
+Related to [`check-the-renders`](check-the-renders.md)'s source-versus- published-artifact shape, but distinct from it: that fragment is about a *rendered page* diverging from the *source* that built it, through a caching mechanism neither party edited by hand.
+Here both the fragment and the body are hand-edited prose in the same push, and the divergence is that one of the two edits did not happen, not that a build step served stale content.)
+
 **A reviewer's round-one confirmation of that table does not expire when the
 diff moves, and the confirmation is what makes the stale figure dangerous.**
 

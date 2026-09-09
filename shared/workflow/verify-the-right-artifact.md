@@ -1657,3 +1657,32 @@ The third carried a full 40-character value and prose saying "the merge commit i
 The clone I tested in had never fetched a pull ref, so it would have answered identically for every candidate explanation.
 The defect is real and is a stale-reference one;
 the fabrication reading was mine, and it pointed at the wrong fix.)
+## The invoking process is itself a member of the population a filter scopes, and reading the filter's prose does not check that
+
+Every shape above substitutes one artifact for another.
+This one substitutes a **claim about a passage** for a claim about the **mechanism the passage describes** --- distinct from ["A mechanism's prose is not the mechanism's definition"](#a-mechanisms-prose-is-not-the-mechanisms-definition) above, which is about a comment's motivating example being narrower than the mechanism it explains.
+Here the passage is not narrow or ambiguous;
+it states its remedy plainly and correctly as prose.
+The gap is between reading that prose carefully and confirming it, and checking whether following the remedy actually produces the exclusion it is read as promising --- which needs the tool's own documented behaviour, not a second reading of the sentence describing it.
+
+A companion memory entry, tracking the underlying `pkill -f` hazard as [ai-config#3427](https://github.com/Morrison-Lab/ai-config/issues/3427) and proposed as `memories/worktree-process-kill.md` in [ai-config#3428](https://github.com/Morrison-Lab/ai-config/pull/3428) (open, not yet merged at the time this entry was written), recommends: for a `pkill -f` scoped only by a shared script path, resolve candidates with `pgrep -f <pattern>`, then filter each one on its own working directory (`readlink /proc/<pid>/cwd`) against your own worktree, killing only a match.
+Reading that passage and confirming it says what it says is not the same claim as "this filter cannot re-admit the shell that is running it."
+The wrong belief was exactly that stronger claim: that a cwd filter, applied to `pgrep -f`'s candidate list, cannot reach the invoking session, because a non-matching session sits in a different working directory.
+That reasons about *other* worktrees' processes and never asks whether the invoking shell itself belongs to the population the filter admits.
+
+It does.
+`pgrep -f <pattern>` matches by regex against every process's full command line, and excludes only its own PID --- not its ancestors.
+The shell that typed the `pgrep`/`pkill` command has that pattern text in its own command line (you just typed it) and sits in your own worktree by construction, which is exactly the condition a cwd filter is built to accept.
+So the shell running the search is a candidate the filter admits, not one it excludes, and nothing about re-reading the passage's prose --- however carefully --- would surface that, because the prose is a true description of the filter it proposes.
+What it needed was a check against `pgrep`'s own documented behaviour: `pgrep --help` lists `-A, --ignore-ancestors` for precisely this case, which means the tool's own authors anticipated it and named the flag the passage's remedy omits.
+
+- **Do:** before trusting a filter's stated coverage, ask whether the process performing the filtering is itself a member of the population being filtered --- not only whether the passage describing the filter is read correctly.
+- **Do:** check a claim about what a filter excludes against the tool's own documented behaviour (a `--help` flag, a manpage clause), not against a second reading of the prose recommending it.
+- **Don't:** treat "the filter's cwd check would not match a *different* worktree's process" as having shown it cannot match the *invoking* one --- those are different claims, and only the second is the one that matters for self-exclusion.
+- **Don't:** read a remedy's prose as verified once it has been read carefully;
+  a coherent, correctly-stated remedy can still fail to achieve what it is read as promising.
+
+(Measured 2026-09-09 in this sandbox: `pgrep --help` lists `-A, --ignore-ancestors` as a documented flag, confirming `pgrep -f <pattern>` excludes only its own PID by default and matches an ancestor shell whose command line contains the pattern.
+The corrected belief and its displacing fact are the same pair `memories/worktree-process-kill.md` (ai-config#3428) records for the underlying `pkill -f` hazard;
+this entry is the general verification-method lesson the specific fix does not itself state --- that verifying the passage prescribing a remedy is not verifying the remedy holds.
+If ai-config#3428's own remedy is revised to add `-A`/`--ignore-ancestors` before it merges, that revision does not retire this entry: the general lesson --- that reading a remedy's prose is a different claim from checking the remedy against the tool's own behaviour --- outlives the one fix it was measured against.)

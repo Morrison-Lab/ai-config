@@ -1245,3 +1245,26 @@ Neither was a round happening to come back empty --- which, per the convergence 
   "Should this exist" and "should this iterate further" have different right answers, and a change worth shipping is the usual situation in which the continue-or-stop question arises at all.
 - **Don't:** treat an empty round as the answer to either question;
   a converging series narrows its own search space, so the empty round is the least informative one.
+
+### Do not write to the tree a dispatched reviewer is reading
+
+The reviewer reads the working tree, so any write to it moves the ground under a read already in progress.
+The trigger is not `git checkout` specifically, which is the narrower form [`memories/git-worktrees.md`](../../memories/git-worktrees.md)'s "Switching a shared worktree's branch under a live dispatched reviewer breaks its reads" section records.
+An ordinary in-place edit does it too: same worktree, same paths, different bytes underneath them mid-read.
+
+The dispatcher cannot detect the damage afterwards, and the reviewer usually cannot either.
+A reviewer that trusts a plain file read for the length of a long review reviews a mix of two states and reports no error at all, so the finding it returns may be about a line that no longer exists and the line it passes over may never have been in the tree it read.
+Nothing in the resulting report says which.
+
+The remedy is procedural rather than git-level, and it is the dispatcher's: dispatch the review, wait for it to report, then touch the files.
+Fixing findings while the round is still running is what produces this, and it feels like promptness rather than a mistake.
+On the reviewer's side, pin the target to a commit and read `git show <sha>:<path>` rather than the working copy.
+
+- **Do:** treat "don't touch the tree under review" as covering every write to it, an edit and a `git add` and a formatter run alike.
+- **Do:** have the reviewer read a pinned commit, so a dispatcher's slip degrades into a stale review rather than an incoherent one.
+- **Don't:** assume a live reviewer is safe from ordinary editing because no branch switch occurred.
+- **Don't:** start fixing a round's findings before that round has reported.
+
+(Measured 2026-09-09, `Morrison-Lab/ai-config`: an adversarial-reviewer subagent reading `scripts/check-docx-tracked-changes.py` reported the file "began changing under me (uncommitted)" while the dispatching session applied fixes to the same tree.
+It recovered by comparing `git show HEAD:<path>` against a copy saved at the start of its read, and said so in its report;
+that recovery is what surfaced the drift, not anything the dispatcher noticed.)

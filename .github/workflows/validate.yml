@@ -28,6 +28,11 @@ jobs:
       - name: Run check-links tests
         # ai-config#2881: CommonMark autolinks and relative link verification.
         run: python3 scripts/test_check_links.py
+      - name: Run resolve-equation-anchors tests
+        # The page-side script numbers unlabeled display equations by
+        # position, so a cited `#eq-anchor-N` silently renames when an
+        # earlier equation is added. This replays that assignment.
+        run: python3 scripts/test_resolve_equation_anchors.py
       - name: Check ASCII punctuation in source files
         # ai-config#2550: ensure .py and .R source files obey the ASCII punctuation policy.
         run: python3 scripts/check-ascii-punctuation.py
@@ -430,6 +435,16 @@ jobs:
         run: python3 scripts/test_check_bare_fragment_mentions.py
       - name: Run backlog-triage instrument tests
         run: python3 scripts/test_triage_backlog.py
+      - name: Run check-rendered-page tests
+        # The suite pins two decisions that a later edit would otherwise
+        # silently undo: exact class-TOKEN exclusion (substring matching
+        # swallowed a real `gt_footnotes` div), and keeping `citation` OUT of
+        # the exclusion set (Quarto puts a literal `?@fig-x` inside one, so
+        # excluding it makes the checker call a broken page clean). Neither
+        # is visible in the checker's output, only in its silence.
+        run: python3 scripts/test_check_rendered_page.py
+      - name: Run docx tracked-change checker tests
+        run: python3 scripts/test_check_docx_tracked_changes.py
       - name: Check for stale and orphaned records (advisory)
         # ai-config#1544. Non-blocking, and for two separate reasons.
         #

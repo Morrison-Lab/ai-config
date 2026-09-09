@@ -736,6 +736,102 @@ measurement is a function of the tree rather than the commit.
 [`dont-incur-technical-debt`](../principles/dont-incur-technical-debt.md)'s
 "The one exception" section carries that mechanic, and the deferral it licenses.
 
+**A verification transcript carries the table's staleness defect in a form
+that resists its own remedy, because there is no count in it to re-derive.**
+
+A table's figures are wrong or stale; a pasted block of live command output
+--- a redirect trace, a curl response, a rendered page's contents --- makes the
+same claim about a **behavior or configuration** instead of a number, and it
+goes stale the identical way: honestly captured against a diff that a later
+round then changes underneath it.
+"Re-derive every count" has nothing to act on here.
+The only check is to re-run the exact command the transcript shows and
+compare its current output against what is printed.
+
+That absence of a re-derivable number is also what makes a transcript
+outlive a table's own staleness.
+Its evidentiary weight comes from being real output rather than an assertion,
+so it reads as **more** rigorous than an unverified claim would --- and that
+is exactly what suppresses the impulse to re-run it.
+A reader has less reason to doubt genuine command output than a bare
+sentence, so the artifact that most needs re-running is the one least likely
+to get it.
+
+- **Do:** treat a pasted command-output block in a PR body as a claim with the
+  same shelf life as a count, and re-run the exact command at push time before
+  reporting the PR ready.
+- **Do:** read a later round that changes the config, file, or behavior a
+  transcript demonstrates as invalidating that transcript, even when the
+  round's own findings have nothing to do with it.
+- **Don't:** let a transcript's realism substitute for re-running it --- the
+  same honesty that made it true when captured is what makes a reader trust it
+  after it stops being true.
+- **Don't:** assume an unverified prose claim is the riskier artifact in a
+  body; a measured transcript decays identically and reads as more
+  trustworthy while doing it.
+
+Whether this is mechanizable splits in two.
+The general case --- does a body's transcript still describe the diff's
+current behavior --- is not lexically decidable: answering it means re-running
+arbitrary shown commands and judging the output semantically, which is a
+job for a reader rather than a pattern match.
+A narrower slice is decidable as a **flag**, not a verifier: a PR body
+containing a fenced block shaped like command output, on a PR whose
+config-shaped paths changed in a commit after the body was last edited.
+That reaches the shape of this case without executing anything the body
+contains, which running the transcript's own command would require.
+No such check exists yet; naming the boundary here is the record of that gap,
+per `gha`'s CLAUDE.md precedent that a judgment not to mechanize belongs in
+the corpus as plainly as a mechanism does.
+
+See [`ardi.cases.md`](ardi.cases.md), "A verification transcript in the PR
+body outlived the config it demonstrated".
+
+**A body sentence narrating what the diff does is the third member of that
+family, and a user asking you to REMOVE something is the moment it goes
+false.**
+
+The two entries above cover figures and pasted output, artifacts that read as
+evidence, which is what makes their staleness worth naming.
+A plain sentence --- "I added a short note recording what the engine does" ---
+carries no count to re-derive and no command to re-run, so neither remedy
+reaches it, and it is the commonest thing a PR body contains.
+
+The trigger is what earns it its own entry.
+Every other staleness in this family arrives through a *round*: a finding
+addressed, a fix that moves what an earlier round measured.
+The impulse to re-read the body rides along with the review loop, because the
+loop is what changed the diff.
+A user instruction to drop, hold, or defer content arrives from outside that
+loop.
+Removing the content *is* the whole task as stated, the commit lands, the
+reply reports it, and nothing in that sequence passes near the body.
+So the body goes on describing an addition the diff no longer makes.
+A reviewer reads that first-person sentence as a claim about the current diff
+rather than as an account of an earlier head.
+
+The same paragraph usually carries a second stale artifact, and it is the
+worse of the two: the **offer** that invited the instruction.
+"If you would rather that note not appear, say so and I will drop it" is a
+question the user has already answered, and a reviewer cannot tell that from
+the body --- it reads as an open decision the PR is waiting on, which is the
+exact inverse of the truth.
+
+- **Do:** edit the PR body in the same push that removes content at a user's
+  request, so it says what the diff does now rather than what an earlier head
+  did.
+- **Do:** delete the offer that prompted the instruction, since an answered
+  offer left standing reads as an open question.
+- **Don't:** treat the removal commit and the chat reply as having discharged
+  the request --- the body is a third artifact, and nothing in the request
+  names it.
+- **Don't:** wait for the next round to catch it: the reviewer reads the body
+  before producing findings, so a stale body shapes that round rather than
+  being corrected by it.
+
+See [`ardi.cases.md`](ardi.cases.md), "A PR body still claiming an addition
+the user had asked to withdraw".
+
 **The read side of that comparison can lag a push by a few seconds, so test
 the two *local* refs against each other before concluding anything failed.**
 

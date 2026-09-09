@@ -171,10 +171,24 @@ committed pass.
      A net-positive append fails
      `scripts/test_check_memory_file_size.py`
      even when every new sentence is a real lesson
-     (3rd occurrence, 2026-08-25 on `memories/preferences.md` in
-     ai-config#2262: `origin/main` sat exactly at the cap, 1200 lines as
-     that cap then stood, and a +5-line append reddened `validate`.
-     Prior: `shared/writing/semantic-line-breaks.md` ai-config#1291;
+     (4th occurrence, 2026-09-09 on `memories/mistake-patterns.md`,
+     found by a scheduled PR-sweep session rather than by a push: `main` sat
+     exactly at the cap, 1250 lines / 61 `## Pattern` headings, at the exact
+     value `--max-lines` defaults to, with zero headroom -- confirmed via
+     `python3 scripts/check-memory-file-size.py --strict` (exit 0, "0 lines
+     of headroom") and independently via PR #3386's head (`3f58d9b6`, 1275
+     lines / 62 headings) failing `validate`'s size check.
+     The consequence is not scoped to whichever PR crosses the line: with the
+     file already full, every other open PR that appends a pattern --
+     unrelated in content, no larger than any prior append -- fails the same
+     check the moment it is pushed, which is easy to misread as a defect in
+     that PR rather than as pre-existing headroom exhaustion.
+     The split is tracked in ai-config#3340, filed 2026-09-07 and still open;
+     check it before re-filing.
+     Prior: `memories/preferences.md` ai-config#2262 (3rd, 2026-08-25:
+     `origin/main` sat exactly at the cap, 1200 lines as that cap then stood,
+     and a +5-line append reddened `validate`);
+     `shared/writing/semantic-line-breaks.md` ai-config#1291;
      `shared/workflow/review-verdict-pitfalls.md` ai-config#811).
    - **When step 2 routed the item to a repo other than ai-config, grep both
      corpora.**

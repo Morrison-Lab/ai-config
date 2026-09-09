@@ -349,6 +349,15 @@ See [`finish-wave`](skills/finish-wave/SKILL.md).
 When listing PRs in a table (or anywhere they could be clickable), make each PR number a markdown link to the PR URL — `[#237](https://github.com/<owner>/<repo>/pull/237)`.
 The plain text form forces the user to copy/paste; the linked form lets them open the PR in one click.
 
+**The same rule covers any forge artifact I reference, not just a PR number in a table.**
+Telling the user I replied to a comment, filed an issue, posted a review, or kicked off a run --- in a table or in ordinary chat prose --- and naming it without a link leaves them to go find it themselves, which is the exact cost the table-only version of this rule already removes for PR numbers.
+A comment has no number to recognize the way a PR does, so its link is the *only* way the user can locate it without re-deriving the search themselves.
+
+- **Do:** link every comment, review, issue, PR, or run I mention having acted on, wherever the mention occurs --- table or prose.
+- **Don't:** report "I replied to that" or "filed the issue" as a bare fact with no URL attached.
+
+(Directive from the user, 2026-09-09: telling them a reply had been posted without linking it made them go find it themselves.)
+
 ## Tag chat output by category so long recaps stay scannable
 
 Recaps get long across many parallel tracks, so tag categories of output with a stable marker and let the eye jump straight to what needs the user's attention.
@@ -631,6 +640,19 @@ The unfiltered listing comes first: the state filter answers only whether a revi
 - **Don't:** pass over a review because its author is a bot or its state is `COMMENTED`, nor read that state as blocking on its own.
 
 See [`CLAUDE.cases.md`](CLAUDE.cases.md), "A bot's `COMMENTED` review is the same blind spot".
+
+**The review's own required check run can itself read green over a `NOT_CLEAN` verdict --- this is a distinct failure from "CI green isn't the review verdict".**
+The paragraph above treats `statusCheckRollup` and the review verdict as two different signals that both need checking.
+That framing still assumes the review's *own* check run --- the one wired specifically to gate on the review outcome, e.g. a `review / require-clean-verdict` job from a shared reusable workflow --- tracks that outcome faithfully.
+It does not always.
+Measured on `d-morrison/rme` PRs #1132 and #1133: `gh pr view --json statusCheckRollup` showed `review / require-clean-verdict` as `SUCCESS` on both, while each PR's latest `**Claude finished review` comment carried `"verdict": "NOT_CLEAN"` in its embedded `review-data:` JSON, with open findings.
+Why the two disagree was not established.
+A stale check run from an earlier head, and a gate that never parses the embedded verdict at all, would both produce this reading, and neither was ruled out.
+The pair below does not depend on which it is: the comment is authoritative either way.
+[`review-verdict-pitfalls`](shared/workflow/review-verdict-pitfalls.md) is the catalog for this family --- add further cases there rather than here.
+
+- **Do:** treat a green review-gating check run as unverified until the latest review comment's own verdict field confirms it, even when that check run's name implies it enforces the verdict directly.
+- **Don't:** read a named review-verdict check (e.g. `require-clean-verdict`) as SUCCESS meaning the review is clean --- name and outcome can disagree.
 
 (A specific case of the standing **never assume; always verify** rule in `memories/preferences.md` — confirm the verdict with a fresh query, don't recall it.)
 
@@ -1502,6 +1524,27 @@ The remedy is to replace the pronoun with the noun, not to reword around it.
 This is distinct from [`challenge-ambiguous-terminology`](shared/workflow/challenge-ambiguous-terminology.md), which governs a word whose **meaning** is unresolved rather than a word whose **antecedent** is.
 Apply it wherever `code-review`/`ard`/`ardi` already reviews a prose diff, alongside the other prose-review rules in this file.
 
+## Writing style: don't build a model only to retract it
+
+A "rug-pull" presents a model, claim, or picture and a sentence or two later
+retracts or replaces it --- "X.
+However, the implementation actually Y."
+Every sentence can be individually true and cited; the defect is in the
+order, which no fact-check or read-through inspects.
+It is also the natural shape to write when the facts were discovered in
+that order, which is why it survives self-review: the prose narrates the
+author's own path rather than exposing the subject to a reader who never
+walked it.
+Lead with what is actually the case, and present an idealization or a
+prior approach afterward as an extension, not a correction --- except when
+the **reader** already holds the wrong model and the passage exists to
+correct it, in which case presenting it first is the point.
+
+[shared/writing/no-rug-pulls.md](shared/writing/no-rug-pulls.md)
+
+Check this at composition time as much as in review: the order is fixed while drafting,
+and a read-through inspects each sentence rather than the sequence.
+
 ## Writing style: semantic line breaks in prose
 
 [`shared/writing/semantic-line-breaks.md`](shared/writing/semantic-line-breaks.md)
@@ -1560,6 +1603,32 @@ self-review confirms the claim, which was never the defect.
 ## Writing style: cite sources thoroughly
 
 [`shared/writing/citations.md`](shared/writing/citations.md)
+
+## Check the renders, not just the source
+
+[shared/workflow/check-the-renders.md](shared/workflow/check-the-renders.md)
+
+Where a repo publishes a website or a book, the deliverable is the rendered
+page, and a correct source diff is not evidence the published page is
+correct.
+An unexpanded macro, a citation key pandoc renders as `key?`, a crossref
+resolving to nothing, a list that lost its blank line, a swallowed KaTeX
+error --- none shows in the diff, none makes CI red.
+The worst case is a fixed source over an unfixed deployed page, served from a
+stale render cache; every other check in this corpus passes on it.
+`python3 scripts/check-rendered-page.py <url-or-file>` is the instrument for
+the pattern failures, taking a preview URL, a published URL, or a local
+`_site/` file.
+It cannot detect staleness, which is a relation between a page and a commit
+rather than a property of the page: for that, grep the render for the exact
+text the diff added and removed.
+
+- **Do:** check the rendered page, and the deployed preview rather than only a
+  local render where the repo caches renders.
+- **Don't:** read a correct source diff as evidence about the published page.
+
+(Directive from the user, 2026-09-07: "for repos that render websites and
+books, always check the renders".)
 
 ## Fact-check prose and internal reasoning in review
 

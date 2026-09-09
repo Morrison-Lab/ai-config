@@ -33,7 +33,7 @@ suspicion lands on the check rather than on the instruction.
 The result is that the least examined input is the one determining everything
 else.
 
-## Four shapes, in rising order of how settled they look
+## Shapes, in rising order of how settled they look
 
 **A convention document's own claims.**
 A `CLAUDE.md`, a design doc, a lab manual, a README.
@@ -57,12 +57,27 @@ from a set, and the set is the part you did not choose.
 Answering it well is not the same as answering it correctly, because the right
 answer may be neither, or both, or a third thing the options obscured.
 
+**A question that asserts its premise through its own grammar.**
+"Why did you do X?" is not a request for information about X; it is a claim
+that X happened, wearing the grammatical form of a question about why.
+This is harder to challenge than a posed choice, and harder than any of the
+three shapes above, because answering it reads as responsiveness and
+challenging it reads as evasion --- the opposite of a convention document or
+a brief, where scrutiny at least looks like diligence.
+Supplying reasons for something you did not do is not a wrong answer to a
+right question; it is agreement with a false premise, delivered as if it
+were cooperation.
+The asymmetry is what makes this shape worth naming on its own: checking
+whether the premise holds costs one query against the artifact the question
+is about, while wrongly accepting it costs a confession to work you never
+did, and can cost the work itself if the confession is acted on.
+
 **A supplied measurement.**
 A brief can hand over a number rather than a claim or an instruction ---
 "four POSTs, HTTP 200, zero reviews resulted" --- offered as the evidence a
 conclusion already rests on.
-This looks the most settled of the four, because it arrives with a count
-attached, and a count reads as having already been checked.
+This looks the most settled of the shapes above, because it arrives with a
+count attached, and a count reads as having already been checked.
 It has not: the number is real, but the measurement can carry a confound the
 person who ran it never saw, because seeing it required knowing something the
 measurement itself does not show.
@@ -97,7 +112,13 @@ state what the options share before picking one.
 An option set has a presupposition, and naming it is what makes rejecting it
 possible; unnamed, it is simply the shape of the question.
 
-For a supplied measurement, add a fourth: name what would have to be true
+For a question that asserts its premise, add a fourth: name the premise the
+question's grammar asserts, and check it against the artifact the question
+is about before answering --- a "why did you rewrite X" against the file
+X names, a "why did that fail" against the run it names --- rather than
+answering the "why" as posed.
+
+For a supplied measurement, add a fifth: name what would have to be true
 about *how it was taken* for the number to mean what the brief says it
 means, and check that rather than the number itself.
 
@@ -125,13 +146,20 @@ checkable by a reader, and a resolution to be thoughtful is not.
 - **Don't:** answer a choice as posed when its options share a false
   presupposition, and don't stall on the choice either --- say which
   presupposition fails and what follows.
+- **Do:** check a "why did you X" question's premise against the artifact X
+  names before answering why, whenever X is a claim about your own past
+  action.
+- **Don't:** supply reasons for an action the question asserts you took
+  without first confirming you took it --- that is agreement with a false
+  premise, not an answer.
 - **Don't:** treat a supplied number as settled because it arrived with a
   count attached --- a count that is real can still carry a confound the
   measurer never saw.
 
 See [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md),
-"A supplied measurement carried a status-code confound" and
-"A run-level conclusion stood in for a job-level one".
+"A supplied measurement carried a status-code confound",
+"A run-level conclusion stood in for a job-level one", and
+"A 'why did you rewrite this' question asserted a premise nobody had checked".
 
 ## When the work itself settles the premise, run it before writing anything
 
@@ -737,3 +765,15 @@ the author had already read the same file twice without finding it.)
 - A companion rule on **posing** non-exclusive options as alternatives lives in
   [`avoid-false-dichotomies`](avoid-false-dichotomies.md); read that for the asking side and
   this for the answering side.
+- `CLAUDE.md`'s "Generalize instructions to every AI agent by default" governs
+  a different axis than this fragment's own "the check the assignment's
+  author owes" bullet.
+  That section says an instruction unscoped by *agent* (Claude, Codex,
+  Gemini) carries to every agent absent an explicit restriction.
+  It says nothing about carrying an instruction across *surfaces* --- a rule
+  about Word document comments does not transfer to GitHub comments merely
+  because both are called "comments".
+  Assuming it does is exactly this fragment's unexamined-default failure,
+  applied to a prior instruction's scope rather than to a brief's premise.
+  See [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md),
+  "A Word-comment-length instruction generalized to GitHub comments".

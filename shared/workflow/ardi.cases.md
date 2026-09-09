@@ -619,6 +619,48 @@ The corrected body now shows the base, head and delta per group, states the
 `ast.parse` derivation, and keeps the wrong figures on the record rather than
 silently overwriting them, since the review thread refers to them.)
 
+## A verification transcript in the PR body outlived the config it demonstrated
+
+(UCD-SERG/serocalculator#685, 2026-09-09.
+An early round's PR body carried a "Verified by ..." block of real command
+output, showing a redirect resolving to `/latest-tag/...`.
+A later, adversarial round changed the shipped config to target `/v1.4.1/`
+instead.
+The transcript was never reversed and never wrong when written; the config
+it demonstrated changed underneath it.
+
+A second paragraph in the same body claimed
+`inst/extdata/example_noise_params.csv` and its `.rds` counterpart were
+"deliberately unchanged --- hand-maintained example fixtures with no OSF
+download behind them", and that "Two copies remain at `5e+06`" --- a value
+of the `y.high` column, an upper limit of detection, not a byte size.
+A later round found both files were actually a stale OSF export: the same
+four Pakistan rows as `example_noise_params_pk`, agreeing to 4.4e-15 on
+every column but `y.high`, and still carrying the row-index column
+`write.csv()` had left in them.
+It regenerated both, so all three copies now agree at `1000`.
+That paragraph was simply reversed by a later round and left standing ---
+an ordinary stale assertion.
+
+The two claims fail differently, which is what makes them one lesson rather
+than two.
+The fixtures claim is the case the existing "re-derive every count" habit
+would plausibly have caught, since a stated figure invites re-derivation.
+The transcript claim is the one with no existing remedy: it was accurate
+when captured, there is no count in it to re-derive, and the only check
+available is to re-run the exact command it shows.
+[`ardi`](ardi.md)'s new entry is for that case.
+
+Neither paragraph was revisited before the PR reached fully clean, carrying
+a measured, honest-looking transcript and a specific figure as evidence for
+a configuration and a file state the diff no longer contained.
+CI read the diff and not the body, and reviewers who had already read and
+passed each paragraph in an earlier round had no reason to reopen it, so
+nothing in the loop re-ran the command or re-read the figure once either
+was falsified.
+Caught only when the body was reread against the current diff before
+reporting the PR ready.)
+
 ## A round-one confirmation laundering a body the next round contradicts
 
 (`Morrison-Lab/ai-config#1522`, 2026-08-16, merged as `bc89ec93`.
@@ -963,3 +1005,71 @@ What makes it recur rather than merely happen is that each round's fix creates
 the next round's stale sentence, which is what
 [`ardi`](ardi.md)'s grep bullet now says explicitly: the grep is owed after
 every round's fix, not once when the PR's headline defect is closed.)
+
+## A PR body still claiming an addition the user had asked to withdraw
+
+(Measured 2026-09-09 on
+[`UCD-SERG/serocalculator#685`](https://github.com/UCD-SERG/serocalculator/pull/685).
+Worked example for [`ardi`](ardi.md)'s "A body sentence narrating what the diff
+does" entry.)
+
+The PR's `#679` section carried a paragraph headed "One judgment call worth
+flagging".
+Its two load-bearing sentences, transcribed from the body **as it stood before
+this session replaced it**, were:
+
+> I added a short note there recording what the engine does, worded so it
+> adjudicates nothing, and filed #683 asking whether the `P_a` scaling is
+> intended.
+> [...]
+> If you'd rather that note not appear in the rendered article until #683 is
+> settled, say so and I'll drop it.
+
+**That quotation is no longer checkable against the live PR, and the reason is
+this entry's own subject.**
+Fixing the stale body is what destroyed the evidence for the case record about
+stale bodies.
+GitHub keeps a body's edit history in its web UI but does not expose it through
+the REST API, so a later reader fetching the PR finds only the replacement.
+The source here is this session's own `pull_request_read` result, taken before
+the edit.
+
+The user answered the offer: "yes, I want to hold the methodology note".
+The note was removed, `vignettes/methodology.qmd` went back to being
+byte-identical with `main`, the `NEWS.md` bullet describing it was dropped, the
+text was parked on the issue that would decide its fate, the commit pushed, and
+the chat reply reported all of it.
+
+The body was not touched, and neither sentence had any remaining referent.
+The first asserted an addition the diff no longer made; the second posed, to
+the next reviewer, a decision the user had already made about fifty minutes
+before.
+That interval is measured from the user's instruction in chat, so unlike the
+1h37m below it, no public artifact records its start and a reader cannot
+re-derive it.
+
+Three things about the shape are worth keeping.
+
+**Nothing in the request named the body.**
+"Hold the note" describes a file, and the file was changed.
+The removal commit and the reply between them look like a complete discharge,
+which is why the body survives: the debt it carries is invisible from inside
+the task as stated.
+
+**The offer was the worse of the two.**
+A stale narrative sentence is a claim a reviewer can check against the diff in
+one glance.
+An answered offer cannot be checked against anything --- the answer lives in a
+chat the reviewer never saw --- so it reads as a live blocker on the PR.
+
+**It was caught by a rule written earlier in the same session.**
+[`ardi`](ardi.md)'s verification-transcript entry, merged 1h37m earlier in
+this same session on
+[ai-config#3375](https://github.com/Morrison-Lab/ai-config/pull/3375), covers
+pasted command output in a PR body.
+That entry did not fire here, because the stale artifact was neither a count
+nor a transcript, and the trigger was a user instruction rather than a review
+round.
+The check that did fire was the habit the entry instilled --- re-read the body
+before dispatching the review --- which is the argument for the entry
+generalizing rather than for it having already covered this.

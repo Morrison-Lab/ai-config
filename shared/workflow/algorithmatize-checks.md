@@ -1029,7 +1029,8 @@ Only the message assertion, plus a check that `novel-nesting` does not appear in
 This is a third route to "a case passing for the wrong reason", alongside the pre-existing-needle and earlier-rejection-stage routes above, and it needs the same remedy the `Do` line already states: designate, per mutation, the one assertion that must fail, and score the mutation on that assertion rather than on whether any assertion in the test changed.
 
 - **Do:** when a test carries more than one assertion on a single mutation, name the discriminating assertion before running the mutation, and score on that assertion alone.
-- **Don't:** read a test as having caught a mutation because the test as a whole failed; an exit code a different, unrelated failure path can also produce is not evidence about the removed clause.
+- **Don't:** read a test as having caught a mutation because the test as a whole failed;
+  an exit code a different, unrelated failure path can also produce is not evidence about the removed clause.
 
 (Measured 2026-09-09: a guard refusing an empty `--reference` document was pinned by an `rc == 1` assertion and a message assertion.
 Removing the guard left `rc == 1` true either way, and only the message assertion --- together with the absence of `novel-nesting` in the mutant's output --- discriminated the mutation.)

@@ -1252,11 +1252,13 @@ What caught it was `py_compile` raising at the point the file actually stopped p
 - **Do:** after any scripted edit, verify from the artifact rather than from the script's own report -- grep the file for the new text and confirm the old text is gone, run a parser or compiler over it (`py_compile`, an R `parse()` call, the language's own syntax check), and run the relevant tests, before trusting that the change landed.
 - **Do:** when a scripted edit replaces a delimited region (a docstring, a fenced block, a quoted string), verify the delimiters on both sides of the substitution are still balanced in context, not only that the substring search matched -- a replacement that opens a delimiter without closing it can leave the file syntactically parseable right up to the point it silently is not, with nothing at the edit site itself looking wrong.
 - **Don't:** trust a script's own `assert`, print, or exit status as evidence the target file changed -- an assert can pass against the string it was handed without that string ever having matched the live file, and an exit 0 says only that the script's own control flow completed.
-- **Don't:** read "the diff at the edit site looks fine" as sufficient for a delimiter-swap edit; the corruption in this shape is not local to the edited line, it is everything between the newly opened delimiter and wherever the file next happens to close one.
+- **Don't:** read "the diff at the edit site looks fine" as sufficient for a delimiter-swap edit;
+  the corruption in this shape is not local to the edited line, it is everything between the newly opened delimiter and wherever the file next happens to close one.
 
 (Measured 2026-09-09: three heredoc'd Python patch scripts applied during one manuscript-review session.
 Two reported success with the file unchanged on re-grep, cause unestablished.
-The third swallowed roughly 100 lines of an unrelated function into a docstring by leaving a replacement's opening triple-quote unclosed; `py_compile` and a targeted re-grep for the swallowed code were what caught it, not the script's own output.)
+The third swallowed roughly 100 lines of an unrelated function into a docstring by leaving a replacement's opening triple-quote unclosed;
+`py_compile` and a targeted re-grep for the swallowed code were what caught it, not the script's own output.)
 
 ## A tracked-change DISPLAY VIEW, standing in for the resolved document a finding means
 
@@ -1267,7 +1269,8 @@ This is about a rendering mode that SHOWS content that will not survive: Word's 
 
 Two review comments drafted for a manuscript told the author to repair a stray equation object and a doubled symbol.
 Both were visible only in that display mode.
-One sat inside a `<w:del>` the author had already used to remove it; the other was the old half of a `<w:ins>`/`<w:del>` pair from an edit that replaced one symbol with another.
+One sat inside a `<w:del>` the author had already used to remove it;
+the other was the old half of a `<w:ins>`/`<w:del>` pair from an edit that replaced one symbol with another.
 Extracting the resolved (accept-mode) text -- the same pandoc extraction the producer-side section already uses -- showed neither object survives: the equation and the doubled symbol are both absent once the tracked changes are resolved, and the finding was wrong.
 
 The general shape: a display mode that shows pending edits inline is a genuine, CURRENT artifact of the file.
@@ -1277,9 +1280,11 @@ A reader who has not resolved the tracked changes is reading the union of two do
 
 - **Do:** before reporting a finding about a redlined document, extract or view the RESOLVED (accept-mode) text and confirm the finding still holds there, not only in a display mode that shows pending changes inline.
 - **Do:** when a finding is genuinely about the pre-edit or in-progress state -- a comment on the edit itself, not on its outcome -- say so explicitly ("in All Markup view", "before this deletion is accepted"), so the two states are never conflated silently.
-- **Don't:** treat what an "All Markup" screen shows as the document a reader will eventually see; it is the union of two states, and "the document" defaults to the one a reader gets once changes are resolved.
+- **Don't:** treat what an "All Markup" screen shows as the document a reader will eventually see;
+  it is the union of two states, and "the document" defaults to the one a reader gets once changes are resolved.
 - **Don't:** assume a stray-looking object or a doubled symbol found this way is a defect without first checking whether it is the visible half of a change the author already made.
 
 (Measured 2026-09-09: two draft review comments for a manuscript resubmission named a stray equation object and a doubled symbol, both visible only in Word's "All Markup" display.
 Extracting accept-mode and reject-mode text separately showed both were already-deleted tracked changes, and the accept-mode text was clean.
-`memories/office-open-xml.md`'s "Two pandoc diffs verify a redlined docx" section gives the identical two extractions for a self-check on an edit; this is the same mechanism applied to a finding about someone else's edit instead.)
+`memories/office-open-xml.md`'s "Two pandoc diffs verify a redlined docx" section gives the identical two extractions for a self-check on an edit;
+this is the same mechanism applied to a finding about someone else's edit instead.)

@@ -39,14 +39,31 @@ CLAIM = re.compile(
     r"defaults: (\S+) hwthreads / (\S+) / (\S+), off GPU node (\S+)\)"
 )
 
+# Every walltime spelling salloc accepts. Checked before compaction, so a
+# script value SLURM would reject -- the README's own "7d" shorthand, most
+# plausibly -- is refused here rather than compacting to itself and
+# comparing equal against the README that taught it.
+SLURM_TIME = re.compile(
+    r"""\d+                    # minutes
+      | \d+:\d\d               # minutes:seconds
+      | \d+:\d\d:\d\d          # hours:minutes:seconds
+      | \d+-\d\d?              # days-hours
+      | \d+-\d\d?:\d\d         # days-hours:minutes
+      | \d+-\d\d?:\d\d:\d\d    # days-hours:minutes:seconds
+    """,
+    re.X,
+)
+
 
 def compact_time(slurm_time: str) -> str:
     """Render a SLURM walltime the way the README states it (48h, 7d).
 
     Both SLURM forms the default has used are handled: HH:MM:SS, and the
-    D-HH:MM:SS form the 7-day default introduced. A value that is neither
-    is returned unchanged, so the comparison fails loudly on a shape this
-    does not know rather than silently matching nothing.
+    D-HH:MM:SS form the 7-day default introduced. Any other accepted SLURM
+    spelling is returned unchanged, so the README must then state it
+    verbatim; `parse_script` has already refused anything SLURM would not
+    accept at all, which is what stops an unknown value compacting to
+    itself and matching a README that copied it.
     """
     m = re.fullmatch(r"(\d+)-(\d\d):(\d\d):(\d\d)", slurm_time)
     if m and m.group(2) == "00" and m.group(3) == "00" and m.group(4) == "00":
@@ -69,6 +86,12 @@ def parse_script(text: str) -> dict[str, str]:
                   file=sys.stderr)
             sys.exit(2)
         values[name] = m.group(1)
+    if not re.fullmatch(SLURM_TIME, values["time"]):
+        print(f"parse failure: the script's walltime {values['time']!r} is"
+              " not a spelling salloc accepts -- fix the script rather than"
+              " teaching this check to compare an invalid value",
+              file=sys.stderr)
+        sys.exit(2)
     return values
 
 

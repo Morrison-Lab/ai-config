@@ -626,17 +626,38 @@ An early round's PR body carried a "Verified by ..." block of real command
 output, showing a redirect resolving to `/latest-tag/...`.
 A later, adversarial round changed the shipped config to target `/v1.4.1/`
 instead.
-A second paragraph in the same body, claiming two `inst/extdata` fixture
-files were "deliberately unchanged --- hand-maintained fixtures" and stayed
-at a stated byte size, was likewise reversed by a still-later round that
-edited those files.
-Neither paragraph was revisited: the PR reached fully clean carrying a
-measured, honest-looking transcript and a specific figure as evidence for a
-configuration and a file state the diff no longer contained.
+The transcript was never reversed and never wrong when written; the config
+it demonstrated changed underneath it.
+
+A second paragraph in the same body claimed
+`inst/extdata/example_noise_params.csv` and its `.rds` counterpart were
+"deliberately unchanged --- hand-maintained example fixtures with no OSF
+download behind them", and that "Two copies remain at `5e+06`" --- a value
+of the `y.high` column, an upper limit of detection, not a byte size.
+A later round found both files were actually a stale OSF export: the same
+four Pakistan rows as `example_noise_params_pk`, agreeing to 4.4e-15 on
+every column but `y.high`, and still carrying the row-index column
+`write.csv()` had left in them.
+It regenerated both, so all three copies now agree at `1000`.
+That paragraph was simply reversed by a later round and left standing ---
+an ordinary stale assertion.
+
+The two claims fail differently, which is what makes them one lesson rather
+than two.
+The fixtures claim is the case the existing "re-derive every count" habit
+would plausibly have caught, since a stated figure invites re-derivation.
+The transcript claim is the one with no existing remedy: it was accurate
+when captured, there is no count in it to re-derive, and the only check
+available is to re-run the exact command it shows.
+[`ardi`](ardi.md)'s new entry is for that case.
+
+Neither paragraph was revisited before the PR reached fully clean, carrying
+a measured, honest-looking transcript and a specific figure as evidence for
+a configuration and a file state the diff no longer contained.
 CI read the diff and not the body, and reviewers who had already read and
-passed that paragraph in an earlier round had no reason to reopen it, so
-nothing in the loop re-ran the command or re-read the claim once it was
-falsified.
+passed each paragraph in an earlier round had no reason to reopen it, so
+nothing in the loop re-ran the command or re-read the figure once either
+was falsified.
 Caught only when the body was reread against the current diff before
 reporting the PR ready.)
 

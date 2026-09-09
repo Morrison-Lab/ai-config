@@ -5250,31 +5250,17 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     # return its "structured blocking verdict" string, and the NOTE block was
     # gated on that pattern being empty (review finding, PR #3359).
     not_clean_payload_body = (
-        "**Claude finished review**
-
-"
-        "### Verdict
-**Needs more work**
-
-"
-        "<!-- review-data:
-"
-        "{
-"
-        '  "schema_version": "1.1",
-'
-        '  "reviewer": "claude",
-'
-        '  "commit_sha": "0123456789abcdef0123456789abcdef01234567",
-'
-        '  "verdict": "NOT_CLEAN",
-'
-        '  "findings": [{"severity": "blocker", "title": "x"}]
-'
-        "}
-"
-        "-->
-"
+        "**Claude finished review**\n\n"
+        "### Verdict\n**Needs more work**\n\n"
+        "<!-- review-data:\n"
+        "{\n"
+        '  "schema_version": "1.1",\n'
+        '  "reviewer": "claude",\n'
+        '  "commit_sha": "0123456789abcdef0123456789abcdef01234567",\n'
+        '  "verdict": "NOT_CLEAN",\n'
+        '  "findings": [{"severity": "blocker", "title": "x"}]\n'
+        "}\n"
+        "-->\n"
     )
     not_clean_items = [
         ("comment", "2026-09-09T00:00:00Z", not_clean_payload_body, "", "COMMENT", "claude[bot]"),

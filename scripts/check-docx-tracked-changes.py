@@ -50,6 +50,20 @@ that a content diff cannot see:
     known-good reference `.docx` -- the general form, since the Word-authored
     original is ground truth for which shapes are legal, independent of any
     hard-coded rule above.
+  * an OOXML math (OMML) structure -- m:sSup, m:f, m:nary, and the like --
+    orphaned into an empty placeholder box.  Word renders every slot of such
+    a structure (a superscript's base and exponent, a fraction's numerator
+    and denominator, ...) whether or not it has content, and each carries an
+    m:<tag>Pr/m:ctrlPr child holding the structure's OWN revision mark.  If
+    an edit deletes every run inside the structure without also marking
+    that ctrlPr `w:del`, the structure survives acceptance as an empty box;
+    the mirror case (an inserted structure whose ctrlPr isn't marked
+    `w:ins`) leaves an empty box on rejection.  A pandoc/text accept-reject
+    diff can't see this -- an empty box carries no text -- and it is
+    unrelated to the structural-validity checks above: the markup here is
+    perfectly well-formed, it just renders wrong.  A structure carrying no
+    `m:t` at all is a blank placeholder already present in the source,
+    reported for information rather than as a finding.
 
 Every run reports how many parts and elements it actually examined, so a
 run that finds nothing is distinguishable from a run that examined nothing.
@@ -64,6 +78,7 @@ import zipfile
 from pathlib import Path
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+M = "{http://schemas.openxmlformats.org/officeDocument/2006/math}"
 MC_IGNORABLE = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Ignorable"
 
 # Elements that carry a w:id and are part of the tracked-change / revision
@@ -100,6 +115,22 @@ REVISION_TAGS = frozenset(
 )
 
 XML_PART_SUFFIXES = (".xml", ".rels")
+
+# OOXML math (OMML) structures Word renders slot-by-slot (m:sSup's base and
+# exponent, m:f's numerator and denominator, ...) whether or not a given
+# slot has content. Each carries an m:<tag>Pr child holding the m:ctrlPr
+# that must carry the structure's OWN revision mark for a structure whose
+# text is entirely deleted/inserted to disappear along with it rather than
+# surviving as an empty placeholder box -- see check_orphaned_math() below.
+MATH_STRUCT_TAGS = (
+    "sSup", "sSub", "sSubSup", "sPre", "d", "f", "nary", "func", "rad",
+    "limLow", "limUpp", "groupChr", "bar", "acc", "eqArr", "box",
+    "borderBox", "phant", "m",
+)
+
+# The mark that removes a run's text under each direction: accepting
+# changes drops text under w:del, rejecting drops text under w:ins.
+MATH_GONE_MARK = {"accept": W + "del", "reject": W + "ins"}
 
 
 def local(tag: str) -> str:
@@ -159,13 +190,15 @@ def parent_map_of(root: ET.Element) -> dict:
     return {child: parent for parent in root.iter() for child in parent}
 
 
-def nesting_triples(root: ET.Element) -> set:
+def nesting_triples(root: ET.Element, parents: dict) -> set:
     """(grandparent, parent, child) tags for every non-root element.
 
     The tags are fully qualified; see qualified() for why the namespace is
-    load-bearing here rather than noise.
+    load-bearing here rather than noise. `parents` is the whole part's own
+    parent map, built once by the caller and shared across every check that
+    needs one -- see check_document()'s "one parent-map build per part"
+    comment.
     """
-    parents = parent_map_of(root)
     triples = set()
     for elem in root.iter():
         parent = parents.get(elem)
@@ -177,9 +210,8 @@ def nesting_triples(root: ET.Element) -> set:
     return triples
 
 
-def check_marker_in_rpr(root: ET.Element, part: str, findings: list) -> int:
+def check_marker_in_rpr(root: ET.Element, part: str, findings: list, parents: dict) -> int:
     """Flag w:ins/w:del as a child of w:rPr, except the CT_ParaRPr (w:pPr) case."""
-    parents = parent_map_of(root)
     examined = 0
     for rpr in root.iter(W + "rPr"):
         examined += 1
@@ -248,12 +280,11 @@ def check_dual_rpr(root: ET.Element, part: str, findings: list) -> int:
     return examined
 
 
-def check_orphan_deltext(root: ET.Element, part: str, findings: list) -> int:
+def check_orphan_deltext(root: ET.Element, part: str, findings: list, parents: dict) -> int:
     """Flag a w:delText with no w:del ancestor -- text marked deleted that
     nothing actually gates, the classic-markup mirror of check_marker_in_rpr
     for OMML: there the marker sat beside the text instead of wrapping it,
     here the text sits outside the wrapper that should contain it."""
-    parents = parent_map_of(root)
     examined = 0
     for elem in root.iter(W + "delText"):
         examined += 1
@@ -323,16 +354,107 @@ def check_ignorable_prefixes(data: bytes, part: str, findings: list) -> int:
     return examined
 
 
+def text_survives(t: ET.Element, mode: str, parents: dict) -> bool:
+    """True if `t` (an m:t) is not gated out by an ancestor w:ins/w:del
+    under the given accept/reject direction. Walks the WHOLE ancestor
+    chain, not just the enclosing math structure -- an m:t inside a
+    paragraph that is itself wholly w:del'd from an outer edit is exactly
+    as gone as one directly wrapped, and both must read as gone here."""
+    gone_tag = MATH_GONE_MARK[mode]
+    node = parents.get(t)
+    while node is not None:
+        if node.tag == gone_tag:
+            return False
+        node = parents.get(node)
+    return True
+
+
+def ctrl_marks_of(struct_elem: ET.Element) -> set:
+    """Revision marks on a math structure's OWN m:ctrlPr, read from its own
+    m:<tag>Pr child -- never a descendant's, since a nested structure's mark
+    must not excuse its parent."""
+    pr = struct_elem.find(M + local(struct_elem.tag) + "Pr")
+    if pr is None:
+        return set()
+    ctrl = pr.find(M + "ctrlPr")
+    if ctrl is None:
+        return set()
+    return {c.tag for c in ctrl.iter() if c.tag in (W + "ins", W + "del")}
+
+
+def check_orphaned_math(
+    root: ET.Element, part: str, findings: list, notes: list, parents: dict
+) -> tuple:
+    """Flag a math structure that renders as an empty placeholder box.
+
+    A structure is ORPHANED, under a given accept/reject direction, when it
+    contains at least one m:t, none of those m:t survive that direction,
+    and its own m:ctrlPr carries no matching w:ins/w:del -- that is the
+    defect, introduced by an edit that deleted/inserted the structure's
+    runs without also marking the structure itself.
+
+    A structure carrying no m:t at all is BLANK: an empty placeholder
+    already present in the source, appended to `notes` for information and
+    never treated as a finding -- conflating the two would flag every
+    intentionally-empty placeholder a document already has.
+
+    Checks both directions in one pass; returns (zones_examined,
+    structs_examined).
+    """
+    zones = structs = 0
+    for p in root.iter(W + "p"):
+        ctx = "".join(t.text or "" for t in p.iter(W + "t"))[:60]
+        for om in p.iter(M + "oMath"):
+            zones += 1
+            for tag in MATH_STRUCT_TAGS:
+                for s in om.iter(M + tag):
+                    structs += 1
+                    ts = list(s.iter(M + "t"))
+                    if not ts:
+                        notes.append(
+                            f"[blank-math] {part}: <m:{tag}> has no text "
+                            "runs -- a placeholder already present in the "
+                            f"source, not a defect (near {ctx!r})"
+                        )
+                        continue
+                    marks = ctrl_marks_of(s)
+                    for mode in ("accept", "reject"):
+                        survives = any(
+                            (t.text or "").strip()
+                            for t in ts
+                            if text_survives(t, mode, parents)
+                        )
+                        if survives or MATH_GONE_MARK[mode] in marks:
+                            continue
+                        findings.append(
+                            Finding(
+                                "orphaned-math",
+                                part,
+                                f"<m:{tag}> loses all its text under "
+                                f"{mode} (every m:t sits inside "
+                                f"{qualified(MATH_GONE_MARK[mode])}) but "
+                                "its own m:ctrlPr is not marked "
+                                f"{qualified(MATH_GONE_MARK[mode])}, so "
+                                "Word renders an empty placeholder box "
+                                f"under {mode} (near {ctx!r})",
+                            )
+                        )
+    return zones, structs
+
+
 def check_document(path: Path) -> tuple:
     """Run every intra-document check on one .docx. Returns (findings,
-    stats-dict, reference_triples_for_this_doc)."""
+    stats-dict, reference_triples_for_this_doc, notes)."""
     findings: list = []
+    notes: list = []
     parts_examined = 0
     parts_malformed = 0
     elements_examined = 0
     ids_examined = 0
     deltext_examined = 0
     ignorable_examined = 0
+    math_zones_examined = 0
+    math_structs_examined = 0
     id_seen: dict = {}
     all_triples: set = set()
 
@@ -346,12 +468,21 @@ def check_document(path: Path) -> tuple:
             continue
 
         elements_examined += sum(1 for _ in root.iter())
-        check_marker_in_rpr(root, name, findings)
+        # One parent-map build per part, shared by every check below that
+        # needs to walk upward -- check_marker_in_rpr, check_orphan_deltext,
+        # nesting_triples, and check_orphaned_math each used to build their
+        # own (four full-tree walks per part); a review finding on #3423
+        # caught the duplication.
+        parents = parent_map_of(root)
+        check_marker_in_rpr(root, name, findings, parents)
         ids_examined += check_duplicate_ids(root, name, id_seen, findings)
         check_dual_rpr(root, name, findings)
-        deltext_examined += check_orphan_deltext(root, name, findings)
+        deltext_examined += check_orphan_deltext(root, name, findings, parents)
         ignorable_examined += check_ignorable_prefixes(data, name, findings)
-        all_triples |= nesting_triples(root)
+        all_triples |= nesting_triples(root, parents)
+        zones, structs = check_orphaned_math(root, name, findings, notes, parents)
+        math_zones_examined += zones
+        math_structs_examined += structs
 
     stats = {
         "parts_examined": parts_examined,
@@ -361,8 +492,10 @@ def check_document(path: Path) -> tuple:
         "deltext_examined": deltext_examined,
         "ignorable_examined": ignorable_examined,
         "triples_examined": len(all_triples),
+        "math_zones_examined": math_zones_examined,
+        "math_structs_examined": math_structs_examined,
     }
-    return findings, stats, all_triples
+    return findings, stats, all_triples, notes
 
 
 def check_against_reference(
@@ -384,7 +517,7 @@ def check_against_reference(
     return len(edited_triples)
 
 
-def report(path: Path, findings: list, stats: dict) -> None:
+def report(path: Path, findings: list, stats: dict, notes: list) -> None:
     print(f"== {path} ==")
     print(
         f"  examined {stats['parts_examined']} part(s) "
@@ -393,8 +526,12 @@ def report(path: Path, findings: list, stats: dict) -> None:
         f"{stats['ids_examined']} revision id(s), "
         f"{stats['deltext_examined']} w:delText element(s), "
         f"{stats['ignorable_examined']} mc:Ignorable declaration(s), "
-        f"{stats['triples_examined']} nesting triple(s)"
+        f"{stats['triples_examined']} nesting triple(s), "
+        f"{stats['math_zones_examined']} math zone(s), "
+        f"{stats['math_structs_examined']} math structure(s)"
     )
+    for n in notes:
+        print(f"  {n}")
     if not findings:
         print("  no findings")
         return
@@ -417,7 +554,7 @@ def main(argv: list) -> int:
     reference_examined = 0
     if args.reference is not None:
         try:
-            ref_findings, ref_stats, reference_triples = check_document(
+            ref_findings, ref_stats, reference_triples, _ref_notes = check_document(
                 args.reference
             )
         except (zipfile.BadZipFile, OSError) as exc:
@@ -447,7 +584,7 @@ def main(argv: list) -> int:
     any_findings = False
     for docx_path in args.docx:
         try:
-            findings, stats, triples = check_document(docx_path)
+            findings, stats, triples, notes = check_document(docx_path)
         except (zipfile.BadZipFile, OSError) as exc:
             print(f"== {docx_path} ==")
             print(f"  ERROR: could not open as a zip package: {exc}")
@@ -470,7 +607,7 @@ def main(argv: list) -> int:
                     "nothing was checked",
                 )
             )
-        report(docx_path, findings, stats)
+        report(docx_path, findings, stats, notes)
         if findings:
             any_findings = True
         print()

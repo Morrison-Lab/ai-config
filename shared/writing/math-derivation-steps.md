@@ -450,6 +450,7 @@ The decision is the same question on every authoring surface this corpus touches
 - **Quarto/LaTeX**: `$...$` for inline, `$$...$$` or an `equation`/`align` environment for display --- and in Quarto specifically, display is also what makes an equation crossreferenceable at all (`{#eq-...}`), so choosing inline for an equation the prose later needs to cite forecloses that citation before it is written.
 - **Word/OOXML**: `<m:oMath>` in a normal run for inline, `<m:oMathPara>` wrapping the `<m:oMath>` for display.
   The two are structurally distinct elements rather than a style applied to one element, so converting between them means moving the equation into (or out of) the paragraph-level wrapper, not toggling an attribute.
+  `m:oMathPara` does not claim its own line by itself: two separate `w:br` elements do that work, one immediately before it and one as the last child inside `m:oMath`, and either can be missing on its own --- see [`memories/office-open-xml.md`](../../memories/office-open-xml.md)'s "`m:oMathPara` does not claim its own line" section for the exact shape and why that gap looks like a display/inline mistake without being one.
 
 ### Do and don't: display versus inline
 
@@ -463,12 +464,16 @@ The decision is the same question on every authoring surface this corpus touches
 
 ### In review: display versus inline
 
-Flag an equation whose display/inline form reads as inherited rather than decided: a display equation running directly into the sentence that introduces it, with no separating punctuation or paragraph break, is display markup wrapped around what reads as an inline clause.
+A display equation running directly into the sentence that introduces it, with no separating punctuation or paragraph break, is a symptom rather than a diagnosis, and it is ambiguous between two causes with opposite remedies.
+Either the display/inline choice was wrong and the equation should be inline, or the choice was right and the display mechanics are incomplete --- in Quarto/LaTeX a missing blank line around `$$...$$`, in Word/OOXML a missing `w:br` (see the Word/OOXML bullet above).
+**Check the underlying markup before changing anything.**
+Converting a correctly-display equation to inline because it looks glued to its introducing sentence removes the display form the argument actually needed, and does not fix the missing break that caused the symptom.
+
 Flag the inverse too --- an equation the prose cites again later, written inline with no way to reference it.
 And flag a pair of compared equations set at different scales, since that finding is invisible on the diff of either equation alone;
 it shows only once both are read together.
 
 (Directive from the user, 2026-09-09: "let's make a cai policy: every time you write or edit an equation, ask yourself if it should be a display equation or inline".
-A Word manuscript supplement authored three new equations in one section that session, each copied as display markup from a neighbouring equation, and each rendering ran directly into the sentence introducing it.
-A checker written afterward --- per file, counting display equations examined and how many were missing a line break on either side --- measured 14 examined and 0 defective on the untouched original documents (a clean negative control), 18 examined and 7 defective on the working build, and 18 examined and 0 defective after repair.
+A Word manuscript supplement authored three new equations in one section that session, each correctly authored as display, and each rendering ran directly into the sentence introducing it because the equation's `m:oMathPara` was missing one or both of the surrounding `w:br` breaks described above --- the display/inline choice itself was right throughout.
+A checker written afterward --- per file, counting display equations examined and how many were missing a line break on either side --- measured 14 examined and 0 defective on the untouched original documents (a clean negative control), 18 examined and 7 defective on the working build, and 18 examined and 0 defective after repair, with the repair keeping all three equations display and adding the missing breaks.
 Two of the seven sat in a different section from the three the author knew about, and neither the author nor the user had noticed them: the defect carries no text of its own, so a build check that only compares accepted versus rejected text was blind to it by construction.)

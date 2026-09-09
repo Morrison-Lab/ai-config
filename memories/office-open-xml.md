@@ -523,3 +523,35 @@ The repair was to rebuild the affected root using a Word-authored sibling part's
 
 (Measured 2026-09-09, same manuscript and session as the OMML entry above.
 `scripts/check-docx-tracked-changes.py` in this repo implements the check this incident argues for.)
+
+## `m:oMathPara` does not claim its own line; the surrounding `w:br` elements do
+
+`m:oMathPara` marks an equation as display math, but that markup alone does not put it on its own line.
+Two ordinary line breaks, each its own run, do that work:
+
+```xml
+<w:r><w:br/></w:r>
+<m:oMathPara>
+  <m:oMath>
+    ...
+    <m:r><w:br/></m:r>
+  </m:oMath>
+</m:oMathPara>
+```
+
+A `<w:r><w:br/></w:r>` immediately **before** the `m:oMathPara` breaks the introducing prose onto its own line.
+A closing `<m:r><w:br/></m:r>` as the **last child of `m:oMath`** breaks the equation off from whatever prose follows it.
+The two breaks are independent: either can be present while the other is missing, and each omission produces a different symptom (the prose runs into the equation, or the equation runs into what follows) with the same underlying markup otherwise unchanged.
+
+Neither omission has anything to do with whether `m:oMathPara` was the right choice.
+The equation is still correctly display either way, so "this equation runs into its neighbouring prose" does not by itself say whether the fix is converting to inline or adding the missing break --- reading the two break positions is what decides it.
+
+- **Do:** check both `w:br` positions --- immediately before the `m:oMathPara`, and as the last child of `m:oMath` --- before concluding a running-together equation has the wrong display/inline form.
+- **Do:** treat the two breaks as independently omittable, so confirming one is present says nothing about the other.
+- **Don't:** convert a correctly-display equation to inline as the fix for prose running into it;
+  that discards a correct choice without repairing the missing break, and the equation will still run into whatever follows it if the closing break is also missing.
+
+(Measured 2026-09-09, same manuscript and session as the OMML entries above.
+Three new equations, each correctly authored as display, were missing one or both of these breaks;
+two further equations elsewhere in the same document had the identical gap, unnoticed until a per-file checker counted display equations against their break requirements.
+See [`shared/writing/math-derivation-steps.md`](../shared/writing/math-derivation-steps.md)'s "Choose display or inline, deliberately" section for the display-versus-inline decision this defect is easy to mistake for.)

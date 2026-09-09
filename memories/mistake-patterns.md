@@ -880,7 +880,7 @@ A clean automated review from every available provider evaluating the current HE
   triggered them --- once several have accumulated in a session, the
   classifier can start denying a plainly innocuous, unrelated command too
   (e.g. `gh run list -R ... --json ...`), which is a widened blast radius
-  the earlier occurrences below did not record.
+  the earlier occurrences in [`mistake-patterns.cases.md`](mistake-patterns.cases.md) did not record.
 - **Example**: 2026-09-01, `Lacaedemon/sparta` [PR #1459](https://github.com/Lacaedemon/sparta/pull/1459) (GIA sweep), tracked as [ai-config#2899](https://github.com/Morrison-Lab/ai-config/issues/2899);
   previously `ucdavis/bcs` 2026-08-28 ([ai-config#2544](https://github.com/Morrison-Lab/ai-config/issues/2544), closed by [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820)).
   In an auto-permission-mode plugin-consumer session where no `adversarial-reviewer` agent is registered (`Agent type not found`),

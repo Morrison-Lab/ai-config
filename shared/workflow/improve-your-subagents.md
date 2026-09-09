@@ -6,20 +6,29 @@ The agent was not the weak link; the briefing was.
 
 ## A completion report is not evidence that every item of a multi-part brief was done
 
-Improving a subagent over time still assumes its report tells you what happened. It does not, for the specific and easy-to-miss case of a brief with more than one deliverable in it.
+Improving a subagent over time still assumes its report tells you what happened.
+It does not, for the specific and easy-to-miss case of a brief with more than one deliverable in it.
 
-[`issue-first`](issue-first.md)'s deferral section already names this failure for your own replies to the user: doing two of three requested things and describing only the two is a silent partial delivery, indistinguishable from having done all three unless the reader rereads their own original request. The same shape arrives from a dispatched agent, and there the orchestrator is the one who must notice it, because the agent that stopped short has no reason to flag what it never attempted.
+[`issue-first`](issue-first.md)'s deferral section already names this failure for your own replies to the user: doing two of three requested things and describing only the two is a silent partial delivery, indistinguishable from having done all three unless the reader rereads their own original request.
+The same shape arrives from a dispatched agent, and there the orchestrator is the one who must notice it, because the agent that stopped short has no reason to flag what it never attempted.
 
-[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "A subagent's report arrives in the same position" section governs a related but different failure: a factual *claim* inside the report that turns out wrong when re-derived. This is about an item the brief asked for that the report never mentions at all --- there is no claim to fact-check, because the report simply does not address it, and a report that is silent about an item reads exactly like one where that item went smoothly.
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "A subagent's report arrives in the same position" section governs a related but different failure: a factual *claim* inside the report that turns out wrong when re-derived.
+This is about an item the brief asked for that the report never mentions at all --- there is no claim to fact-check, because the report simply does not address it, and a report that is silent about an item reads exactly like one where that item went smoothly.
 
-A three-part dispatch --- fix the code, fix the tests, correct a filed issue's body to match the fix --- came back describing the first two in detail and never mentioning the third. Nothing in the report's tone or completeness signaled an omission; it read as a normal, finished piece of work. `updated_at == created_at` on the issue, checked directly, settled it in one query: the issue had never been touched.
+A three-part dispatch --- fix the code, fix the tests, correct a filed issue's body to match the fix --- came back describing the first two in detail and never mentioning the third.
+Nothing in the report's tone or completeness signaled an omission;
+it read as a normal, finished piece of work.
+`updated_at == created_at` on the issue, checked directly, settled it in one query: the issue had never been touched.
 
 - **Do:** before accepting a subagent's completion report, list the distinct items the brief asked for and name, for each one, the query that would show it done --- a diff touching the right file, a timestamp that moved, a comment posted.
 - **Do:** run that query for every item, not only the ones the report discusses at length.
 - **Don't:** read a report's silence about an item as evidence that item needed no separate mention because it went fine.
-- **Don't:** treat a report that is detailed and correct about two of three items as evidence about the third; detail on the covered items says nothing about the uncovered one.
+- **Don't:** treat a report that is detailed and correct about two of three items as evidence about the third;
+  detail on the covered items says nothing about the uncovered one.
 
-(Measured 2026-09-09: a dispatched agent given a three-part instruction reported back on the first two parts only. The third --- correcting a filed issue's body --- was never done and never mentioned as skipped or deferred. `updated_at == created_at` on the issue via a single API read confirmed it had not been touched since filing.)
+(Measured 2026-09-09: a dispatched agent given a three-part instruction reported back on the first two parts only.
+The third --- correcting a filed issue's body --- was never done and never mentioned as skipped or deferred.
+`updated_at == created_at` on the issue via a single API read confirmed it had not been touched since filing.)
 
 ## What to change, in order of payoff
 

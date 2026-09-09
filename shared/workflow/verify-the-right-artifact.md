@@ -812,51 +812,26 @@ case, which is why all three were off by the same amount.
 Note the detector here was a second party re-running the measurement, not a
 check: nothing in CI could have caught it.)
 
-**Reading the right line does not settle what the line's number counts, and a
-wrong reading there survives every faithful copy that follows.**
+**Reading the right line does not settle what the line's number counts, and a wrong reading there survives every faithful copy that follows.**
 
-The section above corrects a *derivation* error: grepping the wrong line
-instead of the summary. This corrects an error in the summary line itself ---
-correctly read, correctly quoted, and still wrong, because its wording names
-one population while its number counts another.
+The section above corrects a *derivation* error: grepping the wrong line instead of the summary.
+This corrects an error in the summary line itself --- correctly read, correctly quoted, and still wrong, because its wording names one population while its number counts another.
 
-A checker reporting "N display equation(s) missing a line break" is
-ambiguous between two claims: N *equations* are affected, or N *findings*
-occurred (an equation can be missing a break on either side, so one equation
-can produce two findings). The tool's own sentence grammatically asserts the
-first while its counter tracks the second, and nothing about reading that
-line "correctly" resolves which one a downstream reader inherits. Everyone
-who then repeats the number is being faithful to the source, which is
-exactly why the error survives: a copy cannot be more careful than the thing
-it copies, and each faithful copy looks like independent confirmation
-without being one.
+A checker reporting "N display equation(s) missing a line break" is ambiguous between two claims: N *equations* are affected, or N *findings* occurred (an equation can be missing a break on either side, so one equation can produce two findings).
+The tool's own sentence grammatically asserts the first while its counter tracks the second, and nothing about reading that line "correctly" resolves which one a downstream reader inherits.
+Everyone who then repeats the number is being faithful to the source, which is exactly why the error survives: a copy cannot be more careful than the thing it copies, and each faithful copy looks like independent confirmation without being one.
 
-- **Do:** before repeating a checker's summary count, read the noun in its
-  own sentence and ask whether the counter beside it tracks that noun or a
-  different one (a finding versus the distinct items it can occur on).
-- **Do:** fix the wording at the tool once an ambiguity like this is found,
-  not only the prose that repeated it --- the next reader inherits the tool's
-  sentence, not your correction of it.
-- **Don't:** treat "I read the suite's own summary line, not a grep-derived
-  count" as sufficient; that rules out one substitution and not the one
-  where the line itself names the wrong population.
-- **Don't:** read several faithful copies of one number as corroboration ---
-  they share a single source and inherit its error together.
+- **Do:** before repeating a checker's summary count, read the noun in its own sentence and ask whether the counter beside it tracks that noun or a different one (a finding versus the distinct items it can occur on).
+- **Do:** fix the wording at the tool once an ambiguity like this is found, not only the prose that repeated it --- the next reader inherits the tool's sentence, not your correction of it.
+- **Don't:** treat "I read the suite's own summary line, not a grep-derived count" as sufficient;
+  that rules out one substitution and not the one where the line itself names the wrong population.
+- **Don't:** read several faithful copies of one number as corroboration --- they share a single source and inherit its error together.
 
-(Measured 2026-09-09 on
-[Morrison-Lab/ai-config#3426](https://github.com/Morrison-Lab/ai-config/pull/3426):
-a per-file checker counting missing line breaks around display equations
-printed a summary of the shape "N display equation(s) missing a line
-break" where N counted findings (an equation missing breaks on both sides
-counts twice). The true equation count was smaller. The findings-count,
-under the equation-shaped sentence, was copied verbatim into a status
-report, a subagent brief, a filed issue, the corpus fragment recording the
-incident, a companion memory file, and the PR body describing all of it ---
-six artifacts, each a faithful transcription of the one before it, all
-wrong in the same direction. A review round caught it at the sixth. The
-fix reached the tool itself, which now prints both counts under distinct
-labels, rather than only correcting the prose that had repeated the
-conflated one.)
+(Measured 2026-09-09 on [Morrison-Lab/ai-config#3426](https://github.com/Morrison-Lab/ai-config/pull/3426): a per-file checker counting missing line breaks around display equations printed a summary of the shape "N display equation(s) missing a line break" where N counted findings (an equation missing breaks on both sides counts twice).
+The true equation count was smaller.
+The findings-count, under the equation-shaped sentence, was copied verbatim into a status report, a subagent brief, a filed issue, the corpus fragment recording the incident, a companion memory file, and the PR body describing all of it --- six artifacts, each a faithful transcription of the one before it, all wrong in the same direction.
+A review round caught it at the sixth.
+The fix reached the tool itself, which now prints both counts under distinct labels, rather than only correcting the prose that had repeated the conflated one.)
 
 **An eighth: what a change TRANSFORMS, standing in for what it CONCLUDES.**
 

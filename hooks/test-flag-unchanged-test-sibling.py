@@ -41,10 +41,14 @@ def git(repo: Path, *args: str) -> None:
                    capture_output=True, text=True)
 
 
-def make_repo(tmp: Path, files: dict[str, str], stage: list[str]) -> Path:
+def make_repo(tmp: Path, files: dict[str, str], stage: list[str],
+              untracked: dict[str, str] | None = None) -> Path:
+    """A repo whose `files` are committed then re-dirtied, with `stage`
+    staged. `untracked` files are written and never added, which is the
+    brand-new-test case: `git ls-files` alone cannot see them."""
     repo = tmp / f"r{len(list(tmp.iterdir()))}"
     repo.mkdir()
-    git(repo, "init", "-q")
+    git(repo, "init", "-q", "-b", "main")
     git(repo, "config", "user.email", "t@example.com")
     git(repo, "config", "user.name", "t")
     for path, body in files.items():
@@ -59,6 +63,10 @@ def make_repo(tmp: Path, files: dict[str, str], stage: list[str]) -> Path:
     git(repo, "reset", "-q")
     for path in stage:
         git(repo, "add", path)
+    for path, body in (untracked or {}).items():
+        f = repo / path
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(body, encoding="utf-8")
     return repo
 
 
@@ -121,6 +129,24 @@ def main() -> None:
         repo = make_repo(tmp, nested, ["scripts/test_a.py"])
         check("staged test file is not itself treated as a subject",
               not fired(run(repo)), json.dumps(run(repo)))
+
+        # 4c. The commonest real "forgot the test" shape: the test is
+        # brand new and never `git add`-ed. `git ls-files` lists only
+        # tracked paths, so a tracked-only listing is blind to exactly the
+        # case this guard is most for (caught in review on #3421).
+        repo = make_repo(tmp, {"scripts/subject.py": "1"},
+                         ["scripts/subject.py"],
+                         untracked={"scripts/test_subject.py": "2"})
+        out = run(repo)
+        check("untracked brand-new test sibling still warns", fired(out),
+              json.dumps(out))
+
+        # 4d. An IGNORED file is not a test someone forgot to stage.
+        repo = make_repo(tmp, {"scripts/subject.py": "1",
+                               ".gitignore": "scripts/test_subject.py\n"},
+                         ["scripts/subject.py"],
+                         untracked={"scripts/test_subject.py": "2"})
+        check("ignored sibling does not warn", not fired(run(repo)))
 
         # 5. Trailing-form name, which this corpus also uses.
         trailing = {"scripts/thing.py": "print(1)",

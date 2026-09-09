@@ -110,8 +110,18 @@ def staged_files(cwd: str) -> list[str]:
     return git_lines(cwd, "diff", "--cached", "--name-only")
 
 
-def tracked_files(cwd: str) -> list[str]:
-    return git_lines(cwd, "ls-files")
+def candidate_files(cwd: str) -> list[str]:
+    """Tracked files plus untracked-but-not-ignored ones.
+
+    `git ls-files` alone lists only tracked paths, which is blind to the
+    commonest shape this guard is for: the test is brand new and has never
+    been added, so it exists on disk and in nobody's index. `--others
+    --exclude-standard` adds exactly those while still honouring
+    .gitignore, so a generated or ignored file is not mistaken for a test
+    somebody forgot to stage (caught in review on ai-config#3421).
+    """
+    return git_lines(cwd, "ls-files", "--cached", "--others",
+                     "--exclude-standard")
 
 
 def dirname(path: str) -> str:
@@ -123,12 +133,12 @@ def basename(path: str) -> str:
 
 
 def unstaged_test_siblings(staged: list[str],
-                           tracked: list[str]) -> list[tuple[str, str]]:
+                           candidates: list[str]) -> list[tuple[str, str]]:
     """Pairs of (subject, its test sibling) where the test is not staged."""
     staged_set = set(staged)
-    # Index every tracked test file by (directory, normalized subject stem).
+    # Index every candidate test file by (dir, normalized subject stem).
     index: dict[tuple[str, str], str] = {}
-    for path in tracked:
+    for path in candidates:
         name = basename(path)
         stem = test_stem(name)
         if stem is not None:
@@ -179,7 +189,7 @@ def main() -> int:
         return 0
 
     cwd = payload.get("cwd") or os.getcwd()
-    pairs = unstaged_test_siblings(staged_files(cwd), tracked_files(cwd))
+    pairs = unstaged_test_siblings(staged_files(cwd), candidate_files(cwd))
     if not pairs:
         if is_dry_run:
             print(json.dumps(

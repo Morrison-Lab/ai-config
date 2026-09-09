@@ -1869,6 +1869,18 @@ Run a parse or round-trip check after any heredoc'd edit that writes escape sequ
 Cost three identical failed patch attempts before the cause was visible, then
 recurred immediately in a `jq` filter reading a PR review body.)
 
+**2026-09-08 recurrence, twice in one session --- believed pattern and displacing fact, stated as their own pair.**
+Believed pattern: typing `"\\n"` inside a heredoc body reaches the interpreter as the two-character escape sequence it was typed as.
+Displacing fact: on this transport it reaches the interpreter as `"\n"`, a real newline landing inside what was meant to be a literal string.
+First instance: a `printf "...\n"` line, composed inside a heredoc that assembled a markdown snippet, had its `\n` collapse to a literal newline in the emitted snippet.
+Second instance: a Python-heredoc edit writing `"\\n"` escapes into a test fixture produced literal newlines instead, yielding a `SyntaxError` that was pushed to a PR before being caught.
+
+- **Do:** build the character with `chr(92)` (or a placeholder token) before it enters a heredoc body, and print `repr()` of the constructed string before writing it.
+- **Don't:** type a doubled backslash directly inside any heredoc body, quoted delimiter or not.
+
+`hooks/warn-heredoc-doubled-backslash.py` is the mechanism this recurrence produced: a warn-only `PreToolUse` guard on the `Bash` tool matcher that scans a command's heredoc bodies for a doubled backslash and names the offending line, so the rule fires at composition time instead of relying on having read this section.
+(Tracked as [ai-config#3362](https://github.com/Morrison-Lab/ai-config/issues/3362).)
+
 ## Strict Merge Control Policy
 
 - **NEVER merge any Pull Request or Merge Request without explicit user permission.**

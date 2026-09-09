@@ -20,14 +20,58 @@ what a run does once it starts, split at the 1200-line gate.
   `gh workflow run claude-review.yml -f pr_number=<N>` (not `claude-code-review.yml`).
 - The review workflow (which calls `Morrison-Lab/gha`'s reusable review workflow)
   is **not** comment-triggered.
-  It runs on `pull_request` (`types: [opened,
+  Where it is fully enabled it runs on `pull_request` (`types: [opened,
   synchronize, ready_for_review, reopened]`) and on `workflow_dispatch` (input
   `pr_number`).
   Posting an `@claude review` *comment* drives the separate agent
   workflow `claude.yml` (which then re-dispatches a review after it pushes) --- it
   does not directly fire the review workflow.
+- **Some repos in this family have switched automatic review off, so read the
+  trigger block rather than this bullet.**
+  A repo may ship the review workflow with its `pull_request:` trigger
+  commented out and its agent job carrying `if: false`, so a review starts only
+  when someone asks for one or dispatches it.
+  Measured 2026-09-08: `UCD-SERG/serocalculator` and `UCD-SERG/serodynamics` are
+  both in that state, while `Morrison-Lab/gha` is not.
+  Both halves matter, and they can land separately: serodynamics disabled only
+  the trigger in `e9bc578` (2026-07-06, whose own message calls it temporary)
+  and did not disable the agent until `b5816d2` (2026-07-31), eight seconds
+  before serocalculator's `864ad51` did the same thing.
+  So a single commit citation is not evidence for the compound state --- read
+  both halves.
+  **The bullet above is also wrong for such a repo in a second way:** an
+  `@claude review` comment cannot drive `claude.yml` there, because that
+  workflow never runs.
+  What happens to the comment instead is per-repo, and one of the two named
+  above ignores it entirely.
+  **What that job accepts differs per repo, so do not carry one repo's answer
+  to another.**
+  serocalculator's gate accepts `/review` at the start of the body and nothing
+  else, so `@claude review` is silently ignored there.
+  serodynamics' accepts `/review` *or* any comment containing `@claude`, from a
+  non-bot `OWNER`/`MEMBER`/`COLLABORATOR` --- a local mention path added because
+  the agent being off left every `@claude review` unanswered
+  (serodynamics#285).
+  Derive all of this with the [`for f in .github/workflows/*.yml`
+  loop](#derive-it-rather-than-recalling-it) below, rather than probing two
+  filenames, and read its comment-stripping caveat before trusting a row.
+  The loop is what makes the answer right for `Morrison-Lab/gha`, where the
+  trigger lives in the caller stub `claude-review.yml` and
+  `claude-code-review.yml` is the reusable workflow with no `pull_request:` key
+  at all --- so a filename-based probe reports gha as trigger-less, the exact
+  opposite of the truth.
+  Read the agent half from the job's own condition rather than from
+  `grep -n 'if: false'`, whose matches include the header comment *describing*
+  the disable mechanism (three hits in serocalculator's `claude.yml`, only one
+  of them the live condition).
+  This costs more than it looks like it should, because the failure has no
+  signal at all.
+  Such a PR sits at all-green CI with zero pending checks and **no
+  `review / claude-review` entry**, so a monitoring loop sees nothing failing
+  and nothing queued, re-arms, and never terminates --- there is no missing
+  check to notice, because none was ever created.
 - A new push (`synchronize`) auto-fires a fresh review --- the normal path during
-  an iterate loop.
+  an iterate loop, on a repo whose `pull_request` trigger is live.
   General again as of 2026-08-20, `ai-config` included --- see
   "`ai-config` auto-reviews on push as of 2026-08-20, and did not before" later
   in this file, and read its date before acting on it.
@@ -307,10 +351,26 @@ had recorded it correctly:
 ```bash
 for f in .github/workflows/*.yml; do
   printf '%-32s ' "$(basename "$f")"
-  sed -n '/^on:/,/^[a-z]/p' "$f" | grep -oE 'pull_request_review_comment|pull_request_review|pull_request|issue_comment|workflow_dispatch|schedule|issues|push' | sort -u | tr '\n' ' '
+  sed -n '/^on:/,/^[a-z]/p' "$f" | sed 's/#.*//' | grep -oE 'pull_request_review_comment|pull_request_review|pull_request|issue_comment|workflow_dispatch|schedule|issues|push' | sort -u | tr '\n' ' '
   echo
 done
 ```
+
+**The `sed 's/#.*//'` is load-bearing, and was missing until 2026-09-08.**
+Without it the grep matches `pull_request` inside a **commented-out** trigger,
+so a repo that has deliberately disabled automatic review reports it as live
+--- the exact opposite of the truth, from the command this section offers as
+the thing to trust instead of memory.
+Measured that day against `UCD-SERG/serocalculator` and
+`UCD-SERG/serodynamics`, both of which returned `pull_request` while their
+`on:` blocks carry `#   pull_request:`.
+
+**Read the caller stub's row, not the reusable workflow's.**
+A `workflow_call` file's `on:` block is mostly input *descriptions*, and those
+are prose rather than comments, so the word-grep matches trigger names written
+inside them and no amount of comment-stripping helps.
+In `Morrison-Lab/gha` the row worth reading is `claude-review.yml`, not
+`claude-code-review.yml`.
 
 **What the old state taught is still worth keeping, because the failure it
 describes recurs wherever a repo lacks the trigger.**

@@ -39,9 +39,29 @@ CLAIM = re.compile(
     r"defaults: (\S+) hwthreads / (\S+) / (\S+), off GPU node (\S+)\)"
 )
 
+# The README's own shorthand, which salloc does not accept. This is the one
+# way an unrecognised value could compact to itself and compare equal against
+# the README that taught it, so it is refused by name. Validating SLURM's
+# whole walltime grammar here was tried and reverted: it accepts unpadded
+# fields (`1:0:0`) and the keywords UNLIMITED and INFINITE, so a pattern
+# tight enough to be worth having rejected valid values and failed CI on
+# them, which is a worse failure than the one it guarded.
+README_SHORTHAND = re.compile(r"\d+[dh]")
+
 
 def compact_time(slurm_time: str) -> str:
-    """Render a SLURM H:MM:SS default the way the README states it (48h)."""
+    """Render a SLURM walltime the way the README states it (48h, 7d).
+
+    Both SLURM forms the default has used are handled: zero-padded
+    HH:MM:SS, and the D-HH:MM:SS form the 7-day default introduced. Any
+    other spelling is returned unchanged, so the README must then state it
+    verbatim and drift is still caught by the comparison. The one value that
+    could compact to itself and match a README that copied it is this
+    README's own shorthand, which `parse_script` refuses.
+    """
+    m = re.fullmatch(r"(\d+)-(\d\d):(\d\d):(\d\d)", slurm_time)
+    if m and m.group(2) == "00" and m.group(3) == "00" and m.group(4) == "00":
+        return f"{int(m.group(1))}d"
     m = re.fullmatch(r"(\d+):(\d\d):(\d\d)", slurm_time)
     if m and m.group(2) == "00" and m.group(3) == "00":
         return f"{int(m.group(1))}h"
@@ -60,6 +80,12 @@ def parse_script(text: str) -> dict[str, str]:
                   file=sys.stderr)
             sys.exit(2)
         values[name] = m.group(1)
+    if re.fullmatch(README_SHORTHAND, values["time"]):
+        print(f"parse failure: the script's walltime {values['time']!r} is"
+              " this README's shorthand, which salloc does not accept -- the"
+              " script wants a SLURM spelling such as 7-00:00:00",
+              file=sys.stderr)
+        sys.exit(2)
     return values
 
 

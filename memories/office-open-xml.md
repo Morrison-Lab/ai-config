@@ -524,6 +524,46 @@ The repair was to rebuild the affected root using a Word-authored sibling part's
 (Measured 2026-09-09, same manuscript and session as the OMML entry above.
 `scripts/check-docx-tracked-changes.py` in this repo implements the check this incident argues for.)
 
+## A math structure's ctrlPr must be marked separately from its runs, or accepting/rejecting leaves an empty box
+
+The two entries above cover markup *validity* -- whether the XML is legal at all.
+This one is a *rendering* defect in perfectly well-formed markup: a math structure whose runs are correctly tracked-change-marked, but whose own container is not, so it survives the edit as an empty placeholder box.
+
+OOXML math structures Word renders slot-by-slot regardless of content --- `m:sSup`'s base (`m:e`) and exponent (`m:sup`), `m:f`'s numerator and denominator, and similarly `m:sSub`, `m:sSubSup`, `m:sPre`, `m:d`, `m:nary`, `m:func`, `m:rad`, `m:limLow`, `m:limUpp`, `m:groupChr`, `m:bar`, `m:acc`, `m:eqArr`, `m:box`, `m:borderBox`, `m:phant`, `m:m` (matrix).
+Each carries an `m:<tag>Pr` child holding an `m:ctrlPr`, and that `ctrlPr` carries the **structure's own** revision mark, independent of whatever marks sit on the runs inside it:
+
+```xml
+<m:sSup>
+  <m:sSupPr><m:ctrlPr><w:del w:id="10" w:author="..." w:date="..."><w:rPr>...</w:rPr></w:del></m:ctrlPr></m:sSupPr>
+  <m:e><m:r><w:del w:id="11" ...><w:rPr>.../><m:t>x</m:t></w:del></m:r></m:e>
+  <m:sup><m:r><w:del w:id="12" ...><w:rPr>.../><m:t>2</m:t></w:del></m:r></m:sup>
+</m:sSup>
+```
+
+Deleting every run inside a structure without also marking its `ctrlPr` `w:del` leaves the structure itself un-deleted: accepting the change removes all the text and Word still draws the (now empty) base/exponent box, because the box is a property of the structure, not of its text.
+The mirror case: a structure built entirely from `w:ins` runs whose `ctrlPr` is not marked `w:ins` leaves the same empty box on **rejection**.
+
+This is measured as Word's own convention, not invented: a real hand-edited document in this same manuscript carried 3 `m:ctrlPr` elements marked `w:ins` and 6 marked `w:del`, on structures whose own runs carried the matching mark independently.
+Word marks both -- the structure's `ctrlPr` and its runs' text -- as two separate facts about the same edit.
+
+The 19-tag list above is the complete set, confirmed against the raw `shared-math.xsd` schema (every `complexType` ending `Pr` checked for a `ctrlPr` child) rather than trusted from a hand-written enumeration -- the first version of this list, and of the check it documents, missed `m:m` (the matrix element), caught by a review on the PR that introduced both (Morrison-Lab/ai-config#3423).
+That same schema search found one more `ctrlPr` location, deliberately left out of the list above: `CT_OMathArg` (the type of `m:e`, used for every argument slot -- a structure's base, its numerator, a matrix cell, ...) also carries an optional `ctrlPr`, as a direct sibling of its own content rather than nested inside an `<x>Pr` wrapper the way every structure above is.
+That is a different revision-tracking surface -- most plausibly per-argument insertion/deletion in a variable-arity construct like a matrix row, rather than the fixed-slot empty-box defect this entry is about -- with a different wrapper shape needing its own traversal code, so it is tracked separately rather than folded into the tag list here (Morrison-Lab/ai-config#3429).
+
+Nothing existing catches an unmarked `ctrlPr`.
+An accept/reject text diff can't see it, because an empty placeholder box carries no text to diff.
+It is also independent of the structural-validity checks two entries up: the markup here is entirely legal, it simply renders wrong.
+
+- **Do:** when deleting/inserting every run inside a math structure by hand, mark that structure's own `m:<tag>Pr/m:ctrlPr` with the same direction, as a second edit distinct from marking the runs.
+- **Do:** distinguish a structure that lost all its text to an edit (a defect, if its `ctrlPr` is unmarked) from one that carries no text at all in either direction (a blank placeholder already in the source, not a defect) --- conflating the two produces a report dominated by noise.
+- **Don't:** assume marking a structure's runs is sufficient;
+  the structure's own container needs its own mark.
+- **Don't:** trust a content/text diff to catch this --- an empty box renders no text, so there is nothing for a text diff to see.
+
+(Measured 2026-09-09, same manuscript as the two entries above.
+`scripts/check-docx-tracked-changes.py`'s `check_orphaned_math` implements the check this convention argues for -- built from a working draft, then extended into that script's existing per-part check pipeline, checking both accept and reject in one pass.
+Reproduced against four real deliveries of the same manuscript: one carrying exactly one orphaned `m:sSup` under accept, one carrying exactly one orphaned `m:sSub` under reject (present since the first delivery, fixed only in the next), and the final two both clean under both directions.)
+
 ## `m:oMathPara` does not claim its own line; the surrounding `w:br` elements do
 
 `m:oMathPara` marks an equation as display math, but that markup alone does not put it on its own line.
@@ -545,13 +585,15 @@ The two breaks are independent: either can be present while the other is missing
 
 Neither omission has anything to do with whether `m:oMathPara` was the right choice.
 The equation is still correctly display either way, so "this equation runs into its neighbouring prose" does not by itself say whether the fix is converting to inline or adding the missing break --- reading the two break positions is what decides it.
+This is a *rendering* gap distinct from the ctrlPr entry above: that one is about a structure's own container losing its revision mark;
+this one is about a correctly-marked display equation missing the plain line breaks that put it on its own line, and the two can be checked independently.
 
 - **Do:** check both `w:br` positions --- immediately before the `m:oMathPara`, and as the last child of `m:oMath` --- before concluding a running-together equation has the wrong display/inline form.
 - **Do:** treat the two breaks as independently omittable, so confirming one is present says nothing about the other.
 - **Don't:** convert a correctly-display equation to inline as the fix for prose running into it;
   that discards a correct choice without repairing the missing break, and the equation will still run into whatever follows it if the closing break is also missing.
 
-(Measured 2026-09-09, same manuscript and session as the OMML entries above.
+(Measured 2026-09-09, same manuscript and session as the entries above.
 Three new equations, each correctly authored as display, were missing one or both of these breaks;
 two further equations elsewhere in the same document had the identical gap, unnoticed until a per-file checker counted display equations against their break requirements.
 Five equations in total, missing seven breaks between them (three missing one side, two missing both) --- the same tally [`shared/writing/math-derivation-steps.md`](../shared/writing/math-derivation-steps.md)'s "Choose display or inline, deliberately" section records, which also carries the display-versus-inline decision this defect is easy to mistake for.)

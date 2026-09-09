@@ -1554,3 +1554,23 @@ reproduces the failure described here.
 - **Don't:** assume a report is verdict-free just because a guard's refusal
   message says so --- check which vocabulary the guard's own regex accepts
   before concluding the review never reached a verdict.
+
+**A tenth case: the review's own required check run can read green over a `NOT_CLEAN` verdict.**
+The check-shaped cases above include gates that never fail, gates that only report a dispatch,
+and a green check with no review posted at all.
+This one is the check wired specifically to gate on the review outcome --- a `review / require-clean-verdict` job from a shared reusable workflow --- which is the last check a reader would think to distrust, because its name states the very property being checked.
+
+Measured 2026-09-06 on `d-morrison/rme` PRs #1132 and #1133:
+`gh pr view --json statusCheckRollup` showed `review / require-clean-verdict` as `SUCCESS` on both,
+while each PR's latest `**Claude finished review` comment carried `"verdict": "NOT_CLEAN"` in its embedded `review-data:` JSON, with open findings.
+
+Why the two disagreed was not established.
+A stale check run from an earlier head, and a gate that never parses the embedded verdict at all, would both produce this reading, and neither was ruled out.
+Which it is does not matter: the comment is authoritative either way.
+
+The date is load-bearing.
+Both PRs' latest payloads read `CLEAN` by 2026-09-07, so re-running the query now returns the opposite and reads as though the entry were wrong.
+What the entry records is that the two signals *can* disagree, not that they disagree on those PRs today.
+
+- **Do:** name the review-gating check when you report a PR clean, and say which comment's verdict field you read to confirm it.
+- **Don't:** let a check whose name asserts the property stand in for the artifact that carries it --- that naming is what makes this case hard to doubt.

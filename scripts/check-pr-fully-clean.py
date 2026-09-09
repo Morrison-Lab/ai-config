@@ -2048,9 +2048,11 @@ def classify_verdict(body: str, state: str = "") -> str:
     is NOT an approval, and must not supersede an earlier verdict. Its very
     thoroughness is what makes it read as a sign-off.
 
-    A not-clean signal wins over a clean one within a single body, matching
-    fully-clean.md's rule that when a verdict line and the findings beneath it
-    disagree, the findings win.
+    For a body without a well-formed ``review-data`` payload, a not-clean
+    signal wins over a clean one within that body, matching fully-clean.md's
+    rule that when a verdict line and the findings beneath it disagree, the
+    findings win. A well-formed payload is the exception described below: it
+    decides on its own and the prose is not consulted.
 
     Cited finding vocabulary is blanked first (see strip_cited_finding_vocab),
     so a clean verdict that merely quotes "Needs more work" is not misread as

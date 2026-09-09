@@ -5071,8 +5071,9 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     # because the #3054 issue thread names this exact "well-formed CLEAN
     # payload contradicted by informal prose" shape (there via #2945, #2736,
     # #3307, #2452, #1690, #2523) as the false positive the new rule exists
-    # to subsume. A reviewer that emits a self-contradictory well-formed
-    # payload is trusted at face value now; the trust boundary moved to
+    # to subsume. A well-formed CLEAN payload contradicted by its own
+    # comment's prose is trusted at face value now (the payload itself is
+    # internally consistent: CLEAN with empty findings); the trust boundary moved to
     # "is the payload well-formed" rather than "does the prose agree with
     # it".
     check("classify_verdict: a schema_version CLEAN payload with empty findings decides directly, even over contradicting prose (#3054)",

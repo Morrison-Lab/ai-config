@@ -972,10 +972,12 @@ Only a `CLEAN` payload with a non-empty or malformed `findings` list falls
 through to the old behaviour, since that combination is self-contradicting
 on its face regardless of what the prose says.
 The trust boundary moved from "does the prose agree with the payload" to "is
-the payload well-formed" --- a reviewer that emits a self-contradictory
-well-formed payload (the #2913/#2945 shape, hypothetically) is now taken at
-its word, which is the tradeoff #2950 explicitly declined to make and #3054
+the payload well-formed" --- a well-formed payload whose own comment's prose
+contradicts it (the #2913/#2945 shape, hypothetically) is now taken at its
+word, which is the tradeoff #2950 explicitly declined to make and #3054
 explicitly re-argues.
+A payload that contradicts itself, `CLEAN` beside a non-empty or malformed
+`findings` list, is still not trusted.
 
 - **Do:** trust a `schema_version`-carrying payload's own `CLEAN`/`NOT_CLEAN`
   verdict directly, and treat a `CLEAN` payload with non-empty or malformed

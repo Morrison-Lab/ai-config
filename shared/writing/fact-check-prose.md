@@ -902,8 +902,9 @@ names for an assignment's author.
   line from memory; the read and the transcription are separate acts, and
   only a fresh derivation in the writing command catches drift between them.
 
-(`Morrison-Lab/ai-config`, 2026-09-09, fixed in `b000014e` on a sibling
-branch: `docs/review-trigger-carve-outs`.
+(`Morrison-Lab/ai-config`, 2026-09-09, fixed in
+[#3378](https://github.com/Morrison-Lab/ai-config/pull/3378), which
+squash-merged to `main` as `d482b528`.
 Whether an instrument could catch this --- something that finds fenced or
 code-span content attributed to a named `file:line` and diffs it against that
 file --- is worth asking, per

@@ -302,6 +302,17 @@ which says "File it before reporting it."
 The issue was filed only once the user asked for it directly, as
 [UCD-SERG/serocalculator#694](https://github.com/UCD-SERG/serocalculator/issues/694).)
 
+**The sibling case, for a memory or skill update rather than a GitHub
+issue, lives in [`no-empty-promises`](no-empty-promises.md)'s "Repeating
+the disclosure across turns is not the discharge either."**
+That section covers a stopping-point line describing a memory entry as
+"owed," where the remedy is to dispatch a subagent rather than to file an
+issue.
+The two sections share the shape --- a truthful, repeated status report that
+reads as diligence while nothing gets done --- and differ in the artifact
+and the remedy, so a recap naming both an "owed" memory entry and a "still
+unfiled" issue is caught in full only by reading both.
+
 ## Offering to hand over work you have already finished
 
 The general rule is [`no-cop-out-offers`](no-cop-out-offers.md), which covers any offer to do already-authorized work and carries the `Stop` hook this section anticipates.

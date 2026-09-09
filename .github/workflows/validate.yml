@@ -128,6 +128,15 @@ jobs:
         run: python3 scripts/test_check_verdict_scan_parity.py
       - name: Run check-user-quote tests
         run: python3 scripts/test_check_user_quote.py
+      - name: Run check-ambiguous-referents tests
+        # scripts/check-ambiguous-referents.py is a candidate finder like
+        # check-user-quote.py, not a gate: "is the nearest antecedent the
+        # intended one" has no decidable condition
+        # (shared/writing/ambiguous-reference.md), so it is not run against
+        # the corpus here. Its tests do run, pinning the measured incident
+        # (a four-referent sentence) as the positive case and two
+        # single-referent sentences as negative controls.
+        run: python3 scripts/test_check_ambiguous_referents.py
       - name: Check lead-in counts against their enumerations
         # ai-config#3005. A lead-in count goes stale when a later edit splits
         # or merges one item, and a reader who counts along never reaches the

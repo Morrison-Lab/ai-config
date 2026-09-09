@@ -105,6 +105,60 @@ risk concentrates where a pronoun opens a subordinate clause
 in a sentence already naming two or more nouns.
 Read those, and leave the rest.
 
+## A candidate finder narrows the search without deciding it
+
+The judgment above --- is the nearest antecedent the intended one --- has no
+decidable condition, and nothing here changes that.
+What is decidable is the positional heuristic two paragraphs up: how many
+referring expressions one sentence carries.
+Each one adds a candidate antecedent for every other one in the same
+sentence, so a sentence naming several is worth reading closely and a
+sentence naming one usually is not.
+That count is a mechanical fact about the sentence, separate from the
+grammatical judgment the fragment says cannot be automated.
+
+`scripts/check-ambiguous-referents.py` counts it.
+Given a file, it flags every sentence carrying two or more referring
+expressions (`it`, `its`, `this`, `that`, `these`, `those`, a comma-`which`)
+and prints the sentence for a human to read against its own nearest-antecedent
+test.
+It is a candidate finder, not a decider --- advisory only, always exits 0, not
+wired into CI as a gate, run by hand after drafting the way
+`scripts/check-user-quote.py` is:
+
+```bash
+python3 scripts/check-ambiguous-referents.py <file>
+```
+
+This is deliberately narrower than a re-read.
+Self-review reads a sentence for meaning and stops the moment it resolves,
+which is the same failure "The tell" names above --- the fluent wrong reading
+is invisible from the inside because it is fluent.
+A count does not read for meaning at all, so it flags a sentence a fluent
+re-read would pass straight through.
+
+- **Do:** run the checker over drafted prose before pushing, and read each
+  flagged sentence's pronouns against their nearest antecedents.
+- **Do:** treat a flagged sentence as a prompt to check, not as a confirmed
+  defect --- several referring expressions in one sentence is not itself
+  wrong when every one resolves correctly.
+- **Don't:** read a clean run as proof the document has no ambiguous
+  referent; a sentence with exactly one wrong-antecedent pronoun is outside
+  what a referent *count* can see.
+
+(Measured 2026-09-09, in a manuscript-review session, drafting a supplement's
+prose: "integrate over 0 <= t <= a to that probability and to its complement
+respectively, so the bracket is itself a probability density on that
+interval," followed immediately by a bare "It is Equation (4)."
+Four referring expressions --- two instances of "that," "its," and "It" ---
+each landing on a different intended referent than its nearest grammatical
+candidate, in one passage.
+Self-review passed it; the user caught it.
+The checker above flags the joined sentence at its default threshold of two,
+confirmed by mutation: raising the threshold past the sentence's own count of
+four silences it, and two single-referent negative-control sentences stay
+quiet at the default.)
+
 ## The most expensive place for one is a Do/Don't bullet
 
 Everything above prices an ambiguous referent as a **wrong fact** a reader

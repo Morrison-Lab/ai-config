@@ -175,6 +175,70 @@ So "an owed UMS pass" stays clean, and "owed by me" does not.
 (Directive from the user, 2026-08-20: "'Owed by me' is another phrase indicating a broken promise".
 Tracked as ai-config#1792.)
 
+## Repeating the disclosure across turns is not the discharge either
+
+The modal section above rules out a rule promise shipped with no mechanism.
+The debt section rules out naming an owed action with no mechanism.
+Neither covers a third shape: a status line that truthfully **reports**
+outstanding items every turn, is phrased as neither a commitment nor a
+silent drop, and still never gets paid.
+
+That third shape passes both existing tests.
+It commits to nothing --- "N memory entries not yet filed, M issues still
+unfiled" states a fact rather than a promise, so the modal check finds no
+future-tense verb to catch.
+And it is not silently dropped either --- the items are named, every turn,
+which reads as *more* diligent than [`use-subagents`](use-subagents.md)'s
+"queued" / "next up" tell, not less.
+It even matches this fragment's own stated remedy: "say plainly that
+something was not done, and name what tracks it."
+Saying it plainly, on a loop, turn after turn, is not what that line means.
+
+Restating the list is itself the failure mode dressed as compliance.
+Each individual sentence is true when written, so nothing about any single
+turn looks wrong; only the sequence does, and the sequence is exactly what
+nobody rereads.
+The remedy already exists at the moment the item is first noticed ---
+dispatch it, per [`use-subagents`](use-subagents.md)'s pre-authorized
+sidecar delegation, in the same turn the debt is noticed, rather than
+carrying it forward as a status line.
+
+- **Do:** dispatch a sidecar subagent for a debt item the moment it is
+  noticed, in the same turn, rather than naming it in a recap.
+- **Do:** read a status line that lists the same outstanding item across
+  more than one turn as proof the item was never actually delegated.
+- **Don't:** treat a recap that truthfully discloses outstanding items as
+  having discharged them --- disclosure is not payment, however many times
+  it is repeated.
+- **Don't:** read "I am not promising, I am reporting" as an exemption from
+  the modal or debt tests above; a status line that never changes across
+  turns is the debt, restated.
+
+**This is the memory/dispatch half of a two-part failure; the issue-filing
+half already has its own section elsewhere, and the two are siblings rather
+than duplicates.**
+[`report-mistakes-proactively`](report-mistakes-proactively.md)'s
+"Repeating an 'unfiled' status report is not tracking, however many times
+it gets said" covers the same repeated-disclosure shape for a **GitHub
+issue** specifically --- "is/was still unfiled," "hasn't been filed" --- and
+its remedy is to file the issue, backed by `hooks/flag-unfiled-issue.py`.
+What that section does not reach is a **memory or skill update** described
+as "owed," where the remedy is not filing but dispatching a subagent to
+write it, per [`use-subagents`](use-subagents.md).
+A single stopping-point line naming both a memory entry "owed" and an issue
+"still unfiled" is caught in full only by reading both sections: this one
+for the memory half, that one for the issue half.
+
+(Directive from the user, 2026-09-09, verbatim: "you are not allowed to say
+'are owed'; you don't get to take on debt.
+pay the toll immediately using a subagent."
+Measured across roughly a dozen replies in one session: a stopping-point
+line closed each reply with a list of memory entries "owed" and issues
+"still unfiled," carried forward turn after turn rather than dispatched,
+even though [`use-subagents`](use-subagents.md)'s sidecar-delegation grant
+already pre-authorized launching a subagent on each item the moment it was
+noticed.)
+
 (Directive from the user, `cai`, 2026-08-19: "no empty promises; every promise
 ('going forward, I will/won't' etc) must be accompanied by an implemented
 mechanism for ensuring accountability (for example, a memory + hook pair)".

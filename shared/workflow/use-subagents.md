@@ -69,6 +69,13 @@ Only asking why the work was routed that way surfaces it.
 - **Don't:** report an owed item as a status --- describing it that well is proof the brief already exists.
 - **Don't:** apply a "cheaper to do than to brief" test to the fetch when the reading is the actual work.
 
+[`no-empty-promises`](no-empty-promises.md)'s "Repeating the disclosure
+across turns is not the discharge either" section covers the near-miss this
+tell does not: a status line that truthfully re-lists the same owed items
+every turn, rather than naming them once and dispatching.
+That is neither the queued tell nor the owed-item tell above --- it commits
+to nothing and drops nothing --- so it needs its own read.
+
 Distinct from [`when-to-orchestrate`](when-to-orchestrate.md), which governs the heavier `Workflow` tool.
 That rule is a **gate**: a fan-out across four or more verification-bearing targets is a real spend, so it has to be opted into or proposed with a cost estimate.
 This one is a **grant**: a single `Agent` call covering one sidecar task is cheap, needs no opt-in, and the cost it prevents is an idle parallel track rather than an overspend.

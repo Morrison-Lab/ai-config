@@ -425,6 +425,76 @@ specifically rather than to file contents or a corpus fact.
   population is closed --- closedness rules out the set growing, not the
   summary being wrong.
 
+## Which local checks predict CI is itself a derivable set, not a remembered one
+
+Everything above governs a set of **work items** --- PRs, issues, files,
+findings.
+The same failure recurs one level down, over a set of **checks**: which
+local commands to run before a push, so CI comes back green on the first
+try.
+That list looks closed --- it is fixed by `.github/workflows/validate.yml`
+at the commit you are pushing, not something a bot or a peer can add to
+mid-task --- and the closedness test above would wave it through on that
+basis.
+What breaks is the same gap [`A derivation is still an enumeration of one
+pattern`](#a-derivation-is-still-an-enumeration-of-one-pattern) names for a
+search pattern: a hand-picked subset of the checks is a **narrower**
+enumeration than the population, chosen from memory of which checks matter
+rather than derived from what CI actually runs, and it is non-empty and
+plausible in exactly the way that section says makes an incomplete match
+invisible.
+
+Picking checks by hand fails in the ordinary way: a check that exists locally
+and is simply not chosen.
+Two pushes on one PR each hit this, on a different check both times ---
+`check-ascii-punctuation.py` first, then `gen-hooks-plugin.py --check` ---
+because each pre-push pass reconstructed "the checks that matter" from
+recollection of the diff rather than from the workflow file CI actually
+reads.
+
+`scripts/run-local-validation.py` is the instrument, and it already exists
+for exactly this reason (ai-config#1940, ai-config#1262): it parses
+`validate.yml` and runs every step it finds, rather than a curated subset,
+and reports what it could not run locally and why, so a check it skipped is
+visible rather than silently absent.
+
+```bash
+python3 scripts/run-local-validation.py                # every derivable step
+python3 scripts/run-local-validation.py --only 'punctuation|hooks'   # scope a slow run
+python3 scripts/run-local-validation.py --list          # show the derived plan without running it
+```
+
+**A fix sitting uncommitted in the working tree looks identical to a fix
+that shipped, and this is the same substitution
+[`verify-the-right-artifact`](verify-the-right-artifact.md) names for every
+other artifact --- the local tree is an adjacent copy of what actually gets
+pushed, not the thing itself.**
+Running the deriving script against an uncommitted edit proves the edit
+would pass, and says nothing about the commit that is about to leave the
+machine.
+Commit before the derived run, the same way that fragment's own "a local
+composite is not yet the reusable-workflow chain" caution applies to
+checking the wrong revision generally.
+
+- **Do:** derive the pre-push check list from `scripts/run-local-validation.py`
+  rather than reconstructing it from memory of the diff.
+- **Do:** commit before running the derived list, so a pass proves something
+  about the commit that will actually be pushed.
+- **Don't:** hand-pick a subset of checks because the diff "obviously" only
+  touches one of them --- that is the narrow-pattern failure this fragment
+  already names, applied to a check list instead of a search term.
+- **Don't:** trust a clean local run against uncommitted changes as evidence
+  about what CI will see.
+
+(Morrison-Lab/ai-config, 2026-09-09, manuscript-review session: two
+successive pushes on one PR each ran a hand-picked subset of local checks
+and each failed CI on a check that was never in that subset --- first
+`check-ascii-punctuation.py`, over a curly apostrophe inside a new hook's
+regex character class; then `gen-hooks-plugin.py --check`, over the
+generated plugin mirror left stale after registering that hook.
+`scripts/run-local-validation.py` derives the full step list from
+`validate.yml` and was available the whole time.)
+
 ## In review
 
 Flag a brief, a plan, or a skill step that hands an agent a hard-coded list of PR or issue numbers to work through, where the tracker could gain another before the work finishes.

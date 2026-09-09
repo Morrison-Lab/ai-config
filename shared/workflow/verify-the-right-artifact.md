@@ -899,6 +899,33 @@ The converted view is evidence about what a reader sees, which is a different cl
   that is [`grep-is-not-coverage`](grep-is-not-coverage.md)'s guaranteed-either-way null in a new surface.
 - **Don't:** treat "lossy" as "stale" --- refetching a conversion returns the same omissions.
 
+**Recurrence, 2026-09-09, on the same manuscript and the same link.**
+Asked whether the Shiny-app link had survived an edit, a sweep collected
+`w:hyperlink` elements and visible text, found neither, and reported to the
+user that the manuscript advertised the app twice while linking to it
+nowhere --- recommending the link be restored.
+Both readings are derived views that drop a field code, which is the
+agreement-by-shared-omission this section already names, and the Do-list
+above already prescribes the fix: grep the stored form when the claim is
+that something is absent.
+The rule existed, named this exact link, and did not fire.
+
+A second instance the same day generalizes it past hyperlinks.
+Asked whether a script `L` was used anywhere, a search over Unicode
+math-alphanumeric codepoints and over `m:sty` returned nothing, and the
+report was that no script letter existed in any of the three files.
+Word stores that styling as `m:rPr/m:scr val="script"`, a third
+representation neither query touched, and the supplement had been using it
+for the likelihood symbol all along.
+So the failure is not specific to hyperlinks or to pandoc: any absence
+claim about a `.docx` is a claim about the representations searched, and
+OOXML stores most things more than one way.
+
+- **Do:** enumerate which representations a `.docx` absence claim covers,
+  and say so in the claim.
+- **Don't:** report an absence from one attribute or element name when the
+  format has a second spelling for the same thing.
+
 (Measured 2026-09-01 while adding tracked changes and comments to three `.docx` files for a journal resubmission.
 A manuscript's Shiny-app link was absent from the rels listing and absent from pandoc's markdown output,
 and the conclusion that it had been deleted was written into a draft review finding.

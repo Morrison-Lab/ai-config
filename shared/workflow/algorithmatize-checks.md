@@ -121,6 +121,30 @@ into this rule.
 - **Don't:** validate a matcher by reading it -- a wrong one reads as correct.
 - **Don't:** trust a comment describing what the pattern cannot match.
 
+**The bad-input test above is not the negative control, and a brand-new
+instrument needs both before its first real finding is trusted.**
+Passing the reported bad input proves the instrument can catch the thing it
+was built for; it says nothing about whether the instrument reports a clean
+result on input that is already fine, which is the direction a hand-rolled
+checker fails silently and dangerously.
+A false **negative** here -- reporting a defect that is not there -- is not
+the safe-side error it usually is: it reads as a rigorous, structural
+finding rather than a guess, so it invites "fixing" content that was never
+broken, which can destroy real work the false positive in the other
+direction never would have.
+
+- **Do:** run a newly built instrument against a known-good input and require
+  a clean (no-op) result before trusting any finding it reports elsewhere.
+- **Don't:** treat an instrument's own careful construction as a substitute
+  for running it against a case where the right answer is "nothing wrong".
+
+See [`memories/office-open-xml.md`](../../memories/office-open-xml.md)'s "A
+hand-built accept/reject simulator is itself an unverified instrument until
+it passes a negative control", where a self-built docx tracked-change
+renderer reported data loss that did not exist, and rewriting it to walk
+the document in order and re-running it against the untouched original
+found the bug immediately.
+
 ### Scale that from one reported input to a corpus of real ones
 
 The rule above fixes the exact input that prompted the guard, and asks for

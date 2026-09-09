@@ -48,6 +48,9 @@ a product one.
    step 1's flag, or as one combined flag-plus-link message when filing is
    quick — and in a PR comment when the mistake surfaced while working a
    PR, so the record is discoverable from both sides.
+   `CLAUDE.md`'s "Link PRs in tables" section covers the mechanics for any
+   forge artifact, issues included: the link belongs in the comment itself,
+   not merely in a later chat recap the PR thread never sees.
 
 ## Filing is not gated on approval
 
@@ -76,6 +79,48 @@ It decides **where** the report lands --- a new issue, or a comment carrying
 the new evidence onto an open one --- not **whether** to make it.
 Those are different questions, and only the first has a discretionary
 answer.
+
+## The issue and "land it in this PR instead" are not alternatives
+
+A specific offer shape earns its own section because the false choice inside
+it is easy to miss: "I will open the issue unless you would rather it just
+land here."
+That reads as consideration for scope, not as the standalone offer the
+section above rules out, because it names a real alternative --- the work
+could genuinely land in the current PR instead of a separate one.
+
+It is a false dichotomy wearing that real alternative as cover.
+Filing the issue and landing the work in this PR are not competing
+outcomes; they compose in sequence, per
+[`avoid-false-dichotomies`](avoid-false-dichotomies.md)'s "offer composable
+options as steps with an order when they simply sequence rather than
+compete": file the issue now, and if the work then lands in the PR anyway,
+close the issue as completed once that PR merges.
+Posing them as either/or is what manufactures the exclusivity --- nothing
+about the underlying work forces the choice, and the "unless you'd rather"
+half of the sentence is already on
+[`no-cop-out-offers`](no-cop-out-offers.md)'s list of offer phrasings.
+
+- **Do:** file the issue immediately, whatever answer later arrives about
+  where the work lands.
+- **Do:** close the issue as completed when the PR that ends up containing
+  the fix merges, rather than treating the PR as having made the issue
+  unnecessary retroactively.
+- **Don't:** phrase filing as conditional on the user preferring it over
+  landing the work in the current PR --- state the filed issue as done, then
+  ask separately whether the fix belongs here or in its own PR.
+
+(User directive, 2026-09-09, verbatim: "file that issue; you should have
+filed it immediately, and then if I told you to land it in 688, you could
+have just closed the issue as completed once 688 merged.
+never hesitate to file an issue for a valid problem or extension."
+The incident: a PR comment on `UCD-SERG/serocalculator#688` closed with "I
+will open the issue unless you would rather it just land here."
+The issue was filed 11 minutes later as `UCD-SERG/serocalculator#693`, so
+step 3 above was not skipped --- but the PR thread was never told, and read
+as though nothing had been filed until corrected.
+See step 4's linking-back requirement, and `CLAUDE.md`'s "Link PRs in
+tables" section, for that second half of the same incident.)
 
 ## A gated action bundled into a discretionary one is still an offer
 

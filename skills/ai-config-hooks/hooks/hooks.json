@@ -603,6 +603,20 @@
             "timeout": 15,
             "script": "guard-slide-major-tag.py",
             "why": "Denies `gh workflow run slide-major-tag.yml` when git diff tag..origin/<default> adds a job-level permission to a reusable workflow (workflow_call in on:). A called workflow cannot request permissions its caller does not grant, so sliding the tag breaks every un-updated consumer with startup_failure (Morrison-Lab/gha#830 breaking ucdavis/bcs#966; same class as gha#685). Clearable with ALLOW_BREAKING_SLIDE=1. Tracked as #3303."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/flag-unattributable-reviewer-request.py\"'",
+            "timeout": 10,
+            "script": "flag-unattributable-reviewer-request.py",
+            "why": "Warns when a reviewer request is not the LAST command in a Bash call. no-unreviewed-pr.py credits a request by the whole call's exit status, so a request piped into `tail`, or followed by a verify read, shares its status with that command and cannot be attributed -- its discharge is withheld even though the request succeeded and a review landed. Measured on ai-config#3403, where the Stop block fired three times against a working request and its wording (\"no SUCCESSFUL request\") invited reissuing the same broken shape rather than unpiping it.",
+            "_note_warns_never_blocks": [
+              "Emits `additionalContext` and a `systemMessage` and nothing else -- no",
+              "`permissionDecision` key, so the normal permission flow is untouched.",
+              "A non-last request is legitimate when one call requests reviewers for",
+              "several PRs, which is why undischargeable_requests returns a LIST at",
+              "all, so a blocking guard would refuse a real shape."
+            ]
           }
         ]
       },
@@ -1080,6 +1094,13 @@
             "timeout": 10,
             "script": "warn-title-only-issue-edit.py",
             "why": "Morrison-Lab/gha#839, 2026-09-07: a session retitled an issue after a review corrected its derivation, but never edited the body -- the body's own \"Scope\" section still stood as the superseded claim, and a later PR body wrongly asserted the issue had been \"corrected ... with the flawed derivation and its replacement written up there.\" Warns, never blocks, when a `gh issue edit` / `glab issue update` (or an `mcp__github__issue_write` update) sets a title with no body change, and no LATER call in the transcript sets a body for the same issue. Deliberately `Stop` rather than `PreToolUse`: one of its own negative controls is a title-only edit followed by a body edit for the same issue in a LATER command, which a `PreToolUse` hook firing at the title edit cannot see yet -- only a `Stop` hook, reading the whole turn (or session) after the fact, can tell that shape apart from the incident it exists to catch. Matches only actual `tool_use` invocations, never assistant prose, so this corpus quoting the command in this very file's docstring does not self-trigger."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/flag-unfiled-issue.py\"'",
+            "timeout": 10,
+            "script": "flag-unfiled-issue.py",
+            "why": "shared/workflow/report-mistakes-proactively.md, CLAUDE.md's 'Status requests do not make issues report-only' -- user directive 2026-09-09, verbatim: 'always file issues immediately; is still unfiled. should be a hook trigger?'. Measured across roughly six consecutive replies in one session: a stopping-point line stated a known defect (stale equation-number comments in a C source file) was 'still unfiled', repeated turn after turn, until the user asked for it filed directly (UCD-SERG/serocalculator#694). Warns, never blocks, when a reply reports a known gap with a RETROSPECTIVE status phrase (`is/was still unfiled`, `hasn't been filed`, `needs an issue`, `should be filed`, a copula-bound `is/remains untracked`, `still needs a tracking issue`, `I owe ... an issue`) and no issue-create or issue-comment call follows it in the transcript. Distinct from `no-unfiled-finding.py`, which blocks the FORWARD assertion that something is worth an issue and does not match this backward-looking phrasing at all -- the two share no trigger vocabulary except `needs an issue` / `should be filed`, which fire both hooks on purpose rather than being de-duplicated away. Warns rather than blocks because whether an item should have been filed is not lexically decidable (it may already be filed, or belong to a repo this session cannot file into), and blocking a truthful status report would be worse than the report. Reuses the sibling's `visible_prose`/`scan`/`RX_ALREADY` via a dynamic import (degrading to silence if unavailable) so fenced code, blockquotes, and inline code spans are stripped before matching, the same self-implicating-example mitigation the sibling uses -- partial by design, since plain prose about the phrase with no backticks still matches."
           }
         ]
       }

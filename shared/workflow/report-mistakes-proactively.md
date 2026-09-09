@@ -230,6 +230,89 @@ Widening it is tracked in [ai-config#2017](https://github.com/Morrison-Lab/ai-co
 The rule above stands on its own and does not depend on the guard: a mechanized check is what makes a rule cheap to obey, never what makes it true.
 That separation is worth stating rather than leaving implicit, because the reverse reading -- that an unmechanized rule is somehow provisional -- is what turns a hard guard into a reason to stop writing the rule down.
 
+## Repeating an "unfiled" status report is not tracking, however many times it gets said
+
+The two sections above are about a message that carries an assertion --- a
+fresh claim that something is worth an issue, or a fresh deferral of the
+decision to someone else.
+This one has no assertion in it at all.
+It is a status report, said again: the same known gap, described as still
+unfiled, once more.
+
+> That set of stale equation-number comments is still unfiled.
+
+Nothing about that sentence is false.
+The gap really is unfiled, and saying so reads as diligence --- the kind of
+line a careful stopping-point recap is supposed to carry.
+That is exactly what makes it the worse failure rather than a milder one:
+each repetition puts the omission on the record again, and each repetition
+makes it feel more handled than the last, while the tracker still holds
+nothing.
+A reader scanning six such lines across six replies sees six honest
+disclosures.
+Nobody sees that the same sentence was never once acted on.
+
+The near-miss is composition-time, and it is a habit rather than a single
+bad sentence.
+Step 3 above says file it in the same stride as noticing it, and the first
+time the gap was noticed, it likely was flagged correctly.
+What repeats is not the discovery --- it is the *report of the discovery*,
+carried forward into every later stopping point as though restating the
+status were itself an update to it.
+Nothing about a repeated status line invites the question "did I ever
+actually file this", because the sentence answers a different question
+("is this still open") truthfully every time it is asked.
+
+- **Do:** file the issue the moment a known gap is about to be described as
+  unfiled again, before writing the sentence that reports it.
+- **Do:** treat a stopping-point line naming an unfiled item as the trigger
+  to file it, not as evidence that it is being tracked.
+- **Don't:** repeat an "unfiled" disclosure across replies --- repetition is
+  not tracking, and it reads as diligence while the omission persists.
+- **Don't:** defer filing because the item is small, out of scope for the
+  current task, or belongs to work still in progress; per
+  [`issue-first`](issue-first.md)'s deferral section, an out-of-scope item
+  may be deferred, but only by filing it, never by restating its status.
+
+`hooks/flag-unfiled-issue.py` is the mechanism, and it is a WARN rather than
+a BLOCK, unlike `no-unfiled-finding.py` above.
+The two hooks answer different questions.
+`no-unfiled-finding.py` matches a FORWARD assertion (`worth an issue`,
+`needs a tracking issue`) and blocks, because the message is making a fresh
+claim and nothing yet contradicts it.
+This hook matches a RETROSPECTIVE status report (`is/was still unfiled`,
+`hasn't been filed`) and warns, because whether the item should have been
+filed is not lexically decidable from the phrase alone --- the reply may be
+narrating an item already filed, or one this session cannot file into.
+The two share almost no trigger vocabulary: a message built entirely from
+this section's phrasing sails straight past `no-unfiled-finding.py`'s
+`worth`/`needs`/`deserves`/`warrants` list, which is the same "a guard
+matching one instance of a class is not a guard on the class" lesson the
+section above already draws, arrived at independently and about a
+differently-shaped near-miss.
+
+(Directive from the user, 2026-09-09, verbatim: "always file issues
+immediately; 'is still unfiled.' should be a hook trigger?"
+The incident: across roughly six consecutive replies in one session, a
+closing stopping-point line reported a known defect --- a set of stale
+equation-number comments in a C source file --- as "still unfiled".
+The rule requiring it was already loaded: this file's own procedure above,
+and CLAUDE.md's "Status requests do not make issues report-only" section,
+which says "File it before reporting it."
+The issue was filed only once the user asked for it directly, as
+[UCD-SERG/serocalculator#694](https://github.com/UCD-SERG/serocalculator/issues/694).)
+
+**The sibling case, for a memory or skill update rather than a GitHub
+issue, lives in [`no-empty-promises`](no-empty-promises.md)'s "Repeating
+the disclosure across turns is not the discharge either."**
+That section covers a stopping-point line describing a memory entry as
+"owed," where the remedy is to dispatch a subagent rather than to file an
+issue.
+The two sections share the shape --- a truthful, repeated status report that
+reads as diligence while nothing gets done --- and differ in the artifact
+and the remedy, so a recap naming both an "owed" memory entry and a "still
+unfiled" issue is caught in full only by reading both.
+
 ## Offering to hand over work you have already finished
 
 The general rule is [`no-cop-out-offers`](no-cop-out-offers.md), which covers any offer to do already-authorized work and carries the `Stop` hook this section anticipates.

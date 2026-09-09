@@ -299,20 +299,9 @@ about *these* things, and the sentence written down is about *this
 environment*.
 Ask which population was actually sampled before writing the general form.
 
-**A recurrence is worth the cost it names.**
-Measured 2026-09-08 on `UCD-SERG/serocalculator#685`: `requireNamespace()`
-returned `FALSE` for several packages, which became "R 4.6.1 with about 30 base
-packages --- `devtools`, `testthat`, `spelling`, `lintr` and `roxygen2` cannot
-be run here", written into commit messages, a PR body, and PR comments over
-several hours.
-`options(repos = ...); available.packages()` --- one call, run late and only on
-a hunch --- returned a full CRAN index.
-The cost of not running it earlier: three failed spellcheck rounds fixed by
-guessing at a dictionary, a testthat snapshot reconstructed by hand, two
-`expect_snapshot_value(style = "serialize")` payloads missed entirely because
-no test could be run to fail on them, and a PR body of "could not be verified"
-claims that had to be publicly retracted.
-Every one of those disappeared within minutes of the install finishing.
+Measured 2026-09-08 on `UCD-SERG/serocalculator#685`, where the generalized
+claim survived several hours and four kinds of avoidable rework before one
+`available.packages()` call refuted it.
 
 - **Do:** name the population your probe sampled, and keep the written claim
   to that population.
@@ -323,7 +312,8 @@ Every one of those disappeared within minutes of the install finishing.
   right.
 
 See [`growth-mindset.cases.md`](growth-mindset.cases.md), "branch-protection
-settings reported unreadable across several turns, never once queried".
+settings reported unreadable across several turns, never once queried" and
+"an R toolchain declared absent from a probe of five packages".
 
 ## Applies to our own metacognitive tooling, too
 

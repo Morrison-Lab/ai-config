@@ -364,8 +364,8 @@ this entry is the corrected-belief record of hitting it live.
 
 Reading the hook's source settled it in one look, the same remedy [`get-under-the-hood`](../principles/get-under-the-hood.md)'s "A guard's refusal message goes unread" section already names for a sibling case against the same hook (2026-09-02/03, a different attempt count and a different unread qualifier).
 Running the POST bare, with nothing chained after it, discharged on the first try.
-[Morrison-Lab/ai-config#3408](https://github.com/Morrison-Lab/ai-config/pull/3408) proposes a warning hook (`flag-unattributable-reviewer-request.py`) that would have named this at composition time rather than at `Stop`;
-it is open, not merged, as of this entry.
+[Morrison-Lab/ai-config#3408](https://github.com/Morrison-Lab/ai-config/pull/3408) shipped a warning hook (`flag-unattributable-reviewer-request.py`) that names this at composition time rather than at `Stop`;
+it merged 2026-09-09.
 
 - **Do:** read a Stop-hook block as a claim about the hook's own logic first, and check whether the underlying condition it reports on (here, whether GitHub actually has the request) independently holds.
 - **Do:** open the hook's source the first time its wording does not resolve the question, rather than re-running the blocked command --- the source read is bounded, and the re-run is not.

@@ -41,7 +41,16 @@ CLAIM = re.compile(
 
 
 def compact_time(slurm_time: str) -> str:
-    """Render a SLURM H:MM:SS default the way the README states it (48h)."""
+    """Render a SLURM walltime the way the README states it (48h, 7d).
+
+    Both SLURM forms the default has used are handled: HH:MM:SS, and the
+    D-HH:MM:SS form the 7-day default introduced. A value that is neither
+    is returned unchanged, so the comparison fails loudly on a shape this
+    does not know rather than silently matching nothing.
+    """
+    m = re.fullmatch(r"(\d+)-(\d\d):(\d\d):(\d\d)", slurm_time)
+    if m and m.group(2) == "00" and m.group(3) == "00" and m.group(4) == "00":
+        return f"{int(m.group(1))}d"
     m = re.fullmatch(r"(\d+):(\d\d):(\d\d)", slurm_time)
     if m and m.group(2) == "00" and m.group(3) == "00":
         return f"{int(m.group(1))}h"

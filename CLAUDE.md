@@ -641,15 +641,11 @@ The unfiltered listing comes first: the state filter answers only whether a revi
 
 See [`CLAUDE.cases.md`](CLAUDE.cases.md), "A bot's `COMMENTED` review is the same blind spot".
 
-**The review's own required check run can itself read green over a `NOT_CLEAN` verdict --- this is a distinct failure from "CI green isn't the review verdict".**
-The paragraph above treats `statusCheckRollup` and the review verdict as two different signals that both need checking.
-That framing still assumes the review's *own* check run --- the one wired specifically to gate on the review outcome, e.g. a `review / require-clean-verdict` job from a shared reusable workflow --- tracks that outcome faithfully.
-It does not always.
-Measured on `d-morrison/rme` PRs #1132 and #1133: `gh pr view --json statusCheckRollup` showed `review / require-clean-verdict` as `SUCCESS` on both, while each PR's latest `**Claude finished review` comment carried `"verdict": "NOT_CLEAN"` in its embedded `review-data:` JSON, with open findings.
-Why the two disagree was not established.
-A stale check run from an earlier head, and a gate that never parses the embedded verdict at all, would both produce this reading, and neither was ruled out.
-The pair below does not depend on which it is: the comment is authoritative either way.
-[`review-verdict-pitfalls`](shared/workflow/review-verdict-pitfalls.md) is the catalog for this family --- add further cases there rather than here.
+**The review's own required check run can itself read green over a `NOT_CLEAN` verdict --- a distinct failure from "CI green isn't the review verdict".**
+The `gh pr checks` paragraph at the top of this section treats check state and the review verdict as two signals that both need checking.
+This one says the review's *own* gate, e.g. `review / require-clean-verdict`,
+does not always track the outcome it is named for.
+[`review-verdict-pitfalls`](shared/workflow/review-verdict-pitfalls.md) carries the measured case and the analysis, and is where further cases go.
 
 - **Do:** treat a green review-gating check run as unverified until the latest review comment's own verdict field confirms it, even when that check run's name implies it enforces the verdict directly.
 - **Don't:** read a named review-verdict check (e.g. `require-clean-verdict`) as SUCCESS meaning the review is clean --- name and outcome can disagree.
@@ -1937,6 +1933,31 @@ Run a parse or round-trip check after any heredoc'd edit that writes escape sequ
 [ai-config#1923](https://github.com/Morrison-Lab/ai-config/issues/1923).
 Cost three identical failed patch attempts before the cause was visible, then
 recurred immediately in a `jq` filter reading a PR review body.)
+
+**2026-09-08 recurrence, twice in one session --- believed pattern and displacing fact, stated as their own pair.**
+Believed pattern: typing `"\\n"` inside a heredoc body reaches the
+interpreter as the two-character escape sequence it was typed as.
+Displacing fact: on this transport it reaches the interpreter as `"\n"`,
+a real newline landing inside what was meant to be a literal string.
+First instance: a `printf "...\n"` line, composed inside a heredoc that
+assembled a markdown snippet, had its `\n` collapse to a literal newline
+in the emitted snippet.
+Second instance: a Python-heredoc edit writing `"\\n"` escapes into a test
+fixture produced literal newlines instead, yielding a `SyntaxError` that
+was pushed to a PR before being caught.
+
+- **Do:** build the character with `chr(92)` (or a placeholder token)
+  before it enters a heredoc body, and print `repr()` of the constructed
+  string before writing it.
+- **Don't:** type a doubled backslash directly inside any heredoc body,
+  quoted delimiter or not.
+
+`hooks/warn-heredoc-doubled-backslash.py` is the mechanism this
+recurrence produced: a warn-only `PreToolUse` guard on the `Bash` tool
+matcher that scans a command's heredoc bodies for a doubled backslash and
+names the offending line, so the rule fires at composition time instead
+of relying on having read this section.
+(Tracked as [ai-config#3362](https://github.com/Morrison-Lab/ai-config/issues/3362).)
 
 ## Strict Merge Control Policy
 

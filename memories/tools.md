@@ -836,27 +836,16 @@ The paragraphs above start from `-l`/`uniq -c`, where a deliberate deduplication
 `grep -c` needs no such step: it counts **matching lines** (or, run with `-r`, matching lines per file), and a line carrying the pattern twice still counts once.
 So a `grep -c` reading undercounts by the number of *extra* matches on lines carrying more than one --- a line with three matches contributes two to the shortfall while being one line --- the same silent, plausible-looking shortfall as the dedup case, and it is easy to miss precisely because no dedup command is visible to raise suspicion.
 
-Three miscounts in one PR, and only the first is purely this gap --- the
-other two are worth separating, because "switch `-c` to `-o`" would have
-fixed just one of them:
-
-- "nine remaining raw `\hat` sites" --- 9 matching lines, **10** occurrences.
-  The line-vs-occurrence gap exactly.
-- "the 17 remaining raw `e^{...}`" --- the diff held **18** lines carrying
-  **22** occurrences.
-  The published 17 was neither:
-  it was a *patch script's* replacement count,
-  reported as though it described the file.
-- "all 103 `\sb` uses across 37 files" --- **110** occurrences across **38**
-  files.
-  The 103 is the line-vs-occurrence gap.
-  The file count is not, since no `-c` undercounts files:
-  that half came from a `| grep -v latex-macros` filter
-  in the counting pipeline that the sentence never mentioned.
-
+Three miscounts in one PR, with three different causes --- worth separating,
+because "switch `-c` to `-o`" fixes only the first:
+"nine remaining raw `\hat` sites" was 9 matching lines and **10** occurrences;
+"the 17 remaining raw `e^{...}`" was a *patch script's* replacement count,
+where the diff held **18** lines carrying **22** occurrences;
+"103 `\sb` uses across 37 files" was **110** occurrences across **38** files,
+the file half coming from an unmentioned `| grep -v latex-macros` filter
+rather than from `-c` at all.
 Two of the three reached public issue bodies before being corrected.
-What unifies them is not one flag: each number was really derived, and each
-answered a narrower question than the sentence quoting it asked.
+All three numbers were genuinely derived, which is why none felt like a guess.
 For a true occurrence count use the parent section's idiom,
 `grep -roh 'PATTERN' . | wc -l`.
 

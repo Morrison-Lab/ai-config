@@ -51,7 +51,10 @@ Nothing in this fragment fires on that, because there is no wrong object to name
 So when a check of yours came back clean and the claim still feels under-supported, ask which of the two is happening: whether you read the wrong thing, or read the right thing and then took a step.
 
 - **Do:** send a claim to that section instead of this one when the artifact is the correct one and the doubt is about the step taken from it.
-- **Don't:** read a shape here failing to match as evidence the claim is supported --- these shapes cover substitutions only.
+- **Don't:** read a shape here failing to match as evidence the claim is supported --- the four shapes below cover substitutions only.
+
+One case sits between the two, and has its own section at the end of this file: the artifact is right, the reading is right, and the claim is the *same* proposition at a wider scope than the measurement covered.
+That is not a step taken from the measurement, so it is not the neighbouring rule either.
 
 ## The four shapes
 
@@ -359,9 +362,13 @@ See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), 
 ## A measurement of the right artifact can still be scoped narrower than the claim made from it
 
 Every shape above is a *substitution*: the thing read is not the thing the claim is about.
-This one is subtler, because the thing read genuinely is the right artifact --- the claim is just wider than what got measured.
-Nothing about that feels like guessing, because the number really was derived, from the real object, by a real command.
-It just answered a narrower question than the one the prose then asked.
+This one is about the **sentence** rather than the object: whatever was measured, the claim reported covers more than the measurement did.
+Nothing about it feels like guessing, because the number really was derived by a real command.
+
+The two failures overlap, and the four instances below show it.
+Two are substitutions as well --- a build path the system never uses, and a baseline read that returned nothing --- so the shapes above would have caught them had anyone asked.
+Two are not: the display-math and `microtype` cases read exactly the right document, and only the sentence overreached.
+What they share is the tell, not the mechanism: a scope decision made once during setup, and never repeated in the sentence that reports the result.
 
 [`metacognitive-monitoring`](metacognitive-monitoring.md)'s "A sound measurement does not license the claim standing next to it" already names the general gap between a measurement and a neighbouring claim, including cases where the claim is about a different proposition entirely.
 What follows is the narrow case where the claim is about the *same* proposition as the measurement, just at a wider scope along one identifiable axis --- build path, ref, math subset, package set --- so the fix is naming that one axis rather than restating the whole claim.
@@ -373,10 +380,15 @@ Four instances from one session, all against the same PR, none of which felt lik
   The book never builds that way --- Pandoc reads the source, expands the `macros.qmd` LaTeX macros the chapter actually uses, and only then hands TeX to the renderer.
   Compiling the raw source with `pdflatex` measures an artifact the build never produces, so "the chapter's math does not compile" was a claim about a document nobody ships.
   Two issues were filed on that premise before the mismatch surfaced.
-- **A submodule path read through `git show`, silently empty.**
+- **A submodule path read through `git show`, with the error thrown away.**
   The same harness fetched the comparison baseline's macros with `git show <ref>:latex-macros/macros.qmd`.
-  `latex-macros` is a submodule, so that path is a gitlink in `<ref>`'s tree, not a blob --- `git show` returns nothing, and nothing about an empty string looks like an error.
-  The baseline arm silently compiled with zero macros defined, inflating every comparison figure against it (a "153pt worst case" that was really 47pt once the real baseline macros were loaded).
+  `latex-macros` is a submodule, so that path is a gitlink in `<ref>`'s tree rather than a blob.
+  Git says so, loudly: measured `rc=128` and
+  `fatal: path 'latex-macros/macros.qmd' exists on disk, but not in 'HEAD'` on stderr.
+  Only *stdout* was empty --- and the harness read stdout alone, discarding both the status and stderr,
+  so the baseline arm compiled with zero macros defined and inflated every figure built against it
+  (a "153pt worst case" that was really 47pt once the real baseline macros loaded).
+  The lesson is the harness's, not git's: an empty read is only silent if you silence it.
 - **Display math measured, inline math assumed included.**
   An overfull-box measurement scanned only `$$...$$` display blocks and was reported as covering "the chapter" --- it never touched the inline `$...$` math in the parent file, some of which also overflowed.
 - **A required package left out of the harness, silently changing the answer.**
@@ -388,7 +400,8 @@ The shared shape: a scope decision --- which build path, which ref, which subset
 the fix here is a stricter version of the same falsifying-question test, aimed at scope rather than identity: **what does this measurement cover, and is that the same thing the claim names?**
 
 - **Do:** state a measurement's scope in the same sentence as its number --- which build path, which ref, which subset, which flags --- rather than in a paragraph the reader has to reconstruct.
-- **Do:** confirm the artifact measured is produced by the same path the real system uses, not a hand-rolled shortcut that happens to consume the same source file (a submodule path read with `git show` is the sharpest case: empty is a silent success, not an error).
+- **Do:** confirm the artifact measured is produced by the same path the real system uses, not a hand-rolled shortcut that happens to consume the same source file.
+- **Do:** check a read's exit status, not just whether it returned bytes --- every empty read in these four instances was accompanied by a non-zero status and a message the harness discarded.
 - **Don't:** report a subset measurement ("display math", "one package configuration") under the claim's full name ("the chapter's math", "the worst case") without naming the subset.
 - **Don't:** trust a comparison baseline's absolute number without confirming its own inputs loaded --- an empty or under-configured baseline arm inflates every relative claim built on it.
 

@@ -423,6 +423,15 @@ def main(argv: list) -> int:
         except (zipfile.BadZipFile, OSError) as exc:
             print(f"ERROR: reference {args.reference} could not be opened: {exc}")
             return 1
+        # An empty reference is worse than a silent pass: every triple in
+        # the documents under test would then read as absent from it, so
+        # the run would bury a real finding under a flood of false ones.
+        if ref_stats["parts_examined"] == 0:
+            print(
+                f"ERROR: reference {args.reference} has no XML parts, so it "
+                "is not usable as ground truth"
+            )
+            return 1
         reference_examined = ref_stats["triples_examined"]
         print(f"== reference: {args.reference} ==")
         print(

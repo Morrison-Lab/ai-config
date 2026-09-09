@@ -341,6 +341,16 @@ with __import__("tempfile").TemporaryDirectory() as tmp:
     check("a package with no XML parts is a finding, not a clean pass", rc == 1)
     check("the finding says nothing was examined", "nothing-examined" in out)
 
+    # The same gap on the --reference side is worse than a silent pass: an
+    # empty reference makes every triple in the document under test read as
+    # absent from it, burying a real finding under false ones.
+    rc, out = run_check([good], reference=hollow)
+    check("an empty reference is refused rather than used as ground truth", rc == 1)
+    check(
+        "the empty-reference error says the reference is unusable",
+        "not usable as ground truth" in out and "novel-nesting" not in out,
+    )
+
     # -- the nesting diff compares namespaces, not just local names ----------
     ns_novel = make_docx(tmp_path, "ns-novel.docx", NAMESPACE_ONLY_NOVELTY)
     rc, out = run_check([ns_novel], reference=reference)

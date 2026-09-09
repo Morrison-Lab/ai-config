@@ -331,6 +331,16 @@ with __import__("tempfile").TemporaryDirectory() as tmp:
     check("a directory is reported as an error rather than raising", rc == 1)
     check("the directory error is the checker's own message", "ERROR" in out)
 
+    # A zip with no XML parts is the vacuous pass the stats line exists to
+    # expose: without this, "examined 0 parts ... no findings" exits 0, which
+    # is what every caller actually consumes.
+    hollow = tmp_path / "hollow.docx"
+    with zipfile.ZipFile(hollow, "w") as z:
+        z.writestr("word/media/image1.png", b"not xml")
+    rc, out = run_check([hollow])
+    check("a package with no XML parts is a finding, not a clean pass", rc == 1)
+    check("the finding says nothing was examined", "nothing-examined" in out)
+
     # -- the nesting diff compares namespaces, not just local names ----------
     ns_novel = make_docx(tmp_path, "ns-novel.docx", NAMESPACE_ONLY_NOVELTY)
     rc, out = run_check([ns_novel], reference=reference)

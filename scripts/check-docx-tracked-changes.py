@@ -183,13 +183,14 @@ def check_marker_in_rpr(root: ET.Element, part: str, findings: list) -> int:
     examined = 0
     for rpr in root.iter(W + "rPr"):
         examined += 1
-        grandparent = parents.get(rpr)
-        if grandparent is not None and grandparent.tag == W + "pPr":
-            continue  # CT_ParaRPr: w:ins/w:del is legal here
+        # The w:rPr's OWN parent, which is what the CT_ParaRPr exception is
+        # stated in terms of: a marker is legal only when this is a w:pPr.
+        rpr_parent = parents.get(rpr)
+        if rpr_parent is not None and rpr_parent.tag == W + "pPr":
+            continue
+        parent_desc = local(rpr_parent.tag) if rpr_parent is not None else "(root)"
         for child in rpr:
             if child.tag in (W + "ins", W + "del"):
-                parent = parents.get(rpr)
-                parent_desc = local(parent.tag) if parent is not None else "(root)"
                 findings.append(
                     Finding(
                         "marker-in-rpr",
@@ -447,6 +448,19 @@ def main(argv: list) -> int:
         if reference_triples is not None:
             check_against_reference(triples, reference_triples, findings)
 
+        # Zero parts means the package held nothing this tool can read, which
+        # is not the same fact as a document that was read and found clean.
+        # Reporting it as clean is the vacuous pass the stats line exists to
+        # make visible, so it is a finding rather than a footnote.
+        if stats["parts_examined"] == 0:
+            findings.append(
+                Finding(
+                    "nothing-examined",
+                    "(package)",
+                    "no XML parts found -- this is not a .docx, or it is empty; "
+                    "nothing was checked",
+                )
+            )
         report(docx_path, findings, stats)
         if findings:
             any_findings = True

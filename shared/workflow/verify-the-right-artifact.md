@@ -1223,7 +1223,9 @@ The malformed marker is symmetric under both readings, and the namespace defect 
 - **Do:** treat a clean content diff as evidence about content only, never as evidence that the file is well-formed or that its consuming application will open it.
 - **Don't:** infer markup validity from a passing accept/reject (or any other rendered-content) comparison -- a malformed gate and a working one can render identically, and a namespace defect can sit entirely outside what the comparison looks at.
 - **Don't:** trust a hand-rolled accept/reject walker's silence as confirmation;
-  per this file's "A hand-built accept/reject simulator is itself an unverified instrument..." section above, run it against a document you know is malformed and confirm it actually flags something, not only against documents you expect to pass.
+  per [`memories/office-open-xml.md`](../../memories/office-open-xml.md)'s
+  "A hand-built accept/reject simulator is itself an unverified instrument..."
+  section, run it against a document you know is malformed and confirm it actually flags something, not only against documents you expect to pass.
 
 (Measured 2026-09-09: a repair pass on a manuscript's tracked-change OMML equations swapped a `w:ins`/`w:del` marker from an invalid child-of-`w:rPr` position to the valid wrapping position across five successive delivered copies, while the verification in use throughout was `word/document.xml`'s accept/reject text diff (comparing paragraph text under each mode).
 That diff reported the documents clean at every delivery -- the malformed marker was an empty element with no children, so neither the accept walk nor the reject walk treated it as gating anything, and the run's text simply always appeared.

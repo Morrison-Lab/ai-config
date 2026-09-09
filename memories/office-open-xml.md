@@ -474,7 +474,8 @@ The one place a marker legitimately sits **inside** a `w:rPr` is when that `w:rP
 That single exception is the whole of it: everywhere else, `w:ins`/`w:del` wraps `w:rPr` and the content, rather than sitting inside it.
 
 **The cause was a direction-ambiguous note, and the fix is to quote the source instead of describing its shape.**
-An earlier note recorded a related measurement as "54 del / 53 ins on path `w:del < w:rPr < m:r < m:oMath`" --- see this same file's "A regex simulating accept/reject..." section above, which is the entry that notation comes from.
+An earlier note in this same file measured 54 `<w:del>` and 53 `<w:ins>`
+elements on the path `w:del < w:rPr < m:r < m:oMath` --- see its "A regex simulating accept/reject..." section above, which is the entry that notation comes from.
 A "path" written as a chain of tag names carries no marked direction: read one way it says the marker sits *inside* the properties, read the other way it says the marker *wraps* them, and nothing in the four bare names decides which.
 That note was read in the wrong direction when used as a template for writing brand-new markers, and the nesting came out inverted.
 

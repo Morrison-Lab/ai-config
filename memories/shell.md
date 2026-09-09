@@ -38,6 +38,44 @@ Because the pattern is a substring of the searcher's own `argv`, this causes sil
 
 (Measured 2026-09-01 during the [`serocalculator#668`](https://github.com/UCD-SERG/serocalculator/pull/668) session, documented in [ai-config#2915](https://github.com/Morrison-Lab/ai-config/issues/2915).)
 
+### Two worktrees make the pattern non-discriminating, and the cwd filter does not exclude you
+
+The rule above says kill by PID.
+Where several worktrees of one repo run the same script, pattern-killing is worse than merely imprecise, in two ways that both read as safe.
+
+**The pattern cannot tell the worktrees apart.**
+Cutting a new worktree does not change a script's path within the repo, so `pkill -f "scripts/run-local-validation.py"` matches every worktree's run of it, a peer's live one included.
+This holds for a *relative*-path invocation, which is the usual shape.
+Launching by absolute path gives each worktree a distinct command line, which is the anchoring remedy the bullet above already prescribes.
+
+**Filtering the candidates by working directory still does not exclude your own caller.**
+`pgrep` on Linux (procps-ng) excludes its own PID and nothing else, so a caller whose argv carries the pattern is itself a match --- and its working directory is your worktree by construction, which is exactly what such a filter accepts.
+Measured with two throwaway directories standing in for worktrees, a `sleep` in each, and the listing run as `bash -c '<script>'` from the first:
+
+```
+pid=19236 cwd=/tmp/wtDemoB self=no     <- peer, correctly excluded by cwd
+pid=19238 cwd=/tmp/wtDemoA self=no     <- the intended target
+pid=19240 cwd=/tmp/wtDemoA self=YES    <- the caller, wrongly accepted
+```
+
+`pgrep -A`/`--ignore-ancestors` drops the third row and keeps the first two.
+BSD and macOS `pgrep` document the opposite default --- caller and ancestors excluded unless re-admitted --- so confirm which polarity your platform has rather than carrying either assumption across.
+
+**Whether the caller matches at all depends on how it was invoked**, which is why one clean test proves little: `bash -c '<script>'` carries the pattern in its own argv and matches, while `sh script.sh` and a script on stdin do not, because their argv is just the interpreter and a path.
+
+**A report that a kill happened is a state claim about someone else's process.**
+The natural follow-up to "I may have killed your run" is to tell the peer to re-run, and acting on that without checking is backwards: if the run survived, the advice destroys it.
+Re-read the peer's process table before recommending or acting on any such remediation.
+
+- **Do:** pair a `/proc/<pid>/cwd` filter with `pgrep -A`, or with an explicit `$$`-and-ancestors exclusion.
+- **Do:** re-query a peer's process state before acting on any report that a kill succeeded, including your own.
+- **Don't:** run `pkill -f` against a script path more than one worktree can run.
+- **Don't:** conclude the caller is safe from one test --- an invocation whose argv omits the pattern hides the hazard rather than ruling it out.
+
+(Measured 2026-09-09 on `Morrison-Lab/ai-config`, three worktrees deep: an agent ran `pkill -f "scripts/run-local-validation.py"` to clear its own stale run and reported it may have caught a peer's.
+The peer's run was alive 90 seconds later, so whether that `pkill` hit an earlier run or missed on timing was never established --- the *mechanism* is confirmed, the damage on that occasion is not.
+Tracked as [ai-config#3427](https://github.com/Morrison-Lab/ai-config/issues/3427).)
+
 ## Heredocs in chained terminal commands are unreliable
 
 Multi-line heredoc-style commands in chained terminal commands get garbled or silently fail.

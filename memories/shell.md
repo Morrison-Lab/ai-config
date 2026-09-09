@@ -40,17 +40,41 @@ Because the pattern is a substring of the searcher's own `argv`, this causes sil
 
 ### Two worktrees make the pattern non-discriminating, and the cwd filter does not exclude you
 
-The rule above says kill by PID.
-Where several worktrees of one repo run the same script, pattern-killing is worse than merely imprecise, in two ways that both read as safe.
+The bullets above already give the remedies: kill by PID,
+and where a pattern is unavoidable, anchor it or exclude the current shell.
+This section is what several worktrees of one repo add to that,
+and the first half of it is an elaboration of "exclude the current shell process"
+rather than a new fix.
 
 **The pattern cannot tell the worktrees apart.**
-Cutting a new worktree does not change a script's path within the repo, so `pkill -f "scripts/run-local-validation.py"` matches every worktree's run of it, a peer's live one included.
-This holds for a *relative*-path invocation, which is the usual shape.
-Launching by absolute path gives each worktree a distinct command line, which is the anchoring remedy the bullet above already prescribes.
+Cutting a new worktree does not change a script's path within the repo,
+so `pkill -f "scripts/run-local-validation.py"` matches every worktree's run of it,
+a peer's live one included.
+That holds for a *relative*-path invocation, which is the usual shape.
+Launching by absolute path instead gives each worktree a distinct command line ---
+a different technique from the regex anchoring the bullet above prescribes,
+and one that solves a different problem:
+anchoring constrains where in a string a match may occur,
+while an absolute path makes the whole argv unique across worktrees.
+Note that a relative-path *pattern* still matches an absolute-path invocation,
+since the absolute path contains the relative one as a substring.
 
-**Filtering the candidates by working directory still does not exclude your own caller.**
-`pgrep` on Linux (procps-ng) excludes its own PID and nothing else, so a caller whose argv carries the pattern is itself a match --- and its working directory is your worktree by construction, which is exactly what such a filter accepts.
-Measured with two throwaway directories standing in for worktrees, a `sleep` in each, and the listing run as `bash -c '<script>'` from the first:
+**Filtering the candidates by working directory does not exclude your own caller.**
+`pgrep` on Linux (procps-ng) excludes its own PID and nothing else,
+so a caller whose argv carries the pattern is itself a match ---
+and its working directory is your worktree by construction,
+which is exactly what such a filter accepts.
+Run this from one of two throwaway directories standing in for worktrees,
+with a long-running process started in each:
+
+```bash
+for pid in $(pgrep -f "$pattern"); do
+  printf 'pid=%s cwd=%s self=%s\n' "$pid" "$(readlink /proc/$pid/cwd)" \
+    "$( [ "$pid" = "$$" ] && echo YES || echo no )"
+done
+```
+
+Invoked as `bash -c '<the script above>'` from `/tmp/wtDemoA`:
 
 ```
 pid=19236 cwd=/tmp/wtDemoB self=no     <- peer, correctly excluded by cwd
@@ -59,12 +83,23 @@ pid=19240 cwd=/tmp/wtDemoA self=YES    <- the caller, wrongly accepted
 ```
 
 `pgrep -A`/`--ignore-ancestors` drops the third row and keeps the first two.
-BSD and macOS `pgrep` document the opposite default --- caller and ancestors excluded unless re-admitted --- so confirm which polarity your platform has rather than carrying either assumption across.
+BSD and macOS document the opposite default:
+`pkill.1` in both `freebsd/freebsd-src` and `apple-oss-distributions/adv_cmds`
+states, under `-a`, that "the current pgrep or pkill process and all of its ancestors are excluded".
+So confirm which polarity your platform has
+rather than carrying either assumption across.
 
-**Whether the caller matches at all depends on how it was invoked**, which is why one clean test proves little: `bash -c '<script>'` carries the pattern in its own argv and matches, while `sh script.sh` and a script on stdin do not, because their argv is just the interpreter and a path.
+**Whether the caller matches at all depends on how it was invoked**,
+which is why one clean test proves little.
+A `bash -c '<script>'` caller carries the pattern in its own argv and matches.
+`sh script.sh` does not, since its argv is the interpreter and a path.
+A script fed on stdin does not either, and for a stronger reason:
+its argv is just `bash`, with no path in it at all.
 
 **A report that a kill happened is a state claim about someone else's process.**
-The natural follow-up to "I may have killed your run" is to tell the peer to re-run, and acting on that without checking is backwards: if the run survived, the advice destroys it.
+The natural follow-up to "I may have killed your run" is to tell the peer to re-run,
+and acting on that without checking is backwards:
+if the run survived, the advice destroys it.
 Re-read the peer's process table before recommending or acting on any such remediation.
 
 - **Do:** pair a `/proc/<pid>/cwd` filter with `pgrep -A`, or with an explicit `$$`-and-ancestors exclusion.
@@ -72,8 +107,12 @@ Re-read the peer's process table before recommending or acting on any such remed
 - **Don't:** run `pkill -f` against a script path more than one worktree can run.
 - **Don't:** conclude the caller is safe from one test --- an invocation whose argv omits the pattern hides the hazard rather than ruling it out.
 
-(Measured 2026-09-09 on `Morrison-Lab/ai-config`, three worktrees deep: an agent ran `pkill -f "scripts/run-local-validation.py"` to clear its own stale run and reported it may have caught a peer's.
-The peer's run was alive 90 seconds later, so whether that `pkill` hit an earlier run or missed on timing was never established --- the *mechanism* is confirmed, the damage on that occasion is not.
+(Measured 2026-09-09 on `Morrison-Lab/ai-config`, three worktrees deep:
+an agent ran `pkill -f "scripts/run-local-validation.py"` to clear its own stale run
+and reported it may have caught a peer's.
+The peer's run was alive 90 seconds later,
+so whether that `pkill` hit an earlier run or missed on timing was never established ---
+the *mechanism* is confirmed, the damage on that occasion is not.
 Tracked as [ai-config#3427](https://github.com/Morrison-Lab/ai-config/issues/3427).)
 
 ## Heredocs in chained terminal commands are unreliable

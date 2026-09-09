@@ -222,26 +222,47 @@ CASES = [
           "table.")], "warn",
      "same data-merge sentence, but 'branch' anchors it as PR-readiness "
      "vocabulary within the window"),
+
+    # --- #3475 finding 2: with NO CI reading anywhere, `idx > last_partial`
+    # was `idx > -1`, true for every event -- so the scoping fix was silently
+    # inert in exactly the transcripts that have no partial reading at all,
+    # re-admitting the whole transcript through the branch written to stop it.
+
+    ([UNRELATED_AGENT_DISPATCH, UNRELATED_AGENT_REPORT,
+      say("#123 is fully clean.")], "allow",
+     "no CI reading anywhere: an unrelated dispatch must not make a claim "
+     "about a different PR look subagent-sourced (there is no window to be "
+     "inside when last_partial is -1)"),
 ]
 
-# (events, must_contain, must_not_contain, label) -- finding 2 regression
-# (ai-config#3472): the WARN explanation must be derived from the condition
-# that actually fired, not from an independent predicate that can disagree
-# with it. This case has hit_core match ("fully clean" -- original
-# vocabulary) with a RELEVANT subagent report whose index sits before the
-# eventual PUSH: the old predicate `last_subagent >= 0 and last_complete <=
-# last_subagent` evaluates False here (last_complete=3 > last_subagent=2),
-# so it would wrongly print the vocabulary explanation even though the
-# claim used no merge-ready vocabulary at all and the real reason is the
-# subagent's stale report.
+# (events, must_contain, must_not_contain, label). The WARN explanation must
+# be derived from the condition that ACTUALLY fired, and must never assert
+# something the transcript contradicts.
+#
+# The first case is the one #3475's review caught this suite baking in
+# backwards. Shape: AGENT_DISPATCH, AGENT_REPORT, CHECKER_3468, PUSH, claim.
+# The session DID run the complete instrument, after the subagent's report --
+# so "you are relying on a subagent's report, not a reading you ran yourself"
+# is simply false here. What left the claim uncovered is the ordinary PUSH
+# after that read. Naming the subagent would be a false statement from a hook
+# whose whole purpose is grounding claims in what the transcript shows.
+#
+# The second case keeps the subagent reason honest in the situation it was
+# written for: the report is the LAST evidence, with no complete read after it.
 CONTENT_CASES = [
     ([AGENT_DISPATCH, AGENT_REPORT, CHECKER_3468, PUSH,
       say("#3468 is fully clean.")],
+     "a `git push` landed after it",
      "dispatched subagent's OWN report",
-     "without the vocabulary this guard originally keyed on",
-     "source_note must name the subagent as the reason, never fabricate "
-     "the vocabulary explanation, when hit_core matched and a relevant "
-     "subagent -- not vocabulary -- is why WARN fired"),
+     "a complete read AFTER the subagent means the push, not the subagent, "
+     "is why the claim is uncovered -- the message must say so and must not "
+     "blame the subagent"),
+    ([CHECKER_3468, AGENT_DISPATCH, AGENT_REPORT,
+      say("#3468 is fully clean.")],
+     "dispatched subagent's OWN report",
+     "a `git push` landed after it",
+     "with the subagent's report as the LAST evidence, the subagent reason "
+     "is the true one and the push reason must not appear"),
 ]
 
 

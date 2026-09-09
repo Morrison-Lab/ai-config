@@ -319,7 +319,11 @@ def _relevant_last_subagent(subagent_events, last_partial, claim_pr_refs):
     """
     relevant = -1
     for idx, pr_refs in subagent_events:
-        in_window = idx > last_partial
+        # A window exists only if there IS a CI reading to be after.
+        # With `last_partial == -1`, `idx > -1` is true for EVERY
+        # event, which re-admits the whole transcript through the
+        # very branch that was scoped to stop it (#3475 finding 2).
+        in_window = last_partial >= 0 and idx > last_partial
         matches_target = bool(claim_pr_refs) and bool(pr_refs & claim_pr_refs)
         if in_window or matches_target:
             relevant = max(relevant, idx)
@@ -421,7 +425,13 @@ def main() -> int:
     # least one of the two branches below always applies, and both apply
     # when both reasons are in play.
     reasons = []
-    if last_subagent >= 0:
+    # Only name the subagent when it is actually WHY the claim is
+    # uncovered. If a complete instrument read happened after the
+    # subagent's report, the session did run the instrument, and a
+    # later push is what left the claim stale -- saying otherwise is
+    # a false statement from a hook whose job is grounding claims in
+    # what the transcript shows (#3475 finding 1).
+    if last_subagent >= 0 and last_subagent > last_complete:
         reasons.append(
             "The most recent evidence in this transcript for that claim is a "
             "dispatched subagent's OWN report, not a reading you ran yourself. "
@@ -432,6 +442,13 @@ def main() -> int:
             "write-up): a subagent reported \"status: CLEAN / MERGEABLE\", and "
             "`check-pr-fully-clean.py` later exited 1 because a verdict-bearing "
             "review landed AFTER the subagent finished."
+        )
+    if last_push > last_complete >= 0 and last_complete >= last_subagent:
+        reasons.append(
+            "A complete instrument read is in this transcript, but a "
+            "`git push` landed after it, so it describes a head that is "
+            "no longer this PR's. A verdict covers the commit it named; "
+            "re-run the instrument against what you just pushed."
         )
     if not hit_core:
         reasons.append(

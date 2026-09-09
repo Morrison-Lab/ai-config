@@ -349,6 +349,15 @@ See [`finish-wave`](skills/finish-wave/SKILL.md).
 When listing PRs in a table (or anywhere they could be clickable), make each PR number a markdown link to the PR URL — `[#237](https://github.com/<owner>/<repo>/pull/237)`.
 The plain text form forces the user to copy/paste; the linked form lets them open the PR in one click.
 
+**The same rule covers any forge artifact I reference, not just a PR number in a table.**
+Telling the user I replied to a comment, filed an issue, posted a review, or kicked off a run --- in a table or in ordinary chat prose --- and naming it without a link leaves them to go find it themselves, which is the exact cost the table-only version of this rule already removes for PR numbers.
+A comment has no number to recognize the way a PR does, so its link is the *only* way the user can locate it without re-deriving the search themselves.
+
+- **Do:** link every comment, review, issue, PR, or run I mention having acted on, wherever the mention occurs --- table or prose.
+- **Don't:** report "I replied to that" or "filed the issue" as a bare fact with no URL attached.
+
+(Directive from the user, 2026-09-09: telling them a reply had been posted without linking it made them go find it themselves.)
+
 ## Tag chat output by category so long recaps stay scannable
 
 Recaps get long across many parallel tracks, so tag categories of output with a stable marker and let the eye jump straight to what needs the user's attention.
@@ -1501,6 +1510,27 @@ The remedy is to replace the pronoun with the noun, not to reword around it.
 
 This is distinct from [`challenge-ambiguous-terminology`](shared/workflow/challenge-ambiguous-terminology.md), which governs a word whose **meaning** is unresolved rather than a word whose **antecedent** is.
 Apply it wherever `code-review`/`ard`/`ardi` already reviews a prose diff, alongside the other prose-review rules in this file.
+
+## Writing style: don't build a model only to retract it
+
+A "rug-pull" presents a model, claim, or picture and a sentence or two later
+retracts or replaces it --- "X.
+However, the implementation actually Y."
+Every sentence can be individually true and cited; the defect is in the
+order, which no fact-check or read-through inspects.
+It is also the natural shape to write when the facts were discovered in
+that order, which is why it survives self-review: the prose narrates the
+author's own path rather than exposing the subject to a reader who never
+walked it.
+Lead with what is actually the case, and present an idealization or a
+prior approach afterward as an extension, not a correction --- except when
+the **reader** already holds the wrong model and the passage exists to
+correct it, in which case presenting it first is the point.
+
+[shared/writing/no-rug-pulls.md](shared/writing/no-rug-pulls.md)
+
+Check this at composition time as much as in review: the order is fixed while drafting,
+and a read-through inspects each sentence rather than the sequence.
 
 ## Writing style: semantic line breaks in prose
 

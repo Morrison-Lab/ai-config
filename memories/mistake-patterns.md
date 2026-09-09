@@ -1208,3 +1208,43 @@ blindness in a different code shape: there a raw-text subsumption proof was
 used to DELETE a parser branch, here a raw-text scan is used to decide the
 parser never RUNS.
 Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
+
+## Pattern 54: A Briefed "Measured" Claim Ships Unverified Because It Already Sounds Checked
+
+- **Mistake**: publishing a technical claim into a memory file because a task
+  brief stated it as already "measured", instead of reproducing it first.
+  A claim pre-labelled as verified reads as settled input rather than as an
+  assertion to check ---
+  [`dont-take-my-word-for-it.md`](../shared/principles/dont-take-my-word-for-it.md)'s
+  "illusion of prior verification", with the label doing confidence's work.
+- **Direction of failure**: fail-open into the corpus.
+  The false claim was the entry's whole thesis, so shipping it would have
+  taught every later reader a wrong lesson from a "reproduction" that never ran.
+- **Example**: 2026-09-09,
+  [#3379](https://github.com/Morrison-Lab/ai-config/pull/3379).
+  The brief asserted that an unpinned `npx markdownlint-cli2` matched no files
+  and that `Summary: 0 issues in 0 files` was the tell.
+  Reproduction disproved both: an unpinned run lints the whole corpus exactly
+  as a pinned one does, and that string is a later version's wording for the
+  same clean verdict, appearing over 752 files and over an empty match alike.
+  Scope lives on the `Linting:` line above it, and this was caught before
+  review.
+- **A second, narrower miss rode along**, caught by a reviewer rather than by
+  me: the dupe-check grepped only the two files the brief named, missing
+  `shared/principles/fail-fast.rationale.md` and
+  `memories/nested-worktree-instrument-inflation.md`, which already carried the
+  lesson.
+  [`grep-is-not-coverage.md`](../shared/workflow/grep-is-not-coverage.md) names
+  the shape; the specific error was letting the brief set the search scope.
+- **Fix**: treat "measured" in a brief as a claim to re-measure, and scope a
+  dupe-check to the corpus rather than to the files a brief happens to name.
+
+- **Do:** reproduce a brief's own "measured" claim before writing it into a
+  memory file, exactly as for any unverified assertion.
+- **Do:** grep the whole corpus for a dupe-check, not the files the task names.
+- **Don't:** read a stated measurement, a date, or confident phrasing as
+  evidence the claim was checked --- those are the signals
+  [`dont-take-my-word-for-it.md`](../shared/principles/dont-take-my-word-for-it.md)
+  says to distrust.
+- **Don't:** let a brief-scoped grep stand in for a corpus-wide one because it
+  returned zero hits.

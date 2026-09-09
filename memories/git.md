@@ -64,6 +64,46 @@ ordering was right and the interval understated by four weeks.
 The graft decoration and the `--git-dir` failure above were reproduced
 directly, on a `--depth 3` clone of this repo plus a linked worktree.)
 
+## `git log -S`/`-G` on one half of a coordinated multi-part change finds the wrong commit
+
+Some states are produced by **two or more separate edits landing together**:
+disabling a review agent in `Morrison-Lab/gha`-derived workflows takes both
+commenting out the workflow's `pull_request:` trigger and setting the job's
+`if: false`, and neither edit alone reproduces the disabled state.
+A `-S`/`-G` pickaxe search anchored on one half's text only finds commits that
+touched that half, which is a narrower population than "commits that changed
+whether the agent is disabled" --- so it can return a real, plausible commit
+that is nonetheless not the one that produced the state being investigated.
+
+Searching `git log -S'  # pull_request:'` for when a repo's `@claude` agent was
+disabled found only commits touching the trigger comment, and returned one
+that was not the commit that actually disabled the agent (the `if: false`
+edit landed separately).
+The wrong commit was published as the answer and had to be corrected once the
+other half was checked.
+
+The general shape: when a claim is "which commit produced state X" and X is
+defined by N coordinated edits, a pickaxe search on any single one of those N
+edits is a search for a **different, narrower** question --- "which commit
+touched edit-shape 1" rather than "which commit produced X" --- and the two
+can have different answers whenever the edits landed in separate commits.
+
+- **Do:** enumerate every edit that jointly produces the state before
+  picking a search term, and run `-S`/`-G` against **each** one, taking the
+  latest of the resulting commits (or the one where the last missing piece
+  landed) as the actual answer.
+- **Do:** when only one edit's pattern is at hand, state that the result
+  answers "which commit touched this text", not "which commit produced this
+  state", until the other edits are checked too.
+- **Don't:** treat a single `-S`/`-G` hit on a multi-part state as settling
+  which commit caused it --- confirm the commit actually produces the full
+  state (e.g. by checking it out and reproducing the behavior) before citing
+  it.
+
+(`Morrison-Lab/gha`, `UCD-SERG/serodynamics`: a claim that commit `e9bc578`
+disabled the `@claude` review agent in serodynamics was corrected to
+`b5816d2` after checking the `if: false` half separately.)
+
 ## Git push with multiple writable remotes
 
 - **An unqualified `git push` follows the branch's configured upstream, not the repository's canonical remote.**

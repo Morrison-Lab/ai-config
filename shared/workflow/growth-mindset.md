@@ -282,8 +282,40 @@ so the absence of the first two is no evidence about the third.
   established it; a claim that ends the inquiry can never be contradicted by
   it.
 
+### The route via a true measurement, over-generalized
+
+**The claim is more durable when a real measurement sits under it, and that
+is the route this section does not name.**
+Everything above treats the limitation as inferred from the *shape of the tool
+surface* --- a listing with no matching entry.
+The harder case starts from a genuine negative result and over-generalizes it.
+Probing a handful of packages and finding each absent is a true measurement;
+concluding that the environment cannot install any is a different claim
+entirely, about a population the probe never sampled.
+That is [`metacognitive-monitoring`](metacognitive-monitoring.md)'s scope
+failure wearing a measurement's clothes, and it resists correction better than
+a guess does, because you can point at the check you ran.
+
+The tell is a grammatical shift that no instrument catches: the evidence is
+about *these* things, and the sentence written down is about *this
+environment*.
+Ask which population was actually sampled before writing the general form.
+
+Measured 2026-09-08 on `UCD-SERG/serocalculator#685`, where the generalized
+claim survived several hours and four kinds of avoidable rework before one
+`available.packages()` call refuted it.
+
+- **Do:** name the population your probe sampled, and keep the written claim
+  to that population.
+- **Do:** run the availability query for the *class* of resource --- for
+  packages, the index itself --- rather than generalizing from instances.
+- **Don't:** treat a true narrow negative as licence for a broad one; the
+  measurement makes the wrong claim harder to dislodge, not likelier to be
+  right.
+
 See [`growth-mindset.cases.md`](growth-mindset.cases.md), "branch-protection
-settings reported unreadable across several turns, never once queried".
+settings reported unreadable across several turns, never once queried" and
+"an R toolchain declared absent from a probe of five packages".
 
 ## Applies to our own metacognitive tooling, too
 

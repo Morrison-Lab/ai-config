@@ -21,6 +21,11 @@ When PSW and this guidance disagree, PSW wins.
 - **Join independent clauses with coordinating conjunctions** (and, but, so, or)
   over subordinate constructions. Prefer "X is fast, but Y is correct" over
   "While X is fast, Y is correct."
+- **Don't build a model only to retract it.**
+  Lead with what is actually the case;
+  present an idealization or a prior approach afterward,
+  as an extension rather than a correction to something just asserted.
+  See [`no-rug-pulls`](no-rug-pulls.md).
 
 This is a default, not an absolute rule. Keep a clause or a technical term when
 removing it would lose meaning or precision. Never trade an honest hedge for

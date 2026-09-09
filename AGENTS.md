@@ -453,6 +453,42 @@ Complete the delivery cycle: create the applicable tracking issue when issue-fir
 This does not grant merge authority.
 The strict merge policy below still applies.
 
+## Commit, push, and PR any potentially-reusable work you produce
+
+The section above covers work you were asked to implement.
+This covers what you produce incidentally, in any medium: a script that computed a number, a derivation you worked out to settle a question, an analysis you wrote to answer one.
+Nobody asked for it, so it never enters a delivery cycle, and it dies with the container.
+If it is likely to be reusable it gets committed, pushed, and opened as a pull request in at least one repository.
+When no existing repository is a reasonable home, create one.
+
+Code is the obvious case and the least of it.
+**Math and prose are the ones that get left behind**, because they feel like the *explanation* of the work rather than an artifact of it --- a derivation reads as something you said, not something you made.
+So the reusable derivation, the argument that settled a design question, the comparison that ruled an option out: each is a document some repository should hold, not a paragraph in a chat log.
+
+The near-miss is work that backs a claim you have already published --- a measurement quoted in an issue, a table in a PR body, a derivation summarized in a review.
+The claim is durable and the thing behind it is not, so no reader can check it, re-run it on other inputs, or find its error.
+That case hides because the deliverable shipped: the issue is filed, the question is answered, and the work reads as finished.
+
+Posting it as a comment is not committing it.
+A forge comment is durable, which is what makes this substitution tempting, and it is still not reviewable as a diff, not runnable, not versioned against the thing it describes, and not somewhere a later reader would think to look.
+
+Re-derive or re-run the committed form and say in the commit message that it reproduces what you published.
+Work gets tidied on the way into a repository, and a cleaned-up version that no longer supports the claim it backs is worse than none, because being committed lends it authority.
+
+Not every fragment qualifies.
+The test is whether reproducing it would cost more than a moment, or whether anything durable cites it.
+Pick the home by subject, and match whatever shape that repository's neighbours already have.
+
+- **Do:** commit and PR it in the same session that produced the claim it backs.
+- **Do:** treat a derivation or an analysis as an artifact needing a home, exactly like a script.
+- **Do:** create a repository when none fits.
+- **Don't:** leave it uncommitted because the deliverable it fed already shipped.
+- **Don't:** post it as a comment instead of committing it.
+- **Don't:** commit a tidied version you have not re-checked against what you published.
+
+(Directive from the user, 2026-09-08, in three parts: potentially-reusable code should be committed, pushed and PRed into at least one repo, creating one if none fits; the rule covers code written incidentally, not only work that was requested; and it applies to math and prose, not just code.
+It came after two R scripts and a density derivation backing the measurements in UCD-SERG/serocalculator#687 sat in a session scratchpad while the issue quoting them was already filed and being acted on by another session.)
+
 ## Never dispatch a worker on Fable without explicit, specific permission
 
 A dispatched worker (a subagent, a workflow `agent()` call, a delegated CLI run) that names no model inherits the conductor's, so in a Fable session omitting the parameter is a Fable launch nobody chose.

@@ -987,6 +987,40 @@ A payload that contradicts itself, `CLEAN` beside a non-empty or malformed
   when the same comment carries a well-formed payload that says otherwise ---
   the payload wins now, not the prose.
 
+**Confirming occurrence, and a distinct trap it exposes: the prose is not
+lying, it is applying the reviewer's own (looser) blocking bar rather than
+this corpus's.**
+`d-morrison/rme#1138`'s review posted 2026-09-09T15:40:54Z read, in prose:
+"**Ready for merge** --- ... no new blocking issues were found; the
+remaining items above (subfile extraction, `\ba`/`\ea` consistency, citation
+verification) are suggestions/nits, not blockers", while the same comment's
+structured payload carried `"verdict": "NOT_CLEAN"` with three entries in
+`findings`.
+Per the rule above, the payload wins and the PR is not clean --- confirmed by
+`scripts/check-pr-fully-clean.py`, which consumed the structured payload
+directly and refused, rather than by reading either line by eye.
+The reviewer's own "suggestions/nits, not blockers" classification is not
+this corpus's bar: `CLAUDE.md`'s Strict Merge Control Policy vetoes a merge
+over any standing not-clean, nits included, regardless of how the reviewer
+itself prioritized its findings.
+A second failure stacked on the first here: the driving session had cached
+the *previous* round on the same head as "Ready for merge with zero
+findings", and that cached belief was what made the new round's prose/payload
+disagreement invisible until the instrument was run fresh --- the exact case
+`CLAUDE.md`'s "Re-check for latest review findings before reporting PR
+status" rule exists to prevent.
+
+- **Do:** read the structured `verdict`/`findings` payload on every review
+  comment, and treat a non-empty `findings` array as not-clean regardless of
+  the comment's own prose verdict line.
+- **Do:** re-run `check-pr-fully-clean.py` fresh for the current head rather
+  than trusting a cached read of an earlier round on the same PR.
+- **Don't:** adopt a reviewer's own "suggestions/nits, not blockers"
+  classification as this corpus's merge bar.
+
+See [`fully-clean.cases.md`](fully-clean.cases.md), "A prose 'Ready for
+merge' over a structured `NOT_CLEAN` payload".
+
 **Calling the checker is not consuming it: grepping its PROSE instead of
 reading its EXIT STATUS re-opens the whole failure one layer up.**
 

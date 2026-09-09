@@ -122,13 +122,16 @@ live-push tell.
 Morrison-Lab/ai-config#857 -> #872 is the *correct* same-name follow-up
 from new `main`, not a prior occurrence of this failure.
 
-3rd occurrence, 2026-09-09, ai-config#3432 -> #3436: a fix agent was
-dispatched to address a Copilot finding on PR #3363, found `#3363` already
-merged and its branch auto-deleted, did not recreate the branch, and instead
-filed #3432 and opened #3436 as a fresh follow-up off `origin/main`.
-Do: re-home a pending fix as a new PR off main once `gh pr list --state all
---head <branch>` reads MERGED.
-Don't: recreate the deleted branch or push the fix onto it.
+A correctly-handled case, not a third occurrence of the failure: 2026-09-09,
+ai-config#3432 -> #3436.
+A fix agent was dispatched to address a Copilot finding on PR #3363, found
+PR #3363 already merged with its branch auto-deleted, did not recreate the
+branch, and instead filed #3432 and opened #3436 as a fresh follow-up off
+`origin/main`.
+
+- **Do:** re-home a pending fix as a new PR off main once `gh pr list --state
+  all --head <branch>` reads MERGED.
+- **Don't:** recreate the deleted branch or push the fix onto it.
 
 So `ALLOW_FORCE_PUSH=1` is a deliberate escape valve for a case this rule did not foresee, not a shortcut for a known one.
 If you reach for it, say in the same breath what the lease refused and why forcing is right --- and if the answer is `stale info`, it is not.

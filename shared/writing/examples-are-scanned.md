@@ -178,7 +178,7 @@ This one is narrower, and it is the case most likely to be met while working thr
 
 A hook's block message states its trigger so the blocked reply can be fixed.
 `hooks/no-unfiled-finding.py` fires on a message that names a finding as worth an `<issue-shaped word>` and files nothing;
-its remedy text tells the reply what phrase tripped the hook and what to do next. (The angle-bracketed placeholder here is deliberate, per the parent section's own remedy: this entry names the trigger closely enough that spelling it out live, rather than as a placeholder, risks retriggering the same hook if it is ever quoted back into a reply.)
+its remedy text tells the reply what phrase tripped the hook and what to do next. (The angle-bracketed placeholder here is deliberate, per the parent section's own remedy: this entry names the trigger closely enough that spelling the trigger out live, rather than as a placeholder, risks retriggering the hook if this passage is ever quoted back into a reply.)
 Comply, then describe the compliance in a later reply --- "I filed the thing the hook flagged" --- and the description restates the same words the hook matches, because restating them precisely is what makes the report accurate.
 The hook fires again, on a reply that did exactly what it asked.
 
@@ -195,7 +195,7 @@ This differs from the negation and quotation cases in what kind of fact would re
 A negation is a property of the sentence's meaning, read in isolation.
 A quotation is a property of who is speaking, read in isolation.
 A compliance report needs a fact **outside** the message being scanned --- whether the obligation was already discharged earlier in the transcript --- so no rewording of the message under scrutiny can fix it on its own;
-the fix has to look elsewhere in the transcript, or accept the false positive, per the parent section's point that a safe failure direction is not the same as a cheap one.
+the fix has to look elsewhere in the transcript, or accept the false positive, per the negation section's point above that a safe failure direction is not the same as a cheap one.
 
 - **Do:** treat a hook firing on a reply that restates its own trigger vocabulary as a candidate false positive, and check the transcript for a discharge, rather than assuming the report itself was wrong.
 - **Do:** treat a repeat firing on identical wording as evidence the fix needs a behavioural discriminator (an earlier discharging action in the transcript), not a narrower or wider phrase match.
@@ -205,7 +205,8 @@ the fix has to look elsewhere in the transcript, or accept the false positive, p
   that is the reward the detector is structurally offering, and taking it makes the next reader's report less precise for no reason connected to the truth of the report.
 
 (Measured 2026-09-08/09: `hooks/no-unfiled-finding.py` blocked a reply naming a defect as worth an `<issue-shaped word>` with nothing filed --- a correct firing.
-The next reply filed [Morrison-Lab/ai-config#3371](https://github.com/Morrison-Lab/ai-config/issues/3371) and, in the message reporting that filing, quoted the earlier trigger wording while explaining what had been caught.
+The finding itself is unrelated to hooks or this file's subject (a `check-pr-fully-clean.py` attribution gap noticed in passing) and was then filed as [Morrison-Lab/ai-config#3371](https://github.com/Morrison-Lab/ai-config/issues/3371);
+its topic does not matter here, only that filing it is what the next reply had to report, and in doing so it quoted the earlier trigger wording while explaining what had been caught.
 The hook fired a second time on that reply, asking for the issue that had already been created --- confirmed by `gh issue view 3371` returning `OPEN`, created before the blocked reply's turn.
 That defect family (a hook matching a MENTION of its trigger phrase rather than only a live USE of it) was already tracked, for a different hook, at [Morrison-Lab/ai-config#2016](https://github.com/Morrison-Lab/ai-config/issues/2016) ("no-stale-pr-status.py fires on a MENTION of its trigger phrase, not only a use") --- per this repo's triage policy, a new symptom of a tracked family is a comment on that issue rather than a new one, so this instance was posted there rather than filed separately.
 No hook has been fixed by this entry;

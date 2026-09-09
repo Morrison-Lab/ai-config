@@ -69,7 +69,8 @@ Recorded in the main file under "A compliance report is not an escape either";
 this entry carries the fuller timeline.
 
 `hooks/no-unfiled-finding.py` blocked a reply that named a defect as worth an `<issue-shaped word>` and filed nothing --- a correct firing, matching the anti-pattern the hook exists to catch.
-The finding was then filed as [#3371](https://github.com/Morrison-Lab/ai-config/issues/3371).
+The finding itself is unrelated to hooks or this file's subject --- a `check-pr-fully-clean.py` attribution gap noticed in passing --- and was then filed as [#3371](https://github.com/Morrison-Lab/ai-config/issues/3371);
+its topic does not matter to what follows, only that filing it is what the next reply had to report.
 
 The very next reply reported that filing.
 To say what had happened, it restated the wording the earlier reply had been blocked over --- there is no other way to describe what a hook caught without naming what it caught.
@@ -80,8 +81,9 @@ So the second firing was a false positive on a message reporting a true, already
 Both are confirmed by reading the transcript's own tool calls rather than by trusting either reply's account of itself.
 
 **Why the phrase-list route is closed here in particular.**
-Every other remedy this file recommends for a matched phrase --- render the example, escape the negation, stop quoting --- changes something about the *matched sentence itself*.
-This one cannot, because the sentence's accuracy is exactly what makes it match: a vaguer report dodges the hook and also under-reports what was caught, which is a worse trade than absorbing the false positive.
+The example case has a remedy that changes the *sentence*: render it so it cannot match.
+The negation and quotation cases have no such remedy --- this file's own guidance for both is to fix the detector or absorb the false positive, never to reword a true sentence to dodge it.
+This case is like the latter two in offering no sentence-level fix, but for a different reason: the sentence's accuracy is exactly what makes it match, so a vaguer report would dodge the hook and also under-report what was caught, which is a worse trade than absorbing the false positive.
 The only fix that does not cost accuracy is behavioural: check the transcript for a filing tool call after the first block and before the second message, which the hook already has the transcript to do.
 
 **Where the finding was tracked.**

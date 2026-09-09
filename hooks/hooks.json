@@ -383,6 +383,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-duplicate-key-blind-verification.py\"",
+            "timeout": 10,
+            "script": "warn-duplicate-key-blind-verification.py",
+            "why": "shared/workflow/algorithmatize-checks.md. yaml.safe_load/load/full_load silently keeps the LAST of a duplicate mapping key, so a check that only inspects the parsed mapping's keys or their count (.keys(), len(...), a membership test, ==set(...)) cannot see a duplicate-key defect -- the duplicate is already gone by the time either analysis runs. Measured on gha#839: a sweep asking which caller stubs would uncomment into a DUPLICATE `with:` key used exactly this shape and reported 1 broken file where the true count, under a duplicate-rejecting loader, was 5. WARNS, never blocks, and only when a Bash command actually EXECUTES python (a -c argument, a heredoc piped to python's stdin, or a heredoc that writes a .py file the same command then runs) -- parsed with `ast`, not text search, so a phrase merely quoted inside a string literal (this corpus's own docs discussing the rule) cannot trip it, and a load already guarded by a registered add_constructor is silent, since that IS the fix this hook recommends."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-commit-chained-to-push.py\"",
             "timeout": 10,
             "script": "no-commit-chained-to-push.py",

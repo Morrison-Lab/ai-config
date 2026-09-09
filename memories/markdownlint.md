@@ -28,6 +28,30 @@ Split out of [`tools.md`](tools.md) on 2026-09-01 when that file crossed the 125
   **Do:** run it before pushing markdown, and say which of the four checks it covered.
   **Don't:** read a clean markdownlint run as the `lint-markdown` job passing.
   (Morrison-Lab/ai-config#3060, 2026-09-03.)
+- **`Summary: 0 issues in 0 files` means the run matched no files, not that it
+  ran clean --- a real clean run instead reports `Summary: 0 error(s)`.**
+  The two verdicts read alike at a glance and mean opposite things: one says
+  the linter never examined this repo's markdown, the other says it examined
+  the repo and found nothing.
+  Reaching that empty-match state is easy to trigger by accident, because
+  `Morrison-Lab/gha`'s own `lint-markdown/` capability derives the pinned
+  version via `node -p "require('./lint-markdown/package.json')..."`, and this
+  repo carries no `lint-markdown/` directory at all --- copying that idiom in
+  here throws `MODULE_NOT_FOUND`, `npx` falls through to an unpinned
+  invocation with no `--config`, that invocation matches nothing, and the run
+  prints `Summary: 0 issues in 0 files` looking exactly like success.
+  **Do:** read the summary line's exact wording as part of confirming the
+  check ran, and treat `0 issues in 0 files` as a run that examined nothing.
+  **Don't:** copy a version-derivation command from another repo's tooling
+  (`gha`'s `lint-markdown/package.json` path included) without checking that
+  the path it reads actually exists in this repo.
+  (Morrison-Lab/ai-config#3377, 2026-09-09: `npx markdownlint-cli2@0.23.0
+  --config .markdownlint-cli2.jsonc shared/workflow/ardi.md` reported
+  `Linting: 752 file(s)` / `Summary: 0 error(s)`, after an unpinned fallback
+  invocation had reported the empty-match form.
+  `Morrison-Lab/gha`'s CLAUDE.md records the same distinction for its own
+  paths; ai-config#3060 above documents this repo's own local-run command
+  but not this failure mode.)
 - **Don't tag a non-shell CLI block `bash`/`sh` (MD040).**
   MD040 wants a language on every fence, which invites tagging anything command-shaped as `bash`.
   Claude slash commands (`/ums`, `/plugin`, `/also`) and other application-level directives are not shell-executable, so `bash` implies a reader can run them and they fail when someone tries.

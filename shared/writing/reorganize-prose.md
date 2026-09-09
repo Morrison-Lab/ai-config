@@ -69,6 +69,39 @@ grants the move, it does not exempt it from what a move costs.
   "A defect whose surface form varies defeats a phrase grep", for the case
   this generalizes from --- a quoted-heading grep sweep still left two more
   rounds' worth of differently-worded instances for reviewers to find.
+- **A relocation can hand a reference a new, closer, wrong antecedent,
+  without the original target moving or vanishing at all.**
+  The two checks above both ask whether a reference still resolves, which is
+  a question about the reference's own target.
+  This failure resolves fine by that test --- the intended target is still
+  there, several entries up, untouched --- and breaks anyway, because
+  something nearer moved in front of it and reads as the referent instead.
+  The two checks above are answered by looking *at the reference's target*;
+  this one is answered by looking *at what now precedes the reference*, which
+  is why finishing them does not catch it.
+  It hits a moved block's own opening sentence hardest, because a mover
+  naturally checks the seams they created --- what now follows the block,
+  what the block now follows --- while the block's first few words get read
+  as content rather than as a reference in their own right.
+  A demonstrative ("this", "that", "the same X") at the very start of a
+  relocated entry is the shape to check first: read only the text now
+  directly above it and ask whether it could pass as that demonstrative's
+  antecedent, even wrongly.
+  Fixing it by moving again just relocates the same exposure; naming the
+  referent at first mention (instead of pointing at "the same defect" or
+  "this pattern") holds wherever the entry ends up, so prefer that repair.
+  **Do:** name the referent explicitly in a relocated block's opening
+  sentence, and re-check that opening sentence against whatever now
+  immediately precedes it after every move.
+  **Don't:** treat "the target still exists somewhere earlier" as clearing a
+  relocated block's own opening reference --- a nearer, wrong antecedent can
+  capture it even when the real one is untouched.
+  (Morrison-Lab/ai-config#3375, 2026-09-09: a paragraph opening "the same
+  defect" landed just below an unrelated paragraph describing a case where a
+  figure does *not* go stale, so its nearest antecedent read as the opposite
+  of what it meant, even though the entry's real referent sat unmoved several
+  entries earlier and every mechanical check --- an identical sorted line
+  multiset, all five repo checks --- was clean.)
 - **A downstream count or position reference can silently break**, even
   though you touched neither its sentence nor its file.
   [`forward-references.md`](forward-references.md)'s "Inserting prose makes a

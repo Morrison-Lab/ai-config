@@ -436,3 +436,40 @@ this one reports a problem that does not exist, from the same cause --- a measur
 - **Do:** run `git fetch --prune` after a merge that auto-deletes the branch, and before trusting anything that compares against a remote-tracking ref.
 - **Do:** settle "is there anything to push" from `origin/main..HEAD` and `git ls-remote`, not from the tracking ref.
 - **Don't:** push to clear the warning --- the remote branch is gone, and recreating it is what `check-before-pushing` forbids.
+
+**The hook names a branch, never a repository, and this harness gives every
+scoped repo the same branch name --- so the report cannot tell you where to
+look, and the obvious repo is the wrong one.**
+
+`~/.claude/stop-hook-git-check.sh` compares `origin/$current_branch..HEAD`
+(read the script rather than inferring it: the wording *"There are N unpushed
+commit(s) on branch 'X'"* is emitted **only** on that path, while the
+`origin/HEAD` fallback prints a differently-worded *"and no remote branch"*).
+So the message is already evidence that the branch's own tracking ref was used
+--- which is what makes a diagnosis of "it compared against `main`" refutable
+from the message text alone.
+
+Measured 2026-09-09: the hook reported 13 while the session's *foreground* repo
+(`serocalculator`) was provably in sync --- `ls-remote` tip equal to `HEAD`, 0
+ahead of upstream.
+Checking that repo thoroughly and concluding the hook was broken is the whole
+error: the count belonged to `ai-config`, whose
+`origin/<branch>` was the stale ref this section is about, at 13 commits from a
+prior squash-merged PR on the same branch name.
+
+**A coincidence of value is what sealed it.** 13 was also exactly
+`origin/main..HEAD` in `serocalculator` --- that PR's own size --- so a wrong
+explanation ("the check counts against `main`") arrived pre-confirmed by a
+number that matched.
+Two different repos, two different quantities, one integer.
+
+- **Do:** reproduce the hook's own computation in **every** scoped repo before
+  diagnosing it, since the branch name it prints is shared across all of them:
+  `for d in ...; do (cd $d; b=$(git branch --show-current);
+  git rev-list --count "origin/$b..HEAD"); done`.
+- **Do:** read the emitting script when a report contradicts a measurement ---
+  which of its branches produced the wording is usually decisive.
+- **Don't:** conclude an instrument is wrong because the repo you happened to
+  check is clean; find the repo whose numbers match first.
+- **Don't:** treat a matching count as corroboration of a mechanism --- derive
+  the mechanism, then see whether the count follows.

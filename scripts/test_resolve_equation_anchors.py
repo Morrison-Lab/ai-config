@@ -75,6 +75,33 @@ class ResolveAnchors(unittest.TestCase):
             [r["anchor"] for r in resolved], ["eq-anchor-1", "eq-anchor-1"]
         )
 
+    def test_void_element_is_a_sibling_not_an_ancestor(self):
+        """A void tag must not become a container.
+
+        `<br>` never closes, so pushing it onto the open-element stack makes
+        it the parent of everything after it.
+
+        This asserts on the TREE rather than on the anchors, because the
+        anchors do not distinguish it. A generated `eq-anchor-N` id itself
+        starts with `eq-`, so the next equation's ancestor walk finds it and
+        reuses it whether or not the void tag sits in between. Asserting on
+        anchors here would pass under a parser that misparents everything
+        after the first `<br>` on the page.
+        """
+        html = page(f"<p>{display('a')}<br>{display('b')}</p>")
+        builder = MODULE._TreeBuilder()
+        builder.feed(html)
+        builder.close()
+        equations = [
+            element
+            for element in MODULE._walk(builder.root)
+            if "math" in MODULE._classes(element)
+            and "display" in MODULE._classes(element)
+        ]
+        self.assertEqual(
+            [element["parent"]["tag"] for element in equations], ["p", "p"]
+        )
+
     def test_parent_id_that_is_not_an_eq_label_is_reused_not_renumbered(self):
         html = page(f'<p id="para">{display("a")}</p><p>{display("b")}</p>')
         resolved = MODULE.resolve_anchors(html)

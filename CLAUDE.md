@@ -1749,11 +1749,6 @@ Open the PR.
 - **Don't:** leave a reusable learning in session-local auto-memory as a substitute for committing it.
 - **Don't:** offer to upstream it, or ask which repo --- decide and do it, surfacing the choice only when it is genuinely ambiguous or architecturally significant.
 
-## Commit any potentially-reusable work you produce
-
-The artifact counterpart of the section above --- code, math, or prose; universal rather than Claude-specific, so its text lives in `AGENTS.md`.
-The case that hides is a derivation or script an issue already quotes: the claim is durable, the scratchpad is not.
-
 ## PowerShell CLI Command Safety
 
 - **Never pass backtick-containing content in PowerShell double-quoted strings**: PowerShell treats `` ` `` as its escape character — `` `b `` (Backspace, 0x08), `` `n ``, `` `t ``, `` `r ``, etc. — so Markdown code spans and other backtick-containing text will be silently corrupted. Use single-quoted strings (`'...'` / `@'...'@`) for inline content, or write to a file and pass `--body-file` for multi-line PR descriptions.

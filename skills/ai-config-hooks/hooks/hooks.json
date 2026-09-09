@@ -603,6 +603,20 @@
             "timeout": 15,
             "script": "guard-slide-major-tag.py",
             "why": "Denies `gh workflow run slide-major-tag.yml` when git diff tag..origin/<default> adds a job-level permission to a reusable workflow (workflow_call in on:). A called workflow cannot request permissions its caller does not grant, so sliding the tag breaks every un-updated consumer with startup_failure (Morrison-Lab/gha#830 breaking ucdavis/bcs#966; same class as gha#685). Clearable with ALLOW_BREAKING_SLIDE=1. Tracked as #3303."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/flag-unattributable-reviewer-request.py\"'",
+            "timeout": 10,
+            "script": "flag-unattributable-reviewer-request.py",
+            "why": "Warns when a reviewer request is not the LAST command in a Bash call. no-unreviewed-pr.py credits a request by the whole call's exit status, so a request piped into `tail`, or followed by a verify read, shares its status with that command and cannot be attributed -- its discharge is withheld even though the request succeeded and a review landed. Measured on ai-config#3403, where the Stop block fired three times against a working request and its wording (\"no SUCCESSFUL request\") invited reissuing the same broken shape rather than unpiping it.",
+            "_note_warns_never_blocks": [
+              "Emits `additionalContext` and a `systemMessage` and nothing else -- no",
+              "`permissionDecision` key, so the normal permission flow is untouched.",
+              "A non-last request is legitimate when one call requests reviewers for",
+              "several PRs, which is why undischargeable_requests returns a LIST at",
+              "all, so a blocking guard would refuse a real shape."
+            ]
           }
         ]
       },

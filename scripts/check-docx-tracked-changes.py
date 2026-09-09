@@ -125,7 +125,7 @@ XML_PART_SUFFIXES = (".xml", ".rels")
 MATH_STRUCT_TAGS = (
     "sSup", "sSub", "sSubSup", "sPre", "d", "f", "nary", "func", "rad",
     "limLow", "limUpp", "groupChr", "bar", "acc", "eqArr", "box",
-    "borderBox", "phant",
+    "borderBox", "phant", "m",
 )
 
 # The mark that removes a run's text under each direction: accepting
@@ -190,13 +190,15 @@ def parent_map_of(root: ET.Element) -> dict:
     return {child: parent for parent in root.iter() for child in parent}
 
 
-def nesting_triples(root: ET.Element) -> set:
+def nesting_triples(root: ET.Element, parents: dict) -> set:
     """(grandparent, parent, child) tags for every non-root element.
 
     The tags are fully qualified; see qualified() for why the namespace is
-    load-bearing here rather than noise.
+    load-bearing here rather than noise. `parents` is the whole part's own
+    parent map, built once by the caller and shared across every check that
+    needs one -- see check_document()'s "one parent-map build per part"
+    comment.
     """
-    parents = parent_map_of(root)
     triples = set()
     for elem in root.iter():
         parent = parents.get(elem)
@@ -208,9 +210,8 @@ def nesting_triples(root: ET.Element) -> set:
     return triples
 
 
-def check_marker_in_rpr(root: ET.Element, part: str, findings: list) -> int:
+def check_marker_in_rpr(root: ET.Element, part: str, findings: list, parents: dict) -> int:
     """Flag w:ins/w:del as a child of w:rPr, except the CT_ParaRPr (w:pPr) case."""
-    parents = parent_map_of(root)
     examined = 0
     for rpr in root.iter(W + "rPr"):
         examined += 1
@@ -279,12 +280,11 @@ def check_dual_rpr(root: ET.Element, part: str, findings: list) -> int:
     return examined
 
 
-def check_orphan_deltext(root: ET.Element, part: str, findings: list) -> int:
+def check_orphan_deltext(root: ET.Element, part: str, findings: list, parents: dict) -> int:
     """Flag a w:delText with no w:del ancestor -- text marked deleted that
     nothing actually gates, the classic-markup mirror of check_marker_in_rpr
     for OMML: there the marker sat beside the text instead of wrapping it,
     here the text sits outside the wrapper that should contain it."""
-    parents = parent_map_of(root)
     examined = 0
     for elem in root.iter(W + "delText"):
         examined += 1
@@ -468,13 +468,18 @@ def check_document(path: Path) -> tuple:
             continue
 
         elements_examined += sum(1 for _ in root.iter())
-        check_marker_in_rpr(root, name, findings)
+        # One parent-map build per part, shared by every check below that
+        # needs to walk upward -- check_marker_in_rpr, check_orphan_deltext,
+        # nesting_triples, and check_orphaned_math each used to build their
+        # own (four full-tree walks per part); a review finding on #3423
+        # caught the duplication.
+        parents = parent_map_of(root)
+        check_marker_in_rpr(root, name, findings, parents)
         ids_examined += check_duplicate_ids(root, name, id_seen, findings)
         check_dual_rpr(root, name, findings)
-        deltext_examined += check_orphan_deltext(root, name, findings)
+        deltext_examined += check_orphan_deltext(root, name, findings, parents)
         ignorable_examined += check_ignorable_prefixes(data, name, findings)
-        all_triples |= nesting_triples(root)
-        parents = parent_map_of(root)
+        all_triples |= nesting_triples(root, parents)
         zones, structs = check_orphaned_math(root, name, findings, notes, parents)
         math_zones_examined += zones
         math_structs_examined += structs

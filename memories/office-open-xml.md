@@ -529,7 +529,7 @@ The repair was to rebuild the affected root using a Word-authored sibling part's
 The two entries above cover markup *validity* -- whether the XML is legal at all.
 This one is a *rendering* defect in perfectly well-formed markup: a math structure whose runs are correctly tracked-change-marked, but whose own container is not, so it survives the edit as an empty placeholder box.
 
-OOXML math structures Word renders slot-by-slot regardless of content --- `m:sSup`'s base (`m:e`) and exponent (`m:sup`), `m:f`'s numerator and denominator, and similarly `m:sSub`, `m:sSubSup`, `m:sPre`, `m:d`, `m:nary`, `m:func`, `m:rad`, `m:limLow`, `m:limUpp`, `m:groupChr`, `m:bar`, `m:acc`, `m:eqArr`, `m:box`, `m:borderBox`, `m:phant`.
+OOXML math structures Word renders slot-by-slot regardless of content --- `m:sSup`'s base (`m:e`) and exponent (`m:sup`), `m:f`'s numerator and denominator, and similarly `m:sSub`, `m:sSubSup`, `m:sPre`, `m:d`, `m:nary`, `m:func`, `m:rad`, `m:limLow`, `m:limUpp`, `m:groupChr`, `m:bar`, `m:acc`, `m:eqArr`, `m:box`, `m:borderBox`, `m:phant`, `m:m` (matrix).
 Each carries an `m:<tag>Pr` child holding an `m:ctrlPr`, and that `ctrlPr` carries the **structure's own** revision mark, independent of whatever marks sit on the runs inside it:
 
 ```xml
@@ -545,6 +545,10 @@ The mirror case: a structure built entirely from `w:ins` runs whose `ctrlPr` is 
 
 This is measured as Word's own convention, not invented: a real hand-edited document in this same manuscript carried 3 `m:ctrlPr` elements marked `w:ins` and 6 marked `w:del`, on structures whose own runs carried the matching mark independently.
 Word marks both -- the structure's `ctrlPr` and its runs' text -- as two separate facts about the same edit.
+
+The 19-tag list above is the complete set, confirmed against the raw `shared-math.xsd` schema (every `complexType` ending `Pr` checked for a `ctrlPr` child) rather than trusted from a hand-written enumeration -- the first version of this list, and of the check it documents, missed `m:m` (the matrix element), caught by a review on the PR that introduced both (Morrison-Lab/ai-config#3423).
+That same schema search found one more `ctrlPr` location, deliberately left out of the list above: `CT_OMathArg` (the type of `m:e`, used for every argument slot -- a structure's base, its numerator, a matrix cell, ...) also carries an optional `ctrlPr`, as a direct sibling of its own content rather than nested inside an `<x>Pr` wrapper the way every structure above is.
+That is a different revision-tracking surface -- most plausibly per-argument insertion/deletion in a variable-arity construct like a matrix row, rather than the fixed-slot empty-box defect this entry is about -- with a different wrapper shape needing its own traversal code, so it is tracked separately rather than folded into the tag list here (Morrison-Lab/ai-config#3429).
 
 Nothing existing catches an unmarked `ctrlPr`.
 An accept/reject text diff can't see it, because an empty placeholder box carries no text to diff.

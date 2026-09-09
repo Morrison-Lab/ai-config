@@ -374,6 +374,69 @@ NESTED_INNER_MARKED_OUTER_NOT = (
     + DOC_FOOTER
 )
 
+# m:m (matrix) -- a 1x1 matrix whose one cell is entirely w:del'd, ctrlPr
+# unmarked -- the defect, under ACCEPT. Added after a review finding
+# (Morrison-Lab/ai-config#3422 follow-up): the tag list initially omitted
+# m:m even though m:mPr/m:ctrlPr follows the identical pattern as every
+# other structure here.
+ORPHANED_M_ACCEPT = (
+    DOC_HEADER
+    + f"""<w:p><m:oMath>
+  <m:m>
+    <m:mPr><m:ctrlPr><w:rPr/></m:ctrlPr></m:mPr>
+    <m:mr><m:e><m:r><w:del w:id="801" w:author="A" w:date="2026-01-01T00:00:00Z">
+      <w:rPr/><m:t>a</m:t></w:del></m:r></m:e></m:mr>
+  </m:m>
+</m:oMath></w:p>
+"""
+    + DOC_FOOTER
+)
+
+# Same shape, mPr/ctrlPr correctly marked w:del -- must NOT be flagged.
+CLEAN_M_ACCEPT = (
+    DOC_HEADER
+    + f"""<w:p><m:oMath>
+  <m:m>
+    <m:mPr><m:ctrlPr><w:del w:id="800" w:author="A" w:date="2026-01-01T00:00:00Z">
+      <w:rPr/></w:del></m:ctrlPr></m:mPr>
+    <m:mr><m:e><m:r><w:del w:id="801" w:author="A" w:date="2026-01-01T00:00:00Z">
+      <w:rPr/><m:t>a</m:t></w:del></m:r></m:e></m:mr>
+  </m:m>
+</m:oMath></w:p>
+"""
+    + DOC_FOOTER
+)
+
+# The mirror case: matrix cell entirely w:ins'd, ctrlPr unmarked -- the
+# defect, under REJECT.
+ORPHANED_M_REJECT = (
+    DOC_HEADER
+    + f"""<w:p><m:oMath>
+  <m:m>
+    <m:mPr><m:ctrlPr><w:rPr/></m:ctrlPr></m:mPr>
+    <m:mr><m:e><m:r><w:ins w:id="811" w:author="A" w:date="2026-01-01T00:00:00Z">
+      <w:rPr/><m:t>b</m:t></w:ins></m:r></m:e></m:mr>
+  </m:m>
+</m:oMath></w:p>
+"""
+    + DOC_FOOTER
+)
+
+# Same shape, mPr/ctrlPr correctly marked w:ins -- must NOT be flagged.
+CLEAN_M_REJECT = (
+    DOC_HEADER
+    + f"""<w:p><m:oMath>
+  <m:m>
+    <m:mPr><m:ctrlPr><w:ins w:id="810" w:author="A" w:date="2026-01-01T00:00:00Z">
+      <w:rPr/></w:ins></m:ctrlPr></m:mPr>
+    <m:mr><m:e><m:r><w:ins w:id="811" w:author="A" w:date="2026-01-01T00:00:00Z">
+      <w:rPr/><m:t>b</m:t></w:ins></m:r></m:e></m:mr>
+  </m:m>
+</m:oMath></w:p>
+"""
+    + DOC_FOOTER
+)
+
 # m:t gated out by an ANCESTOR w:del two levels up rather than its direct
 # parent -- pins that text_survives() walks the whole parent chain rather
 # than checking only the immediate wrapper. Not a claim about legal OOXML
@@ -631,6 +694,42 @@ with __import__("tempfile").TemporaryDirectory() as tmp:
     check(
         "only the inner structure is flagged, not the outer m:d as well",
         out.count("[orphaned-math]") == 1,
+    )
+
+    orphaned_m_accept = make_docx(tmp_path, "orphaned-m-accept.docx", ORPHANED_M_ACCEPT)
+    rc, out = run_check([orphaned_m_accept])
+    check(
+        "an m:m (matrix) fully w:del'd with an unmarked ctrlPr fails the run",
+        rc == 1 and "orphaned-math" in out and "m:m" in out,
+    )
+    check(
+        "the matrix finding names the accept direction, not reject",
+        "under accept" in out and "under reject" not in out,
+    )
+
+    clean_m_accept = make_docx(tmp_path, "clean-m-accept.docx", CLEAN_M_ACCEPT)
+    rc, out = run_check([clean_m_accept])
+    check(
+        "an m:m fully w:del'd WITH a matching w:del ctrlPr is not flagged",
+        rc == 0 and "orphaned-math" not in out,
+    )
+
+    orphaned_m_reject = make_docx(tmp_path, "orphaned-m-reject.docx", ORPHANED_M_REJECT)
+    rc, out = run_check([orphaned_m_reject])
+    check(
+        "an m:m fully w:ins'd with an unmarked ctrlPr fails the run",
+        rc == 1 and "orphaned-math" in out and "m:m" in out,
+    )
+    check(
+        "the matrix finding names the reject direction, not accept",
+        "under reject" in out and "under accept" not in out,
+    )
+
+    clean_m_reject = make_docx(tmp_path, "clean-m-reject.docx", CLEAN_M_REJECT)
+    rc, out = run_check([clean_m_reject])
+    check(
+        "an m:m fully w:ins'd WITH a matching w:ins ctrlPr is not flagged",
+        rc == 0 and "orphaned-math" not in out,
     )
 
     nested2 = make_docx(tmp_path, "nested2.docx", NESTED_INNER_MARKED_OUTER_NOT)

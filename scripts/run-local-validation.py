@@ -34,6 +34,15 @@ What it runs, in order:
      is BROKEN rather than NOT RUN, and fails the run, since CI would reject
      it too.
 
+Which gates apply to which files is derived, not recalled (#3120). Each
+`uses:` job declares its own file scope in the workflow (`with: globs` and
+`with: paths-ignore`), so --changed intersects that scope with
+`git diff --name-only <base>...HEAD` and reports every gate as SELECTED or
+SKIPPED with the reason. The `validate` job declares no path filter in
+validate.yml, so its steps are repo-wide and always selected -- which is what
+CI does too. A gate is never dropped silently: a run that selected two gates
+and a run that selected five print different plans.
+
 Steps whose name matches --skip (default: the dependency install, which needs
 the network and is already satisfied locally) are skipped and counted.
 
@@ -52,10 +61,12 @@ Usage:
   python3 scripts/run-local-validation.py --list           # show the derived plan
   python3 scripts/run-local-validation.py --only 'links|punctuation'
   python3 scripts/run-local-validation.py --base origin/main   # base for diff-scoped checks
+  python3 scripts/run-local-validation.py --changed --list # gates the current diff selects
 """
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import os
 import re
 import subprocess
@@ -64,6 +75,8 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+_REQUIRES_CACHE = {}
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_WORKFLOW = ROOT / ".github" / "workflows" / "validate.yml"
@@ -98,17 +111,149 @@ def _nlb_equivalent(job: Dict[str, Any], base: str) -> Optional[Dict[str, Any]]:
     return {"command": "python3 scripts/vendor/gha-check-new-line-breaks.py", "env": env}
 
 
-# Only a job whose exact check is vendored into this repo gets a local
-# equivalent. new-line-breaks qualifies: scripts/vendor/gha-check-new-line-breaks.py
-# is the pinned copy of the composite action's script. lint-markdown and
-# lint-qmd do not: gha's lint-markdown action runs four checks (markdownlint,
-# code-block length, list-item splices, table splits), and a local
-# `markdownlint-cli2` call reproduces one of them while reporting a clean
-# zero for the other three -- the guessed-equivalent failure this runner
-# exists to avoid. Both are listed as NOT RUN so the denominator names them.
+# A job that only `uses:` something gets a local equivalent when one can be
+# run here. Two kinds:
+#
+#   FULL      the vendored script IS the pinned copy of what CI runs
+#             (new-line-breaks; scripts/vendor/gha-check-new-line-breaks.py).
+#   PARTIAL   the local command reproduces some of the action's checks and
+#             not all of them. gha's lint-markdown action runs four
+#             (markdownlint, code-block length, list-item splices, table
+#             splits) and `markdownlint-cli2` is the first of them.
+#
+# A PARTIAL equivalent used to be refused outright, on the grounds that
+# running one of four checks and printing a clean zero for the other three is
+# the guessed-equivalent failure this runner exists to avoid. That reasoning
+# holds for a SILENT partial and not for a labelled one -- and refusing it
+# left the markdown gate absent from every markdown-only pre-push run, which
+# is ai-config#3120 (CI then failed #3119 on MD046). So the partial runs, is
+# tagged PARTIAL, and names the checks it does not cover, in the plan and in
+# the summary.
+DEFAULT_GLOBS = {
+    # The action's own input default, used when the caller omits `globs:`.
+    # Kept beside the equivalents so a job that declares no scope still has a
+    # derived one rather than an implicit "everything".
+    "check-new-line-breaks": "*.md",
+    "lint-markdown": "*.md",
+    "lint-qmd": "*.qmd",
+}
+
+# Checks the lint-markdown / lint-qmd actions run that `markdownlint-cli2`
+# alone does not. Named in the output so the gap is visible rather than
+# reported as a clean zero.
+MARKDOWNLINT_UNCOVERED = (
+    "code-block length, list-item splices, table splits"
+)
+
+
+def _markdownlint_equivalent(job: Dict[str, Any], base: str) -> Optional[Dict[str, Any]]:
+    """A PARTIAL local stand-in for gha's lint-markdown / lint-qmd actions.
+
+    The action selects files with `git ls-files -- <pathspec>`; markdownlint-cli2
+    selects them with its own globber, where a git pathspec `*.md` (any depth)
+    spells as `**/*.md` and a `paths-ignore` entry spells as a `!` negation."""
+    globs, ignore = job_scope(job)
+    config = str((_job_with(job) or {}).get("config-file") or "").strip()
+    patterns = [f"'{_pathspec_to_glob(g)}'" for g in globs]
+    patterns += [f"'!{i}'" for i in ignore]
+    cmd = "npx --no-install markdownlint-cli2"
+    if config:
+        cmd += f" --config {config}"
+    return {
+        "command": cmd + " " + " ".join(patterns),
+        "env": {},
+        "partial": MARKDOWNLINT_UNCOVERED,
+        "requires": "npx --no-install markdownlint-cli2 --help",
+        "install_hint": "npm install --no-save markdownlint-cli2  (or: npm install -g markdownlint-cli2)",
+    }
+
+
 LOCAL_EQUIVALENTS = {
     "check-new-line-breaks": _nlb_equivalent,
+    "lint-markdown": _markdownlint_equivalent,
+    "lint-qmd": _markdownlint_equivalent,
+    "antigravity-code-review": lambda j, b: None,
+    "claude.yml": lambda j, b: None,
+    "claude-code-review": lambda j, b: None,
+    "detect-review-request": lambda j, b: None,
+    "cleanup-pr-previews": lambda j, b: None,
+    "preview-deploy": lambda j, b: None,
+    "preview.yml": lambda j, b: None,
+    "quarto-publish": lambda j, b: None,
+    "sync-shared-fragments": lambda j, b: None,
 }
+
+
+def _pathspec_to_glob(pathspec: str) -> str:
+    """A git pathspec as a markdownlint-cli2 (fast-glob) pattern.
+
+    `*.md` matches at any depth in git and only at the root in fast-glob, so
+    it becomes `**/*.md`, which fast-glob matches at the root as well."""
+    pathspec = pathspec.strip()
+    if "/" not in pathspec and not pathspec.startswith("**"):
+        return "**/" + pathspec
+    return pathspec
+
+
+def _job_with(job: Dict[str, Any]) -> Dict[str, Any]:
+    """The `with:` of a reusable-workflow job, or of its non-`actions/` step."""
+    if job.get("with"):
+        return dict(job["with"])
+    for step in job.get("steps", []) or []:
+        uses = str(step.get("uses", ""))
+        if uses and not uses.startswith("actions/") and step.get("with"):
+            return dict(step["with"])
+    return {}
+
+
+def job_scope(job: Dict[str, Any]) -> tuple:
+    """(globs, paths-ignore) for a `uses:` job, read out of the workflow.
+
+    This is the derivation ai-config#3120 asks for: which files a gate covers
+    is declared in validate.yml, so it is read from there rather than kept in
+    a second copy anywhere -- including in the head of whoever is pushing."""
+    with_ = _job_with(job)
+    uses = _uses_of(job)
+    raw = str(with_.get("globs") or "").strip()
+    if not raw:
+        raw = next((v for k, v in DEFAULT_GLOBS.items() if k in uses), "")
+    globs = [g for g in raw.split() if g]
+    ignore_raw = str(with_.get("paths-ignore") or "")
+    ignore = [i.strip() for i in ignore_raw.replace("\n", ",").split(",") if i.strip()]
+    return globs, ignore
+
+
+def matches_scope(path: str, globs: List[str], paths_ignore: List[str]) -> bool:
+    """Whether one repo-relative path falls inside a gate's declared scope.
+
+    git pathspec semantics: a pattern with no `/` matches at any depth, so it
+    is tested against the basename as well as the full path."""
+    path = path.replace("\\", "/")
+    for pattern in paths_ignore:
+        if fnmatch.fnmatch(path, pattern) or fnmatch.fnmatch(path, pattern.rstrip("/*") + "/*"):
+            return False
+    for pattern in globs:
+        if fnmatch.fnmatch(path, pattern):
+            return True
+        if "/" not in pattern and fnmatch.fnmatch(path.rsplit("/", 1)[-1], pattern):
+            return True
+    return False
+
+
+def changed_files(root: Path, base: str) -> Optional[List[str]]:
+    """`git diff --name-only <base>...HEAD`, or None when it cannot be read.
+
+    None is not an empty diff. An empty list would select no scoped gate at
+    all, which is the clean-verdict-over-an-empty-population failure
+    (ai-config#3114); the caller reports the failure and selects everything."""
+    try:
+        out = subprocess.run(["git", "diff", "--name-only", f"{base}...HEAD"],
+                             cwd=str(root), capture_output=True, text=True, check=True).stdout
+    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        print(f"warning: could not compute the changed-file list against {base} ({exc}); "
+              "every gate is selected", file=sys.stderr)
+        return None
+    return [ln.strip() for ln in out.splitlines() if ln.strip()]
 
 
 @dataclass
@@ -122,6 +267,11 @@ class Step:
     note: str = ""
     kind: str = "step"            # "step" from the workflow, or "workflow-file" for another file's notice
     broken: bool = False           # a workflow-file notice whose file could not be parsed
+    requires: Optional[str] = None
+    install_hint: Optional[str] = None
+    partial: Optional[str] = None
+    globs: List[str] = field(default_factory=list)
+    paths_ignore: List[str] = field(default_factory=list)
 
 
 def _uses_of(job: Dict[str, Any]) -> str:
@@ -151,6 +301,8 @@ def derive_steps(workflow: Dict[str, Any], job_name: str, base: str) -> List[Ste
             env=env,
             cwd=s.get("working-directory"),
             source=job_name,
+            globs=["*"],
+            paths_ignore=[],
         )
         expression = GITHUB_EXPRESSION.search(step.command) or next(
             (m for m in (GITHUB_EXPRESSION.search(v) for v in env.values()) if m), None
@@ -173,11 +325,16 @@ def derive_steps(workflow: Dict[str, Any], job_name: str, base: str) -> List[Ste
             if key in uses:
                 equivalent = fn(job, base)
                 break
+        globs, paths_ignore = job_scope(job)
         if equivalent is None:
             steps.append(Step(name=name, command="", source=name, runnable=False,
-                              note=f"no local equivalent for {uses}"))
+                              note=f"no local equivalent for {uses}",
+                              globs=globs, paths_ignore=paths_ignore))
         else:
-            steps.append(Step(name=name, command=equivalent["command"], env=equivalent["env"], source=name))
+            steps.append(Step(name=name, command=equivalent["command"], env=equivalent.get("env", {}), source=name,
+                              requires=equivalent.get("requires"), install_hint=equivalent.get("install_hint"),
+                              partial=equivalent.get("partial"),
+                              globs=globs, paths_ignore=paths_ignore))
     return steps
 
 
@@ -276,6 +433,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--workflow", default=str(DEFAULT_WORKFLOW))
     p.add_argument("--job", default="validate", help="job whose run: steps to execute (default: validate)")
     p.add_argument("--base", default="origin/main", help="base ref for diff-scoped checks (default: origin/main)")
+    p.add_argument("--changed", action="store_true", help="gates the current diff selects")
     p.add_argument("--only", default=None, help="regex; run only derived steps whose name matches (other-workflow-file notices are always listed)")
     p.add_argument("--skip", default=DEFAULT_SKIP, help=f"regex; skip derived steps whose name matches (default: {DEFAULT_SKIP!r}; never an other-workflow-file notice)")
     p.add_argument("--list", action="store_true", help="print the derived plan and exit 0")
@@ -285,6 +443,13 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--root", default=str(ROOT), help=argparse.SUPPRESS)
     return p.parse_args(argv)
 
+
+
+def availability_note(step):
+    """The parenthetical a listed step carries when its tool was not probed."""
+    if step.note == "availability checked at run time":
+        return f" ({step.note})"
+    return ""
 
 def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(argv)
@@ -300,27 +465,64 @@ def main(argv: Optional[List[str]] = None) -> int:
     only = re.compile(args.only) if args.only else None
     skip = re.compile(args.skip) if args.skip else None
 
+    changed = changed_files(root, args.base) if args.changed else None
+    if args.changed and changed is not None and not changed:
+        print(f"info: no files changed against {args.base}; every gate is selected", file=sys.stderr)
+        changed = None
+
     plan = []
     for s in steps:
-        # --only and --skip select among the steps derived from the workflow.
-        # An other-workflow-file notice is not a step to run; it stays in the
-        # denominator whatever the filters say, and only --no-other-workflows
-        # drops it (#1881).
         if s.kind == "workflow-file":
-            plan.append((s, False))
+            plan.append((s, False, ""))
             continue
         if only and not only.search(s.name):
             continue
-        skipped = bool(skip and skip.search(s.name))
-        plan.append((s, skipped))
+
+        skipped = False
+        reason = ""
+
+        if skip and skip.search(s.name):
+            skipped = True
+            reason = "matched --skip"
+        elif args.changed and changed is not None:
+            if s.globs and not any(matches_scope(f, s.globs, s.paths_ignore) for f in changed):
+                skipped = True
+                reason = "no scoped files changed"
+
+        if not skipped and s.requires:
+            if args.list:
+                s.note = "availability checked at run time"
+            else:
+                if s.requires not in _REQUIRES_CACHE:
+                    proc = subprocess.run(["bash", "-c", s.requires], capture_output=True, text=True)
+                    _REQUIRES_CACHE[s.requires] = (proc.returncode == 0)
+                if not _REQUIRES_CACHE[s.requires]:
+                    skipped = True
+                    reason = f"missing tool; fix: {s.install_hint}"
+
+        plan.append((s, skipped, reason))
 
     if args.list:
-        for s, skipped in plan:
-            tag = "SKIP" if skipped else ("BROKEN" if s.broken else ("NOT RUN" if not s.runnable else "RUN"))
-            detail = s.note if not s.runnable else s.command.splitlines()[0]
+        for s, skipped, reason in plan:
+            if skipped:
+                tag = "SKIP"
+                detail = reason
+            elif s.broken:
+                tag = "BROKEN"
+                detail = s.note
+            elif not s.runnable:
+                tag = "NOT RUN"
+                detail = s.note
+            elif s.partial:
+                tag = "PARTIAL"
+                detail = s.command.splitlines()[0] + f" (misses {s.partial})"
+                detail += availability_note(s)
+            else:
+                tag = "RUN"
+                detail = s.command.splitlines()[0] + availability_note(s)
             print(f"{tag:8} [{s.source}] {s.name}: {detail}")
-        print(_denominator(len(plan), sum(1 for s, _ in plan if s.kind == "workflow-file"), args.workflow,
-                          broken=sum(1 for s, _ in plan if s.broken)))
+        print(_denominator(len(plan), sum(1 for s, _, _ in plan if s.kind == "workflow-file"), args.workflow,
+                          broken=sum(1 for s, _, _ in plan if s.broken)))
         return 0
 
     dirty = dirty_tree(root)
@@ -332,15 +534,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"warning: {msg}", file=sys.stderr)
 
     results = []
-    for s, skipped in plan:
+    for s, skipped, reason in plan:
         if skipped:
-            results.append((s, "skip", 0.0))
+            results.append((s, "skip", 0.0, reason))
             continue
         if s.broken:
-            results.append((s, "broken", 0.0))
+            results.append((s, "broken", 0.0, ""))
             continue
         if not s.runnable:
-            results.append((s, "not run", 0.0))
+            results.append((s, "not run", 0.0, ""))
             continue
         print(f"==> [{s.source}] {s.name}", flush=True)
         t0 = time.monotonic()
@@ -348,11 +550,11 @@ def main(argv: Optional[List[str]] = None) -> int:
             rc = run_step(s, root, args.timeout)
         except subprocess.TimeoutExpired:
             rc = "timeout"
-        results.append((s, rc, time.monotonic() - t0))
+        results.append((s, rc, time.monotonic() - t0, ""))
 
     print()
     print(f"{'step':60} {'rc':>8} {'seconds':>8}")
-    for s, rc, secs in results:
+    for s, rc, secs, _ in results:
         print(f"{s.name[:60]:60} {str(rc):>8} {secs:8.1f}")
     failed = [r for r in results if r[1] not in (0, "skip", "not run")]
     skipped_n = sum(1 for r in results if r[1] == "skip")
@@ -360,13 +562,19 @@ def main(argv: Optional[List[str]] = None) -> int:
     ran = len(results) - skipped_n - len(not_run)
     print(f"\n{ran - len(failed)} passed, {len(failed)} failed, {skipped_n} skipped, "
           f"{len(not_run)} not runnable locally, of "
-          + _denominator(len(results), sum(1 for s, _, _ in results if s.kind == "workflow-file"), args.workflow,
-                         broken=sum(1 for s, _, _ in results if s.broken)))
-    for s, _, _ in not_run:
+          + _denominator(len(results), sum(1 for s, _, _, _ in results if s.kind == "workflow-file"), args.workflow,
+                         broken=sum(1 for s, _, _, _ in results if s.broken)))
+    for s, rc, _, reason in results:
+        if rc == "skip" and reason:
+            print(f"  skipped: {s.name} ({reason})")
+    for s, _, _, _ in not_run:
         print(f"  not run: {s.name} ({s.note})")
-    for s, rc, _ in results:
+    for s, rc, _, _ in results:
         if rc == "broken":
             print(f"  broken: {s.name} ({s.note})")
+    for s, rc, _, _ in results:
+        if rc == 0 and s.partial:
+            print(f"  partial: {s.name} (misses {s.partial})")
     return 1 if failed else 0
 
 

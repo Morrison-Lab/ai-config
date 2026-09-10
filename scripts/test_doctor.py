@@ -106,6 +106,16 @@ class TestDoctor(unittest.TestCase):
         self.assertIn("contains a double quote", res["details"])
 
     @patch("doctor.run_cmd")
+    def test_check_agy_hook_commands_over_zero_manifests_fails(self, mock_run_cmd):
+        """A report covering no manifest cannot say the hooks are launchable."""
+        empty = {"ok": True, "reports": [{"path": "hooks.json", "present": False, "findings": []}]}
+        mock_run_cmd.return_value = (0, json.dumps(empty), "")
+        res = doctor.check_agy_hook_commands()
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["status"], "FAIL")
+        self.assertIn("zero manifests", res["details"])
+
+    @patch("doctor.run_cmd")
     def test_check_agy_hook_commands_without_a_report_fails(self, mock_run_cmd):
         """No parseable report means the check did not run, which is not a pass."""
         mock_run_cmd.return_value = (1, "", "Traceback")

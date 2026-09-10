@@ -7,7 +7,7 @@ Antigravity resolves on macOS and Linux and `cmd.exe` resolves on neither
 count: `python3` is usually absent from a Windows PATH and `~` is not expanded
 there. Copying it verbatim is what left the Windows install needing a hand
 repair, and the repair is what wrote the escaped quotes that broke every
-`run_command` hook (ai-config#3091).
+`run_command` hook (https://github.com/Morrison-Lab/ai-config/issues/3091).
 
 Rendering rather than repairing keeps the escaping right by construction:
 `json.dumps` writes a real quote in the value as one escape, never two.

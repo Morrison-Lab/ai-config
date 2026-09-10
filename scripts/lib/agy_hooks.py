@@ -8,7 +8,7 @@ to copy it verbatim into the Antigravity staging directory
 `cmd.exe`, so the staged copy on Windows was repaired by hand with quoted
 absolute paths. Every `run_command` PreToolUse hook then failed to launch, with
 `cmd.exe` reporting a backslash-prefixed quoted path as not recognized
-(ai-config#3091).
+(https://github.com/Morrison-Lab/ai-config/issues/3091).
 
 The quoting is what fails, and it fails whether or not the repair wrote the
 quotes correctly. Measured 2026-09-09: a launcher that hands the whole command
@@ -40,6 +40,10 @@ from typing import Callable, Iterator, Tuple
 # doubled backslashes").
 BACKSLASH = chr(92)
 ESCAPED_QUOTE = BACKSLASH + '"'
+
+# cmd.exe parses each of these as command syntax. A Windows hook command is
+# emitted unquoted (see `windows_problems`), so none of them can be carried.
+CMD_METACHARACTERS = "&|<>^%()"
 
 CANONICAL_INTERPRETER = "python3"
 CANONICAL_PLUGIN_DIR = "~/.gemini/config/plugins/ai-config"
@@ -131,7 +135,7 @@ def command_problems(command: str) -> list[str]:
         problems.append(
             "contains a backslash-escaped quote; the backslash is part of the "
             "value, so cmd.exe reads it as the first character of the program "
-            "name and reports the path as not recognized (ai-config#3091). "
+            "name and reports the path as not recognized (https://github.com/Morrison-Lab/ai-config/issues/3091). "
             "Write a plain quote and let the JSON encoder escape it."
         )
     if command.count('"') % 2:
@@ -283,9 +287,61 @@ def windows_problems(command: str) -> list[str]:
             "contains a double quote; the launcher hands the command to "
             "cmd.exe as a single argument and re-escapes embedded quotes, so "
             "a quoted path arrives with a leading backslash and does not "
-            "resolve (ai-config#3091). Use unquoted paths."
+            "resolve (https://github.com/Morrison-Lab/ai-config/issues/3091). Use unquoted paths."
+        )
+    problems.extend(unrendered_posix_problems(command))
+    problems.extend(cmd_metacharacter_problems(command))
+    return problems
+
+
+def unrendered_posix_problems(command: str) -> list[str]:
+    """Return defects that mark a command as never having been rendered.
+
+    A staged manifest still carrying the canonical POSIX form is the exact
+    stale state https://github.com/Morrison-Lab/ai-config/issues/3091 reports, and `program_resolves` alone does not
+    catch it: `python3` can sit on PATH as a Windows Store alias while
+    `cmd.exe` still cannot expand the `~` that follows it.
+    """
+    problems = []
+    if command.startswith(CANONICAL_INTERPRETER + " "):
+        problems.append(
+            f"still starts with '{CANONICAL_INTERPRETER} '; cmd.exe resolves "
+            "no such program reliably, so this manifest was copied rather "
+            "than rendered by scripts/render-agy-hooks.py"
+        )
+    if "~" in command:
+        problems.append(
+            "contains '~', which cmd.exe does not expand; a rendered Windows "
+            "command carries an absolute path"
         )
     return problems
+
+
+def cmd_metacharacter_problems(command: str) -> list[str]:
+    """Return defects from characters `cmd.exe` parses as command syntax.
+
+    A Windows command is emitted unquoted (see `windows_problems`), so every
+    character quoting would otherwise neutralize is live. Checking only quotes
+    and spaces leaves a path carrying `&` or `%` to be split or expanded.
+    """
+    found = sorted({c for c in CMD_METACHARACTERS if c in command})
+    if not found:
+        return []
+    return [
+        "contains " + ", ".join(repr(c) for c in found) + "; cmd.exe parses "
+        "these as command syntax and the command is emitted unquoted, so the "
+        "hook would be split or expanded rather than launched"
+    ]
+
+
+def describe_char(char: str) -> str:
+    """Name a character the way an error message should read it.
+
+    A bare repr reports a space as `' '`, which a reader scans straight past on
+    the one path where the space is the whole problem.
+    """
+    names = {" ": "a space", '"': "a double quote"}
+    return names.get(char, repr(char))
 
 
 def assert_cmd_safe(path: str, role: str) -> None:
@@ -294,11 +350,14 @@ def assert_cmd_safe(path: str, role: str) -> None:
     Quoting is unavailable here (see `windows_problems`), so a path carrying a
     space has no correct rendering and stopping is the only honest answer.
     """
-    if '"' in path or " " in path:
+    unsafe = sorted({c for c in CMD_METACHARACTERS + ' "' if c in path})
+    if unsafe:
         raise ValueError(
-            f"the {role} path {path!r} contains a space or a quote, and a "
-            "Windows hook command cannot be quoted (ai-config#3091). Point "
-            "AGY_HOOK_PYTHON at an interpreter on a space-free path, or "
+            f"the {role} path {path!r} contains "
+            + ", ".join(describe_char(c) for c in unsafe)
+            + ", and a Windows hook command cannot be quoted "
+            "(https://github.com/Morrison-Lab/ai-config/issues/3091), so cmd.exe would parse it as command syntax. "
+            "Point AGY_HOOK_PYTHON at an interpreter on a plain path, or "
             "install the plugin under one."
         )
 

@@ -87,5 +87,54 @@ class TestEmptyManifestFails(unittest.TestCase):
         self.assertEqual(rc, 1)
         self.assertIn("carries no hook commands", out)
 
+
+class TestWindowsStaleAndMetacharacters(unittest.TestCase):
+    """A staged Windows manifest must not pass in its unrendered POSIX form."""
+
+    POSIX = "python3 ~/.gemini/config/plugins/ai-config/hooks/x.py"
+
+    def test_unrendered_posix_command_is_rejected_on_windows(self):
+        findings = agy_hooks.windows_problems(self.POSIX)
+        self.assertTrue(any("still starts with" in f for f in findings))
+        self.assertTrue(any("does not expand" in f for f in findings))
+
+    def test_a_rendered_windows_command_passes(self):
+        rendered = "C:/Python313/python.exe C:/Users/x/.gemini/hooks/x.py"
+        self.assertEqual(agy_hooks.windows_problems(rendered), [])
+
+    def test_each_cmd_metacharacter_is_rejected(self):
+        for char in agy_hooks.CMD_METACHARACTERS:
+            command = "C:/py/python.exe C:/plug" + char + "in/hooks/x.py"
+            with self.subTest(char=char):
+                findings = agy_hooks.cmd_metacharacter_problems(command)
+                self.assertTrue(findings, char)
+                self.assertIn(repr(char), findings[0])
+
+    def test_assert_cmd_safe_rejects_a_metacharacter_path(self):
+        with self.assertRaises(ValueError) as ctx:
+            agy_hooks.assert_cmd_safe("C:/Program&Files/python.exe", "interpreter")
+        self.assertIn("'&'", str(ctx.exception))
+
+    def test_assert_cmd_safe_accepts_a_plain_path(self):
+        agy_hooks.assert_cmd_safe("C:/Python313/python.exe", "interpreter")
+
+
+class TestMissingInstalledManifest(unittest.TestCase):
+    """An absent staged manifest is a defect once its directory exists."""
+
+    def test_absent_and_required_is_a_finding(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            missing = Path(tmp) / "hooks.json"
+            report = CHECKER.check_file(missing, canonical=False, required=True)
+        self.assertFalse(report["present"])
+        self.assertTrue(any("is missing although" in f for f in report["findings"]))
+
+    def test_absent_and_not_required_stays_a_skip(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            missing = Path(tmp) / "hooks.json"
+            report = CHECKER.check_file(missing, canonical=False)
+        self.assertFalse(report["present"])
+        self.assertEqual(report["findings"], [])
+
 if __name__ == "__main__":
     unittest.main()

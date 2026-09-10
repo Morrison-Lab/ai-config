@@ -157,10 +157,10 @@ def check_agy_hook_commands() -> Dict[str, Any]:
 
     A hook command that fails to launch leaves every guard inert while
     Antigravity skips it silently and a headless `agy` run still reports
-    success (ai-config#3091), so this reports FAIL rather than WARN: the
+    success (https://github.com/Morrison-Lab/ai-config/issues/3091), so this reports FAIL rather than WARN: the
     machine has no client-side enforcement at all until it is fixed.
 
-    Deviation from ai-config#3091: The static check catches the quoting
+    Deviation from https://github.com/Morrison-Lab/ai-config/issues/3091: The static check catches the quoting
     regression the issue measured. A dynamic cmd /c probe would need a
     synthetic stdin payload to avoid firing on a hook's own business logic,
     and a resolvable-but-broken interpreter is therefore out of its reach.
@@ -178,8 +178,18 @@ def check_agy_hook_commands() -> Dict[str, Any]:
         }
 
     findings = [f"{r['path']}: {f}" for r in report["reports"] for f in r["findings"]]
+    checked = [r for r in report["reports"] if r["present"]]
+    if code == 0 and not findings and not checked:
+        return {
+            "name": "agy_hook_commands",
+            "ok": False,
+            "status": "FAIL",
+            "details": (
+                "no Antigravity hook manifest was checked at all; a report "
+                "covering zero manifests cannot say the hooks are launchable."
+            ),
+        }
     if code == 0 and not findings:
-        checked = [r for r in report["reports"] if r["present"]]
         return {
             "name": "agy_hook_commands",
             "ok": True,

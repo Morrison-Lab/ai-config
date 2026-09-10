@@ -337,7 +337,7 @@ The reply lands as a `PLANNER_RESPONSE` step in `~/.gemini/antigravity/brain/<co
 This route did real tool work and two edit-only doc fixes on 2026-09-02, so it is a working fallback, not merely a documented one --- but it depends on the IDE process already running, which the direct CLI install above does not.
 
 **A headless `agy` run reports success over a hook that failed to launch.**
-Measured 2026-09-09 (ai-config#3091): the staged Windows `hooks.json` carried quoted absolute paths, every `run_command` hook failed to start, the agent could run no shell command at all, and the dispatch still exited 0 and printed a "Completed Work Summary" naming files it never wrote.
+Measured 2026-09-09 ([ai-config#3091](https://github.com/Morrison-Lab/ai-config/issues/3091)): the staged Windows `hooks.json` carried quoted absolute paths, every `run_command` hook failed to start, the agent could run no shell command at all, and the dispatch still exited 0 and printed a "Completed Work Summary" naming files it never wrote.
 A clean `git status` was the only tell.
 `memories/antigravity.md` carries the quoting rule and the fix;
 what matters to a dispatcher is that the run's own report cannot be taken as evidence.

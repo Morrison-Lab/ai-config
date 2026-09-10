@@ -6,7 +6,7 @@ skips a hook whose subprocess dies (see `memories/antigravity.md`, "Fail-open
 on a hook subprocess timeout or crash is intentional"), and a headless `agy`
 run then reports success and prints a work summary listing files it never
 wrote. Nothing is red, and `git status` staying clean is the only tell
-(ai-config#3091).
+(https://github.com/Morrison-Lab/ai-config/issues/3091).
 
 So the launch has to be checked ahead of the run. Two files are in scope:
 
@@ -28,7 +28,7 @@ Usage:
     python3 scripts/check-agy-hook-commands.py --installed
     python3 scripts/check-agy-hook-commands.py --installed --json
 
-Deviation from ai-config#3091: The issue asked for a dynamic check that runs
+Deviation from https://github.com/Morrison-Lab/ai-config/issues/3091: The issue asked for a dynamic check that runs
 each hook command through cmd /c on Windows. This script instead uses a static
 pattern inspection and a PATH existence check, and never launches anything. The
 static check catches the quoting regression the issue measured. A dynamic
@@ -84,10 +84,25 @@ def check_manifest(
     return findings
 
 
-def check_file(path: Path, canonical: bool, check_program: bool = False) -> dict:
-    """Check one manifest file and return a report dict."""
+def check_file(
+    path: Path, canonical: bool, check_program: bool = False, required: bool = False
+) -> dict:
+    """Check one manifest file and return a report dict.
+
+    `required` marks a manifest whose absence is itself the defect. The staged
+    copy is required once its plugin directory exists, because that means
+    bootstrap.sh ran and its render step failed: Antigravity then launches with
+    no hooks at all, which is the state a silent SKIP would report as healthy.
+    """
     if not path.is_file():
-        return {"path": str(path), "present": False, "findings": [], "commands": 0}
+        findings = []
+        if required:
+            findings = [
+                "is missing although its plugin directory exists, so "
+                "bootstrap.sh ran and its render step did not; Antigravity is "
+                "loading no hooks. Re-run bootstrap.sh and read its warnings."
+            ]
+        return {"path": str(path), "present": False, "findings": findings, "commands": 0}
     try:
         manifest = load_manifest(path)
     except Exception as exc:
@@ -122,7 +137,15 @@ def main(argv: list[str]) -> int:
 
     reports = [check_file(CANONICAL_MANIFEST, canonical=True)]
     if args.installed:
-        reports.append(check_file(installed_manifest_path(), canonical=False, check_program=True))
+        staged = installed_manifest_path()
+        reports.append(
+            check_file(
+                staged,
+                canonical=False,
+                check_program=True,
+                required=staged.parent.is_dir(),
+            )
+        )
 
     for report in reports:
         if report["present"] and not report["commands"]:

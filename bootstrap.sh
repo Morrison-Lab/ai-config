@@ -75,7 +75,7 @@ if [ -d "$SCRIPT_DIR/plugins/ai-config" ]; then
   # portable POSIX form (`python3 ~/.gemini/...`), which Antigravity resolves
   # on macOS and Linux and cmd.exe resolves on neither count. Copying it
   # verbatim left the Windows install needing a hand repair, and that repair
-  # introduced the quoting that broke every run_command hook (ai-config#3091).
+  # introduced the quoting that broke every run_command hook (https://github.com/Morrison-Lab/ai-config/issues/3091).
   # The renderer refuses to emit a command carrying the quoting or the
   # unresolved prefix that broke the install; it does not check that the
   # interpreter it names exists, which check-agy-hook-commands.py does.

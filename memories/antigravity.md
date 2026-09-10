@@ -23,7 +23,7 @@ backed by a staging directory created in `bootstrap.sh`.
 
 ### A Windows hook command must carry no quotes, and `python3` and `~` do not resolve there
 
-Measured 2026-09-09 on Windows 11 (ai-config#3091).
+Measured 2026-09-09 on Windows 11 ([ai-config#3091](https://github.com/Morrison-Lab/ai-config/issues/3091)).
 `cmd.exe` resolves neither `python3` nor `~`, so the portable POSIX command form cannot be staged verbatim onto a Windows machine.
 The obvious repair, an absolute interpreter path in quotes, does not work either: the launcher hands the whole command to `cmd.exe` as a **single argument**, which re-escapes every embedded quote on the way, so a correctly quoted path arrives with a backslash in front of it and `cmd.exe` reports it as not recognized.
 The same two paths **unquoted** launch and return `{"decision": "allow"}`.
@@ -39,7 +39,7 @@ That leaves one correct form, an unquoted absolute interpreter path followed by 
 
 ### A hooked-tool failure leaves headless `agy` reporting success
 
-Same measurement (ai-config#3091), and it is why the quoting bug survived a full dispatch unnoticed.
+Same measurement ([ai-config#3091](https://github.com/Morrison-Lab/ai-config/issues/3091)), and it is why the quoting bug survived a full dispatch unnoticed.
 A `run_command` hook that fails to launch is skipped (see this file's fail-open section), the agent then cannot run any shell command, and the headless run still exits 0 and prints a "Completed Work Summary" naming files it never wrote.
 Nothing in the exit code, the stdout, or the summary distinguishes that from a successful dispatch.
 

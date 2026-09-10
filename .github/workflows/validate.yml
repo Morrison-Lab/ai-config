@@ -182,7 +182,7 @@ jobs:
         # enabled_ai_config_plugins for its double-registration warning.
         run: python3 scripts/test_plugin_overlap.py
       - name: Check Antigravity hook commands can launch
-        # ai-config#3091: the staged Windows manifest carried quoted absolute
+        # https://github.com/Morrison-Lab/ai-config/issues/3091: the staged Windows manifest carried quoted absolute
         # paths, and the launcher re-escapes an embedded quote on its way to
         # cmd.exe, so every run_command hook failed to start. Antigravity
         # skips a hook whose subprocess dies and headless agy still reports

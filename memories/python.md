@@ -282,3 +282,21 @@ Adding one invalid escape to `hooks/flag-cop-out-offer.py` and running `hooks/te
 - **Don't:** rely on `error::SyntaxWarning` alone for invalid escapes --- it is vacuous on 3.11, and the injection test passes anyway on 3.12 and later.
 - **Don't:** broaden a category-only filter to `error::DeprecationWarning` to cover the gap, which errors on every unrelated deprecation as well.
 - **Don't:** put a regex in the `-W`/`PYTHONWARNINGS` message field, which is escaped to a literal there unlike `warnings.filterwarnings()`'s own `message=`, so `error:invalid.*sequence::` matches nothing and the filter is vacuous with no error.
+
+## `Path.write_text` writes CRLF on Windows, and `read_text` hides it
+
+`pathlib.Path.write_text("a\nb\n")` writes `b"a\r\nb\r\n"` on Windows, so any tool that reads those bytes without normalizing --- `grep`, `awk`, a shell anchor match, a later regex against LF-normalized text --- sees content the script never intended to write.
+A Python round-trip cannot detect it: `read_text()` normalizes universal newlines on the way back in and returns `"a\nb\n"`, so the mismatch is invisible to the script that caused it.
+Measured 2026-09-10 on Windows 11 / CPython 3.13.
+
+Write and read bytes explicitly instead:
+
+```python
+s = p.read_bytes().decode("utf-8").replace("\r\n", "\n")
+p.write_bytes(s.encode("utf-8"))
+```
+
+- **Do:** use `write_bytes`/`read_bytes` for content another tool will match against byte-for-byte.
+- **Don't:** verify what `write_text` wrote by reading it back with `read_text` --- that round-trip normalizes the very bytes in question.
+- **Don't:** diagnose the resulting anchor-match failure as a wrong anchor string;
+  print `repr()` of the file's bytes.

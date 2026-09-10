@@ -198,3 +198,18 @@ pre-empt these when authoring shell, especially under `set -euo pipefail`:
 - **bash 3.2 (macOS default) compatibility:** indexed arrays, C-style `for ((...))`, and `${2+set}` all work;
   **associative arrays do NOT** (4.0+).
   Parse key=value records with `while IFS='=' read -r k v; do case "$k" in ...`.
+
+## Git Bash process substitution fails for a native-Windows consumer
+
+In Git Bash on Windows, `<(...)` works for msys-native consumers and fails only when the consumer is a **native Windows binary** that has to reopen the msys `/proc/NNNN/fd/N` path.
+Measured 2026-09-10 on Git Bash 2.37.2.windows.2: `cat <(cat f)`, `wc -l <(printf ...)` and `grep -c a <(printf ...)` all exit 0, while `git hash-object <(printf 'x\n')` exits 128 with `fatal: could not open '/proc/20068/fd/63' for reading`.
+`git commit -F <(...)` fails the same way, reporting `could not read log file` --- so the error text comes from the consuming tool rather than from the shell, and grepping for a remembered message finds nothing.
+Write the content to a real file and pass the path.
+
+[`zsh.md`](zsh.md) records a different failure of the same construct, under zsh on Linux, with an explicit non-reproduction on macOS;
+[`claude-code.md`](claude-code.md) points at that entry rather than adding a third measurement.
+Two unrelated platform failures of one construct is the argument for suspecting it early rather than diagnosing it again.
+
+- **Do:** write the content to a file when the consumer is a native Windows binary (`git`, and anything else not built against msys).
+- **Do:** grep for the construct rather than for an error string, since the message belongs to the consumer.
+- **Don't:** conclude process substitution is unavailable in Git Bash --- test it with `cat` and it works.

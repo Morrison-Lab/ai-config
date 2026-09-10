@@ -69,30 +69,52 @@ grants the move, it does not exempt it from what a move costs.
   "A defect whose surface form varies defeats a phrase grep", for the case
   this generalizes from --- a quoted-heading grep sweep still left two more
   rounds' worth of differently-worded instances for reviewers to find.
-- **Inbound links to the SOURCE file go stale too, and no phrase search finds them.**
+- **Inbound links to the SOURCE file go stale too, and the sweep that finds
+  them is an enumeration rather than a search.**
   The bullet above sweeps the moved block and the survivor left behind.
   Both are searches over *text you moved*, so both are blind to the other
-  direction: a third file that links to the source file and describes, in its
-  own words, content that has just left it.
-  Such a link names the **file**, never the moved passage, so grepping for the
-  moved content's distinctive phrases returns nothing --- and a link that still
-  resolves, to a file that still exists, turns nothing red.
-  It is the worse half of the two, because the reader who follows it lands
-  somewhere real and finds no trace of what was cited, with no pointer onward.
-  Enumerate every inbound link to the source file and ask of each, one at a
-  time, whether the claim it makes still describes something in that file:
+  direction: a third file that links to the source file and describes content
+  that has just left it.
+  Nothing turns red, because the link still resolves to a file that still
+  exists, and the reader who follows it lands somewhere real and finds no trace
+  of what was cited, with no pointer onward.
+
+  A phrase search over the moved content **sometimes** finds these, and cannot
+  be relied on to.
+  A citing file that quotes the moved block's own distinctive string --- an
+  error message, a command --- does match.
+  One that paraphrases in its own words does not, and neither does one that
+  cites the *file* for a claim it states differently.
+  So a clean phrase sweep is evidence about the sites that quote, and says
+  nothing about the rest, which is exactly the reading that makes it feel
+  finished.
+
+  Enumerate instead.
+  List every inbound link to the source file, then ask of each, one at a time,
+  whether the claim it makes still describes something in that file:
 
   ```bash
   grep -rn '<source-basename>' --include='*.md' .
   ```
 
-  The list is short and the question is per-link, so this is cheap.
-  What makes it easy to skip is that the phrase sweep feels like the sweep ---
-  it is derived, it is repo-wide, and it comes back clean.
-  - **Do:** sweep both directions --- the moved text for outbound references,
-    and the source file's inbound links for claims that moved.
-  - **Don't:** read a clean repo-wide search for the moved content as having
-    checked the inbound direction; it cannot, by construction.
+  That list is long in a corpus this size --- 100 hits across 54 files, in the
+  move this bullet was written for --- so narrow it mechanically rather than by
+  eye: take the distinctive terms of the moved block and keep only the links
+  whose surrounding lines contain one.
+  That filter is a heuristic in both directions, and both matter.
+  It surfaced two real stale sites here, and it also returned two false
+  positives keyed on a phrase as generic as "default branch", so read its
+  output as a shortlist to check by hand rather than as the answer.
+
+  - **Do:** enumerate the inbound links and check each claim against the source
+    file's remaining content.
+  - **Do:** narrow a long list by context overlap with the moved block, then
+    read the survivors.
+  - **Don't:** read a clean phrase sweep as having checked this direction ---
+    it covers only the citing sites that happen to quote.
+  - **Don't:** write this rule and skip running it, which is how the move that
+    prompted it left two stale links standing after the sweep was codified.
+
 - **A downstream count or position reference can silently break**, even
   though you touched neither its sentence nor its file.
   [`forward-references.md`](forward-references.md)'s "Inserting prose makes a

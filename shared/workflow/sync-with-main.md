@@ -436,9 +436,9 @@ Three details in that block are each load-bearing.
 `refs/remotes/origin/HEAD` is absent in a clone that never ran
 `git remote set-head`, so the fallback is not decoration; and the name it
 resolves to is not always `main`, which
-[`memories/preferences.md`](../../memories/preferences.md) records as a
-measured `fatal: invalid reference: origin/main` on a repo whose default is
-named otherwise.
+[`memories/subagent-worktrees.md`](../../memories/subagent-worktrees.md)
+records as a measured `fatal: invalid reference: origin/main` on a repo whose
+default is named otherwise.
 The `git fetch` is what stops the check being vacuous: `merge-tree` reads the
 remote-tracking ref, so an unfetched `origin/<base>` compares against the
 `main` you cloned and reports clean, which is

@@ -77,10 +77,41 @@ when the keyword sits next to the number.
 The squash commit of #1718 closed #1717 that way, and the hook that commit
 shipped stayed unregistered until #2275 / #2294.
 
+**A sentence that DEFERS the close is the same hazard, and it carries no
+negation for the rule above to catch.**
+Measured 2026-09-07 on `ucdavis/bcs#982`, whose body read "... follow in a data
+PR that closes #923".
+That promises a *later* pull request will close the issue.
+It closed the issue on #982's merge, and nobody noticed for two days --- the
+data PR was then opened by a session that reasoned carefully about writing
+`Refs #923` rather than `Closes`, never queried the issue's state, and reported
+it open in three successive recaps.
+
+The deferral shape reads as safe precisely because the rule above says "even
+when the sentence negates it", so a sentence with no negation in it scans as
+out of scope while being exactly as dangerous.
+Choosing between `Closes` and `Refs` is also reasoning about an issue you have
+not looked at: query the state (`gh issue view N --json state`) before
+asserting it anywhere.
+
 - **Do:** keep the number off the keyword (`Refs #N`, or "the closing
   keyword was not used for #N").
+- **Do:** phrase a deferral so the number never touches the keyword --- "a
+  later data PR will close it (#N)".
+- **Do:** query an issue's state before writing `Closes` or `Refs`, or before
+  reporting it open.
 - **Don't:** write a sentence that places a closing keyword next to #N
   in order to say you are not using it.
+- **Don't:** read a sentence as safe because it names a future PR as the one
+  that will do the closing.
+
+`hooks/warn-deferred-closing-keyword.py` is this rule's mechanism, added on the
+third occurrence: it warns when a closing keyword sits next to an issue
+reference mid-line inside a sentence carrying a deferral or negation cue.
+A bare `Closes #N` line never fires.
+It is scoped to a pull-request description, an issue description, and a commit
+message, because those are the only three surfaces GitHub's parser reads --- a
+plain comment may carry `closes #N` all it likes and closes nothing.
 
 See [`ardi.cases.md`](ardi.cases.md), "A negated closing-keyword sentence
 still closes the issue", and

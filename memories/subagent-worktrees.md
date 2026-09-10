@@ -357,6 +357,31 @@ The one cheap check that works today is a message: `SendMessage` to the agent's 
   measured twice, and the second time it was still running.
 - **Don't:** write "no instrument is possible" when what is true is "none was built and the objection is unmeasured" --- two drafts of this entry made exactly that upgrade, and a durable record that forecloses a question stops anyone reopening it.
 
+**Third occurrence, 2026-09-10, and this one supplies a cheap instrument the second occurrence's open question left unbuilt.**
+A background `Agent` reported `status=completed`, its summary read "Agent ... finished", and its own final message declared "**Stopping Point**: Clean stopping point reached --- both PRs this session opened are merged, working tree is clean, no uncommitted changes, no open questions."
+This is a stronger claim than either prior occurrence's bare completion notification: it is the agent asserting, in its own words, that it has nothing left to do.
+`ps -p` on the PID recorded in its worktree's lock reason showed the process alive, and it was still alive 8h57m later.
+The agent's self-report was wrong about the one thing the agent was in the best position to know.
+
+**The two prior occurrences are about inferring liveness from *absence* of signal** --- a quiet tree, an unlisted `ListAgents` row, an empty `session-lock list`.
+This is the opposite failure, and the more persuasive one: a *positive, explicit, first-person* claim of completion, which is exactly the shape of evidence a careful reader is most likely to accept at face value, and it was false anyway.
+The prescribed remedy in both prior occurrences is "ask the agent" --- but here the agent already answered, unprompted, and the answer was the wrong one, so the remedy that matters is not asking again --- it is not trusting the answer.
+
+**The check that actually works is process-table ground truth, not the agent's account of itself.**
+`isolation: "worktree"` locks the worktree it creates, and the lock's reason string embeds the dispatching process, e.g. `claude agent <name> (pid NNNNN start <date>)`.
+Parse the PID out of that reason and run `ps -p <pid>`: alive means the process has not exited, full stop, regardless of what the agent's own last message or completion summary claims.
+This is a different signal from `session-lock`'s own registry (`ai-session.sh`'s `find_agent_pid` plus `kill -0`, used for the deliberately-registered worktrees under that skill) --- it reads the harness's own worktree lock, which exists for `Agent`-dispatched worktrees `session-lock` never touches.
+
+- **Do:** treat a completion report, however explicit or self-assured ("Stopping Point: Clean", "finished", `status=completed`), as a claim about the agent's output, never as a claim about its process.
+- **Do:** parse the PID from the worktree's `git worktree list` lock reason and run `ps -p <pid>` before reclaiming a dispatched agent's worktree, rather than reading its own sign-off.
+- **Don't:** let a first-person "I'm done, clean stopping point" claim outrank the process check --- it is the most persuasive wrong signal available, and it was measured wrong.
+- **Don't:** treat this as redundant with "ask the agent" --- the agent had already spoken, unasked, and was wrong;
+  the fix is independent verification, not a second question.
+
+(Measured 2026-09-10.
+Worktree lock named `pid 80565`;
+`ps -p 80565` showed the process alive both immediately and 8h57m later, so the worktree could not be safely reclaimed despite the agent's own declared clean stopping point.)
+
 ## Switching a shared worktree's branch under a live dispatched reviewer breaks its reads
 
 The "A subagent that has REPORTED COMPLETION can still be resumed" section is about the orchestrator writing into an agent's own, separate worktree.

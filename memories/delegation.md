@@ -275,23 +275,27 @@ A tool needing a permission it hasn't been granted (`read_file` is the one obser
 The available escapes are `--mode plan` (read-only), `--mode accept-edits`, `--dangerously-skip-permissions`, or an allow-rule under `permissions.allow` in `settings.json` --- but this file's own auto-mode classifier section already found `--dangerously-skip-permissions` and `--mode accept-edits` denied by Claude Code's permission classifier, so those two may not be reachable from an orchestrated dispatch even where they solve the headless problem.
 **Measured 2026-09-09: the `permissions.allow` route works.**
 `--dangerously-skip-permissions` stays denied by Claude Code's classifier, and `--mode plan` is still untested.
-With this in `~/.gemini/antigravity-cli/settings.json` (agy 1.1.28, Windows 11):
+With this in `~/.gemini/antigravity-cli/settings.json` (agy 1.1.28, Windows 11;
+`<user>` and `<repo>` stand for the real account and checkout):
 
 ```json
 {
   "permissions": {
     "allow": [
       "command(*)",
-      "read_file(C:\\Users\\dougm\\Documents\\Github\\sparta)",
-      "write_file(C:\\Users\\dougm\\Documents\\Github\\sparta)"
+      "read_file(C:\\Users\\<user>\\path\\to\\<repo>)",
+      "write_file(C:\\Users\\<user>\\path\\to\\<repo>)"
     ]
   },
-  "trustedWorkspaces": ["C:\\Users\\dougm\\Documents\\Github\\sparta"]
+  "trustedWorkspaces": ["C:\\Users\\<user>\\path\\to\\<repo>"]
 }
 ```
 
-a plain `agy --print "<prompt>" --effort low` ran a shell command and reported its stdout, from the user's own terminal and then from a Claude Code Bash call.
-`command(*)` is the form to use: as of 2026-09-09, upstream issue google-antigravity/antigravity-cli#614 reports that `command(git)` never matches on Windows because the resolved `C:\Program Files\Git\...` path is split at the space, and that a `\*` glob inside a `read_file`/`write_file` rule crashes the sandbox, so directory rules are written bare (they are recursive).
+A plain `agy --print "<prompt>" --effort low` ran a shell command and reported its stdout, from the user's own terminal and then from a Claude Code Bash call.
+`command(*)` is the form to use.
+As of 2026-09-09, upstream issue [google-antigravity/antigravity-cli#614](https://github.com/google-antigravity/antigravity-cli/issues/614) reports two Windows defects: `command(git)` never matches, because the resolved `C:\Program Files\Git\...` path is split at the space, and a `\*` glob inside a `read_file`/`write_file` rule crashes the sandbox.
+So directory rules are written bare (they are recursive).
+`command(*)` is a broad grant, so pair it with a `trustedWorkspaces` list that names only the repos the dispatch should touch.
 Before the rules existed, `-p "/permissions"` itself was denied for `read_file`, so headless mode cannot even list its own rules until one is granted.
 
 Two facts about the run that every brief has to account for:

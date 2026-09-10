@@ -578,7 +578,11 @@ def substitution_bodies(command):
     either, since its value is unknown here; that under-credits, which for a
     DISCHARGE test is the direction that warns. An opener inside a
     single-quoted span is text the shell never expands, so it opens nothing;
-    inside double quotes it does expand, and is followed. The walk tracks
+    inside double quotes it does expand, and is followed. The scan resumes
+    AFTER each body rather than inside it, since `read_roots` recurses into
+    the body and would otherwise re-extract every nested substitution once
+    per enclosing level, which is exponential in the nesting depth (CI
+    review of a60a5f1a: 15 seconds on a 187-character command). The walk tracks
     which quote is open, so an apostrophe inside a double-quoted word does
     not start a single-quoted span (twelfth review round). A backtick body
     is closed by the first backtick outside its own quotes, so a quoted
@@ -618,7 +622,7 @@ def substitution_bodies(command):
             continue
         close = matching_paren(command, match.end())
         bodies.append(command[match.end():close])
-        index = match.end()
+        index = close + 1
     return bodies
 
 

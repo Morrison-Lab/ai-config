@@ -374,6 +374,9 @@ _ATTRIBUTION_CASES = [
      "a real read inside a substitution is still credited"),
     ("echo $(echo $(cat ~/.claude/settings.json))", {"claude"},
      "and one nested a level deeper"),
+    ("echo $(echo $(echo $(echo $(cat ~/.claude/settings.json))))", {"claude"},
+     "the scan resumes after each body rather than inside it, so nesting "
+     "costs one pass per level and a deep read is still credited"),
     ("grep -rn '~/.claude/settings.json' $(git diff --name-only)", set(),
      "a substitution among a grep's arguments does not hand the fallback the "
      "grep whose pattern spells a manifest (CI review round on #3469)"),

@@ -20,8 +20,12 @@ RX_FETCH_COMMENTS = re.compile(
 )
 
 RX_VERDICT_LINES = re.compile(
-    r'split\("(\\n|\n)"\)|test\("[^"]*(?:Verdict|Ready for merge|Needs more work|NOT CLEAN|NOT_CLEAN|Reviewed commit)[^"]*"\)'
+    r'test\("[^"]*(?:Verdict|Ready for merge|Needs more work|NOT CLEAN|NOT_CLEAN|Reviewed commit)[^"]*"\)'
 )
+
+# A split of the body on its own is not a verdict-line read: a split followed
+# by length counts lines. It becomes one when the split lines are then sliced.
+RX_SPLIT_THEN_SLICE = re.compile(r'split\("(\\n|\n)"\).*\.\[\d+:\d+\]')
 
 RX_JQ_FILTER_FILE = re.compile(
     r"""\bjq\b[^\n|;&]*?\s+(?:-[a-zA-Z]*f(?:\s+|=)|--from-file(?:\s+|=))(?:"([^"]+)"|'([^']+)'|([^\s|;&]+))""",
@@ -88,7 +92,7 @@ def should_warn(command: str, cwd: str | None = None) -> bool:
 
     union_text = "\n".join([command] + file_texts) if file_texts else command
 
-    if not RX_VERDICT_LINES.search(union_text):
+    if not RX_VERDICT_LINES.search(union_text) and not RX_SPLIT_THEN_SLICE.search(union_text):
         return False
     if "findings" in union_text or "review-data" in union_text:
         return False

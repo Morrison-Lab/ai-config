@@ -137,6 +137,23 @@ def test_suite() -> list[str]:
         failures.append(f"case 4b failed: returncode={res4b.returncode}, stdout={res4b.stdout!r}")
     print(f"  {'FAIL' if len(failures) > prev else 'ok  '} case 4b: bare slice over the comments array stays silent")
 
+    # Case 4c: a split of the body with no verdict test and no slice (a line
+    # count) is not a verdict-line read -> silent
+    cmd_split_len = 'gh api repos/owner/repo/issues/123/comments | jq ".[] | .body | split(\"\\n\") | length"'
+    res4c = run_hook(bash_payload(cmd_split_len))
+    prev = len(failures)
+    if res4c.returncode != 0 or res4c.stdout.strip() != "":
+        failures.append(f"case 4c failed: returncode={res4c.returncode}, stdout={res4c.stdout!r}")
+    print(f"  {'FAIL' if len(failures) > prev else 'ok  '} case 4c: split-and-count stays silent")
+
+    # Case 4d: split then a slice of the lines is a verdict-line read -> warns
+    cmd_split_slice = 'gh api repos/owner/repo/issues/123/comments | jq ".[-1].body | split(\"\\n\") | .[0:4]"'
+    res4d = run_hook(bash_payload(cmd_split_slice))
+    prev = len(failures)
+    if res4d.returncode != 0 or "additionalContext" not in res4d.stdout:
+        failures.append(f"case 4d failed to warn: returncode={res4d.returncode}, stdout={res4d.stdout!r}")
+    print(f"  {'FAIL' if len(failures) > prev else 'ok  '} case 4d: split then slice warns")
+
     # Additional silent: --json commentsX (not a real comments field) stays silent
     cmd_comments_x = (
         'gh pr view 42 --json commentsX --jq \'.comments[].body | split("\\n") | map(select(test("Verdict")))\''

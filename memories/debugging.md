@@ -432,7 +432,8 @@ command's own stderr, which was sitting in the same output.)
 adds two things the locale case above does not: `xargs` as the
 child-process boundary, and a false zero that reached a commit message
 rather than a check's own printed summary.**
-(Deliberately not numbered. The only other occurrence counter in this file
+(Deliberately not numbered.
+The only other occurrence counter in this file
 sits in "An empty grep for one spelling is not evidence the concept is
 absent", which is a different mechanism, so a count here would invite a
 comparison against occurrences that are not this pattern's.)

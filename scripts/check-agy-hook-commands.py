@@ -27,6 +27,14 @@ Usage:
     python3 scripts/check-agy-hook-commands.py
     python3 scripts/check-agy-hook-commands.py --installed
     python3 scripts/check-agy-hook-commands.py --installed --json
+
+Deviation from ai-config#3091: The issue asked for a dynamic check that runs
+each hook command through cmd /c on Windows. This script instead uses a static
+pattern inspection and a PATH existence check, and never launches anything. The
+static check catches the quoting regression the issue measured. A dynamic
+cmd /c probe would need a synthetic stdin payload to avoid firing on a hook's
+own business logic, and a resolvable-but-broken interpreter is therefore out of
+its reach.
 """
 from __future__ import annotations
 

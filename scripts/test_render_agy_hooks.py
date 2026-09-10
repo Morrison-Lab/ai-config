@@ -1,19 +1,7 @@
 #!/usr/bin/env python3
-"""Tests for the Antigravity hook command checker and renderer.
-
-The measured failure (ai-config#3091) is the positive case: the staged Windows
-manifest carried quoted absolute paths, and `cmd.exe` reported the path as not
-recognized because the launcher re-escapes an embedded quote on the way. Both
-the escaped form recorded in the issue and the correctly quoted form are
-rejected here, since neither can launch.
-
-The negative controls matter as much: the repo's own canonical manifest passes,
-and the rendered POSIX form passes. A checker that rejects everything and a
-checker that never runs are indistinguishable from a red build alone.
-"""
+"""Tests for the Antigravity hook command checker and renderer."""
 from __future__ import annotations
 
-import importlib.util
 import json
 import sys
 import unittest
@@ -23,43 +11,16 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from lib import agy_hooks  # noqa: E402
-
-
-def load_checker():
-    """Import the hyphenated checker script as a module."""
-    path = REPO_ROOT / "scripts" / "check-agy-hook-commands.py"
-    spec = importlib.util.spec_from_file_location("check_agy_hook_commands", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-CHECKER = load_checker()
-
-BACKSLASH = chr(92)
-PYTHON_EXE = "C:/Users/u/AppData/Local/Programs/Python/Python312/python.exe"
-ADAPTER = "C:/Users/u/.gemini/config/plugins/ai-config/claude-hook-adapter.py"
-
-# The exact string the installed manifest carried, per the issue: each quote
-# preceded by a backslash inside the JSON string VALUE.
-ESCAPED_FORM = (
-    BACKSLASH + '"' + PYTHON_EXE + BACKSLASH + '" '
-    + BACKSLASH + '"' + ADAPTER + BACKSLASH + '"'
+from lib.agy_hooks_fixtures import (
+    ADAPTER,
+    BACKSLASH,
+    CHECKER,
+    ESCAPED_FORM,
+    PYTHON_EXE,
+    QUOTED_FORM,
+    UNQUOTED_FORM,
+    manifest_with,
 )
-QUOTED_FORM = '"' + PYTHON_EXE + '" "' + ADAPTER + '"'
-UNQUOTED_FORM = PYTHON_EXE + " " + ADAPTER
-
-
-def manifest_with(command: str) -> dict:
-    """Wrap one command in both manifest shapes Antigravity uses."""
-    return {
-        "enforce-merge-control": {
-            "PreToolUse": [
-                {"matcher": "run_command", "hooks": [{"type": "command", "command": command}]}
-            ],
-            "Stop": [{"type": "command", "command": command}],
-        }
-    }
 
 
 class TestRender(unittest.TestCase):
@@ -119,9 +80,54 @@ class TestNativePathDetection(unittest.TestCase):
         self.assertTrue(agy_hooks.is_native_windows_path(PYTHON_EXE))
 
 
-if __name__ == "__main__":
-    unittest.main()
 
+import os
+from unittest.mock import patch
+
+
+
+
+
+class TestEnvironmentResolution(unittest.TestCase):
+    def test_is_windows(self):
+        with patch("os.name", "nt"):
+            self.assertTrue(agy_hooks.is_windows())
+        with patch("os.name", "posix"), patch("sys.platform", "linux"), patch.dict("os.environ", {}, clear=True):
+            self.assertFalse(agy_hooks.is_windows())
+            
+    def test_resolve_plugin_dir(self):
+        with patch("os.path.expanduser", return_value="C:/Users/u/.gemini/config/plugins/ai-config"):
+            self.assertEqual(
+                agy_hooks.resolve_plugin_dir(True),
+                "C:/Users/u/.gemini/config/plugins/ai-config"
+            )
+
+    @patch.dict(os.environ, {"AGY_HOOK_PYTHON": "C:/Custom/Python/python.exe"})
+    def test_resolve_python_exe_override(self):
+        self.assertEqual(agy_hooks.resolve_python_exe(True), "C:/Custom/Python/python.exe")
+
+    @patch.dict(os.environ, {}, clear=True)
+    @patch("sys.executable", "/mingw64/bin/python.exe")
+    @patch("shutil.which", return_value="C:/Python312/python.exe")
+    def test_resolve_python_exe_native_path(self, mock_which):
+        self.assertEqual(agy_hooks.resolve_python_exe(True), "C:/Python312/python.exe")
+
+    @patch.dict(os.environ, {}, clear=True)
+    @patch("sys.executable", "/mingw64/bin/python.exe")
+    @patch("shutil.which", return_value="C:/Program Files/Python/python.exe")
+    def test_resolve_python_exe_rejects_space(self, mock_which):
+        resolved = agy_hooks.resolve_python_exe(True)
+        with self.assertRaises(ValueError) as ctx:
+            agy_hooks.assert_cmd_safe(resolved, "interpreter")
+        self.assertIn("space", str(ctx.exception))
+        
+    @patch.dict(os.environ, {}, clear=True)
+    @patch("sys.executable", "/mingw64/bin/python.exe")
+    @patch("shutil.which", return_value=None)
+    def test_resolve_python_exe_no_interpreter_raises(self, mock_which):
+        with self.assertRaises(ValueError) as ctx:
+            agy_hooks.resolve_python_exe(True)
+        self.assertIn("cannot name a Windows interpreter", str(ctx.exception))
 
 if __name__ == "__main__":
     unittest.main()

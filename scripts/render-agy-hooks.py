@@ -54,7 +54,11 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv)
 
     windows = agy_hooks.is_windows() if args.platform == "auto" else args.platform == "windows"
-    text = render(Path(args.source), windows)
+    try:
+        text = render(Path(args.source), windows)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
 
     if not args.output:
         sys.stdout.write(text)

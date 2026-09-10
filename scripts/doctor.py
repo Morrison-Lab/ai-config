@@ -159,6 +159,11 @@ def check_agy_hook_commands() -> Dict[str, Any]:
     Antigravity skips it silently and a headless `agy` run still reports
     success (ai-config#3091), so this reports FAIL rather than WARN: the
     machine has no client-side enforcement at all until it is fixed.
+
+    Deviation from ai-config#3091: The static check catches the quoting
+    regression the issue measured. A dynamic cmd /c probe would need a
+    synthetic stdin payload to avoid firing on a hook's own business logic,
+    and a resolvable-but-broken interpreter is therefore out of its reach.
     """
     script = REPO_ROOT / "scripts" / "check-agy-hook-commands.py"
     code, out, err = run_cmd([sys.executable, str(script), "--installed", "--json"])

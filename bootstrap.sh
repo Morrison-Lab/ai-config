@@ -77,7 +77,8 @@ if [ -d "$SCRIPT_DIR/plugins/ai-config" ]; then
   # verbatim left the Windows install needing a hand repair, and that repair
   # introduced the quoting that broke every run_command hook (ai-config#3091).
   # Rendering fails fast rather than staging a manifest that cannot launch.
-  python3 "$SCRIPT_DIR/scripts/render-agy-hooks.py" --output "$PLUGIN_STAGING_DIR/hooks.json"
+  python3 "$SCRIPT_DIR/scripts/render-agy-hooks.py" --output "$PLUGIN_STAGING_DIR/hooks.json" || printf warn  scripts/render-agy-hooks.py exited %d
+ "$?"
 
   # Symlink executable scripts and repository directories
   ln -sfn "$SCRIPT_DIR/plugins/ai-config/claude-hook-adapter.py" "$PLUGIN_STAGING_DIR/claude-hook-adapter.py"

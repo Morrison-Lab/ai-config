@@ -390,7 +390,7 @@ jobs:
         # An unresolved INLINE @token is reported but does not fail, since
         # most are prose -- see the script's docstring.
         run: python3 scripts/check-context-closure.py
-      - name: Report this PR's own context-closure delta (advisory)
+      - name: Report this PR's context-closure delta; gate root-file growth near the cap
         # ai-config#1373. The step above reports the closure's LEVEL against a
         # budget; this reports what THIS branch did to it. Those are different
         # questions, and only the second is attributable to an author: the
@@ -403,11 +403,20 @@ jobs:
         # about. Reporting the number where a reviewer already looks is the
         # whole intervention.
         #
-        # `|| true` is not swallowing a failure here: the script's own baseline
-        # mode never exits non-zero for a delta, so the only statuses it can
-        # return are usage errors (2) on a rev this runner cannot resolve --
-        # a shallow clone, a force-push -- which must not redden an unrelated
-        # PR. The delta itself is in the log either way.
+        # The delta stays advisory, for the reason above. What is NOT advisory
+        # is the root file's near-cap ratchet (ai-config#3367): once CLAUDE.md
+        # reaches 90% of the harness's hard 150,000-character cap, a PR may not
+        # grow it further. That fires on one file, only inside a band it is
+        # not normally in, so it does not reproduce the cry-wolf failure the
+        # paragraph above rules out -- and the cap it defends has been breached
+        # for real once already (ai-config#1258), while this step's advisory
+        # delta ran throughout and did not prevent the regrowth.
+        #
+        # A blanket `|| true` cannot stay, because it would swallow that gate
+        # along with the environment errors it was added for. The exit codes
+        # already separate the two, so discriminate rather than suppress:
+        # 1 is a finding this PR owns, 2 is a rev this runner could not resolve
+        # (a shallow clone, a force-push) and must not redden an unrelated PR.
         #
         # The base has to be fetched explicitly. `actions/checkout` above sets
         # no `fetch-depth`, so it clones at depth 1 and `origin/<base>` does
@@ -434,7 +443,14 @@ jobs:
             echo "baseline: origin/$BASE unreachable; skipping the delta report"
             exit 0
           fi
-          python3 scripts/check-context-closure.py --baseline "$REV" || true
+          python3 scripts/check-context-closure.py --baseline "$REV"
+          STATUS=$?
+          if [ "$STATUS" -eq 2 ]; then
+            echo "::warning::context-closure baseline could not be measured" \
+              "(exit 2); the growth ratchet did not run on this PR."
+            exit 0
+          fi
+          exit "$STATUS"
       - name: Check for oversized memory files
         # ai-config#695, #2970: memory files are read on demand, so length is
         # a real per-use cost. Gated strictly at 1250 lines in CI so the pre-push

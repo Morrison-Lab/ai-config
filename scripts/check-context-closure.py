@@ -162,6 +162,32 @@ DEFAULT_ROOT_CHAR_WARN_FRACTION = 0.90
 # decide what comes out; crossing this means one file grew past the largest
 # thing anyone had accepted, which is a decision someone should make on
 # purpose.
+DEFAULT_ROOT_GROWTH_GATE_FRACTION = 0.90
+"""Fraction of the root cap above which the root file may not grow at all.
+
+A RATCHET, not a budget, and the distinction is the whole design. The
+advisory delta report (ai-config#1373, wired into validate.yml) has run on
+every PR since 2026-08-10 and did not slow the root file: measured
+2026-09-10, CLAUDE.md went 84,979 -> 143,827 bytes in the 26 days after the
+trim that step was meant to make unnecessary. So reporting the number where
+a reviewer already looks was tried, at length, and is not sufficient.
+
+Gating ALL closure growth is still wrong for the reason validate.yml states:
+a fragment that grows because it earned the words is the normal case, so a
+flat no-growth rule fires on most PRs and trains everyone past it. This
+gate avoids that by firing on ONE file and only near ITS OWN hard limit.
+Below the fraction the root file grows freely; at or above it, any net
+growth fails. The number of PRs affected is therefore zero until the cap is
+genuinely close, which is exactly when a reviewer's attention is worth
+spending -- and ai-config#1258 records the cap actually being breached, so
+the failure this prevents is observed rather than hypothetical.
+
+0.90 matches DEFAULT_ROOT_CHAR_WARN_FRACTION deliberately: the warning and
+the gate should fire at the same line, or the warning becomes the notice
+that a later, unrelated threshold exists. Raise it above 1.0 to disable the
+gate, which leaves the hard cap as the only root-file check.
+"""
+
 DEFAULT_FRAGMENT_CAP_BYTES = 100_000
 
 # English prose runs roughly 3.5-4.5 bytes per token, so a token figure from
@@ -653,6 +679,29 @@ def root_char_count(base: Path, root: str) -> int | None:
         return None
 
 
+def root_char_count_at(base: Path, root: str, rev: str) -> int | None:
+    """Characters in the root file at `rev`, or None if it cannot be read.
+
+    The git-side twin of `root_char_count`, and it counts CHARACTERS from
+    decoded text for the same reason that one does: the harness's cap is
+    stated in characters, and this corpus's prose is not pure ASCII, so
+    `git cat-file -s` (bytes) would read a few hundred characters high on a
+    file this size and make a trim look smaller than it was.
+
+    Undecodable content returns None rather than raising, so a baseline the
+    gate cannot read degrades to "not checked" (reported by the caller)
+    rather than to a confident comparison against zero -- which would score
+    the entire file as growth.
+    """
+    blob = git_reader(base, rev)(root)
+    if blob is None:
+        return None
+    try:
+        return len(blob.decode("utf-8"))
+    except UnicodeDecodeError:
+        return None
+
+
 def render_root_chars(chars: int | None, root: str, cap: int, warn_fraction: float):
     """(over, text) for the root file's hard character cap.
 
@@ -686,6 +735,47 @@ def render_root_chars(chars: int | None, root: str, cap: int, warn_fraction: flo
             f"note it."
         )
     return False, text
+
+
+def render_root_growth(before, after, root, cap, fraction):
+    """(over, text) for the near-cap no-growth ratchet on the root file.
+
+    Reports on every baseline run, passing or failing, and says which of the
+    three states it is in -- below the line, above it and not grown, above it
+    and grown. A check that prints only when it fails is indistinguishable
+    from one that never ran, and here the interesting reading is the one
+    just below the line, where an author still has room to plan a trim.
+    """
+    line = cap * fraction
+    if after is None or before is None:
+        return False, (
+            f"\n  {root}: growth ratchet NOT checked (a character count was "
+            f"unreadable on one side)."
+        )
+    delta = after - before
+    if after < line:
+        return False, (
+            f"\n  {root} growth ratchet: inactive ({after:,} chars is below "
+            f"{line:,.0f}, {100 * fraction:.0f}% of the {cap:,} cap); "
+            f"this branch changed it by {delta:+,}."
+        )
+    if delta <= 0:
+        return False, (
+            f"\n  {root} growth ratchet: satisfied. At {after:,} chars the "
+            f"file is past {100 * fraction:.0f}% of the cap, and this branch "
+            f"changed it by {delta:+,}."
+        )
+    return True, (
+        f"\n  ROOT FILE GREW INSIDE THE RATCHET: {root} is at {after:,} "
+        f"characters, past {line:,.0f} ({100 * fraction:.0f}% of the {cap:,} "
+        f"cap), and this branch adds {delta:+,} more.\n"
+        f"  Only {cap - after:,} characters remain before the harness stops "
+        f"loading the file whole. Near the cap the file may shrink or hold, "
+        f"not grow.\n"
+        f"  Move this section into an @-imported fragment or a linked "
+        f"companion file (ai-config#1259), or trim an equivalent amount of "
+        f"prose elsewhere in {root}."
+    )
 
 
 def positive_int(value: str) -> int:
@@ -774,6 +864,17 @@ def main(argv=None) -> int:
         ),
     )
     parser.add_argument(
+        "--root-growth-gate-fraction",
+        type=float,
+        default=DEFAULT_ROOT_GROWTH_GATE_FRACTION,
+        help=(
+            "with --baseline, forbid ANY net growth of the root file once it "
+            "reaches this fraction of --root-char-cap "
+            f"(default: {DEFAULT_ROOT_GROWTH_GATE_FRACTION}). Pass a value "
+            "above 1.0 to disable the ratchet."
+        ),
+    )
+    parser.add_argument(
         "--fragment-cap",
         type=positive_int,
         default=DEFAULT_FRAGMENT_CAP_BYTES,
@@ -842,6 +943,7 @@ def main(argv=None) -> int:
     total = sum(size for _, size, _ in files)
     after_total = None
     growth_over = False
+    root_growth_over = False
     if args.baseline:
         base_files, base_missing, base_inline, base_amb = walk_closure(
             args.root, baseline_reader(base, args.baseline)
@@ -884,6 +986,14 @@ def main(argv=None) -> int:
                 "working tree",
             )
         )
+        root_growth_over, root_growth_text = render_root_growth(
+            root_char_count_at(base, args.root, args.baseline),
+            root_char_count(base, args.root),
+            args.root,
+            args.root_char_cap,
+            args.root_growth_gate_fraction,
+        )
+        print(root_growth_text)
         growth = total - baseline_total
         if args.max_growth is not None and growth > args.max_growth:
             print(
@@ -996,6 +1106,14 @@ def main(argv=None) -> int:
     if frag_over:
         # Same stance as root_over above, and NOT gated on --strict. See
         # DEFAULT_FRAGMENT_CAP_BYTES for why this one fails rather than warns.
+        return 1
+    if root_growth_over:
+        # NOT gated on --strict, and not on --max-growth either. This one
+        # defends the harness's own hard cap rather than a budget of ours,
+        # so it takes the same stance as root_over above: an operator who
+        # wants it off says so with --root-growth-gate-fraction, and the
+        # default is on. Requiring an opt-in flag would reproduce the
+        # advisory step this ratchet exists because of.
         return 1
     if growth_over:
         # Not gated on --strict either, but for the opposite reason to the

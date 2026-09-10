@@ -285,6 +285,41 @@ same-PR-scoping clauses all held, and a single regression case that two of the
 three clauses each kept correct made reverting any one of them still pass; each
 clause needed its own isolating case before the mutation test meant anything.)
 
+## Two conditions no input can distinguish mask each other's mutation test the same way, without an AND
+
+The pattern above is a suite-coverage gap: the clauses are independent in
+principle, and a regression case simply never isolated one from the others.
+This is a different mechanism --- the clauses are not independent even in
+principle, because the domain the guard reads from ties them together, so
+no test case anyone could write would ever exercise one without the other.
+
+(Morrison-Lab/ai-config#3506, drafting `hooks/no-move-without-inbound-sweep.py`:
+a rename-skip branch tested `src in renamed or dst in renamed`, on the belief
+that either side alone was sufficient to identify a rename.
+Git's diff format names both the old and new path on every rename record it
+emits, so the two conditions are true or false together for every input a
+real diff can produce --- there is no rename where one holds and the other
+does not.
+The ordinary test suite passed.
+The mutation check broke `src in renamed` alone, expecting the suite to
+catch it, and the suite stayed green: `dst in renamed` covered for the
+broken clause on every case in the corpus, because it always does.
+The fix was to collect only one side of the pair, which leaves a single
+condition a test can actually pin, rather than two that read as a
+redundant safety margin and are actually an untestable coupling.)
+
+- **Do:** before trusting an OR (or AND) of two guard conditions, ask
+  whether the domain the guard reads from can ever make them differ ---
+  for a git rename, it cannot.
+- **Do:** collapse two conditions that are always true or false together
+  into the one a test can isolate, rather than keeping both as apparent
+  defense in depth.
+- **Don't:** read "the suite is green and the mutation broke a real clause"
+  as proof the clause is covered --- a same-valued sibling condition passes
+  the mutant through undetected.
+- **Don't:** treat two guard conditions as independently defensive without
+  checking whether the input format that feeds them can ever separate them.
+
 ## The harness that performs those mutations needs the same scrutiny
 
 (`Morrison-Lab/ai-config#1293`, 2026-08-08, measured while drafting the rule:

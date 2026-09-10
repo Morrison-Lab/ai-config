@@ -1270,7 +1270,7 @@ def strip_cited_finding_vocab(text: str) -> str:
 _BARE_REJECTION = (
     r"\b(?:Rejected|Unapproved|"
     r"(?<!non-)(?<!non\s)(?<!not\s)(?<!no\s)Block(?:ed|ing)?"
-    r"|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings"
+    r"|Impasse|Deadlock|(?<!no-)Changes\s+requested|Actionable\s+findings"
     r"|Partial\s+review)\b"
 )
 
@@ -1845,7 +1845,7 @@ VERDICT_NOT_CLEAN_PATTERNS = [
     # already existed for `no changes requested`.
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
     r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock|Partial review)",
-    r"changes\s+requested\b",
+    r"(?<!no-)changes\s+requested\b",
     _BARE_REJECTION,
     r"\[FINDINGS_COUNT:\s*[1-9]\d*\]",  # Machine-readable finding count > 0
     r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm|approval)\b",
@@ -1908,7 +1908,7 @@ VERDICT_NOT_CLEAN_PATTERNS = [
 # and `not-a-nit` are compound adjectives whose hyphen does not negate what
 # follows, and swallowing those is the dangerous direction.
 NOT_CLEAN_NEGATION_PREFIX = re.compile(
-    r"\b(?:non-|no-|(?:no|not|nothing|none|never)\s+(?:\w+\s+){0,2})$",
+    r"\b(?:no|not|nothing|none|never)\s+(?:\w+\s+){0,2}$",
     re.IGNORECASE,
 )
 # Two alternation groups on purpose. Emphasis markers are tolerated ONLY
@@ -1981,7 +1981,7 @@ FINDING_PATTERNS = [
     r"\*\*Location:\*\*",
     r"Verdict:\s*(?:Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock|Partial review)",
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
-    r"changes\s+requested\b",
+    r"(?<!no-)changes\s+requested\b",
     _BARE_REJECTION,
     r"\[FINDINGS_COUNT:\s*[1-9]\d*\]",  # Machine-readable finding count > 0
     r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm|approval)\b",

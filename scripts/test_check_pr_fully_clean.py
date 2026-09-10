@@ -1896,12 +1896,13 @@ def main() -> int:
     # lived in the generic guard rather than in the bare pattern. That gap is
     # why the first version of this fix passed 797 tests with the regression
     # in it.
-    # `no-` is deliberately absent from this list. The guard sees only the
-    # text before the matched phrase, so it cannot exempt `no-changes` (a
-    # real usage, per #2369) without also exempting `no-blocking` -- which
-    # is the right reading anyway, since it means what `non-blocking` means.
-    # The pair below pins both halves of that call.
-    for _neg in ("not", "never", "nothing", "none"):
+    # All five negators, including `no`. An earlier round exempted `no-`
+    # in the generic prefix guard to keep `no-changes requested` clean, and
+    # that swallowed `no-blocking` with it. The hyphen now lives on the
+    # `Changes\s+requested` alternative itself, so the generic guard stays
+    # space-only and every hyphenated negator before a not-clean phrase
+    # stays flagged.
+    for _neg in ("not", "no", "never", "nothing", "none"):
         check(f"classify_verdict: '{_neg}-blocking' stays not-clean",
               checker.classify_verdict(
                   f"### Verdict\nReady for merge. {_neg}-blocking nit noted.\n",
@@ -1915,10 +1916,18 @@ def main() -> int:
               "### Verdict\nReady for merge. not-blocking nit noted.\n")
           is not None)
     # The case the fix exists for must still pass, through the same pipeline.
-    check("classify_verdict: 'no-blocking' reads clean, like 'non-blocking'",
+    # The five phrases the generic hyphen exemption silently swallowed
+    # before it was withdrawn (#3497 review): every alternative of
+    # `_BARE_REJECTION`, not just the one the fix was written for.
+    for _phrase in ("rejected", "unapproved", "impasse", "deadlock"):
+        check(f"classify_verdict: 'non-{_phrase}' stays not-clean",
+              checker.classify_verdict(
+                  f"### Verdict\nReady for merge. non-{_phrase} nit noted.\n",
+                  "") == "not-clean")
+    check("classify_verdict: 'no-rejected' stays not-clean",
           checker.classify_verdict(
-              "### Verdict\nReady for merge. no-blocking nit noted.\n", "")
-          == "clean")
+              "### Verdict\nReady for merge. no-rejected nit noted.\n", "")
+          == "not-clean")
     check("classify_verdict: 'no-changes requested' stays exempt (#2369)",
           checker.classify_verdict(
               "### Verdict\nNo-changes requested.\n", "") != "not-clean")

@@ -120,6 +120,24 @@ def test_moves():
     check("a deletion with no destination is not a move",
           not list(guard.moves(only_del)))
 
+    # A rename carrying edits prints `--- a/OLD` against `+++ b/NEW`, so a
+    # parser keyed on the `+++` side credits removals to a path that did not
+    # exist before the commit. Found by adversarial review, round 2.
+    split_rename = (
+        "diff --git a/a.md b/c.md\n"
+        "similarity index 90%\n"
+        "rename from a.md\nrename to c.md\n"
+        "--- a/a.md\n+++ b/c.md\n@@ -1,20 +1,1 @@\n"
+        + "\n".join("-" + l for l in BIG) + "\n+NEW HEADER LINE FOR THE RENAMED FILE\n"
+        "diff --git a/b.md b/b.md\n--- /dev/null\n+++ b/b.md\n"
+        "@@ -0,0 +1,20 @@\n" + "\n".join("+" + l for l in BIG) + "\n"
+    )
+    got = list(guard.moves(split_rename))
+    check("a modified rename does not report its DESTINATION as the source",
+          all(src != "c.md" for src, _, _ in got))
+    check("a modified rename is exempted by its source name",
+          not got)
+
     # Detection is prose-scoped: the warning's rationale and its remediation
     # command are both about prose citation, so a code refactor must not get
     # them.
@@ -212,6 +230,21 @@ def test_swept():
     p = _transcript(["grep -rn 'memories/preferences.md' --include='*.md' ."])
     check("a path-qualified sweep still names the file",
           guard.swept(p, "preferences.md"))
+    os.unlink(p)
+
+    # `git -C <path> grep` is the same pre-subcommand option shape `is_commit`
+    # already handled. Found by adversarial review, round 2.
+    p = _transcript(["git -C /repo grep -n 'preferences.md'"])
+    check("git -C <path> grep counts", guard.swept(p, "preferences.md"))
+    os.unlink(p)
+
+    p = _transcript(["git --git-dir=/repo/.git grep -n 'preferences.md'"])
+    check("git --git-dir=... grep counts", guard.swept(p, "preferences.md"))
+    os.unlink(p)
+
+    p = _transcript(["git -C /repo log --oneline 'preferences.md'"])
+    check("git -C <path> log is not a sweep",
+          not guard.swept(p, "preferences.md"))
     os.unlink(p)
 
 
@@ -318,6 +351,12 @@ MUTATIONS = [
      "return True"),
     ("recursion not required", "if not recursive:\n            continue",
      "if False:\n            continue"),
+    ("removals credited to the + side",
+     'removed.setdefault(old_path, set()).add(line[1:])',
+     'removed.setdefault(new_path, set()).add(line[1:])'),
+    ("git pre-subcommand options not skipped",
+     "    while i < len(words) and words[i].startswith(\"-\"):",
+     "    while False:"),
 ]
 
 

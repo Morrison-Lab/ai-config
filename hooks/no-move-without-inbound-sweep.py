@@ -75,8 +75,8 @@ import sys
 # A move has to be substantial before it is worth a warning. Calibrated by
 # running `moves()` against the two diffs that prompted this guard, rather than
 # from their diffstats -- the two disagree, and the figure that matters is this
-# function's own: 409 for ai-config#3480 and 134 for #3499, against diffstats of
-# 496 and 137. `moves()` counts DISTINCT significant lines present on both sides,
+# function's own: 409 for ai-config#3480, against that merged commit's diffstat
+# of 494 for the moved file (1 insertion, 493 deletions), and 134 for #3499. `moves()` counts DISTINCT significant lines present on both sides,
 # so it is always the smaller number, and quoting a diffstat here would describe
 # a population this threshold is not measured against.
 #
@@ -124,6 +124,21 @@ RECURSIVE_BY_DEFAULT = {"rg", "ag", "ack"}
 GREP_RECURSIVE_LONG = {"--recursive", "--dereference-recursive"}
 
 
+def skip_git_options(words: list, i: int) -> int:
+    """Index of the subcommand, stepping over git's pre-subcommand options.
+
+    The options in `GIT_OPTS_WITH_VALUE` take a separate value, so the value
+    has to be skipped too -- otherwise `git -C /repo commit` reads as
+    `git /repo`.
+    """
+    while i < len(words) and words[i].startswith("-"):
+        takes_value = words[i] in GIT_OPTS_WITH_VALUE
+        i += 1
+        if takes_value and i < len(words):
+            i += 1
+    return i
+
+
 def is_sweep(command: str, basename: str) -> bool:
     """Is this command a repo-wide search naming `basename`?
 
@@ -141,9 +156,15 @@ def is_sweep(command: str, basename: str) -> bool:
         if not words:
             continue
 
-        i = 0
-        if os.path.basename(words[0]) == "git" and len(words) > 1 and words[1] == "grep":
-            program, i = "git grep", 2
+        if os.path.basename(words[0]) == "git":
+            # `git -C <path> grep` is an ordinary shape when working across a
+            # worktree, and it is the same pre-subcommand option handling
+            # `is_commit` needs, so both call one helper.
+            j = skip_git_options(words, 1)
+            if j < len(words) and words[j] == "grep":
+                program, i = "git grep", j + 1
+            else:
+                continue
         else:
             program, i = os.path.basename(words[0]), 1
 
@@ -249,12 +270,13 @@ def moves(diff: str):
     """
     removed: dict[str, set] = {}
     added: dict[str, set] = {}
-    path = None
+    old_path = None
+    new_path = None
     renamed = set()
 
     for line in diff.split("\n"):
         if line.startswith("diff --git "):
-            path = None
+            old_path = new_path = None
             continue
         if line.startswith("rename from "):
             # Only the SOURCE side is collected. A rename's destination is a
@@ -264,15 +286,27 @@ def moves(diff: str):
             # which is a branch no test could pin.
             renamed.add(line[len("rename from "):].strip())
             continue
+        # The two sides are tracked separately because they can DIFFER. A
+        # rename carrying edits prints `--- a/OLD` against `+++ b/NEW`, so
+        # crediting removals to the `+++` path would report content as having
+        # left a file that did not exist before the commit -- and would name
+        # that path in the remediation grep, where nobody has ever linked to
+        # it, while the real stale links against OLD went unreported.
+        if line.startswith("--- a/"):
+            old_path = line[6:].strip()
+            continue
+        if line.startswith("--- /dev/null"):
+            old_path = None
+            continue
         if line.startswith("+++ b/"):
-            path = line[6:].strip()
+            new_path = line[6:].strip()
             continue
-        if path is None or line.startswith(("+++", "---", "@@")):
+        if line.startswith(("+++", "---", "@@")):
             continue
-        if line.startswith("-") and significant(line):
-            removed.setdefault(path, set()).add(line[1:])
-        elif line.startswith("+") and significant(line):
-            added.setdefault(path, set()).add(line[1:])
+        if line.startswith("-") and old_path and significant(line):
+            removed.setdefault(old_path, set()).add(line[1:])
+        elif line.startswith("+") and new_path and significant(line):
+            added.setdefault(new_path, set()).add(line[1:])
 
     for src, gone in removed.items():
         if src in renamed:
@@ -358,13 +392,7 @@ def is_commit(command: str) -> bool:
                 i += 1
         if i >= len(words) or os.path.basename(words[i]) != "git":
             continue
-        i += 1
-        # Skip git's own pre-subcommand options, taking their values with them.
-        while i < len(words) and words[i].startswith("-"):
-            takes_value = words[i] in GIT_OPTS_WITH_VALUE
-            i += 1
-            if takes_value and i < len(words):
-                i += 1
+        i = skip_git_options(words, i + 1)
         if i < len(words) and words[i] == "commit":
             return True
     return False

@@ -684,34 +684,40 @@ that round is not redundant, since it found two false discharges the worker's ro
 - **Don't:** brief a worker to push and ARDI its own PR;
   the guard refuses it by construction, and the retry burns the worker's whole budget.
 
-## Parse a delegated edit in its own language, not only its commit message
+## A syntax check does not catch a delegated edit whose quoting was dropped
 
-The section above says to diff a delegated commit's message against its diff.
-That catches a worker describing a change it did not make.
-It cannot catch the commoner failure, where the description is accurate and the *code* arrived mangled --- so the check reads as performed while the defect walks through it.
+[`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md) already says to run a parser over a scripted edit before trusting it.
+That is right, and it is not sufficient for delegated shell.
+A dropped quote usually leaves a *different valid program* rather than an invalid one, so the parser passes and the artifact is still wrong.
 
 Measured 2026-09-10 on [ai-config#3435](https://github.com/Morrison-Lab/ai-config/pull/3435).
-An `agy` worker asked to guard a call in `bootstrap.sh` wrote a `printf` whose quotes were dropped and whose format string was split by a literal newline, leaving `"$?"` alone on the next line.
-Under that script's `set -euo pipefail` it expands to `0`, runs `0` as a command, and aborts the bootstrap on every platform and every run, before the dotfiles installer loop and the symlinks below it.
+An `agy` worker asked to guard a call in `bootstrap.sh` emitted this:
 
-Three checks passed over it.
-The commit message was accurate.
-The repo's Python suites were green, because none of them executes `bootstrap.sh`.
-And the message-versus-diff check found nothing, because the message was never the thing that was wrong.
-`bash -n bootstrap.sh` found it in one command.
+```sh
+cmd || printf warn  render-agy-hooks.py exited %d
+ "$?"
+```
 
-Shell is where this bites hardest, and for two compounding reasons rather than one.
-Quoting is exactly what a transport corrupts, per `CLAUDE.md`'s "Tool transport collapses doubled backslashes" section, so a shell edit is the likeliest to arrive mangled.
-And an installer or a hook is usually executed by no test suite at all, so a syntax error in one survives a green run and reaches a user's machine.
+The format string lost its quotes and gained a real newline, so `"$?"` became its own command.
+Under that script's `set -euo pipefail` it expands to `0`, runs `0`, and aborts the bootstrap before the installer loop and the symlinks below it.
 
-The check costs one command per language: `bash -n` for shell, `python -m py_compile` (or `ast.parse`) for Python, `Rscript -e 'parse(...)'` for R, `jq empty` for JSON.
-Run it against the file the worker touched, before trusting the commit.
+`bash -n` exits 0 on that file.
+Verified on the reduced case: `bash -n` reports nothing, and running it dies with `0: command not found` and status 127.
+Nothing about the text is ungrammatical --- `printf` simply took different arguments than the author meant, which is the shape a lost quote produces almost every time.
 
-- **Do:** parse every file a delegated worker edited, in that file's own language, before reading its commit as done.
-- **Do:** treat an edit to a script no test executes --- an installer, a hook, a CI helper --- as needing that parse most, not least.
-- **Don't:** read an accurate commit message as evidence the code is well-formed;
-  those are different claims about different artifacts.
-- **Don't:** rely on a green suite that never runs the edited file.
+**Executing the artifact is the check that works, and this repo already had it.**
+`scripts/test_agy_hook_adapter.py` runs `bash bootstrap.sh` and asserts a zero exit, and `validate.yml` gates it, so CI would have failed on the mangled line.
+It could not run on the Windows machine that wrote it, for an unrelated path-quoting bug in the test itself ([ai-config#3551](https://github.com/Morrison-Lab/ai-config/issues/3551)) --- so the local loop was blind and the adversarial reviewer was the only detector before push.
+
+The transferable part is which check answers which question.
+A parser answers whether the file is *well-formed*.
+Only running it answers whether it *does what the commit message says*, and a delegated edit is exactly where those two come apart, because the worker describes its intent accurately while the transport mangles the text.
+
+- **Do:** run the suite that executes an edited script, not only a parser over it, before trusting a delegated commit that touched shell.
+- **Do:** treat a test you cannot run locally as an unchecked artifact, and say so, rather than reading the parser's silence as coverage.
+- **Don't:** read `bash -n` (or `py_compile`) passing as evidence that a delegated edit is correct --- it reports grammar, and dropped quoting is grammatical.
+- **Don't:** rely on the commit message agreeing with the diff here;
+  the message was accurate and the code was not.
 
 ## opencode free tier: a full authoring task, validated mechanically
 

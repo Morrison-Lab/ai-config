@@ -522,7 +522,38 @@ Read it instead as the case `deterministic-tools` names: once an
 instrument exists, the remaining failure is not knowing the rule but
 reaching for the instrument, and the only fix that generalizes is to make
 the derived run the default pre-push action rather than a thing to
-remember.)
+remember.
+
+Sixth and seventh, 2026-09-10, on two consecutive PRs of one session.
+The sixth is
+[ai-config#3524](https://github.com/Morrison-Lab/ai-config/pull/3524),
+failing the `Check the hooks-only skills-directory plugin is in sync` step ---
+`gen-hooks-plugin.py --check`, the *same* check as the fifth occurrence above,
+missed again with this section already written.
+
+The seventh is
+[ai-config#3528](https://github.com/Morrison-Lab/ai-config/pull/3528), which
+went red twice on `Run hook-runner tests` --- `test_test_hooks.py`, enforcing a
+no-bare-`python3` convention from ai-config#2098 that the author had never
+read.
+It is worth separating from the six before it, because it is not the
+hand-picking this section describes.
+What had been run was the new hook's own suite,
+`hooks/test-warn-generated-file-stale.py` --- complete and correct *for the
+artifact*, and passing honestly.
+A file's own tests are written by whoever wrote the file, so they encode what
+that author already understood, which is exactly the set of conventions they
+were never going to violate;
+the unread ones live in the suites that range over a whole *class* of file.
+So the population narrowed here is not the check list but the class the checks
+range over, and picking the artifact's own suite feels like having checked in a
+way that picking three checks from memory does not.
+
+The first draft of this very entry attributed both failures to #3528.
+The step names above are what settled it, and they are the artifact to read:
+`gh run view <id> --json jobs --jq '.jobs[].steps[] | select(.conclusion=="failure") | .name'`
+names the failing step, where the job log's own `FAIL:` lines include ones
+tests print deliberately.)
 
 ## In review
 

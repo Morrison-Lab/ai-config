@@ -11,8 +11,9 @@ On 2026-09-10, fixing a CI check in `Morrison-Lab/qwt`, this ran on macOS:
 
 It printed `grep: invalid option -- P` to stderr and exited 1. The session
 read the empty stdout as "no tracked file contains an em dash" and wrote that
-claim into a commit message. Five tracked files contained one; an adversarial
-reviewer caught it.
+claim into a commit message; an adversarial reviewer caught it. Five tracked
+files still contained one at that point -- what remained, not the incident's
+total, since the scan ran after the files CI had flagged were already fixed.
 
 The interactive shell's `grep` was a `ugrep` shell function, per
 `memories/tools.md`. A function does not survive into a child of `xargs`, so

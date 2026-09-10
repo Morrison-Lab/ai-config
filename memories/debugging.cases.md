@@ -75,7 +75,9 @@ The guard now picks its sentence from this table, and `find` is resolved from th
 
 ### What the false zero cost
 
-Five tracked files contained an em dash.
+Five tracked files still contained an em dash when the broken scan reported none.
+That is what remained at that point rather than the incident's total: the scan ran after the CI-flagged files were already fixed, and the full fix touched 13 files.
+Worth stating, because a later reviewer read the 13-file total as contradicting the five.
 The scan reported none, the claim went into a commit message, and an adversarial reviewer caught it.
 The replacement scan reports `examined 79 of 82 tracked files` alongside the hit count, the other three being two binaries and a submodule, so a zero now carries evidence the scan ran.
 

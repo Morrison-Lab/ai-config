@@ -34,11 +34,12 @@ RX_JQ_FILTER_FILE = re.compile(
 )
 
 NOTE = (
-    "this filter prints only the verdict lines of a review round; a round can "
-    "be Ready for merge and still carry non-blocking findings in its body and "
-    "in the review-data JSON findings array, which this filter drops "
-    "(measured 2026-09-09, ai-config#3493, two findings carried over unaddressed); "
-    "read the full body of every round since the last one you processed, or parse "
+    "this filter narrows a review round's body to a few lines, by a verdict "
+    "vocabulary test or by slicing the split lines; a round can be Ready for "
+    "merge and still carry non-blocking findings in its body and in the "
+    "review-data JSON findings array, which such a filter drops (measured "
+    "2026-09-09, ai-config#3493, two findings carried over unaddressed); read "
+    "the full body of every round since the last one you processed, or parse "
     "the review-data findings array, before reporting the PR's state."
 )
 

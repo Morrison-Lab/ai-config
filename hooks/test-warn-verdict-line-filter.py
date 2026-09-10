@@ -63,7 +63,7 @@ def test_suite() -> list[str]:
             if hso.get("hookEventName") != "PreToolUse":
                 failures.append(f"case 1 wrong hookEventName: {hso.get('hookEventName')}")
             ctx = hso.get("additionalContext", "")
-            if "this filter prints only the verdict lines" not in ctx:
+            if "this filter narrows a review round's body to a few lines" not in ctx:
                 failures.append(f"case 1 missing expected note text in additionalContext: {ctx}")
             if "findings" not in ctx:
                 failures.append(f"case 1 additionalContext missing findings explanation: {ctx}")

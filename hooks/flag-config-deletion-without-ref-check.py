@@ -566,14 +566,25 @@ def substitution_bodies(command):
     credited the manifest (review rounds on #3469). A manifest path that a
     substitution merely PRODUCES (`jq . $(echo <manifest>)`) is not credited
     either, since its value is unknown here; that under-credits, which for a
-    DISCHARGE test is the direction that warns.
+    DISCHARGE test is the direction that warns. An opener inside a
+    single-quoted span is text the shell never expands, so it opens nothing;
+    inside double quotes it does expand, and is followed.
     """
     bodies = []
     index = 0
     while index < len(command):
-        match = RX_SUBSTITUTION_OPEN.search(command, index)
+        char = command[index]
+        if char == "'":
+            close = command.find("'", index + 1)
+            index = len(command) if close < 0 else close + 1
+            continue
+        if char == "\\":
+            index += 2
+            continue
+        match = RX_SUBSTITUTION_OPEN.match(command, index)
         if not match:
-            break
+            index += 1
+            continue
         if match.group(0) == "`":
             close = command.find("`", match.end())
             close = len(command) if close < 0 else close

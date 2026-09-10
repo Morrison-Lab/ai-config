@@ -375,6 +375,13 @@ _ATTRIBUTION_CASES = [
     ("echo $(foo \"(\" bar) ; grep -rn '~/.claude/settings.json' README.md", set(),
      "a quoted parenthesis inside a substitution is text, so the body ends at "
      "the real close and the later grep is never scanned (review round)"),
+    ("echo 'example: $(cat ~/.claude/settings.json)'", set(),
+     "an opener inside single quotes never expands, so it opens no body "
+     "(CI review of 2f17a906)"),
+    ("echo 'see `cat ~/.claude/settings.json`'", set(),
+     "the same with a backtick"),
+    ("echo \"$(cat ~/.claude/settings.json)\"", {"claude"},
+     "inside double quotes the substitution does expand and is followed"),
     ("cat $(echo \"a)b\"; cat ~/.claude/settings.json)", {"claude"},
      "a quoted close inside the body does not end it early"),
     ("cat $(echo \\( ; cat ~/.claude/settings.json)", {"claude"},

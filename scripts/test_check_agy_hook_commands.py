@@ -56,6 +56,12 @@ class TestCanonicalProblems(unittest.TestCase):
         self.assertTrue(any("Stop" in f for f in findings))
         self.assertTrue(any("does not start with" in f for f in findings))
 
+    def test_a_command_with_two_defect_classes_reports_both(self):
+        """A canonical-specific defect must not hide a command_problems one."""
+        findings = agy_hooks.canonical_problems(ESCAPED_FORM)
+        self.assertTrue(any("escaped" in f or "backslash" in f for f in findings))
+        self.assertTrue(any("does not start with" in f for f in findings))
+
     def test_both_manifest_shapes_are_walked(self):
         found = [where for where, _ in agy_hooks.iter_commands(manifest_with(UNQUOTED_FORM))]
         self.assertEqual(len(found), 2)

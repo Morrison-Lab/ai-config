@@ -17,15 +17,12 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from lib import agy_hooks  # noqa: E402
 from lib.agy_hooks_fixtures import (
-    RENDERER,
-    ADAPTER,
     BACKSLASH,
     CHECKER,
-    ESCAPED_FORM,
     PYTHON_EXE,
     QUOTED_FORM,
+    RENDERER,
     UNQUOTED_FORM,
-    manifest_with,
 )
 
 

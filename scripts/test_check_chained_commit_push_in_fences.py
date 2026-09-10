@@ -268,5 +268,11 @@ check("the real corpus is actually scanned",
 check("the corpus is clean, and the run exits 0 accordingly",
       payload["findings"] == [] and exit_code == 0)
 
+# A Quarto attribute fence in a .qmd file, run end to end through the scanner.
+QMD_CHAINED = "Some prose.\n\n```{bash}\ngit commit -m x && git push origin HEAD\n```\n"
+result = scan_fixture({"notes/demo.qmd": QMD_CHAINED})
+check("a {bash} fence in a .qmd is examined", result["blocks_examined"] == 1)
+check("a {bash} fence in a .qmd is denied when chained", len(result["findings"]) == 1)
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

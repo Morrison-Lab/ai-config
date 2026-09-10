@@ -64,6 +64,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+from collections import Counter
 import json
 import re
 import subprocess
@@ -81,9 +82,9 @@ SHELL_LANGUAGES = {
 # A fence opener, tolerating leading indentation.  ai-config#3002's sweep is
 # believed to have anchored at column 0, which misses every block nested in a
 # list item --- `skills/st/SKILL.md`'s is indented two spaces, several others
-# three.  The indentation is captured so the closing fence can be matched at
-# the same or shallower depth, and stripped from the block body before the
-# block is handed to the predicate.
+# three.  The opener's indentation is captured so it can be stripped from the
+# block body before the block is handed to the predicate; the closer's own
+# indentation is not compared, since any closing fence ends the block.
 FENCE_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<ticks>```+|~~~+)(?P<info>.*)$")
 
 # Blocks that carry the chained form ON PURPOSE.  Each entry names the reason,
@@ -125,8 +126,10 @@ def fenced_blocks(text: str):
     opener's indentation removed from each line, so an indented block is fed
     to the predicate as the reader would paste it.
 
-    Any indentation closes the fence (CommonMark allows a closing fence
-    indented up to three spaces regardless of the opener).
+    Any indentation closes the fence. CommonMark caps a closing fence at
+    three spaces of indentation, and a reader pasting a block would not
+    notice a deeper one, so this scanner is deliberately looser than the
+    spec rather than stricter.
     """
     lines = text.splitlines()
     i = 0
@@ -258,7 +261,6 @@ def main(argv=None) -> int:
                   "Nothing about either command needs to change.")
 
     allowed_excess = False
-    from collections import Counter
     allowed_counts = Counter(hit["path"] for hit in result["allowed"])
     for path, (allowed_count, _) in ALLOWED.items():
         if allowed_counts[path] > allowed_count:

@@ -686,8 +686,8 @@ that round is not redundant, since it found two false discharges the worker's ro
 
 ## A syntax check does not catch a delegated edit whose quoting was dropped
 
-[`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md) already says to run a parser over a scripted edit before trusting it.
-That is right, and it is not sufficient for delegated shell.
+[`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md) already says to run a parser over a scripted edit *and* run the relevant tests before trusting it.
+What this case adds is which of those two halves decides, for delegated shell, and that the cheap half carries no partial credit.
 A dropped quote usually leaves a *different valid program* rather than an invalid one, so the parser passes and the artifact is still wrong.
 
 Measured 2026-09-10 on [ai-config#3435](https://github.com/Morrison-Lab/ai-config/pull/3435).
@@ -711,7 +711,8 @@ It could not run on the Windows machine that wrote it, for an unrelated path-quo
 
 The transferable part is which check answers which question.
 A parser answers whether the file is *well-formed*.
-Only running it answers whether it *does what the commit message says*, and a delegated edit is exactly where those two come apart, because the worker describes its intent accurately while the transport mangles the text.
+Only running it answers whether it *does what the commit message says*, and a delegated edit is where those two come apart, because the worker's account of its own change is accurate while the text it wrote is not.
+Nothing here settles whether the worker authored the malformed line or a transport mangled one it wrote correctly, and the check is the same either way.
 
 - **Do:** run the suite that executes an edited script, not only a parser over it, before trusting a delegated commit that touched shell.
 - **Do:** treat a test you cannot run locally as an unchecked artifact, and say so, rather than reading the parser's silence as coverage.

@@ -421,19 +421,35 @@ def test_scope_matching():
     check("qmd change selects lint-qmd", is_selected(qmd_step, ["test.qmd"]))
     check("qmd change does not select lint-markdown", not is_selected(md_step, ["test.qmd"]))
 
+# A fresh CI runner configures no git identity, so a fixture repo's commits
+# have to carry their own or `git commit` refuses (CI review of e75d3c59).
+GIT_IDENTITY = {
+    "GIT_AUTHOR_NAME": "ai-config tests",
+    "GIT_AUTHOR_EMAIL": "tests@example.invalid",
+    "GIT_COMMITTER_NAME": "ai-config tests",
+    "GIT_COMMITTER_EMAIL": "tests@example.invalid",
+}
+
+
 def test_changed_end_to_end():
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         wf = _write_fixture(tmp)
-        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp, check=True)
+        env = {**os.environ, **GIT_IDENTITY}
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp, check=True,
+                       env=env)
         # Create a file and commit it
         (Path(tmp) / "test.md").write_text("x")
-        subprocess.run(["git", "add", "test.md"], cwd=tmp, check=True)
-        subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=tmp, check=True)
+        subprocess.run(["git", "add", "test.md"], cwd=tmp, check=True,
+                       env=env)
+        subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=tmp, check=True,
+                       env=env)
         # Create a new branch
-        subprocess.run(["git", "checkout", "-q", "-b", "feature"], cwd=tmp, check=True)
+        subprocess.run(["git", "checkout", "-q", "-b", "feature"], cwd=tmp, check=True,
+                       env=env)
         # Modify the file and commit
         (Path(tmp) / "test.md").write_text("y")
-        subprocess.run(["git", "commit", "-q", "-am", "mod"], cwd=tmp, check=True)
+        subprocess.run(["git", "commit", "-q", "-am", "mod"], cwd=tmp, check=True,
+                       env=env)
 
         out = io.StringIO()
         with redirect_stdout(out), redirect_stderr(io.StringIO()):
@@ -469,6 +485,7 @@ def main():
     test_missing_tool_skips()
     print('running test_scope_matching()', flush=True)
     test_scope_matching()
+    print('running test_list_shows_availability_note()', flush=True)
     test_list_shows_availability_note()
     print('running test_changed_end_to_end()', flush=True)
     test_changed_end_to_end()

@@ -41,7 +41,8 @@ What does not: the Mistake, Canonical Rule, Fix, or Do/Don't lines, which are wh
   what neither previously recorded is that the escalation is not scoped to
   that command -- it widens to spend suspicion on unrelated, ordinary reads
   once several denials have accumulated in the session.
-- **4th occurrence, 2026-09-09, and a violation of this pattern's own canonical Do** ([#2994](https://github.com/Morrison-Lab/ai-config/issues/2994); the denials landed while composing the commit that became `ef2e64e0` on [#3480](https://github.com/Morrison-Lab/ai-config/pull/3480), whose history shows the outcome as two commits where one was intended).
+- **4th occurrence, 2026-09-09, and a violation of this pattern's own canonical Do** ([#2994](https://github.com/Morrison-Lab/ai-config/issues/2994)).
+  The denials landed while composing the commit that became `ef2e64e0` on [#3480](https://github.com/Morrison-Lab/ai-config/pull/3480), whose history shows the outcome as two commits where one was intended.
   `git commit --amend -F <file>` was denied three times in a row.
   A plain `git commit -F <file>`, run immediately afterwards with the same message file and the same staged tree, succeeded on the first attempt, with no settings change and no restart in between.
   The canonical Do says to stop after the classifier's second denial of the same goal and hand the user the decision, and the goal here never changed: get one fix round recorded in git history under a corrected message.
@@ -50,4 +51,5 @@ What does not: the Mistake, Canonical Rule, Fix, or Do/Don't lines, which are wh
   What survives is the observation and not the licence.
   A different operation reaching the same goal was not denied, where three attempts at one operation were, which is a fact about the classifier that the pattern's Do/Don't pair does not currently describe.
   Whether the pair should distinguish a different operation from a rephrasing is a question for the pattern entry rather than something a case record may settle, and it is filed as [#3483](https://github.com/Morrison-Lab/ai-config/issues/3483).
-  The 2026-09-06/07 occurrence recorded in this file measured that an identical re-run often succeeds; this occurrence is not evidence about that, since the command that succeeded was not the one denied.
+  The 2026-09-06/07 occurrence recorded in this file measured that an identical re-run often succeeds.
+  This occurrence is not evidence about that, since the command that succeeded was not the one denied.

@@ -691,7 +691,7 @@ That is right, and it is not sufficient for delegated shell.
 A dropped quote usually leaves a *different valid program* rather than an invalid one, so the parser passes and the artifact is still wrong.
 
 Measured 2026-09-10 on [ai-config#3435](https://github.com/Morrison-Lab/ai-config/pull/3435).
-An `agy` worker asked to guard a call in `bootstrap.sh` emitted this:
+An `agy` worker asked to guard a call in `bootstrap.sh` emitted a line of this shape:
 
 ```sh
 cmd || printf warn  render-agy-hooks.py exited %d

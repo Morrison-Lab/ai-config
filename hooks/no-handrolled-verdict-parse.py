@@ -286,19 +286,20 @@ def _read_filter_file(raw_path: str, cwd: str | None = None) -> str | None:
     if not raw_path:
         return None
     try:
-        base_cwd = cwd or os.getcwd()
-        if os.path.isabs(raw_path):
-            resolved = raw_path
-        else:
-            resolved = os.path.join(base_cwd, raw_path)
-
-        candidates = [resolved, raw_path]
         try:
-            candidates.append(os.path.expanduser(resolved))
+            expanded = os.path.expanduser(raw_path)
         except Exception:
-            pass
+            expanded = raw_path
+
+        base_cwd = cwd or os.getcwd()
+        if os.path.isabs(expanded):
+            resolved = expanded
+        else:
+            resolved = os.path.join(base_cwd, expanded)
+
+        candidates = [resolved, expanded, raw_path]
         if os.name == "nt":
-            m = re.match(r"^/([a-zA-Z])/(.*)", raw_path)
+            m = re.match(r"^/([a-zA-Z])/(.*)", expanded)
             if m:
                 win_path = f"{m.group(1)}:/{m.group(2)}"
                 candidates.extend([win_path, os.path.join(base_cwd, win_path)])

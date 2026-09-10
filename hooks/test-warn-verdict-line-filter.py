@@ -26,14 +26,20 @@ def bash_payload(command: str) -> dict:
     return {"tool_name": "Bash", "tool_input": {"command": command}}
 
 
-def run_hook(raw_or_payload: str | dict | list | None) -> subprocess.CompletedProcess:
+def run_hook(
+    raw_or_payload: str | dict | list | None, env: dict | None = None
+) -> subprocess.CompletedProcess:
     inp = raw_or_payload if isinstance(raw_or_payload, str) else json.dumps(raw_or_payload)
+    hook_env = os.environ.copy()
+    if env:
+        hook_env.update(env)
     return subprocess.run(
         [sys.executable, HOOK],
         input=inp,
         capture_output=True,
         text=True,
         timeout=10,
+        env=hook_env,
     )
 
 
@@ -70,6 +76,9 @@ def test_suite() -> list[str]:
         ("pulls comments with slice", 'gh api pulls/456/comments | jq \'.[] | .body | split("\\n") | .[0:5]\''),
         ("--json comments with NOT CLEAN", 'gh pr view 42 --json comments --jq \'.comments[].body | split("\\n") | map(select(test("NOT CLEAN")))\''),
         ("--json reviews with Reviewed commit", 'gh pr view 42 --json reviews --jq \'.reviews[].body | test("Reviewed commit")\''),
+        ("--json state,comments with verdict filter", 'gh pr view 42 --json state,comments --jq \'.comments[].body | split("\\n") | map(select(test("Verdict")))\''),
+        ("--json comments with NOT_CLEAN", 'gh pr view 42 --json comments --jq \'.comments[].body | split("\\n") | map(select(test("NOT_CLEAN")))\''),
+        ("--json reviews,comments,number with Needs more work", 'gh pr view 42 --json reviews,comments,number --jq \'.comments[].body | split("\\n") | map(select(test("Needs more work")))\''),
     ]
     for label, cmd in more_warns:
         prev = len(failures)
@@ -119,6 +128,16 @@ def test_suite() -> list[str]:
     if res4.returncode != 0 or res4.stdout.strip() != "":
         failures.append(f"case 4 failed: returncode={res4.returncode}, stdout={res4.stdout!r}")
     print(f"  {'FAIL' if len(failures) > prev else 'ok  '} case 4: comments fetch with plain body stays silent")
+
+    # Additional silent: --json commentsX (not a real comments field) stays silent
+    cmd_comments_x = (
+        'gh pr view 42 --json commentsX --jq \'.comments[].body | split("\\n") | map(select(test("Verdict")))\''
+    )
+    res_cx = run_hook(bash_payload(cmd_comments_x))
+    prev = len(failures)
+    if res_cx.returncode != 0 or res_cx.stdout.strip() != "":
+        failures.append(f"--json commentsX failed: returncode={res_cx.returncode}, stdout={res_cx.stdout!r}")
+    print(f"  {'FAIL' if len(failures) > prev else 'ok  '} silent case: --json commentsX stays silent")
 
     # Case 5: tool_name not Bash -> silent
     non_bash_payload = {
@@ -189,6 +208,34 @@ def test_suite() -> list[str]:
             f"  {'FAIL' if len(failures) > prev else 'ok  '} case 8: file-carried plain filter stays silent"
         )
 
+
+    # Case 9: file-carried filter via ~-prefixed path warns
+    with tempfile.TemporaryDirectory() as tmpdir:
+        home_filter = os.path.join(tmpdir, "verdict.jq")
+        with open(home_filter, "w", encoding="utf-8") as fh:
+            fh.write('split("\\n") | map(select(test("Verdict|Ready for merge")))')
+
+        cmd_tilde_warn = (
+            "gh api repos/owner/repo/issues/123/comments | jq -f ~/verdict.jq"
+        )
+        tilde_env = {"HOME": tmpdir, "USERPROFILE": tmpdir}
+        res9 = run_hook(bash_payload(cmd_tilde_warn), env=tilde_env)
+        prev = len(failures)
+        if res9.returncode != 0:
+            failures.append(f"case 9 non-zero exit: {res9.returncode}")
+        elif not res9.stdout.strip():
+            failures.append("case 9 failed to warn: stdout is empty")
+        else:
+            try:
+                payload = json.loads(res9.stdout)
+                hso = payload.get("hookSpecificOutput", {})
+                if "additionalContext" not in hso:
+                    failures.append("case 9 missing additionalContext")
+            except json.JSONDecodeError as exc:
+                failures.append(f"case 9 invalid json: {exc}")
+        print(
+            f"  {'FAIL' if len(failures) > prev else 'ok  '} case 9: file-carried filter via ~ path warns"
+        )
     return failures
 
 

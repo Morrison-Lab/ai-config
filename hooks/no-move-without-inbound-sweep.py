@@ -449,8 +449,17 @@ def main() -> int:
         payload = json.load(sys.stdin)
     except (ValueError, RecursionError):
         # `RecursionError` is a `RuntimeError`, not a `ValueError`, so deeply
-        # nested JSON (~1000 levels, a couple of kilobytes) slips past a catch
-        # written for malformed input. Named at all three parse sites.
+        # nested JSON slips past a catch written for malformed input. Named at
+        # all three parse sites.
+        #
+        # The depth required is NOT the Python recursion limit. `json` uses the
+        # C-accelerated scanner by default, which recurses on the C stack, so
+        # `sys.setrecursionlimit` does not move it: measured at roughly 116,000
+        # levels on this machine against a limit of 1000. That makes it a
+        # property of the platform's stack rather than a constant, which is why
+        # the tests search for a depth that genuinely raises instead of
+        # asserting one. An earlier draft assumed ~1000 and its fixtures parsed
+        # cleanly, pinning nothing.
         return 0
     if not isinstance(payload, dict):
         # Valid JSON that is not an object: a bare list, string, or number.

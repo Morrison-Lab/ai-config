@@ -26,6 +26,34 @@ spec.loader.exec_module(guard)
 failures = []
 
 
+def deep_json(payload='""'):
+    """A JSON string nested deeply enough to raise `RecursionError`, verified.
+
+    The depth cannot be hard-coded. `json` uses the C-accelerated scanner by
+    default, which recurses on the C stack rather than the Python one, so
+    `sys.setrecursionlimit` does not move the threshold and the threshold is a
+    property of the platform's stack: measured at roughly 116,000 levels here,
+    against a `sys.getrecursionlimit()` of 1000.
+
+    An earlier version of these fixtures used 998 levels, on the assumption
+    that the Python recursion limit governed. It does not, so those fixtures
+    parsed cleanly and never entered the branch they claimed to pin --- the
+    same defect as a probe that misses its code path, and indistinguishable
+    from a passing test. So this searches upward for a depth that genuinely
+    raises, and the caller asserts it found one rather than trusting a
+    constant.
+    """
+    n = 200_000
+    for _ in range(5):
+        text = "[" * n + payload + "]" * n
+        try:
+            json.loads(text)
+        except RecursionError:
+            return text
+        n *= 2
+    return None
+
+
 def check(name, cond):
     if cond:
         print(f"  ok   {name}")
@@ -244,14 +272,17 @@ def test_swept():
 
     # `RecursionError` is a `RuntimeError`, not a `ValueError`, so a catch
     # written for malformed JSON does not cover deeply nested JSON.
-    deep = "[" * 998 + "]" * 998
-    rec = {"message": {"content": [{"name": "Bash", "input": deep}],
-                       "_x": "preferences.md"}}
-    try:
-        ok = guard.commands(rec) == []
-    except Exception:
-        ok = False
-    check("a deeply nested input string does not crash", ok)
+    deep = deep_json()
+    check("the deep-nesting fixture actually raises RecursionError",
+          deep is not None)
+    if deep is not None:
+        rec = {"message": {"content": [{"name": "Bash", "input": deep}],
+                           "_x": "preferences.md"}}
+        try:
+            ok = guard.commands(rec) == []
+        except Exception:
+            ok = False
+        check("a deeply nested input string does not crash", ok)
 
     # A bad record must not hide a real sweep on a LATER line either.
     fd, p2 = tempfile.mkstemp(suffix=".jsonl")
@@ -266,15 +297,17 @@ def test_swept():
 
     # The basename must appear as a LEAF, or the line filter short-circuits
     # before the parse and the probe exercises nothing.
-    fd, p2 = tempfile.mkstemp(suffix=".jsonl")
-    with os.fdopen(fd, "w") as fh:
-        fh.write("[" * 998 + '"preferences.md"' + "]" * 998 + "\n")
-    try:
-        ok = guard.swept(p2, "preferences.md") is False
-    except Exception:
-        ok = False
-    check("a deeply nested transcript line does not crash", ok)
-    os.unlink(p2)
+    deep = deep_json('"preferences.md"')
+    if deep is not None:
+        fd, p2 = tempfile.mkstemp(suffix=".jsonl")
+        with os.fdopen(fd, "w") as fh:
+            fh.write(deep + "\n")
+        try:
+            ok = guard.swept(p2, "preferences.md") is False
+        except Exception:
+            ok = False
+        check("a deeply nested transcript line does not crash", ok)
+        os.unlink(p2)
 
     # Found by adversarial review of this guard: each of the four below was a
     # real defect in the first draft, in one direction or the other.
@@ -420,10 +453,11 @@ def test_end_to_end():
 
     e2 = dict(os.environ)
     e2.pop("ANTIGRAVITY_AGENT", None)
-    out = subprocess.run([sys.executable, TARGET],
-                         input="[" * 998 + "]" * 998,
-                         capture_output=True, text=True, env=e2, timeout=30)
-    check("exits 0 on a deeply nested payload", out.returncode == 0)
+    deep = deep_json()
+    if deep is not None:
+        out = subprocess.run([sys.executable, TARGET], input=deep,
+                             capture_output=True, text=True, env=e2, timeout=60)
+        check("exits 0 on a deeply nested payload", out.returncode == 0)
 
     # A syntactically valid payload that is not an object.
     e = dict(os.environ)
@@ -479,6 +513,12 @@ MUTATIONS = [
     ("RecursionError not caught at the payload parse",
      "    except (ValueError, RecursionError):\n        # `RecursionError` is a",
      "    except ValueError:\n        # `RecursionError` is a"),
+    ("RecursionError not caught at the record parse",
+     "                rec = json.loads(line)\n            except (ValueError, RecursionError):",
+     "                rec = json.loads(line)\n            except ValueError:"),
+    ("RecursionError not caught at the tool-input parse",
+     "                args = json.loads(args)\n            except (ValueError, RecursionError):",
+     "                args = json.loads(args)\n            except ValueError:"),
 ]
 
 

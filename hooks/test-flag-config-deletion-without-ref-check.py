@@ -344,7 +344,9 @@ _ATTRIBUTION_CASES = [
     ("cat <<< '~/.claude/settings.json'", set(),
      "a here-string is the opener's literal text, not a file it opens"),
     ("cat <<<~/.claude/settings.json", set(),
-     "the same with the text attached to the operator"),
+     "the same with the text attached: the tokenizer splits it off either way"),
+    ("cat <<-EOF ~/.claude/settings.json\nx\nEOF", {"claude"},
+     "a dash heredoc opener followed by a real file operand still credits it"),
     ("cat <<EOF\ngrep -rn '~/.claude/settings.json' README.md\nEOF", set(),
      "a heredoc BODY is never executed, so a manifest it mentions is not "
      "read (review of #3469: a scratch script or commit message discharged "

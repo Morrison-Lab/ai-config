@@ -333,10 +333,11 @@ RX_CHAIN_SPLIT = re.compile(r"&&|[|][|]|;|[|]")
 RX_OUT_REDIRECT = re.compile(r"^(?:>>?[|&]?|&>>?)(.*)$")
 RX_IN_REDIRECT = re.compile(r"^<(&?)>?(.*)$")
 # A here-string (`<<<`) is followed by its literal text, which names no file
-# the command opens. A heredoc opener (`<<`, `<<-`) reaches this parser with
-# its delimiter and body already blanked by `shellcmd._heredoc_free`, so only
-# the operator itself is skipped.
-RX_HERE_STRING = re.compile(r"^<<<(.*)$")
+# the command opens; the tokenizer always splits the text from the operator,
+# attached or not, so both are skipped. A heredoc opener (`<<`, `<<-`) reaches
+# this parser with its delimiter and body already blanked by
+# `shellcmd._heredoc_free`, so only the operator itself is skipped.
+RX_HERE_STRING = re.compile(r"^<<<$")
 RX_HERE_DOC = re.compile(r"^<<-?$")
 
 HOME = os.path.expanduser("~")
@@ -416,9 +417,8 @@ def read_operands(argv):
         if token.isdigit() and index + 1 < len(argv) and argv[index + 1][:1] in "<>":
             index += 1
             token = argv[index]
-        here_string = RX_HERE_STRING.match(token)
-        if here_string:
-            index += 1 if here_string.group(1) else 2
+        if RX_HERE_STRING.match(token):
+            index += 2
             continue
         if RX_HERE_DOC.match(token):
             index += 1

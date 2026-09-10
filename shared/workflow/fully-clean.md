@@ -962,6 +962,8 @@ A round-2 disposition comment, agent-posted under the author's login, opened a b
 `check-pr-fully-clean.py` matched the `VERDICT_NOT_CLEAN_PATTERNS` alternative `(?<!non-)(?<!non\s)Block(?:ed|ing)?`, classified the comment as a verdict-bearing statement from the author with verdict not-clean, and the per-reviewer rule from [ai-config#2274](https://github.com/Morrison-Lab/ai-config/issues/2274) then held the PR NOT clean through two later CLEAN payload rounds from the bot, because a later all-clear from a different reviewer does not supersede a reviewer's own not-clean statement.
 A later plain status comment from the same author did not count as a clean statement either, so the only exit was editing the original wording.
 Tracked as [ai-config#3502](https://github.com/Morrison-Lab/ai-config/issues/3502).
+The "standing not-clean can be your own" section above describes the same per-reviewer scan from the other side;
+this is the case where the not-clean statement was never a verdict at all.
 
 - **Do:** name the finding in a disposition bullet ("the `command(*)` finding: Addressed in `<sha>`"), never its severity label.
 - **Do:** when the instrument names *you* as the not-clean reviewer, read the matched pattern and reword your own comment, rather than requesting another bot round that cannot supersede it.

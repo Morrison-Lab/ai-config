@@ -357,10 +357,11 @@ The one cheap check that works today is a message: `SendMessage` to the agent's 
   measured twice, and the second time it was still running.
 - **Don't:** write "no instrument is possible" when what is true is "none was built and the objection is unmeasured" --- two drafts of this entry made exactly that upgrade, and a durable record that forecloses a question stops anyone reopening it.
 
-**Third occurrence, 2026-09-10, and this one supplies a cheap instrument the second occurrence's open question left unbuilt.**
+**Third occurrence, 2026-09-10, and the first where the agent's own explicit sign-off was the false signal.**
+It adds a second cheap check alongside the `SendMessage` one named above, and it does not touch the open question that section records --- that question is about a `SubagentStop` ledger detecting a *resumption* by another session, which a PID-liveness read cannot see.
 A background `Agent` reported `status=completed`, its summary read "Agent ... finished", and its own final message declared "**Stopping Point**: Clean stopping point reached --- both PRs this session opened are merged, working tree is clean, no uncommitted changes, no open questions."
 This is a stronger claim than either prior occurrence's bare completion notification: it is the agent asserting, in its own words, that it has nothing left to do.
-`ps -p` on the PID recorded in its worktree's lock reason showed the process alive, and it was still alive 8h57m later.
+`ps -p` on the PID recorded in its worktree's lock reason showed the process alive.
 The agent's self-report was wrong about the one thing the agent was in the best position to know.
 
 **The two prior occurrences are about inferring liveness from *absence* of signal** --- a quiet tree, an unlisted `ListAgents` row, an empty `session-lock list`.
@@ -369,20 +370,12 @@ The prescribed remedy in both prior occurrences is "ask the agent" --- but here 
 
 **The check that actually works is process-table ground truth, not the agent's account of itself.**
 `isolation: "worktree"` locks the worktree it creates, and the lock's reason string embeds the dispatching process, e.g. `claude agent <name> (pid NNNNN start <date>)`.
-Parse the PID out of that reason and run `ps -p <pid>`,
-regardless of what the agent's own last message or completion summary claims.
-The worktree-lock PID check is a different signal from `session-lock`'s own registry
-(`ai-session.sh`'s `find_agent_pid` plus `kill -0`, used for the deliberately-registered worktrees under that skill) ---
-it reads the harness's own worktree lock,
-which exists for `Agent`-dispatched worktrees `session-lock` never touches.
-
-**Read the process STATE, not merely the exit code --- `ps -p` reports an unreaped zombie as present.**
-A child that has exited but whose parent has not reaped it stays in the process table with `STAT=Z`,
-so `ps -p <pid>` exits 0 over a process that is in fact already gone.
-That is the same trap [`claude-code`](claude-code.md)'s entry on `kill -0` reporting an unreaped zombie as alive records,
-and for the same reason: both signals read the process table alone and neither distinguishes a running process from a dead-but-unreaped one.
-So take the state with `ps -o stat= -p <pid>` and treat a leading `Z` as dead.
-(Measured 2026-09-10: a forked child that called `os._exit(0)` and went unreaped returned rc=0 and `STAT=Z` from `ps -p`.)
+Parse the PID out of that reason and run `ps -o stat= -p <pid>`, reading the process STATE rather than the exit code, regardless of what the agent's own last message or completion summary claims.
+A leading `Z` is dead, not alive: a child that has exited but whose parent has not reaped it stays in the process table, so a bare `ps -p <pid>` exits 0 over a process that is in fact already gone.
+That is the same trap [`claude-code`](claude-code.md)'s entry on `kill -0` reporting an unreaped zombie as alive records, and for the same reason: both signals read the process table alone, and neither distinguishes a running process from a dead-but-unreaped one. (Measured 2026-09-10 on macOS 26.6.2, Darwin 25.6.0: a forked child that called `os._exit(0)` and went unreaped returned rc=0 and `STAT=Z` from `ps -p`;
+independently reproduced by an adversarial reviewer on the same platform.
+Reap timing and init identity are environment properties, not properties of Unix --- re-measure under a different init before relying on the numbers, per [`timestamp-volatile-claims`](../shared/writing/timestamp-volatile-claims.md).)
+The worktree-lock PID check is a different signal from `session-lock`'s own registry (`ai-session.sh`'s `find_agent_pid` plus `kill -0`, which tracks the sessions that skill registers, each carrying an optional worktree field) --- it reads the harness's own worktree lock, which `ai-session.sh` never sets.
 
 - **Do:** treat a completion report, however explicit or self-assured ("Stopping Point: Clean", "finished", `status=completed`), as a claim about the agent's output, never as a claim about its process.
 - **Do:** parse the PID from the worktree's `git worktree list` lock reason and run `ps -o stat= -p <pid>` before reclaiming a dispatched agent's worktree, treating a `Z` state as dead, rather than reading its own sign-off.

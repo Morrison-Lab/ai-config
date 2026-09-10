@@ -30,7 +30,10 @@ review comments are invisible here, resolved or not (ai-config#3079). No
 `<summary>`-scoped match on `suppressed` exists in this file either, so a
 Copilot finding inside a collapsed `<details>` block is invisible too
 (ai-config#3170): it creates no inline comment and states no verdict, so no
-count performed here can see it. Measured on ai-config#3167, where this
+count performed here can see it. The one exception is a Copilot review
+carrying its own heading verdict (ai-config#3066): `copilot_verdict` matches
+`Suppressed comments` anywhere in that body, so a collapsed block there
+reads as not-clean; every other path is still blind to it. Measured on ai-config#3167, where this
 script printed FULLY CLEAN twice over a standing finding -- an inline comment
 at head 16544c50, and a suppressed "previously missed" item at head 7e1294b0.
 Both are pre-squash heads, reachable from no branch: fetch them from
@@ -2114,7 +2117,7 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
         return ""
     if scan is None or cited is None:
         scan, cited = strip_cited_finding_vocab_with_mask(body)
-        
+
     def _has_valid_match(pattern, text):
         for m in pattern.finditer(text):
             if not match_is_cited(cited, m.start(), m.end()):

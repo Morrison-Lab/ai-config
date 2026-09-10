@@ -94,6 +94,10 @@ one concrete answer to "keep going, but change what you are asking for."
   `glab` claim while sibling claims in the same six lines sat unchecked, plus
   local adversarial rounds countable only from the session transcript.
   Every brief had named the claims to verify.)
+- **Don't:** hand over a bare list of things to verify.
+  A reviewer reads an enumeration as the scope of the task, so the round comes
+  back clean having checked your list and nothing else --- which is
+  indistinguishable from a round that found nothing.
 
 **Measure the agent.**
 Rounds to clean per PR, and mistakes per dispatch, by class.

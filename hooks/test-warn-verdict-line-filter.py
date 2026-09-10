@@ -1,0 +1,160 @@
+#!/usr/bin/env python3
+"""Tests for warn-verdict-line-filter.py.
+
+Verifies that PreToolUse warning fires when a Bash command fetches PR review
+comments and filters the comment body down to verdict lines without mentioning
+findings or review-data (ai-config#3493, 2026-09-09).
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+
+HOOK = (
+    sys.argv[1]
+    if len(sys.argv) > 1
+    else os.path.join(os.path.dirname(__file__), "warn-verdict-line-filter.py")
+)
+
+
+def bash_payload(command: str) -> dict:
+    return {"tool_name": "Bash", "tool_input": {"command": command}}
+
+
+def run_hook(raw_or_payload: str | dict | list | None) -> subprocess.CompletedProcess:
+    inp = raw_or_payload if isinstance(raw_or_payload, str) else json.dumps(raw_or_payload)
+    return subprocess.run(
+        [sys.executable, HOOK],
+        input=inp,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+
+def test_suite() -> list[str]:
+    failures: list[str] = []
+
+    # Case 1: command fetches issue comments, pipes to jq split and test filter -> warns
+    cmd_warn = (
+        'gh api repos/owner/repo/issues/123/comments | '
+        'jq \'.[] | .body | split("\\n") | map(select(test("Verdict|Ready for merge")))\''
+    )
+    res1 = run_hook(bash_payload(cmd_warn))
+    if res1.returncode != 0:
+        failures.append(f"case 1 non-zero exit: {res1.returncode}")
+    elif not res1.stdout.strip():
+        failures.append("case 1 failed to warn: stdout is empty")
+    else:
+        try:
+            payload = json.loads(res1.stdout)
+            hso = payload.get("hookSpecificOutput", {})
+            if hso.get("hookEventName") != "PreToolUse":
+                failures.append(f"case 1 wrong hookEventName: {hso.get('hookEventName')}")
+            ctx = hso.get("additionalContext", "")
+            if "this filter prints only the verdict lines" not in ctx:
+                failures.append(f"case 1 missing expected note text in additionalContext: {ctx}")
+            if "findings" not in ctx:
+                failures.append(f"case 1 additionalContext missing findings explanation: {ctx}")
+        except json.JSONDecodeError as exc:
+            failures.append(f"case 1 invalid json: {exc}")
+    print(f"  {'FAIL' if failures else 'ok  '} case 1: comment fetch with split and test filter warns")
+
+    # Additional warn cases: pulls/comments with slice, --json comments with NOT CLEAN, --json reviews with Reviewed commit
+    more_warns = [
+        ("pulls comments with slice", 'gh api pulls/456/comments | jq \'.[] | .body | split("\\n") | .[0:5]\''),
+        ("--json comments with NOT CLEAN", 'gh pr view 42 --json comments --jq \'.comments[].body | split("\\n") | map(select(test("NOT CLEAN")))\''),
+        ("--json reviews with Reviewed commit", 'gh pr view 42 --json reviews --jq \'.reviews[].body | test("Reviewed commit")\''),
+    ]
+    for label, cmd in more_warns:
+        prev = len(failures)
+        res = run_hook(bash_payload(cmd))
+        if res.returncode != 0:
+            failures.append(f"{label} non-zero exit: {res.returncode}")
+        elif not res.stdout.strip():
+            failures.append(f"{label} failed to warn: stdout is empty")
+        else:
+            try:
+                payload = json.loads(res.stdout)
+                hso = payload.get("hookSpecificOutput", {})
+                if "additionalContext" not in hso:
+                    failures.append(f"{label} missing additionalContext")
+            except json.JSONDecodeError as exc:
+                failures.append(f"{label} invalid json: {exc}")
+        print(f"  {'FAIL' if len(failures) > prev else 'ok  '} warn case: {label}")
+
+    # Case 2: same command but contains the word findings -> silent
+    cmd_with_findings = cmd_warn + " # check findings array"
+    res2 = run_hook(bash_payload(cmd_with_findings))
+    prev = len(failures)
+    if res2.returncode != 0 or res2.stdout.strip() != "":
+        failures.append(f"case 2 failed: returncode={res2.returncode}, stdout={res2.stdout!r}")
+    print(f"  {'FAIL' if len(failures) > prev else 'ok  '} case 2: contains 'findings' stays silent")
+
+    # Additional silent: contains review-data
+    cmd_with_review_data = cmd_warn + " # parse review-data"
+    res_rd = run_hook(bash_payload(cmd_with_review_data))
+    prev = len(failures)
+    if res_rd.returncode != 0 or res_rd.stdout.strip() != "":
+        failures.append(f"contains review-data failed: returncode={res_rd.returncode}, stdout={res_rd.stdout!r}")
+    print(f"  {'FAIL' if len(failures) > prev else 'ok  '} silent case: contains 'review-data' stays silent")
+
+    # Case 3: verdict filter without comments fetch (e.g. local file grep) -> silent
+    cmd_local_file = 'grep -E "Verdict|Ready for merge" local-review.txt | jq \'.[] | split("\\n")\''
+    res3 = run_hook(bash_payload(cmd_local_file))
+    prev = len(failures)
+    if res3.returncode != 0 or res3.stdout.strip() != "":
+        failures.append(f"case 3 failed: returncode={res3.returncode}, stdout={res3.stdout!r}")
+    print(f"  {'FAIL' if len(failures) > prev else 'ok  '} case 3: verdict filter without comments fetch stays silent")
+
+    # Case 4: comments fetch with plain .[-1].body and no line filter -> silent
+    cmd_plain_body = 'gh api repos/owner/repo/issues/123/comments | jq ".[-1].body"'
+    res4 = run_hook(bash_payload(cmd_plain_body))
+    prev = len(failures)
+    if res4.returncode != 0 or res4.stdout.strip() != "":
+        failures.append(f"case 4 failed: returncode={res4.returncode}, stdout={res4.stdout!r}")
+    print(f"  {'FAIL' if len(failures) > prev else 'ok  '} case 4: comments fetch with plain body stays silent")
+
+    # Case 5: tool_name not Bash -> silent
+    non_bash_payload = {
+        "tool_name": "Edit",
+        "tool_input": {"command": cmd_warn},
+    }
+    res5 = run_hook(non_bash_payload)
+    prev = len(failures)
+    if res5.returncode != 0 or res5.stdout.strip() != "":
+        failures.append(f"case 5 failed: returncode={res5.returncode}, stdout={res5.stdout!r}")
+    print(f"  {'FAIL' if len(failures) > prev else 'ok  '} case 5: tool_name not Bash stays silent")
+
+    # Case 6: empty or invalid stdin -> exit 0 silent
+    res6_empty = run_hook("")
+    prev = len(failures)
+    if res6_empty.returncode != 0 or res6_empty.stdout.strip() != "":
+        failures.append(f"case 6 empty failed: returncode={res6_empty.returncode}, stdout={res6_empty.stdout!r}")
+    print(f"  {'FAIL' if len(failures) > prev else 'ok  '} case 6a: empty stdin exits 0 silently")
+
+    res6_invalid = run_hook("{not valid json")
+    prev = len(failures)
+    if res6_invalid.returncode != 0 or res6_invalid.stdout.strip() != "":
+        failures.append(f"case 6 invalid json failed: returncode={res6_invalid.returncode}, stdout={res6_invalid.stdout!r}")
+    print(f"  {'FAIL' if len(failures) > prev else 'ok  '} case 6b: invalid json stdin exits 0 silently")
+
+    return failures
+
+
+def main() -> int:
+    failures = test_suite()
+    if failures:
+        print("\nFAILED:")
+        for fail in failures:
+            print(f"  {fail}")
+        return 1
+    print("\nall tests passed")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

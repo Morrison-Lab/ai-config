@@ -443,6 +443,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-verdict-line-filter.py\"",
+            "timeout": 10,
+            "script": "warn-verdict-line-filter.py",
+            "why": "Warns, never blocks, when a review round is read through a verdict-line jq filter, which drops non-blocking findings carried in the body and in the review-data findings array (ai-config#3493, measured 2026-09-09)."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-push-without-self-review.py\"",
             "timeout": 10,
             "script": "no-push-without-self-review.py",

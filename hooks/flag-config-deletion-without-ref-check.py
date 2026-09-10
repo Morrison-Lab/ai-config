@@ -308,11 +308,14 @@ CD_VERBS = frozenset({"cd", "pushd", "popd"})
 # back to the lexical path rather than to silence".
 RX_UNPARSEABLE = re.compile(r"[$][(]|`|<<|[<>][(]")
 # A redirect operand is not a file the command READS. `> file` and `>> file`
-# (with or without a leading descriptor, attached or separate) name a file the
-# shell opens for writing, so overwriting a manifest must not discharge the
-# guard; `< file` names one the command reads, so its target stays an operand.
-RX_OUT_REDIRECT = re.compile(r"^(?:[0-9]*>>?[|]?|&>>?)(.*)$")
-RX_IN_REDIRECT = re.compile(r"^[0-9]*<(.*)$")
+# name a file the shell opens for writing, so overwriting a manifest must not
+# discharge the guard; `< file` names one the command reads, so its target
+# stays an operand. `shlex` with `punctuation_chars=True` never fuses a
+# descriptor digit with the operator, so `2>&1` arrives as `2`, `>&`, `1`:
+# the loop below joins a bare all-digit token to the operator that follows it
+# rather than letting the digit fall through as a positional.
+RX_OUT_REDIRECT = re.compile(r"^(?:>>?[|&]?|&>>?)(.*)$")
+RX_IN_REDIRECT = re.compile(r"^<(&?)(.*)$")
 
 HOME = os.path.expanduser("~")
 
@@ -388,17 +391,20 @@ def read_operands(argv):
             end_of_opts = True
             index += 1
             continue
+        if token.isdigit() and index + 1 < len(argv) and argv[index + 1][:1] in "<>":
+            index += 1
+            token = argv[index]
         out_redirect = RX_OUT_REDIRECT.match(token)
         if out_redirect:
             index += 1 if out_redirect.group(1) else 2
             continue
         in_redirect = RX_IN_REDIRECT.match(token)
         if in_redirect:
-            target = in_redirect.group(1)
-            if not target:
-                index += 1
+            dup, target = in_redirect.groups()
+            if dup:
+                index += 1 if target else 2
                 continue
-            if target.startswith("&"):
+            if not target:
                 index += 1
                 continue
             positional.append(target)

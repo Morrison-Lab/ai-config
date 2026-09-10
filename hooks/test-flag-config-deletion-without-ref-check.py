@@ -341,6 +341,17 @@ if not _ok:
 print("\n--- root attribution (read_roots)")
 _HOME = os.path.expanduser("~")
 _ATTRIBUTION_CASES = [
+    ("grep 2>&1 ~/.claude/settings.json", set(),
+     "a descriptor digit is joined to its operator, not left as a positional "
+     "that would shield the pattern slot of a pattern-first verb"),
+    ("grep 2>/dev/null ~/.claude/settings.json", set(),
+     "the same descriptor shape with a file target"),
+    ("cat 2>&1 ~/.claude/settings.json", {"claude"},
+     "a non-pattern verb still credits the operand after a joined redirect"),
+    ("jq . 0< ~/.claude/settings.json", {"claude"},
+     "a descriptor-prefixed input redirect is still a read"),
+    ("cat <&0 ~/.claude/settings.json", {"claude"},
+     "a descriptor duplication credits nothing and skips its number"),
     ("cat payload.json > ~/.claude/settings.json", set(),
      "an output redirect target is written, not read"),
     ("cat payload.json 2>~/.claude/settings.json", set(),

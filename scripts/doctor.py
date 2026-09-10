@@ -152,6 +152,44 @@ def check_hook_catalog() -> Dict[str, Any]:
     }
 
 
+def check_agy_hook_commands() -> Dict[str, Any]:
+    """Check that Antigravity hook commands can launch, here and in the repo.
+
+    A hook command that fails to launch leaves every guard inert while
+    Antigravity skips it silently and a headless `agy` run still reports
+    success (ai-config#3091), so this reports FAIL rather than WARN: the
+    machine has no client-side enforcement at all until it is fixed.
+    """
+    script = REPO_ROOT / "scripts" / "check-agy-hook-commands.py"
+    code, out, err = run_cmd([sys.executable, str(script), "--installed", "--json"])
+    try:
+        report = json.loads(out)
+    except Exception:
+        return {
+            "name": "agy_hook_commands",
+            "ok": False,
+            "status": "FAIL",
+            "details": f"check-agy-hook-commands.py produced no report: {err or out}",
+        }
+
+    findings = [f"{r['path']}: {f}" for r in report["reports"] for f in r["findings"]]
+    if code == 0 and not findings:
+        checked = [r for r in report["reports"] if r["present"]]
+        return {
+            "name": "agy_hook_commands",
+            "ok": True,
+            "status": "OK",
+            "details": f"Antigravity hook commands launchable in {len(checked)} manifest(s).",
+        }
+    return {
+        "name": "agy_hook_commands",
+        "ok": False,
+        "status": "FAIL",
+        "findings": findings,
+        "details": f"{len(findings)} unlaunchable Antigravity hook command(s): {'; '.join(findings)}",
+    }
+
+
 def check_context_closure() -> Dict[str, Any]:
     """Check if CLAUDE.md context closure budget passes."""
     code, out, err = run_cmd([sys.executable, str(REPO_ROOT / "scripts" / "check-context-closure.py")])
@@ -630,6 +668,7 @@ def run_doctor() -> Dict[str, Any]:
         check_submodules(),
         check_codex_wrappers(),
         check_hook_catalog(),
+        check_agy_hook_commands(),
         check_context_closure(),
         check_jsonc_configs(),
         check_ai_clis(),

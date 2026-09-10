@@ -68,9 +68,16 @@ if [ -d "$SCRIPT_DIR/plugins/ai-config" ]; then
   fi
   mkdir -p "$PLUGIN_STAGING_DIR"
 
-  # Copy canonical plugin manifest and hooks.json to staging runtime directory
+  # Copy the canonical plugin manifest to the staging runtime directory.
   cp -f "$SCRIPT_DIR/plugins/ai-config/plugin.json" "$PLUGIN_STAGING_DIR/plugin.json"
-  cp -f "$SCRIPT_DIR/plugins/ai-config/hooks.json" "$PLUGIN_STAGING_DIR/hooks.json"
+
+  # hooks.json is RENDERED rather than copied. The canonical file stays in the
+  # portable POSIX form (`python3 ~/.gemini/...`), which Antigravity resolves
+  # on macOS and Linux and cmd.exe resolves on neither count. Copying it
+  # verbatim left the Windows install needing a hand repair, and that repair
+  # introduced the quoting that broke every run_command hook (ai-config#3091).
+  # Rendering fails fast rather than staging a manifest that cannot launch.
+  python3 "$SCRIPT_DIR/scripts/render-agy-hooks.py" --output "$PLUGIN_STAGING_DIR/hooks.json"
 
   # Symlink executable scripts and repository directories
   ln -sfn "$SCRIPT_DIR/plugins/ai-config/claude-hook-adapter.py" "$PLUGIN_STAGING_DIR/claude-hook-adapter.py"

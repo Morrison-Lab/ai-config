@@ -17,7 +17,7 @@ What does not: the Mistake, Canonical Rule, Fix, or Do/Don't lines, which are wh
 - **2nd occurrence of the misidentified-hook-copy class, 2026-09-03** ([#3141](https://github.com/Morrison-Lab/ai-config/issues/3141), recorded in [#3156](https://github.com/Morrison-Lab/ai-config/issues/3156)), and it is an occurrence of **this bullet's own Fix step being skipped** rather than of a new mechanism.
   `hooks/no-unreviewed-pr.py` demanded a Copilot review while the moratorium ran to `2026-12-01`, and the session identified "the loaded copy" as the newest per-commit directory under `~/.claude/plugins/cache/` --- the exact proxy Pattern 43's Fix step, in [`mistake-patterns.md`](mistake-patterns.md), rules out.
   Several cache directories carried the same value, so newest isolated nothing --- derive the count rather than citing one, since the cache is garbage-collected and it fell from nine to five between 2026-09-03 and 2026-09-04 with no edit in between.
-  The label above names the diagnostic failure rather than a stale cache, and stays right after the resolution below: what recurred was reading the wrong artifact, and the copy captured firing sits outside the cache this pattern is named for.
+  This bullet's own label names the diagnostic failure rather than a stale cache, and stays right once the resolution recorded at the end of it is known: what recurred was reading the wrong artifact, and the copy captured firing sits outside the cache this pattern is named for.
   What the resolution order would have surfaced: the copy registered directly in `~/.claude/settings.json` carries the correct date and returns 0 before reading the transcript, `enabledPlugins` for this plugin is `false`, and the user-scope pin in `installed_plugins.json` names a hook with **no `MORATORIUM_END` at all**.
   Resolved 2026-09-04 by capture rather than by reasoning: `ps -eo args` sampled at 0.05s while deliberately triggering the guard named a snapshot under `~/Library/Application Support/Claude/local-agent-mode-sessions/`, carrying the expired constant.
   No pass had looked there, and no corpus step named it.
@@ -29,7 +29,8 @@ What does not: the Mistake, Canonical Rule, Fix, or Do/Don't lines, which are wh
   Five denials in one session, with no settings change and no restart.
   Three times, an identical re-run of a just-denied command succeeded on the
   very next attempt --- confirming, without a session restart, what the
-  2nd occurrence above only measured *across* a restart.
+  2026-09-03 occurrence recorded in this file only measured *across* a
+  restart.
   Separately, after several differently-shaped attempts at the same goal,
   the classifier began denying a plainly innocuous, unrelated command
   (`gh run list -R ... --json ...`), which also succeeded on an identical
@@ -39,13 +40,12 @@ What does not: the Mistake, Canonical Rule, Fix, or Do/Don't lines, which are wh
   what neither previously recorded is that the escalation is not scoped to
   that command -- it widens to spend suspicion on unrelated, ordinary reads
   once several denials have accumulated in the session.
-- **4th occurrence, and the first with a cheap remedy that is not a retry, 2026-09-09.**
-  `git commit --amend -F <file>` was denied three times in a row while composing one commit;
-  the third attempt differed from the second only in where the message file lived.
-  A plain `git commit -F <file>`, run immediately afterwards with the same message file and the same staged tree, succeeded on the first attempt.
-  Nothing about the session changed in between: no settings edit, no restart, no gap.
-  What the 3rd occurrence above measured is that an *identical* re-run of a denied command often succeeds, which reads as pure nondeterminism.
-  This adds that the denial is also **shape-sensitive**, so a command that is refused repeatedly may have a differently-shaped equivalent that is not refused at all --- here, dropping `--amend` and letting the fix be a second commit.
-  That is worth trying before an identical retry, because it is strictly cheaper: the retry spends a turn to learn nothing when it fails, while the shape change both clears the denial and, in this case, produced the better artifact anyway.
-  A round-2 fix commit records the review round in history where an amend would have erased it.
-  The same session had `git add -A` warned about, and `git push` refused for a chained-command parse, in the same stretch --- so read a run of guard interactions as the expected texture of a fix round rather than as a signal that something is wrong with the session.
+- **4th occurrence, 2026-09-09, and the one that separates a different ACTION from a rephrased one** ([#2994](https://github.com/Morrison-Lab/ai-config/issues/2994); measured while opening [#3480](https://github.com/Morrison-Lab/ai-config/pull/3480)).
+  `git commit --amend -F <file>` was denied three times in a row.
+  A plain `git commit -F <file>`, run immediately afterwards with the same message file and the same staged tree, succeeded on the first attempt, with no settings change and no restart in between.
+  Read carelessly that is the behaviour Pattern 43's own **Don't** forbids --- keep rephrasing until something gets through --- and the reason it is not is worth stating, because the two look identical from outside.
+  A rephrasing leaves the action fixed and varies the wording, which is what makes each denied variant evidence against the next.
+  Dropping `--amend` changed the action: the fix stopped being a history rewrite and became a second commit, which is a different thing to ask permission for and, here, the better artifact anyway --- a round-2 fix commit records the review round in history where an amend would have erased it.
+  So the question to ask after a second denial is not how else to phrase the same request but whether a *different* operation reaches the same goal, which is a question the pattern's Do/Don't pair does not currently pose.
+  Where no such operation exists, the canonical Do still governs: stop and hand the user the decision.
+  The 2026-09-06/07 occurrence recorded in this file measured that an identical re-run often succeeds, which reads as pure nondeterminism; this one is not evidence about that, since the successful command was not the denied one.

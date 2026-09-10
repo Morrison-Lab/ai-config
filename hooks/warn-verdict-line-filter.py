@@ -5,11 +5,13 @@ A Bash command that fetches PR review comments and narrows the comment body to
 verdict lines drops non-blocking findings in the body and in the review-data
 JSON findings array.
 Measured 2026-09-09 on ai-config#3493: two findings carried over unaddressed.
+Filter files passed via -f / --from-file are also inspected (ai-config#3494).
 """
 
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 
@@ -19,6 +21,11 @@ RX_FETCH_COMMENTS = re.compile(
 
 RX_VERDICT_LINES = re.compile(
     r'split\("(\\n|\n)"\)|test\("[^"]*(?:Verdict|Ready for merge|NOT CLEAN|Reviewed commit)[^"]*"\)|\.\[\d+:\d+\]'
+)
+
+RX_JQ_FILTER_FILE = re.compile(
+    r"""\bjq\b[^\n|;&]*?\s+(?:-[a-zA-Z]*f(?:\s+|=)|--from-file(?:\s+|=))(?:"([^"]+)"|'([^']+)'|([^\s|;&]+))""",
+    re.I,
 )
 
 NOTE = (
@@ -31,13 +38,58 @@ NOTE = (
 )
 
 
-def should_warn(command: str) -> bool:
+def _read_filter_file(raw_path: str, cwd: str | None = None) -> str | None:
+    """Read filter file text if it exists on disk. Never crashes."""
+    if not raw_path:
+        return None
+    try:
+        base_cwd = cwd or os.getcwd()
+        if os.path.isabs(raw_path):
+            resolved = raw_path
+        else:
+            resolved = os.path.join(base_cwd, raw_path)
+
+        candidates = [resolved, raw_path]
+        try:
+            candidates.append(os.path.expanduser(resolved))
+        except Exception:
+            pass
+        if os.name == "nt":
+            m = re.match(r"^/([a-zA-Z])/(.*)", raw_path)
+            if m:
+                win_path = f"{m.group(1)}:/{m.group(2)}"
+                candidates.extend([win_path, os.path.join(base_cwd, win_path)])
+
+        for cand in candidates:
+            try:
+                if os.path.isfile(cand):
+                    with open(cand, "r", encoding="utf-8", errors="ignore") as fh:
+                        return fh.read()
+            except Exception:
+                pass
+    except Exception:
+        return None
+    return None
+
+
+def should_warn(command: str, cwd: str | None = None) -> bool:
     """True when command matches comment fetch and verdict lines without findings."""
     if not RX_FETCH_COMMENTS.search(command):
         return False
-    if not RX_VERDICT_LINES.search(command):
+
+    file_texts = []
+    for m in RX_JQ_FILTER_FILE.finditer(command):
+        raw_path = m.group(1) or m.group(2) or m.group(3)
+        if raw_path:
+            text = _read_filter_file(raw_path, cwd)
+            if text:
+                file_texts.append(text)
+
+    union_text = "\n".join([command] + file_texts) if file_texts else command
+
+    if not RX_VERDICT_LINES.search(union_text):
         return False
-    if "findings" in command or "review-data" in command:
+    if "findings" in union_text or "review-data" in union_text:
         return False
     return True
 
@@ -107,7 +159,8 @@ def main() -> int:
         if not isinstance(command, str) or not command.strip():
             return 0
 
-        if should_warn(command):
+        cwd = payload.get("cwd") or (payload.get("tool_input") or {}).get("cwd") or os.getcwd()
+        if should_warn(command, cwd=cwd):
             _emit(NOTE)
     except Exception:
         return 0

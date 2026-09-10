@@ -4,6 +4,7 @@
 Verifies that PreToolUse warning fires when a Bash command fetches PR review
 comments and filters the comment body down to verdict lines without mentioning
 findings or review-data (ai-config#3493, 2026-09-09).
+Filter files passed via -f / --from-file are also tested (ai-config#3494).
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 
 HOOK = (
     sys.argv[1]
@@ -141,6 +143,51 @@ def test_suite() -> list[str]:
     if res6_invalid.returncode != 0 or res6_invalid.stdout.strip() != "":
         failures.append(f"case 6 invalid json failed: returncode={res6_invalid.returncode}, stdout={res6_invalid.stdout!r}")
     print(f"  {'FAIL' if len(failures) > prev else 'ok  '} case 6b: invalid json stdin exits 0 silently")
+
+    # Case 7: file-carried split+test filter warns
+    with tempfile.TemporaryDirectory() as tmpdir:
+        verdict_jq = os.path.join(tmpdir, "verdict.jq").replace("\\", "/")
+        with open(verdict_jq, "w", encoding="utf-8") as fh:
+            fh.write('split("\\n") | map(select(test("Verdict|Ready for merge")))')
+
+        cmd_file_warn = (
+            f"gh api repos/owner/repo/issues/123/comments | jq -f {verdict_jq}"
+        )
+        res7 = run_hook(bash_payload(cmd_file_warn))
+        prev = len(failures)
+        if res7.returncode != 0:
+            failures.append(f"case 7 non-zero exit: {res7.returncode}")
+        elif not res7.stdout.strip():
+            failures.append("case 7 failed to warn: stdout is empty")
+        else:
+            try:
+                payload = json.loads(res7.stdout)
+                hso = payload.get("hookSpecificOutput", {})
+                if "additionalContext" not in hso:
+                    failures.append("case 7 missing additionalContext")
+            except json.JSONDecodeError as exc:
+                failures.append(f"case 7 invalid json: {exc}")
+        print(
+            f"  {'FAIL' if len(failures) > prev else 'ok  '} case 7: file-carried split+test filter warns"
+        )
+
+        # Case 8: file-carried plain filter stays silent
+        plain_jq = os.path.join(tmpdir, "plain.jq").replace("\\", "/")
+        with open(plain_jq, "w", encoding="utf-8") as fh:
+            fh.write(".[-1].body\n")
+
+        cmd_file_plain = (
+            f"gh api repos/owner/repo/issues/123/comments | jq -f {plain_jq}"
+        )
+        res8 = run_hook(bash_payload(cmd_file_plain))
+        prev = len(failures)
+        if res8.returncode != 0 or res8.stdout.strip() != "":
+            failures.append(
+                f"case 8 failed: returncode={res8.returncode}, stdout={res8.stdout!r}"
+            )
+        print(
+            f"  {'FAIL' if len(failures) > prev else 'ok  '} case 8: file-carried plain filter stays silent"
+        )
 
     return failures
 

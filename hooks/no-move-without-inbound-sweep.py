@@ -322,32 +322,49 @@ def moves(diff: str):
 
 
 def swept(transcript: str, basename: str) -> bool:
-    """Did a repo-wide search naming `basename` run in this session?"""
+    """Did a repo-wide search naming `basename` run in this session?
+
+    The two failure modes are not symmetric, and an earlier draft treated them
+    as one. Not being able to OPEN the transcript is a statement about the
+    whole session: a guard that fired whenever it could not see one would fire
+    on every session that hides it, so that case returns True. A malformed
+    RECORD says nothing about the other records, so it is skipped rather than
+    clearing the file.
+
+    Collapsing the two is a fail-open, and it was one here: `commands()` raised
+    `AttributeError` on a record whose `message` was a truthy non-dict, an outer
+    `except Exception` caught it, and the guard reported the whole transcript
+    swept when nothing had been searched at all. Silent, and in the permissive
+    direction --- the shape `shared/principles/fail-fast.md` names.
+    """
     if not transcript or not os.path.isfile(transcript):
-        # Unknown, so assume it did. A guard that fires when it cannot see the
-        # transcript would fire on every session that hides one.
         return True
     try:
-        with open(transcript, errors="ignore") as fh:
-            for line in fh:
-                if basename not in line:
-                    continue
-                try:
-                    rec = json.loads(line)
-                except Exception:
-                    continue
-                for cmd in commands(rec):
-                    if is_sweep(cmd, basename):
-                        return True
-    except Exception:
+        fh = open(transcript, errors="ignore")
+    except OSError:
         return True
+    with fh:
+        for line in fh:
+            if basename not in line:
+                continue
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                continue
+            for cmd in commands(rec):
+                if is_sweep(cmd, basename):
+                    return True
     return False
 
 
 def commands(rec) -> list:
     """Every Bash command string in one transcript record."""
     out = []
-    msg = rec.get("message") or {}
+    if not isinstance(rec, dict):
+        return out
+    msg = rec.get("message")
+    if not isinstance(msg, dict):
+        return out
     content = msg.get("content")
     if not isinstance(content, list):
         return out

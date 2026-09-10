@@ -26,6 +26,8 @@ from pathlib import Path
 from typing import Iterator
 
 SCRIPT_SUFFIXES = (".py", ".sh")
+# The one variable the plugin loader sets and a shell does not.
+PLUGIN_ROOT_VAR = "CLAUDE_PLUGIN_ROOT"
 
 
 def script_token(command: str) -> str | None:
@@ -35,8 +37,12 @@ def script_token(command: str) -> str | None:
     wrapper, a shell one-liner, an interpreter invoked with no script. That
     is a `skipped`, not a finding.
     """
+    # A POSIX shlex eats a bare backslash as an escape, which turns an
+    # unquoted Windows path into one word with no separators. Doubling every
+    # backslash first makes shlex hand each one back as itself.
+    protected = command.replace('\\', '\\' + '\\')
     try:
-        tokens = shlex.split(command, posix=True)
+        tokens = shlex.split(protected, posix=True)
     except ValueError:
         tokens = command.split()
     for token in tokens:
@@ -63,8 +69,13 @@ def classify_command(command: str) -> tuple[str, str | None]:
     if token is None:
         return "skipped", None
     path = expand(token)
-    if "$" in path or "%" in path:
+    if PLUGIN_ROOT_VAR in path:
         return "skipped", path
+    if "$" in path or "%" in path:
+        # Any other variable this process cannot expand is one the harness
+        # will not expand either, so the registration is broken, not merely
+        # uncheckable.
+        return "missing", path
     return ("ok" if Path(path).expanduser().is_file() else "missing"), path
 
 
@@ -82,6 +93,7 @@ def _iter_hooks(settings: dict) -> Iterator[tuple[str, str, dict]]:
             for hook in group.get("hooks", []):
                 if isinstance(hook, dict):
                     yield event, matcher, hook
+
 
 def registered_hooks(settings: dict) -> Iterator[tuple[str, str, str]]:
     """Yield (event, matcher, command) for every hook a settings dict binds."""

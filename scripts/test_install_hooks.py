@@ -75,6 +75,8 @@ check("an unexpandable plugin-root path is skipped, not missing",
           'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/guard.py"')[0] == "skipped")
 check("a command naming no script at all is skipped",
       hp.classify_command("echo hello")[0] == "skipped")
+check("an undefined variable in the path is missing, not skipped",
+      hp.classify_command("python3 $NO_SUCH_VAR_2392/hooks/guard.py")[0] == "missing")
 check("script_token reads the script past its interpreter",
       hp.script_token('python3 "/a/b/guard.py"') == "/a/b/guard.py")
 check("registered_hooks yields one row per bound command",
@@ -126,14 +128,18 @@ with tempfile.TemporaryDirectory() as tmp:
     present = home / "guard.py"
     home.mkdir(parents=True)
     present.write_text("import sys" + NL + "sys.exit(0)" + NL)
-    
+
     # Backslash Windows path
     windows_path = str(present).replace('/', '\\')
     write_settings(home, settings_with(f'python3 "{windows_path}"'))
     result = run_check(home)
     check("a backslash Windows path that exists is reported ok",
           result.returncode == 0 and "Every registered hook path resolves" in result.stdout)
-          
+    write_settings(home, settings_with(f'python3 {windows_path}'))
+    result = run_check(home)
+    check("an UNQUOTED backslash Windows path that exists is reported ok",
+          result.returncode == 0 and "Every registered hook path resolves" in result.stdout)
+
     # Forward-slash Windows path (str(Path) might use backslashes on Windows, so force forward slash)
     forward_path = str(present).replace('\\', '/')
     write_settings(home, settings_with(f'python3 "{forward_path}"'))

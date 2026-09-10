@@ -684,6 +684,35 @@ that round is not redundant, since it found two false discharges the worker's ro
 - **Don't:** brief a worker to push and ARDI its own PR;
   the guard refuses it by construction, and the retry burns the worker's whole budget.
 
+## Parse a delegated edit in its own language, not only its commit message
+
+The section above says to diff a delegated commit's message against its diff.
+That catches a worker describing a change it did not make.
+It cannot catch the commoner failure, where the description is accurate and the *code* arrived mangled --- so the check reads as performed while the defect walks through it.
+
+Measured 2026-09-10 on [ai-config#3435](https://github.com/Morrison-Lab/ai-config/pull/3435).
+An `agy` worker asked to guard a call in `bootstrap.sh` wrote a `printf` whose quotes were dropped and whose format string was split by a literal newline, leaving `"$?"` alone on the next line.
+Under that script's `set -euo pipefail` it expands to `0`, runs `0` as a command, and aborts the bootstrap on every platform and every run, before the dotfiles installer loop and the symlinks below it.
+
+Three checks passed over it.
+The commit message was accurate.
+The repo's Python suites were green, because none of them executes `bootstrap.sh`.
+And the message-versus-diff check found nothing, because the message was never the thing that was wrong.
+`bash -n bootstrap.sh` found it in one command.
+
+Shell is where this bites hardest, and for two compounding reasons rather than one.
+Quoting is exactly what a transport corrupts, per `CLAUDE.md`'s "Tool transport collapses doubled backslashes" section, so a shell edit is the likeliest to arrive mangled.
+And an installer or a hook is usually executed by no test suite at all, so a syntax error in one survives a green run and reaches a user's machine.
+
+The check costs one command per language: `bash -n` for shell, `python -m py_compile` (or `ast.parse`) for Python, `Rscript -e 'parse(...)'` for R, `jq empty` for JSON.
+Run it against the file the worker touched, before trusting the commit.
+
+- **Do:** parse every file a delegated worker edited, in that file's own language, before reading its commit as done.
+- **Do:** treat an edit to a script no test executes --- an installer, a hook, a CI helper --- as needing that parse most, not least.
+- **Don't:** read an accurate commit message as evidence the code is well-formed;
+  those are different claims about different artifacts.
+- **Don't:** rely on a green suite that never runs the edited file.
+
 ## opencode free tier: a full authoring task, validated mechanically
 
 Measured 2026-08-28 on opencode CLI 1.18.15 (macOS),

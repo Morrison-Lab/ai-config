@@ -11,9 +11,15 @@ On 2026-09-10, fixing a CI check in `Morrison-Lab/qwt`, this ran on macOS:
 
 It printed `grep: invalid option -- P` to stderr and exited 1. The session
 read the empty stdout as "no tracked file contains an em dash" and wrote that
-claim into a commit message; an adversarial reviewer caught it. Five tracked
-files still contained one at that point -- what remained, not the incident's
-total, since the scan ran after the files CI had flagged were already fixed.
+claim into a commit message; an adversarial reviewer caught it.
+
+Five tracked files still contained one at that point, which is what remained
+rather than the incident's total. Twelve of the thirteen files that fix
+touched had an em dash; seven were already clean when this scan ran (four CI
+had flagged, plus three under `.claude/**`, which the checker's `ignored_dirs`
+skips), leaving the five outside its extension set. Both halves of that
+subtraction are stated because an earlier draft named only the four, which
+implies eight and does not reach five.
 
 The interactive shell's `grep` was a `ugrep` shell function, per
 `memories/tools.md`. A function does not survive into a child of `xargs`, so

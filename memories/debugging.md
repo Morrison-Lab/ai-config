@@ -428,79 +428,50 @@ the exit status explicitly (`rc=$?; case $rc in 0) ...;; 1) ...;; *) echo
 glyphs" without having scanned anything; caught only by re-reading the
 command's own stderr, which was sitting in the same output.)
 
-**A second route into this section's failure, measured 2026-09-10, and it
-adds two things the locale case above does not: `xargs` as the
-child-process boundary, and a false zero that reached a commit message
-rather than a check's own printed summary.**
-(Deliberately not numbered.
-The only other occurrence counter in this file
-sits in "An empty grep for one spelling is not evidence the concept is
-absent", which is a different mechanism, so a count here would invite a
-comparison against occurrences that are not this pattern's.)
+**A second route into this section's failure, measured 2026-09-10:
+`xargs` as the child-process boundary, where the remedy above does not reach.**
 
 ```bash
 git ls-files -z | xargs -0 grep -lP '[\x{2014}]'
 ```
 
 printed `grep: invalid option -- P` to stderr and exited 1.
-The interactive shell's `grep` was a `ugrep 7.8.4` function, per
+An interactive shell's `grep` is a `ugrep` function, per
 [`tools.md`](tools.md)'s "`grep` in a Claude Code session is a shell
-function" entry --- and a function does not reach a child of `xargs` any more
-than it reaches a child of a script, so the child got the real on-`PATH`
-binary: BSD `grep`, which rejects `-P` outright rather than merely
-mis-handling it under an unset locale.
-Empty stdout with the stderr line unread was reported as "no tracked file
-contains an em dash", and that claim was written into a commit message before
-an adversarial reviewer caught it: five tracked files did contain one.
+function" entry, and a function does not reach a child of `xargs`, so the
+child got the on-`PATH` binary: BSD `grep`, which has no `-P` at all.
+The empty stdout was reported as "no tracked file contains an em dash", and
+that claim reached a commit message before a reviewer caught it.
 
-The rc matters because it defeats the remedy this section already
-prescribes, and the reason is the indirection rather than grep.
-BSD grep rejects the flag with rc=**2**, exactly like the locale case above,
-so the `case $rc in 0) ...;; 1) ...;; *) ...; esac` branch would catch it.
-`xargs` then reports **1** for a child that exited non-zero, laundering that
-distinguishable 2 into the one value that means "searched, found nothing"
-(measured 2026-09-10: `/usr/bin/grep -lP x a.md` alone gives rc=2, and
-`printf 'a.md' | xargs -0 /usr/bin/grep -lP x` gives rc=1, as does an honest
-no-match through the same pipe).
-So the single boundary that swaps the binary also destroys the evidence that
-it did --- which is why this route needs naming even though the remedy for
-the locale case was already written down.
-Nothing about the status then distinguishes "searched every file and found
-none" from "rejected the flag before opening a single file", which is exactly
-the zero-matrix problem
-[`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md) and
-[`batch-merge-and-resolve`](../shared/workflow/batch-merge-and-resolve.md)'s
-negative-control section already name for other detectors: the fix that
-actually worked here was the same one they prescribe, replacing the shell
-pipeline with a small Python scan that reports how many files it examined
-alongside how many hits it found, so a zero carries evidence the scan ran
-rather than evidence of absence.
+The exit code is the indirection's doing rather than grep's, which is why the
+explicit-`rc`-branch remedy directly above was not enough on its own.
+BSD grep rejects the flag with rc=**2**, exactly like the locale case, so that
+branch would have caught it.
+`xargs` reports **1** for a child that exited non-zero, laundering the
+distinguishable 2 into the one value that also means "searched, found
+nothing".
+So one boundary swaps the binary and destroys the evidence it did --- the
+zero-matrix problem
+[`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md) names,
+whose prescribed fix is the one that worked here.
 
 - **Do:** treat `xargs`, `find -exec`, a Makefile recipe, and a script as the
   same kind of child-process boundary --- an interactive shell's `grep`
   function or alias reaches none of them.
 - **Do:** measure a flag before calling it GNU-only.
-  Only `-P`/`--perl-regexp` are actually rejected by
-  `grep (BSD grep, GNU compatible) 2.6.0-FreeBSD`;
-  `-z`, `--null-data`, `--include`, `--exclude` and `--exclude-dir` are all
-  documented in its own man page and all returned rc=0 when run.
-  A first draft of the guard below listed all seven by generalizing from the
-  one flag that had been tested, which would have made it assert
-  "BSD grep rejects `--include`" over a correct command --- the same
-  unmeasured-claim error as the false zero it exists to catch.
+  Only `-P`/`--perl-regexp` are rejected by BSD grep; `-z`, `--null-data`,
+  `--include`, `--exclude` and `--exclude-dir` all work.
 - **Do:** have a content-search check report the population it examined
-  (file count, item count) alongside the hit count, so a zero is
-  distinguishable from a detector that never ran.
-- **Don't:** trust `rc` alone to separate "found nothing" from "never ran" for
-  this specific failure --- BSD grep's rejected `-P` and GNU grep's honest
-  no-match both exit 1.
+  alongside the hit count, so a zero is distinguishable from a detector that
+  never ran.
+- **Don't:** read `rc` as separating "found nothing" from "never ran" once an
+  indirection is in the pipeline --- it collapses grep's 2 onto 1, and 1 is
+  also an honest no-match.
 - **Don't:** read empty stdout under `xargs` as having searched anything,
-  without first checking stderr and the exit status together.
+  without checking stderr and the exit status together.
 
-(The explicit-`rc`-branch remedy directly above was banked seven weeks
-earlier, in #715 during ai-config#712's lifecycle, and was not enough on its
-own here because it assumes the failure exits 2; qwt CI-fix session,
-2026-09-10.)
+See [`debugging.cases.md`](debugging.cases.md), "A GNU-only grep flag in an
+`xargs` child", for the measurements and the guard this produced.
 
 ## An error quotes the failing call, so its ARGUMENTS are not your data
 

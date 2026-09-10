@@ -141,23 +141,29 @@ with tempfile.TemporaryDirectory() as tmp:
     home.mkdir(parents=True)
     present.write_text("import sys" + NL + "sys.exit(0)" + NL)
 
-    # Backslash Windows path
-    windows_path = str(present).replace('/', '\\')
-    write_settings(home, settings_with(f'python3 "{windows_path}"'))
-    result = run_check(home)
-    check("a backslash Windows path that exists is reported ok",
-          result.returncode == 0 and "Every registered hook path resolves" in result.stdout)
-    write_settings(home, settings_with(f'python3 {windows_path}'))
-    result = run_check(home)
-    check("an UNQUOTED backslash Windows path that exists is reported ok",
-          result.returncode == 0 and "Every registered hook path resolves" in result.stdout)
+    # The resolution of a Windows-shaped path is OS-native (Path.is_file),
+    # so these three run only on Windows; the token-level Windows cases
+    # above run everywhere.
+    if os.name == "nt":
+        # Backslash Windows path
+        windows_path = str(present).replace('/', '\\')
+        write_settings(home, settings_with(f'python3 "{windows_path}"'))
+        result = run_check(home)
+        check("a backslash Windows path that exists is reported ok",
+              result.returncode == 0 and "Every registered hook path resolves" in result.stdout)
+        write_settings(home, settings_with(f'python3 {windows_path}'))
+        result = run_check(home)
+        check("an UNQUOTED backslash Windows path that exists is reported ok",
+              result.returncode == 0 and "Every registered hook path resolves" in result.stdout)
 
-    # Forward-slash Windows path (str(Path) might use backslashes on Windows, so force forward slash)
-    forward_path = str(present).replace('\\', '/')
-    write_settings(home, settings_with(f'python3 "{forward_path}"'))
-    result = run_check(home)
-    check("a forward-slash Windows path that exists is reported ok",
-          result.returncode == 0 and "Every registered hook path resolves" in result.stdout)
+        # Forward-slash Windows path (str(Path) might use backslashes on Windows, so force forward slash)
+        forward_path = str(present).replace('\\', '/')
+        write_settings(home, settings_with(f'python3 "{forward_path}"'))
+        result = run_check(home)
+        check("a forward-slash Windows path that exists is reported ok",
+              result.returncode == 0 and "Every registered hook path resolves" in result.stdout)
+    else:
+        print("SKIP: Windows-path resolution checks (not on Windows)")
 
 with tempfile.TemporaryDirectory() as tmp:
     home = Path(tmp) / "claude"

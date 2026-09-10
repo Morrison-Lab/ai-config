@@ -1073,7 +1073,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unfiled-finding.py\"",
             "timeout": 10,
             "script": "no-unfiled-finding.py",
-            "why": "report-mistakes-proactively 'Filing is not gated on approval' -- no-offer-to-file.py catches the OFFER (needs a `?`); this catches the DECLARATIVE form, which asks nothing and so slips past it."
+            "why": "report-mistakes-proactively 'Filing is not gated on approval' -- no-offer-to-file.py catches the OFFER, interrogative or not (`want me to file` and `say the word and I will file` both match with no `?`); this catches the DECLARATIVE ASSERTION that a finding is worth an issue, which asks nothing and so slips past it. Neither covers the deferral shape ('I would rather you tell me whether it is worth a ninth'); ai-config#3520 records why a lexical guard for that was attempted and abandoned."
           },
           {
             "type": "command",

@@ -362,8 +362,16 @@ _ATTRIBUTION_CASES = [
     ("grep -rn '~/.claude/settings.json' README.md && echo `date`", set(),
      "a backtick in a NEIGHBOURING segment does not hand the lexical fallback "
      "a segment the argv parse already decided (review round on #3469)"),
-    ("cat ~/.codex/config.toml; jq . $(echo ~/.claude/settings.json)", {"codex", "claude"},
-     "the fallback still runs on the segment that carries the substitution"),
+    ("cat ~/.codex/config.toml; jq . $(echo ~/.claude/settings.json)", {"codex"},
+     "a manifest path a substitution PRODUCES is unknown here and not "
+     "credited: the fallback scans the substitution's text, not its value"),
+    ("grep -rn '~/.claude/settings.json' $(git diff --name-only)", set(),
+     "a substitution among a grep's arguments does not hand the fallback the "
+     "grep whose pattern spells a manifest (CI review round on #3469)"),
+    ("grep -rn '~/.claude/settings.json' README.md `date`", set(),
+     "the same with a backtick"),
+    ("diff <(cat ~/.claude/settings.json) <(cat $(echo x))", {"claude"},
+     "a nested substitution inside a process substitution still scans"),
     ("cat file 2<> ~/.claude/settings.json", {"claude"},
      "a read-write redirect opens its target for reading"),
     ("grep 5 < ~/.claude/settings.json", set(),

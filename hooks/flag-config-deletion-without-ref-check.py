@@ -308,17 +308,13 @@ CD_VERBS = frozenset({"cd", "pushd", "popd"})
 # Constructs whose argv is not what the shell would pass: the value of a
 # command substitution is unknown here, and a PROCESS substitution splits into
 # an argv whose `argv[0]` is the outer program, so
-# `diff <(cat <manifest>) <(cat other)` presents `diff` where `cat` ran. Union
-# the argv verdict with the lexical one for both, per the issue's "fall back to
-# the lexical path rather than to silence", scoped to the chain segment that
-# carries the construct (see `unparseable_segments`). A heredoc is NOT in this
-# set: its body is never executed, so nothing inside it is a read, and both
-# the argv path and the segment split see the command with the body blanked
-# by `shellcmd._heredoc_free`. Scanning the raw body credited a manifest that
-# a commit message or a scratch script merely mentioned (review of #3469).
-RX_UNPARSEABLE = re.compile(r"[$][(]|`|[<>][(]")
-# Chain operators, for scoping that fallback to the segment that needs it.
-RX_CHAIN_SPLIT = re.compile(r"&&|[|][|]|;|[|]")
+# `diff <(cat <manifest>) <(cat other)` presents `diff` where `cat` ran. The
+# lexical scan runs over the text INSIDE each such construct and nothing else
+# (see `substitution_bodies`), per the issue's "fall back to the lexical path
+# rather than to silence". A heredoc is NOT in this set: its body is never
+# executed, so nothing inside it is a read, and the argv path sees the command
+# with the body blanked by `shellcmd._heredoc_free`.
+RX_SUBSTITUTION_OPEN = re.compile(r"[$][(]|`|[<>][(]")
 # A redirect operand is not a file the command READS. `> file` and `>> file`
 # name a file the shell opens for writing, so overwriting a manifest must not
 # discharge the guard; `< file` names one the command reads, so its target
@@ -554,27 +550,53 @@ def read_roots(command):
     parsed = argv_read_roots(command) if simple_commands_with_scope else None
     if parsed is None:
         return lexical_read_roots(command)
-    for segment in unparseable_segments(_heredoc_free(command)):
-        parsed = parsed | lexical_read_roots(segment)
+    for body in substitution_bodies(_heredoc_free(command)):
+        parsed = parsed | lexical_read_roots(body)
     return parsed
 
 
-def unparseable_segments(command):
-    """The chain segments of `command` whose argv cannot be trusted.
+def substitution_bodies(command):
+    """The text INSIDE each command or process substitution in `command`.
 
-    The fallback is scoped to the segment carrying the substitution
-    rather than to the whole line, so a backtick in one command does not hand
-    the lexical scan a neighbouring command the argv parse already decided:
-    a `grep` over README.md followed by an `echo` of a backticked `date` credits
-    nothing, since the grep segment parsed cleanly and the echo names no
-    manifest. The caller hands this the command with heredoc bodies blanked,
-    so a body that merely mentions a manifest is never scanned. The split is
-    textual, so a chain operator inside a quoted string
-    splits too; that only narrows what the lexical scan sees, which for a
+    The argv parse cannot see what runs inside `$( )`, backticks, `<( )` or
+    `>( )`, so the lexical scan is applied to exactly that text and nothing
+    else. Scanning the whole segment instead handed the regex the outer
+    command too, which the argv parse had already decided: a grep whose
+    PATTERN spells a manifest path, with a substitution among its arguments,
+    credited the manifest (review rounds on #3469). A manifest path that a
+    substitution merely PRODUCES (`jq . $(echo <manifest>)`) is not credited
+    either, since its value is unknown here; that under-credits, which for a
     DISCHARGE test is the direction that warns.
     """
-    return [seg for seg in RX_CHAIN_SPLIT.split(command)
-            if RX_UNPARSEABLE.search(seg)]
+    bodies = []
+    index = 0
+    while index < len(command):
+        match = RX_SUBSTITUTION_OPEN.search(command, index)
+        if not match:
+            break
+        if match.group(0) == "`":
+            close = command.find("`", match.end())
+            close = len(command) if close < 0 else close
+            bodies.append(command[match.end():close])
+            index = close + 1
+            continue
+        close = matching_paren(command, match.end())
+        bodies.append(command[match.end():close])
+        index = match.end()
+    return bodies
+
+
+def matching_paren(text, start):
+    """Index of the `)` closing the group that opened just before `start`."""
+    depth = 1
+    for index in range(start, len(text)):
+        if text[index] == "(":
+            depth += 1
+        elif text[index] == ")":
+            depth -= 1
+            if depth == 0:
+                return index
+    return len(text)
 
 
 def targeted_roots(text):

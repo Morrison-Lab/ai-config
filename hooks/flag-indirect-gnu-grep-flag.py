@@ -26,14 +26,18 @@ grep that never ran, and that remedy would have caught this -- BSD grep
 rejects the flag with rc=**2**, exactly like the locale failure that remedy
 was written for.
 
-The indirection is what defeats it. `xargs` reports **1** for a child that
-exited non-zero, laundering grep's distinguishable 2 into the one status that
-also means "searched, found nothing" (measured 2026-09-10: `/usr/bin/grep
--lP x a.md` alone gives rc=2; the same through `xargs -0` gives rc=1, as does
-an honest no-match through that pipe). So the single boundary that swaps the
-binary also destroys the evidence it did, and after it neither stdout nor
-`rc` distinguishes "searched every file, found none" from "rejected the flag
-before opening one".
+The indirection is what defeats it, for some indirections. `xargs` reports
+**1** for a child that exited non-zero, laundering grep's distinguishable 2
+into the one status that also means "searched, found nothing" (measured
+2026-09-10: `/usr/bin/grep -lP x a.md` alone gives rc=2; the same through
+`xargs -0` gives rc=1, as does an honest no-match through that pipe).
+
+Not all of them, though, and `RC_BEHAVIOUR` below carries the measurements:
+`sh -c`, `bash -c`, `zsh -c` and `env` preserve the child's status, so rc=2
+survives and an rc branch still works; `find`'s `;` form exits 0 and tells
+you even less than a laundered 1 does. The warning says which, because
+claiming the `xargs` story uniformly would tell a reader an rc check is
+useless in exactly the cases where it is the right remedy.
 
 ## Why the indirection is the trigger, not the flag
 
@@ -87,6 +91,56 @@ GNU_ONLY_FLAGS = {
 # alias by that name does not reach it.
 INDIRECTIONS = ("xargs", "find", "parallel", "sh", "bash", "zsh", "env")
 
+# What each indirection does to the child's exit status, MEASURED 2026-09-10
+# against a stub that prints BSD grep's rejection and exits 2:
+#
+#     sh -c            rc=2    preserved
+#     bash -c          rc=2    preserved
+#     zsh -c           rc=2    preserved
+#     env              rc=2    preserved
+#     xargs -0         rc=1    laundered
+#     find ... {} \;   rc=0    discarded
+#     find ... {} +    rc=1    laundered
+#
+# An earlier draft asserted "laundered" for all seven, having measured only
+# `xargs`. That is false for four of them and backwards for `find`'s
+# semicolon form, and it matters more than a wrong detail usually would: it
+# would have told a future session that an rc check cannot separate
+# "rejected the flag" from "found nothing" in exactly the cases where it can.
+# `parallel` is marked laundered on the reviewer's measurement rather than
+# this session's, and is noted as such.
+RC_LAUNDERED = "laundered"
+RC_PRESERVED = "preserved"
+RC_DISCARDED = "discarded"
+
+RC_BEHAVIOUR = {
+    "xargs": RC_LAUNDERED,
+    "parallel": RC_LAUNDERED,
+    "sh": RC_PRESERVED,
+    "bash": RC_PRESERVED,
+    "zsh": RC_PRESERVED,
+    "env": RC_PRESERVED,
+    # `find` depends on the terminator, so it is resolved per-command rather
+    # than looked up here.
+}
+
+RC_SENTENCE = {
+    RC_LAUNDERED: """and `{via}` reports **1** for a child that exited
+non-zero -- laundering grep's distinguishable **2** into the one status that
+also means "searched, found nothing". So the boundary that swapped the binary
+also destroyed the evidence it did, and branching on `rc` cannot separate the
+two here.""",
+    RC_PRESERVED: """while `{via}` passes the child's exit status through
+unchanged. So `rc` **does** still tell you: grep's rejection is **2**, an
+honest no-match is **1**. Branch on it (`case $rc in 0) ...;; 1) ...;; *)
+"CHECK FAILED TO RUN";; esac`) and this failure announces itself. The
+resolution risk above is the whole of what this warning is about.""",
+    RC_DISCARDED: r"""and `find ... -exec CMD {{}} \;` exits **0** whatever the child
+returned. So `rc` is worse than ambiguous here: a rejected flag is
+indistinguishable from complete success, not merely from an empty result.
+Read stderr, or use the `+` form, whose status does reach you.""",
+}
+
 # A quote may sit immediately before the name, as in `sh -c 'grep -P ...`,
 # and the name may carry a path (`/usr/bin/grep`), which the token scan
 # below strips the same way the indirection scan does.
@@ -107,13 +161,9 @@ child-process boundary. On macOS the PATH answer is typically
 `grep (BSD grep, GNU compatible) 2.6.0-FreeBSD`, it prints
 `{stderr}` and exits 2.
 
-The failure then mimics a pass. The usage error goes to **stderr** while
-**stdout is empty**, and `{via}` reports **1** for a child that exited
-non-zero -- laundering grep's distinguishable 2 into the one status that
-means "searched, found nothing". An honest no-match through the same pipe
-also gives 1. So the boundary that swapped the binary also destroyed the
-evidence it did, which is why branching on `rc` alone does not separate them
-here.
+What that does to the exit status depends on the indirection, so it is
+measured rather than assumed. The usage error goes to **stderr** while
+**stdout is empty**, {rc_sentence}
 
 Measured 2026-09-10: a false "no tracked file contains an em dash" reached a
 commit message this way.
@@ -144,11 +194,11 @@ own `/usr/bin/grep`, it is not: measured 2026-09-10 against
 accepts it, in which case this warning is noise -- check which one
 `{invoked}` is.
 
-If it is the BSD one, the failure mimics a pass: the usage error goes to
-**stderr**, **stdout is empty**, and `{via}` reports **1** for a non-zero
-child, which is also what an honest no-match returns. So read stderr, and
-prefer a scan that reports the population it examined over one whose only
-output is the hits.
+If it is the BSD one: the usage error goes to **stderr**, **stdout is
+empty**, {rc_sentence}
+
+Either way, prefer a scan that reports the population it examined over one
+whose only output is the hits.
 """
 
 
@@ -199,6 +249,29 @@ def _utility_after(toks, vi):
     return None
 
 
+def _rc_behaviour(toks, vi):
+    """How `toks[vi]` treats its child's exit status.
+
+    `find` is resolved from the terminator rather than the table: the `+`
+    batching form launders a non-zero child to 1, while the `;` form exits 0
+    regardless, which is a different and worse story. `_utility_after`
+    deliberately treats the two alike when LOCATING the utility, because the
+    terminator does not change which token that is -- it changes only what
+    reaches the caller afterwards.
+    """
+    base = toks[vi].rsplit("/", 1)[-1]
+    if base != "find":
+        return RC_BEHAVIOUR.get(base, RC_LAUNDERED)
+    # `+` ends the -exec list; a bare `;` (the shell eats the backslash) does
+    # the per-file form. Default to the semicolon reading, which is both the
+    # commoner spelling and the worse behaviour, so an unparsed terminator
+    # does not get the reassuring message.
+    for t in toks[vi + 1:]:
+        if t == "+":
+            return RC_LAUNDERED
+    return RC_DISCARDED
+
+
 def indirect_gnu_grep(payload):
     """Return (flag, via, command) when a GNU-only grep flag is reached
     through a child-process boundary, else None."""
@@ -243,6 +316,7 @@ def indirect_gnu_grep(payload):
     # through: an indirection was present, a grep token was present, and
     # nothing established that the second was what the first ran.
     via = None
+    via_at = None
     for i, t in enumerate(toks[:grep_at]):
         base = t.rsplit("/", 1)[-1]
         if base not in INDIRECTIONS:
@@ -251,6 +325,7 @@ def indirect_gnu_grep(payload):
         # child and the function DOES apply; only -exec/-execdir spawns it.
         if _utility_after(toks, i) == grep_at:
             via = base
+            via_at = i
             break
     if via is None:
         return None
@@ -270,10 +345,12 @@ def indirect_gnu_grep(payload):
         # `--perl-regexp=x` carries its value on the same token.
         bare = t.split("=", 1)[0]
         if bare in GNU_ONLY_FLAGS:
-            return bare, via, command, invoked, pinned, GNU_ONLY_FLAGS[bare]
+            return (bare, via, command, invoked, pinned,
+                    GNU_ONLY_FLAGS[bare], _rc_behaviour(toks, via_at))
         # Clustered short flags: -lP, -rlP, etc.
         if re.fullmatch(r"-[A-Za-z]{2,}", t) and "P" in t[1:]:
-            return "-P", via, command, invoked, pinned, GNU_ONLY_FLAGS["-P"]
+            return ("-P", via, command, invoked, pinned,
+                    GNU_ONLY_FLAGS["-P"], _rc_behaviour(toks, via_at))
     return None
 
 
@@ -299,7 +376,8 @@ def main():
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
-    flag, via, command, invoked, pinned, stderr = found
+    flag, via, command, invoked, pinned, stderr, rc_kind = found
+    rc_sentence = RC_SENTENCE[rc_kind].format(via=via)
     template = NOTE_PINNED if pinned else NOTE_RESOLVED
     # No `permissionDecision` key: an absent decision defers to the normal
     # permission flow. Naming "allow" would suppress a prompt the user would
@@ -309,22 +387,30 @@ def main():
             "hookEventName": "PreToolUse",
             "additionalContext": template.format(
                 flag=flag, via=via, command=command, invoked=invoked,
-                stderr=stderr),
+                stderr=stderr, rc_sentence=rc_sentence),
         },
     }
     if not os.environ.get("ANTIGRAVITY_AGENT"):
+        # One clause per measured rc behaviour. The earlier single string
+        # said "rc=1 -- indistinguishable from no match" for every
+        # indirection, which is true only of the laundering ones.
+        rc_clause = {
+            RC_LAUNDERED: "rc=1, indistinguishable from no match",
+            RC_PRESERVED: "rc=2, which an rc check CAN still separate from a "
+                          "no-match's 1",
+            RC_DISCARDED: "rc=0, indistinguishable from full success",
+        }[rc_kind]
         if pinned:
             out["systemMessage"] = (
                 "`%s %s` via `%s` pins that binary: if it is macOS's BSD grep "
-                "the flag is rejected, with empty stdout and rc=1 -- "
-                "indistinguishable from no match." % (invoked, flag, via)
+                "the flag is rejected, with empty stdout and %s."
+                % (invoked, flag, via, rc_clause)
             )
         else:
             out["systemMessage"] = (
                 "`%s %s` via `%s` resolves by PATH in the child, past this "
                 "session's own `%s`: BSD grep rejects the flag, with empty "
-                "stdout and rc=1 -- indistinguishable from no match."
-                % (invoked, flag, via, invoked)
+                "stdout and %s." % (invoked, flag, via, invoked, rc_clause)
             )
     print(json.dumps(out))
     return 0

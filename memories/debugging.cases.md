@@ -11,6 +11,15 @@ Belongs to [`debugging.md`](debugging.md)'s "A second route into this section's 
 
 Measured 2026-09-10 during a `Morrison-Lab/qwt` CI fix, against `grep (BSD grep, GNU compatible) 2.6.0-FreeBSD` on macOS.
 
+### The command
+
+```bash
+git ls-files -z | xargs -0 grep -lP '[\x{2014}]'
+```
+
+Printed `grep: invalid option -- P` to stderr, exited 1, and emptied stdout.
+The session's `grep` is a `ugrep` shell function, which does not cross into an `xargs` child, so the child got `/usr/bin/grep`.
+
 ### Which flags BSD grep actually rejects
 
 Two, not the seven a first draft of the guard claimed:
@@ -41,6 +50,28 @@ printf 'a.md' | xargs -0 /usr/bin/grep -l ZZZ rc=1   (honest no-match)
 The second and third are indistinguishable, which is the whole defect.
 
 [`batch-merge-and-resolve`](../shared/workflow/batch-merge-and-resolve.md)'s negative-control section makes the same point for a different detector: a zero matrix and a detector that never ran look alike, so report the population examined rather than only the hits.
+
+### What each indirection does to the exit status
+
+Measured against a stub that prints BSD grep's rejection and exits 2:
+
+```
+sh -c            rc=2   preserved
+bash -c          rc=2   preserved
+zsh -c           rc=2   preserved
+env              rc=2   preserved
+xargs -0         rc=1   laundered
+find ... {} \;   rc=0   discarded
+find ... {} +    rc=1   laundered
+```
+
+A draft of the guard asserted "laundered" for all seven, having measured only `xargs`.
+Four of them are the opposite, and `find`'s semicolon form is worse than either: a rejected flag then looks like complete success rather than an empty result.
+
+The four preserved cases are the ones worth getting right.
+Claiming the `xargs` story uniformly would tell a reader an rc branch cannot separate "rejected the flag" from "found nothing" in exactly the cases where that branch is the correct remedy --- so the generalization does not merely overstate, it inverts the advice.
+
+The guard now picks its sentence from this table, and `find` is resolved from the terminator rather than the table, since the two forms differ.
 
 ### What the false zero cost
 

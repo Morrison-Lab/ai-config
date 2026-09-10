@@ -158,6 +158,12 @@ CASES = [
      "xargs -I's placeholder sits before the utility and must be skipped "
      "when locating it"),
 
+    ("C20-find-semicolon",
+     "find . -name '*.md' -exec grep -lP 'x' {} " + B + ";",
+     True,
+     "the per-file -exec form; it warns, and its rc story differs from the "
+     "+ form's (find exits 0, discarding the child's status entirely)"),
+
     ("C15-z-portable",
      "git ls-files -z | xargs -0 grep -lz 'x'",
      False,
@@ -198,7 +204,8 @@ MUTATIONS = [
     ("M1-drop-indirection-requirement",
      # Treat every grep as indirect: the pipe and bare cases must now warn.
      ('    if via is None:' + chr(10) + '        return None',
-      '    if via is None:' + chr(10) + '        via = via or "?"'),
+      '    if via is None:' + chr(10) + '        via = via or "xargs"'
+       + chr(10) + '        via_at = 0 if via_at is None else via_at'),
      {"C6-bare-grep-P", "C7-pipe-to-grep"}),
 
     ("M2-drop-find-exec-handling",
@@ -213,7 +220,7 @@ MUTATIONS = [
     ("M3-drop-flag-requirement",
      # Any indirect grep warns, flag or not.
      ('    for t in toks[grep_at + 1:]:',
-      '    return "-P", via, command, invoked, pinned, GNU_ONLY_FLAGS[\"-P\"]' + chr(10) + '    for t in toks[grep_at + 1:]:'),
+      '    return "-P", via, command, invoked, pinned, GNU_ONLY_FLAGS[\"-P\"], RC_LAUNDERED' + chr(10) + '    for t in toks[grep_at + 1:]:'),
      # C12 carries no grep token at all, so it returns before the
      # mutated line is reached -- excluded rather than faked.
      {"C8-xargs-portable-grep", "C9-grep-in-pattern",
@@ -317,12 +324,69 @@ def stderr_quote_matches_flag():
     return failures
 
 
+def rc_story_matches_indirection():
+    r"""Each indirection must get the rc behaviour MEASURED for it.
+
+    A draft asserted "launders rc=2 into rc=1" for all seven indirections
+    having measured only `xargs`. Measured 2026-09-10 against a stub printing
+    BSD grep's rejection and exiting 2:
+
+        sh -c / bash -c / zsh -c / env  rc=2  preserved
+        xargs -0                        rc=1  laundered
+        find ... {} +                   rc=1  laundered
+        find ... {} \;                  rc=0  discarded
+
+    The four preserved cases are the ones that matter most to get right: the
+    old text told a reader an rc check could not separate a rejected flag
+    from a no-match, in exactly the cases where it can.
+    """
+    expect = [
+        ("ls | xargs -0 grep -lP 'x'", "rc=1", "laundered"),
+        ("ls | parallel grep -lP 'x'", "rc=1", "laundered"),
+        ("sh -c " + chr(39) + "grep -P x f" + chr(39), "rc=2", "preserved"),
+        ("bash -c " + chr(39) + "grep -P x f" + chr(39), "rc=2", "preserved"),
+        ("zsh -c " + chr(39) + "grep -P x f" + chr(39), "rc=2", "preserved"),
+        ("env grep -P x f", "rc=2", "preserved"),
+        ("find . -exec grep -lP x {} +", "rc=1", "laundered"),
+        ("find . -exec grep -lP x {} " + B + ";", "rc=0", "discarded"),
+    ]
+    failures = []
+    for cmd, want_rc, label in expect:
+        payload = {"tool_name": "Bash", "tool_input": {"command": cmd}}
+        proc = subprocess.run([sys.executable, HOOK],
+                              input=json.dumps(payload),
+                              capture_output=True, text=True)
+        # A template whose literal braces are unescaped raises on .format(),
+        # which is how the find-semicolon case was first found: the hook exits
+        # non-zero and emits nothing, so a test that only checks for a warning
+        # would report it as a missing warning rather than a crash.
+        if proc.returncode != 0:
+            print("  FAIL %-28s hook exited %s: %s"
+                  % (label + " " + cmd[:14], proc.returncode,
+                     proc.stderr.strip()[:60]))
+            failures.append(cmd)
+            continue
+        sm = (json.loads(proc.stdout or "{}")).get("systemMessage", "")
+        ok = want_rc in sm
+        print("  %s %-9s %-34s expects %s  %s"
+              % ("PASS" if ok else "FAIL", label, cmd[:34], want_rc,
+                 "" if ok else "got: " + sm[-60:]))
+        if not ok:
+            failures.append(cmd)
+    return failures
+
+
 def main():
+
+
     print("Baseline cases:")
     _, base_fail = baseline()
     print()
     print("Warning-text accuracy:")
     base_fail += stderr_quote_matches_flag()
+    print()
+    print("Per-indirection rc story:")
+    base_fail += rc_story_matches_indirection()
     print()
     print("Mutation coverage:")
     mut_fail = mutate()

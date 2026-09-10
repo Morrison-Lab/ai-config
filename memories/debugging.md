@@ -431,17 +431,14 @@ command's own stderr, which was sitting in the same output.)
 **A second route into this section's failure, measured 2026-09-10:
 `xargs` as the child-process boundary, where the remedy above does not reach.**
 
-```bash
-git ls-files -z | xargs -0 grep -lP '[\x{2014}]'
-```
-
-printed `grep: invalid option -- P` to stderr and exited 1.
+A glyph scan through `xargs -0 grep -lP` printed `invalid option -- P` to
+stderr and exited 1.
 An interactive shell's `grep` is a `ugrep` function, per
 [`tools.md`](tools.md)'s "`grep` in a Claude Code session is a shell
 function" entry, and a function does not reach a child of `xargs`, so the
-child got the on-`PATH` binary: BSD `grep`, which has no `-P` at all.
-The empty stdout was reported as "no tracked file contains an em dash", and
-that claim reached a commit message before a reviewer caught it.
+child got the on-`PATH` binary: BSD `grep`, which has no `-P`.
+The empty stdout became "no tracked file contains an em dash", in a commit
+message.
 
 The exit code is the indirection's doing rather than grep's, which is why the
 explicit-`rc`-branch remedy directly above was not enough on its own.
@@ -450,23 +447,26 @@ branch would have caught it.
 `xargs` reports **1** for a child that exited non-zero, laundering the
 distinguishable 2 into the one value that also means "searched, found
 nothing".
-So one boundary swaps the binary and destroys the evidence it did --- the
-zero-matrix problem
+
+So under `xargs` one boundary swaps the binary and destroys the evidence it
+did --- the zero-matrix problem
 [`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md) names,
 whose prescribed fix is the one that worked here.
+Only some indirections behave that way, though: `sh -c`, `bash -c`, `zsh -c`
+and `env` preserve the status, and `find`'s `;` form exits 0.
+The cases file carries the measured table.
 
-- **Do:** treat `xargs`, `find -exec`, a Makefile recipe, and a script as the
-  same kind of child-process boundary --- an interactive shell's `grep`
-  function or alias reaches none of them.
+- **Do:** treat `xargs`, `find -exec`, a Makefile recipe and a script as one
+  kind of child-process boundary --- a `grep` function or alias reaches none.
 - **Do:** measure a flag before calling it GNU-only.
   Only `-P`/`--perl-regexp` are rejected by BSD grep; `-z`, `--null-data`,
   `--include`, `--exclude` and `--exclude-dir` all work.
-- **Do:** have a content-search check report the population it examined
-  alongside the hit count, so a zero is distinguishable from a detector that
-  never ran.
-- **Don't:** read `rc` as separating "found nothing" from "never ran" once an
-  indirection is in the pipeline --- it collapses grep's 2 onto 1, and 1 is
-  also an honest no-match.
+- **Do:** have a content search report the population it examined alongside
+  the hit count, so a zero differs from a detector that never ran.
+- **Don't:** generalize an indirection's effect on `rc` from one measurement
+  --- `xargs` collapses grep's 2 onto 1, `find`'s `;` form discards it to 0,
+  and `sh -c`, `bash -c`, `zsh -c` and `env` preserve it, so the branch that
+  is useless under the first two is exactly what works under the last four.
 - **Don't:** read empty stdout under `xargs` as having searched anything,
   without checking stderr and the exit status together.
 

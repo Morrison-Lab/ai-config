@@ -69,6 +69,30 @@ grants the move, it does not exempt it from what a move costs.
   "A defect whose surface form varies defeats a phrase grep", for the case
   this generalizes from --- a quoted-heading grep sweep still left two more
   rounds' worth of differently-worded instances for reviewers to find.
+- **Inbound links to the SOURCE file go stale too, and no phrase search finds them.**
+  The bullet above sweeps the moved block and the survivor left behind.
+  Both are searches over *text you moved*, so both are blind to the other
+  direction: a third file that links to the source file and describes, in its
+  own words, content that has just left it.
+  Such a link names the **file**, never the moved passage, so grepping for the
+  moved content's distinctive phrases returns nothing --- and a link that still
+  resolves, to a file that still exists, turns nothing red.
+  It is the worse half of the two, because the reader who follows it lands
+  somewhere real and finds no trace of what was cited, with no pointer onward.
+  Enumerate every inbound link to the source file and ask of each, one at a
+  time, whether the claim it makes still describes something in that file:
+
+  ```bash
+  grep -rn '<source-basename>' --include='*.md' .
+  ```
+
+  The list is short and the question is per-link, so this is cheap.
+  What makes it easy to skip is that the phrase sweep feels like the sweep ---
+  it is derived, it is repo-wide, and it comes back clean.
+  - **Do:** sweep both directions --- the moved text for outbound references,
+    and the source file's inbound links for claims that moved.
+  - **Don't:** read a clean repo-wide search for the moved content as having
+    checked the inbound direction; it cannot, by construction.
 - **A downstream count or position reference can silently break**, even
   though you touched neither its sentence nor its file.
   [`forward-references.md`](forward-references.md)'s "Inserting prose makes a

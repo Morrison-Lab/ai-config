@@ -178,7 +178,7 @@ When a new entry lands after `main` has appended one of its own, take the next n
 - **Mistake**: Committing directly to the primary checkout --- to `main` or to an existing feature branch already checked out there --- instead of isolating the work in a dedicated `git worktree`.
 - **Example**: 2026-08-19 session (cwd `wai`, working `Morrison-Lab/ai-config`): committed memory updates straight onto `fix/quote-yaml-placeholders` on the primary ai-config checkout, where a parallel session sharing that checkout would have collided with them.
 - **Canonical Rule**: `AGENTS.md` ("Worktree isolation"), which requires a dedicated worktree for write/edit tasks so parallel sessions never clobber each other's working directory or branch state.
-  See also [`git-worktrees.md`](git-worktrees.md) for the liveness rules that decide when a worktree may be touched or reclaimed.
+  See also [`subagent-worktrees.md`](subagent-worktrees.md) for the liveness rules that decide when a peer or subagent worktree may be touched or reclaimed.
 - **Fix**: Create the worktree before the first edit (`git worktree add`), not after the first commit.
   Treat the primary checkout as read-only during a write session, and push early --- a pushed commit survives anything that happens to a working tree.
 

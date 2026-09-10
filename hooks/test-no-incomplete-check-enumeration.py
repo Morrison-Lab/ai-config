@@ -66,6 +66,14 @@ SAME_INDEX_REPORT_AND_PARTIAL = {"type": "user", "message": {"content": [
 # A subagent dispatched and reporting only on #100 (#3475 round 7). Used to
 # show that a passing mention of #100 in a message whose CLAIM is about a
 # different PR must not make that subagent count as the claim's evidence.
+# The subagent genuinely IS the claim's evidence, but the message names a
+# closer, unrelated PR before the claim phrase (#3475 round 8).
+AGENT_500_DISPATCH = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "a500", "name": "Agent",
+     "input": {"prompt": "drive #500 to a clean verdict and report back"}}]}}
+AGENT_500_REPORT = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "a500",
+     "content": "#500 is clean: CI green, review CLEAN"}]}}
 AGENT_100_DISPATCH = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "id": "a100", "name": "Agent",
      "input": {"prompt": "drive #100 to clean"}}]}}
@@ -228,11 +236,11 @@ CASES = [
      "the same unrelated dispatch, but landing AFTER the CI reading, is in "
      "the claim's evidence window and DOES count (timing-based, per spec)"),
     ([SAME_PR_AGENT_DISPATCH, SAME_PR_AGENT_REPORT, PARTIAL,
-      say("#651 is fully clean at a5f4f3f2.")], "warn",
-     "a subagent dispatched about the SAME PR, before the CI reading, is "
-     "outside the timing window but matches the claim's target -- the "
-     "matches_target arm must carry it (compare the unrelated-#9999 case "
-     "directly above, identical in shape, which blocks)"),
+      say("#651 is fully clean at a5f4f3f2.")], "block",
+     "a same-PR subagent BEFORE the CI reading no longer softens the "
+     "canonical case to a warn: the newest evidence is the partial "
+     "reading, and target matching stopped routing the decision in round "
+     "8 -- it only adds a reason now"),
 
     # --- Finding 4 regression (ai-config#3472): merge-readiness vocabulary
     # needs a PR/git anchor, not just the bare phrase ---
@@ -263,10 +271,26 @@ CASES = [
      "NOT after it, so it stays outside the window and the original case "
      "still blocks -- the strict `>` boundary, which nothing else pins"),
     ([AGENT_100_DISPATCH, AGENT_100_REPORT,
-      say("#100 was closed as a duplicate. #200 is fully clean.")], "allow",
-     "a subagent for #100 is not evidence for a claim about #200, even "
-     "though the message mentions both -- the claim's subject is the PR "
-     "near the claim, not every reference in the message"),
+      say("#100 was closed as a duplicate. #200 is fully clean.")], "warn",
+     "matching is permissive on purpose (round 8): a nearby #100 the "
+     "subagent worked on earns a WARN, whose cost is noise. What it must "
+     "NOT do is block, or suppress a block -- see the #651 case below"),
+    ([UNRELATED_AGENT_DISPATCH, UNRELATED_AGENT_REPORT,
+      say("Earlier I looked at #9999, which is an unrelated issue in a "
+          "different repository and has nothing whatever to do with the "
+          "work in front of us here today, mentioned only because it "
+          "came up in passing. Moving on to the actual subject: #200 is "
+          "fully clean.")], "allow",
+     "the window is what keeps permissive matching from reaching a "
+     "mention this far from the claim -- whole-message matching would "
+     "warn here on the strength of a sentence that disclaims relevance"),
+    ([AGENT_500_DISPATCH, AGENT_500_REPORT,
+      say("#500: implemented the changes over in #501 as a follow-on. "
+          "It's fully clean.")], "warn",
+     "the subagent genuinely IS this claim's evidence, but the nearest "
+     "reference before the claim is #501 -- narrowing the match to the "
+     "single labelled PR silenced the guard entirely here (round 8), so "
+     "matching stays permissive over the window"),
     ([AGENT_100_DISPATCH, AGENT_100_REPORT, PARTIAL,
       say("#100 was closed as a duplicate. #651 is fully clean at "
           "a5f4f3f2.")], "block",
@@ -340,7 +364,7 @@ CONTENT_CASES = [
      "a push after a partial reading, with no complete read ever -- the "
      "message must not claim a complete read exists"),
     ([AGENT_DISPATCH, AGENT_REPORT, PARTIAL,
-      say("#3468 is ready to merge.")],
+      say("#3468 is green, awaiting your merge.")],
      "SHORT CI surface",
      "dispatched subagent's OWN report",
      "a partial reading AFTER the subagent's report is the newest evidence, "

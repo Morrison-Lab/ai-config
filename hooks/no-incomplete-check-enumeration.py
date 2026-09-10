@@ -304,23 +304,44 @@ def already_fired(text):
 _LABEL_WINDOW = 120
 
 
+def _claim_window_refs(text, hit):
+    """Every `#N` near the claim phrase, in reading order.
+
+    ONE windowed source of truth for what the claim is about, from which
+    the two consumers take what each needs. They want different things,
+    and rounds 7 and 8 of #3475 were the two ways of getting that wrong:
+
+    - The LABEL wants exactly one, conservatively, since it is carried
+      into the remediation command the user runs. Naming the wrong PR
+      sends the instrument somewhere useless (round 5).
+    - The MATCH wants all of them, permissively, since it only asks
+      whether a subagent worked on something this claim is about. Too
+      narrow and a genuinely relevant report stops matching, which
+      silences the WARN entirely (round 8). Too wide -- the whole message
+      -- and an unrelated subagent counts, which downgraded the canonical
+      BLOCK case to a WARN (round 7).
+
+    A shared window gives both what they need without letting them
+    disagree about which references are in play at all.
+    """
+    if hit is None:
+        return [m.group(0) for m in RX_PR_REF.finditer(text)]
+    pos = hit.start()
+    end = hit.end()
+    return [m.group(0) for m in RX_PR_REF.finditer(text)
+            if (m.end() <= pos and pos - m.end() <= _LABEL_WINDOW)
+            or (m.start() >= end and m.start() - end <= _LABEL_WINDOW)]
+
+
 def _pr_label(text, hit=None):
     """Name the PR the CLAIM is about, or decline to name one.
 
-    A message routinely mentions several PRs and issues -- "#100 was closed
-    as a duplicate. #200 is green, awaiting your merge." -- and the first
-    reference is very often not the subject of the terminal claim. The
-    payload's remediation command carries this label, so naming the wrong
-    one points the user's instrument run at the wrong PR (#3475 round 5).
-
-    No heuristic over free text can always pick right, so this one is
-    bounded rather than clever: the nearest reference within
-    `_LABEL_WINDOW` characters of the claim phrase, preferring one before
-    it, since a claim's subject usually precedes it. Outside that window it
-    returns the generic label. Round 6 found the unbounded form reaching
-    across a whole message to grab a reference the text itself called
-    unrelated -- a confident wrong label, which is worse than an honest
-    vague one.
+    Takes the nearest windowed reference, preferring one before the claim
+    phrase since a claim's subject usually precedes it. Outside the window
+    it returns the generic label: no heuristic over free text always picks
+    right, and a confident wrong label is worse than an honest vague one,
+    because the label is carried into the command the user then runs
+    (#3475 rounds 5 and 6).
     """
     generic = "the PR you named"
     if hit is None:
@@ -353,6 +374,7 @@ def _relevant_last_subagent(subagent_events, last_partial, claim_pr_refs):
     Returns the highest transcript index of a relevant event, or -1.
     """
     relevant = -1
+    timed = -1
     for idx, pr_refs in subagent_events:
         # A window exists only if there IS a CI reading to be after.
         # With `last_partial == -1`, `idx > -1` is true for EVERY
@@ -360,9 +382,11 @@ def _relevant_last_subagent(subagent_events, last_partial, claim_pr_refs):
         # very branch that was scoped to stop it (#3475 finding 2).
         in_window = last_partial >= 0 and idx > last_partial
         matches_target = bool(claim_pr_refs) and bool(pr_refs & claim_pr_refs)
+        if in_window:
+            timed = max(timed, idx)
         if in_window or matches_target:
             relevant = max(relevant, idx)
-    return relevant
+    return relevant, timed
 
 
 def main() -> int:
@@ -389,8 +413,24 @@ def main() -> int:
     # downgraded the canonical BLOCK case to a WARN -- the same regression
     # the docstring says was fixed once already (#3475 round 7).
     pr_label = _pr_label(text, hit)
-    claim_pr_refs = {pr_label} if pr_label.startswith("#") else set()
-    last_subagent = _relevant_last_subagent(subagent_events, last_partial, claim_pr_refs)
+    claim_pr_refs = {r for r in _claim_window_refs(text, hit)}
+    # Two answers, because the two consumers must not share one.
+    #
+    # `last_subagent` is PERMISSIVE -- any subagent this claim plausibly
+    # rests on. It feeds the reasons and `reading_needed_since`, whose only
+    # consequence is a WARN, and this hook family accepts noise over
+    # silence. Narrowing it to the single labelled PR silenced the guard
+    # entirely on "#500: implemented in #501 ... it's fully clean", where
+    # the subagent genuinely was the evidence (#3475 round 8).
+    #
+    # `subagent_timed` is OBJECTIVE -- landed after the CI reading, no text
+    # heuristic involved -- and is the only thing allowed to suppress the
+    # BLOCK. Free-text subject attribution is not reliably decidable, so it
+    # must not decide whether the canonical case blocks: routing the BLOCK
+    # through `matches_target` is what let a passing mention of #100
+    # downgrade a #651 claim (#3475 round 7).
+    last_subagent, subagent_timed = _relevant_last_subagent(
+        subagent_events, last_partial, claim_pr_refs)
 
     # A complete enumeration after BOTH the last push AND the last subagent
     # report covers the claim -- a subagent's report is an event that can
@@ -417,7 +457,14 @@ def main() -> int:
     # section for why.
     # `last_partial >= 0` is implied here: the guard above returned when
     # both were negative, so `last_subagent < 0` already forces it.
-    is_original_ci_case = bool(hit_core) and last_subagent < 0
+    # `last_partial >= 0` is back, and its history is the point. Round 4
+    # proved it inert -- and it was, while this line read `last_subagent < 0`
+    # and the early return above guaranteed the implication. Keying on
+    # `subagent_timed` breaks that implication, so a conjunct that really was
+    # dead becomes load-bearing again. An inertness proof is a statement about
+    # the surrounding guards, not about the conjunct.
+    is_original_ci_case = (
+        bool(hit_core) and subagent_timed < 0 and last_partial >= 0)
 
     if is_original_ci_case:
         print(json.dumps({

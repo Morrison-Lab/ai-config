@@ -18,21 +18,22 @@ In every session --- at session start, and again periodically during long sessio
    `installed_plugins.json`'s `lastUpdated` field records when the pin was last written, not how far behind the pin currently sits, so confirming the plugin is enabled and not doubled tells you nothing about whether the cached snapshot it points at is stale.
 
    Measured on this Windows machine, 2026-09-09: the pinned commit's `lastUpdated` read 2026-08-27T18:33:12Z, 13 days before the session that read it, and `git rev-list --count <pinned-commit>..HEAD` in a fresh ai-config checkout counted 459 commits ahead of that pin.
-   The gap included a targeted hook fix (`hooks/no-placeholder-reply.py`, [#2964](https://github.com/Morrison-Lab/ai-config/issues/2964)) whose absence let a placeholder reply through unblocked --- see [ai-config#3437](https://github.com/Morrison-Lab/ai-config/issues/3437).
+   The gap included a targeted hook fix (`hooks/no-placeholder-reply.py`, [#2964](https://github.com/Morrison-Lab/ai-config/pull/2964)) whose absence let a placeholder reply through unblocked --- see [ai-config#3437](https://github.com/Morrison-Lab/ai-config/issues/3437).
 
-   Check it by comparing the plugin cache's newest directory date, or by grepping the cache for a phrase from a recent `main` commit, against the checkout's own `main`:
+   Check it from the pin the active scope actually serves, not from the newest directory under the cache: the cache can hold a newer snapshot while this scope's entry still points at an older one.
+   Read the `gitCommitSha` of the entry whose `scope` and `projectPath` match the session, then count how far `main` has moved past it:
 
    ```bash
-   ls -lt ~/.claude/plugins/cache/Morrison-Lab/ai-config/ | head -3
-   git -C <ai-config checkout> log -1 --format=%cI origin/main
+   python3 -c "import json; [print(e['scope'], e.get('projectPath', '-'), e['gitCommitSha']) for e in json.load(open('$HOME/.claude/plugins/installed_plugins.json'))['plugins']['ai-config@Morrison-Lab']]"
+   git -C <ai-config checkout> fetch -q origin && git -C <ai-config checkout> rev-list --count <gitCommitSha>..origin/main
    ```
 
-   A cache directory dated well before that `log` timestamp is stale, whatever `installed_plugins.json`'s own `lastUpdated` claims.
+   A count in the hundreds is a stale pin, whatever `installed_plugins.json`'s own `lastUpdated` claims and however new the other cache directories are.
 
    `claude plugin update <plugin>` (verified present in `claude plugin --help` output on this machine) is the remedy once staleness is confirmed --- run it per scope (`claude plugin update ai-config@Morrison-Lab`, and `claude plugin update --scope project ai-config@Morrison-Lab` from each affected project/worktree), then restart the session to pick up the refreshed cache path.
    [ai-config#2439](https://github.com/Morrison-Lab/ai-config/issues/2439) tracks making this check itself part of the session-start sweep rather than something a session discovers by symptom.
 
-   - **Do:** compare the plugin cache's newest directory date (or a content grep) against the checkout's own `main`, rather than trusting the auto-update mechanism to have already run.
+   - **Do:** count commits from the active scope's pinned `gitCommitSha` to `origin/main`, rather than trusting the auto-update mechanism to have already run.
    - **Do:** run `claude plugin update` (per scope) once staleness is confirmed, then restart to apply it.
    - **Do:** confirm a CLI remedy exists (`claude plugin --help`) on the machine in question before writing that none does.
    - **Don't:** read "auto-updates at session start" as meaning the currently-running session's cache is already current --- that is exactly the claim this check tests.

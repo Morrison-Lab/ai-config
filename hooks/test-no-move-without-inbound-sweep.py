@@ -120,6 +120,16 @@ def test_moves():
     check("a deletion with no destination is not a move",
           not list(guard.moves(only_del)))
 
+    # Detection is prose-scoped: the warning's rationale and its remediation
+    # command are both about prose citation, so a code refactor must not get
+    # them.
+    check("a .py to .py move is not reported",
+          not list(guard.moves(_diff("hooks/a.py", "hooks/b.py", BIG))))
+    check("a .md to .md move is reported",
+          len(list(guard.moves(_diff("a.md", "b.md", BIG)))) == 1)
+    check("a .qmd source is reported",
+          len(list(guard.moves(_diff("a.qmd", "b.md", BIG)))) == 1)
+
     # An edit within ONE file must not count as moving to itself.
     same = (f"diff --git a/a.md b/a.md\n--- a/a.md\n+++ b/a.md\n@@ -1,20 +1,20 @@\n"
             + "\n".join("-" + l for l in BIG) + "\n"
@@ -174,6 +184,35 @@ def test_swept():
 
     check("an unreadable transcript is treated as swept",
           guard.swept("/nonexistent/path.jsonl", "preferences.md"))
+
+    # Found by adversarial review of this guard: each of the four below was a
+    # real defect in the first draft, in one direction or the other.
+    p = _transcript(["grep --recursive 'preferences.md' ."])
+    check("the LONG recursion flag counts", guard.swept(p, "preferences.md"))
+    os.unlink(p)
+
+    p = _transcript(["grep -nr 'preferences.md' ."])
+    check("a clustered short flag counts either way round",
+          guard.swept(p, "preferences.md"))
+    os.unlink(p)
+
+    # `-report.md` is a filename, not a recursion flag.
+    p = _transcript(["grep -n 'preferences.md' -report.md"])
+    check("a dash-prefixed FILENAME is not a recursion flag",
+          not guard.swept(p, "preferences.md"))
+    os.unlink(p)
+
+    # A sweep for a LONGER name must not clear a move out of a shorter one
+    # whose basename is a suffix substring of it.
+    p = _transcript(["grep -rn 'data.md' --include='*.md' ."])
+    check("a sweep for data.md does not clear a move out of a.md",
+          not guard.swept(p, "a.md"))
+    os.unlink(p)
+
+    p = _transcript(["grep -rn 'memories/preferences.md' --include='*.md' ."])
+    check("a path-qualified sweep still names the file",
+          guard.swept(p, "preferences.md"))
+    os.unlink(p)
 
 
 # --------------------------------------------------------------------------
@@ -271,6 +310,14 @@ MUTATIONS = [
      "return True\n\n\ndef commands"),
     ("trivial lines counted", "return not TRIVIAL.match(body)", "return True"),
     ("fires on any command", "if not is_commit(command):", "if False:"),
+    ("prose gating removed", "if not src.lower().endswith(PROSE_SUFFIXES):",
+     "if False:"),
+    ("basename matched as a bare substring",
+     "return re.search(r\"(?:\\A|[^\\w.-])\" + re.escape(basename) + r\"(?:\\Z|[^\\w.-])\",\n"
+     "                     word + \" \") is not None",
+     "return True"),
+    ("recursion not required", "if not recursive:\n            continue",
+     "if False:\n            continue"),
 ]
 
 

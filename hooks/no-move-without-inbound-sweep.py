@@ -47,6 +47,20 @@ guard's job is to make the moment arrive.
 
 It also skips pure renames. A rename takes the whole file with it, so every
 inbound link breaks loudly and `check-links.py` already reports them.
+
+Three misses are accepted by construction, and are worth naming so nobody reads
+a silent commit as an all-clear:
+
+  - A move whose lines are REFLOWED in transit. Lines are compared whole, so a
+    rewrapped paragraph does not match itself. The guard under-reports rather
+    than inventing moves.
+  - A move SPLIT ACROSS TWO COMMITS -- deleted from the source in one, added to
+    the destination in another. Each commit's staged diff is all this guard
+    sees, and neither half is a move on its own.
+  - A commit issued through a nested shell (`sh -c "git commit ..."`) or
+    `xargs`. `is_commit` parses the statement it is given and does not descend
+    into a quoted command line, which is a lot of machinery for a shape that
+    is rare in practice.
 """
 
 from __future__ import annotations
@@ -58,12 +72,18 @@ import shlex
 import subprocess
 import sys
 
-# A move has to be substantial before it is worth a warning. Measured against
-# the two moves that prompted this guard: 496 lines (ai-config#3480) and 137
-# (#3499). A threshold this low also catches a moved paragraph, which has the
-# same failure mode at smaller scale, while staying clear of the incidental
-# overlap two files get from shared boilerplate -- a Do/Don't label, a blank
-# line, a fence marker. Those are excluded separately by TRIVIAL below.
+# A move has to be substantial before it is worth a warning. Calibrated by
+# running `moves()` against the two diffs that prompted this guard, rather than
+# from their diffstats -- the two disagree, and the figure that matters is this
+# function's own: 409 for ai-config#3480 and 134 for #3499, against diffstats of
+# 496 and 137. `moves()` counts DISTINCT significant lines present on both sides,
+# so it is always the smaller number, and quoting a diffstat here would describe
+# a population this threshold is not measured against.
+#
+# A threshold this low also catches a moved paragraph, which has the same
+# failure mode at smaller scale, while staying clear of the incidental overlap
+# two files get from shared boilerplate -- a Do/Don't label, a blank line, a
+# fence marker. Those are excluded separately by TRIVIAL below.
 MIN_MOVED_LINES = 12
 
 # Lines too common to count as evidence of a move. A file full of `- **Do:**`
@@ -78,6 +98,15 @@ TRIVIAL = re.compile(r"""
     )
 """, re.VERBOSE)
 
+# Detection is scoped to prose, because the whole rationale is prose citation:
+# a memory file or fragment is cited BY NAME from other prose, which is what
+# makes a stale citation invisible. Code has no equivalent -- a moved function
+# is referenced by import or by symbol, and a mover who breaks one gets an
+# ImportError rather than a link that still resolves. Firing on a `.py`-to-`.py`
+# refactor would hand the author a warning about "citing sites" and a
+# markdown-only remediation command, neither of which fits what moved.
+PROSE_SUFFIXES = (".md", ".markdown", ".qmd", ".rmd", ".txt", ".rst")
+
 # `git` options that sit BEFORE the subcommand. The ones listed here take a
 # separate value, so the value has to be skipped too or it reads as the
 # subcommand -- `git -C /repo commit` would otherwise look like `git /repo`.
@@ -86,17 +115,77 @@ GIT_OPTS_WITH_VALUE = {
     "--config-env",
 }
 
-# A repo-wide search naming the source file. `grep -r`, `git grep`, `rg` and
-# `ag` all qualify; a plain `grep pattern file` does not, since reading one
-# file is not an enumeration of who links to it.
-SWEEP_RE = re.compile(r"""
-    (?:
-        \bgrep\b (?=[^|;&]*\s-[A-Za-z]*[rR])
-      | \bgit\s+grep\b
-      | \brg\b
-      | \bag\b
-    )
-""", re.VERBOSE)
+# Programs that search a tree by default, so no recursion flag is needed.
+RECURSIVE_BY_DEFAULT = {"rg", "ag", "ack"}
+
+# `grep`'s recursion flags, long form and short. The short forms cluster, so
+# `-rn` and `-nr` both count, and a token that merely CONTAINS an r does not:
+# `-report.md` is a filename, not a flag cluster.
+GREP_RECURSIVE_LONG = {"--recursive", "--dereference-recursive"}
+
+
+def is_sweep(command: str, basename: str) -> bool:
+    """Is this command a repo-wide search naming `basename`?
+
+    Word-parsed rather than pattern-matched. A regex over the raw string gets
+    this wrong in both directions, measured: it misses `grep --recursive`
+    (the long flag has a second dash where the pattern wants letters) and it
+    accepts `grep -n x -report.md` (a dash-prefixed FILENAME read as a
+    recursion flag). Both were found by adversarial review of this guard.
+    """
+    for part in re.split(r"(?:&&|\|\||[;|\n])", command or ""):
+        try:
+            words = shlex.split(part, comments=False)
+        except ValueError:
+            words = part.split()
+        if not words:
+            continue
+
+        i = 0
+        if os.path.basename(words[0]) == "git" and len(words) > 1 and words[1] == "grep":
+            program, i = "git grep", 2
+        else:
+            program, i = os.path.basename(words[0]), 1
+
+        if program in RECURSIVE_BY_DEFAULT or program == "git grep":
+            recursive = True
+        elif program == "grep":
+            recursive = False
+            for w in words[i:]:
+                if w == "--":
+                    break
+                if w in GREP_RECURSIVE_LONG:
+                    recursive = True
+                    break
+                # A short-option cluster: one dash, then letters only. That
+                # excludes `--recursive` (handled above) and `-report.md`.
+                if (len(w) > 1 and w[0] == "-" and w[1] != "-"
+                        and w[1:].isalpha() and ("r" in w[1:] or "R" in w[1:])):
+                    recursive = True
+                    break
+        else:
+            continue
+
+        if not recursive:
+            continue
+        if any(names_file(w, basename) for w in words[i:]):
+            return True
+    return False
+
+
+def names_file(word: str, basename: str) -> bool:
+    """Does `word` name `basename`, as a whole filename rather than a suffix?
+
+    `"a.md" in "data.md"` is true as a substring and false as a claim about
+    which file is being searched for, so a sweep for `data.md` must not clear
+    a move out of `a.md`. Anchoring on a path separator or a non-name character
+    is what draws that line.
+    """
+    if basename not in word:
+        return False
+    return re.search(r"(?:\A|[^\w.-])" + re.escape(basename) + r"(?:\Z|[^\w.-])",
+                     word + " ") is not None
+
 
 NOTE = """\
 This `git commit` stages a CONTENT MOVE, and no inbound-link sweep for the \
@@ -188,6 +277,8 @@ def moves(diff: str):
     for src, gone in removed.items():
         if src in renamed:
             continue
+        if not src.lower().endswith(PROSE_SUFFIXES):
+            continue
         for dst, arrived in added.items():
             if dst == src:
                 continue
@@ -212,7 +303,7 @@ def swept(transcript: str, basename: str) -> bool:
                 except Exception:
                     continue
                 for cmd in commands(rec):
-                    if basename in cmd and SWEEP_RE.search(cmd):
+                    if is_sweep(cmd, basename):
                         return True
     except Exception:
         return True

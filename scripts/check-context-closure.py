@@ -162,12 +162,18 @@ DEFAULT_ROOT_CHAR_WARN_FRACTION = 0.90
 # decide what comes out; crossing this means one file grew past the largest
 # thing anyone had accepted, which is a decision someone should make on
 # purpose.
+DEFAULT_FRAGMENT_CAP_BYTES = 100_000
+
+# English prose runs roughly 3.5-4.5 bytes per token, so a token figure from
+# any single divisor is an estimate with about +/-15% in it. Byte counts are
+# exact, which is why the budget itself is denominated in bytes and tokens
+# are only ever shown alongside as a reader aid.
 DEFAULT_ROOT_GROWTH_GATE_FRACTION = 0.90
 """Fraction of the root cap above which the root file may not grow at all.
 
 A RATCHET, not a budget, and the distinction is the whole design. The
 advisory delta report (ai-config#1373, wired into validate.yml) has run on
-every PR since 2026-08-10 and did not slow the root file: measured
+every PR since 2026-08-15 (31ef46bd) and did not slow the root file: measured
 2026-09-10, CLAUDE.md went 84,979 -> 143,827 bytes in the 26 days after the
 trim that step was meant to make unnecessary. So reporting the number where
 a reviewer already looks was tried, at length, and is not sufficient.
@@ -184,16 +190,12 @@ the failure this prevents is observed rather than hypothetical.
 
 0.90 matches DEFAULT_ROOT_CHAR_WARN_FRACTION deliberately: the warning and
 the gate should fire at the same line, or the warning becomes the notice
-that a later, unrelated threshold exists. Raise it above 1.0 to disable the
-gate, which leaves the hard cap as the only root-file check.
+that a later, unrelated threshold exists. Pass --no-root-growth-gate to disable
+the gate, which leaves the hard cap as the only root-file check. A
+fraction above 1.0 does NOT disable it: a file already past the cap is
+past that line too.
 """
 
-DEFAULT_FRAGMENT_CAP_BYTES = 100_000
-
-# English prose runs roughly 3.5-4.5 bytes per token, so a token figure from
-# any single divisor is an estimate with about +/-15% in it. Byte counts are
-# exact, which is why the budget itself is denominated in bytes and tokens
-# are only ever shown alongside as a reader aid.
 DEFAULT_BYTES_PER_TOKEN = 4
 
 # Claude Code evaluates an import written as `@path` but NOT one inside a
@@ -765,17 +767,59 @@ def render_root_growth(before, after, root, cap, fraction):
             f"file is past {100 * fraction:.0f}% of the cap, and this branch "
             f"changed it by {delta:+,}."
         )
+    # Past the cap the subtraction goes negative, and "Only -2,000 characters
+    # remain" is worse than useless next to the hard-cap message the same run
+    # already prints. State the overshoot instead: it is the same number with
+    # the sign carrying meaning rather than contradicting the sentence.
+    headroom = (
+        f"  Only {cap - after:,} characters remain before the harness stops "
+        f"loading the file whole."
+        if after <= cap
+        else f"  The file is ALREADY {after - cap:,} characters over the cap, "
+        f"so the harness is not loading it whole."
+    )
     return True, (
         f"\n  ROOT FILE GREW INSIDE THE RATCHET: {root} is at {after:,} "
         f"characters, past {line:,.0f} ({100 * fraction:.0f}% of the {cap:,} "
         f"cap), and this branch adds {delta:+,} more.\n"
-        f"  Only {cap - after:,} characters remain before the harness stops "
-        f"loading the file whole. Near the cap the file may shrink or hold, "
+        f"{headroom} Near the cap the file may shrink or hold, "
         f"not grow.\n"
         f"  Move this section into an @-imported fragment or a linked "
         f"companion file (ai-config#1259), or trim an equivalent amount of "
         f"prose elsewhere in {root}."
     )
+
+
+def unit_fraction(value: str) -> float:
+    """An argparse type for a fraction in (0, 1].
+
+    `--root-char-cap` already goes through `positive_int`; this flag decides
+    a job's exit status and was going through bare `float`, which accepts
+    three values that all make a build gate unconditional while printing a
+    garbled reason for it. Measured before this guard existed: 0 rendered
+    "past 0 (0% of the cap)", a negative rendered "past -130 (-100%)", and
+    NaN rendered "past nan (nan%)" and gated because every comparison
+    against NaN is false.
+
+    That is `shared/principles/fail-fast.md` inverted -- bad input producing
+    maximum strictness rather than a visible error -- and the NaN case is
+    the one no reviewer would predict, so the type rejects at the boundary
+    rather than trusting the caller. Disabling the gate is a separate flag
+    (`--no-root-growth-gate`), because expressing "off" as an out-of-range
+    number is what made the old help text false.
+    """
+    try:
+        parsed = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{value!r} is not a number")
+    # `not (0 < parsed <= 1)` rather than two comparisons: NaN fails every
+    # ordered comparison, so only the negated form catches it.
+    if not (0 < parsed <= 1):
+        raise argparse.ArgumentTypeError(
+            f"must be a fraction in (0, 1], got {value!r}; "
+            "pass --no-root-growth-gate to turn the gate off"
+        )
+    return parsed
 
 
 def positive_int(value: str) -> int:
@@ -865,14 +909,22 @@ def main(argv=None) -> int:
     )
     parser.add_argument(
         "--root-growth-gate-fraction",
-        type=float,
+        type=unit_fraction,
         default=DEFAULT_ROOT_GROWTH_GATE_FRACTION,
         help=(
             "with --baseline, forbid ANY net growth of the root file once it "
             "reaches this fraction of --root-char-cap "
-            f"(default: {DEFAULT_ROOT_GROWTH_GATE_FRACTION}). Pass a value "
-            "above 1.0 to disable the ratchet."
+            f"(default: {DEFAULT_ROOT_GROWTH_GATE_FRACTION}). Must be in "
+            "(0, 1]; pass --no-root-growth-gate to turn the gate off."
         ),
+    )
+    parser.add_argument(
+        "--no-root-growth-gate",
+        action="store_true",
+        help="with --baseline, report the root file's growth but never fail "
+        "on it. For a caller whose baseline is not a merge base (a tip "
+        "fallback counts the base's own trims as this branch's growth), and "
+        "as the honest spelling of 'off' -- an out-of-range fraction is not.",
     )
     parser.add_argument(
         "--fragment-cap",
@@ -986,7 +1038,7 @@ def main(argv=None) -> int:
                 "working tree",
             )
         )
-        root_growth_over, root_growth_text = render_root_growth(
+        root_growth_reported, root_growth_text = render_root_growth(
             root_char_count_at(base, args.root, args.baseline),
             root_char_count(base, args.root),
             args.root,
@@ -994,6 +1046,9 @@ def main(argv=None) -> int:
             args.root_growth_gate_fraction,
         )
         print(root_growth_text)
+        if root_growth_reported and args.no_root_growth_gate:
+            print("  (reported only: --no-root-growth-gate is set)")
+        root_growth_over = root_growth_reported and not args.no_root_growth_gate
         growth = total - baseline_total
         if args.max_growth is not None and growth > args.max_growth:
             print(

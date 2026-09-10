@@ -1127,6 +1127,23 @@ check(
     # nothing until the cap is genuinely close.
     not _over and "inactive" in _text and "+40" in _text,
 )
+_over, _text = ccc.render_root_growth(100, 117, "CLAUDE.md", 130, 0.90)
+check(
+    "growth with the file exactly ON the line fails: the band is closed below",
+    # 130 * 0.90 == 117.0 exactly, so this is the single decision the whole
+    # design rests on, and the one a later `<` -> `<=` refactor would flip
+    # silently with a green suite. Neither case above lands on it: they sit
+    # at 120 and at 50 against the same 117.
+    _over and "ROOT FILE GREW" in _text,
+)
+_over, _text = ccc.render_root_growth(116, 116, "CLAUDE.md", 130, 0.90)
+check(
+    "holding steady just BELOW the line reads inactive, not satisfied",
+    # The other side of the same boundary, and the two words have to differ:
+    # "satisfied" asserts the ratchet looked and approved, "inactive" that it
+    # never applied. Conflating them would hide a mis-set fraction entirely.
+    not _over and "inactive" in _text,
+)
 _over, _text = ccc.render_root_growth(None, 120, "CLAUDE.md", 130, 0.90)
 check(
     "an unreadable side reports NOT checked rather than scoring it as growth",
@@ -1167,17 +1184,45 @@ with tempfile.TemporaryDirectory() as tmp:
         ccc.main(gate + ["--baseline", rev]) == 1,
     )
     check(
-        "it fails without --strict and without --max-growth",
-        # Both flags are opt-in, and requiring either would rebuild the
-        # advisory step this ratchet exists because of.
+        "it still fails under --strict, which it neither needs nor is weakened by",
+        # The check above covers the bare case. Both flags are opt-in and
+        # requiring either would rebuild the advisory step this ratchet exists
+        # because of, so the pair pins "independent of --strict" in both
+        # directions rather than naming one case and running the other.
         ccc.main(gate + ["--baseline", rev, "--strict"]) == 1,
     )
     check(
-        "a fraction above 1.0 disables the ratchet",
-        ccc.main(
-            gate + ["--baseline", rev, "--root-growth-gate-fraction", "1.5"]
-        ) == 0,
+        "--no-root-growth-gate reports the growth without failing on it",
+        ccc.main(gate + ["--baseline", rev, "--no-root-growth-gate"]) == 0,
     )
+    for _bad in ("0", "-1", "nan", "1.5", "abc"):
+        # Each previously passed argparse and made the gate UNCONDITIONAL
+        # while printing a garbled threshold -- fail-fast inverted, bad input
+        # producing maximum strictness rather than a visible error. NaN is
+        # the one nobody predicts: every ordered comparison against it is
+        # false, so `after < line` could not be true and the failure branch
+        # always ran. 1.5 is here because the help text used to call an
+        # out-of-range fraction the way to disable the gate, which it never
+        # reliably was -- a file past the cap is past 1.5 * cap too.
+        #
+        # Through main() rather than calling unit_fraction() directly, per the
+        # --bytes-per-token block above: a direct call stays green against a
+        # `type=float` regression. argparse exits rather than returning, so
+        # SystemExit(2) is the pass condition.
+        try:
+            ccc.main(
+                gate + ["--baseline", rev, "--root-growth-gate-fraction", _bad]
+            )
+            _rejected = False
+        except SystemExit as _exc:
+            _rejected = _exc.code == 2
+        except Exception:
+            # A crash downstream is not "rejected at parse time".
+            _rejected = False
+        check(
+            f"--root-growth-gate-fraction {_bad} is rejected by the parser",
+            _rejected,
+        )
     check(
         "a roomier cap makes the same growth inactive",
         # The negative control for the band itself: identical growth, cap
@@ -1192,12 +1237,33 @@ with tempfile.TemporaryDirectory() as tmp:
         "a trim inside the band passes",
         ccc.main(gate + ["--baseline", rev]) == 0,
     )
-    # ... and a fragment growing while the root file holds must still pass,
-    # since moving prose OUT of the root into an @-imported fragment is the
-    # remedy the failure message prescribes.
-    (base / "frag.md").write_text("f" * 500, encoding="utf-8")
+    # The remedy the failure message prescribes: move prose OUT of the root
+    # and into an @-imported fragment. That must pass, or the gate blocks its
+    # own remedy -- and it is the case the ratchet's whole shape depends on,
+    # since the closure TOTAL does not shrink when bytes merely relocate.
+    #
+    # Constructed rather than inherited. The previous version of this check
+    # reused the already-trimmed root above and changed only frag.md, an
+    # input the ratchet never reads, so its argv was byte-identical to the
+    # check before it and it re-asserted that outcome instead of this one.
+    (base / "CLAUDE.md").write_text(
+        "@frag.md" + chr(10) + ("x" * 99), encoding="utf-8"
+    )
+    (base / "frag.md").write_text("f" * 11, encoding="utf-8")
+    _moved_files, _, _, _ = ccc.walk_closure("CLAUDE.md", ccc.local_reader(base))
+    _moved_total = sum(n for _, n, _ in _moved_files)
+    _at_rev, _, _, _ = ccc.walk_closure(
+        "CLAUDE.md", ccc.baseline_reader(base, rev)
+    )
+    _rev_total = sum(n for _, n, _ in _at_rev)
     check(
-        "moving prose into a fragment passes, since the root file shrank",
+        "the migration really does relocate bytes rather than delete them",
+        # Without this the check below could pass merely because everything
+        # got smaller, which is the trim case one check above, not this one.
+        _moved_total >= _rev_total,
+    )
+    check(
+        "moving prose from the root into a fragment passes the ratchet",
         ccc.main(gate + ["--baseline", rev]) == 0,
     )
 

@@ -418,6 +418,26 @@ jobs:
         # 1 is a finding this PR owns, 2 is a rev this runner could not resolve
         # (a shallow clone, a force-push) and must not redden an unrelated PR.
         #
+        # `|| STATUS=$?` rather than a bare call followed by `STATUS=$?`. This
+        # step declares no `shell:` and the workflow no `defaults:`, so GitHub
+        # runs the body as `bash -e {0}` -- and `set -uo pipefail` adds to that
+        # rather than clearing errexit. A bare non-zero call therefore kills
+        # the script before the assignment, making the whole discrimination
+        # below dead code and failing the job on exactly the exit 2 the
+        # paragraph above says must not fail it. Putting the call in an `||`
+        # list also suspends errexit for it, which is the point.
+        #
+        # The ratchet is DISABLED unless the baseline is a real merge base.
+        # The tip fallback counts whatever the base gained since this branch
+        # diverged, which the comment above already concedes "reads as a
+        # shrink" -- tolerable for an advisory number, not for a gate, since a
+        # trim that merged to main after the branch diverged would be charged
+        # to this branch as growth. Near the cap main's root file can only
+        # shrink or hold, so that skew runs consistently in the failing
+        # direction. With a depth-50 fetch against a base taking tens of
+        # first-parent commits a day, the fallback is the ordinary case rather
+        # than the exception, so this is not a corner.
+        #
         # The base has to be fetched explicitly. `actions/checkout` above sets
         # no `fetch-depth`, so it clones at depth 1 and `origin/<base>` does
         # not resolve at all -- the step would print "cannot resolve" on every
@@ -434,17 +454,21 @@ jobs:
           set -uo pipefail
           BASE="${{ github.base_ref || github.event.repository.default_branch }}"
           git fetch --quiet --depth=50 origin "$BASE" || true
+          GATE=""
           if REV="$(git merge-base HEAD FETCH_HEAD 2>/dev/null)"; then
             echo "baseline: merge base with origin/$BASE ($REV)"
           elif git rev-parse --verify --quiet FETCH_HEAD >/dev/null; then
             REV=FETCH_HEAD
-            echo "baseline: tip of origin/$BASE (no merge base within 50 commits)"
+            GATE="--no-root-growth-gate"
+            echo "baseline: tip of origin/$BASE (no merge base within 50 commits);" \
+              "reporting the root-file ratchet without gating on it"
           else
             echo "baseline: origin/$BASE unreachable; skipping the delta report"
             exit 0
           fi
-          python3 scripts/check-context-closure.py --baseline "$REV"
-          STATUS=$?
+          STATUS=0
+          python3 scripts/check-context-closure.py --baseline "$REV" $GATE \
+            || STATUS=$?
           if [ "$STATUS" -eq 2 ]; then
             echo "::warning::context-closure baseline could not be measured" \
               "(exit 2); the growth ratchet did not run on this PR."

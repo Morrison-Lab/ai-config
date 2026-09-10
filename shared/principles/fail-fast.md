@@ -28,7 +28,8 @@ Worked-example case records for the rules below live in
   the one you know about.
 - Do not use `2>/dev/null` on a command whose output is then consumed.
   This shape is a member of the silent fallback family.
-  Silencing the one channel carrying the failure turns a diagnosable error into an empty result.
+  Silencing the one channel carrying the failure;
+  turns a diagnosable error into an empty result.
   An empty result is indistinguishable from a legitimately empty one.
 - When a fallback is genuinely wanted --- graceful degradation at a
   system boundary, a retry for a known-transient failure --- make it

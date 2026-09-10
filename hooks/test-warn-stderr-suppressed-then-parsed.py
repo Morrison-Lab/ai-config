@@ -39,6 +39,24 @@ check("captured by backticks fires", fires("var=`cmd 2>/dev/null`"), True)
 check("captured by backticks names reason", reported("var=`cmd 2>/dev/null`")[1], "captured by a command substitution")
 check("redirected with append fires", fires("cmd 2>/dev/null >> out.json"), True)
 
+
+# Group Positives
+for label, cmd in [
+    ("subshell redirected", "(cmd 2>/dev/null) > out.json"),
+    ("subshell piped", "(cmd 2>/dev/null) | jq ."),
+    ("brace group redirected", "{ cmd 2>/dev/null; } > out.json"),
+    ("loop redirected", "for f in a b; do cmd 2>/dev/null; done > out.json"),
+]:
+    check(f"{label} fires", fires(cmd), True)
+
+for label, cmd in [
+    ("group output discarded", "(cmd 2>/dev/null) >/dev/null"),
+    ("group output merged", "(cmd 2>/dev/null) >/dev/null 2>&1"),
+]:
+    check(f"{label} is ignored", fires(cmd), False)
+
+check("nested substitution reported filename", reported('cmd 2>/dev/null > "$(mktemp)"')[1], 'redirected to `"$(mktemp)"`')
+
 # The measured incident from ai-config#2998
 INCIDENT = 'glab api "projects/.../pipelines/$p/jobs" > "$SP/j.json" 2>/dev/null'
 check("the measured incident fires", fires(INCIDENT), True)
@@ -66,7 +84,9 @@ def run_hook(command, tool_name="Bash"):
         "tool_name": tool_name,
         "tool_input": {"command": command},
     })
-    return subprocess.run([sys.executable, HOOK], input=payload,
+    env = dict(os.environ)
+    env.pop("ANTIGRAVITY_AGENT", None)
+    return subprocess.run([sys.executable, HOOK], input=payload, env=env,
                           capture_output=True, text=True, timeout=10)
 
 

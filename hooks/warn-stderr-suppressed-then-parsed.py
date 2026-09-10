@@ -271,16 +271,86 @@ def _regions(masked, spans):
 # pipe is what makes the stage before it a consumed one, so it has to stay
 # inside the segment and is split out separately. The `&` alternative excludes
 # `2>&1` and `>&-` by lookbehind and `&&` by lookahead.
-RX_SEGMENT = re.compile(r"&&|\|\||;|\n|(?<![>&])&(?!&)|[(){}]")
+RX_SEGMENT = re.compile(r"&&|\|\||;|\n|(?<![>&])&(?!&)")
 RX_PIPE = re.compile(r"(?<!\|)\|(?!\|)")
 
 
+
+def _depth_delta(token, is_kw):
+    if not is_kw: return 0, 0
+    if token in ("(", "{", "if", "while", "for", "until", "case"): return 0, 1
+    if token in (")", "}", "fi", "done", "esac"): return -1, -1
+    return 0, 0
+
+def _get_depths(text):
+    rx = re.compile(r"&&|\|\||;;|<<|>>|<|>|[;|&()\n]|\w+|[^\s\w;|&()<>\n]+")
+    depth = 0
+    in_cmd = True
+    depths = [0] * len(text)
+    
+    for match in rx.finditer(text):
+        token = match.group()
+        is_kw = in_cmd or token in ("(", ")")
+        
+        pre, post = _depth_delta(token, is_kw)
+        token_depth = max(0, depth + pre)
+        depth = max(0, depth + post)
+        
+        for i in range(match.start(), match.end()):
+            depths[i] = token_depth
+            
+        if is_kw and token in ("do", "then", "else", "elif", "!", "time", "(", ")", "{", "}", "if", "while", "for", "until", "case", "fi", "done", "esac"):
+            in_cmd = True
+        elif token in (";", "&", "|", "&&", "||", "\n"):
+            in_cmd = True
+        else:
+            in_cmd = False
+    return depths
+
+def _handle_quoted_char(char, quote, index, text):
+    if char == quote: return None, index + 1
+    if char == "\\" and index + 1 < len(text): return quote, index + 2
+    return quote, index + 1
+
+def _extract_token(text, start):
+    index = start
+    quote = None
+    paren_depth = 0
+    while index < len(text):
+        char = text[index]
+        if quote:
+            quote, index = _handle_quoted_char(char, quote, index, text)
+            continue
+        if char in "\"'`":
+            quote = char
+            index += 1
+            continue
+        if char == "$" and index + 1 < len(text) and text[index+1] == "(":
+            paren_depth += 1
+            index += 2
+            continue
+        if char == "(":
+            paren_depth += 1
+            index += 1
+            continue
+        if char == ")":
+            if paren_depth == 0: break
+            paren_depth -= 1
+            index += 1
+            continue
+        if paren_depth == 0 and char in " \t\n;&|<>": break
+        if char == "\\": index += 1
+        index += 1
+    return text[start:index]
+
 def _split(text, separator):
     """[(offset, piece), ...] -- `text` split on `separator`, offsets kept."""
+    depths = _get_depths(text)
     out, pos = [], 0
     for match in separator.finditer(text):
-        out.append((pos, text[pos:match.start()]))
-        pos = match.end()
+        if depths[match.start()] == 0:
+            out.append((pos, text[pos:match.start()]))
+            pos = match.end()
     out.append((pos, text[pos:]))
     return out
 
@@ -302,9 +372,11 @@ def _consumption(stage, is_last, captured, original_stage):
         return None
     to_file = RX_STDOUT_FILE.search(stage)
     if to_file is not None:
-        orig_match = RX_STDOUT_FILE.search(original_stage[to_file.start():])
-        if orig_match:
-            return "redirected to `{}`".format(orig_match.group(1))
+        match = re.match(r"(?:1?>>?)\s*", original_stage[to_file.start():])
+        if match:
+            target = _extract_token(original_stage, to_file.start() + match.end())
+            if target:
+                return "redirected to `{}`".format(target)
         return "redirected to `{}`".format(to_file.group(1))
     if not is_last:
         return "piped into the next command"

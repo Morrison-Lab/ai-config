@@ -81,7 +81,15 @@ In every session --- at session start, and again periodically during long sessio
    ```bash
    python3 <ai-config-checkout>/scripts/install-hooks.py          # report
    python3 <ai-config-checkout>/scripts/install-hooks.py --fix     # register the missing ones
+   python3 <ai-config-checkout>/scripts/install-hooks.py --check   # do the registered paths resolve?
    ```
+   **Run `--check` too, because the report above and `--check` answer different questions and only the second one can see the outage.**
+   The report is keyed on `hooks/hooks.json`, so it speaks only about hooks this repo ships, at the path this script would itself write.
+   `--check` reads the settings files instead and asks, of every binding they carry, whether the path inside the command resolves.
+   That matters because an unresolvable path is not an inert guard: `python3` exits 2 on a file it cannot open, and exit 2 is the `PreToolUse` deny signal, so one stale absolute path denies every tool call its matcher names --- and from inside the session that is indistinguishable from the guard legitimately firing.
+   A path this process cannot expand (`${CLAUDE_PLUGIN_ROOT}` is set by the plugin loader, not by the shell) is reported as `skipped` rather than `missing`, since not checkable here is a different finding from not present.
+   `--check` exits 1 when any registered path is missing, and also when there is no settings file at all --- the zero case arms nothing, so reporting it as clean would be the pass-path-equals-failure-path shape.
+   See [ai-config#2392](https://github.com/Morrison-Lab/ai-config/issues/2392) for the two measured occurrences, the second of which lost `Bash` and `Write`/`Edit` together and so had no self-repair path left.
    Four caveats before running `--fix`.
    Check `enabledPlugins` in `settings.json` first: if the ai-config **plugin** is enabled it already loads every hook in `hooks/hooks.json`, and `--fix` then registers each one a second time under a different command string, so every hook fires twice --- the two paths are mutually exclusive, per README.
    And hooks connect at **session start**, so a mid-session `--fix` arms nothing until a restart.
@@ -100,10 +108,10 @@ In every session --- at session start, and again periodically during long sessio
    (Measured 2026-09-01: the cache hook at rev `a3e0fdb` predated [ai-config#2820](https://github.com/Morrison-Lab/ai-config/pull/2820)'s fallback while the marketplace clone had pulled past it;
    tracked as [ai-config#2899](https://github.com/Morrison-Lab/ai-config/issues/2899);
    see [`mistake-patterns.md`](../../memories/mistake-patterns.md) Pattern 43 for the full deadlock.)
-   `install-hooks.py --fix` covers the non-plugin path only, and its own docstring is explicit about what it does not do: it never places a file, and it does not check that the script it is registering exists.
+   `install-hooks.py --fix` covers the non-plugin path only, and its own docstring is explicit about what it does not do: it never places a file.
    `bootstrap.sh` no longer places `hooks/` under `~/.claude` (see its header comment), so this path currently only helps on a machine whose `~/.claude/hooks` already holds the scripts some other way.
    Registering a hook whose file is absent is worse than leaving it unregistered: an unregistered guard is inert, while a registered-but-absent `PreToolUse` `Bash` hook makes `python3` exit 2 on **every** Bash call and takes the shell down.
-   `--fix` prints a note naming this only when run *without* `--fix`, so the run that causes the damage is the one that stays silent about it.
+   `--fix` therefore refuses to register a hook whose script is not on disk, prints `REFUSED` naming it, and keeps the exit code non-zero (ai-config#2392) --- so the machine that lacks the scripts ends a `--fix` run with nothing registered rather than with a session-wide deny.
    **Point 1 governs this instrument too, and its stale run is dangerous.**
    A stale `install-hooks.py` run reads an old `hooks/hooks.json`, finds every hook it knows about already bound, and prints `All hooks registered.` --- a positive all-clear over hooks it cannot see.
    Pull first, then measure, and treat the examined count as the thing to read: it is the manifest's size, so a number below the current hook count means the checkout is behind rather than the machine being clean.

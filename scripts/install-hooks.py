@@ -36,13 +36,36 @@ settings file produces.
 
 Exit code is 0 when everything is registered, 1 otherwise, so it can gate CI.
 `--fix` merges the missing entries in, backing the file up first, and never
-touches a hook it did not add.
+touches a hook it did not add. It refuses to register a hook whose script is
+not on disk, because that registration is itself the outage described below.
+
+## `--check`
+
+The statuses above are all keyed on `hooks/hooks.json`, so they can only speak
+about hooks this repo ships, at the path this script would itself write. That
+is the narrower of the two questions. `--check` asks the wider one: for every
+hook the settings files actually register, does the path in its command
+resolve?
+
+It matters because an unresolvable path is not an inert guard. `python3` exits
+2 on a file it cannot open, and exit 2 is the `PreToolUse` deny signal, so one
+stale absolute path denies every tool call its matcher names -- and from inside
+the session that is indistinguishable from the guard legitimately firing. See
+[#2392](https://github.com/Morrison-Lab/ai-config/issues/2392) for the two
+measured occurrences, the second of which lost `Bash` and `Write`/`Edit`
+together and so had no self-repair path left.
+
+`--check` exits 1 when any registered path is missing. A command whose path
+interpolates a variable this process cannot expand (`${CLAUDE_PLUGIN_ROOT}` is
+set by the plugin loader, not by the shell) is reported as skipped rather than
+missing: not checkable here is not the same finding as not present.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import shlex
 import shutil
 import sys
 import time
@@ -50,6 +73,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from plugin_overlap import enabled_ai_config_plugins  # noqa: E402
+from hook_paths import check_settings  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 MANIFEST = REPO / "hooks" / "hooks.json"
@@ -186,11 +210,71 @@ def add_entry(settings: dict, entry: dict) -> None:
     groups.append(new)
 
 
+def settings_files(cdir: Path) -> list[Path]:
+    """The settings files the harness merges, in the order it reads them."""
+    return [p for p in (cdir / "settings.json", cdir / "settings.local.json")
+            if p.is_file()]
+
+
+def check_registered_paths() -> int:
+    """Report every registered hook whose script path does not resolve.
+
+    Reads the settings files rather than the manifest, so it also sees hooks
+    this repo does not ship -- which is the point: the outage is caused by the
+    binding, whoever wrote it.
+    """
+    cdir = claude_dir()
+    files = settings_files(cdir)
+    if not files:
+        print(f"FATAL: no settings.json or settings.local.json under {cdir}, "
+              "so nothing is registered and every guard in this corpus is "
+              "inert. This is the zero case, not a clean one.")
+        return 1
+
+    rows = []
+    for path in files:
+        for row in check_settings(load_settings(path)):
+            row["settings"] = path
+            rows.append(row)
+
+    for row in rows:
+        if row["status"] != "missing":
+            continue
+        where = f"{row['event']}/{row['matcher']}" if row["matcher"] else row["event"]
+        print(f"  MISSING  {row['path']}")
+        print(f"           registered on {where} in {row['settings']}")
+
+    counts = {s: sum(1 for r in rows if r["status"] == s)
+              for s in ("ok", "missing", "skipped")}
+    print()
+    print(f"examined {len(rows)} registered hook command(s) in "
+          + ", ".join(str(p) for p in files))
+    print(f"  ok={counts['ok']} missing={counts['missing']} "
+          f"skipped={counts['skipped']}")
+    if not counts["missing"]:
+        print()
+        print("Every registered hook path resolves.")
+        return 0
+    print()
+    print("A registered path that does not resolve is not an inert guard:")
+    print("python3 exits 2 on a file it cannot open, and exit 2 is the")
+    print("PreToolUse deny signal, so each line above denies every tool call")
+    print("its matcher names. Fix the install or drop the binding; see")
+    print("ai-config#2392.")
+    return 1
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--fix", action="store_true",
                     help="register the missing hooks (backs settings.json up first)")
+    ap.add_argument("--check", action="store_true",
+                    help="verify every registered hook path resolves, and exit "
+                         "non-zero naming the ones that do not")
     args = ap.parse_args()
+
+    if args.check:
+        return check_registered_paths()
 
     entries = load_manifest()
     cdir = claude_dir()
@@ -240,6 +324,15 @@ def main() -> int:
     added = 0
     for entry, status in rows:
         if status == "missing":
+            script = hooks_dir / entry["script"]
+            if not script.exists():
+                print(f"  REFUSED {entry['script']} -- no script at {script}.")
+                print("          Registering it would deny every tool call its "
+                      "matcher names,")
+                print("          since python3 exits 2 on a missing file and "
+                      "exit 2 is the")
+                print("          PreToolUse deny signal (#2392).")
+                continue
             add_entry(settings, entry)
             added += 1
             print(f"  registered {entry['script']} on {entry['event']}")

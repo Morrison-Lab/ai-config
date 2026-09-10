@@ -96,6 +96,11 @@ jobs:
         run: python3 scripts/test_check_python_escapes.py
       - name: Run git command regex helper tests
         run: python3 scripts/test_git_cmd.py
+      - name: Run hook path resolution tests
+        # ai-config#2392: a registered hook whose script path does not resolve
+        # denies every tool call its matcher names, since python3 exits 2 and
+        # exit 2 is the PreToolUse deny signal.
+        run: python3 scripts/test_install_hooks.py
       - name: Run orchestrator tests
         # ai-config#2627: this suite existed and ran nowhere, so the
         # orchestrator's own behaviour was unpinned -- which is how a literal

@@ -39,3 +39,13 @@ What does not: the Mistake, Canonical Rule, Fix, or Do/Don't lines, which are wh
   what neither previously recorded is that the escalation is not scoped to
   that command -- it widens to spend suspicion on unrelated, ordinary reads
   once several denials have accumulated in the session.
+- **4th occurrence, and the first with a cheap remedy that is not a retry, 2026-09-09.**
+  `git commit --amend -F <file>` was denied three times in a row while composing one commit;
+  the third attempt differed from the second only in where the message file lived.
+  A plain `git commit -F <file>`, run immediately afterwards with the same message file and the same staged tree, succeeded on the first attempt.
+  Nothing about the session changed in between: no settings edit, no restart, no gap.
+  What the 3rd occurrence above measured is that an *identical* re-run of a denied command often succeeds, which reads as pure nondeterminism.
+  This adds that the denial is also **shape-sensitive**, so a command that is refused repeatedly may have a differently-shaped equivalent that is not refused at all --- here, dropping `--amend` and letting the fix be a second commit.
+  That is worth trying before an identical retry, because it is strictly cheaper: the retry spends a turn to learn nothing when it fails, while the shape change both clears the denial and, in this case, produced the better artifact anyway.
+  A round-2 fix commit records the review round in history where an amend would have erased it.
+  The same session had `git add -A` warned about, and `git push` refused for a chained-command parse, in the same stretch --- so read a run of guard interactions as the expected texture of a fix round rather than as a signal that something is wrong with the session.

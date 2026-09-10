@@ -120,5 +120,35 @@ with tempfile.TemporaryDirectory() as tmp:
     check("--check says the zero case is not a clean one",
           "zero case" in result.stdout)
 
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp) / "claude"
+    present = home / "guard.py"
+    home.mkdir(parents=True)
+    present.write_text("import sys" + NL + "sys.exit(0)" + NL)
+    
+    # Backslash Windows path
+    windows_path = str(present).replace('/', '\\')
+    write_settings(home, settings_with(f'python3 "{windows_path}"'))
+    result = run_check(home)
+    check("a backslash Windows path that exists is reported ok",
+          result.returncode == 0 and "Every registered hook path resolves" in result.stdout)
+          
+    # Forward-slash Windows path (str(Path) might use backslashes on Windows, so force forward slash)
+    forward_path = str(present).replace('\\', '/')
+    write_settings(home, settings_with(f'python3 "{forward_path}"'))
+    result = run_check(home)
+    check("a forward-slash Windows path that exists is reported ok",
+          result.returncode == 0 and "Every registered hook path resolves" in result.stdout)
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp) / "claude"
+    write_settings(home, settings_with('echo hello'))
+    result = run_check(home)
+    check("--check prints a skipped row with its reason",
+          "SKIPPED" in result.stdout and "no script token found" in result.stdout)
+    check("--check exits 0 for skipped alone",
+          result.returncode == 0)
+
 print(NL + f"{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

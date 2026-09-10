@@ -238,11 +238,16 @@ def check_registered_paths() -> int:
             rows.append(row)
 
     for row in rows:
-        if row["status"] != "missing":
+        if row["status"] not in ("missing", "skipped"):
             continue
         where = f"{row['event']}/{row['matcher']}" if row["matcher"] else row["event"]
-        print(f"  MISSING  {row['path']}")
-        print(f"           registered on {where} in {row['settings']}")
+        if row["status"] == "missing":
+            print(f"  MISSING  {row['path']}")
+            print(f"           registered on {where} in {row['settings']}")
+        elif row["status"] == "skipped":
+            reason = "unexpandable variable" if row["path"] else "no script token found"
+            print(f"  SKIPPED  {row['command']}")
+            print(f"           registered on {where} in {row['settings']} ({reason})")
 
     counts = {s: sum(1 for r in rows if r["status"] == s)
               for s in ("ok", "missing", "skipped")}

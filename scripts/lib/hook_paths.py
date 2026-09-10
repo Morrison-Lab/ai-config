@@ -68,8 +68,7 @@ def classify_command(command: str) -> tuple[str, str | None]:
     return ("ok" if Path(path).expanduser().is_file() else "missing"), path
 
 
-def registered_hooks(settings: dict) -> Iterator[tuple[str, str, str]]:
-    """Yield (event, matcher, command) for every hook a settings dict binds."""
+def _iter_hooks(settings: dict) -> Iterator[tuple[str, str, dict]]:
     hooks = settings.get("hooks")
     if not isinstance(hooks, dict):
         return
@@ -81,9 +80,15 @@ def registered_hooks(settings: dict) -> Iterator[tuple[str, str, str]]:
                 continue
             matcher = group.get("matcher") or ""
             for hook in group.get("hooks", []):
-                command = hook.get("command")
-                if command:
-                    yield event, matcher, command
+                if isinstance(hook, dict):
+                    yield event, matcher, hook
+
+def registered_hooks(settings: dict) -> Iterator[tuple[str, str, str]]:
+    """Yield (event, matcher, command) for every hook a settings dict binds."""
+    for event, matcher, hook in _iter_hooks(settings):
+        command = hook.get("command")
+        if command:
+            yield event, matcher, command
 
 
 def check_settings(settings: dict) -> list[dict]:

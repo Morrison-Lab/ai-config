@@ -2117,6 +2117,7 @@ def main() -> int:
         checker.classify_verdict(
             "### Verdict\nNeeds more work: non-blocking issue, please rename variable x.\n",
             "",
+            "copilot"
         )
         == "not-clean",
     )
@@ -5812,7 +5813,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
 
     check(
         "classify_verdict: Copilot affirmative review classifies clean",
-        checker.classify_verdict(copilot_clean_body, "COMMENTED") == "clean",
+        checker.classify_verdict(copilot_clean_body, "COMMENTED", "copilot") == "clean",
     )
     for _label, _body in (
         ("changes recommended", copilot_changes_body),
@@ -5822,7 +5823,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     ):
         check(
             f"classify_verdict: Copilot {_label} review classifies not-clean",
-            checker.classify_verdict(_body, "COMMENTED") == "not-clean",
+            checker.classify_verdict(_body, "COMMENTED", "copilot") == "not-clean",
         )
     check(
         "classify_verdict: a finding stated in a Copilot body's prose beats "
@@ -5834,10 +5835,27 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
                 "documentation-only",
             ),
             "COMMENTED",
+            "copilot"
         )
         == "not-clean",
     )
 
+    check(
+        "classify_verdict: a non-Copilot body with that heading and an explicit clean verdict stays clean",
+        checker.classify_verdict("### \U0001f7e2 Approval recommended\n\n### Verdict\n\n**Ready for merge**", "COMMENTED", "someone-else") == "clean",
+    )
+    check(
+        "copilot_verdict: fenced example of Copilot heading is ignored",
+        checker.copilot_verdict('```\n### \U0001f7e1 Changes recommended\n```\n### \U0001f7e2 Approval recommended\n\n- **Comments generated:** 0') == "clean",
+    )
+    check(
+        "copilot_verdict: negated heading is not affirmative",
+        checker.copilot_verdict("### Not Approval recommended\n\n- **Comments generated:** 0") == "",
+    )
+    check(
+        "copilot_verdict: quoted heading is not affirmative",
+        checker.copilot_verdict("## \"Approval recommended\"? No.\n\n- **Comments generated:** 0") == "",
+    )
     check(
         "_is_bot_author admits Copilot's bare login as well as the [bot] form",
         checker._is_bot_author("copilot-pull-request-reviewer")

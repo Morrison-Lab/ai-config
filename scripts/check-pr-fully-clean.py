@@ -2074,7 +2074,7 @@ def _is_marked_or_in_verdict_section(scan: str, match_start: int) -> bool:
 # characters, not a character class, because the decorating emoji varies with
 # the verdict and a class enumerating today's three would silently stop
 # matching a fourth.
-_COPILOT_HEADING_PREFIX = r"(?:^|\n)[ \t]*#{1,6}[^\n]{0,12}?"
+_COPILOT_HEADING_PREFIX = r"(?:^|\n)[ \t]*#{1,6}[ \t]*(?:[^\w\n\"\']+[ \t]*)?"
 COPILOT_AFFIRMATIVE_HEADER = re.compile(
     _COPILOT_HEADING_PREFIX + r"\bApproval\s+recommended\b", re.IGNORECASE
 )
@@ -2096,7 +2096,7 @@ COPILOT_COMMENT_COUNT = re.compile(
 )
 
 
-def copilot_verdict(body: str) -> str:
+def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str:
     """Classify a Copilot formal review body as 'not-clean', 'clean', or ''.
 
     Returns ``clean`` only when all three of the issue's conditions hold at
@@ -2112,16 +2112,25 @@ def copilot_verdict(body: str) -> str:
     """
     if not body:
         return ""
+    if scan is None or cited is None:
+        scan, cited = strip_cited_finding_vocab_with_mask(body)
+        
+    def _has_valid_match(pattern, text):
+        for m in pattern.finditer(text):
+            if not match_is_cited(cited, m.start(), m.end()):
+                return m
+        return None
+
     # Checked first: a negative heading is a verdict on its own, and reading it
     # before the affirmative test means a body carrying both spellings (a
     # re-review quoting its own earlier round) cannot resolve to clean.
-    if COPILOT_NEGATIVE_HEADER.search(body):
+    if _has_valid_match(COPILOT_NEGATIVE_HEADER, scan):
         return "not-clean"
-    if not COPILOT_AFFIRMATIVE_HEADER.search(body):
+    if not _has_valid_match(COPILOT_AFFIRMATIVE_HEADER, scan):
         return ""
-    if COPILOT_SUPPRESSED_BLOCK.search(body):
+    if _has_valid_match(COPILOT_SUPPRESSED_BLOCK, scan):
         return "not-clean"
-    count = COPILOT_COMMENT_COUNT.search(body)
+    count = _has_valid_match(COPILOT_COMMENT_COUNT, scan)
     if count is None:
         return ""
     if int(count.group(1)) != 0:
@@ -2129,7 +2138,7 @@ def copilot_verdict(body: str) -> str:
     return "clean"
 
 
-def classify_verdict(body: str, state: str = "") -> str:
+def classify_verdict(body: str, state: str = "", author: str = "") -> str:
     """Classify one automated review item as 'not-clean', 'clean', or '' (none).
 
     Returns '' when the item states no verdict at all. That case is the whole
@@ -2195,17 +2204,18 @@ def classify_verdict(body: str, state: str = "") -> str:
     if payload_is_blocking(structured):
         return "not-clean"
 
+    scan, cited = strip_cited_finding_vocab_with_mask(body)
+
     # Copilot's heading verdict, read in two halves around the prose scans
     # below rather than in one place. The blocking half returns immediately,
     # because a Copilot not-clean must not be reachable past any later guard.
     # The clean half waits until the not-clean scan has had its chance, so a
     # finding stated in the body's prose still wins over an affirmative
     # heading, exactly as fully-clean.md's "findings win" rule requires.
-    copilot = copilot_verdict(body)
+    is_copilot = _reviewer_identity(body, author) == "Copilot"
+    copilot = copilot_verdict(body, scan, cited) if is_copilot else ""
     if copilot == "not-clean":
         return "not-clean"
-
-    scan, cited = strip_cited_finding_vocab_with_mask(body)
 
     for pat in VERDICT_NOT_CLEAN_PATTERNS:
         for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
@@ -2588,7 +2598,7 @@ def check_latest_verdict(
     for item in dated:
         _kind, when, body, _oid, state = item[:5]
         author = item[5] if len(item) > 5 else ""
-        verdict = classify_verdict(body, state)
+        verdict = classify_verdict(body, state, author)
         identity = _reviewer_identity(body, author)
         finding_pat = _unresolved_finding_pattern(body)
         if (verdict == "not-clean" or finding_pat) and \
@@ -2853,7 +2863,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         is_bot_author = _is_bot_author(author_login) or (
             author_assoc in ("OWNER", "MEMBER") and _reviewer_identity(body, author_login) not in (author_login, "unknown")
         )
-        verdict = classify_verdict(body)
+        verdict = classify_verdict(body, "", author_login)
 
         # Automated reviews must be authored by a recognized bot author or contain a known review agent marker.
         # A comment that is neither from a bot account nor carrying a review agent marker is admitted
@@ -2999,7 +3009,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
     dated_matching = sorted(matching_items, key=lambda it: it[1] or "")
     latest_by_provider = {}
     for item in dated_matching:
-        if classify_verdict(item[2], item[4]) in ("clean", "not-clean") or _unresolved_finding_pattern(item[2]):
+        if classify_verdict(item[2], item[4], item[5] if len(item) > 5 else "") in ("clean", "not-clean") or _unresolved_finding_pattern(item[2]):
             provider = _reviewer_identity(item[2], item[5] if len(item) > 5 else "")
             latest_by_provider[provider] = item
     matching_items = list(latest_by_provider.values())
@@ -3008,6 +3018,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
     for item in matching_items:
         body = item[2]
         state = item[4]
+        author = item[5] if len(item) > 5 else ""
         if state in ("CHANGES_REQUESTED", "REJECTED"):
             has_findings = True
             issues.append(f"Matching review for SHA {sha[:8]} has state '{state}'")
@@ -3019,7 +3030,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
                 f"Review comment for SHA {sha[:8]} contains findings "
                 f"(matched pattern '{matched}')"
             )
-        elif classify_verdict(body, state) == "not-clean":
+        elif classify_verdict(body, state, author) == "not-clean":
             has_findings = True
             issues.append(f"Review comment for SHA {sha[:8]} explicitly blocks.")
 
@@ -3035,7 +3046,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
             # and keep their previous (bot-pooled) eligibility.
             if len(item) > 6 and item[6] is False:
                 continue
-            if len(item) > 5 and classify_verdict(item[2], item[4]) == "clean":
+            if len(item) > 5 and classify_verdict(item[2], item[4], item[5]) == "clean":
                 login = item[5]
                 identity = _reviewer_identity(item[2], login)
                 unique_authors.add(identity)

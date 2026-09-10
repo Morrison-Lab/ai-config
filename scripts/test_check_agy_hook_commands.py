@@ -129,6 +129,20 @@ class TestMissingInstalledManifest(unittest.TestCase):
         self.assertFalse(report["present"])
         self.assertTrue(any("is missing although" in f for f in report["findings"]))
 
+    def test_a_required_missing_manifest_prints_its_finding(self):
+        """The text CLI must not print SKIP over a finding; validate.yml reads it."""
+        with tempfile.TemporaryDirectory() as tmp:
+            staged = Path(tmp) / "plugins" / "ai-config" / "hooks.json"
+            staged.parent.mkdir(parents=True)
+            sink = io.StringIO()
+            with patch.object(CHECKER, "installed_manifest_path", lambda: staged):
+                with contextlib.redirect_stdout(sink):
+                    rc = CHECKER.main(["--installed"])
+        self.assertEqual(rc, 1)
+        self.assertIn("FAIL", sink.getvalue())
+        self.assertIn("is missing although", sink.getvalue())
+        self.assertNotIn("SKIP", sink.getvalue())
+
     def test_absent_and_not_required_stays_a_skip(self):
         with tempfile.TemporaryDirectory() as tmp:
             missing = Path(tmp) / "hooks.json"

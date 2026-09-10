@@ -160,7 +160,7 @@ def main(argv: list[str]) -> int:
         return 1 if failed else 0
 
     for report in reports:
-        if not report["present"]:
+        if not report["present"] and not report["findings"]:
             print(f"SKIP {report['path']} (not present)")
             continue
         if report["findings"]:

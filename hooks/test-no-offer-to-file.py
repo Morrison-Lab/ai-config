@@ -70,6 +70,26 @@ CASES = [
         False, "your call whether about merge strategy does not block",
     ),
 
+    # Negative: the DEFER phrase and the DOMAIN word are in DIFFERENT
+    # sentences. A whole-message conjunction would block these; the
+    # sentence-scoped gate must not (ai-config#3520 review round 1).
+    (
+        [TOOL, say(
+            "Filed as #3519. Separately, both rebases are equally safe, "
+            "so I'd rather you decide which one to take."
+        )], False, "deferral in a different sentence from the filing report does not block",
+    ),
+    (
+        [TOOL, say(
+            "I opened the tracking issue already. Your call whether to squash "
+            "or rebase this branch."
+        )], False, "your call whether about merge, with an issue mentioned elsewhere, does not block",
+    ),
+    (
+        [TOOL, say("I'd rather you decide which of these files to keep.")],
+        False, "literal use of files as a noun does not block",
+    ),
+
     # Negative cases: trigger phrases quoted inside inline code spans
     (
         [TOOL, say("We shouldn't add a hook for `want me to file` because it is too broad.")],

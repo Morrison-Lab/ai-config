@@ -53,7 +53,7 @@ RX_DEFER = re.compile("|".join(DEFER), re.I)
 # anaphoric reference still lands as long as the message names the domain
 # somewhere.
 DOMAIN = re.compile(
-    r"\b(issues?|filed?|files|filing|tracks?|tracking|tracked|records?|recording|memor(y|ies|ize)|follow-?ups?|tickets?)\b",
+    r"\b(issues?|filed|filing|tracking|tracked|record(s|ing|ed)?|memor(y|ies|ize)|follow-?ups?|tickets?)\b",
     re.I,
 )
 
@@ -112,6 +112,22 @@ except Exception:
         return _CODE_SPAN_RE.sub(" ", _FENCE_RE.sub(" ", text))
 
 
+_SENTENCE_RE = re.compile(r"[^.!?]+[.!?]*")
+
+
+def _defer_hit(prose):
+    """A deferral only counts when the filing vocabulary is in the SAME sentence.
+
+    A whole-message conjunction fires on any long reply that defers about one
+    thing and happens to mention an issue elsewhere, which blocks a legitimate
+    turn (ai-config#3520 review round 1).
+    """
+    for sentence in _SENTENCE_RE.findall(prose):
+        if RX_DEFER.search(sentence) and DOMAIN.search(sentence):
+            return RX_DEFER.search(sentence)
+    return None
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -124,8 +140,8 @@ def main() -> int:
 
     prose = strip_code(text)
     hit = RX.search(prose)
-    if not hit and RX_DEFER.search(prose) and DOMAIN.search(prose):
-        hit = RX_DEFER.search(prose)
+    if not hit:
+        hit = _defer_hit(prose)
     if not hit:
         return 0
 

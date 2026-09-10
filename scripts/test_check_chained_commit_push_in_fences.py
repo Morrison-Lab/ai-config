@@ -110,7 +110,7 @@ def scan_fixture(files):
     """Run the sweep over a throwaway git repo containing `files`."""
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
-        subprocess.run(["git", "init", "-q", str(root)], check=True)
+        subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
         (root / "hooks").mkdir()
         (root / "hooks" / "no-commit-chained-to-push.py").write_text(
             (REPO / "hooks" / "no-commit-chained-to-push.py")
@@ -233,7 +233,7 @@ cccp.load_predicate = original_evaluate
 
 with tempfile.TemporaryDirectory() as tmp:
     root = Path(tmp)
-    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
     (root / "hooks").mkdir()
     (root / "hooks" / "no-commit-chained-to-push.py").write_text(
         (REPO / "hooks" / "no-commit-chained-to-push.py").read_text(encoding="utf-8"),

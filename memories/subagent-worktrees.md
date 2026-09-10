@@ -369,11 +369,23 @@ The prescribed remedy in both prior occurrences is "ask the agent" --- but here 
 
 **The check that actually works is process-table ground truth, not the agent's account of itself.**
 `isolation: "worktree"` locks the worktree it creates, and the lock's reason string embeds the dispatching process, e.g. `claude agent <name> (pid NNNNN start <date>)`.
-Parse the PID out of that reason and run `ps -p <pid>`: alive means the process has not exited, full stop, regardless of what the agent's own last message or completion summary claims.
-This is a different signal from `session-lock`'s own registry (`ai-session.sh`'s `find_agent_pid` plus `kill -0`, used for the deliberately-registered worktrees under that skill) --- it reads the harness's own worktree lock, which exists for `Agent`-dispatched worktrees `session-lock` never touches.
+Parse the PID out of that reason and run `ps -p <pid>`,
+regardless of what the agent's own last message or completion summary claims.
+The worktree-lock PID check is a different signal from `session-lock`'s own registry
+(`ai-session.sh`'s `find_agent_pid` plus `kill -0`, used for the deliberately-registered worktrees under that skill) ---
+it reads the harness's own worktree lock,
+which exists for `Agent`-dispatched worktrees `session-lock` never touches.
+
+**Read the process STATE, not merely the exit code --- `ps -p` reports an unreaped zombie as present.**
+A child that has exited but whose parent has not reaped it stays in the process table with `STAT=Z`,
+so `ps -p <pid>` exits 0 over a process that is in fact already gone.
+That is the same trap [`claude-code`](claude-code.md)'s entry on `kill -0` reporting an unreaped zombie as alive records,
+and for the same reason: both signals read the process table alone and neither distinguishes a running process from a dead-but-unreaped one.
+So take the state with `ps -o stat= -p <pid>` and treat a leading `Z` as dead.
+(Measured 2026-09-10: a forked child that called `os._exit(0)` and went unreaped returned rc=0 and `STAT=Z` from `ps -p`.)
 
 - **Do:** treat a completion report, however explicit or self-assured ("Stopping Point: Clean", "finished", `status=completed`), as a claim about the agent's output, never as a claim about its process.
-- **Do:** parse the PID from the worktree's `git worktree list` lock reason and run `ps -p <pid>` before reclaiming a dispatched agent's worktree, rather than reading its own sign-off.
+- **Do:** parse the PID from the worktree's `git worktree list` lock reason and run `ps -o stat= -p <pid>` before reclaiming a dispatched agent's worktree, treating a `Z` state as dead, rather than reading its own sign-off.
 - **Don't:** let a first-person "I'm done, clean stopping point" claim outrank the process check --- it is the most persuasive wrong signal available, and it was measured wrong.
 - **Don't:** treat this as redundant with "ask the agent" --- the agent had already spoken, unasked, and was wrong;
   the fix is independent verification, not a second question.

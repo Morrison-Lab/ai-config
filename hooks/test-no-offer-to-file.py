@@ -48,26 +48,26 @@ CASES = [
             "That's arguably a guard gap (a tag-only push ships no commits), "
             "but I've filed enough guard issues this session that I'd rather "
             "you tell me whether it's worth a ninth than assume it."
-        )], True, "declarative preference deferring a filing decision blocks",
+        )], "warn", "declarative preference deferring a filing decision warns",
     ),
     (
         [TOOL, say("I'll leave the call to you on whether this needs an issue.")],
-        True, "leave the call to you plus filing domain blocks",
+        "warn", "leave the call to you plus filing domain warns",
     ),
     (
         [TOOL, say("Your call whether that's worth tracking.")],
-        True, "your call whether plus tracking blocks",
+        "warn", "your call whether plus tracking warns",
     ),
 
     # Negative: the same deferral with NO filing/recording domain in the
     # message is an ordinary judgment handback, not an unfiled finding.
     (
         [TOOL, say("Both rebases are equally safe, so I'd rather you decide which one to take.")],
-        False, "deferral with no filing vocabulary does not block",
+        "pass", "deferral with no filing vocabulary stays silent",
     ),
     (
         [TOOL, say("Your call whether to squash or rebase merge this branch.")],
-        False, "your call whether about merge strategy does not block",
+        "pass", "your call whether about merge strategy stays silent",
     ),
 
     # Negative: the DEFER phrase and the DOMAIN word are in DIFFERENT
@@ -77,17 +77,17 @@ CASES = [
         [TOOL, say(
             "Filed as #3519. Separately, both rebases are equally safe, "
             "so I'd rather you decide which one to take."
-        )], False, "deferral in a different sentence from the filing report does not block",
+        )], "pass", "deferral in a different sentence from the filing report stays silent",
     ),
     (
         [TOOL, say(
             "I opened the tracking issue already. Your call whether to squash "
             "or rebase this branch."
-        )], False, "your call whether about merge, with an issue mentioned elsewhere, does not block",
+        )], "pass", "your call whether about merge, with an issue elsewhere, stays silent",
     ),
     (
         [TOOL, say("I'd rather you decide which of these files to keep.")],
-        False, "literal use of files as a noun does not block",
+        "pass", "literal use of files as a noun stays silent",
     ),
 
     # Negative cases: trigger phrases quoted inside inline code spans
@@ -161,7 +161,11 @@ def run(events):
             text=True,
             env=env,
         ).stdout
-        return '"decision": "block"' in out or '"decision":"block"' in out
+        if '"decision": "block"' in out or '"decision":"block"' in out:
+            return "block"
+        if '"systemMessage"' in out:
+            return "warn"
+        return "pass"
     finally:
         os.unlink(path)
 
@@ -169,12 +173,14 @@ def run(events):
 def main():
     passes = failures = 0
     for events, expected, label in CASES:
-        got = run(events)
+        raw = run(events)
+        # Legacy cases use True/False for block; DEFER cases use "warn".
+        got = raw if isinstance(expected, str) else (raw == "block")
         if got == expected:
             print(f"PASS: {label}")
             passes += 1
         else:
-            print(f"FAIL: {label} (expected block={expected}, got {got})")
+            print(f"FAIL: {label} (expected {expected}, got {got})")
             failures += 1
 
     # Sentinel behavior: same message twice should not block on second run

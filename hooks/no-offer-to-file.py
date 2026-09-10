@@ -45,7 +45,6 @@ DEFER = [
     r"i'?d rather (you|we) (tell|decide|say|choose|pick)",
     r"i'?(ll| will) leave (it|that|this|the (call|decision)) (to|with) you",
     r"your call whether",
-    r"(rather|instead of) (than )?assum(e|ing) it",
 ]
 RX_DEFER = re.compile("|".join(DEFER), re.I)
 
@@ -128,6 +127,19 @@ def _defer_hit(prose):
     return None
 
 
+def _seen_once(text):
+    """True when this exact message already produced output (idempotence)."""
+    key = hashlib.sha256(text.encode()).hexdigest()[:16]
+    sentinel = os.path.join(tempfile.gettempdir(), f".claude-offer-warn-{key}")
+    if os.path.exists(sentinel):
+        return True
+    try:
+        open(sentinel, "w").close()
+    except Exception:
+        pass
+    return False
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -141,7 +153,23 @@ def main() -> int:
     prose = strip_code(text)
     hit = RX.search(prose)
     if not hit:
-        hit = _defer_hit(prose)
+        # The DEFER arm WARNS rather than blocks. The PATTERNS above match a
+        # syntactic form (an interrogative offer) and can block safely; a
+        # deferral is a *stance*, and no lexical test separates it from
+        # ordinary prose reliably enough to justify blocking a legitimate
+        # turn -- the same reasoning flag-cop-out-offer.py gives for warning
+        # on an offer whose authorization it cannot judge.
+        defer = _defer_hit(prose)
+        if defer and not _seen_once(text):
+            print(json.dumps({"systemMessage": (
+                "[hook: no-offer-to-file] This reply defers a filing decision "
+                f"back to the user ({defer.group(0)!r}) in a sentence that also "
+                "names filing or tracking.\n"
+                "report-mistakes-proactively: file a valid finding without asking, "
+                "and note that how many you have already filed is not an input.\n"
+                "Warning only -- disregard if this deferral is not about filing."
+            )}))
+        return 0
     if not hit:
         return 0
 

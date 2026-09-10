@@ -1038,7 +1038,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-offer-to-file.py\"",
             "timeout": 10,
             "script": "no-offer-to-file.py",
-            "why": "report-mistakes-proactively 'Filing is not gated on approval' -- blocks a reply that offers to file or record instead of doing it. Extended 2026-09-10 (ai-config#3520) to also catch the offer phrased as a DECLARATIVE PREFERENCE that hands the decision back ('I'd rather you tell me whether it is worth a ninth'), which asks nothing and names the artifact only by anaphora; that arm additionally requires filing vocabulary in the same SENTENCE, so an unrelated deferral elsewhere in a long reply does not fire."
+            "why": "report-mistakes-proactively 'Filing is not gated on approval' -- blocks a reply that offers to file or record instead of doing it. Extended 2026-09-10 (ai-config#3520) with a second, WARN-ONLY arm for the offer phrased as a DECLARATIVE PREFERENCE that hands the decision back ('I'd rather you tell me whether it is worth a ninth'), which asks nothing and names the artifact only by anaphora. That arm warns rather than blocks because a deferral is a stance rather than a syntactic form, so no lexical test separates it from ordinary prose reliably enough to block a turn -- the reasoning flag-cop-out-offer.py gives for its own warn. It requires filing vocabulary in the same sentence, which reduces but does not eliminate misfires: a run-on sentence or an unpunctuated bullet list defeats the sentence split, and the warning says so."
           },
           {
             "type": "command",

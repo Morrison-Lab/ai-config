@@ -438,11 +438,30 @@ jobs:
         # first-parent commits a day, the fallback is the ordinary case rather
         # than the exception, so this is not a corner.
         #
-        # The base has to be fetched explicitly. `actions/checkout` above sets
-        # no `fetch-depth`, so it clones at depth 1 and `origin/<base>` does
-        # not resolve at all -- the step would print "cannot resolve" on every
-        # run and read as working. Fetching here rather than deepening the
-        # shared checkout keeps the clone cost on the one step that needs it.
+        # BOTH sides have to be deepened, and the paragraph that used to sit
+        # here named only one. `actions/checkout` above sets no `fetch-depth`,
+        # so it clones at depth 1: the base does not resolve, which that
+        # paragraph caught, and THIS BRANCH has no ancestry either, which it
+        # did not. `git merge-base HEAD FETCH_HEAD` cannot succeed against a
+        # one-commit HEAD however deep the base fetch goes, so the tip
+        # fallback below was not the rare case its own comment assumed -- it
+        # was every run.
+        #
+        # Measured on run 34537469691, the first CI execution of the growth
+        # gate: "baseline: tip of origin/main (no merge base within 50
+        # commits)", on a branch whose merge base is ZERO first-parent commits
+        # back. Nothing about main's commit rate was involved. Since the tip
+        # fallback disables the ratchet (below), the gate would have reported
+        # forever and never once fired -- an instrument wired into CI and
+        # silently advisory, which is the exact failure
+        # `shared/workflow/algorithmatize-checks.md` gained a section about in
+        # this same PR.
+        #
+        # Unshallowing is cheap and bounded here: this repo is a few thousand
+        # commits of markdown, and the `new-line-breaks` job in this same file
+        # already takes `fetch-depth: 0` for the same reason, its comment
+        # making the same argument -- a shallow clone "would turn the gate
+        # vacuous without turning anything red".
         #
         # The rev used is echoed rather than assumed. A merge base is the right
         # subject (it asks what this branch added), but a bounded fetch may not
@@ -453,15 +472,24 @@ jobs:
         run: |
           set -uo pipefail
           BASE="${{ github.base_ref || github.event.repository.default_branch }}"
-          git fetch --quiet --depth=50 origin "$BASE" || true
+          # Deepen this branch first: with HEAD at depth 1 there is no
+          # ancestry for a merge base to be found in, whatever the base
+          # fetch retrieves. `--unshallow` errors on an already-complete
+          # clone, so it is guarded on the shallow marker rather than by
+          # `|| true`, which would hide a real fetch failure too.
+          if [ -f "$(git rev-parse --git-dir)/shallow" ]; then
+            git fetch --quiet --unshallow origin || true
+          fi
+          git fetch --quiet origin "$BASE" || true
           GATE=""
           if REV="$(git merge-base HEAD FETCH_HEAD 2>/dev/null)"; then
             echo "baseline: merge base with origin/$BASE ($REV)"
           elif git rev-parse --verify --quiet FETCH_HEAD >/dev/null; then
             REV=FETCH_HEAD
             GATE="--no-root-growth-gate"
-            echo "baseline: tip of origin/$BASE (no merge base within 50 commits);" \
-              "reporting the root-file ratchet without gating on it"
+            echo "::warning::context-closure baseline fell back to the tip" \
+              "of origin/$BASE (no merge base even after unshallowing), so" \
+              "the root-file growth ratchet REPORTED WITHOUT GATING here."
           else
             echo "baseline: origin/$BASE unreachable; skipping the delta report"
             exit 0

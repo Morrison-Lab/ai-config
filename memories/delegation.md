@@ -703,7 +703,9 @@ Under that script's `set -euo pipefail` it expands to `0`, runs `0`, and aborts 
 
 `bash -n` exits 0 on that file.
 Verified on the reduced case: `bash -n` reports nothing, and running it dies with `0: command not found` and status 127.
-Nothing about the text is ungrammatical --- `printf` simply took different arguments than the author meant, which is the shape a lost quote produces almost every time.
+Nothing about the text is ungrammatical --- `printf` simply took different arguments than the author meant.
+That is what happened here;
+whether a lost quote usually lands that way rather than producing a syntax error is not measured, and the check below is worth running either way.
 
 **Executing the artifact is the check that works, and this repo already had it.**
 `scripts/test_agy_hook_adapter.py` runs `bash bootstrap.sh` and asserts a zero exit, and `validate.yml` gates it, so CI would have failed on the mangled line.
@@ -711,10 +713,13 @@ It could not run on the Windows machine that wrote it, for an unrelated path-quo
 
 The transferable part is which check answers which question.
 A parser answers whether the file is *well-formed*.
-Only running it answers whether it *does what the commit message says*, and a delegated edit is where those two come apart, because the worker's account of its own change is accurate while the text it wrote is not.
+Only running it can expose a failure that lives in the *behaviour* rather than in the grammar, which is the class this defect belongs to.
+It is not proof the change is right: an execution test asserts what it happens to assert, so a semantically wrong edit passes wherever the relevant behaviour is untested.
+What it rules out is the case here, where a delegated edit's own account of itself is accurate and the text it wrote is not.
 Nothing here settles whether the worker authored the malformed line or a transport mangled one it wrote correctly, and the check is the same either way.
 
 - **Do:** run the suite that executes an edited script, not only a parser over it, before trusting a delegated commit that touched shell.
+- **Do:** run the script yourself against a throwaway fixture when no suite executes it, which is the common case --- `upload_skills.sh` and `scripts/inventory.sh` have none --- and treat that gap as worth a filed issue rather than a reason to skip the check.
 - **Do:** treat a test you cannot run locally as an unchecked artifact, and say so, rather than reading the parser's silence as coverage.
 - **Don't:** read `bash -n` (or `py_compile`) passing as evidence that a delegated edit is correct --- it reports grammar, and dropped quoting is grammatical.
 - **Don't:** rely on the commit message agreeing with the diff here;

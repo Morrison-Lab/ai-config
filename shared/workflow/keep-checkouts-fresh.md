@@ -11,7 +11,7 @@ In every session --- at session start, and again periodically during long sessio
    Still flag it rather than force if the tree is dirty, or if a path on local `main` is genuinely missing from `origin/main`.
    **If `main` isn't the currently checked-out branch** (the session is already working on a feature branch), skip the checkout dance entirely --- `git branch -f main origin/main` realigns the ref in place without touching the working tree or switching away from the branch you're actively on.
 2. **The `~/.claude` consumer install.**
-   Claude Code and Cursor no longer read this repo's `skills/`/`commands/` as a symlinked copy under `~/.claude` at all --- they install this repo as a native plugin, which auto-updates at session start (see README's *Verify the install*), so the freshness question moves from a symlinked copy to the pinned snapshot the plugin serves.
+   Claude Code and Cursor no longer read this repo's `skills/` and `commands/` as a symlinked copy under `~/.claude` at all --- they install this repo as a native plugin, which auto-updates at session start (see README's *Verify the install*), so the freshness question moves from a symlinked copy to the pinned snapshot the plugin serves.
    That is a claim about what is **served**, and not about what is **left over**.
 
    **The auto-update claim is narrower than it reads: it is a claim about the update *mechanism*, and says nothing about whether this session's already-cached snapshot is current.**
@@ -39,6 +39,7 @@ In every session --- at session start, and again periodically during long sessio
    - **Don't:** read "auto-updates at session start" as meaning the currently-running session's cache is already current --- that is exactly the claim this check tests.
    - **Don't:** read `installed_plugins.json`'s `lastUpdated` field as a freshness measure.
      It says when the pin was last written, and nothing about how many commits `origin/main` has gained since the pinned SHA.
+
    `shared/`, `hooks/`, and `memories/` have no plugin-equivalent replacement yet ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), so anyone relying on `~/.claude/shared`, `~/.claude/hooks`, or `~/.claude/memories` today is on a symlink or copy placed by an install predating that change, or by a manual step --- `bootstrap.sh` no longer places any of them.
    **`skills/` belongs in that sweep too, and the plugin serving them is not a reason to skip it.**
    A leftover `~/.claude/skills` from a pre-plugin install loads alongside the plugin, listing every skill twice --- bare `ums` beside `ai-config:ums` --- which crowds the skill listing and can cost entries their descriptions, the text routing selects on.

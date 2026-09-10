@@ -40,7 +40,8 @@ After positive membership verification, the user grants standing authorization
 across sessions and workspaces for normal, non-destructive GitHub operations
 in that repository, including non-force pushes, issue and PR comments, opening
 or updating issues and PRs, requesting reviews, and other ordinary repository
-workflow actions. This does not authorize force pushes or merges; merge
+workflow actions.
+This does not authorize force pushes or merges; merge
 authority remains governed by the strict merge policy below.
 
 Do not infer membership from a public repository, prior contributions, a fork,

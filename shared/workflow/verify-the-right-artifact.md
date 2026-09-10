@@ -1539,7 +1539,7 @@ already all read clean.
   established by guesswork, when a direct capture would name the actual
   path without needing the set enumerated at all.
 
-(Ai-config#3141 is the worked incident: chasing which copy of
+(ai-config#3141 is the worked incident: chasing which copy of
 `hooks/no-unreviewed-pr.py` was firing an expired moratorium, the copy
 registered in `~/.claude/settings.json` was current, the `installed_plugins.json`
 pins (three of them, user and project scope) did not contain the hook file

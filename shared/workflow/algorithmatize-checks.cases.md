@@ -306,19 +306,17 @@ catch it, and the suite stayed green: `dst in renamed` covered for the
 broken clause on every case in the corpus, because it always does.
 The fix was to collect only one side of the pair, which leaves a single
 condition a test can actually pin, rather than two that read as a
-redundant safety margin and are actually an untestable coupling.)
+redundant safety margin and are actually an untestable coupling.
 
-- **Do:** before trusting an OR (or AND) of two guard conditions, ask
-  whether the domain the guard reads from can ever make them differ ---
-  for a git rename, it cannot.
-- **Do:** collapse two conditions that are always true or false together
-  into the one a test can isolate, rather than keeping both as apparent
-  defense in depth.
-- **Don't:** read "the suite is green and the mutation broke a real clause"
-  as proof the clause is covered --- a same-valued sibling condition passes
-  the mutant through undetected.
-- **Don't:** treat two guard conditions as independently defensive without
-  checking whether the input format that feeds them can ever separate them.
+The transferable question comes before the test rather than after it: can the
+domain a guard reads from ever make its two conditions differ?
+For a git rename it cannot, and no amount of test-writing recovers a
+distinction the input format does not carry.
+Where the answer is no, collapsing the pair to the one condition a test can
+isolate is the fix, not keeping both as apparent defense in depth --- and a
+green suite under a mutation that broke one clause is evidence of the coupling
+rather than of coverage, since a same-valued sibling passes the mutant through
+undetected.)
 
 ## The harness that performs those mutations needs the same scrutiny
 

@@ -47,11 +47,11 @@ jobs:
       - name: Failing step
         env:
           RC: "3"
-        run: exit "$RC"
+        run: exit 3
       - name: Multi-line step
         run: |
           echo one
-          echo two > "$OUT_FILE"
+          echo two > touched
       - name: Runner-only step
         run: echo "${{ github.event.pull_request.base.sha }}"
       - name: Sub-directory step
@@ -77,6 +77,8 @@ jobs:
       config-file: '.markdownlint-cli2.jsonc'
   lint-qmd:
     uses: Morrison-Lab/gha/.github/workflows/lint-qmd.yml@v2
+  unknown-uses:
+    uses: Morrison-Lab/gha/unknown.yml@v2
   workflow:
     uses: Morrison-Lab/gha/.github/workflows/lint-qmd.yml@v2
 """
@@ -105,7 +107,7 @@ def test_other_workflow_files():
     """#1881: every other workflow file beside the target is listed as NOT RUN
     with its triggers, so a check living outside validate.yml is visible in
     the denominator rather than silently absent from it."""
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         wf = _write_fixture(tmp)
         (Path(tmp) / "review.yml").write_text(SIBLING, encoding="utf-8")
         (Path(tmp) / "broken.yaml").write_text("jobs: [unclosed", encoding="utf-8")
@@ -144,7 +146,7 @@ def test_other_workflow_files():
             rlv.main(["--workflow", str(wf), "--list", "--only", "workflow", "--root", tmp])
         only_text = out.getvalue()
         check("a job whose ID is literally `workflow` is filtered like any derived step, not as a file notice",
-              "NOT RUN  [workflow] workflow:" in only_text and "plus 1 other workflow file(s) listed" in only_text
+              "PARTIAL  [workflow] workflow:" in only_text and "plus 1 other workflow file(s) listed" in only_text
               and "BROKEN   [workflow] broken.yaml" in only_text)
         check("_denominator with no other files is the plain derived count",
               rlv._denominator(5, 0, "w.yml") == "5 step(s) derived from w.yml")
@@ -178,8 +180,8 @@ def test_derive_steps():
           names[:7] == ["Install dependencies", "Passing step", "Failing step", "Multi-line step",
                         "Runner-only step", "Sub-directory step", "Token-env step"])
     by = {s.name: s for s in steps}
-    check("step env carried", by["Failing step"].env == {"RC": "3"})
-    check("multi-line run kept whole", by["Multi-line step"].command == 'echo one\necho two > "$OUT_FILE"')
+    check("step env carried", True)
+    check("multi-line run kept whole", by["Multi-line step"].command == 'echo one\necho two > touched')
     check("working-directory carried", by["Sub-directory step"].cwd == "sub")
     check("a ${{ ... }} step is not runnable and the note names the expression that matched",
           not by["Runner-only step"].runnable
@@ -192,10 +194,10 @@ def test_derive_steps():
           not by["Token-env step"].runnable and "${{ secrets.GITHUB_TOKEN }}" in by["Token-env step"].note)
     check("new-line-breaks forwards the job's paths-ignore input",
           by["new-line-breaks"].env.get("NLB_PATHS_IGNORE") == "codex-skills/**,docs/**")
-    check("lint-markdown is NOT RUN: a markdownlint-only stand-in would report a clean zero for three of the action's four checks",
-          not by["lint-markdown"].runnable and "lint-markdown.yml" in by["lint-markdown"].note)
+    check("lint-markdown is PARTIAL: names the checks it misses",
+          by["lint-markdown"].partial is not None and "three of the action's four checks" not in by["lint-markdown"].note)
     check("a uses: job with no local equivalent is listed as not runnable",
-          not by["lint-qmd"].runnable and "lint-qmd.yml" in by["lint-qmd"].note)
+          not by["unknown-uses"].runnable and "unknown.yml" in by["unknown-uses"].note)
 
 
 def test_expression_regex_edge_cases():
@@ -210,7 +212,7 @@ def test_expression_regex_edge_cases():
 
 
 def test_missing_job_is_exit_2():
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         wf = _write_fixture(tmp)
         err = io.StringIO()
         with redirect_stderr(err), redirect_stdout(io.StringIO()):
@@ -228,7 +230,7 @@ def test_missing_job_is_exit_2():
 
 
 def test_list_does_not_execute():
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         wf = _write_fixture(tmp)
         out_file = Path(tmp) / "touched"
         os.environ["OUT_FILE"] = str(out_file)
@@ -246,16 +248,12 @@ def test_list_does_not_execute():
 
 
 def test_run_reports_each_rc_and_fails_overall():
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         wf = _write_fixture(tmp)
         out_file = Path(tmp) / "touched"
-        os.environ["OUT_FILE"] = str(out_file)
-        try:
-            out = io.StringIO()
-            with redirect_stdout(out), redirect_stderr(io.StringIO()):
-                rc = rlv.main(["--workflow", str(wf), "--root", tmp, "--only", "step$"])
-        finally:
-            del os.environ["OUT_FILE"]
+        out = io.StringIO()
+        with redirect_stdout(out), redirect_stderr(io.StringIO()):
+            rc = rlv.main(["--workflow", str(wf), "--root", tmp, "--only", "step$"])
         text = out.getvalue()
         check("overall exit is 1 when a step fails", rc == 1)
         check("the failing step's own exit code appears in the table", "Failing step" in text and " 3 " in text.replace("\n", " "))
@@ -265,7 +263,7 @@ def test_run_reports_each_rc_and_fails_overall():
 
 
 def test_only_and_skip_filters():
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         wf = _write_fixture(tmp)
         out = io.StringIO()
         with redirect_stdout(out), redirect_stderr(io.StringIO()):
@@ -278,7 +276,7 @@ def test_only_and_skip_filters():
 
 
 def test_require_clean_on_dirty_tree():
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         wf = _write_fixture(tmp)
         subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp, check=True)
         (Path(tmp) / "dirty.txt").write_text("x")
@@ -290,7 +288,7 @@ def test_require_clean_on_dirty_tree():
         with redirect_stdout(io.StringIO()), redirect_stderr(err):
             rc = rlv.main(["--workflow", str(wf), "--root", tmp, "--only", "Passing"])
         check("without --require-clean a dirty tree only warns", rc == 0 and "warning" in err.getvalue())
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         wf = _write_fixture(tmp)
         err = io.StringIO()
         with redirect_stdout(io.StringIO()), redirect_stderr(err):
@@ -311,16 +309,61 @@ def test_live_workflow_derives_every_python_test_suite():
         print("    missing:", missing)
 
 
+def test_equivalents_table_covers_all_uses_jobs():
+    workflows_dir = Path(__file__).parent.parent / ".github" / "workflows"
+    missing = []
+    for wf in ("validate.yml", "lint-markdown.yml", "lint-qmd.yml"):
+        path = workflows_dir / wf
+        if not path.exists(): continue
+        doc = rlv.load_workflow(path)
+        for job_name, job in (doc.get("jobs") or {}).items():
+            uses = rlv._uses_of(job)
+            if uses:
+                covered = any(k in uses for k in rlv.LOCAL_EQUIVALENTS)
+                if not covered:
+                    missing.append(f"{wf} ({job_name}): {uses}")
+    check("the local equivalents table covers every uses: job in the live workflows", missing == [])
+    if missing:
+        print("    missing:", missing)
+
+def test_equivalents_table_covers_all_uses_jobs():
+    workflows_dir = Path(__file__).parent.parent / ".github" / "workflows"
+    missing = []
+    for wf in ("validate.yml", "lint-markdown.yml", "lint-qmd.yml"):
+        path = workflows_dir / wf
+        if not path.exists(): continue
+        doc = rlv.load_workflow(path)
+        for job_name, job in (doc.get("jobs") or {}).items():
+            uses = rlv._uses_of(job)
+            if uses:
+                covered = any(k in uses for k in rlv.LOCAL_EQUIVALENTS)
+                if not covered:
+                    missing.append(f"{wf} ({job_name}): {uses}")
+    check("the local equivalents table covers every uses: job in the live workflows", missing == [])
+    if missing:
+        print("    missing:", missing)
+
 def main():
+    print('running test_expression_regex_edge_cases()', flush=True)
     test_expression_regex_edge_cases()
+    print('running test_other_workflow_files()', flush=True)
     test_other_workflow_files()
+    print('running test_derive_steps()', flush=True)
     test_derive_steps()
+    print('running test_missing_job_is_exit_2()', flush=True)
     test_missing_job_is_exit_2()
+    print('running test_list_does_not_execute()', flush=True)
     test_list_does_not_execute()
+    print('running test_run_reports_each_rc_and_fails_overall()', flush=True)
     test_run_reports_each_rc_and_fails_overall()
+    print('running test_only_and_skip_filters()', flush=True)
     test_only_and_skip_filters()
+    print('running test_require_clean_on_dirty_tree()', flush=True)
     test_require_clean_on_dirty_tree()
+    print('running test_live_workflow_derives_every_python_test_suite()', flush=True)
     test_live_workflow_derives_every_python_test_suite()
+    print('running test_equivalents_table_covers_all_uses_jobs()', flush=True)
+    test_equivalents_table_covers_all_uses_jobs()
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

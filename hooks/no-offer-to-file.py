@@ -43,7 +43,7 @@ RX = re.compile("|".join(PATTERNS), re.I)
 # deferral ("I'd rather you decide which merge strategy") does not fire.
 DEFER = [
     r"i'?d rather (you|we) (tell|decide|say|choose|pick)",
-    r"i'?(ll| will) leave (it|that|this|the (call|decision)) (to|with) you",
+    r"i'?(ll| will) leave (it|that|this|the|that) ?(call|decision)? ?(to|with) you",
     r"your call whether",
 ]
 RX_DEFER = re.compile("|".join(DEFER), re.I)
@@ -52,7 +52,7 @@ RX_DEFER = re.compile("|".join(DEFER), re.I)
 # anaphoric reference still lands as long as the message names the domain
 # somewhere.
 DOMAIN = re.compile(
-    r"\b(issues?|filed|filing|tracking|tracked|record(s|ing|ed)?|memor(y|ies|ize)|follow-?ups?|tickets?)\b",
+    r"\b(issues?|filed|filing|(tracking|tracker) issue|follow-?ups?)\b",
     re.I,
 )
 
@@ -153,12 +153,14 @@ def main() -> int:
     prose = strip_code(text)
     hit = RX.search(prose)
     if not hit:
-        # The DEFER arm WARNS rather than blocks. The PATTERNS above match a
-        # syntactic form (an interrogative offer) and can block safely; a
-        # deferral is a *stance*, and no lexical test separates it from
-        # ordinary prose reliably enough to justify blocking a legitimate
-        # turn -- the same reasoning flag-cop-out-offer.py gives for warning
-        # on an offer whose authorization it cannot judge.
+        # The DEFER arm WARNS rather than blocks, and the reason is precision
+        # rather than the undecidable-authorization argument
+        # flag-cop-out-offer.py makes -- that hook matches reliably and warns
+        # because the right RESPONSE is undecidable, which is a different
+        # problem. Here the DETECTION is the uncertain half: scored against
+        # ten probes (three real deferrals, seven ordinary sentences) this
+        # arm was 3/3 and 0/7, but ten hand-written probes are not evidence
+        # of a rate. Warning keeps a misfire cheap while the sample grows.
         defer = _defer_hit(prose)
         if defer and not _seen_once(text):
             print(json.dumps({"systemMessage": (
@@ -169,8 +171,6 @@ def main() -> int:
                 "and note that how many you have already filed is not an input.\n"
                 "Warning only -- disregard if this deferral is not about filing."
             )}))
-        return 0
-    if not hit:
         return 0
 
     # fire at most once per distinct message

@@ -55,8 +55,8 @@ CASES = [
         "warn", "leave the call to you plus filing domain warns",
     ),
     (
-        [TOOL, say("Your call whether that's worth tracking.")],
-        "warn", "your call whether plus tracking warns",
+        [TOOL, say("Your call whether that's worth tracking as an issue.")],
+        "warn", "your call whether plus a filing artifact warns",
     ),
 
     # Negative: the same deferral with NO filing/recording domain in the
@@ -88,6 +88,26 @@ CASES = [
     (
         [TOOL, say("I'd rather you decide which of these files to keep.")],
         "pass", "literal use of files as a noun stays silent",
+    ),
+
+    # Negative: DEFER plus an AMBIGUOUS word that is not a filing artifact.
+    # These are the round-3 reviewer's own probes; the narrowed DOMAIN is what
+    # keeps them silent (ai-config#3520).
+    (
+        [TOOL, say("I'd rather you decide how to record the vote tally in the spreadsheet.")],
+        "pass", "record as an ordinary verb stays silent",
+    ),
+    (
+        [TOOL, say("Your call whether the memory allocator needs tuning here.")],
+        "pass", "memory as a computing term stays silent",
+    ),
+    (
+        [TOOL, say("I'll leave the decision to you about which tickets to buy for the show.")],
+        "pass", "tickets in a non-forge sense stays silent",
+    ),
+    (
+        [TOOL, say("I'll leave that call to you on whether to open a follow-up.")],
+        "warn", "leave that call to you (extra noun) still warns",
     ),
 
     # Negative cases: trigger phrases quoted inside inline code spans
@@ -212,6 +232,27 @@ def main():
         print("FAIL: sentinel did not suppress repeat block")
         failures += 1
 
+
+    # Warn-arm idempotence: the same deferral message twice must warn once.
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        fh.write(json.dumps(say(
+            "I've filed enough issues today that I'd rather you tell me whether "
+            "this one is worth it."
+        )) + "\n")
+    env = dict(os.environ, TMPDIR=tempfile.mkdtemp())
+    payload = json.dumps({"transcript_path": path})
+    w1 = subprocess.run([sys.executable, HOOK], input=payload,
+                        capture_output=True, text=True, env=env).stdout
+    w2 = subprocess.run([sys.executable, HOOK], input=payload,
+                        capture_output=True, text=True, env=env).stdout
+    os.unlink(path)
+    if '"systemMessage"' in w1 and '"systemMessage"' not in w2:
+        print("PASS: warn arm fires once per message")
+        passes += 1
+    else:
+        print("FAIL: warn arm should fire once per message")
+        failures += 1
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

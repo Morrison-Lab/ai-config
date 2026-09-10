@@ -381,7 +381,15 @@ def main() -> int:
     if not hit:
         return 0
 
-    claim_pr_refs = set(RX_PR_REF.findall(text))
+    # The claim's subject, resolved ONCE and used everywhere. Taking every
+    # `#N` in the message here while `_pr_label` used a window around the
+    # claim gave the two a different idea of what the claim is about, and
+    # the disagreement was exploitable: a status recap naming #100 and then
+    # claiming #651 let a #100 subagent count as evidence for #651, which
+    # downgraded the canonical BLOCK case to a WARN -- the same regression
+    # the docstring says was fixed once already (#3475 round 7).
+    pr_label = _pr_label(text, hit)
+    claim_pr_refs = {pr_label} if pr_label.startswith("#") else set()
     last_subagent = _relevant_last_subagent(subagent_events, last_partial, claim_pr_refs)
 
     # A complete enumeration after BOTH the last push AND the last subagent
@@ -400,8 +408,6 @@ def main() -> int:
 
     if already_fired(text):
         return 0
-
-    pr_label = _pr_label(text, hit)
 
     # BLOCK only the narrow, original case this hook has always covered:
     # original clean-claim vocabulary, a partial CI reading in play, no

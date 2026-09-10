@@ -63,6 +63,14 @@ PUSH_AND_CHECKER_SAME_TURN = {"type": "assistant", "message": {"content": [
 SAME_INDEX_REPORT_AND_PARTIAL = {"type": "user", "message": {"content": [
     {"type": "tool_result", "tool_use_id": "agentX", "content": "done with #9999"},
     {"type": "tool_use", "input": {"command": "gh pr checks 651"}}]}}
+# A subagent dispatched and reporting only on #100 (#3475 round 7). Used to
+# show that a passing mention of #100 in a message whose CLAIM is about a
+# different PR must not make that subagent count as the claim's evidence.
+AGENT_100_DISPATCH = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "a100", "name": "Agent",
+     "input": {"prompt": "drive #100 to clean"}}]}}
+AGENT_100_REPORT = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "a100", "content": "#100 done"}]}}
 ENDPOINT = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "gh api repos/ucdavis/bcs/commits/a5f4f3f2/check-runs?per_page=100 --paginate"}}]}}
@@ -254,6 +262,17 @@ CASES = [
      "an unrelated subagent report sharing a turn with a partial reading is "
      "NOT after it, so it stays outside the window and the original case "
      "still blocks -- the strict `>` boundary, which nothing else pins"),
+    ([AGENT_100_DISPATCH, AGENT_100_REPORT,
+      say("#100 was closed as a duplicate. #200 is fully clean.")], "allow",
+     "a subagent for #100 is not evidence for a claim about #200, even "
+     "though the message mentions both -- the claim's subject is the PR "
+     "near the claim, not every reference in the message"),
+    ([AGENT_100_DISPATCH, AGENT_100_REPORT, PARTIAL,
+      say("#100 was closed as a duplicate. #651 is fully clean at "
+          "a5f4f3f2.")], "block",
+     "the canonical BLOCK shape must still block when the message happens "
+     "to name another PR that a subagent did work on -- otherwise the "
+     "round-1 regression reopens for any multi-PR status recap"),
     ([UNRELATED_AGENT_DISPATCH, UNRELATED_AGENT_REPORT,
       say("#123 is fully clean.")], "allow",
      "no CI reading anywhere: an unrelated dispatch must not make a claim "

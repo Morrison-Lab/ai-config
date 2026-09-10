@@ -174,6 +174,77 @@ CASES = [
     ([PROMPT, ONELINE],
      {"tool_name": "Bash", "tool_input": {"command": "echo hello"}}, False,
      "a non-posting Bash command is out of scope"),
+    ([PROMPT, ONELINE],
+     {"tool_name": "Edit", "tool_input": {
+         "file_path": "/repo/.github/workflows/ci.yml",
+         "new_string": "uses: actions/checkout@2d37c48a1b2c3d4e5f6789012345678901234ab"}},
+     False, "adversarial review: a GitHub Actions SHA pin in a .yml file is "
+            "out of scope -- it can never be discharged (the object lives "
+            "in another repository) and the doc-extension scope excludes it"),
+    ([PROMPT, ONELINE],
+     {"tool_name": "Edit", "tool_input": {
+         "file_path": "hooks/flag-unread-commit-citation.py",
+         "new_string": "# see `2d37c48` and `08f5a73`"}},
+     False, "adversarial review: this hook's own .py source is out of scope, "
+            "so its docstring's example SHAs never self-trigger it"),
+
+    # --- adversarial review: reporting/position-report prose is not a claim ------
+    ([PROMPT, ONELINE],
+     bash('gh pr comment 155 --body "clean at head `14817d4b`"'), False,
+     "adversarial review: \"clean at head `X`\" reports position, not a claim"),
+    ([PROMPT, ONELINE],
+     bash('gh pr comment 155 --body "MERGED (squash, `462de02b`)"'), False,
+     "adversarial review: \"MERGED (squash, `X`)\" reports position, not a claim"),
+    ([PROMPT, ONELINE],
+     bash('gh pr comment 155 --body "pushed at `ae58121f`"'), False,
+     "adversarial review: \"pushed at `X`\" reports position, not a claim"),
+    ([PROMPT, ONELINE],
+     bash('gh pr comment 155 --body "Committed `2d37c48a1b2c3d4e5f6`"'), False,
+     "adversarial review: \"Committed `X`\" reports position, not a claim"),
+    ([PROMPT, ONELINE],
+     bash('gh pr comment 155 --body "`2d37c48` broke the build."'), True,
+     "an ordinary assertion (no reporting-context phrase) still fires"),
+
+    # --- adversarial review: git show/diff -s/--stat/--oneline is not a read -----
+    ([PROMPT, tool_use("Bash", command="git show -s --format=%s 2d37c48")],
+     bash(f'gh pr comment 155 --body "{CITED_ONE}"'), True,
+     "adversarial review: git show -s (no patch) does not discharge"),
+    ([PROMPT, tool_use("Bash", command="git show --stat 2d37c48")],
+     bash(f'gh pr comment 155 --body "{CITED_ONE}"'), True,
+     "adversarial review: git show --stat (no patch) does not discharge"),
+    ([PROMPT, tool_use("Bash", command="git show 2d37c48")],
+     bash(f'gh pr comment 155 --body "{CITED_ONE}"'), False,
+     "plain git show (default includes the patch) still discharges"),
+    ([PROMPT, tool_use("Bash", command="git diff --stat 2d37c48^..2d37c48")],
+     bash(f'gh pr comment 155 --body "{CITED_ONE}"'), True,
+     "adversarial review: git diff --stat (no patch) does not discharge"),
+
+    # --- adversarial review: a single hand-written indented claim still fires ----
+    ([PROMPT, ONELINE],
+     edit("memory/rampp-cases.md",
+          "Investigating:\n\n    the commit 2d37c48 is where it broke, per my reading.\n"),
+     True, "adversarial review: a lone indented hand-written claim (not a "
+           "multi-line paste, no strong log marker) is not silenced"),
+
+    # --- adversarial review: an unreadable comment body still warns --------------
+    ([PROMPT, ONELINE],
+     bash("gh pr comment 155 --body-file -"), True,
+     "adversarial review: --body-file - (stdin, unreadable) warns when "
+     "nothing read a commit in this turn"),
+    ([PROMPT, tool_use("Bash", command="git show 2d37c48")],
+     bash("gh pr comment 155 --body-file -"), False,
+     "an unreadable body is silent once SOME commit-reading command ran "
+     "in this turn"),
+
+    # --- the imported MCP_POST_TOOLS set is the WIDE one, not the local
+    #     fallback tuple (adversarial review: a silent narrowing here would
+    #     drop coverage with no test noticing) --------------------------------
+    ([PROMPT, ONELINE],
+     mcp_commit("mcp__github__pull_request_review_write", owner="Morrison-Lab",
+                repo="ai-config", pullNumber=3471, method="create",
+                body=CITED_ONE), True,
+     "mcp__github__pull_request_review_write is covered via the imported "
+     "(wide) MCP_POST_TOOLS, not the narrower local fallback tuple"),
 ]
 
 

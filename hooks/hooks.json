@@ -529,7 +529,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unread-commit-citation.py\"",
             "timeout": 10,
             "script": "flag-unread-commit-citation.py",
-            "why": "ai-config#3471's SHA half: a case entry cited two commit SHAs with a narrative reconstructed from `git log --oneline` alone, and got both backwards -- neither patch was actually opened. Warns, never blocks, when a `gh pr comment`/`gh issue comment`/`gh pr review`/`gh api .../comments` body about to post cites a commit SHA (a word-bounded 7-40 char hex run containing a hex letter, outside a fenced/indented evidence block, not a `Reviewed-Commit:`/`HEAD=` trailer, and -- for a 7-char token -- carrying a nearby cue) and no command reading that commit (`git show`/`git diff`/`git cat-file`/`git log -p`/`gh api .../commits/<sha>`/`gh api .../pulls/N/commits`/`mcp__github__get_commit`) appears in the transcript since the current turn began. A `git log --oneline` that merely lists the SHA does not discharge it -- that is the exact failure this hook exists to catch. Reuses flag-unmeasured-timestamp.py's comment-post detection and no-unmeasured-clock-claim.py's scan() for the turn boundary."
+            "why": "ai-config#3471's SHA half: a case entry cited two commit SHAs with a narrative reconstructed from `git log --oneline` alone, and got both backwards -- neither patch was actually opened. Warns, never blocks, when a `gh pr comment`/`gh issue comment`/`gh pr review`/`gh api .../comments` body about to post cites a commit SHA (a word-bounded 7-40 char hex run containing a hex letter, outside a fenced/indented evidence block, not a `Reviewed-Commit:`/`HEAD=` trailer or a position-report phrasing like \"pushed at\"/\"squash,\", and -- for a 7-char token -- carrying a nearby cue) and no command reading that commit (`git show`/`git diff`/`git cat-file`/`git log -p`/`gh api .../commits/<sha>`/`gh api .../pulls/N/commits`/`mcp__github__get_commit`) appears in the transcript since the current turn began. A `git log --oneline` that merely lists the SHA does not discharge it -- that is the exact failure this hook exists to catch. Reuses flag-unmeasured-timestamp.py's comment-post detection and no-unmeasured-clock-claim.py's scan() for the turn boundary."
           },
           {
             "type": "command",
@@ -867,7 +867,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unread-commit-citation.py\"",
             "timeout": 10,
             "script": "flag-unread-commit-citation.py",
-            "why": "The Write half of the Bash entry above. ai-config#3471: warns when writing a commit SHA citation into a non-scratch file (a case entry, a memory file, a comment) with no read of that commit in the transcript since the current turn began."
+            "why": "The Write half of the Bash entry above. ai-config#3471: warns when writing a commit SHA citation into a non-scratch prose file (.md/.markdown/.txt/.rst/.qmd/.rmd -- a case entry, a memory file) with no read of that commit in the transcript since the current turn began. Scoped to those extensions, not every tracked file, after adversarial review found a GitHub Actions SHA pin and a lockfile hash both false-positive under a broader scope."
           }
         ]
       },
@@ -893,7 +893,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unread-commit-citation.py\"",
             "timeout": 10,
             "script": "flag-unread-commit-citation.py",
-            "why": "The Edit half of the Bash entry above. ai-config#3471: warns when editing a commit SHA citation into a non-scratch file with no read of that commit in the transcript since the current turn began."
+            "why": "The Edit half of the Bash entry above. ai-config#3471: warns when editing a commit SHA citation into a non-scratch prose file (.md/.markdown/.txt/.rst/.qmd/.rmd) with no read of that commit in the transcript since the current turn began."
           }
         ]
       },
@@ -919,7 +919,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unread-commit-citation.py\"",
             "timeout": 10,
             "script": "flag-unread-commit-citation.py",
-            "why": "The NotebookEdit half of the Bash entry above. ai-config#3471: warns when a notebook cell edit writes a commit SHA citation into a non-scratch file with no read of that commit in the transcript since the current turn began."
+            "why": "The NotebookEdit half of the Bash entry above. ai-config#3471: warns when a notebook cell edit writes a commit SHA citation into a non-scratch prose file (.md/.markdown/.txt/.rst/.qmd/.rmd) with no read of that commit in the transcript since the current turn began."
           }
         ]
       },

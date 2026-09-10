@@ -93,29 +93,65 @@ A SHA is excluded from consideration when:
   - it falls inside a fenced code block (`scripts/lib/fences.py`'s
     `strip_fences`, which is genuinely fence-aware rather than a whole-file
     regex, so nested/four-backtick fences do not throw it out of phase), or
-    inside a line indented >=4 spaces that also looks like `git log`/`git
-    show` output (starts with a hex run, `commit `, `Author:`, `Date:`,
-    `diff --git`, `@@`, or a `+++`/`---` diff header) -- a pasted excerpt is
-    evidence being relayed, not a claim being made. This is a narrower net
-    than CommonMark's indented-code-block rule (which has no notion of
-    "looks like a log"), chosen because a true false negative here (missing
-    an indented citation that is NOT quoted output) is cheaper than a false
-    positive that nags on every properly-indented list continuation.
+    inside an indented (>=4 space) PARAGRAPH that looks like a pasted `git
+    log`/`git show` excerpt -- either it contains a strong marker line
+    (`commit `, `Author:`, `Date:`, `diff --git`, `@@`, a `+++`/`---` diff
+    header) or it has TWO OR MORE bare hex-prefixed lines (the `--oneline`
+    shape). A SINGLE indented line starting with a hex run is left alone --
+    adversarial review measured that the naive per-line version of this
+    check silenced a genuine hand-written claim ("2d37c48 is where it
+    broke, per my reading.", merely indented) as readily as it silenced a
+    real paste, since both start with a bare hex run (ai-config#3471).
   - it is preceded on the same line by a reporting label ("Reviewed
-    Commit:", "Reviewed-Commit:", "HEAD=", "head commit:") -- the artifact
-    is reporting its own position, not asserting a fact about the commit.
+    Commit:", "Reviewed-Commit:", "HEAD=", "head commit:"), or by one of a
+    broader set of position-report PHRASINGS this corpus's own session
+    notebooks and PR-status recaps use constantly: "at head `X`", "MERGED
+    (squash, `X`)", "pushed at `X`", "Committed `X`", "checked out `X`".
+    Adversarial review sampled ~500 real citations across two live session
+    notebooks and found the large majority were exactly this shape --
+    reporting the artifact's OWN current position, not asserting a fact
+    about what the commit did. This heuristic is deliberately generous
+    (it trades an occasional real assertion phrased like a status line for
+    silence on the corpus's single commonest true-positive-free pattern),
+    not exhaustive.
+
+SCOPE: PROSE EXTENSIONS ONLY, NOT "ANY TRACKED FILE"
+------------------------------------------------------
+The `Write`/`Edit`/`NotebookEdit` surface is narrowed to `.md`/`.markdown`/
+`.txt`/`.rst`/`.qmd`/`.rmd` targets, not every non-scratch file. Two false-
+positive classes forced this, both found by adversarial review against this
+repo's own tree: a GitHub Actions SHA pin (`uses: actions/checkout@<sha>`)
+in a workflow YAML, and a lockfile hash field -- neither is a narrative
+claim, and a pin can never be discharged at all, since the object it names
+lives in another repository entirely. Narrowing to the extensions where a
+case entry, memory file, or doc prose actually lives keeps the measured
+failure (a `.md` case entry) in scope while removing that whole class. It
+also means this hook's own `.py` source -- whose docstring necessarily
+quotes the measurement's SHAs -- is never itself in scope, so editing this
+file does not trip the guard it defines
+(`shared/writing/examples-are-scanned.md`).
 
 DISCHARGE
 ---------
 A citation of SHA `X` is discharged by, since the current turn began:
-  - `git show X` / `git diff X` / `git cat-file ... X` (X present as an
-    argument token, not merely a flag)
-  - `git log ... -p ... X` (X present AND a `-p`/`--patch` flag present --
-    `git log --oneline` or a bare `git log X` lists commits without
-    reading any of them, and must NOT discharge; that is the exact failure
-    mode this guard exists to catch)
+  - `git show X` / `git diff X` (X present as an argument token, not merely
+    a flag, AND no no-patch flag present -- see below)
+  - `git cat-file -p X` / `git log ... -p ... X` (X present AND a `-p`/
+    `--patch` flag present -- `git log --oneline` or a bare `git log X`
+    lists commits without reading any of them, and must NOT discharge;
+    that is the exact failure mode this guard exists to catch)
   - `gh api repos/OWNER/REPO/commits/X`
   - `mcp__github__get_commit` with `sha`/`ref`/`commit_sha` matching X
+
+`git show`/`git diff` default to printing the patch, so a plain `git show X`
+is a genuine read -- but `-s`/`--no-patch`/`--stat`/`--name-only`/
+`--name-status`/`--oneline`/`--quiet`/`--format=` all suppress it.
+`git show -s --format=%s X` prints exactly one line, the same shape as
+`git log --oneline`, and adversarial review found it discharged before this
+flag check existed -- reopening on the `show` side the exact hole the `-p`
+gate closes on the `log` side. `git cat-file` needs `-p` for the same
+reason `git log` does: `-t`/`-s`/`-e` print only the object's type, size, or
+existence, never its content.
 
 And, as a broad discharge that clears EVERY citation in the body rather than
 one specific SHA (because the command's own text does not name which commit
@@ -132,6 +168,31 @@ A cited SHA matches a discharge SHA by common hex prefix (either is a
 prefix of the other, case-insensitive) -- both are already >=7 characters
 by construction, so an abbreviated citation discharges against a full SHA a
 `git show` command read, and vice versa.
+
+UNREADABLE BODIES
+-----------------
+A forge-comment body this hook cannot read (`--body-file -` stdin, a
+missing `--body-file` target) does not silently pass: it asks the reduced
+question flag-unmeasured-timestamp.py's own UNREADABLE branch asks for its
+surface ("did ANY relevant read happen in this turn at all", since the
+specific cited SHA cannot be recovered) rather than staying quiet, because
+CLAUDE.md's own PowerShell/backtick-safety section mandates exactly
+`--body-file`/`-F body=@file` for a body carrying backticks -- and every SHA
+citation in this corpus is written backticked. Silently trusting an
+unreadable body would exempt precisely the posting route this hook's own
+target shape is written through (adversarial review, ai-config#3471).
+
+KNOWN SCOPE LIMIT
+-----------------
+`mcp__github__issue_write` and PR create/update body tools match the
+registered `mcp__github__.*` hooks.json matcher but are not in the imported
+`MCP_POST_TOOLS`, so a SHA narrative written directly into an issue or PR
+body (rather than a comment on one) is not checked. This mirrors
+flag-unmeasured-timestamp.py's own scope, which has the identical gap for
+the same reason -- `MCP_POST_TOOLS` is a COMMENT-posting registry, not every
+tool that can carry prose. Accepted rather than closed here: widening it
+changes what a sibling hook's identically-named import means, and an issue
+or PR body is a smaller, more visible target than a buried comment thread.
 
 WARN, NEVER BLOCK
 -----------------
@@ -222,31 +283,80 @@ def _looks_like_sha(token):
     return any(c in "abcdefABCDEF" for c in token)
 
 
-# The SHA the artifact is REPORTING about itself, not asserting a fact
-# about -- a claim-comment trailer or a session header, never a citation.
+# The SHA the artifact is REPORTING -- its own current position -- rather
+# than asserting a fact about what that commit DID. Trailer labels
+# ("Reviewed-Commit:", "HEAD="), and the position-report phrasings this
+# corpus's own session notebooks and PR-status recaps use constantly
+# ("clean at head `X`", "MERGED (squash, `X`)", "pushed at `X`", "Committed
+# `X`"): adversarial review measured this against ~500 real citations in
+# two live session notebooks and found the large majority were exactly this
+# shape, not a narrative claim needing verification (ai-config#3471). This
+# heuristic is deliberately generous rather than exhaustive -- it trades
+# missing an occasional real assertion phrased like a status line for not
+# nagging on the commonest true-positive-free pattern in this corpus.
 RX_REPORTING_LABEL = re.compile(
     r"(?:Reviewed[- ]Commit|Reviewed\s+commit|HEAD|head\s+commit|"
     r"Head\s+SHA|commit\s+hash)\s*[:=]\s*$", re.I)
+RX_REPORTING_CONTEXT = re.compile(
+    r"\b(?:at\s+head|head\s+is\s+now\s+at|squash(?:-merged)?\s*,?|"
+    r"pushed(?:\s+(?:at|to))?|merged\s*\(?|clean\s+at(?:\s+head)?|"
+    r"checked\s+out|committed|now\s+at)"
+    # No trailing \b: several alternatives above end in punctuation
+    # (",", "(") rather than a word character, so a \b there would require
+    # a word/non-word transition that does not exist -- e.g. "squash," is
+    # immediately followed by whitespace, both non-word, so \b fails right
+    # where the match should succeed (measured against "MERGED (squash,
+    # `X`)", adversarial review, ai-config#3471).
+    r"\s*[:,(`]?\s*$", re.I)
 
 # A pasted `git log`/`git show` excerpt, indented (quoted) rather than
-# asserted -- evidence being relayed, not a claim being made.
-RX_LOG_OUTPUT_LINE = re.compile(
-    r"^(?:[0-9a-fA-F]{7,40}\b|commit\s|Author:|Date:|Merge:|diff --git|"
-    r"@@|index |\+{3}\s|-{3}\s)")
+# asserted -- evidence being relayed, not a claim being made. `STRONG`
+# markers (a diff/log header line) are unambiguous on their own; a bare
+# hex-prefixed line (the `--oneline` shape) is ambiguous by itself -- a
+# single indented line reading "2d37c48 is where it broke, per my reading"
+# is a hand-written claim, not a paste -- so it is only treated as pasted
+# evidence when it co-occurs with a second such line in the same indented
+# paragraph (adversarial review, ai-config#3471).
+RX_STRONG_LOG_MARKER = re.compile(
+    r"^(?:commit\s|Author:|Date:|Merge:|diff --git|@@|index |\+{3}\s|-{3}\s)")
+RX_BARE_HEX_LINE = re.compile(r"^[0-9a-fA-F]{7,40}\b\s")
 
 
 def _strip_evidence_blocks(text):
-    """Blank fenced code blocks and indented git-log/show-style output."""
+    """Blank fenced code blocks and indented git-log/show-style output.
+
+    Operates on contiguous indented (>=4 space) PARAGRAPHS rather than
+    per-line, so a lone hand-written claim that happens to start with a SHA
+    is not silenced merely for being indented -- see RX_STRONG_LOG_MARKER's
+    docstring above.
+    """
     text = strip_fences(text)
     lines = text.split("\n")
-    out = []
-    for line in lines:
-        stripped = line.lstrip(" ")
-        indent = len(line) - len(stripped)
-        if indent >= 4 and RX_LOG_OUTPUT_LINE.match(stripped):
-            out.append("")
+    n = len(lines)
+    out = list(lines)
+    i = 0
+    while i < n:
+        stripped = lines[i].lstrip(" ")
+        indent = len(lines[i]) - len(stripped)
+        if indent >= 4 and stripped:
+            block = []
+            j = i
+            while j < n:
+                s2 = lines[j].lstrip(" ")
+                ind2 = len(lines[j]) - len(s2)
+                if ind2 >= 4 and s2:
+                    block.append(s2)
+                    j += 1
+                else:
+                    break
+            has_strong = any(RX_STRONG_LOG_MARKER.match(s) for s in block)
+            has_bare_hex = sum(1 for s in block if RX_BARE_HEX_LINE.match(s))
+            if has_strong or has_bare_hex >= 2:
+                for idx in range(i, j):
+                    out[idx] = ""
+            i = j
         else:
-            out.append(line)
+            i += 1
     return "\n".join(out)
 
 
@@ -280,7 +390,8 @@ def find_citations(text):
             continue
         start, end = m.start(), m.end()
         line_start = clean.rfind("\n", 0, start) + 1
-        if RX_REPORTING_LABEL.search(clean[line_start:start]):
+        prefix = clean[line_start:start]
+        if RX_REPORTING_LABEL.search(prefix) or RX_REPORTING_CONTEXT.search(prefix):
             continue
         if len(token) < 8 and not _has_cue(clean, start, end):
             continue
@@ -292,10 +403,19 @@ def find_citations(text):
 # Discharge: what in the transcript would settle a cited SHA
 # --------------------------------------------------------------------------
 
-RX_GIT_SHOW_DIFF_CATFILE = re.compile(
-    r"\bgit\s+(?:show|diff|cat-file)\b([^\n;&|]*)", re.I)
+RX_GIT_SHOW = re.compile(r"\bgit\s+show\b([^\n;&|]*)", re.I)
+RX_GIT_DIFF = re.compile(r"\bgit\s+diff\b([^\n;&|]*)", re.I)
+RX_GIT_CATFILE = re.compile(r"\bgit\s+cat-file\b([^\n;&|]*)", re.I)
 RX_GIT_LOG = re.compile(r"\bgit\s+log\b([^\n;&|]*)", re.I)
 RX_PATCH_FLAG = re.compile(r"(?:^|\s)(?:-p\b|--patch\b)", re.I)
+# `-s`/`--no-patch`/`--stat`/`--name-only`/`--name-status`/`--oneline`/
+# `--quiet`/`--format=` all suppress the patch on `git show`/`git diff` --
+# `git show -s --format=%s <sha>` prints one line, exactly `git log
+# --oneline`'s shape, and must not discharge for the same reason that must
+# not (adversarial review, ai-config#3471).
+RX_NO_PATCH_FLAG = re.compile(
+    r"(?:^|\s)(?:-s\b|--no-patch\b|--stat\b|--name-only\b|--name-status\b|"
+    r"--oneline\b|--quiet\b|-q\b|--format=)", re.I)
 RX_GH_API_COMMIT = re.compile(r"/commits?/([0-9a-fA-F]{7,40})\b", re.I)
 RX_GH_API_PR_COMMITS = re.compile(
     r"\bgh\s+api\s+\S*/pulls/\d+/commits\b", re.I)
@@ -308,8 +428,21 @@ def _shas_in_segment(segment):
 def _bash_discharges(command):
     """(specific_shas: set[str], broad: bool) this Bash command would settle."""
     specific = set()
-    for m in RX_GIT_SHOW_DIFF_CATFILE.finditer(command):
-        specific |= _shas_in_segment(m.group(1))
+    for m in RX_GIT_SHOW.finditer(command):
+        rest = m.group(1)
+        if not RX_NO_PATCH_FLAG.search(rest):
+            specific |= _shas_in_segment(rest)
+    for m in RX_GIT_DIFF.finditer(command):
+        rest = m.group(1)
+        if not RX_NO_PATCH_FLAG.search(rest):
+            specific |= _shas_in_segment(rest)
+    for m in RX_GIT_CATFILE.finditer(command):
+        # `git cat-file -p <sha>` prints the object's content; `-t`/`-s`/`-e`
+        # print only its type, size, or existence -- reusing RX_PATCH_FLAG's
+        # `-p` clause since that is the one cat-file flag that reads content.
+        rest = m.group(1)
+        if RX_PATCH_FLAG.search(rest):
+            specific |= _shas_in_segment(rest)
     for m in RX_GIT_LOG.finditer(command):
         rest = m.group(1)
         if RX_PATCH_FLAG.search(rest):
@@ -412,9 +545,24 @@ def _sha_covered(token, discharged, broad):
 RX_SCRATCH_PATH = re.compile(
     r"(?:^|[/\\])(?:tmp|scratchpad|node_modules|\.git)(?:[/\\]|$)", re.I)
 
+# Narrowed to prose/documentation extensions, not "any non-scratch file"
+# (adversarial review, ai-config#3471): a GitHub Actions SHA pin
+# (`uses: actions/checkout@<sha>`) and a lockfile hash field are both
+# 7-40 char hex tokens in a tracked, non-scratch file, and neither is a
+# narrative claim about what a commit did -- a pin can never be discharged
+# at all, since the object lives in another repository entirely. Scoping to
+# the extensions where a case entry, memory file, or doc prose actually
+# lives keeps the measured failure (a `.md` case entry) in scope while
+# removing that whole false-positive class. This also means this hook's own
+# `.py` source -- which quotes the measurement's SHAs in its docstring --
+# is never itself in scope, so editing this file does not trip the guard it
+# defines (shared/writing/examples-are-scanned.md).
+RX_DOC_EXTENSION = re.compile(r"\.(?:md|markdown|txt|rst|qmd|rmd)$", re.I)
+
 
 def _in_scope_path(path):
-    return bool(path) and not RX_SCRATCH_PATH.search(path)
+    return (bool(path) and not RX_SCRATCH_PATH.search(path)
+            and bool(RX_DOC_EXTENSION.search(path)))
 
 
 def _target_path(tool_input):
@@ -454,9 +602,20 @@ def _extract_write_content(tool_input):
 
 
 def _bash_comment_body(command, cwd):
-    """The body a Bash forge-comment/review post would send, or None."""
+    """("body", text) / ("unreadable", None) / (None, None) for a Bash
+    forge-comment/review post.
+
+    Distinguishing "posts, but this check cannot read the body" from "does
+    not post" matters here exactly as it does in flag-unmeasured-timestamp.py:
+    CLAUDE.md's own PowerShell/backtick-safety section mandates `--body-file`
+    / `-F body=@file` precisely for a body carrying backticks, and every SHA
+    citation in this corpus is written as `` `2d37c48` `` -- backticked. So
+    the prescribed posting route for this guard's own target shape is
+    exactly the one a naive "body is None -> nothing to check" would let
+    through silently (adversarial review, ai-config#3471).
+    """
     if RX_COMMENT_POST is None or strip_heredocs is None or extract_body_text is None:
-        return None
+        return None, None
     stripped = strip_heredocs(command)
     segments = _split_segments(stripped) if _split_segments else [stripped]
     for segment in segments:
@@ -474,31 +633,41 @@ def _bash_comment_body(command, cwd):
         body = extract_body_text(segment, cwd)
         if body is None and _short_flag_body:
             body = _short_flag_body(segment, cwd)
-        return body
-    return None
+        if body is None:
+            return "unreadable", None
+        return "body", body
+    return None, None
 
 
 def _post_from_payload(tool_name, tool_input, cwd):
-    """(body, surface) for the artifact this tool call would write, or (None, None)."""
+    """(kind, body, surface) for the artifact this tool call would write.
+
+    `kind` is "body" (content in `body`), "unreadable" (posts, but this
+    check cannot read what), or None (out of scope).
+    """
     if tool_name in BASH_TOOL_NAMES:
         command = (tool_input.get("command") or tool_input.get("CommandLine")
                    or tool_input.get("cmd") or tool_input.get("script"))
         if isinstance(command, str) and command.strip():
-            body = _bash_comment_body(command, cwd)
-            if body:
-                return body, "comment body"
-        return None, None
+            kind, body = _bash_comment_body(command, cwd)
+            if kind == "body" and body:
+                return "body", body, "comment body"
+            if kind == "unreadable":
+                return "unreadable", None, "comment body"
+        return None, None, None
     if tool_name in WRITE_TOOL_NAMES:
         target = _target_path(tool_input)
         if target and _in_scope_path(target):
             content = _extract_write_content(tool_input)
             if isinstance(content, str) and content.strip():
-                return content, f"edit to `{os.path.basename(target)}`"
-        return None, None
+                return "body", content, f"edit to `{os.path.basename(target)}`"
+        return None, None, None
     if tool_name in MCP_POST_TOOLS:
         body = tool_input.get("body")
-        return (body, "comment body") if isinstance(body, str) else (None, None)
-    return None, None
+        if isinstance(body, str):
+            return "body", body, "comment body"
+        return None, None, None
+    return None, None, None
 
 
 NOTE = (
@@ -513,6 +682,16 @@ NOTE = (
     "alone, turned out backwards on both). Read the commit before asserting "
     "what it did, or say the claim is relayed rather than verified."
 )
+
+UNREADABLE_NOTE = (
+    "[flag-unread-commit-citation] This posts a forge comment whose body "
+    "this check cannot read (it comes from a file not yet on disk, from "
+    "stdin, or from an editor). If it cites a commit SHA, confirm you have "
+    "actually read that commit (`git show`/`git log -p`/etc.) rather than "
+    "reconstructing the claim from `git log --oneline` alone -- see "
+    "CLAUDE.md, \"Don't take anyone's word for it\", and ai-config#3471."
+)
+UNREADABLE_SHA = "(body not readable)"
 
 
 def _read_payload():
@@ -547,35 +726,51 @@ def main() -> int:
     tpath = payload.get("transcript_path") or ""
 
     try:
-        body, surface = _post_from_payload(tool_name, tool_input, cwd)
-        if not body:
+        kind, body, surface = _post_from_payload(tool_name, tool_input, cwd)
+        if kind is None:
             if is_dry_run:
                 print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
             return 0
 
-        citations = find_citations(body)
-        if not citations:
-            if is_dry_run:
-                print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
-            return 0
+        if kind == "unreadable":
+            # Cannot correlate to a specific SHA, so this only asks "did ANY
+            # commit-reading command run in this turn at all" -- mirroring
+            # flag-unmeasured-timestamp.py's UNREADABLE branch, which asks
+            # the same reduced question ("was the clock read at all") for
+            # the surface it cannot see into either.
+            turn_start = _turn_start(tpath)
+            discharged, broad = _discharged_since(tpath, turn_start)
+            if discharged or broad:
+                if is_dry_run:
+                    print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
+                return 0
+            unresolved = UNREADABLE_SHA
+            body_for_key = ""
+        else:
+            citations = find_citations(body)
+            if not citations:
+                if is_dry_run:
+                    print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
+                return 0
 
-        turn_start = _turn_start(tpath)
-        discharged, broad = _discharged_since(tpath, turn_start)
+            turn_start = _turn_start(tpath)
+            discharged, broad = _discharged_since(tpath, turn_start)
 
-        unresolved = None
-        for _start, _end, token in citations:
-            if not _sha_covered(token, discharged, broad):
-                unresolved = token
-                break
+            unresolved = None
+            for _start, _end, token in citations:
+                if not _sha_covered(token, discharged, broad):
+                    unresolved = token
+                    break
 
-        if unresolved is None:
-            if is_dry_run:
-                print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
-            return 0
+            if unresolved is None:
+                if is_dry_run:
+                    print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
+                return 0
+            body_for_key = body
 
         if not is_dry_run:
             key = hashlib.sha256(
-                (tpath + "|" + body + "|" + unresolved).encode()).hexdigest()[:16]
+                (tpath + "|" + body_for_key + "|" + unresolved).encode()).hexdigest()[:16]
             sentinel = os.path.join(
                 tempfile.gettempdir(), f".claude-unread-commit-{key}")
             if os.path.exists(sentinel):
@@ -585,12 +780,19 @@ def main() -> int:
             except Exception:
                 pass
 
-        context = NOTE.format(surface=surface or "comment body", sha=unresolved)
-        message = (
-            f"Commit citation reminder: this {surface or 'comment body'} "
-            f"cites `{unresolved}` with no read of that commit in this "
-            f"turn. Run `git show {unresolved}` (or equivalent) before "
-            f"restating what it did.")
+        if unresolved == UNREADABLE_SHA:
+            context = UNREADABLE_NOTE
+            message = (
+                "Commit citation reminder: this comment's body cannot be "
+                "read by this check. If it cites a commit SHA, confirm you "
+                "actually read that commit before posting.")
+        else:
+            context = NOTE.format(surface=surface or "comment body", sha=unresolved)
+            message = (
+                f"Commit citation reminder: this {surface or 'comment body'} "
+                f"cites `{unresolved}` with no read of that commit in this "
+                f"turn. Run `git show {unresolved}` (or equivalent) before "
+                f"restating what it did.")
         out = {
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",

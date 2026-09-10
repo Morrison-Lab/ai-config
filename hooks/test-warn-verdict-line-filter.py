@@ -73,7 +73,6 @@ def test_suite() -> list[str]:
 
     # Additional warn cases: pulls/comments with slice, --json comments with NOT CLEAN, --json reviews with Reviewed commit
     more_warns = [
-        ("pulls comments with slice", 'gh api pulls/456/comments | jq \'.[] | .body | split("\\n") | .[0:5]\''),
         ("--json comments with NOT CLEAN", 'gh pr view 42 --json comments --jq \'.comments[].body | split("\\n") | map(select(test("NOT CLEAN")))\''),
         ("--json reviews with Reviewed commit", 'gh pr view 42 --json reviews --jq \'.reviews[].body | test("Reviewed commit")\''),
         ("--json state,comments with verdict filter", 'gh pr view 42 --json state,comments --jq \'.comments[].body | split("\\n") | map(select(test("Verdict")))\''),
@@ -128,6 +127,15 @@ def test_suite() -> list[str]:
     if res4.returncode != 0 or res4.stdout.strip() != "":
         failures.append(f"case 4 failed: returncode={res4.returncode}, stdout={res4.stdout!r}")
     print(f"  {'FAIL' if len(failures) > prev else 'ok  '} case 4: comments fetch with plain body stays silent")
+
+    # Case 4b: a bare jq slice over the comments array is paging, not a
+    # verdict-line read; without a split of the body it must stay silent
+    cmd_bare_slice = 'gh api repos/owner/repo/issues/123/comments | jq ".[0:5]"'
+    res4b = run_hook(bash_payload(cmd_bare_slice))
+    prev = len(failures)
+    if res4b.returncode != 0 or res4b.stdout.strip() != "":
+        failures.append(f"case 4b failed: returncode={res4b.returncode}, stdout={res4b.stdout!r}")
+    print(f"  {'FAIL' if len(failures) > prev else 'ok  '} case 4b: bare slice over the comments array stays silent")
 
     # Additional silent: --json commentsX (not a real comments field) stays silent
     cmd_comments_x = (

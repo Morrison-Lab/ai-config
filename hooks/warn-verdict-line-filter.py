@@ -20,7 +20,7 @@ RX_FETCH_COMMENTS = re.compile(
 )
 
 RX_VERDICT_LINES = re.compile(
-    r'split\("(\\n|\n)"\)|test\("[^"]*(?:Verdict|Ready for merge|Needs more work|NOT CLEAN|NOT_CLEAN|Reviewed commit)[^"]*"\)|\.\[\d+:\d+\]'
+    r'split\("(\\n|\n)"\)|test\("[^"]*(?:Verdict|Ready for merge|Needs more work|NOT CLEAN|NOT_CLEAN|Reviewed commit)[^"]*"\)'
 )
 
 RX_JQ_FILTER_FILE = re.compile(

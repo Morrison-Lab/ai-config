@@ -294,30 +294,35 @@ principle, because the domain the guard reads from ties them together, so
 no test case anyone could write would ever exercise one without the other.
 
 (Morrison-Lab/ai-config#3506, drafting `hooks/no-move-without-inbound-sweep.py`.
-Two guard conditions in nested loops, not an `and` or an `or` in one
-expression: the outer loop skipped a source path with `if src in renamed`, and
-the inner loop skipped a destination with `if dst == src or dst in renamed`.
+Two guard conditions in nested loops, not an `and` or an `or` in one expression:
+the outer loop skipped a source path already seen as a rename, and the inner
+loop's skip tested the destination against that same set alongside its own
+self-move check.
 The belief behind the pair was that each side independently identified a
 rename.
 Git's diff format names both the old and new path on every rename record it
 emits, so the two conditions are true or false together for every input a real
 diff can produce --- there is no rename where one holds and the other does not.
 The ordinary test suite passed.
-The mutation check broke `src in renamed` alone, expecting the suite to catch
-it, and the suite stayed green: the inner condition covered for the broken
-outer one on every case in the corpus, because it always does.
-
-**The two-sided code never reached the PR**, which is what makes this a weaker
-citation than it looks and worth saying rather than leaving a reader to
-discover: the mutation ran against the working tree and the fix landed before
-the first commit, so #3506's history carries only the single-sided form from
-`58ece6c4` onward.
-The PR is where the guard lives and where the surviving mutation
-(`renames not skipped`) can be read.
-The coupling itself is reproducible only by reintroducing the inner condition.)
+The mutation check broke the outer condition alone, expecting the suite to catch
+it, and the suite stayed green: the inner one covered for it on every case in
+the corpus, because it always does.
 The fix was to collect only one side of the pair, which leaves a single
-condition a test can actually pin, rather than two that read as a
-redundant safety margin and are actually an untestable coupling.
+condition a test can actually pin, rather than two that read as a redundant
+safety margin and are actually an untestable coupling.
+
+**Neither condition is quoted here, and the two-sided code never reached the
+PR.**
+The mutation ran against the working tree and the fix landed before the first
+commit, so #3506's history carries only the single-sided form from `58ece6c4`
+onward.
+An earlier draft of this record quoted the expression verbatim, twice, and both
+quotes were reconstructions from the authoring session rather than anything a
+reader could open --- which is the failure this file's neighbouring entries are
+about, committed inside a record about verification.
+What #3506 does show is the guard as it shipped and the surviving mutation,
+`renames not skipped`; the coupling is reproducible only by reintroducing the
+inner condition.)
 
 The transferable question comes before the test rather than after it: can the
 domain a guard reads from ever make its two conditions differ?
@@ -327,7 +332,7 @@ Where the answer is no, collapsing the pair to the one condition a test can
 isolate is the fix, not keeping both as apparent defense in depth --- and a
 green suite under a mutation that broke one clause is evidence of the coupling
 rather than of coverage, since a same-valued sibling passes the mutant through
-undetected.)
+undetected.
 
 ## The harness that performs those mutations needs the same scrutiny
 

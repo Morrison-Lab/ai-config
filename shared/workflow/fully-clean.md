@@ -954,7 +954,7 @@ NOT clean over a clean verdict.**
   finding without reading the verdict body it matched.
 
 **Your own disposition comment is a third surface,
-and it is the one the payload rule cannot reach:
+and it is the one a `review-data` payload cannot reach:
 the instrument can read the PR author's ARD comment as a not-clean verdict from a reviewer,
 and then hold the per-reviewer gate on it.**
 Measured 2026-09-09 on [ai-config#3493](https://github.com/Morrison-Lab/ai-config/pull/3493).

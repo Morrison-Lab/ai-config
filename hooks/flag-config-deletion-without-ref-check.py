@@ -295,11 +295,13 @@ MANIFEST_NAMES = frozenset({"settings.json", "config.toml", "config.json",
 CD_VERBS = frozenset({"cd", "pushd", "popd"})
 
 # Constructs whose argv is not what the shell would pass: the value of a
-# command substitution is unknown here, and a heredoc BODY is blanked by
-# `shellcmd._heredoc_free` before `shlex` ever sees it. Union the argv verdict
-# with the lexical one for these, per the issue's "fall back to the lexical
-# path rather than to silence".
-RX_UNPARSEABLE = re.compile(r"[$][(]|`|<<")
+# command substitution is unknown here, a heredoc BODY is blanked by
+# `shellcmd._heredoc_free` before `shlex` ever sees it, and a PROCESS
+# substitution splits into an argv whose `argv[0]` is the outer program, so
+# `diff <(cat <manifest>) <(cat other)` presents `diff` where `cat` ran. Union
+# the argv verdict with the lexical one for all three, per the issue's "fall
+# back to the lexical path rather than to silence".
+RX_UNPARSEABLE = re.compile(r"[$][(]|`|<<|[<>][(]")
 
 HOME = os.path.expanduser("~")
 

@@ -387,6 +387,20 @@ _ATTRIBUTION_CASES = [
     ("sudo -u me cat ~/.claude/settings.json", set(),
      "strip_env peels a zero-argument wrapper only, so a wrapper carrying "
      "its own option hides the read verb (ai-config#3321)"),
+    # Process substitution is the third construct whose argv is not the
+    # shell's: the split leaves `diff` in argv[0] where `cat` ran, so without
+    # the union this reads as no verb at all and the lexical path -- which
+    # credits it -- is never consulted.
+    ("diff <(cat ~/.claude/settings.json) <(cat /tmp/other.json)", {"claude"},
+     "a process substitution falls back to the lexical path, not to silence"),
+    # The `=`-joined long-option form, which advances by exactly one token
+    # whichever table the option belongs to.
+    ("grep --regexp='~/.claude/settings.json' README.md", set(),
+     "an `=`-joined pattern option supplies the pattern and consumes no "
+     "further token, so README.md is still the only file operand"),
+    ("grep --include=*.json hooks ~/.claude/settings.json", {"claude"},
+     "an `=`-joined value option must NOT also eat the next token, or the "
+     "pattern shifts and the manifest is dropped as the pattern positional"),
 ]
 print("(argv parse active: %s)" % (_ns["simple_commands_with_scope"] is not None))
 for _command, _expected, _desc in _ATTRIBUTION_CASES:

@@ -41,7 +41,8 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   (`Unknown shorthand flag`) from a command that parsed fine and died later
   (`Unauthenticated`, or `Accepts 1 arg(s), received 0` when the endpoint
   path is missing).
-  `-R` is what makes the silent-success case above observable at all.
+  Any checkout with a GitLab remote shows the silent-success case above just
+  as well; `-R` is simply what reaches it from one that has none.
   (`glab 1.106.0`, 2026-09-09; recovered from a 2026-06-22 stash, the one
   entry of thirteen whose content had never reached `main`.)
 - `glab issue list --opened` is deprecated --- `--opened` is the default when `--closed` is not used.

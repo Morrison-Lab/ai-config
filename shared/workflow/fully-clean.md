@@ -953,10 +953,13 @@ NOT clean over a clean verdict.**
 - **Don't:** treat a `contains findings (matched pattern ...)` line as a real
   finding without reading the verdict body it matched.
 
-**Your own disposition comment is a third surface, and it is the one the payload rule cannot reach: the instrument can read the PR author's ARD comment as a not-clean verdict from a reviewer, and then hold the per-reviewer gate on it.**
+**Your own disposition comment is a third surface,
+and it is the one the payload rule cannot reach:
+the instrument can read the PR author's ARD comment as a not-clean verdict from a reviewer,
+and then hold the per-reviewer gate on it.**
 Measured 2026-09-09 on [ai-config#3493](https://github.com/Morrison-Lab/ai-config/pull/3493).
 A round-2 disposition comment, agent-posted under the author's login, opened a bullet with "Blocking finding (...): Addressed".
-`check-pr-fully-clean.py` matched `Block(ed|ing)` outside a `non-` prefix, classified the comment as a verdict-bearing statement from the author with verdict not-clean, and the per-reviewer rule from #2274 then held the PR NOT clean through two later CLEAN payload rounds from the bot, because a later all-clear from a different reviewer does not supersede a reviewer's own not-clean statement.
+`check-pr-fully-clean.py` matched the `VERDICT_NOT_CLEAN_PATTERNS` alternative `(?<!non-)(?<!non\s)Block(?:ed|ing)?`, classified the comment as a verdict-bearing statement from the author with verdict not-clean, and the per-reviewer rule from [ai-config#2274](https://github.com/Morrison-Lab/ai-config/issues/2274) then held the PR NOT clean through two later CLEAN payload rounds from the bot, because a later all-clear from a different reviewer does not supersede a reviewer's own not-clean statement.
 A later plain status comment from the same author did not count as a clean statement either, so the only exit was editing the original wording.
 Tracked as [ai-config#3502](https://github.com/Morrison-Lab/ai-config/issues/3502).
 

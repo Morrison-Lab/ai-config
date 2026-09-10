@@ -35,27 +35,6 @@ PATTERNS = [
 ]
 RX = re.compile("|".join(PATTERNS), re.I)
 
-# A second shape the PATTERNS above cannot see: the offer phrased as a
-# DECLARATIVE PREFERENCE rather than a question, referring to the artifact by
-# anaphora ("a ninth") rather than by name. It reads as deference instead of a
-# request, so it survives self-review, and no pattern above matches it.
-# Requires filing/recording vocabulary in the same message, so an unrelated
-# deferral ("I'd rather you decide which merge strategy") does not fire.
-DEFER = [
-    r"i'?d rather (you|we) (tell|decide|say|choose|pick)",
-    r"i'?(ll| will) leave (it|that|this|the|that) ?(call|decision)? ?(to|with) you",
-    r"your call whether",
-]
-RX_DEFER = re.compile("|".join(DEFER), re.I)
-
-# Filing/recording domain, deliberately broader than PATTERNS' verb list so an
-# anaphoric reference still lands as long as the message names the domain
-# somewhere.
-DOMAIN = re.compile(
-    r"\b(issues?|filed|filing|(tracking|tracker) issue|follow-?ups?)\b",
-    re.I,
-)
-
 
 def last_assistant_text(path):
     last = ""
@@ -111,35 +90,6 @@ except Exception:
         return _CODE_SPAN_RE.sub(" ", _FENCE_RE.sub(" ", text))
 
 
-_SENTENCE_RE = re.compile(r"[^.!?]+[.!?]*")
-
-
-def _defer_hit(prose):
-    """A deferral only counts when the filing vocabulary is in the SAME sentence.
-
-    A whole-message conjunction fires on any long reply that defers about one
-    thing and happens to mention an issue elsewhere, which blocks a legitimate
-    turn (ai-config#3520 review round 1).
-    """
-    for sentence in _SENTENCE_RE.findall(prose):
-        if RX_DEFER.search(sentence) and DOMAIN.search(sentence):
-            return RX_DEFER.search(sentence)
-    return None
-
-
-def _seen_once(text):
-    """True when this exact message already produced output (idempotence)."""
-    key = hashlib.sha256(text.encode()).hexdigest()[:16]
-    sentinel = os.path.join(tempfile.gettempdir(), f".claude-offer-warn-{key}")
-    if os.path.exists(sentinel):
-        return True
-    try:
-        open(sentinel, "w").close()
-    except Exception:
-        pass
-    return False
-
-
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -153,24 +103,6 @@ def main() -> int:
     prose = strip_code(text)
     hit = RX.search(prose)
     if not hit:
-        # The DEFER arm WARNS rather than blocks, and the reason is precision
-        # rather than the undecidable-authorization argument
-        # flag-cop-out-offer.py makes -- that hook matches reliably and warns
-        # because the right RESPONSE is undecidable, which is a different
-        # problem. Here the DETECTION is the uncertain half: scored against
-        # ten probes (three real deferrals, seven ordinary sentences) this
-        # arm was 3/3 and 0/7, but ten hand-written probes are not evidence
-        # of a rate. Warning keeps a misfire cheap while the sample grows.
-        defer = _defer_hit(prose)
-        if defer and not _seen_once(text):
-            print(json.dumps({"systemMessage": (
-                "[hook: no-offer-to-file] This reply defers a filing decision "
-                f"back to the user ({defer.group(0)!r}) in a sentence that also "
-                "names filing or tracking.\n"
-                "report-mistakes-proactively: file a valid finding without asking, "
-                "and note that how many you have already filed is not an input.\n"
-                "Warning only -- disregard if this deferral is not about filing."
-            )}))
         return 0
 
     # fire at most once per distinct message

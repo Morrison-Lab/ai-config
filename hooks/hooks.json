@@ -1038,7 +1038,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-offer-to-file.py\"",
             "timeout": 10,
             "script": "no-offer-to-file.py",
-            "why": "report-mistakes-proactively 'Filing is not gated on approval' -- blocks a reply that offers to file or record instead of doing it. Extended 2026-09-10 (ai-config#3520) with a second, WARN-ONLY arm for the offer phrased as a DECLARATIVE PREFERENCE that hands the decision back ('I'd rather you tell me whether it is worth a ninth'), which asks nothing and names the artifact only by anaphora. That arm warns rather than blocks on PRECISION grounds, which is a different argument from flag-cop-out-offer.py's -- that hook matches reliably and warns because the right response is undecidable, whereas here the detection itself is the uncertain half. It requires an unambiguous filing artifact (issue/filed/filing/follow-up, not bare 'record' or 'memory') in the same sentence as the deferral; scored against ten hand-written probes it was 3/3 on real deferrals and 0/7 on ordinary sentences, which is a sample rather than a rate. A run-on sentence or unpunctuated list still defeats the sentence split; warning keeps that misfire cheap."
+            "why": "report-mistakes-proactively 'Filing is not gated on approval' -- blocks a reply that offers to file or record instead of doing it."
           },
           {
             "type": "command",
@@ -1066,7 +1066,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unfiled-finding.py\"",
             "timeout": 10,
             "script": "no-unfiled-finding.py",
-            "why": "report-mistakes-proactively 'Filing is not gated on approval' -- no-offer-to-file.py catches the interrogative OFFER and, since ai-config#3520, the deferral-shaped one; this catches the DECLARATIVE ASSERTION that a finding is worth an issue, which neither of those shapes covers."
+            "why": "report-mistakes-proactively 'Filing is not gated on approval' -- no-offer-to-file.py catches the OFFER, interrogative or not (`want me to file` and `say the word and I will file` both match with no `?`); this catches the DECLARATIVE ASSERTION that a finding is worth an issue, which asks nothing and so slips past it. Neither covers the deferral shape ('I would rather you tell me whether it is worth a ninth'); ai-config#3520 records why a lexical guard for that was attempted and abandoned."
           },
           {
             "type": "command",

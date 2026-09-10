@@ -41,75 +41,6 @@ CASES = [
     ([TOOL, say("I could file an issue about this?")], True, "i could file an issue blocks"),
     ([TOOL, say("Want me to file the issue and open that PR?")], True, "bundled offer blocks"),
 
-    # True positives: the DECLARATIVE PREFERENCE shape (ai-config#3520).
-    # Verbatim sentence that slipped past every pattern on 2026-09-10.
-    (
-        [TOOL, say(
-            "That's arguably a guard gap (a tag-only push ships no commits), "
-            "but I've filed enough guard issues this session that I'd rather "
-            "you tell me whether it's worth a ninth than assume it."
-        )], "warn", "declarative preference deferring a filing decision warns",
-    ),
-    (
-        [TOOL, say("I'll leave the call to you on whether this needs an issue.")],
-        "warn", "leave the call to you plus filing domain warns",
-    ),
-    (
-        [TOOL, say("Your call whether that's worth tracking as an issue.")],
-        "warn", "your call whether plus a filing artifact warns",
-    ),
-
-    # Negative: the same deferral with NO filing/recording domain in the
-    # message is an ordinary judgment handback, not an unfiled finding.
-    (
-        [TOOL, say("Both rebases are equally safe, so I'd rather you decide which one to take.")],
-        "pass", "deferral with no filing vocabulary stays silent",
-    ),
-    (
-        [TOOL, say("Your call whether to squash or rebase merge this branch.")],
-        "pass", "your call whether about merge strategy stays silent",
-    ),
-
-    # Negative: the DEFER phrase and the DOMAIN word are in DIFFERENT
-    # sentences. A whole-message conjunction would block these; the
-    # sentence-scoped gate must not (ai-config#3520 review round 1).
-    (
-        [TOOL, say(
-            "Filed as #3519. Separately, both rebases are equally safe, "
-            "so I'd rather you decide which one to take."
-        )], "pass", "deferral in a different sentence from the filing report stays silent",
-    ),
-    (
-        [TOOL, say(
-            "I opened the tracking issue already. Your call whether to squash "
-            "or rebase this branch."
-        )], "pass", "your call whether about merge, with an issue elsewhere, stays silent",
-    ),
-    (
-        [TOOL, say("I'd rather you decide which of these files to keep.")],
-        "pass", "literal use of files as a noun stays silent",
-    ),
-
-    # Negative: DEFER plus an AMBIGUOUS word that is not a filing artifact.
-    # These are the round-3 reviewer's own probes; the narrowed DOMAIN is what
-    # keeps them silent (ai-config#3520).
-    (
-        [TOOL, say("I'd rather you decide how to record the vote tally in the spreadsheet.")],
-        "pass", "record as an ordinary verb stays silent",
-    ),
-    (
-        [TOOL, say("Your call whether the memory allocator needs tuning here.")],
-        "pass", "memory as a computing term stays silent",
-    ),
-    (
-        [TOOL, say("I'll leave the decision to you about which tickets to buy for the show.")],
-        "pass", "tickets in a non-forge sense stays silent",
-    ),
-    (
-        [TOOL, say("I'll leave that call to you on whether to open a follow-up.")],
-        "warn", "leave that call to you (extra noun) still warns",
-    ),
-
     # Negative cases: trigger phrases quoted inside inline code spans
     (
         [TOOL, say("We shouldn't add a hook for `want me to file` because it is too broad.")],
@@ -181,11 +112,7 @@ def run(events):
             text=True,
             env=env,
         ).stdout
-        if '"decision": "block"' in out or '"decision":"block"' in out:
-            return "block"
-        if '"systemMessage"' in out:
-            return "warn"
-        return "pass"
+        return '"decision": "block"' in out or '"decision":"block"' in out
     finally:
         os.unlink(path)
 
@@ -193,14 +120,12 @@ def run(events):
 def main():
     passes = failures = 0
     for events, expected, label in CASES:
-        raw = run(events)
-        # Legacy cases use True/False for block; DEFER cases use "warn".
-        got = raw if isinstance(expected, str) else (raw == "block")
+        got = run(events)
         if got == expected:
             print(f"PASS: {label}")
             passes += 1
         else:
-            print(f"FAIL: {label} (expected {expected}, got {got})")
+            print(f"FAIL: {label} (expected block={expected}, got {got})")
             failures += 1
 
     # Sentinel behavior: same message twice should not block on second run
@@ -232,27 +157,6 @@ def main():
         print("FAIL: sentinel did not suppress repeat block")
         failures += 1
 
-
-    # Warn-arm idempotence: the same deferral message twice must warn once.
-    fd, path = tempfile.mkstemp(suffix=".jsonl")
-    with os.fdopen(fd, "w") as fh:
-        fh.write(json.dumps(say(
-            "I've filed enough issues today that I'd rather you tell me whether "
-            "this one is worth it."
-        )) + "\n")
-    env = dict(os.environ, TMPDIR=tempfile.mkdtemp())
-    payload = json.dumps({"transcript_path": path})
-    w1 = subprocess.run([sys.executable, HOOK], input=payload,
-                        capture_output=True, text=True, env=env).stdout
-    w2 = subprocess.run([sys.executable, HOOK], input=payload,
-                        capture_output=True, text=True, env=env).stdout
-    os.unlink(path)
-    if '"systemMessage"' in w1 and '"systemMessage"' not in w2:
-        print("PASS: warn arm fires once per message")
-        passes += 1
-    else:
-        print("FAIL: warn arm should fire once per message")
-        failures += 1
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

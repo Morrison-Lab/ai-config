@@ -371,13 +371,21 @@ def commands(rec) -> list:
     for block in content:
         if not isinstance(block, dict) or block.get("name") != "Bash":
             continue
-        args = block.get("input") or {}
+        args = block.get("input")
         if isinstance(args, str):
             try:
                 args = json.loads(args)
-            except Exception:
+            except ValueError:
                 continue
-        cmd = (args or {}).get("command")
+        # Every `.get()` target gets type-checked, not only the ones a review
+        # has named. Narrowing this module's blanket `except Exception` closed
+        # the reported hole and removed the net that had been absorbing this
+        # sibling one, turning a silent fail-open into a crash -- so the
+        # obligation the narrowing creates is to enumerate what the blanket was
+        # covering, rather than to fix the single case that was reported.
+        if not isinstance(args, dict):
+            continue
+        cmd = args.get("command")
         if isinstance(cmd, str):
             out.append(cmd)
     return out
@@ -418,7 +426,10 @@ def is_commit(command: str) -> bool:
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
-    except Exception:
+    except ValueError:
+        return 0
+    if not isinstance(payload, dict):
+        # Valid JSON that is not an object: a bare list, string, or number.
         return 0
 
     if payload.get("tool_name") != "Bash":

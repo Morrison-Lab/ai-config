@@ -224,6 +224,24 @@ def test_swept():
           not guard.swept(p2, "preferences.md"))
     os.unlink(p2)
 
+    # Every `.get()` target, not only the reported one. Narrowing the module's
+    # blanket `except Exception` closed the `message` hole and exposed this
+    # sibling in `input`, turning a silent fail-open into a crash.
+    for label, blk in (("a list", [1, 2]),
+                       ("a JSON string decoding to a list", "[1,2]"),
+                       ("a number", 7)):
+        rec = {"message": {"content": [{"name": "Bash", "input": blk}],
+                           "_x": "preferences.md"}}
+        try:
+            got = guard.commands(rec)
+            ok = got == []
+        except Exception:
+            ok = False
+        check(f"a Bash block whose input is {label} does not crash", ok)
+
+    check("a non-dict record yields no commands",
+          guard.commands("not a dict") == [])
+
     # A bad record must not hide a real sweep on a LATER line either.
     fd, p2 = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w") as fh:
@@ -359,6 +377,14 @@ def test_end_to_end():
     check("silent on an empty payload", out.stdout.strip() == "")
     check("exits 0 on an empty payload", out.returncode == 0)
 
+    # A syntactically valid payload that is not an object.
+    e = dict(os.environ)
+    e.pop("ANTIGRAVITY_AGENT", None)
+    out = subprocess.run([sys.executable, TARGET], input="[1,2,3]",
+                         capture_output=True, text=True, env=e, timeout=30)
+    check("exits 0 on a bare-list payload", out.returncode == 0)
+    check("silent on a bare-list payload", out.stdout.strip() == "")
+
 
 # --------------------------------------------------------------------------
 # Mutation checks
@@ -391,8 +417,15 @@ MUTATIONS = [
      "    while False:"),
     ("message not type-checked", "    if not isinstance(msg, dict):",
      "    if False:"),
-    ("a bad record clears the transcript", "            except ValueError:",
-     "            except ValueError:\n                return True\n            except TypeError:"),
+    # Anchored with its following line: `except ValueError:` alone now appears
+    # twice, since `commands()` narrowed its own catch in the same round.
+    ("a bad record clears the transcript",
+     "            except ValueError:\n                continue\n            for cmd in commands(rec):",
+     "            except ValueError:\n                return True\n            for cmd in commands(rec):"),
+    ("tool input not type-checked", "        if not isinstance(args, dict):",
+     "        if False:"),
+    ("payload not type-checked", "    if not isinstance(payload, dict):",
+     "    if False:"),
 ]
 
 

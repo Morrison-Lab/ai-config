@@ -24,8 +24,9 @@ RX_VERDICT_LINES = re.compile(
 )
 
 # A split of the body on its own is not a verdict-line read: a split followed
-# by length counts lines. It becomes one when the split lines are then sliced.
-RX_SPLIT_THEN_SLICE = re.compile(r'split\("(\\n|\n)"\).*\.\[\d+:\d+\]')
+# by length counts lines. It becomes one when the split lines are then sliced,
+# with any bound shape: .[0:4], .[:4], .[-4:], .[-4:-1].
+RX_SPLIT_THEN_SLICE = re.compile(r'split\("(\\n|\n)"\).*\.\[-?\d*:-?\d*\]')
 
 RX_JQ_FILTER_FILE = re.compile(
     r"""\bjq\b[^\n|;&]*?\s+(?:-[a-zA-Z]*f(?:\s+|=)|--from-file(?:\s+|=))(?:"([^"]+)"|'([^']+)'|([^\s|;&]+))""",

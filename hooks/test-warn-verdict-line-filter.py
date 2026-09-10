@@ -154,6 +154,16 @@ def test_suite() -> list[str]:
         failures.append(f"case 4d failed to warn: returncode={res4d.returncode}, stdout={res4d.stdout!r}")
     print(f"  {'FAIL' if len(failures) > prev else 'ok  '} case 4d: split then slice warns")
 
+    # Case 4e: open-ended and negative slice bounds are still a slice of the
+    # split lines -> warns for each shape
+    for shape in (".[:4]", ".[-4:]", ".[-4:-1]"):
+        cmd_shape = 'gh api repos/owner/repo/issues/123/comments | jq ".[-1].body | split(\"\\n\") | ' + shape + '"'
+        res4e = run_hook(bash_payload(cmd_shape))
+        prev = len(failures)
+        if res4e.returncode != 0 or "additionalContext" not in res4e.stdout:
+            failures.append(f"case 4e {shape} failed to warn: returncode={res4e.returncode}, stdout={res4e.stdout!r}")
+        print(f"  {'FAIL' if len(failures) > prev else 'ok  '} case 4e: split then slice {shape} warns")
+
     # Additional silent: --json commentsX (not a real comments field) stays silent
     cmd_comments_x = (
         'gh pr view 42 --json commentsX --jq \'.comments[].body | split("\\n") | map(select(test("Verdict")))\''

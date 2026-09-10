@@ -30,7 +30,11 @@ review comments are invisible here, resolved or not (ai-config#3079). No
 `<summary>`-scoped match on `suppressed` exists in this file either, so a
 Copilot finding inside a collapsed `<details>` block is invisible too
 (ai-config#3170): it creates no inline comment and states no verdict, so no
-count performed here can see it. Measured on ai-config#3167, where this
+count performed here can see it. The one exception is a Copilot review
+carrying its own heading verdict (ai-config#3066): `copilot_verdict` matches
+`Suppressed comments` anywhere in that body, so a collapsed block there
+reads as not-clean; every other path is still blind to it.
+Measured on ai-config#3167, where this
 script printed FULLY CLEAN twice over a standing finding -- an inline comment
 at head 16544c50, and a suppressed "previously missed" item at head 7e1294b0.
 Both are pre-squash heads, reachable from no branch: fetch them from
@@ -303,7 +307,20 @@ def _is_bot_author(login: Optional[str]) -> bool:
     if not login_str:
         return False
     return (
-        login_str in ("github-actions", "github-actions[bot]", "claude[bot]", "claude", "cursor")
+        login_str
+        in (
+            "github-actions",
+            "github-actions[bot]",
+            "claude[bot]",
+            "claude",
+            "cursor",
+            # `gh pr view --json reviews` returns Copilot's login WITHOUT the
+            # `[bot]` suffix the REST endpoint carries (memories/gh-cli.md,
+            # measured 2026-09-01), so the suffix test below misses it and a
+            # real Copilot review was never admitted from that surface.
+            "copilot",
+            "copilot-pull-request-reviewer",
+        )
         or login_str.endswith("[bot]")
     )
 
@@ -337,6 +354,15 @@ EXCLUSIVE_BOT_IDENTITY: Dict[str, str] = {
     "jules": "Jules",
     "jules[bot]": "Jules",
     "cursor": "Cursor",
+    # Copilot posts under three spellings across the three surfaces that carry
+    # it: `copilot-pull-request-reviewer[bot]` on the REST reviews endpoint,
+    # `copilot-pull-request-reviewer` on `gh pr view --json reviews`, and
+    # `Copilot` on the inline review comments (memories/gh-cli.md). Mapping all
+    # three to one identity is what stops two spellings of one reviewer
+    # satisfying `--quorum 2` on their own.
+    "copilot": "Copilot",
+    "copilot-pull-request-reviewer": "Copilot",
+    "copilot-pull-request-reviewer[bot]": "Copilot",
 }
 
 
@@ -2040,7 +2066,83 @@ def _is_marked_or_in_verdict_section(scan: str, match_start: int) -> bool:
     return False
 
 
-def classify_verdict(body: str, state: str = "") -> str:
+# Copilot's formal-review verdict lives entirely in the body's opening heading
+# (`### <emoji> Approval recommended`), measured on this repo's own #3166 on
+# 2026-09-09. Such a body carries no `review-data:` payload, no `Verdict:`
+# label, and none of the heading vocabulary FINDING_PATTERNS knows, so nothing
+# else in this file can read it: every Copilot review classified as "no verdict"
+# and was dropped before it could count either way (ai-config#3066).
+#
+# The heading prefix is bounded rather than open, so a `Approval recommended`
+# mentioned in prose lower down cannot be read as the verdict. The bound is
+# characters, not a character class, because the decorating emoji varies with
+# the verdict and a class enumerating today's three would silently stop
+# matching a fourth.
+_COPILOT_HEADING_PREFIX = r"(?:^|\n)[ \t]*#{1,6}[ \t]*(?:[^\w\n\"\']+[ \t]*)?"
+COPILOT_AFFIRMATIVE_HEADER = re.compile(
+    _COPILOT_HEADING_PREFIX + r"\bApproval\s+recommended\b", re.IGNORECASE
+)
+COPILOT_NEGATIVE_HEADER = re.compile(
+    _COPILOT_HEADING_PREFIX
+    + r"\b(?:Changes\s+recommended|Needs\s+a\s+closer\s+look)\b",
+    re.IGNORECASE,
+)
+# A `Suppressed comments` section carries real findings that appear in NO other
+# surface -- not in the inline comments, not in the check run
+# (memories/copilot-reviews.md, rounds 35 and 36 on ai-config#2913). An
+# affirmative header standing over one is therefore not a clean round.
+COPILOT_SUPPRESSED_BLOCK = re.compile(r"\bSuppressed\s+comments\b", re.IGNORECASE)
+# Copilot reports its own inline-finding count in the `Review details` block, as
+# `0`, `0 new`, or a positive integer. This is the only count available to a
+# body-only classifier, and its absence is not evidence of zero.
+COPILOT_COMMENT_COUNT = re.compile(
+    r"\bComments\s+generated:\**[ \t]*(\d+)", re.IGNORECASE
+)
+
+
+def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str:
+    """Classify a Copilot formal review body as 'not-clean', 'clean', or ''.
+
+    Returns ``clean`` only when all three of the issue's conditions hold at
+    once: the overview heading is affirmative, the body reports zero inline
+    findings, and it carries no suppressed-findings block. Anything else that
+    is recognisably a Copilot verdict returns ``not-clean``, and a body this
+    function does not recognise returns ``''`` so the ordinary scans decide.
+
+    Fails closed on a missing comment count. An affirmative heading with no
+    `Comments generated:` field states an approval this function cannot confirm
+    is finding-free, so it yields no verdict rather than a clean one -- the
+    same direction ``_is_bot_author`` and the quorum tag already take.
+    """
+    if not body:
+        return ""
+    if scan is None or cited is None:
+        scan, cited = strip_cited_finding_vocab_with_mask(body)
+
+    def _has_valid_match(pattern, text):
+        for m in pattern.finditer(text):
+            if not match_is_cited(cited, m.start(), m.end()):
+                return m
+        return None
+
+    # Checked first: a negative heading is a verdict on its own, and reading it
+    # before the affirmative test means a body carrying both spellings (a
+    # re-review quoting its own earlier round) cannot resolve to clean.
+    if _has_valid_match(COPILOT_NEGATIVE_HEADER, scan):
+        return "not-clean"
+    if not _has_valid_match(COPILOT_AFFIRMATIVE_HEADER, scan):
+        return ""
+    if _has_valid_match(COPILOT_SUPPRESSED_BLOCK, scan):
+        return "not-clean"
+    count = _has_valid_match(COPILOT_COMMENT_COUNT, scan)
+    if count is None:
+        return ""
+    if int(count.group(1)) != 0:
+        return "not-clean"
+    return "clean"
+
+
+def classify_verdict(body: str, state: str = "", author: str = "") -> str:
     """Classify one automated review item as 'not-clean', 'clean', or '' (none).
 
     Returns '' when the item states no verdict at all. That case is the whole
@@ -2053,6 +2155,11 @@ def classify_verdict(body: str, state: str = "") -> str:
     rule that when a verdict line and the findings beneath it disagree, the
     findings win. A well-formed payload is the exception described below: it
     decides on its own and the prose is not consulted.
+
+    A Copilot heading verdict is read by ``copilot_verdict`` (ai-config#3066):
+    its blocking form returns before the prose scans, and its clean form only
+    after the not-clean scan has run, so an affirmative heading never
+    outranks a finding stated in the same body.
 
     Cited finding vocabulary is blanked first (see strip_cited_finding_vocab),
     so a clean verdict that merely quotes "Needs more work" is not misread as
@@ -2103,6 +2210,17 @@ def classify_verdict(body: str, state: str = "") -> str:
 
     scan, cited = strip_cited_finding_vocab_with_mask(body)
 
+    # Copilot's heading verdict, read in two halves around the prose scans
+    # below rather than in one place. The blocking half returns immediately,
+    # because a Copilot not-clean must not be reachable past any later guard.
+    # The clean half waits until the not-clean scan has had its chance, so a
+    # finding stated in the body's prose still wins over an affirmative
+    # heading, exactly as fully-clean.md's "findings win" rule requires.
+    is_copilot = _reviewer_identity(body, author) == "Copilot"
+    copilot = copilot_verdict(body, scan, cited) if is_copilot else ""
+    if copilot == "not-clean":
+        return "not-clean"
+
     for pat in VERDICT_NOT_CLEAN_PATTERNS:
         for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
             if match_is_cited(cited, match.start(), match.end()):
@@ -2126,6 +2244,9 @@ def classify_verdict(body: str, state: str = "") -> str:
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
                     continue
             return "not-clean"
+
+    if copilot == "clean":
+        return "clean"
 
     for pat in VERDICT_CLEAN_PATTERNS:
         for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
@@ -2481,7 +2602,7 @@ def check_latest_verdict(
     for item in dated:
         _kind, when, body, _oid, state = item[:5]
         author = item[5] if len(item) > 5 else ""
-        verdict = classify_verdict(body, state)
+        verdict = classify_verdict(body, state, author)
         identity = _reviewer_identity(body, author)
         finding_pat = _unresolved_finding_pattern(body)
         if (verdict == "not-clean" or finding_pat) and \
@@ -2746,7 +2867,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         is_bot_author = _is_bot_author(author_login) or (
             author_assoc in ("OWNER", "MEMBER") and _reviewer_identity(body, author_login) not in (author_login, "unknown")
         )
-        verdict = classify_verdict(body)
+        verdict = classify_verdict(body, "", author_login)
 
         # Automated reviews must be authored by a recognized bot author or contain a known review agent marker.
         # A comment that is neither from a bot account nor carrying a review agent marker is admitted
@@ -2892,7 +3013,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
     dated_matching = sorted(matching_items, key=lambda it: it[1] or "")
     latest_by_provider = {}
     for item in dated_matching:
-        if classify_verdict(item[2], item[4]) in ("clean", "not-clean") or _unresolved_finding_pattern(item[2]):
+        if classify_verdict(item[2], item[4], item[5] if len(item) > 5 else "") in ("clean", "not-clean") or _unresolved_finding_pattern(item[2]):
             provider = _reviewer_identity(item[2], item[5] if len(item) > 5 else "")
             latest_by_provider[provider] = item
     matching_items = list(latest_by_provider.values())
@@ -2901,6 +3022,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
     for item in matching_items:
         body = item[2]
         state = item[4]
+        author = item[5] if len(item) > 5 else ""
         if state in ("CHANGES_REQUESTED", "REJECTED"):
             has_findings = True
             issues.append(f"Matching review for SHA {sha[:8]} has state '{state}'")
@@ -2912,7 +3034,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
                 f"Review comment for SHA {sha[:8]} contains findings "
                 f"(matched pattern '{matched}')"
             )
-        elif classify_verdict(body, state) == "not-clean":
+        elif classify_verdict(body, state, author) == "not-clean":
             has_findings = True
             issues.append(f"Review comment for SHA {sha[:8]} explicitly blocks.")
 
@@ -2928,7 +3050,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
             # and keep their previous (bot-pooled) eligibility.
             if len(item) > 6 and item[6] is False:
                 continue
-            if len(item) > 5 and classify_verdict(item[2], item[4]) == "clean":
+            if len(item) > 5 and classify_verdict(item[2], item[4], item[5]) == "clean":
                 login = item[5]
                 identity = _reviewer_identity(item[2], login)
                 unique_authors.add(identity)

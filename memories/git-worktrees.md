@@ -377,7 +377,7 @@ git -C /path/to/target-clone worktree add -b <branch> /private/tmp/wt-<slug> "$d
 
 Resolve the default branch rather than writing `origin/main`, per the
 "Resolve `<default-branch>` from the repo rather than assuming `main`" rule in
-[`preferences.md`](preferences.md), which measures the hard-coded form dying
+[`subagent-worktrees.md`](subagent-worktrees.md), which measures the hard-coded form dying
 with `fatal: invalid reference: origin/main` against a repo whose default is
 `develop`.
 That rule prefers `--detach` for a worktree the *dispatcher* creates and hands

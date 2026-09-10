@@ -953,6 +953,39 @@ NOT clean over a clean verdict.**
 - **Don't:** treat a `contains findings (matched pattern ...)` line as a real
   finding without reading the verdict body it matched.
 
+**Your own disposition comment is a third surface,
+and it is the one a later `review-data` payload from another identity cannot supersede:
+the instrument can read the PR author's ARD comment as a not-clean verdict from a reviewer,
+and then hold the per-reviewer gate on it.**
+Measured 2026-09-09 on [ai-config#3493](https://github.com/Morrison-Lab/ai-config/pull/3493).
+A round-2 disposition comment,
+agent-posted under the author's login,
+opened a bullet with "Blocking finding (...): Addressed".
+`check-pr-fully-clean.py` matched the `VERDICT_NOT_CLEAN_PATTERNS` alternative `(?<!non-)(?<!non\s)Block(?:ed|ing)?`,
+classified the comment as a verdict-bearing statement from the author with verdict not-clean,
+and the per-reviewer rule from [ai-config#2274](https://github.com/Morrison-Lab/ai-config/issues/2274) then held the PR NOT clean through two later CLEAN payload rounds from the bot,
+because a later all-clear from a different reviewer does not supersede a reviewer's own not-clean statement.
+A later plain status comment from the same author did not count as a clean statement either,
+so the only exit was editing the original wording.
+Tracked as [ai-config#3502](https://github.com/Morrison-Lab/ai-config/issues/3502).
+The "standing not-clean can be your own" section above describes the same per-reviewer scan from the other side;
+this is the case where the not-clean statement was never a verdict at all.
+The "author filter gates formal reviews and not comments" passage further down explains why the comment was admitted to the scan in the first place:
+the comment loop admits on a bot author or on a review-header marker in the body,
+so a human's comment carrying verdict-shaped text enters on body text alone.
+
+- **Do:** name the finding in a disposition bullet
+  ("the `command(*)` finding: Addressed in `<sha>`"),
+  never its severity label.
+- **Do:** when the instrument names *you* as the not-clean reviewer,
+  read the matched pattern and reword your own comment,
+  rather than requesting another bot round that cannot supersede it.
+- **Don't:** write "Blocking", "Changes requested", "Rejected",
+  or the other not-clean vocabulary in a comment you post on your own PR,
+  even inside "X: Addressed".
+- **Don't:** expect a later "all addressed" comment of yours to clear it;
+  as of 2026-09-09 the phrase scan does not read that shape as clean.
+
 **That shape used to be a deliberate exception, and it no longer is: a
 well-formed `review-data` payload now decides directly, superseding the
 prose scan entirely.**

@@ -31,7 +31,7 @@ push can be legitimate mid-stack. Blocking would buy little and cost a refused
 turn, so this only ever adds context.
 """
 import json
-import os
+import os.path
 import re
 import subprocess
 import sys
@@ -42,7 +42,8 @@ GENERATED = [
     ("hooks/hooks.json", ["python3", "scripts/gen-hooks-plugin.py", "--check"]),
 ]
 
-PUSH = re.compile(r"(?:^|[;&|\n])\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*git\s+push(?![\w-])", re.M)
+_ENV = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:'[^']*'|"[^"]*"|\S*)\s+)*"""
+PUSH = re.compile(r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+push(?![\w-])", re.M)
 
 
 def repo_root():
@@ -62,7 +63,7 @@ def pushed_paths(root):
         try:
             out = subprocess.run(
                 ["git", "-C", root, "diff", "--name-only", f"{rev}...HEAD"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True, text=True, timeout=5,
             )
             if out.returncode == 0:
                 return set(out.stdout.split())
@@ -93,9 +94,19 @@ def main() -> int:
     for source, argv in GENERATED:
         if source not in changed:
             continue
+        # This plugin's hooks fire in EVERY repo the session touches, and
+        # GENERATED names ai-config's own generator. Without this check a
+        # repo that merely happens to have a file at the same path -- or
+        # ai-config itself with a broken generator -- gets told to run a
+        # script that is not there. A missing generator is 'cannot tell',
+        # never 'stale': a nonzero exit only means staleness once the thing
+        # that would report it actually exists.
+        script = next((a for a in argv if a.endswith('.py')), None)
+        if not script or not os.path.isfile(os.path.join(root, script)):
+            continue
         try:
             rc = subprocess.run(
-                argv, cwd=root, capture_output=True, text=True, timeout=30,
+                argv, cwd=root, capture_output=True, text=True, timeout=20,
             ).returncode
         except Exception:
             continue

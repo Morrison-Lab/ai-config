@@ -25,15 +25,16 @@ open("out.json", "w").write(src)
 '''
 
 
-def build_repo(source_edited, regenerated, only_output_edited=False):
+def build_repo(source_edited, regenerated, only_output_edited=False, no_generator=False):
     d = tempfile.mkdtemp()
     run = lambda *a: subprocess.run(a, cwd=d, capture_output=True)
     run("git", "init", "-q", "-b", "main")
     run("git", "config", "user.email", "t@example.com")
     run("git", "config", "user.name", "t")
     os.makedirs(os.path.join(d, "scripts"), exist_ok=True)
-    with open(os.path.join(d, "scripts", "gen.py"), "w") as fh:
-        fh.write(GENERATOR)
+    if not no_generator:
+        with open(os.path.join(d, "scripts", "gen.py"), "w") as fh:
+            fh.write(GENERATOR)
     for name in ("src.json", "out.json"):
         with open(os.path.join(d, name), "w") as fh:
             fh.write('{"a": 1}')
@@ -87,6 +88,10 @@ CASES = [
     # hook would warn here about drift the push did not cause.
     ("only-output", False, "git push", False,
      "generated file stale but source untouched by this push -> silent"),
+    # This plugin's hooks run in EVERY repo. A repo with a file at the same
+    # path but no such generator must not be told to run one.
+    ("no-generator", False, "git push", False,
+     "source edited but the generator does not exist -> silent"),
 ]
 
 
@@ -95,6 +100,8 @@ def main():
     for edited, regen, cmd, expected, label in CASES:
         if edited == "only-output":
             d = build_repo(False, False, only_output_edited=True)
+        elif edited == "no-generator":
+            d = build_repo(True, False, no_generator=True)
         else:
             d = build_repo(edited, regen)
         got = warned(d, cmd)

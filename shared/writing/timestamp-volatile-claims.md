@@ -205,9 +205,16 @@ sentence itself changes the count.
 Every fix is locally correct and the volatility never stops, because each
 round is solving the stated problem (make this figure accurate) rather than
 the prior one (does the rule need this figure to hold).
-When the surrounding rule reads identically whether the number is 94 or 98,
-the number was never carrying the argument --- and removing it dissolves the
-volatility that three rounds of pinning could not.
+When the surrounding rule reads identically with the number removed, the
+number was never carrying the argument, and removing it dissolves the
+volatility that further pinning could not.
+
+The worked incident is in
+[`reorganize-prose.cases.md`](reorganize-prose.cases.md), "A sweep's count
+moves while you write the sentence about it", which carries the four drafts,
+the collision table, and the measurements.
+It is not restated here: that record is the incident, and this section is the
+question it prompts.
 
 This is the question to ask **before** reaching for a vintage stamp, not
 instead of it: a figure the argument genuinely depends on --- a threshold, a

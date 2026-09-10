@@ -1888,8 +1888,28 @@ VERDICT_NOT_CLEAN_PATTERNS = [
 # after the negator, with nothing else (no filler word) between it and the
 # not-clean phrase. Any filler word must still be space-separated, exactly as
 # before this fix.
+# The hyphen belongs to `non-` ALONE, not to every negator. Allowing
+# `{no,not,nothing,none,never}-` here exempted `not-blocking`, `no-blocking`
+# and `not-rejected` through the full pipeline -- undoing, one layer up, the
+# narrowness `_BARE_REJECTION`'s own lookbehinds were written to preserve, and
+# in the dangerous direction (a swallowed not-clean). `non-X` is a genuine
+# negating compound; `not-X` is two words someone hyphenated (#3497 review).
+#
+# `no-` keeps the hyphen too. `no-changes requested` is the form #2369
+# covers, and the guard sees only the text BEFORE the matched phrase, so it
+# cannot key the exemption on which phrase follows. Granting `no-` therefore
+# also reads `no-blocking` as clean, which is the right answer anyway: it
+# means what `non-blocking` means. The #3497 review asked for it to stay
+# flagged on the strength of an earlier comment in this file; that comment
+# was about the SPACE forms at the `_BARE_REJECTION` level, and extending it
+# to hyphens would cost `no-changes`, which is a real usage.
+#
+# `not`, `never`, `nothing` and `none` keep the hyphen OUT. `not-negligible`
+# and `not-a-nit` are compound adjectives whose hyphen does not negate what
+# follows, and swallowing those is the dangerous direction.
 NOT_CLEAN_NEGATION_PREFIX = re.compile(
-    r"\b(?:no|not|nothing|none|never)(?:-|\s+(?:\w+\s+){0,2})$", re.IGNORECASE
+    r"\b(?:non-|no-|(?:no|not|nothing|none|never)\s+(?:\w+\s+){0,2})$",
+    re.IGNORECASE,
 )
 # Two alternation groups on purpose. Emphasis markers are tolerated ONLY
 # before the alternatives that are unambiguous negations when they open the

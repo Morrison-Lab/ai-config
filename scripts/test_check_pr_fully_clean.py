@@ -1882,6 +1882,50 @@ def main() -> int:
     check("_BARE_REJECTION no longer matches inside 'no blocking findings remain'",
           not _re.search(checker._BARE_REJECTION,
                          "no blocking findings remain", _re.I))
+
+    # #3497 review: the hyphen branch of NOT_CLEAN_NEGATION_PREFIX was first
+    # written as `(?:no|not|nothing|none|never)(?:-|\s+...)`, which exempted
+    # `not-blocking` / `no-blocking` / `not-rejected` through the FULL
+    # pipeline -- undoing one layer up the narrowness the lookbehinds above
+    # preserve, in the dangerous direction. `non-X` is a negating compound;
+    # `not-X` is two words someone hyphenated.
+    #
+    # These are asserted through classify_verdict on purpose. The comment
+    # above explains why the bare level is the right place for the SPACE
+    # forms; it does not carry to the hyphen forms, whose whole failure mode
+    # lived in the generic guard rather than in the bare pattern. That gap is
+    # why the first version of this fix passed 797 tests with the regression
+    # in it.
+    # `no-` is deliberately absent from this list. The guard sees only the
+    # text before the matched phrase, so it cannot exempt `no-changes` (a
+    # real usage, per #2369) without also exempting `no-blocking` -- which
+    # is the right reading anyway, since it means what `non-blocking` means.
+    # The pair below pins both halves of that call.
+    for _neg in ("not", "never", "nothing", "none"):
+        check(f"classify_verdict: '{_neg}-blocking' stays not-clean",
+              checker.classify_verdict(
+                  f"### Verdict\nReady for merge. {_neg}-blocking nit noted.\n",
+                  "") == "not-clean")
+    check("classify_verdict: 'not-rejected' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\nReady for merge. not-rejected nit noted.\n", "")
+          == "not-clean")
+    check("_unresolved_finding_pattern: 'not-blocking' still reports a finding",
+          checker._unresolved_finding_pattern(
+              "### Verdict\nReady for merge. not-blocking nit noted.\n")
+          is not None)
+    # The case the fix exists for must still pass, through the same pipeline.
+    check("classify_verdict: 'no-blocking' reads clean, like 'non-blocking'",
+          checker.classify_verdict(
+              "### Verdict\nReady for merge. no-blocking nit noted.\n", "")
+          == "clean")
+    check("classify_verdict: 'no-changes requested' stays exempt (#2369)",
+          checker.classify_verdict(
+              "### Verdict\nNo-changes requested.\n", "") != "not-clean")
+    check("classify_verdict: 'non-blocking' is still exempt",
+          checker.classify_verdict(
+              "### Verdict\nReady for merge. non-blocking nit noted.\n", "")
+          == "clean")
     # The dangerous direction stays covered: a negator that is NOT
     # immediately adjacent to "blocking" must still read as a live finding,
     # because the fixed-width lookbehind only ever looks at the three or

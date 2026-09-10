@@ -1910,11 +1910,31 @@ def main() -> int:
     # a bare `\s`, so a hyphenated negation ("No-changes requested.") was
     # NOT exempted even though the word-spaced form ("No changes
     # requested.") already was -- the same hyphen-vs-space gap "non-blocking"
-    # hit, one guard over. Mutation check: reverting `[\s-]` back to `\s` in
-    # NOT_CLEAN_NEGATION_PREFIX makes this fail (returns "not-clean" instead
-    # of "").
+    # hit, one guard over. Mutation check: reverting the hyphen branch back
+    # to a bare `\s` in NOT_CLEAN_NEGATION_PREFIX makes this fail (returns
+    # "not-clean" instead of "").
     check("classify_verdict: 'No-changes requested.' (hyphenated) is not a verdict",
           checker.classify_verdict("### Verdict\nNo-changes requested.\n", "") == "")
+    # Round-2 adversarial review of #3487: the FIRST attempt at the check
+    # above widened `\s` to `[\s-]` everywhere in NOT_CLEAN_NEGATION_PREFIX,
+    # including inside the `\w+\s+` filler -- which let a hyphen stand in
+    # for a space between the negator and an intervening word, not just
+    # between the negator and the phrase itself. That swallowed any
+    # hyphenated compound ADJECTIVE that happens to open with a negator
+    # word, which has nothing to do with negating what follows: reverting
+    # to that blanket `[\s-]` version makes every check below fail (each
+    # returns "" or None instead of "not-clean"/a real finding).
+    for phrase in (
+        "Not-negligible changes requested.",
+        "No-nonsense changes requested here.",
+        "Not-yet-addressed changes requested below.",
+        "Never-resolved changes requested.",
+    ):
+        check(
+            f"classify_verdict: hyphenated compound adjective before a real "
+            f"not-clean phrase still reads not-clean -- {phrase!r}",
+            checker.classify_verdict(f"### Verdict\n{phrase}\n", "") == "not-clean",
+        )
     check("a previously blocking failure explicitly fixed is not an active finding",
           checker._unresolved_finding_pattern(
               "### Verdict\n**Ready for merge.** The previously blocking "

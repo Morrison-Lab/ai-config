@@ -1237,9 +1237,16 @@ def strip_cited_finding_vocab(text: str) -> str:
 # identical false positive on #3468 (ai-config#3487, measured 2026-09-09),
 # because a hyphen or space after "non" is not the only way a reviewer
 # negates the word -- "not " and "no " immediately before it are the same
-# statement in different words. All four prefixes are now guarded:
-# `non-`, `non `, `not `, `no `. "previously-blocking" is deliberately NOT
-# exempted, although it produces a safe-direction false positive when
+# statement in different words. Four prefixes are now guarded: `non-`,
+# `non `, `not `, `no `. The hyphenated forms of the latter two --
+# "not-blocking", "no-blocking" -- are deliberately NOT exempted and stay
+# flagged: this is the same over-flag-rather-than-swallow direction as
+# "previously-blocking" just below, not an oversight (adding them would mean
+# widening word-boundary lookbehinds the same blanket way that, on the
+# `NOT_CLEAN_NEGATION_PREFIX` guard a few hundred lines down, turned out to
+# swallow real not-clean statements like "Not-negligible changes requested."
+# -- see that guard's own comment). "previously-blocking" is deliberately NOT
+# exempted either, although it produces a safe-direction false positive when
 # narrating a fixed finding: "the previously-blocking finding remains open;
 # do not merge" is a real not-clean statement, and a lexical lookbehind
 # cannot tell it from "the previously-blocking error was fixed". Missing a
@@ -1861,17 +1868,28 @@ VERDICT_NOT_CLEAN_PATTERNS = [
 # so `This is not done. Needs work` and `It is not ready; needs more work` both
 # stay not-clean.
 #
-# `[\s-]` rather than a bare `\s` between the negator and what follows
-# (ai-config#3487): a hyphen separates a word from what comes after it
-# exactly as a space does ("no-changes requested" reads identically to "no
-# changes requested"), and the fixed word-boundary regex `Block(?:ed|ing)?`
-# lookbehinds a few lines below hit the same gap for "non-blocking". Widening
-# only the whitespace class, not the negator words or the clause-boundary
-# behavior, keeps this in the same safe direction: a hyphen still cannot
-# cross a period or semicolon any more than a space could, since `[\s-]`
-# still excludes both.
+# The negator may be joined to what follows by a hyphen instead of a space
+# (ai-config#3487): "no-changes requested" reads identically to "no changes
+# requested", and the fixed word-boundary regex `Block(?:ed|ing)?` lookbehinds
+# a few lines below hit the same gap for "non-blocking".
+#
+# The hyphen branch is intentionally its OWN alternative, `-$`, rather than a
+# blanket `[\s-]` substituted for every `\s` in the pattern (a first attempt
+# at this fix did exactly that, and an adversarial review of #3487 caught it
+# immediately): letting a hyphen stand in for a space INSIDE the `\w+\s+`
+# filler as well swallows a genuine not-clean statement whenever the negator
+# word happens to open a hyphenated compound ADJECTIVE rather than negate the
+# phrase that follows -- "Not-negligible changes requested." and
+# "Never-resolved changes requested." both misclassified as no-verdict under
+# that blanket version, confirmed by reverting to it and rerunning the tests
+# below. "no-negligible" and "not-negligible" are unrelated words; a hyphen
+# there does not mean the same thing a space would. So the hyphen is accepted
+# ONLY in the single position "non-blocking"/"no-changes" actually need: right
+# after the negator, with nothing else (no filler word) between it and the
+# not-clean phrase. Any filler word must still be space-separated, exactly as
+# before this fix.
 NOT_CLEAN_NEGATION_PREFIX = re.compile(
-    r"\b(?:no|not|nothing|none|never)[\s-]+(?:\w+[\s-]+){0,2}$", re.IGNORECASE
+    r"\b(?:no|not|nothing|none|never)(?:-|\s+(?:\w+\s+){0,2})$", re.IGNORECASE
 )
 # Two alternation groups on purpose. Emphasis markers are tolerated ONLY
 # before the alternatives that are unambiguous negations when they open the
@@ -2371,12 +2389,22 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
             if pat == r"changes\s+requested\b":
                 start = match.start()
                 pfx = scan_body[max(0, start - 25):start].lower()
-                # `[\s-]` rather than a bare `\s`, so a hyphenated negation
-                # ("no-changes requested") is recognized the same as a
-                # spaced one ("no changes requested") -- the same
-                # hyphen-vs-space gap that let "non-blocking" through
-                # before ai-config#3487.
-                if re.search(r"\bno[\s-]+(\w+[\s-]+)?$", pfx):
+                # A hyphen right after "no" is recognized the same as a
+                # space ("no-changes requested" reads the same as "no
+                # changes requested") -- the same hyphen-vs-space gap that
+                # let "non-blocking" through before ai-config#3487. The
+                # hyphen is its own alternative, not substituted into the
+                # `\w+\s+` filler's separator too: doing that the first
+                # time around let a hyphenated compound ADJECTIVE ("No-
+                # nonsense changes requested here.") read as a negated
+                # filler word instead of a self-contained word unrelated to
+                # negating "changes requested" -- caught by adversarial
+                # review before this landed. This guard is now redundant
+                # with the `NOT_CLEAN_NEGATION_PREFIX` fix a few hundred
+                # lines up (which every pattern in this loop already goes
+                # through first), kept only for parity with the issue's
+                # own sketch.
+                if re.search(r"\bno(?:-|\s+(?:\w+\s+)?)$", pfx):
                     continue
             return pat
     return None

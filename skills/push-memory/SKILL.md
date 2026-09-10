@@ -137,6 +137,11 @@ These are exactly
    # edit "$wt"/CLAUDE.md or "$wt"/memories/<file>.md, then:
    git -C "$wt" add CLAUDE.md              # or: memories/<file>.md  (+ memories/MEMORY.md when adding a new memories file)
    git -C "$wt" commit -m "memory: <one-line summary>"
+   ```
+
+   Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+   ```bash
    git -C "$wt" push -u origin memory/<slug>
    ```
 

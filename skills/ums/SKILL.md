@@ -361,7 +361,12 @@ committed pass.
    cd "$wt"
    git add "skills/<name>/SKILL.md" "memories/<file>.md"   # the files you touched
    git commit -m "ums: <brief summary>"   # COMMIT
-   git push origin HEAD                   # PUSH
+   ```
+
+   Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+   ```bash
+   git push origin HEAD   # PUSH
    ```
 
    *No PR yet:* branch off main first — a direct-to-main push is denied by
@@ -375,6 +380,11 @@ committed pass.
    cd "../ai-config-worktrees/ums-<topic>"
    git add "skills/<name>/SKILL.md" "memories/<file>.md"   # the files you touched
    git commit -m "ums: <brief summary>"   # COMMIT
+   ```
+
+   Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+   ```bash
    git push -u origin HEAD   # PUSH — PR creation is handled by the post-push verification step below
    ```
 
@@ -394,11 +404,15 @@ committed pass.
    cd "../ai-config-worktrees/ums-<topic>"
    git add "skills/<name>/SKILL.md" "memories/<file>.md"   # the files you touched
    git commit -m "ums: <brief summary>"   # COMMIT
+   ```
+
+   Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+   ```bash
    git push -u origin HEAD   # PUSH -- to your fork; PR creation is handled by the post-push verification step below
    ```
-   **CAUTION:** if a compound `add && commit && push` is **denied**, *nothing*
-   was committed — verify with `git status` / `git log` before any `git reset
-   --hard`, or you'll silently discard the still-uncommitted edits.
+   **CAUTION:** keeping the push in its own call is what makes the commit durable before anything can refuse the push.
+   If you do chain them and the call is **denied**, *nothing* was committed — verify with `git status` / `git log` before any `git reset --hard`, or you'll silently discard the still-uncommitted edits.
 
    **After the PR merges**, remove the worktree so it doesn't accumulate:
    `git -C "$repo" worktree remove "../ai-config-worktrees/<branch>"` (the

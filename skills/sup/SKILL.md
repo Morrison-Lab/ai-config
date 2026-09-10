@@ -139,7 +139,12 @@ git checkout -b fix/<slug> upstream/main  # CREATE_BRANCH — or upstream/master
 # ... make edits ...
 
 git add -A && git commit -m "<conventional commit message>"   # COMMIT
-git push upstream fix/<slug>                                   # PUSH
+```
+
+Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+```bash
+git push upstream fix/<slug>   # PUSH
 
 # Open PR
 gh pr create --repo <owner>/<repo> \
@@ -163,7 +168,12 @@ cd /tmp/upstream-fix
 git checkout -b fix/<slug>   # CREATE_BRANCH
 # ... make edits ...
 git add -A && git commit -m "<conventional commit message>"   # COMMIT
-git push origin fix/<slug>                                     # PUSH
+```
+
+Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+```bash
+git push origin fix/<slug>   # PUSH
 
 # Open PR from your fork to upstream
 gh pr create --repo <owner>/<repo> \

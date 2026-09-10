@@ -349,6 +349,11 @@ git add skills/<name>/SKILL.md codex-skills/<name> \
                                                             # one) — NOT `-A`, which
                                                             # sweeps in unrelated edits
 git commit -m "skills: add <name> — <summary>"   # COMMIT
+```
+
+Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+```bash
 git push -u origin HEAD && gh pr create --fill   # PUSH, CREATE_PR
 ```
 

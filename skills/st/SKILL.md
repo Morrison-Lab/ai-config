@@ -125,7 +125,12 @@ git checkout -b <type>/<slug> origin/main   # CREATE_BRANCH — fix/ feat/ docs/
   on an empty diff (see [`pr-on-claim`](../../shared/workflow/pr-on-claim.md)):
   ```bash
   git commit --allow-empty -m "start: <title> (closes #<N>)"   # COMMIT
-  git push -u origin <type>/<slug>                              # PUSH
+  ```
+
+  Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+  ```bash
+  git push -u origin <type>/<slug>   # PUSH
   gh pr create --draft --title "<title>" --body "Closes #<N>
 
   WIP — opened up front to claim the issue; implementing now."   # CREATE_PR

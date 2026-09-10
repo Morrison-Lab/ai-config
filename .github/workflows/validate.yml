@@ -573,6 +573,18 @@ jobs:
         # a fragment once and then names it bare is the miss this corpus
         # states in prose and, before this step, had no instrument for.
         run: python3 scripts/check-bare-fragment-mentions.py
+      - name: Check for chained commit-and-push in fenced blocks
+        # ai-config#3199: a fenced bash block is a recipe a reader pastes, so
+        # pasted whole it is ONE Bash call. A block whose lines commit and then
+        # push is the shape hooks/no-commit-chained-to-push.py refuses, which
+        # let the corpus prescribe a call its own guard denies. The sweep
+        # imports that guard's evaluate() rather than reimplementing it, and
+        # reports blocks examined alongside blocks denied so a zero from a
+        # clean corpus is distinguishable from a zero from a sweep that never
+        # ran.
+        run: python3 scripts/check-chained-commit-push-in-fences.py
+      - name: Run check-chained-commit-push-in-fences tests
+        run: python3 scripts/test_check_chained_commit_push_in_fences.py
   lint-qmd:
     uses: Morrison-Lab/gha/.github/workflows/lint-qmd.yml@v2
 

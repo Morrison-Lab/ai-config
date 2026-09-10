@@ -131,8 +131,13 @@ those forms — this skill is what it hands off to once memory is the answer.
    repo="$(git -C ~/.claude/memories rev-parse --show-toplevel)"   # ai-config repo root
    rel="CLAUDE.md"   # or memories/<file>.md  (NOT memories/repo/ — that's gone)
    git -C "$repo" add "$rel" \
-     && git -C "$repo" commit -m "memorize: <one-line summary>" \
-     && git -C "$repo" push origin HEAD   # current branch; not HEAD:main — that would push a feature branch's commits onto main
+     && git -C "$repo" commit -m "memorize: <one-line summary>"
+   ```
+
+   Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+   ```bash
+   git -C "$repo" push origin HEAD   # current branch; not HEAD:main — that would push a feature branch's commits onto main
    ```
 
    The push targets the ai-config repo's **current branch**, so run memorize

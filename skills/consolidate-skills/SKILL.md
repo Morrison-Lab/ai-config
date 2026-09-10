@@ -162,7 +162,12 @@ git add skills/<canonical>/ skills/<absorbed-1>/ skills/<absorbed-2>/   # only t
 # dirs you touched — plus memories/preferences.md and/or CLAUDE.md ONLY if you
 # edited them. Never `git add -A` or a bare `skills/`, which sweeps in unrelated edits.
 git commit -m "skills: consolidate <a>/<b> into <canonical> (+ alias stubs)"   # COMMIT
-git push -u origin HEAD && gh pr create --fill                                # PUSH, CREATE_PR
+```
+
+Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+```bash
+git push -u origin HEAD && gh pr create --fill   # PUSH, CREATE_PR
 ```
 
 ## Relationship to other skills

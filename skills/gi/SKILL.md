@@ -228,7 +228,12 @@ branch a diff with an empty commit, push, and open a **draft** PR:
 
 ```bash
 git commit --allow-empty -m "start: <issue title> (closes #<N>)"   # COMMIT
-git push -u origin fix/<slug>                                      # PUSH
+```
+
+Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+```bash
+git push -u origin fix/<slug>   # PUSH
 
 # GitHub — draft PR
 gh pr create --draft --title "<title>" --body "Closes #<N>

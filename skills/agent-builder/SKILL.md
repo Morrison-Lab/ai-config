@@ -226,6 +226,11 @@ python3 scripts/check-vendored-drift.py
 npx --yes markdownlint-cli2@0.22.1   # markdown style on the updated skill's SKILL.md
 git add .claude/agents/<name>.md skills/<calling-skill>/SKILL.md   # stage only what you touched
 git commit -m "agents: add <name> — <summary>"   # COMMIT
+```
+
+Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+```bash
 git push -u origin HEAD && gh pr create --fill   # PUSH, CREATE_PR
 ```
 

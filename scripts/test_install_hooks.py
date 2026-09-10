@@ -77,6 +77,11 @@ check("a command naming no script at all is skipped",
       hp.classify_command("echo hello")[0] == "skipped")
 check("an undefined variable in the path is missing, not skipped",
       hp.classify_command("python3 $NO_SUCH_VAR_2392/hooks/guard.py")[0] == "missing")
+check("a POSIX path with an escaped space keeps its escape",
+      hp.script_token("python3 /path/with\\ space/x.py") == "/path/with space/x.py")
+check("an unquoted Windows path keeps its backslashes",
+      hp.script_token(r"python3 C:\Users\me\.claude\hooks\x.py")
+      == r"C:\Users\me\.claude\hooks\x.py")
 check("script_token reads the script past its interpreter",
       hp.script_token('python3 "/a/b/guard.py"') == "/a/b/guard.py")
 check("registered_hooks yields one row per bound command",

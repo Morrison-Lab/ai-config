@@ -357,9 +357,17 @@ def rc_story_matches_indirection():
                               input=json.dumps(payload),
                               capture_output=True, text=True)
         # A template whose literal braces are unescaped raises on .format(),
-        # which is how the find-semicolon case was first found: the hook exits
-        # non-zero and emits nothing, so a test that only checks for a warning
-        # would report it as a missing warning rather than a crash.
+        # so the hook exits non-zero emitting nothing -- a check that only
+        # asked "did it warn?" would call that a missing warning.
+        #
+        # For the find-semicolon template this branch is NOT what catches it:
+        # `C20-find-semicolon` in CASES runs the same command through
+        # `verdict()`, which raises on a non-zero exit, and that fires first.
+        # This branch covers the commands only THIS section runs: `parallel`,
+        # `bash -c`, `zsh -c` and `env`. (`sh -c` is C4, and `xargs` and both
+        # `find` forms are C1/C3/C20, so those are already covered above.)
+        # Derived by grepping CASES for each, not recalled -- an earlier draft
+        # of this very comment listed `sh -c` here and was wrong.
         if proc.returncode != 0:
             print("  FAIL %-28s hook exited %s: %s"
                   % (label + " " + cmd[:14], proc.returncode,

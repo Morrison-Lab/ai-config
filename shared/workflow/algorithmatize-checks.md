@@ -2177,3 +2177,69 @@ warns.
 - **Don't:** apply the same tuning bias to a blocking guard; both of its
   error directions carry a real cost, so it wants precision, not
   over-triggering.
+
+## Before proposing an instrument, read the one that exists --- and read why it is advisory
+
+This fragment's standing push is to build the instrument.
+The failure that push produces is proposing to build one that is already
+built, and the corpus is now large enough (125 scripts, measured 2026-09-10)
+that "nothing measures this" is a claim about repository state rather than an
+observation.
+It is the shape [`metacognitive-monitoring`](metacognitive-monitoring.md)
+names: a state claim, owed a query rather than a recollection.
+
+The query is cheap and there is no excuse for skipping it:
+
+```bash
+grep -n 'add_argument' scripts/<instrument>.py     # what it can already do
+grep -rn '<instrument>' .github/workflows/          # whether CI runs it, and how
+```
+
+**The second query is the one that gets skipped**, and it is the more
+informative of the two.
+An instrument can exist, be wired into CI, and be deliberately **advisory**,
+which from the outside is indistinguishable from not existing: the check
+runs, prints, and never fails, so the defect it measures keeps growing and
+nothing in the log looks wrong.
+Finding it unenforced feels like finding the gap, and it is not --- the gap
+was decided.
+
+So read the rationale before proposing to gate it.
+A `|| true`, a missing `--strict`, or an unset threshold in this corpus
+usually carries a comment saying why, and that comment is the actual
+assignment: it states a constraint any proposal has to satisfy, per
+[`challenge-the-assignment`](challenge-the-assignment.md).
+The commonest one here is this fragment's own cry-wolf limit --- a gate that
+fires on most PRs trains everyone past it, and takes the real cases with it.
+A proposal that ignores it is not a stronger version of the existing check,
+it is the version that was already rejected.
+
+**What survives is usually a narrower gate, not a higher threshold.**
+When the broad check must stay advisory, look for a slice where the failure
+is unambiguous: one file rather than a whole closure, a hard external limit
+rather than a budget of ours, a band the artifact is not normally in rather
+than every change.
+Fired rarely enough and on a limit nobody disputes, a gate costs no PRs until
+it matters --- which is what makes it survivable where the broad one is not.
+
+- **Do:** grep the instrument's flags and its CI invocation before saying a
+  check is missing.
+- **Do:** read the comment beside a `|| true` or an unset threshold as a
+  constraint on your proposal, not as an oversight.
+- **Do:** propose a narrower gate on a slice with an undisputed limit, when
+  the broad gate is the one that was rejected.
+- **Don't:** infer from a growing defect that nothing measures it --- an
+  advisory check and an absent one produce identical logs.
+- **Don't:** re-propose gating the whole measure at a different number; the
+  cry-wolf objection is about how often it fires, so a threshold tweak does
+  not answer it.
+
+(Measured 2026-09-10, ai-config#3546.
+`CLAUDE.md` grew 84,979 -> 143,827 bytes in the 26 days after the trim of
+ai-config#1258, to 95.8% of the harness's hard cap, while
+`check-context-closure.py --baseline` ran advisorily on every PR throughout.
+A recommendation to "add a per-PR gate on closure growth" was posted to
+ai-config#3367 before either query above had been run; both the flag
+(`--max-growth`) and the CI step already existed, and gating the closure
+total is precisely what `validate.yml`'s comment rejects.
+The root-file ratchet that shipped instead is the narrower-slice form.)

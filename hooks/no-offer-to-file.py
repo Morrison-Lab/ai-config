@@ -35,6 +35,28 @@ PATTERNS = [
 ]
 RX = re.compile("|".join(PATTERNS), re.I)
 
+# A second shape the PATTERNS above cannot see: the offer phrased as a
+# DECLARATIVE PREFERENCE rather than a question, referring to the artifact by
+# anaphora ("a ninth") rather than by name. It reads as deference instead of a
+# request, so it survives self-review, and no pattern above matches it.
+# Requires filing/recording vocabulary in the same message, so an unrelated
+# deferral ("I'd rather you decide which merge strategy") does not fire.
+DEFER = [
+    r"i'?d rather (you|we) (tell|decide|say|choose|pick)",
+    r"i'?(ll| will) leave (it|that|this|the (call|decision)) (to|with) you",
+    r"your call whether",
+    r"(rather|instead of) (than )?assum(e|ing) it",
+]
+RX_DEFER = re.compile("|".join(DEFER), re.I)
+
+# Filing/recording domain, deliberately broader than PATTERNS' verb list so an
+# anaphoric reference still lands as long as the message names the domain
+# somewhere.
+DOMAIN = re.compile(
+    r"\b(issues?|filed?|files|filing|tracks?|tracking|tracked|records?|recording|memor(y|ies|ize)|follow-?ups?|tickets?)\b",
+    re.I,
+)
+
 
 def last_assistant_text(path):
     last = ""
@@ -102,6 +124,8 @@ def main() -> int:
 
     prose = strip_code(text)
     hit = RX.search(prose)
+    if not hit and RX_DEFER.search(prose) and DOMAIN.search(prose):
+        hit = RX_DEFER.search(prose)
     if not hit:
         return 0
 

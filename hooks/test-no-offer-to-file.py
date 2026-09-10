@@ -41,6 +41,35 @@ CASES = [
     ([TOOL, say("I could file an issue about this?")], True, "i could file an issue blocks"),
     ([TOOL, say("Want me to file the issue and open that PR?")], True, "bundled offer blocks"),
 
+    # True positives: the DECLARATIVE PREFERENCE shape (ai-config#3520).
+    # Verbatim sentence that slipped past every pattern on 2026-09-10.
+    (
+        [TOOL, say(
+            "That's arguably a guard gap (a tag-only push ships no commits), "
+            "but I've filed enough guard issues this session that I'd rather "
+            "you tell me whether it's worth a ninth than assume it."
+        )], True, "declarative preference deferring a filing decision blocks",
+    ),
+    (
+        [TOOL, say("I'll leave the call to you on whether this needs an issue.")],
+        True, "leave the call to you plus filing domain blocks",
+    ),
+    (
+        [TOOL, say("Your call whether that's worth tracking.")],
+        True, "your call whether plus tracking blocks",
+    ),
+
+    # Negative: the same deferral with NO filing/recording domain in the
+    # message is an ordinary judgment handback, not an unfiled finding.
+    (
+        [TOOL, say("Both rebases are equally safe, so I'd rather you decide which one to take.")],
+        False, "deferral with no filing vocabulary does not block",
+    ),
+    (
+        [TOOL, say("Your call whether to squash or rebase merge this branch.")],
+        False, "your call whether about merge strategy does not block",
+    ),
+
     # Negative cases: trigger phrases quoted inside inline code spans
     (
         [TOOL, say("We shouldn't add a hook for `want me to file` because it is too broad.")],

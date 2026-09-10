@@ -1038,7 +1038,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-offer-to-file.py\"",
             "timeout": 10,
             "script": "no-offer-to-file.py",
-            "why": "report-mistakes-proactively 'Filing is not gated on approval' -- blocks a reply that offers to file or record instead of doing it."
+            "why": "report-mistakes-proactively 'Filing is not gated on approval' -- blocks a reply that offers to file or record instead of doing it. Extended 2026-09-10 (ai-config#3520) to also catch the offer phrased as a DECLARATIVE PREFERENCE that hands the decision back ('I'd rather you tell me whether it is worth a ninth'), which asks nothing and names the artifact only by anaphora; that arm additionally requires filing vocabulary in the same message, so an unrelated deferral does not fire."
           },
           {
             "type": "command",
@@ -1066,7 +1066,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unfiled-finding.py\"",
             "timeout": 10,
             "script": "no-unfiled-finding.py",
-            "why": "report-mistakes-proactively 'Filing is not gated on approval' -- no-offer-to-file.py catches the OFFER (needs a `?`); this catches the DECLARATIVE form, which asks nothing and so slips past it."
+            "why": "report-mistakes-proactively 'Filing is not gated on approval' -- no-offer-to-file.py catches the interrogative OFFER and, since ai-config#3520, the deferral-shaped one; this catches the DECLARATIVE ASSERTION that a finding is worth an issue, which neither of those shapes covers."
           },
           {
             "type": "command",

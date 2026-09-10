@@ -395,7 +395,12 @@ def _repo_with_staged_move():
     """A real git repo with a staged cross-file move."""
     d = tempfile.mkdtemp()
     run = lambda *a: subprocess.run(a, cwd=d, capture_output=True, text=True)
-    run("git", "init", "-q")
+    # `--initial-branch` pinned rather than inherited: a fixture that takes the
+    # machine's `init.defaultBranch` is a fixture whose behaviour depends on
+    # the developer's config, which `scripts/check-unpinned-git-fixtures.py`
+    # exists to prevent. Nothing here reads the branch name; pinning it keeps
+    # the fixture reproducible anyway.
+    run("git", "init", "-q", "--initial-branch", "main")
     run("git", "config", "user.email", "t@t")
     run("git", "config", "user.name", "t")
     with open(os.path.join(d, "src.md"), "w") as fh:

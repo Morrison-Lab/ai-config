@@ -29,9 +29,11 @@ from typing import Iterator
 SCRIPT_SUFFIXES = (".py", ".sh")
 # The one variable the plugin loader sets and a shell does not.
 PLUGIN_ROOT_VAR = "CLAUDE_PLUGIN_ROOT"
-# A Windows drive-letter path, quoted or bare: the shape whose backslashes
-# are separators rather than escapes.
-RX_DRIVE_PATH = re.compile(r"(?:^|[\s\\\x22\x27])[A-Za-z]:\\")
+# A BARE Windows drive-letter path: the one shape whose backslashes are
+# separators that a POSIX shlex would eat. Inside double quotes shlex keeps
+# a backslash unless it precedes a quote, a backslash, a dollar sign or a
+# backtick, so a quoted Windows path needs no help.
+RX_BARE_DRIVE_PATH = re.compile(r"(?:^|(?<=\s))[A-Za-z]:\\\S*")
 
 
 def script_token(command: str) -> str | None:
@@ -42,14 +44,12 @@ def script_token(command: str) -> str | None:
     is a `skipped`, not a finding.
     """
     # A POSIX shlex eats a bare backslash as an escape, which turns an
-    # unquoted Windows path into one word with no separators. When the
-    # command carries a drive-letter path, double every backslash first so
-    # shlex hands each one back as itself; a POSIX command keeps its escapes
-    # (an escaped space stays inside one word), so the two shapes cannot
-    # share one rule.
-    protected = command
-    if RX_DRIVE_PATH.search(command):
-        protected = command.replace('\\', '\\' + '\\')
+    # unquoted Windows path into one word with no separators. Double the
+    # backslashes inside each bare drive-letter path only, so shlex hands
+    # them back as themselves while an escaped space elsewhere in the same
+    # command keeps its escape.
+    protected = RX_BARE_DRIVE_PATH.sub(
+        lambda m: m.group(0).replace('\\', '\\' + '\\'), command)
     try:
         tokens = shlex.split(protected, posix=True)
     except ValueError:

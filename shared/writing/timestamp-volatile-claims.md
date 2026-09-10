@@ -189,3 +189,55 @@ when reviewing someone else's prose.
 Where the claim is about mutable state, ask for the re-check as well as the
 timestamp, per "A claim inside a PR is read at merge time" above --- a vintage
 tells a later reader to re-verify, and does not stop the claim shipping false.
+
+## The prior question: does the sentence need the figure at all
+
+Everything above assumes the volatile fact earns its place and asks how to
+keep it honest once it's there.
+That assumption is worth checking first, because a figure that keeps
+decaying despite careful pinning is sometimes not a timestamping problem at
+all --- it's a sign the figure was never load-bearing.
+
+The tell is a single number taking several drafting rounds to state
+correctly, each round adding a qualifier the last round lacked: which
+population it counts, which commit it was read on, whether writing the
+sentence itself changes the count.
+Every fix is locally correct and the volatility never stops, because each
+round is solving the stated problem (make this figure accurate) rather than
+the prior one (does the rule need this figure to hold).
+When the surrounding rule reads identically with the number removed, the
+number was never carrying the argument, and removing it dissolves the
+volatility that further pinning could not.
+
+The worked incident is in
+[`reorganize-prose.cases.md`](reorganize-prose.cases.md), "A sweep's count
+moves while you write the sentence about it", which carries the four drafts,
+the collision table, and the measurements.
+It is not restated here: that record is the incident, and this section is the
+question it prompts.
+
+This is the question to ask **before** reaching for a vintage stamp, not
+instead of it: a figure the argument genuinely depends on --- a threshold, a
+count a reader will act on --- still needs the timestamp-and-re-check
+treatment above.
+The check only rules out the figures that were decorative all along.
+
+- **Do:** before pinning a decaying figure with a timestamp, check whether
+  the sentence it lives in argues the same thing with the figure removed.
+- **Do:** delete a figure once removing it changes nothing about the rule's
+  force, rather than pinning a fourth, more careful version of it.
+- **Don't:** spend a second or third drafting round making a figure more
+  precise when the real defect is that the figure was never necessary.
+- **Don't:** treat "the figure is now more carefully qualified" as progress
+  when the qualifying itself is the symptom.
+
+(Measured 2026-09-09, ai-config#3499: a single figure ("N hits across M
+files") took four drafts.
+The first mixed two populations; the second omitted the commit it was read
+against; the third asserted a tip-of-branch figure that the sentence
+containing it falsified on its own, since writing the sentence added a
+literal occurrence of the very string being counted.
+Three rounds of increasingly careful pinning were solving the wrong
+problem: the rule containing the figure worked identically whether it read
+94 or 98, so the figure was never load-bearing, and removing it dissolved
+the volatility rather than requiring a fourth round of qualification.)

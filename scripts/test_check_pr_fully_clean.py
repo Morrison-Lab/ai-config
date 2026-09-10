@@ -1368,6 +1368,10 @@ def main() -> int:
         "Nothing here needs any further work.",
         "No changes requested.",
         "There are no changes requested on this round.",
+        # ai-config#3487: the guard's prefix test required a space between
+        # "no" and what follows, so a hyphenated negation slipped through
+        # even though it says the identical thing.
+        "No-changes requested.",
     ):
         check(
             f"classify_verdict: a NEGATED not-clean phrase is not a verdict -- {phrase!r}",
@@ -1858,6 +1862,147 @@ def main() -> int:
           checker.classify_verdict(
               "### Verdict\nNits below, plus the previously blocking crash which is NOT fixed.\n", "")
           == "not-clean")
+
+    # ai-config#3487: the #2369 fix above only exempted the "non-"/"non "
+    # compounds from the bare `_BARE_REJECTION` pattern itself. "not
+    # blocking" and "no blocking findings remain" say the exact same thing
+    # with a different negator immediately in front of the word, and the
+    # bare pattern matched both with no guard at all -- confirmed by
+    # reverting the `(?<!not\s)(?<!no\s)` lookbehinds and re-running these
+    # two checks, which then fail (match found instead of none).
+    #
+    # These two are asserted at the bare-pattern level, not through
+    # classify_verdict/`_unresolved_finding_pattern`: both of those already
+    # route every `_BARE_REJECTION` match through `NOT_CLEAN_NEGATION_PREFIX`
+    # (below), whose word list already includes "no"/"not" with a plain
+    # space -- so a classify_verdict-level check of the same two phrases
+    # passes identically with or without this fix and would not actually
+    # exercise it. The bare pattern is still worth guarding directly: other
+    # code (and this test file's own #2369 checks) matches `_BARE_REJECTION`
+    # standalone, with no downstream negation guard at all.
+    check("_BARE_REJECTION no longer matches inside 'not blocking'",
+          not _re.search(checker._BARE_REJECTION,
+                         "this is not blocking the merge", _re.I))
+    check("_BARE_REJECTION no longer matches inside 'no blocking findings remain'",
+          not _re.search(checker._BARE_REJECTION,
+                         "no blocking findings remain", _re.I))
+
+    # #3497 review: the hyphen branch of NOT_CLEAN_NEGATION_PREFIX was first
+    # written as `(?:no|not|nothing|none|never)(?:-|\s+...)`, which exempted
+    # `not-blocking` / `no-blocking` / `not-rejected` through the FULL
+    # pipeline -- undoing one layer up the narrowness the lookbehinds above
+    # preserve, in the dangerous direction. `non-X` is a negating compound;
+    # `not-X` is two words someone hyphenated.
+    #
+    # These are asserted through classify_verdict on purpose. The comment
+    # above explains why the bare level is the right place for the SPACE
+    # forms; it does not carry to the hyphen forms, whose whole failure mode
+    # lived in the generic guard rather than in the bare pattern. That gap is
+    # why the first version of this fix passed 797 tests with the regression
+    # in it.
+    # All five negators, including `no`. An earlier round exempted `no-`
+    # in the generic prefix guard to keep `no-changes requested` clean, and
+    # that swallowed `no-blocking` with it. The hyphen now lives on the
+    # `Changes\s+requested` alternative itself, so the generic guard stays
+    # space-only and every hyphenated negator before a not-clean phrase
+    # stays flagged.
+    for _neg in ("not", "no", "never", "nothing", "none"):
+        check(f"classify_verdict: '{_neg}-blocking' stays not-clean",
+              checker.classify_verdict(
+                  f"### Verdict\nReady for merge. {_neg}-blocking nit noted.\n",
+                  "") == "not-clean")
+    check("classify_verdict: 'not-rejected' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\nReady for merge. not-rejected nit noted.\n", "")
+          == "not-clean")
+    check("_unresolved_finding_pattern: 'not-blocking' still reports a finding",
+          checker._unresolved_finding_pattern(
+              "### Verdict\nReady for merge. not-blocking nit noted.\n")
+          is not None)
+    # The case the fix exists for must still pass, through the same pipeline.
+    # The five phrases the generic hyphen exemption silently swallowed
+    # before it was withdrawn (#3497 review): every alternative of
+    # `_BARE_REJECTION`, not just the one the fix was written for.
+    for _phrase in ("rejected", "unapproved", "impasse", "deadlock"):
+        check(f"classify_verdict: 'non-{_phrase}' stays not-clean",
+              checker.classify_verdict(
+                  f"### Verdict\nReady for merge. non-{_phrase} nit noted.\n",
+                  "") == "not-clean")
+    check("classify_verdict: 'no-rejected' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\nReady for merge. no-rejected nit noted.\n", "")
+          == "not-clean")
+    # #3497 review round 4: the lookbehinds had no word boundary, so any
+    # longer word ending in "no"/"not" swallowed the phrase after it.
+    for _word in ("volcano", "casino", "domino"):
+        check(f"classify_verdict: '{_word}-changes requested' stays not-clean",
+              checker.classify_verdict(
+                  f"### Verdict\n{_word.capitalize()}-changes requested.\n",
+                  "") == "not-clean")
+        check(f"classify_verdict: '{_word} blocking' stays not-clean",
+              checker.classify_verdict(
+                  f"### Verdict\nReady for merge. {_word} blocking issue "
+                  "remains.\n", "") == "not-clean")
+    check("classify_verdict: 'no-changes requested' stays exempt (#2369)",
+          checker.classify_verdict(
+              "### Verdict\nNo-changes requested.\n", "") != "not-clean")
+    check("classify_verdict: 'non-blocking' is still exempt",
+          checker.classify_verdict(
+              "### Verdict\nReady for merge. non-blocking nit noted.\n", "")
+          == "clean")
+    # The dangerous direction stays covered: a negator that is NOT
+    # immediately adjacent to "blocking" must still read as a live finding,
+    # because the fixed-width lookbehind only ever looks at the three or
+    # four characters right before the word. "it is not a nit -- it is
+    # blocking" and "there is no doubt this is blocking" both put other
+    # words between the negator and "blocking", so neither is swallowed --
+    # this is the guard against the "blanket negation window" anti-pattern
+    # the issue explicitly warns against. Checked at both the bare-pattern
+    # level and through the full classify_verdict pipeline.
+    check("_BARE_REJECTION still matches 'not a nit -- it is blocking' (negator not adjacent)",
+          bool(_re.search(checker._BARE_REJECTION,
+                          "this is not a nit -- it is blocking", _re.I)))
+    check("_BARE_REJECTION still matches 'no doubt this is blocking' (negator not adjacent)",
+          bool(_re.search(checker._BARE_REJECTION,
+                          "there is no doubt this is blocking", _re.I)))
+    check("classify_verdict: 'not a nit -- it is blocking' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\nThis is not a nit -- it is blocking.\n", "")
+          == "not-clean")
+    check("classify_verdict: 'no doubt this is blocking' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\nThere is no doubt this is blocking merge.\n", "")
+          == "not-clean")
+
+    # ai-config#3487: NOT_CLEAN_NEGATION_PREFIX's negator-to-phrase gap used
+    # a bare `\s`, so a hyphenated negation ("No-changes requested.") was
+    # NOT exempted even though the word-spaced form ("No changes
+    # requested.") already was -- the same hyphen-vs-space gap "non-blocking"
+    # hit, one guard over. Mutation check: reverting the hyphen branch back
+    # to a bare `\s` in NOT_CLEAN_NEGATION_PREFIX makes this fail (returns
+    # "not-clean" instead of "").
+    check("classify_verdict: 'No-changes requested.' (hyphenated) is not a verdict",
+          checker.classify_verdict("### Verdict\nNo-changes requested.\n", "") == "")
+    # Round-2 adversarial review of #3487: the FIRST attempt at the check
+    # above widened `\s` to `[\s-]` everywhere in NOT_CLEAN_NEGATION_PREFIX,
+    # including inside the `\w+\s+` filler -- which let a hyphen stand in
+    # for a space between the negator and an intervening word, not just
+    # between the negator and the phrase itself. That swallowed any
+    # hyphenated compound ADJECTIVE that happens to open with a negator
+    # word, which has nothing to do with negating what follows: reverting
+    # to that blanket `[\s-]` version makes every check below fail (each
+    # returns "" or None instead of "not-clean"/a real finding).
+    for phrase in (
+        "Not-negligible changes requested.",
+        "No-nonsense changes requested here.",
+        "Not-yet-addressed changes requested below.",
+        "Never-resolved changes requested.",
+    ):
+        check(
+            f"classify_verdict: hyphenated compound adjective before a real "
+            f"not-clean phrase still reads not-clean -- {phrase!r}",
+            checker.classify_verdict(f"### Verdict\n{phrase}\n", "") == "not-clean",
+        )
     check("a previously blocking failure explicitly fixed is not an active finding",
           checker._unresolved_finding_pattern(
               "### Verdict\n**Ready for merge.** The previously blocking "

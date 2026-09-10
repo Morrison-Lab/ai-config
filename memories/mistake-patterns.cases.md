@@ -53,3 +53,29 @@ What does not: the Mistake, Canonical Rule, Fix, or Do/Don't lines, which are wh
   Whether the pair should distinguish a different operation from a rephrasing is a question for the pattern entry rather than something a case record may settle, and it is filed as [#3483](https://github.com/Morrison-Lab/ai-config/issues/3483).
   The 2026-09-06/07 occurrence recorded in this file measured that an identical re-run often succeeds.
   This occurrence is not evidence about that, since the command that succeeded was not the one denied.
+
+## Pattern 25: Pushing Prose Without Running the Diff-Scoped `new-line-breaks` Check First
+
+- **2nd occurrence, 2026-09-09** ([PR #3484](https://github.com/Morrison-Lab/ai-config/pull/3484)).
+  A push turned CI's `new-line-breaks` job red for a violation
+  (job 102715315795, a long line with a mid-line semicolon) that one local
+  invocation of `scripts/vendor/gha-check-new-line-breaks.py` would have
+  caught first --- the identical shape the pattern's own 2026-08-29 example
+  already recorded twice in one session.
+  The specific invocation that would have caught it was
+  `NLB_BASE_REF=origin/main NLB_GLOBS='*.md' NLB_CLAUSE_BREAKS=true NLB_CLAUSE_MIN_LENGTH=80 NLB_FAIL=true python3 scripts/vendor/gha-check-new-line-breaks.py`,
+  which adds nothing new to the pattern's own Do step beyond confirming the
+  clause-break flags survive unchanged into a second occurrence.
+  (A companion PR from the same day, #3499, was checked and did not in fact
+  fail this job --- its own body records a clean local run before merge, so
+  it is not cited here as a further occurrence.)
+  What recurs is not a gap in the documentation --- Patterns 25 through 27
+  are among the most extensively written pre-push checks in this corpus ---
+  but the step being skipped anyway.
+  [#2590](https://github.com/Morrison-Lab/ai-config/issues/2590), the
+  pattern's own Algorithmatizable note (a `PreToolUse` guard on `git push`),
+  is closed and shipped as
+  [`hooks/warn-new-line-breaks-on-push.py`](../hooks/warn-new-line-breaks-on-push.py);
+  whether that guard was active in the sessions that produced these two
+  pushes, and why it did not stop them if so, is not established here and
+  is worth checking rather than assuming either way.

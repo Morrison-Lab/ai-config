@@ -243,8 +243,17 @@ def _scrub_all(cmd):
 _SHELL_OPS = set("();|&")
 
 
-def _simple_commands(cmd):
-    """Split a shell command into simple-command argv lists; None on error.
+def _split_commands(cmd):
+    """[(ops, argv)] for each simple command in `cmd`; None on a parse error.
+
+    `ops` is the list of shell control-operator tokens standing between the
+    PREVIOUS simple command and this one -- empty for the first command,
+    `[';']`, `['&&']`, `['||']`, or a run such as `['||', '(']` for a grouped
+    branch. `_simple_commands` discards it, which is all its callers need; the
+    callers that ask whether the call's single exit status belongs to a
+    particular command need it, because a command reached only through `||`
+    may have been short-circuited away by a SUCCEEDING left operand, leaving
+    the call's status at 0 with the command never run (ai-config#3139).
 
     Line-continuations are joined and heredoc bodies blanked first, so shlex
     neither chokes on a heredoc body nor mis-splits a `\\`-continued request
@@ -269,17 +278,57 @@ def _simple_commands(cmd):
         toks = list(lex)
     except ValueError:
         return None                       # unbalanced quotes, etc.
-    cmds, cur = [], []
+    cmds, cur, ops = [], [], []
     for t in toks:
         if t and set(t) <= _SHELL_OPS:    # a control-operator token (||, |, ;, &)
             if cur:
-                cmds.append(cur)
-                cur = []
+                cmds.append((ops, cur))
+                cur, ops = [], []
+            ops.append(t)
         else:
             cur.append(t)
     if cur:
-        cmds.append(cur)
+        cmds.append((ops, cur))
     return cmds
+
+
+def _simple_commands(cmd):
+    """Split a shell command into simple-command argv lists; None on error.
+
+    The operator-free view of `_split_commands`, kept because most callers
+    only ask what the commands ARE. A caller deciding whether the call's exit
+    status is authoritative for one of them wants `_split_commands` plus
+    `_status_owned` instead.
+    """
+    split = _split_commands(cmd)
+    if split is None:
+        return None
+    return [argv for _ops, argv in split]
+
+
+def _status_owned(split, i):
+    """Is the whole call's exit status authoritative for simple command `i`?
+
+    `split` is a `_split_commands` result. True only when command `i` is the
+    chain's LAST simple command AND no `||` stands between it and the command
+    before it.
+
+    Last position is what makes the harness `is_error` -- the exit status of
+    the WHOLE call -- readable as this command's own. After `;` the command
+    always ran, and after `&&` it either ran or was short-circuited away by a
+    FAILURE whose status every discharge in this file withholds on. Both are
+    safe.
+
+    After `||` neither holds: a succeeding left operand short-circuits the
+    command away and leaves the call's status at 0, so a discharge keyed on
+    "last and not failed" fires for a command that never ran -- the silent
+    false clear this guard exists to prevent (ai-config#3139). Withholding
+    instead costs a warning, which is the direction every other ambiguity here
+    already takes.
+    """
+    if i != len(split) - 1:
+        return False
+    return "||" not in split[i][0]
 
 
 def _has_flag(argv, *flags):
@@ -373,7 +422,11 @@ def _argv_request(argv):
 
 
 def _requests_in(cmd):
-    """([(index, num, repo)], simple_commands) for every request in `cmd`.
+    """([(index, num, repo)], split) for every request in `cmd`.
+
+    `split` is the `_split_commands` result the indices point into, so both
+    callers can ask `_status_owned` about a hit rather than comparing indices
+    to a length themselves.
 
     One enumeration for the two callers that need it. `request_ident` takes
     the first hit and asks whether it is last; `undischargeable_requests`
@@ -384,35 +437,33 @@ def _requests_in(cmd):
     Returns `([], [])` on a parse failure, so a caller testing the list gets
     the same "nothing to act on" answer either way.
     """
-    cmds = _simple_commands(cmd)
-    if cmds is None:
+    split = _split_commands(cmd)
+    if split is None:
         return [], []
     found = []
-    for i, argv in enumerate(cmds):
+    for i, (_ops, argv) in enumerate(split):
         ok, num, repo = _argv_request(argv)
         if ok:
             found.append((i, num, repo))
-    return found, cmds
+    return found, split
 
 
 def request_ident(cmd, _reqs=None):
     """(is_request, num, repo, last): does `cmd` genuinely request a reviewer?
 
     `last` is True when the matched request is the LAST simple command in the
-    chain. That is exactly when the harness `is_error` exit status (which
-    reflects the WHOLE call) is authoritative for the request's own outcome.
-    In last position after `;`, the request always runs and its status is the
-    call's own exit status. In last position after `&&`, either the request ran
-    and its status is the call's, or an earlier command failed and
-    short-circuited it away, leaving a failure status the discharge withholds
-    on. Both are safe.
+    chain AND is not reached through a `||` -- `_status_owned`'s condition,
+    which is exactly when the harness `is_error` exit status (reflecting the
+    WHOLE call) is authoritative for the request's own outcome. It is named
+    `last` throughout the caller for its history; read it as "this call's exit
+    status belongs to the request".
 
-    A last-position request after `||` is NOT safe, and this is a known hole
-    rather than an impossibility: `gh pr view ... || <POST>` exits 0 when the
-    read succeeds and the POST never runs, so the discharge clears an
-    obligation on a request that did not happen. Closing it needs operator
-    awareness, which `_simple_commands` discards by design. Tracked in
-    ai-config#3139; do not read the two-case enumeration above as covering it.
+    A last-position request after `||` was previously reported as `last`, and
+    a succeeding left operand short-circuits it away while leaving the call's
+    status at 0 -- so the discharge cleared an obligation on a request that
+    never ran (ai-config#3139). `_status_owned` now withholds `last` there,
+    which routes it down the same unattributable path as a non-last request:
+    no discharge, and named in the diagnostic.
 
     A request chained AHEAD of other commands shares one status with them, and
     which command produced it is not recoverable here -- `_simple_commands`
@@ -420,11 +471,11 @@ def request_ident(cmd, _reqs=None):
     `&&` so the status can be the request's own. The discharge therefore
     treats a non-last request as unattributable and does not fire.
     """
-    found, cmds = _requests_in(cmd) if _reqs is None else _reqs
+    found, split = _requests_in(cmd) if _reqs is None else _reqs
     if not found:
         return False, None, None, False
     i, num, repo = found[0]
-    return True, num, repo, (i == len(cmds) - 1)
+    return True, num, repo, _status_owned(split, i)
 
 
 def undischargeable_requests(cmd, _reqs=None):
@@ -439,13 +490,15 @@ def undischargeable_requests(cmd, _reqs=None):
     Returns a list of (num, repo).
 
     A request in the LAST position is excluded only when it is the chain's
-    ONLY request, which is the case the discharge can speak to: after `&&` or
-    `;` the status is then either the request's own or a short-circuit failure
-    that never ran it, and the discharge is safe under both, so
-    `request_ident` reports it with `last` True. (Not "the status is the
-    request's own" -- that is the unqualified attribution this file corrects
-    elsewhere.) The `||` case is unsafe and is `request_ident`'s hole, not
-    this exclusion's; see there, and ai-config#3139.
+    ONLY request AND the call's status belongs to it (`_status_owned`), which
+    is the case the discharge can speak to: after `&&` or `;` the status is
+    then either the request's own or a short-circuit failure that never ran
+    it, and the discharge is safe under both, so `request_ident` reports it
+    with `last` True. (Not "the status is the request's own" -- that is the
+    unqualified attribution this file corrects elsewhere.) A last-position
+    request reached through `||` is NOT excluded: a succeeding left operand
+    short-circuits it away at status 0, so it is unattributable in exactly the
+    way a non-last request is, and belongs in the diagnostic (ai-config#3139).
 
     It is NOT excluded when an earlier request exists. `pending` is keyed from
     `request_ident`, which returns the FIRST match -- so on `POST #A && POST #B`
@@ -456,10 +509,10 @@ def undischargeable_requests(cmd, _reqs=None):
 
     Including it over-warns at worst, since nothing on this path discharges.
     """
-    found, cmds = _requests_in(cmd) if _reqs is None else _reqs
+    found, split = _requests_in(cmd) if _reqs is None else _reqs
     if not found:
         return []
-    if len(found) == 1 and found[0][0] == len(cmds) - 1:
+    if len(found) == 1 and _status_owned(split, found[0][0]):
         return []
     return [(num, repo) for _i, num, repo in found]
 
@@ -516,16 +569,17 @@ def draft_ident(cmd):
     A draft action chained AHEAD of another command shares one is_error with
     it, and which command produced that status is not recoverable here, so the
     discharge treats it as AMBIGUOUS and keeps the PR tracked (the safe
-    over-warn direction). Fails toward not-a-draft on a parse error, so it
-    never fabricates a clear.
+    over-warn direction). A transition reached through `||` is ambiguous for
+    the same reason and by the same test (`_status_owned`, ai-config#3139).
+    Fails toward not-a-draft on a parse error, so it never fabricates a clear.
     """
-    cmds = _simple_commands(cmd)
-    if cmds is None:
+    split = _split_commands(cmd)
+    if split is None:
         return False, None, None, False
-    for i, argv in enumerate(cmds):
+    for i, (_ops, argv) in enumerate(split):
         ok, num, repo = _argv_draft(argv)
         if ok:
-            return True, num, repo, (i == len(cmds) - 1)
+            return True, num, repo, _status_owned(split, i)
     return False, None, None, False
 
 
@@ -769,16 +823,18 @@ def close_ident(cmd):
     Mirrors draft_ident, including its fail-safe: `last` is what makes the
     harness `is_error` (the WHOLE call's exit status) authoritative for this
     command's own outcome, so a terminal action chained AHEAD of something else
-    is treated as ambiguous and does NOT discharge. Fails toward
-    not-a-close on a parse error, so it never fabricates a clear.
+    is treated as ambiguous and does NOT discharge -- as is one reached
+    through `||`, which a succeeding left operand can skip at status 0
+    (`_status_owned`, ai-config#3139). Fails toward not-a-close on a parse
+    error, so it never fabricates a clear.
     """
-    cmds = _simple_commands(cmd)
-    if cmds is None:
+    split = _split_commands(cmd)
+    if split is None:
         return False, None, None, False
-    for i, argv in enumerate(cmds):
+    for i, (_ops, argv) in enumerate(split):
         ok, num, repo = _argv_close(argv)
         if ok:
-            return True, num, repo, (i == len(cmds) - 1)
+            return True, num, repo, _status_owned(split, i)
     return False, None, None, False
 
 
@@ -998,14 +1054,18 @@ def _argv_probe(argv):
 
 
 def probe_ident(cmd):
-    """(is_probe, num, repo, last): mirrors close_ident, for a status read."""
-    cmds = _simple_commands(cmd)
-    if cmds is None:
+    """(is_probe, num, repo, last): mirrors close_ident, for a status read.
+
+    `last` is `_status_owned`'s condition, so a probe reached through `||` is
+    unattributable here exactly as it is there (ai-config#3139).
+    """
+    split = _split_commands(cmd)
+    if split is None:
         return False, None, None, False
-    for i, argv in enumerate(cmds):
+    for i, (_ops, argv) in enumerate(split):
         ok, num, repo = _argv_probe(argv)
         if ok:
-            return True, num, repo, (i == len(cmds) - 1)
+            return True, num, repo, _status_owned(split, i)
     return False, None, None, False
 
 
@@ -1166,16 +1226,19 @@ def exempt_ident(cmd):
     fail for a reason unrelated to the assertion, which is how a guard with no
     reachable discharge is reproduced one layer in.
 
+    A label command reached through `||` is not authoritative either, for the
+    reason `_status_owned` gives (ai-config#3139).
+
     Fails toward no-exemption on a parse error, so a malformed command never
     discharges.
     """
-    cmds = _simple_commands(cmd)
-    if cmds is None:
+    split = _split_commands(cmd)
+    if split is None:
         return None, None, None, False
-    for i, argv in enumerate(cmds):
+    for i, (_ops, argv) in enumerate(split):
         kind, num, repo = _argv_exempt(argv)
         if kind:
-            return kind, num, repo, (i == len(cmds) - 1)
+            return kind, num, repo, _status_owned(split, i)
     return None, None, None, False
 
 
@@ -2274,7 +2337,7 @@ def scan(path):
                     # so a call requesting reviewers for two PRs named only
                     # one of them (Copilot on ai-config#3024).
                     #
-                    # Each is undischargeable for one of two reasons. It is
+                    # Each is undischargeable for one of three reasons. It is
                     # followed by another simple command, so the status the
                     # discharge reads is that chain's combined status and
                     # cannot be attributed to the request -- and whether it ran
@@ -2282,7 +2345,11 @@ def scan(path):
                     # `&&` chain short-circuits it away. Or it sits last but is
                     # not the request `pending` was keyed on, because an
                     # earlier request in the same chain took that slot, so
-                    # nothing offers it a status to be judged by. That
+                    # nothing offers it a status to be judged by. Or it is
+                    # last and owns the slot, but sits after `||`, where a
+                    # succeeding left operand skips it while the call still
+                    # exits 0 (ai-config#3139), so the status says nothing
+                    # about whether it ran. That
                     # is indistinguishable, from inside the turn, from a request
                     # that failed -- the POST returns 200, the reviewer may even
                     # review -- and the block message otherwise names only
@@ -2292,7 +2359,7 @@ def scan(path):
                     # rather than naming failure as the only possibility
                     # -- it deliberately does NOT claim which of chaining and
                     # failure occurred, since the transcript cannot tell them
-                    # apart, and neither does it distinguish the two reasons
+                    # apart, and neither does it distinguish the three reasons
                     # above, which differ in nothing the reader would act on
                     # (ai-config#3017).
                     #
@@ -2442,15 +2509,16 @@ def main() -> int:
     # the `sole_failed` arm exists to prevent, arriving through the other door
     # (adversarial review on ai-config#3071).
     #
-    # One sentence rather than a branch per reason: the two differ in WHY the
-    # status is unattributable, and not at all in what the reader does about
-    # it, so a second branch would buy a distinction with no action behind it.
+    # One sentence rather than a branch per reason: the three differ in WHY
+    # the status is unattributable, and not at all in what the reader does
+    # about it, so a further branch would buy a distinction with no action
+    # behind it.
     chained = ((
         "A reviewer request for %s appears in the transcript and was not "
         "credited: it shared a call with another command, so this guard "
         "does not attribute that call's exit status to it. What the request "
         "itself did is therefore unknown from here -- it may have returned "
-        "200 with a review landing, it may have failed, and a `&&` chain may "
+        "200 with a review landing, it may have failed, and a `&&` or `||` chain may "
         "have short-circuited before it ran at all. That is why this looks "
         "identical to a request that failed.\n\n" % names
     ) if len(flagged) == 1 else (
@@ -2458,7 +2526,7 @@ def main() -> int:
         "credited: each shared a call with another command, so this guard "
         "does not attribute any call's exit status to its own request. What "
         "each request did is therefore unknown from here -- one may have "
-        "returned 200 with a review landing, one may have failed, and a `&&` "
+        "returned 200 with a review landing, one may have failed, and a `&&` or `||` "
         "chain may have short-circuited before it ran at all. That is why "
         "this looks identical to requests that failed.\n\n" % names
     )) if flagged else ""

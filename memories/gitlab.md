@@ -24,17 +24,24 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
     `glab issue list` (`Unknown shorthand flag: 'O' in -O`).
   - **Don't:** write `--output-format json` anywhere.
     It is a *different* flag, not a deprecated spelling: on `glab issue list`
-    it takes `details`, `ids`, or `urls`, and `glab api` has no such flag.
-    One reviewer reports `glab issue list` silently ignoring an unrecognized
-    value rather than rejecting it --- unconfirmed, so don't count on a loud
-    failure.
+    it takes `details`, `ids`, or `urls`, and `glab api` has no such flag
+    (`Unknown flag: --output-format`).
+    The `glab issue list` half is the dangerous one, because it does not fail
+    at all: `-F json` **exits 0 and prints the default `details` table**, so
+    you get a table where you asked for JSON and nothing says so.
+    Verified against `gitlab-org/gitlab`: `-F json` and `-F totallybogus`
+    both print the same table `-F` prints when omitted, while `-F ids` prints
+    bare IDs and `-O json` prints real JSON.
   - **Don't:** read an empty or garbled capture as the query having returned
     nothing --- the pager ate the output.
-  Diagnose all of these from stderr's **message**, never its exit code:
-  without a configured GitLab remote every one of these commands exits 1,
-  so only the text separates a rejected flag (`Unknown shorthand flag`) from
-  a command that parsed fine and died later (`Unauthenticated`, or
-  `Accepts 1 arg(s), received 0` when the endpoint path is missing).
+  Diagnose all of these from stderr's **message**, never its exit code.
+  Run them against a named public project (`-R gitlab-org/gitlab`) rather
+  than from a repo with no GitLab remote --- without one, every command here
+  exits 1 for that reason alone, and only the text separates a rejected flag
+  (`Unknown shorthand flag`) from a command that parsed fine and died later
+  (`Unauthenticated`, or `Accepts 1 arg(s), received 0` when the endpoint
+  path is missing).
+  `-R` is what makes the silent-success case above observable at all.
   (`glab 1.106.0`, 2026-09-09; recovered from a 2026-06-22 stash, the one
   entry of thirteen whose content had never reached `main`.)
 - `glab issue list --opened` is deprecated --- `--opened` is the default when `--closed` is not used.

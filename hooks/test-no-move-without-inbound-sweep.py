@@ -5,6 +5,17 @@ Each case names the behaviour it pins rather than the input it feeds, so a
 failure says what broke. The mutation checks at the bottom are the point of the
 file: a test that passes against a deliberately broken guard is not testing the
 guard, and this suite has one mutation per branch that matters.
+
+**Runtime.** Expect tens of seconds, dominated almost entirely by the mutation
+harness: it spawns one `python3 ... --against-mutant` subprocess per mutation,
+and each re-executes this whole module. Nothing is shared between those
+subprocesses --- `_DEEP_CACHE` starts empty in every one --- so the memoization
+below saves only a repeated `deep_json()` call *within* a single process,
+measured at roughly 110 ms. Recorded because a commit message once credited
+that memoization with a 98-to-37-second speedup, comparing a figure measured on
+one machine against a figure measured on another and attributing the difference
+to the change between them. The mechanism cannot produce a saving of that size,
+and the two commits run at the same speed.
 """
 
 from __future__ import annotations

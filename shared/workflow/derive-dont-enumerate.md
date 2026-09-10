@@ -522,7 +522,29 @@ Read it instead as the case `deterministic-tools` names: once an
 instrument exists, the remaining failure is not knowing the rule but
 reaching for the instrument, and the only fix that generalizes is to make
 the derived run the default pre-push action rather than a thing to
-remember.)
+remember.
+
+Sixth and seventh, 2026-09-10 on
+[ai-config#3528](https://github.com/Morrison-Lab/ai-config/pull/3528), and
+they close the argument this paragraph opens.
+One hook was added and CI went red twice, on
+`gen-hooks-plugin.py --check` and then on `test_test_hooks.py` --- the first
+being the *same* check as the fifth occurrence above, missed again, with this
+very section already written.
+What had been run both times was the new hook's own suite,
+`hooks/test-warn-generated-file-stale.py`.
+That is a variant worth naming, because it is not the hand-picking this
+section describes: the suite chosen was complete and correct *for the
+artifact*, and passed honestly.
+A file's own tests are written by whoever wrote the file, so they encode
+what that author already understood --- which is exactly the set of
+conventions they were never going to violate.
+The repo-level suites are where the unread conventions live, and
+`test_test_hooks.py` caught one from ai-config#2098 that the test's author
+had never seen.
+So the population being narrowed is not the *check list* but the *class of
+file the checks range over*, and picking the artifact's own suite feels like
+having checked in a way that picking three checks from memory does not.)
 
 ## In review
 

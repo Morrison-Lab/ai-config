@@ -1456,3 +1456,109 @@ reread, which is the same discovery path
 sure about that?" case record already names as invisible to a hook keyed on
 a first-person admission: the wrongness surfaced as an answer to a question,
 with no admission attached.)
+
+## Naming a reference is not verifying it
+
+Repairing a stale reference by making it durable and repairing it by making
+it true are two different edits, and only the first one feels urgent when
+the passage under repair is about references.
+
+A positional cross-reference ("the 2nd occurrence above") breaks the moment
+a record moves, which is exactly the failure this corpus's own
+[`mistake-patterns.cases.md`](../../memories/mistake-patterns.cases.md)
+header rules out by writing every cross-reference by name.
+Swapping the position for a name is the correct fix for durability, and it
+supplies none of the fix for accuracy: a named target is checkable, not
+checked, and the check is a separate step that a reference-repair pass has
+no built-in reason to take, since references are already the subject.
+The named artifact still has to be opened and read against the specific
+claim the reference is standing in for, the same substitution
+[`The four shapes`](#the-four-shapes) already names for every other
+adjacent-artifact case.
+
+- **Do:** open the named target and confirm it contains the specific claim
+  the reference stands in for, as a step separate from naming it.
+- **Do:** treat "the reference is now durable" and "the reference is now
+  true" as two claims needing two checks, even in a pass whose subject is
+  references.
+- **Don't:** replace a positional pointer with a named one and read the
+  improvement in form as evidence of the content underneath.
+- **Don't:** assume a reference-repair pass is exempt from this file's own
+  rule merely because references, not facts, are what is being edited.
+
+(Measured 2026-09-09, ai-config#3484: a stale positional reference reading
+"the 2nd occurrence above" was replaced with a named pointer to "the
+2026-09-03 occurrence recorded in this file" without opening that occurrence
+to confirm it carried the claim being cited.
+It did not.
+The named occurrence was
+[`mistake-patterns.cases.md`](../../memories/mistake-patterns.cases.md)'s
+misidentified-hook-copy record, which carries no restart measurement at
+all; the actual measurement lived in Pattern 43's own Fix step, in
+[`mistake-patterns.md`](../../memories/mistake-patterns.md), a different
+file entirely.
+The repair converted an arguable pointer into a confidently false one, and
+the confidence was new: a vague positional reference invites a reader to
+check it, while a specific named one reads as already checked.)
+
+## A diagnostic returning clean is evidence about the diagnostic, not the fault
+
+A clean result from a targeted check answers "does this specific thing show
+the problem", not "is the problem absent" --- and the gap between those two
+questions is invisible exactly when every individual check was reasonable to
+run.
+
+The tell is a fault that keeps firing after every registration path a
+diagnosis names comes back clean.
+Each clean read gets spent arguing the fault must be elsewhere, when it is
+equally consistent with the diagnosis having examined the wrong population:
+a check that is sound on the artifact it reads says nothing about whether
+that artifact is the one actually responsible.
+Ruling out three registration paths in turn is real work and reads as
+progress, but a fault that persists through all three is telling you about
+the paths checked, not about the fault --- the same shape
+[`fail-fast`](../principles/fail-fast.md) names for a pass path that isn't
+provably disjoint from the failure path, applied here to a diagnostic
+instead of to a guard.
+
+The fix is not a sharper check on the same candidate set; it is capturing
+the fault directly while it fires (a process sample, a live trace) rather
+than continuing to deduce the culprit from registration files that have
+already all read clean.
+
+- **Do:** treat a clean result from every registration path checked so far
+  as evidence about which paths were examined, not as evidence the fault
+  sits elsewhere.
+- **Do:** capture the fault live (a process sample taken while deliberately
+  triggering it) once the obvious registration paths have all read clean,
+  rather than adding a fourth path to the same deduction.
+- **Don't:** read "every check I ran came back clean" as narrowing the
+  search space --- it narrows the set of *checked* paths, not the set of
+  *possible* ones.
+- **Don't:** keep refining the diagnostic technique against a candidate set
+  established by guesswork, when a direct capture would name the actual
+  path without needing the set enumerated at all.
+
+(ai-config#3141 is the worked incident, and it turned on the diagnostic twice
+over.
+Chasing which copy of `hooks/no-unreviewed-pr.py` was firing an expired
+moratorium, a first pass reported the copy registered in
+`~/.claude/settings.json` as current, all three `installed_plugins.json` pins as
+containing no hook file, and `enabledPlugins` as `false` --- every registration
+clean while the guard misbehaved.
+That reading was itself an instrument artifact.
+The probe initialised each pin's result to the string `(no hook file)` and
+overwrote it only when a `MORATORIUM_END` line was found, so a pin whose hook
+file exists but carries no moratorium constant printed as though the file were
+missing.
+Re-derived with the two conditions separated, one pin does hold the hook ---
+user-scope, with no `MORATORIUM_END` at all, which is a copy predating the
+moratorium and therefore one that demands the review unconditionally.
+A registration did explain it.
+So the incident supplies the rule twice: once for the diagnostic that returned
+clean while the fault stood, and once for the probe whose defaulted variable
+described a condition it never tested.
+The record and its measurements live in
+[`mistake-patterns.cases.md`](../../memories/mistake-patterns.cases.md)'s
+Pattern 43 entry; this section states the transferable rule the incident
+does not itself generalize.)

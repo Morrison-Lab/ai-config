@@ -341,6 +341,11 @@ if not _ok:
 print("\n--- root attribution (read_roots)")
 _HOME = os.path.expanduser("~")
 _ATTRIBUTION_CASES = [
+    ("grep -rn '~/.claude/settings.json' README.md && echo `date`", set(),
+     "a backtick in a NEIGHBOURING segment does not hand the lexical fallback "
+     "a segment the argv parse already decided (review round on #3469)"),
+    ("cat ~/.codex/config.toml; jq . $(echo ~/.claude/settings.json)", {"codex", "claude"},
+     "the fallback still runs on the segment that carries the substitution"),
     ("cat file 2<> ~/.claude/settings.json", {"claude"},
      "a read-write redirect opens its target for reading"),
     ("grep 5 < ~/.claude/settings.json", set(),

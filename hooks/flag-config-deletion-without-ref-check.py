@@ -308,8 +308,11 @@ CD_VERBS = frozenset({"cd", "pushd", "popd"})
 # substitution splits into an argv whose `argv[0]` is the outer program, so
 # `diff <(cat <manifest>) <(cat other)` presents `diff` where `cat` ran. Union
 # the argv verdict with the lexical one for all three, per the issue's "fall
-# back to the lexical path rather than to silence".
+# back to the lexical path rather than to silence", scoped to the chain
+# segment that carries the construct (see `unparseable_segments`).
 RX_UNPARSEABLE = re.compile(r"[$][(]|`|<<|[<>][(]")
+# Chain operators, for scoping that fallback to the segment that needs it.
+RX_CHAIN_SPLIT = re.compile(r"&&|[|][|]|;|[|]")
 # A redirect operand is not a file the command READS. `> file` and `>> file`
 # name a file the shell opens for writing, so overwriting a manifest must not
 # discharge the guard; `< file` names one the command reads, so its target
@@ -532,9 +535,25 @@ def read_roots(command):
     parsed = argv_read_roots(command) if simple_commands_with_scope else None
     if parsed is None:
         return lexical_read_roots(command)
-    if RX_UNPARSEABLE.search(command):
-        return parsed | lexical_read_roots(command)
+    for segment in unparseable_segments(command):
+        parsed = parsed | lexical_read_roots(segment)
     return parsed
+
+
+def unparseable_segments(command):
+    """The chain segments of `command` whose argv cannot be trusted.
+
+    The fallback is scoped to the segment carrying the substitution or heredoc
+    rather than to the whole line, so a backtick in one command does not hand
+    the lexical scan a neighbouring command the argv parse already decided:
+    a `grep` over README.md followed by an `echo` of a backticked `date` credits
+    nothing, since the grep segment parsed cleanly and the echo names no
+    manifest. The split is textual, so a chain operator inside a quoted string
+    splits too; that only narrows what the lexical scan sees, which for a
+    DISCHARGE test is the direction that warns.
+    """
+    return [seg for seg in RX_CHAIN_SPLIT.split(command)
+            if RX_UNPARSEABLE.search(seg)]
 
 
 def targeted_roots(text):

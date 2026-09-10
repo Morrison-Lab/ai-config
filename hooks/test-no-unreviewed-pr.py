@@ -175,6 +175,43 @@ PUSH_CORPUS = [
     ("git push --del origin x", False),
     ("gh pr comment 1 --body 'git push'", False),
 ]
+
+# The issue's reproduction and its operator controls, one level below the
+# end-to-end cases: (command, want_last, want_flagged), where `want_last` is
+# `request_ident`'s fourth field and `want_flagged` says whether
+# `undischargeable_requests` names the request. The two are asked together
+# because the defect was BOTH halves at once -- the discharge fired and the
+# diagnostic stayed silent, so a request that never ran was cleared without
+# ever being named (ai-config#3139).
+REQ_READ = "gh pr view 1038 --json reviews"
+OPERATOR_CORPUS = [
+    (REQ_READ + " || " + REQ_CMD_Q, False, True),
+    (REQ_READ + " && " + REQ_CMD_Q, True, False),
+    (REQ_READ + "; " + REQ_CMD_Q, True, False),
+    (REQ_CMD_Q, True, False),
+    (REQ_CMD_Q + " || true", False, True),
+    (REQ_CMD_Q + " && " + REQ_READ, False, True),
+    # No whitespace around the operator: shlex tokenizes `a||b` the same way,
+    # and a fix keyed on a padded literal would miss this.
+    (REQ_READ + "||" + REQ_CMD_Q, False, True),
+]
+
+# `_split_commands` and `_status_owned` themselves: (command, index, owned).
+# The grouped form is the one a per-command "is the immediately preceding
+# token `||`" test gets wrong -- in `a || ( b )` the token just before `b` is
+# `(`, so the operator run has to be carried across the grouping.
+STATUS_OWNED_CORPUS = [
+    ("a; b", 1, True),
+    ("a && b", 1, True),
+    ("a | b", 1, True),
+    ("a || b", 1, False),
+    ("a || b", 0, False),
+    ("a && b; c", 2, True),
+    ("a; b || c", 2, False),
+    ("a || ( b )", 1, False),
+    ("a", 0, True),
+]
+
 CASES = []
 
 
@@ -444,6 +481,36 @@ case(create("c") + [
              "'baduser'", err=True),
     say("A CLI add-reviewer that failed without a 4xx body.")], True,
      "a failed CLI add-reviewer with no 4xx body does not discharge")
+
+# --- a `||`-short-circuited request never ran (ai-config#3139) -------------
+# `<read> || <POST>` exits 0 when the READ succeeds and the POST never runs,
+# so a discharge keyed on "last simple command, not failed" clears the
+# obligation on a request that did not happen -- the silent false clear this
+# guard exists to prevent. Measured shell behaviour:
+#   $ bash -c 'true || { echo RAN; exit 22; }'; echo "exit=$?"   ->  exit=0
+# The `&&` and `;` cases below are the control: the SAME request in the same
+# position, differing only in the operator, must still discharge, so a pass
+# here is evidence about the operator rather than about the fixture.
+case(create("c") + [
+    bash("gh pr view 1038 --json reviews || " + REQ_CMD_Q, tid="q"),
+    res("q", '{"reviews":[]}'),
+    say("Read the reviews; the request never ran.")], True,
+     "a last-position request after `||` does not discharge")
+case(create("c") + [
+    bash("gh pr view 1038 --json reviews && " + REQ_CMD_Q, tid="q"),
+    res("q", OK), say("Read, then requested.")], False,
+     "a last-position request after `&&` still discharges")
+case(create("c") + [
+    bash("gh pr view 1038 --json reviews; " + REQ_CMD_Q, tid="q"),
+    res("q", OK), say("Read, then requested.")], False,
+     "a last-position request after `;` still discharges")
+# The reverse ordering is SAFE and must stay so: the request is not last, so
+# it was already unattributable and the guard already blocked. Pinned because
+# `<request> || true` is a shape people write deliberately, unlike the one
+# above, and an over-broad fix could only have made it noisier.
+case(create("c") + [bash(REQ_CMD_Q + " || true", tid="q"), res("q", OK),
+                    say("Requested with a fallback.")], True,
+     "a request chained AHEAD of `|| true` is still unattributable")
 
 # --- draft carve-out ---
 case([bash("gh pr create --draft --base main --title x", tid="c"),
@@ -2259,6 +2326,34 @@ def main():
         else:
             failures += 1
             print(f"FAIL: _argv_push({cmd!r}) is {got}, want {want}")
+    for cmd, want_last, want_flagged in OPERATOR_CORPUS:
+        got_last = hookmod.request_ident(cmd)[3]
+        got_flagged = bool(hookmod.undischargeable_requests(cmd))
+        if (got_last, got_flagged) == (want_last, want_flagged):
+            passes += 1
+            print(f"PASS: request_ident/undischargeable on {cmd!r}")
+        else:
+            failures += 1
+            print(f"FAIL: {cmd!r} gives last={got_last} flagged={got_flagged}, "
+                  f"want last={want_last} flagged={want_flagged}")
+    for cmd, idx, want in STATUS_OWNED_CORPUS:
+        got = hookmod._status_owned(hookmod._split_commands(cmd), idx)
+        if got is want:
+            passes += 1
+            print(f"PASS: _status_owned({cmd!r}, {idx}) is {want}")
+        else:
+            failures += 1
+            print(f"FAIL: _status_owned({cmd!r}, {idx}) is {got}, want {want}")
+    # `_simple_commands` keeps its own contract -- the argv-only view of the
+    # same split -- so no caller of it changed meaning when the operators
+    # started being carried alongside.
+    if hookmod._simple_commands("a && b; c") == [["a"], ["b"], ["c"]] \
+            and hookmod._simple_commands("gh pr view 'un\"balanced") is None:
+        passes += 1
+        print("PASS: _simple_commands keeps its argv-only contract")
+    else:
+        failures += 1
+        print("FAIL: _simple_commands changed shape")
     for events, expected, label in CASES:
         if expected == "ordering":
             obs = obligations_of(events)

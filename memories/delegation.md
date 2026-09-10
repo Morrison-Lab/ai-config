@@ -657,6 +657,33 @@ Nothing in any call recorded it;
 what made the inheritance visible was the last dispatch dying with
 `rate_limit ... model sent to the API: claude-fable-5-1`.
 
+## Claude subagents are for reviewers only; every other subagent runs on agy
+
+**Directive from the user, 2026-09-09, during a quota sprint that hit the 5-hour Claude limit twice in one day: "use agy only for subagents;
+no claude subagents except reviewers".**
+It arrived after two caps in the same day (five machine-wide, then two machine-wide with one per session), so read it as the standing rule rather than as a throttle for that afternoon.
+The one carve-out is the `adversarial-reviewer`, and it is narrower than it first looked.
+`hooks/no-push-without-self-review.py` on `main` accepts a cross-family review as a discharge when the review ran as the sole command of one Bash call in the shape `agy --print '<single-quoted prompt>'` (its `EXTERNAL_REVIEWER_COMMAND_RE`), so a session whose installed copy is current needs no Claude reviewer at all.
+The copy this session ran under refused every `agy` review because it predated that acceptance: 67 of the 86 hook copies under `~/.claude/hooks` differed from `main` on 2026-09-10, the drift [ai-config#3094](https://github.com/Morrison-Lab/ai-config/issues/3094) tracks, and the first response to a refusal that names no `agy` form is to diff the installed copy against `main` before spending a Claude reviewer on it.
+
+**Headless `agy` does the implementation work on this machine now.**
+The `command(*)` allow-rule in `~/.gemini/antigravity-cli/settings.json`, added at the user's request through another session on 2026-09-09, is what made that true;
+the same session measured the caveats (PowerShell 5.1 with no `&&`, a scratch cwd so every brief starts with `Set-Location`, file tools scoped to the sparta tree so an ai-config brief does its file I/O through shell commands).
+Three implementation dispatches and one review dispatch in this session ran that way at zero Claude cost, each returning a local commit in its worktree.
+
+**A worker subagent cannot push, whichever family it runs on, so brief it to commit locally and never push.**
+`no-push-without-self-review.py` reads the orchestrator's transcript for the reviewer dispatch.
+A subagent thread has no transcript under `~/.claude/projects/` for the subagent's worktree, so the reviewer rounds the subagent runs are invisible to the guard, and the guard refuses every push the subagent attempts.
+Measured 2026-09-09 on ai-config#3469: the worker ran two clean `adversarial-reviewer` rounds and was still refused, then tried the guard's documented `ALLOW_UNREVIEWED_PUSH=1` escape and had it denied by the auto-mode classifier.
+The orchestrator dispatches the reviewer against the worker's diff, addresses the findings itself, and pushes;
+that round is not redundant, since it found two false discharges the worker's rounds had missed.
+
+- **Do:** launch `agy` for implementation, triage, and any other dispatchable work, and reserve the `Agent` tool for `adversarial-reviewer`.
+- **Do:** end every worker brief with "commit locally, do not push, do not mark the PR ready", and run the reviewer and the push from the orchestrator.
+- **Don't:** dispatch a Claude `general-purpose` worker for implementation while this directive stands, however small the task.
+- **Don't:** brief a worker to push and ARDI its own PR;
+  the guard refuses it by construction, and the retry burns the worker's whole budget.
+
 ## opencode free tier: a full authoring task, validated mechanically
 
 Measured 2026-08-28 on opencode CLI 1.18.15 (macOS),

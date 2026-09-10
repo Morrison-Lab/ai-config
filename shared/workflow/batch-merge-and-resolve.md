@@ -826,8 +826,13 @@ order and formatting:
 ```bash
 git show :3:references.bib > theirs.bib   # the base side, formatting to preserve
 git show :2:references.bib > ours.bib
-python3 scripts/bibunion.py theirs.bib ours.bib references.bib
+# then: parse both, emit theirs entries in their own order, append ours
+# whose keys are absent, and fail loudly on a key present in both with
+# differing bodies.
 ```
+
+The union step itself is repo-specific, since only the consuming repo knows
+what a record is, so it belongs in that repo's `scripts/` rather than here.
 
 **Then validate with the consumer, not with a diff.**
 A resolved file is an artifact some tool parses, and that tool is the only
@@ -844,7 +849,15 @@ The diff check that feels equivalent is not.
 lines, so a resolver that deleted every separator scores zero on it ---
 [`sync-with-main`](sync-with-main.md)'s deleted-line blindness, arriving through
 the pattern rather than through the check's scope.
-`'^-[^-]*$'` counts any removed line.
+Tightening the pattern does not fix it: `'^-[^-]*$'` misses any removed line
+carrying a hyphen after its first character, which in a Markdown corpus is
+most bullet lines.
+Ask git for the number instead, which counts every removed line and needs no
+pattern at all:
+
+```bash
+git diff --numstat origin/main -- <file>   # added <TAB> deleted <TAB> path
+```
 
 **Validate on one branch, and let its CI finish, before fanning the resolver
 out.**
@@ -861,14 +874,18 @@ that invites applying it that way.
 - **Don't:** reconstruct a file from conflict markers --- the separators
   between records are context, so they vanish with nothing to report them.
 - **Don't:** accept `grep '^-[^-]'` as proof nothing was removed; it excludes
-  exactly the blank lines this bug deletes.
+  exactly the blank lines this bug deletes, and no tightening of the pattern
+  is as reliable as `git diff --numstat`.
 
 (Morrison-Lab/wai, 2026-09-10.
-Twenty-one open PRs each appended entries to one `references.bib`, so all 231
-scored pairs collided there.
-A marker-parsing resolver joined entries with a single newline and truncated
-one, pandoc refused the file, and the `build` check went red on all
-twenty-one branches in the same push.
+Twenty-three open PRs each appended entries to one `references.bib`.
+A pairwise sweep scored all 253 pairs and found 231 of them colliding in that
+file; the 22 that did not are exactly the pairs formed by the single PR that
+touched the bibliography not at all.
+A marker-parsing resolver was then fanned across the 21 branches that needed
+a sync: it joined entries with a single newline and truncated one, pandoc
+refused the file, and the `build` check went red on all twenty-one branches
+in the same push.
 The `^-[^-]` check had reported zero removals against 35 deleted blank lines.
 The repair was a union over `:2:`/`:3:` validated by a real citation render.
 Tracked as Morrison-Lab/wai#236.)

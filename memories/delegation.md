@@ -273,7 +273,7 @@ The existing "`agy --print` CONSUMES THE NEXT TOKEN" rule above still applies --
 **Headless mode cannot satisfy a tool's permission prompt, and it fails with a named cause rather than hanging.**
 A tool needing a permission it hasn't been granted (`read_file` is the one observed) makes the run print `jetski: no output produced --- a tool required the "read_file" permission that headless mode cannot prompt for` and produce nothing.
 The available escapes are `--mode plan` (read-only), `--mode accept-edits`, `--dangerously-skip-permissions`, or an allow-rule under `permissions.allow` in `settings.json` --- but this file's own auto-mode classifier section already found `--dangerously-skip-permissions` and `--mode accept-edits` denied by Claude Code's permission classifier, so those two may not be reachable from an orchestrated dispatch even where they solve the headless problem.
-**Measured 2026-09-09: the `permissions.allow` route works.**
+**Measured 2026-09-09: a `command(*)` rule under `permissions.allow` in this file is honoured in headless mode.**
 `--dangerously-skip-permissions` stays denied by Claude Code's classifier, and `--mode plan` is still untested.
 With this in `~/.gemini/antigravity-cli/settings.json` (agy 1.1.28, Windows 11;
 `<user>` and `<repo>` stand for the real account and checkout):
@@ -292,6 +292,12 @@ With this in `~/.gemini/antigravity-cli/settings.json` (agy 1.1.28, Windows 11;
 ```
 
 A plain `agy --print "<prompt>" --effort low` ran a shell command and reported its stdout, from the user's own terminal and then from a Claude Code Bash call.
+That contradicts upstream issue [google-antigravity/antigravity-cli#548](https://github.com/google-antigravity/antigravity-cli/issues/548), whose reports through agy 1.1.27 say `command()` grants in this file are loaded but never consulted by `--print`, and that only `~/.gemini/config/config.json` (`userSettings.globalPermissionGrants.allow`) is honoured.
+So the measurement was discriminated against that confound rather than taken on faith.
+This machine's `config.json` carried 17 grants from earlier interactive sessions (`command(gh)`, `command(godot)`, three `bash.exe` invocations, three `read_url` hosts), none of which covers `hostname` or `whoami`, and a headless probe ran both.
+The same probe had been denied for the `command` permission minutes before the `settings.json` edit, with `config.json` unchanged.
+`cli.log` shows the two stores loaded separately (`applyUserSettings: stored shared config permissions: allow=17` from `config.json`, then `CLI settings initialized: permissions=&{Allow:[command(*) ...]}` from `settings.json`), and no `ApplyProjectPermissionGrants` entry for the project.
+On a build older than 1.1.28, or if a `command(*)` rule here is ignored, read those two `cli.log` lines to tell "loaded" from "applied", and fall back to a `command()` entry under `globalPermissionGrants.allow` in `config.json`, per #548.
 `command(*)` is the form to use.
 As of 2026-09-09, upstream issue [google-antigravity/antigravity-cli#614](https://github.com/google-antigravity/antigravity-cli/issues/614) reports two Windows defects: `command(git)` never matches, because the resolved `C:\Program Files\Git\...` path is split at the space, and a `\*` glob inside a `read_file`/`write_file` rule crashes the sandbox.
 So directory rules are written bare (they are recursive).
@@ -312,7 +318,9 @@ Write `cmd //c` from Git Bash, or pass a short brief directly with `--print "$(c
 The Claude Code classifier is the other half.
 As of 2026-09-09, `--dangerously-skip-permissions` was denied on every attempt (three, across two sessions).
 Writing the `permissions.allow` block into `settings.json` was denied once via the Edit tool and then accepted via the Write tool in the next turn, after the user said "you paste it for me" --- so the file edit is reachable, and the flag has not been.
-After those denials the classifier escalated to denying the plain `agy --print` probe the classifier had accepted earlier in the same session, twice;
+The "Don't" bullet further down, measured 2026-09-07 on macOS, records the opposite outcome for the same edit;
+both are dated samples of the classifier, and the Write tool after an explicit user instruction is the shape that passed.
+After those denials the classifier escalated: it denied twice the plain `agy --print` probe it had accepted once earlier in the same session;
 the classifier accepted the identical command again once the user had run it in their own terminal and reported the result.
 Read that as the mistake-patterns Pattern 43 escalation rather than as a property of the command.
 
@@ -476,12 +484,8 @@ only these specific commands, on this one session and date, were denied.
 - **Do:** look for `agy`'s settings file at
   `~/.gemini/antigravity-cli/settings.json` first,
   not under a `~/.antigravity/` or `~/.agy/` guess.
-- **Don't:** assume editing `permissions.allow` from inside
-  the orchestrating Claude Code session is a reachable escape
-  for a headless `agy` permission denial --
-  as of 2026-09-07 that edit itself was denied
-  by Claude Code's own auto-mode classifier,
-  the same as `--dangerously-skip-permissions` was.
+- **Don't:** assume editing `permissions.allow` from inside the orchestrating Claude Code session is a reachable escape for a headless `agy` permission denial -- as of 2026-09-07 that edit itself was denied by Claude Code's own auto-mode classifier, the same as `--dangerously-skip-permissions` was (on Windows, 2026-09-09, the same edit passed via the Write tool after the user asked for it in so many words;
+  see the measured section above).
 - **Don't:** reach for a `daytb`/`mwc`/`away` grant
   to clear this kind of denial --
   it is Claude Code's permission system reacting

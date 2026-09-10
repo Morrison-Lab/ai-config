@@ -110,10 +110,15 @@ A SHA is excluded from consideration when:
     Adversarial review sampled ~500 real citations across two live session
     notebooks and found the large majority were exactly this shape --
     reporting the artifact's OWN current position, not asserting a fact
-    about what the commit did. This heuristic is deliberately generous
-    (it trades an occasional real assertion phrased like a status line for
-    silence on the corpus's single commonest true-positive-free pattern),
-    not exhaustive.
+    about what the commit did. A round-2 refinement (`RX_TRAILING_PUNCT_ONLY`
+    below) requires the REST of the line after the SHA to also be empty or
+    pure closing punctuation, so a status phrase followed by a genuine
+    assertion ("pushed at `X` -- it deletes the guard") still fires. That
+    refinement is deliberately strict: a real position report carrying an
+    ordinary trailing clause ("pushed at `X`, CI running") now fires too,
+    which the sampled corpus shape would not have wanted (round-3
+    adversarial review). The exemption is a generous, not exhaustive,
+    heuristic on both sides of this trade-off, not a coverage guarantee.
 
 SCOPE: PROSE EXTENSIONS ONLY, NOT "ANY TRACKED FILE"
 ------------------------------------------------------
@@ -471,13 +476,16 @@ RX_PATCH_FLAG = re.compile(r"(?:^|\s)(?:-p\b|--patch\b)", re.I)
 RX_NO_PATCH_FLAG = re.compile(
     r"(?:^|\s)(?:-s\b|--no-patch\b|--stat\b|--name-only\b|--name-status\b|"
     r"--oneline\b|--quiet\b|-q\b)", re.I)
-# `--format=` is conditional, unlike the flags above: `--format=fuller` and
-# `--format=medium` still print the full patch (verified against real git,
-# 2nd-round adversarial review), so only a value shaped like a ONE-LINE
-# format (a single placeholder, or the `oneline`/`short`/`reference`
-# built-ins) counts as no-patch.
-RX_NO_PATCH_FORMAT = re.compile(
-    r"--format=(?:%[a-zA-Z]|oneline|short|reference)\b", re.I)
+# `--format=` alone is NOT in this set, and was briefly (round 2) on the
+# premise that a one-line format value (`--format=%h`, `--format=oneline`)
+# suppresses the patch the way `-s`/`--stat` do. Round-3 adversarial review
+# measured real git and found that premise false: `git show --format=<any
+# value> <sha>` still prints the full patch for every value tried
+# (`%h`, `oneline`, `short`, `reference`, `fuller`) -- only `-s`/`--no-patch`
+# actually suppresses it. `git show -s --format=%s <sha>`, the round-1
+# motivating case, is already caught by the `-s` arm above regardless of
+# `--format=`, so the removed clause was strictly a false-positive source
+# with no true positive it uniquely caught.
 RX_GH_API_COMMIT = re.compile(r"/commits?/([0-9a-fA-F]{7,40})\b", re.I)
 RX_GH_API_PR_COMMITS = re.compile(
     r"\bgh\s+api\s+\S*/pulls/\d+/commits\b", re.I)
@@ -494,7 +502,7 @@ def _no_patch(rest):
     verified against `git show -p --stat <sha>`)."""
     if RX_PATCH_FLAG.search(rest):
         return False
-    return bool(RX_NO_PATCH_FLAG.search(rest) or RX_NO_PATCH_FORMAT.search(rest))
+    return bool(RX_NO_PATCH_FLAG.search(rest))
 
 
 def _bash_discharges(command):

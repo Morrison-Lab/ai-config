@@ -240,9 +240,14 @@ CASES = [
      "adversarial review: git diff --stat (no patch) does not discharge"),
     ([PROMPT, tool_use("Bash", command="git show --format=fuller 2d37c48")],
      bash(f'gh pr comment 155 --body "{CITED_ONE}"'), False,
-     "adversarial review round 2: git show --format=fuller still prints "
-     "the patch and must still discharge (only a one-line format value "
-     "counts as no-patch)"),
+     "git show --format=fuller still prints the patch and must still "
+     "discharge"),
+    ([PROMPT, tool_use("Bash", command="git show --format=%h 2d37c48")],
+     bash(f'gh pr comment 155 --body "{CITED_ONE}"'), False,
+     "adversarial review round 3: git show --format=%h ALSO still prints "
+     "the patch (real git prints the patch for every --format= value; only "
+     "-s/--no-patch suppresses it) -- a one-line-shaped format value is not "
+     "a no-patch signal, unlike round 2's premise"),
     ([PROMPT, tool_use("Bash", command="git show -p --stat 2d37c48")],
      bash(f'gh pr comment 155 --body "{CITED_ONE}"'), False,
      "adversarial review round 2: an explicit -p wins over a co-occurring "

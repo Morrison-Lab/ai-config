@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
@@ -78,15 +80,6 @@ class TestNativePathDetection(unittest.TestCase):
 
     def test_drive_letter_path_is_native(self):
         self.assertTrue(agy_hooks.is_native_windows_path(PYTHON_EXE))
-
-
-
-import os
-from unittest.mock import patch
-
-
-
-
 
 class TestEnvironmentResolution(unittest.TestCase):
     def test_is_windows(self):

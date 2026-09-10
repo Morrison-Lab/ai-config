@@ -61,6 +61,11 @@ parse RETIRED: an already-expanded absolute path under the home directory now
 resolves, and so does `cd <root>/hooks && cat ../settings.json`.
 A command reading two manifests at once now credits both, since every file
 operand is examined rather than only the first match.
+An output redirect (`cat payload.json > ~/.claude/settings.json`) no longer
+credits its target, since the shell opens that file for writing, while an
+input redirect (`jq . < ~/.claude/settings.json`) still does. A heredoc body
+redirected into a manifest still takes the regex fallback and is credited
+there: a remaining limit.
 Fires once per distinct message (sentinel keyed by content hash).
 """
 import hashlib
@@ -302,6 +307,12 @@ CD_VERBS = frozenset({"cd", "pushd", "popd"})
 # the argv verdict with the lexical one for all three, per the issue's "fall
 # back to the lexical path rather than to silence".
 RX_UNPARSEABLE = re.compile(r"[$][(]|`|<<|[<>][(]")
+# A redirect operand is not a file the command READS. `> file` and `>> file`
+# (with or without a leading descriptor, attached or separate) name a file the
+# shell opens for writing, so overwriting a manifest must not discharge the
+# guard; `< file` names one the command reads, so its target stays an operand.
+RX_OUT_REDIRECT = re.compile(r"^(?:[0-9]*>>?[|]?|&>>?)(.*)$")
+RX_IN_REDIRECT = re.compile(r"^[0-9]*<(.*)$")
 
 HOME = os.path.expanduser("~")
 
@@ -375,6 +386,22 @@ def read_operands(argv):
         token = argv[index]
         if not end_of_opts and token == "--":
             end_of_opts = True
+            index += 1
+            continue
+        out_redirect = RX_OUT_REDIRECT.match(token)
+        if out_redirect:
+            index += 1 if out_redirect.group(1) else 2
+            continue
+        in_redirect = RX_IN_REDIRECT.match(token)
+        if in_redirect:
+            target = in_redirect.group(1)
+            if not target:
+                index += 1
+                continue
+            if target.startswith("&"):
+                index += 1
+                continue
+            positional.append(target)
             index += 1
             continue
         if not end_of_opts and token.startswith("-") and token != "-":

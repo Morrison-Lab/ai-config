@@ -87,6 +87,11 @@ DELETE_REPLY = (
 )
 
 WARN_CASES = [
+    (DELETE_REPLY, ("cat payload.json > ~/.claude/settings.json",),
+     "OVERWRITING the manifest is a write: a redirect target is not a file "
+     "the command reads, so it must not discharge the guard"),
+    (DELETE_REPLY, ("cat payload.json >> ~/.claude/settings.json",),
+     "appending to the manifest is the same write, spelled `>>`"),
     (DELETE_REPLY, ("locate ~/.claude/settings.json",),
      "`locate` contains `cat`: the read verb is front-anchored like the "
      "manifest name, or a command that opens nothing discharges"),
@@ -159,6 +164,8 @@ WARN_CASES = [
 ]
 
 SILENT_CASES = [
+    (DELETE_REPLY, ("jq . < ~/.claude/settings.json",),
+     "an INPUT redirect is a read of its target"),
     ("Remove them with `rm -rf ~/.cursor/rules`.", ("cat ~/.cursor/mcp.json",),
      "cursor's real manifest is `mcp.json` with no leading dot: per-root "
      "coverage made this permanently un-dischargeable, warning an author who "
@@ -334,6 +341,14 @@ if not _ok:
 print("\n--- root attribution (read_roots)")
 _HOME = os.path.expanduser("~")
 _ATTRIBUTION_CASES = [
+    ("cat payload.json > ~/.claude/settings.json", set(),
+     "an output redirect target is written, not read"),
+    ("cat payload.json 2>~/.claude/settings.json", set(),
+     "a descriptor-prefixed, attached redirect is still a write"),
+    ("jq . < ~/.claude/settings.json", {"claude"},
+     "an input redirect target is read"),
+    ("cat ~/.claude/settings.json 2>/dev/null", {"claude"},
+     "a stderr redirect elsewhere leaves the operand credited"),
     ("grep -rn '~/.claude' ~/.codex/config.toml", {"codex"},
      "the pattern names claude and the OPERAND is codex's manifest"),
     ("grep -rn '~/.claude/settings.json' README.md", set(),

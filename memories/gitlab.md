@@ -13,6 +13,19 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
 - Installed via Homebrew (macOS) or system package manager --- verify with `which glab`.
 - Authenticated on your GitLab instance --- run `glab auth status` to verify host and username
 - Use for MR comments, pipeline checks, CI job logs, etc.
+- **`glab` opens a pager (alternate buffer) that makes output unreadable in a
+  VS Code terminal, the same way `gh` does** --- most often on `glab api` and
+  `glab issue list`.
+  [`gh-cli.md`](gh-cli.md) records the `gh` half and its `GH_PAGER=cat` fix;
+  `glab` needs its own, since `GH_PAGER` does not reach it.
+  - **Do:** pipe through `| cat`, export `PAGER=cat`, or ask for JSON with
+    `--output-format json`; redirect to a file and read that back when a
+    command still takes the terminal.
+  - **Don't:** read an empty or garbled capture as the command having
+    returned nothing --- the pager, not the query, ate the output.
+  (Recovered 2026-09-09 from a stash dated 2026-06-22 during a `/cb` sweep of
+  the stash stack; it was the one entry of thirteen whose content had never
+  reached `main`.)
 - `glab issue list --opened` is deprecated --- `--opened` is the default when `--closed` is not used.
   Just use `glab issue list` (no flag needed).
 - `glab mr list` also defaults to open items, and the installed CLI may reject

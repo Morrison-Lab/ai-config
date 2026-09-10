@@ -89,6 +89,32 @@ Because the pop conflicted, the entry was retained and still reads as
   A line that matches on topic but not verbatim usually means main carries
   the **improved** review-cycle revision
   --- read both and confirm main's is a superset before calling it superseded.
+- **Whole-diff `git apply -R --check` is not that verification, and it fails
+  in the direction that looks safe.**
+  Reverse-applying a stash's diff against a clean checkout of `origin/main`
+  reads like an exact supersession test, and it is one only while the
+  surrounding lines have not moved.
+  `git apply` matches whole hunks with context, so any unrelated edit to the
+  same file since the stash was taken fails the hunk, and one failed hunk
+  fails the file.
+  The verdict comes back "not present on main" for content that is entirely
+  present.
+  Measured 2026-09-09 over this repo's 13-entry stash stack: the whole-diff
+  check reported ABSENT for 12 of 13, including one entry whose added lines
+  were 95% already on `main` and another at 100%.
+  The per-line check in the bullet above scored those two correctly.
+  - **Do:** index every line of every tracked file once
+    (`git ls-files`, read each, build a set of stripped lines), then score
+    each stash's added lines against that set --- one pass answers the whole
+    stack, where a per-line `git grep` costs a subprocess per line and times
+    out.
+  - **Do:** read a partial score as a prompt to open the diff, since the
+    residue is the whole question --- a stale count or a debugging edit is a
+    drop, an unlanded feature is a branch.
+  - **Don't:** treat a whole-diff reverse-apply failure as evidence the
+    content is unlanded.
+  - **Don't:** treat a high percentage as landed without reading the
+    remainder; the 5% that missed is where the unrecorded learning lives.
 - `git stash show -p` **omits the untracked-files component.**
   Check `git show 'stash@{0}^3'`
   (that parent exists only if the stash was made with `-u`)

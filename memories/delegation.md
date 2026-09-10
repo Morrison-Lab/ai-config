@@ -662,7 +662,9 @@ what made the inheritance visible was the last dispatch dying with
 **Directive from the user, 2026-09-09, during a quota sprint that hit the 5-hour Claude limit twice in one day: "use agy only for subagents;
 no claude subagents except reviewers".**
 It arrived after two caps in the same day (five machine-wide, then two machine-wide with one per session), so read it as the standing rule rather than as a throttle for that afternoon.
-The one carve-out is the `adversarial-reviewer`, because `hooks/no-push-without-self-review.py` accepts only that subagent's own result, and a cross-family `agy` review, however good, cannot discharge it.
+The one carve-out is the `adversarial-reviewer`, and it is narrower than it first looked.
+`hooks/no-push-without-self-review.py` on `main` accepts a cross-family review as a discharge when the review ran as the sole command of one Bash call in the shape `agy --print '<single-quoted prompt>'` (its `EXTERNAL_REVIEWER_COMMAND_RE`), so a session whose installed copy is current needs no Claude reviewer at all.
+The copy this session ran under refused every `agy` review because it predated that acceptance: 67 of the 86 hook copies under `~/.claude/hooks` differed from `main` on 2026-09-10, the drift [ai-config#3094](https://github.com/Morrison-Lab/ai-config/issues/3094) tracks, and the first response to a refusal that names no `agy` form is to diff the installed copy against `main` before spending a Claude reviewer on it.
 
 **Headless `agy` does the implementation work on this machine now.**
 The `command(*)` allow-rule in `~/.gemini/antigravity-cli/settings.json`, added at the user's request through another session on 2026-09-09, is what made that true;

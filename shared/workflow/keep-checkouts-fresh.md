@@ -38,7 +38,8 @@ In every session --- at session start, and again periodically during long sessio
    git -C <ai-config checkout> fetch -q origin && git -C <ai-config checkout> rev-list --count <gitCommitSha>..origin/main
    ```
 
-   A count in the hundreds is a stale pin, whatever `installed_plugins.json`'s own `lastUpdated` claims and however new the other cache directories are.
+   Any non-zero count means the served snapshot is behind `origin/main`, whatever `installed_plugins.json`'s own `lastUpdated` claims and however new the other cache directories are;
+   the larger the count, the more fixes the session is running without.
 
    `claude plugin update <plugin>` (verified present in `claude plugin --help` output on this machine) is the remedy once staleness is confirmed --- run it per scope (`claude plugin update ai-config@Morrison-Lab`, and `claude plugin update --scope project ai-config@Morrison-Lab` from each affected project/worktree), then restart the session to pick up the refreshed cache path.
    [ai-config#2439](https://github.com/Morrison-Lab/ai-config/issues/2439) tracks making this check itself part of the session-start sweep rather than something a session discovers by symptom.

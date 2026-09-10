@@ -53,6 +53,29 @@ adjacency between segments, not on raw text or on "these ingredients
 appear somewhere in the command" -- a forced removal that merely shares a
 command with an unrelated `||` or an unrelated loop does not trip it.
 Fails OPEN on any parse trouble.
+
+## Known limitation: a loop opener with nothing before it on its own line
+is not counted
+
+The loop-depth tracker (`find_offense`'s `loop_depth`/`loop_forced` loop)
+only recognizes a `for`/`while`/`until` keyword at `argv[0]` of its own
+segment. A NESTED loop opened on the same segment as the outer loop's
+`do` -- e.g. `for p in a b; do while true; do echo hi; done; git
+worktree remove --force "$p"; done`, real executable bash, forcing every
+outer iteration -- puts `while` at `argv[1]`, not `argv[0]` (the segment
+is `['do', 'while', 'true']`, since no operator separates the outer `do`
+from the inner `while`), so the inner loop's own OPEN is never counted
+while its `done` still decrements the depth the OUTER loop set. The net
+effect: a forced removal that follows can be missed. Found by an
+adversarial review (2026-09-10) that hand-constructed and ran this exact
+command. Tracked as
+[ai-config#3525](https://github.com/Morrison-Lab/ai-config/issues/3525).
+Left undocumented-but-unfixed rather than blocking a merge on it: the
+hook only ever warns, so this is a coverage gap rather than a safety
+regression, and a nested-loop `do`/`while` on one line is a rare enough
+shape that the fix (peel loop keywords from anywhere in a segment's
+argv, not just position 0) is better done as its own change with its
+own tests than folded into this one under review pressure.
 """
 import json
 import os

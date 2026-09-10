@@ -1232,19 +1232,37 @@ def strip_cited_finding_vocab(text: str) -> str:
 # `Block(?:ed|ing)?` needs lookbehinds because `\b` treats a hyphen as a
 # boundary, so "non-blocking" -- how a reviewer marks a nit as NOT blocking
 # -- read a Ready-for-merge review as not-clean (ai-config#2369, measured
-# 2026-08-26 on #2288). Only the `non-`/`non ` compounds are exempted.
-# "previously-blocking" is deliberately NOT exempted, although it produces a
-# safe-direction false positive when narrating a fixed finding: "the
-# previously-blocking finding remains open; do not merge" is a real
-# not-clean statement, and a lexical lookbehind cannot tell it from "the
-# previously-blocking error was fixed". Missing a not-clean is the dangerous
-# direction, so the narration form stays an over-flag -- as does any other
-# `-blocking` compound ("merge-blocking" is a real signal) and the
-# emphasized form ("non-**blocking**": the char before `blocking` is `*`,
-# which the lookbehind cannot see through).
+# 2026-08-26 on #2288). "non-"/"non " were the only compounds exempted at
+# first; "not blocking" and "no blocking findings remain" reproduced the
+# identical false positive on #3468 (ai-config#3487, measured 2026-09-09),
+# because a hyphen or space after "non" is not the only way a reviewer
+# negates the word -- "not " and "no " immediately before it are the same
+# statement in different words. All four prefixes are now guarded:
+# `non-`, `non `, `not `, `no `. "previously-blocking" is deliberately NOT
+# exempted, although it produces a safe-direction false positive when
+# narrating a fixed finding: "the previously-blocking finding remains open;
+# do not merge" is a real not-clean statement, and a lexical lookbehind
+# cannot tell it from "the previously-blocking error was fixed". Missing a
+# not-clean is the dangerous direction, so the narration form stays an
+# over-flag -- as does any other `-blocking` compound ("merge-blocking" is
+# a real signal) and the emphasized form ("non-**blocking**": the char
+# before `blocking` is `*`, which the lookbehind cannot see through). A
+# negator that is NOT immediately adjacent also stays flagged, on purpose:
+# "this is not a nit -- it is blocking" has "not" five words away from
+# "blocking", so none of the fixed-width lookbehinds below fire on it, and
+# the sentence is correctly read as a live finding.
+#
+# `Rejected` and `Unapproved` were checked for the same treatment
+# (ai-config#3487's own question) and deliberately left unguarded: unlike
+# "non-blocking", there is no established review idiom "non-rejected" or
+# "not unapproved" -- a grep of this corpus's own prose and test fixtures
+# turns up no such usage anywhere. Adding a speculative guard for a phrasing
+# that does not occur would only buy risk (silently swallowing a genuine
+# "Rejected" or "Unapproved" finding) for zero real benefit. Revisit if a
+# real occurrence ever surfaces.
 _BARE_REJECTION = (
     r"\b(?:Rejected|Unapproved|"
-    r"(?<!non-)(?<!non\s)Block(?:ed|ing)?"
+    r"(?<!non-)(?<!non\s)(?<!not\s)(?<!no\s)Block(?:ed|ing)?"
     r"|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings"
     r"|Partial\s+review)\b"
 )
@@ -1842,8 +1860,18 @@ VERDICT_NOT_CLEAN_PATTERNS = [
 # belonging to an earlier clause: the `\w+\s+` filler cannot cross punctuation,
 # so `This is not done. Needs work` and `It is not ready; needs more work` both
 # stay not-clean.
+#
+# `[\s-]` rather than a bare `\s` between the negator and what follows
+# (ai-config#3487): a hyphen separates a word from what comes after it
+# exactly as a space does ("no-changes requested" reads identically to "no
+# changes requested"), and the fixed word-boundary regex `Block(?:ed|ing)?`
+# lookbehinds a few lines below hit the same gap for "non-blocking". Widening
+# only the whitespace class, not the negator words or the clause-boundary
+# behavior, keeps this in the same safe direction: a hyphen still cannot
+# cross a period or semicolon any more than a space could, since `[\s-]`
+# still excludes both.
 NOT_CLEAN_NEGATION_PREFIX = re.compile(
-    r"\b(?:no|not|nothing|none|never)\s+(?:\w+\s+){0,2}$", re.IGNORECASE
+    r"\b(?:no|not|nothing|none|never)[\s-]+(?:\w+[\s-]+){0,2}$", re.IGNORECASE
 )
 # Two alternation groups on purpose. Emphasis markers are tolerated ONLY
 # before the alternatives that are unambiguous negations when they open the
@@ -2343,7 +2371,12 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
             if pat == r"changes\s+requested\b":
                 start = match.start()
                 pfx = scan_body[max(0, start - 25):start].lower()
-                if re.search(r"\bno\s+(\w+\s+)?$", pfx):
+                # `[\s-]` rather than a bare `\s`, so a hyphenated negation
+                # ("no-changes requested") is recognized the same as a
+                # spaced one ("no changes requested") -- the same
+                # hyphen-vs-space gap that let "non-blocking" through
+                # before ai-config#3487.
+                if re.search(r"\bno[\s-]+(\w+[\s-]+)?$", pfx):
                     continue
             return pat
     return None

@@ -1028,6 +1028,18 @@
             "why": "Warns when a write-capable Agent launch targets a worktree holding uncommitted work, since the agent cannot tell your changes from its own scratch edits and may discard them."
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-move-without-inbound-sweep.py\"'",
+            "timeout": 15,
+            "script": "no-move-without-inbound-sweep.py",
+            "why": "Warns when a `git commit` stages a cross-file content move and no repo-wide search for the source file's basename ran this session, so the files citing the source for moved content get enumerated rather than assumed clean (ai-config#3501)."
+          }
+        ]
       }
     ],
     "Stop": [

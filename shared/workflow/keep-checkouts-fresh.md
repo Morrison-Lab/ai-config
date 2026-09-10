@@ -19,7 +19,9 @@ In every session --- at session start, and again periodically during long sessio
    **The auto-update claim is narrower than it reads: it is a claim about the update *mechanism*, and says nothing about whether this session's already-cached snapshot is current.**
    `installed_plugins.json`'s `lastUpdated` field records when the pin was last written, not how far behind the pin currently sits, so confirming the plugin is enabled and not doubled tells you nothing about whether the cached snapshot it points at is stale.
 
-   Measured on this Windows machine, 2026-09-09: the pinned commit's `lastUpdated` read 2026-08-27T18:33:12Z, 13 days before the session that read it, and `git rev-list --count <pinned-commit>..origin/main` in a freshly fetched ai-config checkout counted 459 commits ahead of that pin.
+   Measured on this Windows machine, 2026-09-09.
+   The pinned commit's `lastUpdated` read 2026-08-27T18:33:12Z, 13 days before the session that read it,
+   and `git rev-list --count <pinned-commit>..origin/main` in a freshly fetched ai-config checkout counted 459 commits ahead of that pin.
    The gap included a targeted hook fix (`hooks/no-placeholder-reply.py`, [#2964](https://github.com/Morrison-Lab/ai-config/pull/2964)) whose absence let a placeholder reply through unblocked --- see [ai-config#3437](https://github.com/Morrison-Lab/ai-config/issues/3437).
 
    Check it from the pin the active scope actually serves, not from the newest directory under the cache: the cache can hold a newer snapshot while this scope's entry still points at an older one.

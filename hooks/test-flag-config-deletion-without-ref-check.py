@@ -341,6 +341,10 @@ if not _ok:
 print("\n--- root attribution (read_roots)")
 _HOME = os.path.expanduser("~")
 _ATTRIBUTION_CASES = [
+    ("cat <<< '~/.claude/settings.json'", set(),
+     "a here-string is the opener's literal text, not a file it opens"),
+    ("cat <<<~/.claude/settings.json", set(),
+     "the same with the text attached to the operator"),
     ("cat <<EOF\ngrep -rn '~/.claude/settings.json' README.md\nEOF", set(),
      "a heredoc BODY is never executed, so a manifest it mentions is not "
      "read (review of #3469: a scratch script or commit message discharged "

@@ -66,9 +66,11 @@ credits its target, since the shell opens that file for writing, while an
 input redirect (`jq . < ~/.claude/settings.json`) still does, although a
 digit pattern before one (`grep 5 < ~/.claude/settings.json`) is read as a
 descriptor and under-credits, since the tokenizer drops the whitespace that
-tells the two apart. A heredoc body, redirected into a manifest or merely
-mentioning one, credits nothing: the body is blanked before either path
-reads the command, and the opener's own redirect is a write.
+tells the two apart. A heredoc body that merely mentions a manifest credits
+nothing, since the body is blanked before either path reads the command;
+a heredoc redirected into a manifest credits nothing either, since that
+redirect is a write. A here-string is an operand of the opener, not a file,
+so `cat <<< <manifest path>` credits nothing as well.
 Fires once per distinct message (sentinel keyed by content hash).
 """
 import hashlib
@@ -330,6 +332,12 @@ RX_CHAIN_SPLIT = re.compile(r"&&|[|][|]|;|[|]")
 # `<>` opens for reading as well as writing and is credited like `<`.
 RX_OUT_REDIRECT = re.compile(r"^(?:>>?[|&]?|&>>?)(.*)$")
 RX_IN_REDIRECT = re.compile(r"^<(&?)>?(.*)$")
+# A here-string (`<<<`) is followed by its literal text, which names no file
+# the command opens. A heredoc opener (`<<`, `<<-`) reaches this parser with
+# its delimiter and body already blanked by `shellcmd._heredoc_free`, so only
+# the operator itself is skipped.
+RX_HERE_STRING = re.compile(r"^<<<(.*)$")
+RX_HERE_DOC = re.compile(r"^<<-?$")
 
 HOME = os.path.expanduser("~")
 
@@ -408,6 +416,13 @@ def read_operands(argv):
         if token.isdigit() and index + 1 < len(argv) and argv[index + 1][:1] in "<>":
             index += 1
             token = argv[index]
+        here_string = RX_HERE_STRING.match(token)
+        if here_string:
+            index += 1 if here_string.group(1) else 2
+            continue
+        if RX_HERE_DOC.match(token):
+            index += 1
+            continue
         out_redirect = RX_OUT_REDIRECT.match(token)
         if out_redirect:
             index += 1 if out_redirect.group(1) else 2
@@ -539,8 +554,7 @@ def read_roots(command):
     parsed = argv_read_roots(command) if simple_commands_with_scope else None
     if parsed is None:
         return lexical_read_roots(command)
-    executed = _heredoc_free(command) if _heredoc_free else command
-    for segment in unparseable_segments(executed):
+    for segment in unparseable_segments(_heredoc_free(command)):
         parsed = parsed | lexical_read_roots(segment)
     return parsed
 

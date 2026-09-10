@@ -753,3 +753,34 @@ nothing about the branch or the build had ever been wrong.
 
 Reported as the third instance of the same shape noticed in one session --- alongside the `grep -P` locale error this file's opening section already covers, and a regex matching a literal `<tr>` against rendered HTML that reported zero table rows, which is not independently recorded here.
 All three share the property that a check's broken state and its meaningful state print identically, each for a distinct reason --- a swallowed exit code, a literal-vs-rendered mismatch, and here a caching intermediary --- which is why this file separates them into distinct causes rather than one shared remedy.)
+
+## A checker written to catch silent fallback acquired three instances of it, each surfaced only by execution
+
+(`ucdavis/rampp` [#166](https://github.com/ucdavis/rampp/pull/166), 2026-09-09: `tools/check-crossref-downgrades.R`, a script that flags roxygen `[fn()]` links downgraded to plain `` `fn()` `` code spans. See [`metacognitive-monitoring.cases.md`](../workflow/metacognitive-monitoring.cases.md)'s "A review endorsed a workaround" for the PR's review-lifecycle case.
+This one is about the checker's own construction.)
+
+Adding namespace-qualified matching to this checker introduced three silent-fallback defects in succession, and each was caught by running a constructed input rather than by reading the fix:
+
+1. The first draft of the qualified-span regex matched `pkg:::fn()`, for which roxygen has no link syntax --- so the checker would have suggested `[pkg:::fn()]`, an invalid link.
+   Caught before commit, by running a fixture naming `pkg::fn()`, `pkg:::fn()` and `fn()` and reading which three it reported.
+   `2d37c48` is therefore already correct on this point, and the commit history does not record the defect at all --- which is itself the reason to write it down here.
+2. `2d37c48` as committed still matched a **foreign** package's `otherpkg::fn()` against a same-named local topic, because the topic map is keyed by bare alias.
+   The suggested `[otherpkg::fn()]` warns at `roxygenise()` time when `otherpkg` is absent and renders dead, so the checker would have introduced the defect class it exists to catch.
+   `08f5a73` compares the qualifier against `DESCRIPTION`'s `Package` field.
+3. `08f5a73` in turn made a missing `DESCRIPTION` silent: `identical(prefix, NA)` is `FALSE` for every prefix, so every qualified span was skipped and the output was indistinguishable from a clean tree.
+   `0a8ce80` made it stop instead.
+   `fbe4fb8` then found the same family one function over, where an absent, empty, or unreadable `man/` yields zero topics and an empty `R/` yields zero files, each reporting a clean tree at exit 0.
+
+None was visible from reading the fix that introduced it.
+Each surfaced from constructing the input the code silently mishandled --- a `pkg:::fn()` string, an `otherpkg::fn()` string, a tree with no `DESCRIPTION` --- and running the checker against it.
+This is the existing rule (["A sound command can still examine almost nothing"](fail-fast.md#a-sound-command-can-still-examine-almost-nothing-when-the-selection-stage-collapses) and the exit-code and silent-fallback bullets above it) applied to an instrument's own construction rather than to application code.
+An instrument built to catch a defect class is exactly as exposed to that class as the code it inspects, and reading its diff no more catches it there than reading application code catches a swallowed exception.
+
+Note what the commit history alone would show: two of the three, because the first never reached a commit.
+A defect fixed inside the working tree leaves no trace, so a case record is the only place it can live.
+
+- **Do:** when reviewing a fix to a checker/validator, construct and run the input class the fix claims to handle (and the classes adjacent to it --- a triple-colon variant, a foreign-package variant, a missing-file variant), rather than reading the diff for correctness.
+- **Do:** treat every `identical(x, NA)`/`is.na(x)` guard and every "assumes file X exists" branch in a checker as its own silent-fallback candidate, and test it with the file absent.
+- **Don't:** read a checker's own fix as trustworthy because it fixed the specific case a prior round named --- the fix can introduce (or fail to also fix) the adjacent case in the same family.
+- **Don't:** treat "the checker's diff looks right" as evidence about a code path the diff doesn't visibly touch, such as a sibling function (`documented_topics()`) sharing the same guard shape.
+- **Don't:** reconstruct a fix sequence from the commit log alone --- a defect caught before commit is invisible there, and citing the wrong commit for it is worse than omitting it.

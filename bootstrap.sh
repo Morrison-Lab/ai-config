@@ -76,7 +76,11 @@ if [ -d "$SCRIPT_DIR/plugins/ai-config" ]; then
   # on macOS and Linux and cmd.exe resolves on neither count. Copying it
   # verbatim left the Windows install needing a hand repair, and that repair
   # introduced the quoting that broke every run_command hook (ai-config#3091).
-  # Rendering fails fast rather than staging a manifest that cannot launch.
+  # The renderer refuses to emit a manifest it cannot prove launchable, so a
+  # failure here leaves hooks.json missing or stale rather than broken. That
+  # is warned about and not fatal, so the installer loop and the symlinks
+  # below still run; scripts/check-agy-hook-commands.py and doctor.py report
+  # the missing manifest afterwards.
   python3 "$SCRIPT_DIR/scripts/render-agy-hooks.py" --output "$PLUGIN_STAGING_DIR/hooks.json" ||
     printf 'warn  %s exited %d\n' "scripts/render-agy-hooks.py" "$?"
 

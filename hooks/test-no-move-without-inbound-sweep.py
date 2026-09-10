@@ -10,12 +10,16 @@ guard, and this suite has one mutation per branch that matters.
 harness: it spawns one `python3 ... --against-mutant` subprocess per mutation,
 and each re-executes this whole module. Nothing is shared between those
 subprocesses --- `_DEEP_CACHE` starts empty in every one --- so the memoization
-below saves only a repeated `deep_json()` call *within* a single process,
-measured at roughly 110 ms. Recorded because a commit message once credited
-that memoization with a 98-to-37-second speedup, comparing a figure measured on
-one machine against a figure measured on another and attributing the difference
-to the change between them. The mechanism cannot produce a saving of that size,
-and the two commits run at the same speed.
+below saves only a repeated `deep_json()` call *within* a single process ---
+roughly 110 ms here, from 333 ms for three uncached searches.
+
+Recorded because a commit message once credited that memoization with a
+98-to-37-second speedup, comparing a figure measured on one machine against a
+figure measured on another and attributing the difference to the change between
+them. A 61-second saving is about 550 times the 110 ms the mechanism can
+actually produce --- under three orders of magnitude, not the four that
+withdrawal claimed in its turn. Both the original attribution and its
+correction stated a magnitude without dividing.
 """
 
 from __future__ import annotations

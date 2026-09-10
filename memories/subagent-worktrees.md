@@ -349,7 +349,7 @@ Meanwhile the decidable slice upstream of the failure is already built: `hooks/f
 It makes a missing worktree a deliberate choice rather than an accident --- it warns and never denies, by its own docstring, so it bounds nothing.
 It does not make a dispatched agent's tree safe to reclaim, and #1481 is the counter-example --- the orchestrator committed `4d8c6c7a` from inside an agent's own assigned worktree.
 
-The one cheap check that works today is a message: `SendMessage` to the agent's id costs one call and answers the actual question, which is what the first `Do` bullet below says, and what the "Long-stalled uncommitted work in a container-local worktree" section says for a peer session.
+One cheap check that works today is a message: `SendMessage` to the agent's id costs one call and answers the actual question, which is what the first `Do` bullet below says, and what the "Long-stalled uncommitted work in a container-local worktree" section says for a peer session.
 
 - **Do:** ask the agent directly, rather than inferring liveness from a report, a quiet tree, or an absent `ListAgents` row.
 - **Do:** record the branch and commit when a collision happens, so the case can be audited later rather than taken on trust.
@@ -365,19 +365,24 @@ what it adds is a check that does not depend on asking a party whose answer is t
 
 **Read the process state from the worktree lock, not from the agent.**
 `isolation: "worktree"` locks the worktree it creates, and the lock reason names the dispatching process, e.g. `claude agent <name> (pid NNNNN start <date>)`.
+Read it with `git worktree list --porcelain`, not the bare listing, which prints only the word `locked` and no reason.
 Parse that PID and run `ps -o stat= -p <pid>`, reading the STATE rather than the exit code: a leading `Z` is dead.
-A bare `ps -p <pid>` is not sufficient, because an unreaped child stays in the process table, so it exits 0 over a process that has already gone --- the same trap [`claude-code`](claude-code.md)'s entry on `kill -0` records, and for the same reason, since both read the process table alone.
+A bare `ps -p <pid>` is not sufficient.
+An unreaped child stays in the process table, so `ps -p` exits 0 over a process that has already gone.
+That is the trap [`claude-code`](claude-code.md)'s entry on `kill -0` records, and for the same reason: both read the process table alone.
 This is a distinct signal from `session-lock`'s registry (`ai-session.sh`'s `find_agent_pid` plus `kill -0`), which covers only the sessions that skill registers and never calls `git worktree lock`.
 
-- **Do:** parse the PID from the worktree's `git worktree list` lock reason and run `ps -o stat= -p <pid>` before reclaiming a dispatched agent's worktree, treating a `Z` state as dead.
+- **Do:** parse the PID from `git worktree list --porcelain`'s lock reason and run `ps -o stat= -p <pid>` before reclaiming a dispatched agent's worktree, treating a `Z` state as dead.
 - **Do:** prefer that read over the agent's own sign-off, however explicit ("Stopping Point: Clean", `status=completed`), since the sign-off is a claim about its output rather than its process.
 - **Don't:** use a bare `ps -p` or `kill -0` for this --- both report an unreaped zombie as alive.
+- **Don't:** read a non-`Z` state as proof the *dispatching* process is the one still running;
+  a reaped PID can be reissued to something unrelated, so compare the lock's recorded start time against the process's own before trusting it over a long gap.
 - **Don't:** treat this as closing the `SubagentStop`-ledger question recorded above;
   that question is about a *resumption* by another session, which a PID read cannot see.
 
-(Measured 2026-09-10 on macOS 26.6.2, Darwin 25.6.0.
-Worktree lock named `pid 80565`, alive immediately and 8h57m later.
-The zombie behaviour was reproduced directly --- a forked child calling `os._exit(0)`, left unreaped, returns rc=0 and `STAT=Z` from `ps -p` --- and independently by a reviewer on the same machine.
+(Two separate measurements, both 2026-09-10 on macOS 26.6.2, Darwin 25.6.0.
+The incident: a worktree lock naming `pid 80565`, whose process read alive --- state `S`, never `Z` --- immediately and again 8h57m later.
+The zombie behaviour is a synthetic reproduction rather than something that occurrence exhibited: a forked child calling `os._exit(0)`, left unreaped, returns rc=0 and `STAT=Z` from `ps -p`, reproduced independently by a reviewer on the same machine.
 Reap timing and init identity are environment properties rather than properties of Unix, so re-measure under a different init, per [`timestamp-volatile-claims`](../shared/writing/timestamp-volatile-claims.md).)
 
 ## Switching a shared worktree's branch under a live dispatched reviewer breaks its reads

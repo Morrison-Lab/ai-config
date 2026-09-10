@@ -46,12 +46,16 @@ for label, cmd in [
     ("subshell piped", "(cmd 2>/dev/null) | jq ."),
     ("brace group redirected", "{ cmd 2>/dev/null; } > out.json"),
     ("loop redirected", "for f in a b; do cmd 2>/dev/null; done > out.json"),
+    ("case redirected", "case  in\n  a) cmd 2>/dev/null ;;\n  *) other ;;\nesac > out.json"),
+    ("case with parenthesised pattern redirected", "case  in\n  (a) cmd 2>/dev/null ;;\n  *) other ;;\nesac > out.json"),
+    ("select redirected", "select x in a b; do cmd 2>/dev/null; done > out.json"),
 ]:
     check(f"{label} fires", fires(cmd), True)
 
 for label, cmd in [
     ("group output discarded", "(cmd 2>/dev/null) >/dev/null"),
     ("group output merged", "(cmd 2>/dev/null) >/dev/null 2>&1"),
+    ("case output discarded", "case $x in a) cmd 2>/dev/null ;; esac >/dev/null 2>&1"),
 ]:
     check(f"{label} is ignored", fires(cmd), False)
 

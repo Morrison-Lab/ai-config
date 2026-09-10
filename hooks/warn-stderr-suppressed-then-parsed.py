@@ -277,29 +277,52 @@ RX_PIPE = re.compile(r"(?<!\|)\|(?!\|)")
 
 
 def _depth_delta(token, is_kw):
-    if not is_kw: return 0, 0
-    if token in ("(", "{", "if", "while", "for", "until", "case"): return 0, 1
-    if token in (")", "}", "fi", "done", "esac"): return -1, -1
+    if not is_kw:
+        return 0, 0
+    if token in ("(", "{", "if", "while", "for", "until", "select", "case"):
+        return 0, 1
+    if token in (")", "}", "fi", "done", "esac"):
+        return -1, -1
     return 0, 0
+
 
 def _get_depths(text):
     rx = re.compile(r"&&|\|\||;;|<<|>>|<|>|[;|&()\n]|\w+|[^\s\w;|&()<>\n]+")
     depth = 0
     in_cmd = True
     depths = [0] * len(text)
-    
+    case_depth = 0
+    unmatched_parens = 0
+
     for match in rx.finditer(text):
         token = match.group()
         is_kw = in_cmd or token in ("(", ")")
-        
+
+        is_pattern_terminator = False
+        if is_kw:
+            if token == "case":
+                case_depth += 1
+            elif token == "esac":
+                case_depth -= 1
+            elif token == "(":
+                unmatched_parens += 1
+            elif token == ")":
+                if unmatched_parens > 0:
+                    unmatched_parens -= 1
+                elif case_depth > 0:
+                    is_pattern_terminator = True
+
         pre, post = _depth_delta(token, is_kw)
+        if is_pattern_terminator:
+            pre, post = 0, 0
+
         token_depth = max(0, depth + pre)
         depth = max(0, depth + post)
-        
+
         for i in range(match.start(), match.end()):
             depths[i] = token_depth
-            
-        if is_kw and token in ("do", "then", "else", "elif", "!", "time", "(", ")", "{", "}", "if", "while", "for", "until", "case", "fi", "done", "esac"):
+
+        if is_kw and token in ("do", "then", "else", "elif", "!", "time", "(", ")", "{", "}", "if", "while", "for", "until", "select", "case", "fi", "done", "esac"):
             in_cmd = True
         elif token in (";", "&", "|", "&&", "||", "\n"):
             in_cmd = True
@@ -307,10 +330,14 @@ def _get_depths(text):
             in_cmd = False
     return depths
 
+
 def _handle_quoted_char(char, quote, index, text):
-    if char == quote: return None, index + 1
-    if char == "\\" and index + 1 < len(text): return quote, index + 2
+    if char == quote:
+        return None, index + 1
+    if char == "\\" and index + 1 < len(text):
+        return quote, index + 2
     return quote, index + 1
+
 
 def _extract_token(text, start):
     index = start
@@ -321,7 +348,7 @@ def _extract_token(text, start):
         if quote:
             quote, index = _handle_quoted_char(char, quote, index, text)
             continue
-        if char in "\"'`":
+        if char in "\"'":
             quote = char
             index += 1
             continue
@@ -334,14 +361,18 @@ def _extract_token(text, start):
             index += 1
             continue
         if char == ")":
-            if paren_depth == 0: break
+            if paren_depth == 0:
+                break
             paren_depth -= 1
             index += 1
             continue
-        if paren_depth == 0 and char in " \t\n;&|<>": break
-        if char == "\\": index += 1
+        if paren_depth == 0 and char in " \t\n;&|<>":
+            break
+        if char == "\\":
+            index += 1
         index += 1
     return text[start:index]
+
 
 def _split(text, separator):
     """[(offset, piece), ...] -- `text` split on `separator`, offsets kept."""

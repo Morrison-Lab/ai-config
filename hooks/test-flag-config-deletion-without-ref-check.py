@@ -341,6 +341,18 @@ if not _ok:
 print("\n--- root attribution (read_roots)")
 _HOME = os.path.expanduser("~")
 _ATTRIBUTION_CASES = [
+    ("cat <<EOF\ngrep -rn '~/.claude/settings.json' README.md\nEOF", set(),
+     "a heredoc BODY is never executed, so a manifest it mentions is not "
+     "read (review of #3469: a scratch script or commit message discharged "
+     "the guard)"),
+    ("cat > /tmp/x.py <<'PY'\nCASES = [(\"cat ~/.claude/settings.json\",)]\nPY",
+     set(), "the same with a quoted delimiter and an output redirect"),
+    ("cat <<EOF | wc -l\nsee cat ~/.claude/settings.json\nEOF", set(),
+     "and with a pipe after the opener, which used to change the answer"),
+    ("cat <<EOF > ~/.claude/settings.json\nx\nEOF", set(),
+     "a heredoc written INTO a manifest is a write of it, not a read"),
+    ("cat <<EOF; cat ~/.claude/settings.json\nbody\nEOF", {"claude"},
+     "a real read chained after a heredoc opener is still credited"),
     ("grep -rn '~/.claude/settings.json' README.md && echo `date`", set(),
      "a backtick in a NEIGHBOURING segment does not hand the lexical fallback "
      "a segment the argv parse already decided (review round on #3469)"),

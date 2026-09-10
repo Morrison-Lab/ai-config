@@ -66,9 +66,9 @@ credits its target, since the shell opens that file for writing, while an
 input redirect (`jq . < ~/.claude/settings.json`) still does, although a
 digit pattern before one (`grep 5 < ~/.claude/settings.json`) is read as a
 descriptor and under-credits, since the tokenizer drops the whitespace that
-tells the two apart. A heredoc body
-redirected into a manifest still takes the regex fallback and is credited
-there: a remaining limit.
+tells the two apart. A heredoc body, redirected into a manifest or merely
+mentioning one, credits nothing: the body is blanked before either path
+reads the command, and the opener's own redirect is a write.
 Fires once per distinct message (sentinel keyed by content hash).
 """
 import hashlib
@@ -89,13 +89,14 @@ try:
         "scripts", "lib")
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
-    from shellcmd import (resolve_cd_target, simple_commands_with_scope,
-                          strip_env)
+    from shellcmd import (_heredoc_free, resolve_cd_target,
+                          simple_commands_with_scope, strip_env)
 except Exception as _exc:  # broken install; fall back to the lexical path
     print("flag-config-deletion-without-ref-check: cannot load "
           "scripts/lib/shellcmd.py ({0}); using the lexical fallback"
           .format(_exc), file=sys.stderr)
     resolve_cd_target = simple_commands_with_scope = strip_env = None
+    _heredoc_free = None
 
 # Configuration roots whose files are typically referenced by a manifest rather
 # than discovered by scanning. Deleting one here unregisters behaviour.
@@ -303,14 +304,17 @@ MANIFEST_NAMES = frozenset({"settings.json", "config.toml", "config.json",
 CD_VERBS = frozenset({"cd", "pushd", "popd"})
 
 # Constructs whose argv is not what the shell would pass: the value of a
-# command substitution is unknown here, a heredoc BODY is blanked by
-# `shellcmd._heredoc_free` before `shlex` ever sees it, and a PROCESS
-# substitution splits into an argv whose `argv[0]` is the outer program, so
+# command substitution is unknown here, and a PROCESS substitution splits into
+# an argv whose `argv[0]` is the outer program, so
 # `diff <(cat <manifest>) <(cat other)` presents `diff` where `cat` ran. Union
-# the argv verdict with the lexical one for all three, per the issue's "fall
-# back to the lexical path rather than to silence", scoped to the chain
-# segment that carries the construct (see `unparseable_segments`).
-RX_UNPARSEABLE = re.compile(r"[$][(]|`|<<|[<>][(]")
+# the argv verdict with the lexical one for both, per the issue's "fall back to
+# the lexical path rather than to silence", scoped to the chain segment that
+# carries the construct (see `unparseable_segments`). A heredoc is NOT in this
+# set: its body is never executed, so nothing inside it is a read, and both
+# the argv path and the segment split see the command with the body blanked
+# by `shellcmd._heredoc_free`. Scanning the raw body credited a manifest that
+# a commit message or a scratch script merely mentioned (review of #3469).
+RX_UNPARSEABLE = re.compile(r"[$][(]|`|[<>][(]")
 # Chain operators, for scoping that fallback to the segment that needs it.
 RX_CHAIN_SPLIT = re.compile(r"&&|[|][|]|;|[|]")
 # A redirect operand is not a file the command READS. `> file` and `>> file`
@@ -535,7 +539,8 @@ def read_roots(command):
     parsed = argv_read_roots(command) if simple_commands_with_scope else None
     if parsed is None:
         return lexical_read_roots(command)
-    for segment in unparseable_segments(command):
+    executed = _heredoc_free(command) if _heredoc_free else command
+    for segment in unparseable_segments(executed):
         parsed = parsed | lexical_read_roots(segment)
     return parsed
 
@@ -543,12 +548,14 @@ def read_roots(command):
 def unparseable_segments(command):
     """The chain segments of `command` whose argv cannot be trusted.
 
-    The fallback is scoped to the segment carrying the substitution or heredoc
+    The fallback is scoped to the segment carrying the substitution
     rather than to the whole line, so a backtick in one command does not hand
     the lexical scan a neighbouring command the argv parse already decided:
     a `grep` over README.md followed by an `echo` of a backticked `date` credits
     nothing, since the grep segment parsed cleanly and the echo names no
-    manifest. The split is textual, so a chain operator inside a quoted string
+    manifest. The caller hands this the command with heredoc bodies blanked,
+    so a body that merely mentions a manifest is never scanned. The split is
+    textual, so a chain operator inside a quoted string
     splits too; that only narrows what the lexical scan sees, which for a
     DISCHARGE test is the direction that warns.
     """

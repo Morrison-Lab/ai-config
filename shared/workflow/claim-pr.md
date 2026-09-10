@@ -337,14 +337,14 @@ Three readings, and they need the peer's diff rather than a rule:
 A rejected push tells you a peer got there first and says nothing about which
 of the three you are in, so it does not prompt the read that decides.
 
-**A quiet [`ListAgents`](../../memories/git-worktrees.md) is not evidence the
+**A quiet [`ListAgents`](../../memories/subagent-worktrees.md) is not evidence the
 peer does not exist**, and it reported no reachable agents throughout this
 hour.
 The reason is not that it cannot see past this machine --- it lists cloud
 sessions, and Remote Control sessions on other machines, when this session is
 connected to those.
 It is the weaker and more useful fact already recorded in
-[`git-worktrees.md`](../../memories/git-worktrees.md): absence there means
+[`subagent-worktrees.md`](../../memories/subagent-worktrees.md): absence there means
 "not tracked here", never "does not exist".
 A peer outside whatever the harness currently tracks is invisible to it, and
 the listing cannot tell you which case you are in.

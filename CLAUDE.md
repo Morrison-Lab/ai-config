@@ -1088,7 +1088,7 @@ Leaving it unmarked is what is not.
 A clean `git status` and an unlisted agent both describe one instant.
 Neither says whether the session working that worktree has actually stopped, and a quiet worktree can mean either "finished" or "between edits".
 Ask the agent directly (`SendMessage` to its id, or the equivalent for a peer session) before editing or reclaiming its worktree, including one that has sat quietly for hours --- a long stretch is a reason to ask sooner, not evidence of abandonment.
-[`memories/git-worktrees.md`](memories/git-worktrees.md) carries the case where both directions of that misreading --- read as live when quiet, read as dead when live --- happened to the same agent in one session.
+[`memories/subagent-worktrees.md`](memories/subagent-worktrees.md) carries the case where both directions of that misreading --- read as live when quiet, read as dead when live --- happened to the same agent in one session.
 
 **"Stay inside the worktree it was given" holds only while the agent works in the session's own repo.**
 `isolation: "worktree"` places that worktree in the **session's primary repository**, never in a repository the brief happens to name --- so a dispatch into a different clone hands the agent a worktree of the wrong repo, and the instruction above is unfollowable as written.

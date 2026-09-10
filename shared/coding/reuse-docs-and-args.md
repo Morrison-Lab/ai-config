@@ -108,6 +108,13 @@ duplication this fragment exists to prevent. Use `@keywords internal` on the
 helper and keep the `@inheritDotParams`/`@inheritParams`/`[helper()]`
 references intact.
 
+This has happened, at scale, in a repo whose AI review did not have this fragment installed.
+On `ucdavis/rampp` [#154](https://github.com/ucdavis/rampp/pull/154) a commit downgraded `[fn()]` links to plain code spans across 18 files to silence exactly the warning described above, and the review certified it as "complete" rather than flagging it under this section.
+Two things follow.
+A repo running an AI review without this corpus gets none of these standards, so check what a review workflow installs before concluding why it missed something.
+And a written rule depends on the reader recognizing the moment it governs, which a de-linking diff does not announce --- so [#166](https://github.com/ucdavis/rampp/pull/166) is the checker, reporting plain code spans that name a documented topic.
+See [`metacognitive-monitoring.cases.md`](../workflow/metacognitive-monitoring.cases.md)'s "A review endorsed a workaround it had correctly diagnosed, then verified the fix by spot-check" for the full case.
+
 ## In review
 
 Flag all three as review findings, the same weight as other idiomatic-code

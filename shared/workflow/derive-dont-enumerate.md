@@ -425,6 +425,20 @@ specifically rather than to file contents or a corpus fact.
   population is closed --- closedness rules out the set growing, not the
   summary being wrong.
 
+**The same shape recurs with no review comment in it at all: a brief can hand over an enumeration of a fixed schema, and the recipient inherits an incomplete one exactly as it inherits an incomplete finding-summary above.**
+
+Review findings are one instance of a closed population that still needs deriving rather than summarizing;
+a static specification --- a schema's set of element names, a config's list of valid keys, an API's set of fields --- is another.
+Both are closed in the sense the test above means (nothing adds a member while the work runs), and both fail the same way: the enumeration was simply incomplete *when written*, the recipient has no way to tell a complete list from a truncated one, and every artifact built on it inherits the gap.
+
+A brief listing 18 OOXML math structure tags, meant as the complete set an implementation had to handle, omitted `m:m`.
+The list originated in scratch tooling that had never been checked against the schema itself, and was carried faithfully from there into an issue filed as the specification, and from there into an implementation that handled exactly the 18 tags named and no others --- each artifact agreeing with the one before it, because each inherited that source rather than checking it.
+The fix that worked was not adding `m:m` to the list;
+it was telling the recipient to re-derive the tag set from the schema instead of from the list, which turned up a second gap nobody had found by reading the list at all.
+
+- **Do:** when a brief needs a fixed schema, config, or API's full set of names, point at the authoritative source (the schema file, the spec, the API reference) and ask the recipient to derive the set from it, rather than pasting the set you already have.
+- **Don't:** trust an enumeration merely because it is long, specific, and already agreed with by every artifact that copied it --- agreement among copies is evidence about the copying, not about the source.
+
 ## Which local checks predict CI is itself a derivable set, not a remembered one
 
 Everything above governs a set of **work items** --- PRs, issues, files,

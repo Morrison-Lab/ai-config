@@ -62,6 +62,21 @@ The PR then carries a comment reading:
 Unlike a transient network failure or timeout, this is a deterministic repository defect: re-running the job without repairing the secret fails identically.
 Treat this the same as other verdict-blocking failures: perform a fallback adversarial self-review to keep the PR moving, but recognize that the PR is **not** externally clean and the required check remains red until a repository admin updates the secret under **Settings -> Secrets and variables -> Actions** to a single-line value carrying no interior whitespace (for example one from `claude setup-token`).
 
+**Reviewer capability is a distinct axis from reviewer judgment, and every failure mode above is about the first while this is about the second.**
+Quota-skip, a stub review, no workflow at all, and a bad credential all describe cases where the reviewer produced no usable verdict.
+A capability-limited reviewer produces a confident, well-formed verdict --- the judgment in it can be sound --- while being unable to observe some of what the verdict claims to cover, and nothing in the comment's shape distinguishes that from a fully-capable review.
+Three concrete gaps, each filed as its own issue on `ucdavis/rampp` after a review workflow's actual setup was checked rather than assumed: the review workflow installs a different plugin marketplace (`code-review@claude-code-plugins`, not this corpus) and had no `CLAUDE.md` in the repo, so it had none of the lab's standards loaded (rampp#167);
+the review workflow cannot execute `Rscript`, so R code --- including a checker script under review --- is read rather than run, which is exactly the gap [`fail-fast.cases.md`](../principles/fail-fast.cases.md)'s "A checker written to catch silent fallback acquired three instances of it" needed adversarial execution to close (rampp#169);
+and the review emits no machine-readable verdict block at all, which is the *capability* half of a rule already stated: [`fully-clean`](fully-clean.md)'s "A later comment stating no verdict does not supersede an earlier one" tells a reader what to do about it, and assumes some review eventually states one.
+Where a workflow structurally never does, that rule's remedy has nothing to land on, and the first review's inferred impression stands permanently (rampp#172;
+[`review-verdict-pitfalls.md`](review-verdict-pitfalls.md) carries the general shape).
+None of the three is a quota-skip, a stub, a missing workflow, or a bad credential --- the workflow ran, completed, and posted prose that reads as a real review each time.
+
+- **Do:** before trusting a review workflow's verdicts on a repo you have not reviewed before, check what it actually installs (which plugin/marketplace, whether the repo's own `CLAUDE.md`/standards doc is present) and what it can execute (can the job run the language under test, or only read it).
+- **Do:** file each capability gap as its own issue once found, rather than folding it into a one-off note about that PR --- a missing `CLAUDE.md` install or a can't-execute-R limitation is a standing property of the repo's review setup, not of the PR that happened to expose it.
+- **Don't:** read a review's confident, on-topic prose as evidence it observed everything the verdict claims --- a reviewer with no execution access can still write "I traced this by hand" and be right about the trace and wrong about what the trace could catch.
+- **Don't:** treat a capability gap as the same finding as a quota-skip or stub --- a capability-limited review still needs the ARD treatment (address/rebut/defer) and possibly a fallback self-review for the parts it structurally cannot cover, not just a re-run.
+
 **Post the self-review before doing anything else --- don't stall the PR waiting for the bot.
 Then, before writing the check off as permanently broken, try one manual re-run of the failed job --- even after the workflow's own built-in same-run retry (e.g. gha#185's stub-retry) also stubbed.**
 That is scoped to a reviewer that was meant to run and failed.

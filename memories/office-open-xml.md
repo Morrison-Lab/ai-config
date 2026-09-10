@@ -563,3 +563,37 @@ It is also independent of the structural-validity checks two entries up: the mar
 (Measured 2026-09-09, same manuscript as the two entries above.
 `scripts/check-docx-tracked-changes.py`'s `check_orphaned_math` implements the check this convention argues for -- built from a working draft, then extended into that script's existing per-part check pipeline, checking both accept and reject in one pass.
 Reproduced against four real deliveries of the same manuscript: one carrying exactly one orphaned `m:sSup` under accept, one carrying exactly one orphaned `m:sSub` under reject (present since the first delivery, fixed only in the next), and the final two both clean under both directions.)
+
+## `m:oMathPara` does not claim its own line; the surrounding `w:br` elements do
+
+`m:oMathPara` marks an equation as display math, but that markup alone does not put it on its own line.
+Two ordinary line breaks, each its own run, do that work:
+
+```xml
+<w:r><w:br/></w:r>
+<m:oMathPara>
+  <m:oMath>
+    ...
+    <m:r><w:br/></m:r>
+  </m:oMath>
+</m:oMathPara>
+```
+
+A `<w:r><w:br/></w:r>` immediately **before** the `m:oMathPara` breaks the introducing prose onto its own line.
+A closing `<m:r><w:br/></m:r>` as the **last child of `m:oMath`** breaks the equation off from whatever prose follows it.
+The two breaks are independent: either can be present while the other is missing, and each omission produces a different symptom (the prose runs into the equation, or the equation runs into what follows) with the same underlying markup otherwise unchanged.
+
+Neither omission has anything to do with whether `m:oMathPara` was the right choice.
+The equation is still correctly display either way, so "this equation runs into its neighbouring prose" does not by itself say whether the fix is converting to inline or adding the missing break --- reading the two break positions is what decides it.
+This is a *rendering* gap distinct from the ctrlPr entry above: that one is about a structure's own container never being given a revision mark of its own;
+this one is about a correctly-marked display equation missing the plain line breaks that put it on its own line, and the two can be checked independently.
+
+- **Do:** check both `w:br` positions --- immediately before the `m:oMathPara`, and as the last child of `m:oMath` --- before concluding a running-together equation has the wrong display/inline form.
+- **Do:** treat the two breaks as independently omittable, so confirming one is present says nothing about the other.
+- **Don't:** convert a correctly-display equation to inline as the fix for prose running into it;
+  that discards a correct choice without repairing the missing break, and the equation will still run into whatever follows it if the closing break is also missing.
+
+(Measured 2026-09-09, same manuscript and session as the OMML entries above.
+Three new equations, each correctly authored as display, were missing one or both of these breaks;
+two further equations elsewhere in the same document had the identical gap, unnoticed until a per-file checker counted display equations against their break requirements.
+Five equations in total, missing seven breaks between them (three missing one side, two missing both) --- the same tally [`shared/writing/math-derivation-steps.md`](../shared/writing/math-derivation-steps.md)'s "Choose display or inline, deliberately" section records, which also carries the display-versus-inline decision this defect is easy to mistake for.)

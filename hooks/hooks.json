@@ -1066,7 +1066,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-incomplete-check-enumeration.py\"",
             "timeout": 10,
             "script": "no-incomplete-check-enumeration.py",
-            "why": "Blocks a reply declaring a PR clean when the only reading is gh pr checks or statusCheckRollup (short surfaces, not check-pr-fully-clean.py). Distinct from no-stale-pr-status.py, which asks whether a reading is current."
+            "why": "Blocks a reply declaring a PR clean when the only reading is gh pr checks or statusCheckRollup (short surfaces, not check-pr-fully-clean.py). Distinct from no-stale-pr-status.py, which asks whether a reading is current. Extended 2026-09-09, written up in ai-config#3472 (the false claims themselves were made in chat on Morrison-Lab/ai-config#3468 and d-morrison/macros#87 -- those are the subject PRs, not write-ups), to WARN on two more gaps: broader merge-readiness vocabulary ('green, awaiting your merge'), and a terminal claim resting solely on a dispatched subagent's own report with no reading by the conducting session."
           },
           {
             "type": "command",

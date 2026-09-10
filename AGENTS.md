@@ -36,12 +36,13 @@ Drafting locally while approval is pending is allowed.
 Membership or approval does not override
 a stricter repository contribution or AI-agent policy.
 
-The user grants standing authorization, across sessions and workspaces, for
-non-force `git push` operations to `ucdavis/rampp` and
-`Morrison-Lab/ai-config` after positive membership verification.
-This authorization covers pushes only;
-it does not authorize force pushes, merges,
-or any other outward repository communication.
+After positive membership verification, the user grants standing authorization
+across sessions and workspaces for normal, non-destructive GitHub and GitLab
+forge operations in that repository, including non-force pushes, issue and PR
+or MR comments, opening or updating issues and PRs or MRs, requesting reviews,
+and other ordinary repository workflow actions.
+This does not authorize force pushes or merges; merge
+authority remains governed by the strict merge policy below.
 
 Do not infer membership from a public repository, prior contributions, a fork,
 organization membership, technical write access, available credentials,
@@ -51,6 +52,16 @@ and standing authorization to open PRs or file issues
 do not grant permission to communicate with a non-member repository.
 This gate takes precedence
 over automatic filing, PR-opening, review, and follow-up rules.
+
+## Graph and display equation defaults
+
+When authoring analysis figures, prefer `ggplot2` over base graphics wherever
+the dependency is available or appropriate to add.
+For each plot, consider whether an axis should be extended to show important
+reference values such as zero.
+When writing display equations, avoid placing multiple equations on one display
+line unless a special reason makes that layout clearer.
+Label every display equation so it receives an equation number and a stable URL.
 
 ## Check external repository guidelines and PR template before filing
 

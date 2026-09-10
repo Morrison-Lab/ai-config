@@ -1367,6 +1367,34 @@ An integer division is an estimate wearing a computation's clothes, and a figure
 derived FROM derived figures needs its own arithmetic run rather than an
 eyeball.)
 
+**A third case, and the arithmetic was right.**
+The operand was stale.
+
+2026-09-09, during a scheduled sweep.
+A peer session's claim comment on [#3340](https://github.com/Morrison-Lab/ai-config/issues/3340) was reported as "~3 hours ago".
+It was **45 minutes** old --- 45m15s, from a claim at `10:51:46Z` read at `11:37:01Z` --- an over-estimate by a factor of 3.98, the same direction and magnitude class as the 2026-08-21 pair above.
+
+What makes it worth a separate entry is that none of the remedies above would have caught it.
+A clock reading was taken in that very turn, and the subtraction from it was sound.
+The timestamp it subtracted came from a query run an hour earlier, when the newest comment on that issue was a **different** one --- a new comment had arrived between the two checks.
+So the age was computed correctly, from an operand that had silently expired.
+
+The general shape is worse than misremembering an interval, because every instinct that guards against that fires and passes: a clock was read, a timestamp was on hand, arithmetic was performed.
+What was never checked is whether the two operands describe the same moment in the same artifact.
+A repeated query against a moving collection --- an issue's comments, a PR's reviews, a run list --- returns a different last element each time it is run, so `[-1]` is not a stable referent across turns.
+
+The remedy is the one this whole section already prescribes, applied to the operand rather than the clock: read both numbers in the turn that uses them.
+Pairing a body fetched now with a timestamp fetched earlier is the same class of error as [`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md) names for a cached copy standing in for an origin, at field granularity.
+
+- **Do:** re-read the timestamp in the same turn as the content whose age you are reporting, not only the clock.
+- **Do:** treat `[-1]` on a growing collection as a query result rather than an identifier --- it names a different element after anything is appended.
+- **Don't:** carry a timestamp across turns and subtract a fresh clock reading from it;
+  the arithmetic will be right and the answer wrong.
+- **Don't:** read "I measured this" as covering the operands --- it usually covers only the clock.
+
+(Tracked as [#3455](https://github.com/Morrison-Lab/ai-config/issues/3455), which proposes extending `hooks/no-unmeasured-clock-claim.py` to relative-age claims keyed on a timestamp read in the same turn.
+That hook currently matches absolute Pacific times only, so it guards "as of 04:37 PDT" and not "45 minutes ago" --- the harder of the two, since only the second requires arithmetic.)
+
 ## An instrument named in a rule must be one that exists
 
 Naming a check as "an awk pass" or "a scan" reads as grounding a rule in something mechanical.

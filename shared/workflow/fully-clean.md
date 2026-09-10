@@ -585,6 +585,23 @@ not-clean; only a later clean from the same reviewer does
 - **Don't:** merge on one reviewer's all-clear while another still has a
   standing not-clean, even with `mwc` active.
 
+**The standing not-clean can be your own, and clearing it takes a specific comment shape.**
+The rule above is usually read as being about a *reviewer's* verdict, but the per-reviewer scan does not distinguish a bot's identity from a human session's own `gh pr comment` --- so a scoped do-not-merge warning a session posted itself, about a head that has since been replaced, sits exactly the same way and needs the same identity-scoped supersession.
+Prose does not clear it.
+`_is_structured_review_body()` admits a non-bot clean verdict only through the structured-report branch --- a report heading (`## Summary` / `## Findings` / `### Verdict`) plus a line starting `Reviewed-Commit:` --- while a non-bot not-clean is admitted unconditionally, so the two paths are not mirror images.
+The function itself checks only for the heading and the `Reviewed-Commit:` label, not what follows the colon, but writing the full 40-character sha there is still the right convention, since it is what lets a human or another tool confirm which head the withdrawal actually covers.
+A prose withdrawal ("the blocking concern is withdrawn") that fails the structure gate is silently discarded, with nothing distinguishing "not admitted" from "never commented."
+
+- **Do:** withdraw your own earlier not-clean as a structured report --- `## Summary` / `## Findings` / `### Verdict` headings plus a `Reviewed-Commit: <full sha>` line --- not as prose.
+- **Do:** confirm the withdrawal landed by re-running `check-pr-fully-clean.py` and watching the "examined N dated automated review item(s)" count increase, rather than by re-reading the refusal text.
+- **Do:** avoid the finding-regex vocabulary in the withdrawal itself --- `blocking`, `blocked`, `rejected`, `unapproved`, `impasse`, `deadlock`, `changes requested`, `actionable findings`, `partial review` --- since the scanner reads a clearing comment exactly as it reads a review, and a withdrawal that uses the word "blocking" to say a concern is no longer blocking still matches as a finding.
+- **Don't:** assume a plain-prose withdrawal counted just because it posted without error;
+  the comment call succeeding and the verdict being admitted are different facts.
+- **Don't:** read an unchanged refusal after posting a withdrawal as the supersession rule failing --- check the examined-item count first to tell "not admitted" from "admitted and still not-clean."
+
+(Measured 2026-09-09 driving `d-morrison/rme#1138` to merge: a session's own hours-old, head-scoped do-not-merge comment needed three attempts to clear --- plain prose matched the finding regex on its own word "blocking," a reworded prose-with-`### Verdict`-heading version was silently dropped, and only the full structured-report-plus-`Reviewed-Commit` form was admitted, moving the examined count from 29 to 30.
+The discarded-not-admitted gap this surfaces is tracked separately as ai-config#3461 and is not re-filed here.)
+
 This is a different question from how much two reviewers **agreeing** is worth,
 which [`self-review-fallback`](self-review-fallback.md)'s cross-vendor section
 settles: there, same-vendor agreement measures a shared blind spot, and a
@@ -936,6 +953,39 @@ NOT clean over a clean verdict.**
 - **Don't:** treat a `contains findings (matched pattern ...)` line as a real
   finding without reading the verdict body it matched.
 
+**Your own disposition comment is a third surface,
+and it is the one a later `review-data` payload from another identity cannot supersede:
+the instrument can read the PR author's ARD comment as a not-clean verdict from a reviewer,
+and then hold the per-reviewer gate on it.**
+Measured 2026-09-09 on [ai-config#3493](https://github.com/Morrison-Lab/ai-config/pull/3493).
+A round-2 disposition comment,
+agent-posted under the author's login,
+opened a bullet with "Blocking finding (...): Addressed".
+`check-pr-fully-clean.py` matched the `VERDICT_NOT_CLEAN_PATTERNS` alternative `(?<!non-)(?<!non\s)Block(?:ed|ing)?`,
+classified the comment as a verdict-bearing statement from the author with verdict not-clean,
+and the per-reviewer rule from [ai-config#2274](https://github.com/Morrison-Lab/ai-config/issues/2274) then held the PR NOT clean through two later CLEAN payload rounds from the bot,
+because a later all-clear from a different reviewer does not supersede a reviewer's own not-clean statement.
+A later plain status comment from the same author did not count as a clean statement either,
+so the only exit was editing the original wording.
+Tracked as [ai-config#3502](https://github.com/Morrison-Lab/ai-config/issues/3502).
+The "standing not-clean can be your own" section above describes the same per-reviewer scan from the other side;
+this is the case where the not-clean statement was never a verdict at all.
+The "author filter gates formal reviews and not comments" passage further down explains why the comment was admitted to the scan in the first place:
+the comment loop admits on a bot author or on a review-header marker in the body,
+so a human's comment carrying verdict-shaped text enters on body text alone.
+
+- **Do:** name the finding in a disposition bullet
+  ("the `command(*)` finding: Addressed in `<sha>`"),
+  never its severity label.
+- **Do:** when the instrument names *you* as the not-clean reviewer,
+  read the matched pattern and reword your own comment,
+  rather than requesting another bot round that cannot supersede it.
+- **Don't:** write "Blocking", "Changes requested", "Rejected",
+  or the other not-clean vocabulary in a comment you post on your own PR,
+  even inside "X: Addressed".
+- **Don't:** expect a later "all addressed" comment of yours to clear it;
+  as of 2026-09-09 the phrase scan does not read that shape as clean.
+
 **That shape used to be a deliberate exception, and it no longer is: a
 well-formed `review-data` payload now decides directly, superseding the
 prose scan entirely.**
@@ -986,6 +1036,40 @@ A payload that contradicts itself, `CLEAN` beside a non-empty or malformed
 - **Don't:** read a `contains findings` or `NOT clean` line as authoritative
   when the same comment carries a well-formed payload that says otherwise ---
   the payload wins now, not the prose.
+
+**Confirming occurrence, and a distinct trap it exposes: the prose is not
+lying, it is applying the reviewer's own (looser) blocking bar rather than
+this corpus's.**
+`d-morrison/rme#1138`'s review posted 2026-09-09T15:40:54Z read, in prose:
+"**Ready for merge** --- ... no new blocking issues were found; the
+remaining items above (subfile extraction, `\ba`/`\ea` consistency, citation
+verification) are suggestions/nits, not blockers", while the same comment's
+structured payload carried `"verdict": "NOT_CLEAN"` with three entries in
+`findings`.
+Per the rule above, the payload wins and the PR is not clean --- confirmed by
+`scripts/check-pr-fully-clean.py`, which consumed the structured payload
+directly and refused, rather than by reading either line by eye.
+The reviewer's own "suggestions/nits, not blockers" classification is not
+this corpus's bar: `CLAUDE.md`'s Strict Merge Control Policy vetoes a merge
+over any standing not-clean, nits included, regardless of how the reviewer
+itself prioritized its findings.
+A second failure stacked on the first here: the driving session had cached
+the *previous* round on the same head as "Ready for merge with zero
+findings", and that cached belief was what made the new round's prose/payload
+disagreement invisible until the instrument was run fresh --- the exact case
+`CLAUDE.md`'s "Re-check for latest review findings before reporting PR
+status" rule exists to prevent.
+
+- **Do:** read the structured `verdict`/`findings` payload on every review
+  comment, and treat a non-empty `findings` array as not-clean regardless of
+  the comment's own prose verdict line.
+- **Do:** re-run `check-pr-fully-clean.py` fresh for the current head rather
+  than trusting a cached read of an earlier round on the same PR.
+- **Don't:** adopt a reviewer's own "suggestions/nits, not blockers"
+  classification as this corpus's merge bar.
+
+See [`fully-clean.cases.md`](fully-clean.cases.md), "A prose 'Ready for
+merge' over a structured `NOT_CLEAN` payload".
 
 **Calling the checker is not consuming it: grepping its PROSE instead of
 reading its EXIT STATUS re-opens the whole failure one layer up.**

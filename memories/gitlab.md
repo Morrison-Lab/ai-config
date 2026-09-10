@@ -13,6 +13,38 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
 - Installed via Homebrew (macOS) or system package manager --- verify with `which glab`.
 - Authenticated on your GitLab instance --- run `glab auth status` to verify host and username
 - Use for MR comments, pipeline checks, CI job logs, etc.
+- **`glab` opens a pager (alternate buffer) too, most often on `glab api` and
+  `glab issue list`.**
+  [`gh-cli.md`](gh-cli.md) records the `gh` half --- there the pager *hangs*
+  the agent terminal, where `glab` was seen garbling output instead --- and
+  its `GH_PAGER=cat` fix, which does not reach `glab`.
+  - **Do:** pipe through `| cat`, export `PAGER=cat`, or ask for JSON with
+    the long `--output json`, which both commands accept.
+  - **Don't:** write `-O json` for `glab api`; that shorthand exists only on
+    `glab issue list` (`Unknown shorthand flag: 'O' in -O`).
+  - **Don't:** write `--output-format json` anywhere.
+    It is a *different* flag, not a deprecated spelling: on `glab issue list`
+    it takes `details`, `ids`, or `urls`, and `glab api` has no such flag
+    (`Unknown flag: --output-format`).
+    The `glab issue list` half is the dangerous one, because it does not fail
+    at all: `-F json` **exits 0 and prints the default `details` table**, so
+    you get a table where you asked for JSON and nothing says so.
+    Verified against `gitlab-org/gitlab`: `-F json` and `-F totallybogus`
+    both print the same table `-F` prints when omitted, while `-F ids` prints
+    bare IDs and `-O json` prints real JSON.
+  - **Don't:** read an empty or garbled capture as the query having returned
+    nothing --- the pager ate the output.
+  Diagnose all of these from stderr's **message**, never its exit code.
+  Run them against a named public project (`-R gitlab-org/gitlab`) rather
+  than from a repo with no GitLab remote --- without one, every command here
+  exits 1 for that reason alone, and only the text separates a rejected flag
+  (`Unknown shorthand flag`) from a command that parsed fine and died later
+  (`Unauthenticated`, or `Accepts 1 arg(s), received 0` when the endpoint
+  path is missing).
+  Any checkout with a GitLab remote shows the silent-success case above just
+  as well; `-R` is simply what reaches it from one that has none.
+  (`glab 1.106.0`, 2026-09-09; recovered from a 2026-06-22 stash, the one
+  entry of thirteen whose content had never reached `main`.)
 - `glab issue list --opened` is deprecated --- `--opened` is the default when `--closed` is not used.
   Just use `glab issue list` (no flag needed).
 - `glab mr list` also defaults to open items, and the installed CLI may reject

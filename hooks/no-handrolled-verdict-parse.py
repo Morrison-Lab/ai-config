@@ -137,8 +137,11 @@ that gets a guard switched off.
 
 Fails OPEN on any parse trouble. A guard that breaks Bash when a regex
 misbehaves costs more than the mistake it prevents.
+When a jq filter is passed via -f or --from-file, the filter file is read
+and checked as an inline filter would be (ai-config#3494).
 """
 import json
+import os
 import re
 import sys
 
@@ -271,7 +274,61 @@ def select_spans(cmd):
     return spans
 
 
-def phrase_in_matcher_position(cmd):
+# Regex to find -f or --from-file arguments in jq invocations.
+RX_JQ_FILTER_FILE = re.compile(
+    r"""\bjq\b[^\n|;&]*?\s+(?:-[a-zA-Z]*f(?:\s+|=)|--from-file(?:\s+|=))(?:"([^"]+)"|\'([^\']+)\'|([^\s|;&]+))""",
+    re.I,
+)
+
+
+def _read_filter_file(raw_path: str, cwd: str | None = None) -> str | None:
+    """Read filter file text if it exists on disk. Never crashes."""
+    if not raw_path:
+        return None
+    try:
+        try:
+            expanded = os.path.expanduser(raw_path)
+        except Exception:
+            expanded = raw_path
+
+        base_cwd = cwd or os.getcwd()
+        if os.path.isabs(expanded):
+            resolved = expanded
+        else:
+            resolved = os.path.join(base_cwd, expanded)
+
+        candidates = [resolved, expanded, raw_path]
+        if os.name == "nt":
+            m = re.match(r"^/([a-zA-Z])/(.*)", expanded)
+            if m:
+                win_path = f"{m.group(1)}:/{m.group(2)}"
+                candidates.extend([win_path, os.path.join(base_cwd, win_path)])
+
+        for cand in candidates:
+            try:
+                if os.path.isfile(cand):
+                    with open(cand, "r", encoding="utf-8", errors="ignore") as fh:
+                        return fh.read()
+            except Exception:
+                pass
+    except Exception:
+        return None
+    return None
+
+
+def jq_filter_contents(cmd: str, cwd: str | None = None) -> list[str]:
+    """Extract contents of filter files referenced by jq -f / --from-file."""
+    contents = []
+    for m in RX_JQ_FILTER_FILE.finditer(cmd):
+        raw_path = m.group(1) or m.group(2) or m.group(3)
+        if raw_path:
+            text = _read_filter_file(raw_path, cwd)
+            if text:
+                contents.append(text)
+    return contents
+
+
+def phrase_in_matcher_position(cmd, cwd=None, _in_file=False):
     """Clause 1 AND 2: a verdict phrase in a matcher's argument, EXTRACTING.
 
     A phrase inside a `select(...)` is exempt, and that exemption is the
@@ -305,6 +362,13 @@ Blocking the first would be a serious over-block: it is the query this
             if any(a <= pos <= b for a, b in spans):
                 continue  # candidate selection, not extraction
             return hit.group(0)
+
+    if not _in_file:
+        for content in jq_filter_contents(cmd, cwd):
+            p = phrase_in_matcher_position(f"jq '{content}'", _in_file=True)
+            if p:
+                return p
+
     return None
 
 
@@ -461,7 +525,8 @@ def main() -> int:
                 print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
             return 0
         # 1 + 2: a verdict phrase in a matching position.
-        phrase = phrase_in_matcher_position(cmd)
+        cwd = payload.get("cwd") or (payload.get("tool_input") or {}).get("cwd") or os.getcwd()
+        phrase = phrase_in_matcher_position(cmd, cwd=cwd)
         if not phrase:
             if is_dry_run:
                 print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))

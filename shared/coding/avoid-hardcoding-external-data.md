@@ -351,13 +351,14 @@ Here the rewritten text becomes false, which no diff size reveals.
 (Morrison-Lab/ai-config#1008, merged 2026-08-01 as `3eb15a4`: it parameterized
 the base branch to `<default-branch>` across `skills/gip/SKILL.md` and
 `memories/preferences.md`, and stopped at three places on purpose.
-`memories/preferences.md` keeps `git worktree add /tmp/wt-ums main` and the
-scores measured with it, and closes that block by saying those runs "used a
+That preferences block has since moved to `memories/subagent-worktrees.md`
+(ai-config#3385), and it keeps `git worktree add /tmp/wt-ums main` and the
+scores measured with it, closing by saying those runs "used a
 repo whose default branch is literally `main`, which is why they are written
 that way here and why they did not surface the hard-coding".
 `skills/gip/SKILL.md` keeps `fatal: invalid reference: origin/main` as the
 error a reader will actually see.
-Both files state their reasoning in place --- `preferences.md` in the sentence
+Both files state their reasoning in place --- the moved block in the sentence
 quoted above, `gip/SKILL.md` at the line that says hard-coding "fails with
 `fatal: invalid reference: origin/main` on any repo whose default is named
 otherwise".

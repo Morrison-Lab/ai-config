@@ -1214,7 +1214,7 @@ across three rounds.
 Asked plainly, the reviewer said drop; dropping was right and ended the loop.
 The companion half of that session --- concluding a silent subagent had
 stalled when it was alive and twelve rounds ahead --- is recorded in
-[`git-worktrees`](../../memories/git-worktrees.md), "A quiet worktree is not
+[`subagent-worktrees`](../../memories/subagent-worktrees.md), "A quiet worktree is not
 evidence the session working it has stopped".)
 
 ### Ask it whether ANOTHER ROUND earns its place, which is a different question
@@ -1249,7 +1249,7 @@ Neither was a round happening to come back empty --- which, per the convergence 
 ### Do not write to the tree a dispatched reviewer is reading
 
 The reviewer reads the working tree, so any write to it moves the ground under a read already in progress.
-The trigger is not `git checkout` specifically, which is the narrower form [`memories/git-worktrees.md`](../../memories/git-worktrees.md)'s "Switching a shared worktree's branch under a live dispatched reviewer breaks its reads" section records.
+The trigger is not `git checkout` specifically, which is the narrower form [`memories/subagent-worktrees.md`](../../memories/subagent-worktrees.md)'s "Switching a shared worktree's branch under a live dispatched reviewer breaks its reads" section records.
 An ordinary in-place edit does it too: same worktree, same paths, different bytes underneath them mid-read.
 
 The dispatcher cannot detect the damage afterwards, and the reviewer usually cannot either.

@@ -1088,11 +1088,11 @@ Leaving it unmarked is what is not.
 A clean `git status` and an unlisted agent both describe one instant.
 Neither says whether the session working that worktree has actually stopped, and a quiet worktree can mean either "finished" or "between edits".
 Ask the agent directly (`SendMessage` to its id, or the equivalent for a peer session) before editing or reclaiming its worktree, including one that has sat quietly for hours --- a long stretch is a reason to ask sooner, not evidence of abandonment.
-[`memories/git-worktrees.md`](memories/git-worktrees.md) carries the case where both directions of that misreading --- read as live when quiet, read as dead when live --- happened to the same agent in one session.
+[`memories/subagent-worktrees.md`](memories/subagent-worktrees.md) carries the case where both directions of that misreading --- read as live when quiet, read as dead when live --- happened to the same agent in one session.
 
 **"Stay inside the worktree it was given" holds only while the agent works in the session's own repo.**
 `isolation: "worktree"` places that worktree in the **session's primary repository**, never in a repository the brief happens to name --- so a dispatch into a different clone hands the agent a worktree of the wrong repo, and the instruction above is unfollowable as written.
-Name the target clone by path instead, and tell the agent to create its own worktree there off `origin/<default-branch>` --- resolved from that repo, never hard-coded, per `memories/preferences.md`'s measured `fatal: invalid reference: origin/main` failure on a repo whose default is named otherwise.
+Name the target clone by path instead, and tell the agent to create its own worktree there off `origin/<default-branch>` --- resolved from that repo, never hard-coded, per `memories/subagent-worktrees.md`'s measured `fatal: invalid reference: origin/main` failure on a repo whose default is named otherwise.
 Measured 2026-08-07.
 [`memories/git-worktrees.md`](memories/git-worktrees.md) carries the evidence.
 [`shared/workflow/challenge-the-assignment.md`](shared/workflow/challenge-the-assignment.md) covers the general form --- a brief must not assert anything about the recipient's environment, which the author cannot query even in principle.
@@ -1647,7 +1647,7 @@ re-verify it.
 
 [`shared/writing/math-derivation-steps.md`](shared/writing/math-derivation-steps.md)
 
-Two axes.
+Three axes.
 *Between* displayed lines, write out every step, and flag gaps in review.
 *Within* one line, decompose complicated internal structure out into extra
 notation, then reapply that until each line carries one operation.
@@ -1657,6 +1657,15 @@ silently duplicated across sections.
 Stop unfolding at a modeled quantity the reader already accepts at that point
 in the argument, which is a test against the exposition rather than a class
 of expression.
+*Whether a line is displayed at all*: ask this explicitly for every equation written or edited,
+rather than inheriting the form of the nearest neighbouring equation ---
+display when the prose returns to it or it carries the argument,
+inline when it is a grammatical constituent of its own sentence,
+and the same form as its counterpart for any equation meant to be compared against another.
+A display equation running into its own introducing sentence is ambiguous between two causes with opposite fixes ---
+check the markup before changing anything.
+Format-general: applies to `$...$` versus `$$...$$`/an `equation` environment in Quarto/LaTeX,
+exactly as it applies to `<m:oMath>` versus `<m:oMathPara>` in Word/OOXML.
 
 When running `code-review` or the `ard`/`ardi` loop on a diff that touches
 math, apply this in addition to the fact-check above.

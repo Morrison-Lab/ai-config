@@ -69,6 +69,58 @@ grants the move, it does not exempt it from what a move costs.
   "A defect whose surface form varies defeats a phrase grep", for the case
   this generalizes from --- a quoted-heading grep sweep still left two more
   rounds' worth of differently-worded instances for reviewers to find.
+- **Inbound links to the SOURCE file go stale too, and the sweep that finds
+  them is an enumeration rather than a search.**
+  The bullet above sweeps the moved block and the survivor left behind.
+  Both are searches over *text you moved*, so both are blind to the other
+  direction: a third file that links to the source file and describes content
+  that has just left it.
+  Nothing turns red, because the link still resolves to a file that still
+  exists, and the reader who follows it lands somewhere real and finds no trace
+  of what was cited, with no pointer onward.
+
+  A phrase search over the moved content **sometimes** finds these, and cannot
+  be relied on to.
+  A citing file that quotes the moved block's own distinctive string --- an
+  error message, a command --- does match.
+  One that paraphrases in its own words does not, and neither does one that
+  cites the *file* for a claim it states differently.
+  So a clean phrase sweep is evidence about the sites that quote, and says
+  nothing about the rest, which is exactly the reading that makes it feel
+  finished.
+
+  Enumerate instead.
+  List every inbound link to the source file, then ask of each, one at a time,
+  whether the claim it makes still describes something in that file:
+
+  ```bash
+  grep -rn '<source-basename>' --include='*.md' .
+  ```
+
+  That list runs to dozens of files in a corpus this size, so narrow it
+  mechanically rather than by eye: take the distinctive terms of the moved block
+  and keep only the links whose surrounding lines contain one.
+
+  Report that count with its exclusion and its commit, or not at all.
+  A sweep's own fixes change what it counts, so the population moves between
+  the measurement and the sentence about it --- which is why no figure is
+  quoted here.
+  See [`reorganize-prose.cases.md`](reorganize-prose.cases.md), "A sweep's count
+  moves while you write the sentence about it".
+  That filter is a heuristic in both directions, and both matter.
+  It surfaced two real stale sites here, and it also returned two false
+  positives keyed on a phrase as generic as "default branch", so read its
+  output as a shortlist to check by hand rather than as the answer.
+
+  - **Do:** enumerate the inbound links and check each claim against the source
+    file's remaining content.
+  - **Do:** narrow a long list by context overlap with the moved block, then
+    read the survivors.
+  - **Don't:** read a clean phrase sweep as having checked this direction ---
+    it covers only the citing sites that happen to quote.
+  - **Don't:** write this rule and skip running it, which is how the move that
+    prompted it left two stale links standing after the sweep was codified.
+
 - **A downstream count or position reference can silently break**, even
   though you touched neither its sentence nor its file.
   [`forward-references.md`](forward-references.md)'s "Inserting prose makes a

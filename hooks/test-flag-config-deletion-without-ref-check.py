@@ -372,6 +372,13 @@ _ATTRIBUTION_CASES = [
      "the same with a backtick"),
     ("diff <(cat ~/.claude/settings.json) <(cat $(echo x))", {"claude"},
      "a nested substitution inside a process substitution still scans"),
+    ("echo $(foo \"(\" bar) ; grep -rn '~/.claude/settings.json' README.md", set(),
+     "a quoted parenthesis inside a substitution is text, so the body ends at "
+     "the real close and the later grep is never scanned (review round)"),
+    ("cat $(echo \"a)b\"; cat ~/.claude/settings.json)", {"claude"},
+     "a quoted close inside the body does not end it early"),
+    ("cat $(echo \\( ; cat ~/.claude/settings.json)", {"claude"},
+     "a backslash-escaped parenthesis is text too"),
     ("cat file 2<> ~/.claude/settings.json", {"claude"},
      "a read-write redirect opens its target for reading"),
     ("grep 5 < ~/.claude/settings.json", set(),

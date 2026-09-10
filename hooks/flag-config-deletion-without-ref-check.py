@@ -587,15 +587,39 @@ def substitution_bodies(command):
 
 
 def matching_paren(text, start):
-    """Index of the `)` closing the group that opened just before `start`."""
+    """Index of the `)` closing the group that opened just before `start`.
+
+    Quote-aware, since a parenthesis inside a quoted argument of the
+    substitution is text rather than structure: counting it would carry the
+    body past the real close and into a later, unrelated command, which the
+    lexical scan would then read (review round on #3469). A single-quoted
+    span ends at the next quote; a double-quoted span ends at the next quote
+    that is not backslash-escaped; a backslash outside quotes escapes the
+    character after it.
+    """
     depth = 1
-    for index in range(start, len(text)):
-        if text[index] == "(":
+    quote = None
+    index = start
+    while index < len(text):
+        char = text[index]
+        if quote:
+            if char == "\\" and quote == '"':
+                index += 2
+                continue
+            if char == quote:
+                quote = None
+        elif char == "\\":
+            index += 2
+            continue
+        elif char in ("'", '"'):
+            quote = char
+        elif char == "(":
             depth += 1
-        elif text[index] == ")":
+        elif char == ")":
             depth -= 1
             if depth == 0:
                 return index
+        index += 1
     return len(text)
 
 

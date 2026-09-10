@@ -95,6 +95,14 @@ check("the hook's evaluate() allows a commit with no push",
 
 
 # ---------------------------------------------------------------------------
+# Info string parsing
+# ---------------------------------------------------------------------------
+
+check("verbatim {bash} maps to bash", cccp.language_of("{bash}") == "bash")
+check("{bash, echo=FALSE} maps to bash", cccp.language_of("{bash, echo=FALSE}") == "bash")
+check("{.bash} maps to bash", cccp.language_of("{.bash}") == "bash")
+
+# ---------------------------------------------------------------------------
 # End-to-end, against a synthetic repo
 # ---------------------------------------------------------------------------
 
@@ -168,6 +176,12 @@ check("an allowed hit still states its reason, so no exemption is silent",
       result["allowed"] and "anti-example" in result["allowed"][0]["reason"])
 
 result = scan_fixture({
+    "shared/workflow/check-before-pushing.md": CHAINED_INDENTED + "\n" + CHAINED_INDENTED,
+})
+check("a second chained block in the same file exceeds the allowed count",
+      len(result["allowed"]) == 2)
+
+result = scan_fixture({
     "skills/demo/SKILL.md":
         "```python\n"
         "git commit -m x\n"
@@ -192,6 +206,55 @@ check("a fence with no info string is examined, so a defect cannot hide "
 # ---------------------------------------------------------------------------
 # The real corpus
 # ---------------------------------------------------------------------------
+
+original_evaluate = cccp.load_predicate
+
+def patched_load_predicate(root):
+    def raising_evaluate(body):
+        raise ValueError("Systemic failure")
+    return raising_evaluate
+
+cccp.load_predicate = patched_load_predicate
+
+buffer = io.StringIO()
+with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(io.StringIO()):
+    exit_code = cccp.main(["--root", str(REPO), "--json"])
+payload = json.loads(buffer.getvalue())
+
+check("blocks skipped is counted when evaluate raises",
+      payload["blocks_skipped"] == payload["blocks_examined"] and payload["blocks_examined"] > 0)
+
+buffer = io.StringIO()
+with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(io.StringIO()):
+    exit_code_text = cccp.main(["--root", str(REPO)])
+check("main exits 1 when all examined blocks raise", exit_code_text == 1)
+
+cccp.load_predicate = original_evaluate
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    (root / "hooks").mkdir()
+    (root / "hooks" / "no-commit-chained-to-push.py").write_text(
+        (REPO / "hooks" / "no-commit-chained-to-push.py").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (root / "scripts").mkdir()
+    (root / "scripts" / "lib").mkdir()
+    (root / "scripts" / "lib" / "shellcmd.py").write_text(
+        (REPO / "scripts" / "lib" / "shellcmd.py").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    
+    path = root / "shared" / "workflow" / "check-before-pushing.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(CHAINED_INDENTED + "\n" + CHAINED_INDENTED, encoding="utf-8")
+    subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
+    
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(io.StringIO()):
+        exit_code_excess = cccp.main(["--root", str(root)])
+    check("main exits 1 when a path has more allowed hits than permitted", exit_code_excess == 1)
 
 buffer = io.StringIO()
 with contextlib.redirect_stdout(buffer):

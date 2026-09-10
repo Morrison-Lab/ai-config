@@ -43,6 +43,11 @@ control argument.  So the summary states how many files and how many blocks
 were examined alongside how many were denied, and an empty search space is
 itself a failure.
 
+The deciding set of blocks examined is shell-only because
+only shell recipes are parsed for shell commands, while the all-language fenced
+block total is printed to reconcile with global counts and confirm that
+non-shell blocks were correctly bypassed.
+
 Gating: exits 1 on any denial outside the allow-list, 0 otherwise.  The check
 is safe to gate because compliance costs nothing --- splitting a fence in two,
 or putting a prose line between the commit and the push, preserves the recipe
@@ -86,8 +91,9 @@ FENCE_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<ticks>```+|~~~+)(?P<info>.*)$")
 # a path here is a Markdown path: the guard's own docstring quotes the shape it
 # refuses, and needs no entry because a `.py` file is never examined.
 ALLOWED = {
-    "shared/workflow/check-before-pushing.md":
-        "the deliberate anti-example the fragment is about (ai-config#3199)",
+    "shared/workflow/check-before-pushing.md": (
+        1, "the deliberate anti-example the fragment is about (ai-config#3199)"
+    ),
 }
 
 
@@ -118,6 +124,9 @@ def fenced_blocks(text: str):
     `start_line` is 1-based and names the opening fence.  `body` has the
     opener's indentation removed from each line, so an indented block is fed
     to the predicate as the reader would paste it.
+
+    Any indentation closes the fence (CommonMark allows a closing fence
+    indented up to three spaces regardless of the opener).
     """
     lines = text.splitlines()
     i = 0
@@ -151,7 +160,17 @@ def fenced_blocks(text: str):
 
 def language_of(info: str) -> str:
     """The info string's language word, lowercased."""
-    return info.split()[0].lower() if info.split() else ""
+    info = info.strip()
+    if info.startswith('{') and info.endswith('}'):
+        info = info[1:-1].strip()
+    info = info.replace(',', ' ')
+    tokens = info.split()
+    if not tokens:
+        return ""
+    word = tokens[0].lower()
+    if word.startswith('.'):
+        word = word[1:]
+    return word
 
 
 def scan(root: Path):
@@ -160,6 +179,8 @@ def scan(root: Path):
     findings = []
     allowed_hits = []
     blocks_examined = 0
+    blocks_all_languages = 0
+    blocks_skipped = 0
 
     for name in files:
         try:
@@ -167,6 +188,7 @@ def scan(root: Path):
         except (OSError, UnicodeDecodeError):
             continue
         for line_no, info, body in fenced_blocks(text):
+            blocks_all_languages += 1
             if language_of(info) not in SHELL_LANGUAGES:
                 continue
             blocks_examined += 1
@@ -175,6 +197,7 @@ def scan(root: Path):
             try:
                 reason = evaluate(body)
             except Exception:
+                blocks_skipped += 1
                 # The guard itself fails open on an unparseable command, and a
                 # sweep that failed loudly where the guard stays silent would
                 # report a denial the guard would never issue.
@@ -183,7 +206,7 @@ def scan(root: Path):
                 continue
             hit = {"path": name, "line": line_no, "language": language_of(info)}
             if name in ALLOWED:
-                hit["reason"] = ALLOWED[name]
+                hit["reason"] = ALLOWED[name][1]
                 allowed_hits.append(hit)
             else:
                 findings.append(hit)
@@ -191,6 +214,8 @@ def scan(root: Path):
     return {
         "files_scanned": len(files),
         "blocks_examined": blocks_examined,
+        "blocks_all_languages": blocks_all_languages,
+        "blocks_skipped": blocks_skipped,
         "findings": findings,
         "allowed": allowed_hits,
     }
@@ -212,7 +237,10 @@ def main(argv=None) -> int:
         print(json.dumps(result, indent=2))
     else:
         print(f"files scanned:    {result['files_scanned']}")
-        print(f"blocks examined:  {result['blocks_examined']}")
+        print(f"fenced blocks, all languages: {result['blocks_all_languages']}")
+        print(f"blocks examined (shell): {result['blocks_examined']}")
+        if result['blocks_skipped'] > 0:
+            print(f"blocks skipped (predicate raised): {result['blocks_skipped']}")
         print(f"denied:           "
               f"{len(result['findings']) + len(result['allowed'])}")
         print(f"  findings:       {len(result['findings'])}")
@@ -229,10 +257,23 @@ def main(argv=None) -> int:
                   "calls: two fenced blocks, or a prose line between them. "
                   "Nothing about either command needs to change.")
 
+    allowed_excess = False
+    from collections import Counter
+    allowed_counts = Counter(hit["path"] for hit in result["allowed"])
+    for path, (allowed_count, _) in ALLOWED.items():
+        if allowed_counts[path] > allowed_count:
+            print(f"ERROR: {path} has {allowed_counts[path]} allowed hits, but allowlist permits only {allowed_count}", file=sys.stderr)
+            allowed_excess = True
+
     if result["blocks_examined"] == 0:
         print("no fenced shell blocks examined; the sweep found nothing to "
               "check, which is a defect in the sweep rather than a clean "
               "corpus", file=sys.stderr)
+        return 1
+    if result["blocks_examined"] > 0 and result["blocks_skipped"] == result["blocks_examined"]:
+        print("all examined blocks were skipped because the predicate raised", file=sys.stderr)
+        return 1
+    if allowed_excess:
         return 1
     return 1 if result["findings"] else 0
 

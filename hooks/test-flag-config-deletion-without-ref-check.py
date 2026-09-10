@@ -341,6 +341,11 @@ if not _ok:
 print("\n--- root attribution (read_roots)")
 _HOME = os.path.expanduser("~")
 _ATTRIBUTION_CASES = [
+    ("cat file 2<> ~/.claude/settings.json", {"claude"},
+     "a read-write redirect opens its target for reading"),
+    ("grep 5 < ~/.claude/settings.json", set(),
+     "documented limit: the digit pattern is read as a descriptor once the "
+     "tokenizer has dropped the whitespace, so this under-credits (warns)"),
     ("grep 2>&1 ~/.claude/settings.json", set(),
      "a descriptor digit is joined to its operator, not left as a positional "
      "that would shield the pattern slot of a pattern-first verb"),

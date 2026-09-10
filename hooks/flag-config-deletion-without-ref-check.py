@@ -63,7 +63,10 @@ A command reading two manifests at once now credits both, since every file
 operand is examined rather than only the first match.
 An output redirect (`cat payload.json > ~/.claude/settings.json`) no longer
 credits its target, since the shell opens that file for writing, while an
-input redirect (`jq . < ~/.claude/settings.json`) still does. A heredoc body
+input redirect (`jq . < ~/.claude/settings.json`) still does, although a
+digit pattern before one (`grep 5 < ~/.claude/settings.json`) is read as a
+descriptor and under-credits, since the tokenizer drops the whitespace that
+tells the two apart. A heredoc body
 redirected into a manifest still takes the regex fallback and is credited
 there: a remaining limit.
 Fires once per distinct message (sentinel keyed by content hash).
@@ -313,9 +316,13 @@ RX_UNPARSEABLE = re.compile(r"[$][(]|`|<<|[<>][(]")
 # stays an operand. `shlex` with `punctuation_chars=True` never fuses a
 # descriptor digit with the operator, so `2>&1` arrives as `2`, `>&`, `1`:
 # the loop below joins a bare all-digit token to the operator that follows it
-# rather than letting the digit fall through as a positional.
+# rather than letting the digit fall through as a positional. The tokenizer
+# also drops the whitespace that distinguishes `5<file` (descriptor 5) from
+# `grep 5 < file` (pattern 5, then stdin), so the second shape loses its
+# pattern and under-credits: a DISCHARGE limit, in the direction that warns.
+# `<>` opens for reading as well as writing and is credited like `<`.
 RX_OUT_REDIRECT = re.compile(r"^(?:>>?[|&]?|&>>?)(.*)$")
-RX_IN_REDIRECT = re.compile(r"^<(&?)(.*)$")
+RX_IN_REDIRECT = re.compile(r"^<(&?)>?(.*)$")
 
 HOME = os.path.expanduser("~")
 

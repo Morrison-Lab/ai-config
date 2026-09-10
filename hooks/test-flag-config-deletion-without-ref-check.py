@@ -365,6 +365,15 @@ _ATTRIBUTION_CASES = [
     ("cat ~/.codex/config.toml; jq . $(echo ~/.claude/settings.json)", {"codex"},
      "a manifest path a substitution PRODUCES is unknown here and not "
      "credited: the fallback scans the substitution's text, not its value"),
+    ("echo $(grep -rn '~/.claude/settings.json' README.md)", set(),
+     "a substitution's body is parsed, not regex-scanned, so a grep whose "
+     "PATTERN spells a manifest credits nothing there either (CI review)"),
+    ("RESULT=$(grep -rn '~/.claude/settings.json' README.md)", set(),
+     "the same as a captured assignment"),
+    ("echo $(cat ~/.claude/settings.json)", {"claude"},
+     "a real read inside a substitution is still credited"),
+    ("echo $(echo $(cat ~/.claude/settings.json))", {"claude"},
+     "and one nested a level deeper"),
     ("grep -rn '~/.claude/settings.json' $(git diff --name-only)", set(),
      "a substitution among a grep's arguments does not hand the fallback the "
      "grep whose pattern spells a manifest (CI review round on #3469)"),

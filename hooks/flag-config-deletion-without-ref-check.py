@@ -56,8 +56,8 @@ path held in a variable, a `cd` whose target is indeterminate (`cd -`, `popd`),
 a wrapper carrying its own option (`sudo -u me cat ...`, `timeout 5 cat ...`),
 which `strip_env` peels only when the wrapper takes no argument of its own
 (ai-config#3321), and --- most likely in this harness --- a manifest opened
-with the Read tool rather than Bash, since only Bash commands are scanned. Two limits the argv
-parse RETIRED: an already-expanded absolute path under the home directory now
+with the Read tool rather than Bash, since only Bash commands are scanned.
+Two limits the argv parse RETIRED: an already-expanded absolute path under the home directory now
 resolves, and so does `cd <root>/hooks && cat ../settings.json`.
 A command reading two manifests at once now credits both, since every file
 operand is examined rather than only the first match.
@@ -66,7 +66,8 @@ credits its target, since the shell opens that file for writing, while an
 input redirect (`jq . < ~/.claude/settings.json`) still does, although a
 digit pattern before one (`grep 5 < ~/.claude/settings.json`) is read as a
 descriptor and under-credits, since the tokenizer drops the whitespace that
-tells the two apart. A heredoc body that merely mentions a manifest credits
+tells the two apart.
+A heredoc body that merely mentions a manifest credits
 nothing, since the body is blanked before either path reads the command;
 a heredoc redirected into a manifest credits nothing either, since that
 redirect is a write. A here-string is an operand of the opener, not a file,
@@ -315,6 +316,10 @@ CD_VERBS = frozenset({"cd", "pushd", "popd"})
 # executed, so nothing inside it is a read, and the argv path sees the command
 # with the body blanked by `shellcmd._heredoc_free`.
 RX_SUBSTITUTION_OPEN = re.compile(r"[$][(]|`|[<>][(]")
+# How far `read_roots` follows a substitution nested inside a substitution.
+# Deep nesting is vanishingly rare and the bound only ever under-credits,
+# which is the direction that warns.
+MAX_SUBSTITUTION_DEPTH = 8
 # A redirect operand is not a file the command READS. `> file` and `>> file`
 # name a file the shell opens for writing, so overwriting a manifest must not
 # discharge the guard; `< file` names one the command reads, so its target
@@ -536,22 +541,27 @@ def lexical_read_roots(command):
     return found
 
 
-def read_roots(command):
+def read_roots(command, depth=0):
     """The roots whose manifest a command actually READS.
 
-    The argv parse decides, and the lexical scan is consulted only where the
-    argv cannot be trusted: a `shlex` failure returns `None` here, and a
-    command substitution or heredoc means the tokens are not the ones the shell
-    would pass. Unioning in those two cases keeps the guard's behaviour where
-    it was rather than dropping to silence, which for a DISCHARGE test is the
-    fail-open direction a warn-only guard wants.
+    The argv parse decides. A substitution's body is itself a shell command,
+    so it is parsed the same way rather than handed to the regex: scanning it
+    lexically reinstated the argument-position blindness this hook exists to
+    remove, and `echo $(grep -rn '<manifest path>' README.md)` credited a
+    manifest that only ever appeared as a grep PATTERN (CI review of
+    c4dd08a2). The lexical scan survives for the one case argv cannot reach,
+    a `shlex` failure, where the fail-open direction is what a warn-only
+    DISCHARGE test wants. `depth` bounds the recursion, since a substitution
+    can nest.
     """
     command = command or ""
     parsed = argv_read_roots(command) if simple_commands_with_scope else None
     if parsed is None:
         return lexical_read_roots(command)
+    if depth >= MAX_SUBSTITUTION_DEPTH:
+        return parsed
     for body in substitution_bodies(_heredoc_free(command)):
-        parsed = parsed | lexical_read_roots(body)
+        parsed = parsed | read_roots(body, depth + 1)
     return parsed
 
 

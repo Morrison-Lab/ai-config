@@ -163,6 +163,26 @@ check(
     False,
 )
 
+# A backslash escapes inside a backtick substitution. Without that, an escaped
+# backtick closed the substitution early and every following top-level command
+# was swallowed as unterminated content -- a false positive, which this hook's
+# own docstring rules out even though it tolerates under-warning.
+check(
+    "an escaped backtick does not close its substitution",
+    fires(r'`echo \` foo` bar 2>/dev/null'),
+    False,
+)
+check(
+    "an escaped backtick leaves a later offense classified at top level",
+    reported(r'`echo \` foo` bar 2>/dev/null > out.json')[1],
+    "redirected to `out.json`",
+)
+check(
+    "an escaped dollar-paren does not open a substitution",
+    fires(r'echo \$(x) bar 2>/dev/null'),
+    False,
+)
+
 if failures:
     print("FAILED:")
     for line in failures:

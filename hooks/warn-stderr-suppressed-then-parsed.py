@@ -216,7 +216,9 @@ def _mask(command):
                 _blank(out, index, index + 1)
             index += 1
             continue
-        if char == "\\" and index + 1 < size and quote in (None, '"'):
+        # A backslash escapes inside a backtick substitution as it does at top
+        # level and inside double quotes; only single quotes take it literally.
+        if char == "\\" and index + 1 < size and quote in (None, '"', "`"):
             index += 2
             continue
         if char == "$" and index + 1 < size and text[index + 1] == "(":

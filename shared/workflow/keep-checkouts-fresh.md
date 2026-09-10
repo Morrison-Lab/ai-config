@@ -11,8 +11,48 @@ In every session --- at session start, and again periodically during long sessio
    Still flag it rather than force if the tree is dirty, or if a path on local `main` is genuinely missing from `origin/main`.
    **If `main` isn't the currently checked-out branch** (the session is already working on a feature branch), skip the checkout dance entirely --- `git branch -f main origin/main` realigns the ref in place without touching the working tree or switching away from the branch you're actively on.
 2. **The `~/.claude` consumer install.**
-   Claude Code and Cursor no longer read this repo's `skills/`/`commands/` as a symlinked copy under `~/.claude` at all --- they install this repo as a native plugin, which auto-updates at session start (see README's *Verify the install*), so the served copy needs no freshness check.
+   Claude Code and Cursor no longer read this repo's `skills/` and `commands/` as a symlinked copy under `~/.claude` at all.
+   They install this repo as a native plugin, which auto-updates at session start (see README's *Verify the install*),
+   so the freshness question moves from a symlinked copy to the pinned snapshot the plugin serves.
    That is a claim about what is **served**, and not about what is **left over**.
+
+   **The auto-update claim is narrower than it reads: it is a claim about the update *mechanism*, and says nothing about whether this session's already-cached snapshot is current.**
+   `installed_plugins.json`'s `lastUpdated` field records when the pin was last written, not how far behind the pin currently sits, so confirming the plugin is enabled and not doubled tells you nothing about whether the cached snapshot it points at is stale.
+
+   Measured on this Windows machine, 2026-09-09.
+   The pinned commit's `lastUpdated` read 2026-08-27T18:33:12Z, 13 days before the session that read it,
+   and `git rev-list --count <pinned-commit>..origin/main` in a freshly fetched ai-config checkout counted 459 commits ahead of that pin.
+   The gap included a targeted hook fix (`hooks/no-placeholder-reply.py`, [#2964](https://github.com/Morrison-Lab/ai-config/pull/2964)) whose absence let a placeholder reply through unblocked --- see [ai-config#3437](https://github.com/Morrison-Lab/ai-config/issues/3437).
+
+   Check it from the pin the active scope actually serves, not from the newest directory under the cache: the cache can hold a newer snapshot while this scope's entry still points at an older one.
+   Read the `gitCommitSha` of the entry whose `scope` and `projectPath` match the session, then count how far `main` has moved past it:
+
+   ```bash
+   python3 - <<'EOF'
+   import json, os
+   pins = json.load(open(os.path.expanduser("~/.claude/plugins/installed_plugins.json")))
+   entries = pins.get("plugins", {}).get("ai-config@Morrison-Lab") or []
+   if not entries:
+       print("no ai-config@Morrison-Lab entry in installed_plugins.json")
+   for entry in entries:
+       print(entry.get("scope"), entry.get("projectPath", "-"), entry.get("gitCommitSha", "?"))
+   EOF
+   git -C <ai-config checkout> fetch -q origin && git -C <ai-config checkout> rev-list --count <gitCommitSha>..origin/main
+   ```
+
+   Any non-zero count means the served snapshot is behind `origin/main`, whatever `installed_plugins.json`'s own `lastUpdated` claims and however new the other cache directories are;
+   the larger the count, the more fixes the session is running without.
+
+   `claude plugin update <plugin>` (verified present in `claude plugin --help` output on this machine) is the remedy once staleness is confirmed --- run it per scope (`claude plugin update ai-config@Morrison-Lab`, and `claude plugin update --scope project ai-config@Morrison-Lab` from each affected project/worktree), then restart the session to pick up the refreshed cache path.
+   [ai-config#2439](https://github.com/Morrison-Lab/ai-config/issues/2439) tracks making this check itself part of the session-start sweep rather than something a session discovers by symptom.
+
+   - **Do:** count commits from the active scope's pinned `gitCommitSha` to `origin/main`, rather than trusting the auto-update mechanism to have already run.
+   - **Do:** run `claude plugin update` (per scope) once staleness is confirmed, then restart to apply it.
+   - **Do:** confirm a CLI remedy exists (`claude plugin --help`) on the machine in question before writing that none does.
+   - **Don't:** read "auto-updates at session start" as meaning the currently-running session's cache is already current --- that is exactly the claim this check tests.
+   - **Don't:** read `installed_plugins.json`'s `lastUpdated` field as a freshness measure.
+     It says when the pin was last written, and nothing about how many commits `origin/main` has gained since the pinned SHA.
+
    `shared/`, `hooks/`, and `memories/` have no plugin-equivalent replacement yet ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), so anyone relying on `~/.claude/shared`, `~/.claude/hooks`, or `~/.claude/memories` today is on a symlink or copy placed by an install predating that change, or by a manual step --- `bootstrap.sh` no longer places any of them.
    **`skills/` belongs in that sweep too, and the plugin serving them is not a reason to skip it.**
    A leftover `~/.claude/skills` from a pre-plugin install loads alongside the plugin, listing every skill twice --- bare `ums` beside `ai-config:ums` --- which crowds the skill listing and can cost entries their descriptions, the text routing selects on.

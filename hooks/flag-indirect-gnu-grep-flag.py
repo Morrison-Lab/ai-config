@@ -163,6 +163,42 @@ def _tokens(command):
     return out
 
 
+# Tokens an indirection may place before the utility it runs: its own flags,
+# and `xargs -I`'s replacement placeholder. Skipped when locating the utility.
+PLACEHOLDERS = {"{}", "{}" + ";", "()"}
+
+
+def _utility_after(toks, vi):
+    """Index of the utility `toks[vi]` will actually run, or None.
+
+    `grep` appearing anywhere after an indirection is NOT enough: in
+    `xargs -0 python3 script.py grep -P f` the utility is `python3` and
+    `grep -P` is a pair of plain arguments, so warning there is noise on a
+    command that never runs grep. So locate the utility slot and check only
+    that.
+
+    Heuristic, deliberately: the shell's grammar is not reimplemented here.
+    Flags and `xargs -I`'s placeholder are skipped, and the first remaining
+    token is taken as the utility. A flag that takes a SEPARATE value
+    (`xargs -n 4`) would leave that value in the utility slot and suppress a
+    warning -- a false negative, which is the safe direction for a guard
+    that only ever adds context.
+    """
+    base = toks[vi].rsplit("/", 1)[-1]
+    if base == "find":
+        # `find` runs its utility only after -exec/-execdir.
+        for j in range(vi + 1, len(toks)):
+            if toks[j] in {"-exec", "-execdir"}:
+                return j + 1 if j + 1 < len(toks) else None
+        return None
+    for j in range(vi + 1, len(toks)):
+        t = toks[j]
+        if t.startswith("-") or t in PLACEHOLDERS:
+            continue
+        return j
+    return None
+
+
 def indirect_gnu_grep(payload):
     """Return (flag, via, command) when a GNU-only grep flag is reached
     through a child-process boundary, else None."""
@@ -201,17 +237,19 @@ def indirect_gnu_grep(payload):
     if grep_at is None:
         return None
 
+    # Pair the indirection with the utility it actually runs, and require
+    # that utility to BE the grep found above. Checking the two
+    # independently is what let `xargs -0 python3 script.py grep -P f`
+    # through: an indirection was present, a grep token was present, and
+    # nothing established that the second was what the first ran.
     via = None
-    for t in toks[:grep_at]:
+    for i, t in enumerate(toks[:grep_at]):
         base = t.rsplit("/", 1)[-1]
-        if base in INDIRECTIONS:
-            # `find` only spawns via -exec/-execdir; a bare `find ... | grep`
-            # is a pipe, where grep is the shell's own child and a function
-            # DOES apply.
-            if base == "find" and not any(
-                x in {"-exec", "-execdir"} for x in toks[:grep_at]
-            ):
-                continue
+        if base not in INDIRECTIONS:
+            continue
+        # A bare `find ... | grep` is a pipe, where grep is the shell's own
+        # child and the function DOES apply; only -exec/-execdir spawns it.
+        if _utility_after(toks, i) == grep_at:
             via = base
             break
     if via is None:

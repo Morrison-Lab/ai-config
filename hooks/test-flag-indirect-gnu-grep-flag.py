@@ -146,6 +146,18 @@ CASES = [
      "BSD ships egrep, it rejects -P (measured), and egrep is an alias "
      "(grep -E) in this session, so the boundary argument applies"),
 
+    ("C18-grep-as-argument",
+     "git ls-files -z | xargs -0 python3 script.py grep -P somefile",
+     False,
+     "xargs runs python3; `grep -P` is a pair of plain arguments to "
+     "script.py, so nothing here invokes grep at all"),
+
+    ("C19-xargs-placeholder",
+     "git ls-files | xargs -I {} grep -lP 'x' {}",
+     True,
+     "xargs -I's placeholder sits before the utility and must be skipped "
+     "when locating it"),
+
     ("C15-z-portable",
      "git ls-files -z | xargs -0 grep -lz 'x'",
      False,
@@ -189,11 +201,14 @@ MUTATIONS = [
       '    if via is None:' + chr(10) + '        via = via or "?"'),
      {"C6-bare-grep-P", "C7-pipe-to-grep"}),
 
-    ("M2-drop-find-exec-check",
-     # Stop requiring -exec for find: the pipe case must now warn.
-     ('            if base == "find" and not any(',
-      '            if False and not any('),
-     {"C7-pipe-to-grep"}),
+    ("M2-drop-find-exec-handling",
+     # Stop treating `find` specially in the utility lookup. Its utility then
+     # resolves to the first non-flag token (the search path), not the grep
+     # after -exec, so the find -exec case must stop warning. The pipe case
+     # stays silent either way, which is why C3 rather than C7 is the probe
+     # here -- the earlier anchor conflated the two.
+     ('    if base == "find":', '    if False:'),
+     {"C3-find-exec"}),
 
     ("M3-drop-flag-requirement",
      # Any indirect grep warns, flag or not.
@@ -206,6 +221,7 @@ MUTATIONS = [
       # C16 is excluded for the same reason as C12: `ggrep` is not in the
       # name set, so grep_at is None and the function returns before the
       # mutated line. M6-readmit-ggrep is what covers that clause.
+      # C19 already warns, so removing the flag requirement cannot flip it.
       "C15-z-portable"}),
 
     ("M5-drop-path-strip",
@@ -220,6 +236,15 @@ MUTATIONS = [
      # which is the false claim a reviewer found on the binary-identity axis.
      ('in {"grep", "egrep", "fgrep"}:', 'in {"grep", "ggrep", "egrep", "fgrep"}:'),
      {"C16-ggrep-is-gnu"}),
+
+    ("M7-decouple-utility-check",
+     # Accept any indirection paired with any grep token, instead of
+     # requiring the indirection to actually RUN that grep. The
+     # grep-as-argument case must start warning, which is the false positive
+     # a reviewer found.
+     ('        if _utility_after(toks, i) == grep_at:',
+      '        if True:'),
+     {"C18-grep-as-argument"}),
 
     ("M4-drop-tool-gate",
      ('    if tool != "Bash":' + chr(10) + '        return None', '    pass'),

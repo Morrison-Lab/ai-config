@@ -77,7 +77,9 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    Use those key names literally -- a consumer that cannot find them reports the finding as "structured finding in unknown: ", which names nothing.
    Any finding listed here blocks, whatever the "verdict" string says, and a CLEAN payload requires an explicit empty "findings" array -- omitting the key does not clear.)
 
-   Read that sha yourself rather than taking it from the brief.
+   Read that sha yourself rather than taking it from the brief: run `git rev-parse HEAD` in your own worktree, and confirm it resolves with `git rev-parse --verify --quiet <sha>^{commit}` before writing the line.
+   Never invent, guess, or pad a sha to reach 40 characters, and never transcribe one from an abbreviated form you have lying around (`git log --oneline`, a hook's error text, a truncated id quoted in the brief) by extending its visible digits.
+   Report only a sha that a command you actually ran printed in full, in this worktree, and be ready to show that command's output --- a well-formed 40-character hex string is not evidence it is real.
    On Claude Code, the pre-push guard resolves what the push would actually ship --- reading its refspec, not just HEAD --- and compares, which is what ties your verdict to those commits.
    `parse_report` (Claude Code's pre-push guard, and the Cursor Cloud recovery gate) reads the first fingerprint AFTER your verdict, so put it right after the verdict.
    A report without the line authorizes nothing, and one cut short before it is refused rather than read as clean.

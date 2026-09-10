@@ -24,12 +24,19 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   - **Do:** pipe through `| cat`, export `PAGER=cat`, or ask for JSON with
     `--output json` (short form `-O json`); redirect to a file and read that
     back when a command still takes the terminal.
-  - **Don't:** reach for `--output-format json`.
+  - **Don't:** reach for `--output-format json`, and don't expect it to
+    fail loudly.
     It is not a deprecated spelling of `--output` --- on `glab issue list`
     it is a *different* flag taking `details`, `ids`, or `urls`, so `json`
-    is not one of its values, and on `glab api` it does not exist at all.
-    Both spellings exit non-zero, so the failure is at least loud
-    (measured against `glab 1.106.0`, 2026-09-09).
+    is not one of its values, and on `glab api` it does not exist at all
+    (`Unknown flag: --output-format`).
+    A reviewer running `glab issue list` against a live GitLab remote
+    reported that an unrecognized `-F` value is silently ignored and the
+    default `details` table is printed, which would make the wrong flag a
+    *quiet* wrong answer on exactly the command you are most likely to type
+    it on.
+    Unverified here for want of a GitLab remote, and worth confirming before
+    relying on either reading (`glab 1.106.0`, 2026-09-09).
   - **Don't:** read an empty or garbled capture as the command having
     returned nothing --- the pager, not the query, ate the output.
   (Recovered 2026-09-09 from a stash dated 2026-06-22 during a `/cb` sweep of

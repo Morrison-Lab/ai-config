@@ -11,13 +11,15 @@ In every session --- at session start, and again periodically during long sessio
    Still flag it rather than force if the tree is dirty, or if a path on local `main` is genuinely missing from `origin/main`.
    **If `main` isn't the currently checked-out branch** (the session is already working on a feature branch), skip the checkout dance entirely --- `git branch -f main origin/main` realigns the ref in place without touching the working tree or switching away from the branch you're actively on.
 2. **The `~/.claude` consumer install.**
-   Claude Code and Cursor no longer read this repo's `skills/` and `commands/` as a symlinked copy under `~/.claude` at all --- they install this repo as a native plugin, which auto-updates at session start (see README's *Verify the install*), so the freshness question moves from a symlinked copy to the pinned snapshot the plugin serves.
+   Claude Code and Cursor no longer read this repo's `skills/` and `commands/` as a symlinked copy under `~/.claude` at all.
+   They install this repo as a native plugin, which auto-updates at session start (see README's *Verify the install*),
+   so the freshness question moves from a symlinked copy to the pinned snapshot the plugin serves.
    That is a claim about what is **served**, and not about what is **left over**.
 
    **The auto-update claim is narrower than it reads: it is a claim about the update *mechanism*, and says nothing about whether this session's already-cached snapshot is current.**
    `installed_plugins.json`'s `lastUpdated` field records when the pin was last written, not how far behind the pin currently sits, so confirming the plugin is enabled and not doubled tells you nothing about whether the cached snapshot it points at is stale.
 
-   Measured on this Windows machine, 2026-09-09: the pinned commit's `lastUpdated` read 2026-08-27T18:33:12Z, 13 days before the session that read it, and `git rev-list --count <pinned-commit>..HEAD` in a fresh ai-config checkout counted 459 commits ahead of that pin.
+   Measured on this Windows machine, 2026-09-09: the pinned commit's `lastUpdated` read 2026-08-27T18:33:12Z, 13 days before the session that read it, and `git rev-list --count <pinned-commit>..origin/main` in a freshly fetched ai-config checkout counted 459 commits ahead of that pin.
    The gap included a targeted hook fix (`hooks/no-placeholder-reply.py`, [#2964](https://github.com/Morrison-Lab/ai-config/pull/2964)) whose absence let a placeholder reply through unblocked --- see [ai-config#3437](https://github.com/Morrison-Lab/ai-config/issues/3437).
 
    Check it from the pin the active scope actually serves, not from the newest directory under the cache: the cache can hold a newer snapshot while this scope's entry still points at an older one.

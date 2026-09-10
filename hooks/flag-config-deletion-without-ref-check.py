@@ -616,13 +616,20 @@ def matching_backtick(text, start):
     """Index of the backtick closing the body that opened before `start`.
 
     Quote-aware like `matching_paren`, so a backtick inside a quoted argument
-    of the body does not end it early. Runs to the end of the text when no
+    of the body does not end it early. A backslash escapes nothing inside
+    single quotes, so a single-quoted span ending in one still closes at
+    its quote (CI review of 85aa774e). Runs to the end of the text when no
     close exists, which shlex has already ruled out for a parsed command.
     """
     quote = None
     index = start
     while index < len(text):
         char = text[index]
+        if quote == "'":
+            if char == "'":
+                quote = None
+            index += 1
+            continue
         if char == "\\":
             index += 2
             continue

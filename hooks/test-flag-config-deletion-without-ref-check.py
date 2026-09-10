@@ -391,6 +391,9 @@ _ATTRIBUTION_CASES = [
     ("echo `it's $(cat ~/.claude/settings.json)`", {"claude"},
      "an unbalanced quote makes shlex reject the WHOLE command, so this "
      "takes the issue-mandated whole-command lexical fallback"),
+    ("echo `echo '\\'` ; grep -rn '~/.claude/settings.json' README.md", set(),
+     "a single-quoted backslash inside a backtick body escapes nothing, so the "
+     "body closes at its backtick and the later grep is never scanned"),
     ("cat `cat 'x`y'; cat ~/.claude/settings.json`", {"claude"},
      "a quoted backtick inside a backtick body does not end the body early, "
      "so the real read after it is still credited"),

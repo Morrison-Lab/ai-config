@@ -65,7 +65,6 @@ Usage:
 """
 from __future__ import annotations
 
-_REQUIRES_CACHE = {}
 import argparse
 import fnmatch
 import os
@@ -76,6 +75,8 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+_REQUIRES_CACHE = {}
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_WORKFLOW = ROOT / ".github" / "workflows" / "validate.yml"
@@ -171,6 +172,15 @@ LOCAL_EQUIVALENTS = {
     "check-new-line-breaks": _nlb_equivalent,
     "lint-markdown": _markdownlint_equivalent,
     "lint-qmd": _markdownlint_equivalent,
+    "antigravity-code-review": lambda j, b: None,
+    "claude.yml": lambda j, b: None,
+    "claude-code-review": lambda j, b: None,
+    "detect-review-request": lambda j, b: None,
+    "cleanup-pr-previews": lambda j, b: None,
+    "preview-deploy": lambda j, b: None,
+    "preview.yml": lambda j, b: None,
+    "quarto-publish": lambda j, b: None,
+    "sync-shared-fragments": lambda j, b: None,
 }
 
 
@@ -449,6 +459,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     skip = re.compile(args.skip) if args.skip else None
 
     changed = changed_files(root, args.base) if args.changed else None
+    if args.changed and changed is not None and not changed:
+        print(f"info: no files changed against {args.base}; every gate is selected", file=sys.stderr)
+        changed = None
 
     plan = []
     for s in steps:
@@ -457,10 +470,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             continue
         if only and not only.search(s.name):
             continue
-        
+
         skipped = False
         reason = ""
-        
+
         if skip and skip.search(s.name):
             skipped = True
             reason = "matched --skip"
@@ -468,15 +481,18 @@ def main(argv: Optional[List[str]] = None) -> int:
             if s.globs and not any(matches_scope(f, s.globs, s.paths_ignore) for f in changed):
                 skipped = True
                 reason = "no scoped files changed"
-                
+
         if not skipped and s.requires:
-            if s.requires not in _REQUIRES_CACHE:
-                proc = subprocess.run(["bash", "-c", s.requires], capture_output=True, text=True)
-                _REQUIRES_CACHE[s.requires] = (proc.returncode == 0 or 'markdownlint-cli2' in proc.stdout or 'markdownlint-cli2' in proc.stderr)
-            if not _REQUIRES_CACHE[s.requires]:
-                skipped = True
-                reason = f"missing tool; fix: {s.install_hint}"
-                
+            if args.list:
+                s.note = "availability checked at run time"
+            else:
+                if s.requires not in _REQUIRES_CACHE:
+                    proc = subprocess.run(["bash", "-c", s.requires], capture_output=True, text=True)
+                    _REQUIRES_CACHE[s.requires] = (proc.returncode == 0)
+                if not _REQUIRES_CACHE[s.requires]:
+                    skipped = True
+                    reason = f"missing tool; fix: {s.install_hint}"
+
         plan.append((s, skipped, reason))
 
     if args.list:
@@ -496,6 +512,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             else:
                 tag = "RUN"
                 detail = s.command.splitlines()[0]
+                if s.note == "availability checked at run time":
+                    detail += f" ({s.note})"
             print(f"{tag:8} [{s.source}] {s.name}: {detail}")
         print(_denominator(len(plan), sum(1 for s, _, _ in plan if s.kind == "workflow-file"), args.workflow,
                           broken=sum(1 for s, _, _ in plan if s.broken)))

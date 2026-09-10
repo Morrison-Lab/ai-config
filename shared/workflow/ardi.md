@@ -407,8 +407,8 @@ Tracked as ai-config#3110.)
 
 **Pause point: after committing, before `git push`.**
 
-Run `python scripts/run-local-validation.py --changed` to execute the local checks derived from CI.
-Run `python scripts/run-local-validation.py --changed --list` to see them without execution.
+Run `python3 scripts/run-local-validation.py --changed` to execute the local checks derived from CI.
+Run `python3 scripts/run-local-validation.py --changed --list` to see them without execution.
 
 - [ ] **A separate `adversarial-reviewer` subagent reviewed this diff and returned a clean verdict** --- dispatched in the foreground against `git diff origin/<default-branch>...HEAD`, briefed with the standards rather than with your rationale for the change, with every finding Addressed, Rebutted, or Deferred to a tracked issue, and re-dispatched after the last commit so its `Reviewed-Commit:` fingerprint names the commits the push would ship ([`adversarial-self-review`](adversarial-self-review.md)).
   An inline pass under a reviewer framing does not satisfy this, and reads identically in the output --- the test is whether an `Agent` call was made.

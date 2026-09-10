@@ -5,6 +5,7 @@ import io
 import os
 import subprocess
 import sys
+import pathlib
 import tempfile
 from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
@@ -180,7 +181,7 @@ def test_derive_steps():
           names[:7] == ["Install dependencies", "Passing step", "Failing step", "Multi-line step",
                         "Runner-only step", "Sub-directory step", "Token-env step"])
     by = {s.name: s for s in steps}
-    check("step env carried", True)
+    check("step env carried", by["Failing step"].env == {"RC": "3"})
     check("multi-line run kept whole", by["Multi-line step"].command == 'echo one\necho two > touched')
     check("working-directory carried", by["Sub-directory step"].cwd == "sub")
     check("a ${{ ... }} step is not runnable and the note names the expression that matched",
@@ -195,7 +196,7 @@ def test_derive_steps():
     check("new-line-breaks forwards the job's paths-ignore input",
           by["new-line-breaks"].env.get("NLB_PATHS_IGNORE") == "codex-skills/**,docs/**")
     check("lint-markdown is PARTIAL: names the checks it misses",
-          by["lint-markdown"].partial is not None and "three of the action's four checks" not in by["lint-markdown"].note)
+          by["lint-markdown"].partial == rlv.MARKDOWNLINT_UNCOVERED)
     check("a uses: job with no local equivalent is listed as not runnable",
           not by["unknown-uses"].runnable and "unknown.yml" in by["unknown-uses"].note)
 
@@ -312,9 +313,10 @@ def test_live_workflow_derives_every_python_test_suite():
 def test_equivalents_table_covers_all_uses_jobs():
     workflows_dir = Path(__file__).parent.parent / ".github" / "workflows"
     missing = []
-    for wf in ("validate.yml", "lint-markdown.yml", "lint-qmd.yml"):
-        path = workflows_dir / wf
-        if not path.exists(): continue
+    wfs = list(workflows_dir.glob("*.yml"))
+    check("workflow files exist", len(wfs) > 0)
+    for path in wfs:
+        wf = path.name
         doc = rlv.load_workflow(path)
         for job_name, job in (doc.get("jobs") or {}).items():
             uses = rlv._uses_of(job)
@@ -326,22 +328,110 @@ def test_equivalents_table_covers_all_uses_jobs():
     if missing:
         print("    missing:", missing)
 
-def test_equivalents_table_covers_all_uses_jobs():
-    workflows_dir = Path(__file__).parent.parent / ".github" / "workflows"
-    missing = []
-    for wf in ("validate.yml", "lint-markdown.yml", "lint-qmd.yml"):
-        path = workflows_dir / wf
-        if not path.exists(): continue
-        doc = rlv.load_workflow(path)
-        for job_name, job in (doc.get("jobs") or {}).items():
-            uses = rlv._uses_of(job)
-            if uses:
-                covered = any(k in uses for k in rlv.LOCAL_EQUIVALENTS)
-                if not covered:
-                    missing.append(f"{wf} ({job_name}): {uses}")
-    check("the local equivalents table covers every uses: job in the live workflows", missing == [])
-    if missing:
-        print("    missing:", missing)
+
+def test_empty_changed_list_selects_all():
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        wf = _write_fixture(tmp)
+        out = io.StringIO()
+        err = io.StringIO()
+        old_cf = rlv.changed_files
+        try:
+            rlv.changed_files = lambda root, base: []
+            with redirect_stdout(out), redirect_stderr(err):
+                rc = rlv.main(["--workflow", str(wf), "--root", tmp, "--changed", "--list"])
+        finally:
+            rlv.changed_files = old_cf
+        text_out = out.getvalue()
+        text_err = err.getvalue()
+        check("info printed when changed list is empty", "no files changed against" in text_err)
+        check("no scoped files changed skip reason is absent", "no scoped files changed" not in text_out)
+
+def test_missing_tool_skips():
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        wf = _write_fixture(tmp)
+        old_run = subprocess.run
+        def mock_run(*args, **kwargs):
+            if args[0] == ["bash", "-c", "npx --no-install markdownlint-cli2 --help"]:
+                class MockProc:
+                    returncode = 1
+                    stdout = ""
+                    stderr = "markdownlint-cli2 missing"
+                return MockProc()
+            return old_run(*args, **kwargs)
+        try:
+            subprocess.run = mock_run
+            rlv._REQUIRES_CACHE.clear()
+            out = io.StringIO()
+            with redirect_stdout(out), redirect_stderr(io.StringIO()):
+                rc = rlv.main(["--workflow", str(wf), "--root", tmp, "--only", "lint-markdown"])
+        finally:
+            subprocess.run = old_run
+
+        text_out = out.getvalue()
+        check("gate skipped when requires exits 1", "skipped: lint-markdown (missing tool; fix:" in text_out)
+
+def test_scope_matching():
+    import yaml
+    wf_doc = yaml.safe_load(FIXTURE)
+
+    # Check job_scope
+    job_md = wf_doc["jobs"]["lint-markdown"]
+    globs, ignore = rlv.job_scope(job_md)
+    check("job_scope parses lint-markdown globs from default", globs == ["*.md"])
+
+    job_qmd = wf_doc["jobs"]["lint-qmd"]
+    globs_qmd, ignore_qmd = rlv.job_scope(job_qmd)
+    check("job_scope parses lint-qmd globs from default", globs_qmd == ["*.qmd"])
+
+    # Unit tests for matches_scope
+    check("matches_scope matches md file for lint-markdown", rlv.matches_scope("file.md", globs, ignore))
+    check("matches_scope does not match qmd file for lint-markdown", not rlv.matches_scope("file.qmd", globs, ignore))
+
+    check("matches_scope matches qmd file for lint-qmd", rlv.matches_scope("file.qmd", globs_qmd, ignore_qmd))
+    check("matches_scope does not match md file for lint-qmd", not rlv.matches_scope("file.md", globs_qmd, ignore_qmd))
+
+    # A markdown-only change set must select lint-markdown and new-line-breaks and not lint-qmd
+    steps = rlv.derive_steps(wf_doc, "validate", "origin/main")
+    def is_selected(step, changed_files):
+        if not step.globs:
+            return True
+        return any(rlv.matches_scope(f, step.globs, step.paths_ignore) for f in changed_files)
+
+    md_step = next(s for s in steps if s.name == "lint-markdown")
+    nlb_step = next(s for s in steps if s.name == "new-line-breaks")
+    qmd_step = next(s for s in steps if s.name == "lint-qmd")
+
+    check("md change selects lint-markdown", is_selected(md_step, ["test.md"]))
+    check("md change selects new-line-breaks", is_selected(nlb_step, ["test.md"]))
+    check("md change does not select lint-qmd", not is_selected(qmd_step, ["test.md"]))
+
+    check("qmd change selects lint-qmd", is_selected(qmd_step, ["test.qmd"]))
+    check("qmd change does not select lint-markdown", not is_selected(md_step, ["test.qmd"]))
+
+def test_changed_end_to_end():
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        wf = _write_fixture(tmp)
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp, check=True)
+        # Create a file and commit it
+        (pathlib.Path(tmp) / "test.md").write_text("x")
+        subprocess.run(["git", "add", "test.md"], cwd=tmp, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=tmp, check=True)
+        # Create a new branch
+        subprocess.run(["git", "checkout", "-q", "-b", "feature"], cwd=tmp, check=True)
+        # Modify the file and commit
+        (pathlib.Path(tmp) / "test.md").write_text("y")
+        subprocess.run(["git", "commit", "-q", "-am", "mod"], cwd=tmp, check=True)
+
+        out = io.StringIO()
+        with redirect_stdout(out), redirect_stderr(io.StringIO()):
+            # base is main
+            rc = rlv.main(["--workflow", str(wf), "--root", tmp, "--changed", "--base", "main", "--list"])
+
+        text = out.getvalue()
+        # md file changed, lint-markdown should be RUN/PARTIAL/NOT RUN, not skipped
+        check("lint-markdown is not skipped by file scope", "SKIP     [validate] lint-markdown: no scoped files changed" not in text)
+        check("lint-qmd is skipped because no qmd file changed", "SKIP     [lint-qmd] lint-qmd: no scoped files changed" in text)
+
 
 def main():
     print('running test_expression_regex_edge_cases()', flush=True)
@@ -360,6 +450,14 @@ def main():
     test_only_and_skip_filters()
     print('running test_require_clean_on_dirty_tree()', flush=True)
     test_require_clean_on_dirty_tree()
+    print('running test_empty_changed_list_selects_all()', flush=True)
+    test_empty_changed_list_selects_all()
+    print('running test_missing_tool_skips()', flush=True)
+    test_missing_tool_skips()
+    print('running test_scope_matching()', flush=True)
+    test_scope_matching()
+    print('running test_changed_end_to_end()', flush=True)
+    test_changed_end_to_end()
     print('running test_live_workflow_derives_every_python_test_suite()', flush=True)
     test_live_workflow_derives_every_python_test_suite()
     print('running test_equivalents_table_covers_all_uses_jobs()', flush=True)

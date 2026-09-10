@@ -1542,9 +1542,9 @@ already all read clean.
 (Ai-config#3141 is the worked incident: chasing which copy of
 `hooks/no-unreviewed-pr.py` was firing an expired moratorium, the copy
 registered in `~/.claude/settings.json` was current, the `installed_plugins.json`
-pins named a hook with no `MORATORIUM_END` at all, and `enabledPlugins` for
-the plugin read `false` --- every registration path clean, and the stale
-copy fired three times regardless.
+pins (three of them, user and project scope) did not contain the hook file
+at all, and `enabledPlugins` for the plugin read `false` --- every
+registration path clean, and the stale copy fired three times regardless.
 The record and its measurements live in
 [`mistake-patterns.cases.md`](../../memories/mistake-patterns.cases.md)'s
 Pattern 43 entry; this section states the transferable rule the incident

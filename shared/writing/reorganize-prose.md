@@ -97,10 +97,15 @@ grants the move, it does not exempt it from what a move costs.
   grep -rn '<source-basename>' --include='*.md' .
   ```
 
-  That list is long in a corpus this size --- 100 hits across 54 files, in the
-  move this bullet was written for --- so narrow it mechanically rather than by
-  eye: take the distinctive terms of the moved block and keep only the links
-  whose surrounding lines contain one.
+  That list is long in a corpus this size --- 97 hits across 54 markdown files,
+  counting every mention outside the source file itself, in the move this bullet
+  was written for --- so narrow it mechanically rather than by eye: take the
+  distinctive terms of the moved block and keep only the links whose surrounding
+  lines contain one.
+  State the exclusion beside the figure, as that sentence does.
+  The first draft of this bullet said "100 hits across 54 files", which paired a
+  hit count that included the source file's own self-mentions with a file count
+  that excluded it --- two populations in one sentence, and neither named.
   That filter is a heuristic in both directions, and both matter.
   It surfaced two real stale sites here, and it also returned two false
   positives keyed on a phrase as generic as "default branch", so read its

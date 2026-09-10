@@ -122,7 +122,8 @@ live-push tell.
 Morrison-Lab/ai-config#857 -> #872 is the *correct* same-name follow-up
 from new `main`, not a prior occurrence of this failure.
 
-A correctly-handled case, not a third occurrence of the failure: 2026-09-09 PDT, [ai-config#3432](https://github.com/Morrison-Lab/ai-config/issues/3432) -> [#3436](https://github.com/Morrison-Lab/ai-config/pull/3436).
+A correctly-handled case, not a third occurrence of the failure.
+2026-09-09 PDT, [ai-config#3432](https://github.com/Morrison-Lab/ai-config/issues/3432) -> [#3436](https://github.com/Morrison-Lab/ai-config/pull/3436).
 A fix agent was dispatched to address a Copilot finding on [PR #3363](https://github.com/Morrison-Lab/ai-config/pull/3363),
 found that PR already merged with its branch auto-deleted,
 did not recreate the branch,

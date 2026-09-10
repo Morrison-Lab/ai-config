@@ -118,8 +118,11 @@ A SHA is excluded from consideration when:
 SCOPE: PROSE EXTENSIONS ONLY, NOT "ANY TRACKED FILE"
 ------------------------------------------------------
 The `Write`/`Edit`/`NotebookEdit` surface is narrowed to `.md`/`.markdown`/
-`.txt`/`.rst`/`.qmd`/`.rmd` targets, not every non-scratch file. Two false-
-positive classes forced this, both found by adversarial review against this
+`.txt`/`.rst`/`.qmd`/`.rmd`/`.ipynb` targets, not every non-scratch file
+(`.ipynb` is included because it is the only extension `NotebookEdit` ever
+targets -- omitting it left that registered matcher permanently dead, a
+2nd-round adversarial-review finding). Two false-positive classes forced
+this narrowing, both found by first-round adversarial review against this
 repo's own tree: a GitHub Actions SHA pin (`uses: actions/checkout@<sha>`)
 in a workflow YAML, and a lockfile hash field -- neither is a narrative
 claim, and a pin can never be discharged at all, since the object it names
@@ -182,8 +185,8 @@ citation in this corpus is written backticked. Silently trusting an
 unreadable body would exempt precisely the posting route this hook's own
 target shape is written through (adversarial review, ai-config#3471).
 
-KNOWN SCOPE LIMIT
------------------
+KNOWN SCOPE LIMITS (2nd-round adversarial review, ai-config#3471)
+--------------------------------------------------------------------
 `mcp__github__issue_write` and PR create/update body tools match the
 registered `mcp__github__.*` hooks.json matcher but are not in the imported
 `MCP_POST_TOOLS`, so a SHA narrative written directly into an issue or PR
@@ -193,6 +196,27 @@ the same reason -- `MCP_POST_TOOLS` is a COMMENT-posting registry, not every
 tool that can carry prose. Accepted rather than closed here: widening it
 changes what a sibling hook's identically-named import means, and an issue
 or PR body is a smaller, more visible target than a buried comment thread.
+
+RX_REPORTING_CONTEXT's "committed" alternative only silences the literal
+phrasing "Committed `X`". A session that just ran `git commit` and then
+writes "Fixed in `X`", "Commit `X` fixes the case", or "See `X` for the
+fix" into a case file still gets no discharge -- `git commit` is not a
+read command, so citing your own just-made commit warns exactly like citing
+someone else's unread one. Tolerable for a warn-only guard (the false
+positive is annoying, not misleading), and narrower than it sounds: most of
+this corpus's own self-citations use exactly the "Committed"/position-report
+phrasing the exclusion covers.
+
+A quoted, non-executed command still discharges: `_bash_discharges` reads
+command TEXT, not what actually ran, so a Bash call that merely echoes or
+otherwise quotes `git show <sha>` (including, degenerately, a call that
+prints this hook's own `NOTE` message, which contains that literal text)
+is indistinguishable from one that ran it. Shared with every sibling hook
+in this directory that parses command text rather than execution
+(`no-unmeasured-clock-claim.py`'s own docstring discusses the same class
+of limit for its `date` detection) -- fixing it needs the harness to
+report which Bash calls actually executed vs. were merely quoted, which no
+hook here currently has.
 
 WARN, NEVER BLOCK
 -----------------
@@ -309,17 +333,35 @@ RX_REPORTING_CONTEXT = re.compile(
     # `X`)", adversarial review, ai-config#3471).
     r"\s*[:,(`]?\s*$", re.I)
 
+# Applied to what FOLLOWS the SHA on the same line: a genuine position
+# report ends there (a closing backtick, a closing paren, trailing
+# whitespace); a sentence that goes on to assert what the commit DID does
+# not. Required alongside RX_REPORTING_CONTEXT above so "pushed at `X` --
+# it deletes the guard" still fires even though "pushed at" is an excluded
+# left-context phrase (2nd-round adversarial review, ai-config#3471).
+RX_TRAILING_PUNCT_ONLY = re.compile(r"^[`)\].,:;!?\s]*$")
+
 # A pasted `git log`/`git show` excerpt, indented (quoted) rather than
 # asserted -- evidence being relayed, not a claim being made. `STRONG`
 # markers (a diff/log header line) are unambiguous on their own; a bare
 # hex-prefixed line (the `--oneline` shape) is ambiguous by itself -- a
 # single indented line reading "2d37c48 is where it broke, per my reading"
-# is a hand-written claim, not a paste -- so it is only treated as pasted
-# evidence when it co-occurs with a second such line in the same indented
-# paragraph (adversarial review, ai-config#3471).
+# is a hand-written claim, not a paste. Requiring TWO such lines
+# (round 1's fix) is not enough on its own: an indented hand-written
+# two-item list ("2d37c48 is where X went in.\n08f5a73 is where it was
+# narrowed.") has two bare-hex lines too, and is exactly the shape of the
+# ai-config#3471 measurement itself -- silencing it would have missed the
+# incident this hook was built for (2nd-round adversarial review). A real
+# `git log --oneline` subject conventionally does NOT end in sentence-final
+# punctuation; a hand-written claim about a commit very often does. So a
+# bare-hex line only counts as pasted-evidence when it does NOT end in
+# `.`/`!`/`?` -- imperfect (a terse committer can end a subject in a
+# period, a claim can be terse enough to lack one), but it separates the
+# two measured shapes correctly and errs toward flagging when unsure.
 RX_STRONG_LOG_MARKER = re.compile(
     r"^(?:commit\s|Author:|Date:|Merge:|diff --git|@@|index |\+{3}\s|-{3}\s)")
-RX_BARE_HEX_LINE = re.compile(r"^[0-9a-fA-F]{7,40}\b\s")
+RX_BARE_HEX_LINE = re.compile(
+    r"^[0-9a-fA-F]{7,40}\b\s.*[^.!?\s]$")
 
 
 def _strip_evidence_blocks(text):
@@ -390,8 +432,21 @@ def find_citations(text):
             continue
         start, end = m.start(), m.end()
         line_start = clean.rfind("\n", 0, start) + 1
+        line_end = clean.find("\n", end)
+        if line_end == -1:
+            line_end = len(clean)
         prefix = clean[line_start:start]
-        if RX_REPORTING_LABEL.search(prefix) or RX_REPORTING_CONTEXT.search(prefix):
+        suffix = clean[end:line_end]
+        if RX_REPORTING_LABEL.search(prefix):
+            continue
+        # RX_REPORTING_CONTEXT only looks LEFT of the token, so on its own
+        # it would silence a sentence that OPENS with a status phrase and
+        # then goes on to assert something about the commit ("pushed at
+        # `X` -- it deletes the guard"). A genuine position report ends at
+        # the SHA, so also require the rest of the line to be empty or
+        # pure trailing punctuation/whitespace (2nd-round adversarial
+        # review, ai-config#3471).
+        if RX_REPORTING_CONTEXT.search(prefix) and RX_TRAILING_PUNCT_ONLY.match(suffix):
             continue
         if len(token) < 8 and not _has_cue(clean, start, end):
             continue
@@ -409,13 +464,20 @@ RX_GIT_CATFILE = re.compile(r"\bgit\s+cat-file\b([^\n;&|]*)", re.I)
 RX_GIT_LOG = re.compile(r"\bgit\s+log\b([^\n;&|]*)", re.I)
 RX_PATCH_FLAG = re.compile(r"(?:^|\s)(?:-p\b|--patch\b)", re.I)
 # `-s`/`--no-patch`/`--stat`/`--name-only`/`--name-status`/`--oneline`/
-# `--quiet`/`--format=` all suppress the patch on `git show`/`git diff` --
+# `--quiet` suppress the patch on `git show`/`git diff` unconditionally --
 # `git show -s --format=%s <sha>` prints one line, exactly `git log
 # --oneline`'s shape, and must not discharge for the same reason that must
 # not (adversarial review, ai-config#3471).
 RX_NO_PATCH_FLAG = re.compile(
     r"(?:^|\s)(?:-s\b|--no-patch\b|--stat\b|--name-only\b|--name-status\b|"
-    r"--oneline\b|--quiet\b|-q\b|--format=)", re.I)
+    r"--oneline\b|--quiet\b|-q\b)", re.I)
+# `--format=` is conditional, unlike the flags above: `--format=fuller` and
+# `--format=medium` still print the full patch (verified against real git,
+# 2nd-round adversarial review), so only a value shaped like a ONE-LINE
+# format (a single placeholder, or the `oneline`/`short`/`reference`
+# built-ins) counts as no-patch.
+RX_NO_PATCH_FORMAT = re.compile(
+    r"--format=(?:%[a-zA-Z]|oneline|short|reference)\b", re.I)
 RX_GH_API_COMMIT = re.compile(r"/commits?/([0-9a-fA-F]{7,40})\b", re.I)
 RX_GH_API_PR_COMMITS = re.compile(
     r"\bgh\s+api\s+\S*/pulls/\d+/commits\b", re.I)
@@ -425,16 +487,26 @@ def _shas_in_segment(segment):
     return {t for t in RX_HEX_TOKEN.findall(segment) if _looks_like_sha(t)}
 
 
+def _no_patch(rest):
+    """True when `rest` (the args after `git show`/`git diff`) suppresses
+    the patch. An explicit `-p`/`--patch` always wins over a co-occurring
+    `--stat` or similar (real git prints the patch when `-p` is given,
+    verified against `git show -p --stat <sha>`)."""
+    if RX_PATCH_FLAG.search(rest):
+        return False
+    return bool(RX_NO_PATCH_FLAG.search(rest) or RX_NO_PATCH_FORMAT.search(rest))
+
+
 def _bash_discharges(command):
     """(specific_shas: set[str], broad: bool) this Bash command would settle."""
     specific = set()
     for m in RX_GIT_SHOW.finditer(command):
         rest = m.group(1)
-        if not RX_NO_PATCH_FLAG.search(rest):
+        if not _no_patch(rest):
             specific |= _shas_in_segment(rest)
     for m in RX_GIT_DIFF.finditer(command):
         rest = m.group(1)
-        if not RX_NO_PATCH_FLAG.search(rest):
+        if not _no_patch(rest):
             specific |= _shas_in_segment(rest)
     for m in RX_GIT_CATFILE.finditer(command):
         # `git cat-file -p <sha>` prints the object's content; `-t`/`-s`/`-e`
@@ -557,7 +629,15 @@ RX_SCRATCH_PATH = re.compile(
 # `.py` source -- which quotes the measurement's SHAs in its docstring --
 # is never itself in scope, so editing this file does not trip the guard it
 # defines (shared/writing/examples-are-scanned.md).
-RX_DOC_EXTENSION = re.compile(r"\.(?:md|markdown|txt|rst|qmd|rmd)$", re.I)
+# `ipynb` is included because it is the only extension a `NotebookEdit`
+# ever targets -- omitting it left the registered NotebookEdit matcher
+# permanently dead (`_in_scope_path` always False for it), which
+# hooks.json's own `why`, this docstring, and the README row all claimed
+# was covered (2nd-round adversarial review, ai-config#3471). A notebook's
+# markdown cells are exactly the prose surface this hook targets in a
+# `.md` case entry -- `_extract_write_content` already reads `cells`/
+# `source` for them.
+RX_DOC_EXTENSION = re.compile(r"\.(?:md|markdown|txt|rst|qmd|rmd|ipynb)$", re.I)
 
 
 def _in_scope_path(path):
@@ -745,7 +825,15 @@ def main() -> int:
                     print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
                 return 0
             unresolved = UNREADABLE_SHA
-            body_for_key = ""
+            # Keyed by the tool call itself (there is no body to hash) so
+            # a second, DIFFERENT unreadable post in the same transcript
+            # still warns -- keying on "" made every unreadable post in one
+            # transcript share one sentinel, silencing all but the first
+            # (2nd-round adversarial review, ai-config#3471).
+            try:
+                body_for_key = json.dumps(tool_input, sort_keys=True)
+            except Exception:
+                body_for_key = repr(tool_input)
         else:
             citations = find_citations(body)
             if not citations:

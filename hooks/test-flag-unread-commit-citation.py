@@ -166,6 +166,17 @@ CASES = [
      "an 8+ digit pure-numeric run needs no cue but still has no hex letter, "
      "so it is not a SHA candidate either"),
 
+    # --- NotebookEdit is genuinely reachable (2nd-round adversarial review:
+    #     a registered-but-dead matcher, since RX_DOC_EXTENSION omitted
+    #     .ipynb) ----------------------------------------------------------
+    ([PROMPT, ONELINE],
+     {"tool_name": "NotebookEdit", "tool_input": {
+         "notebook_path": "/repo/memory/case-notebook.ipynb",
+         "new_source": CITED_BOTH}}, True,
+     "a NotebookEdit to a .ipynb target is in scope (RX_DOC_EXTENSION "
+     "includes .ipynb, since that is the only extension NotebookEdit "
+     "ever targets)"),
+
     # --- out of scope -------------------------------------------------------------
     ([PROMPT, ONELINE],
      {"tool_name": "Write", "tool_input": {
@@ -204,6 +215,15 @@ CASES = [
     ([PROMPT, ONELINE],
      bash('gh pr comment 155 --body "`2d37c48` broke the build."'), True,
      "an ordinary assertion (no reporting-context phrase) still fires"),
+    ([PROMPT, ONELINE],
+     bash('gh pr comment 155 --body "pushed at `2d37c48` -- it deletes the guard"'),
+     True, "adversarial review round 2: a status phrase that OPENS the "
+           "sentence and is followed by a real assertion still fires -- "
+           "a position report ends at the SHA, this one does not"),
+    ([PROMPT, ONELINE],
+     bash('gh pr comment 155 --body "the regression was committed `2d37c48` and broke the regex"'),
+     True, "adversarial review round 2: \"committed `X` and broke...\" "
+           "still fires (text follows the SHA)"),
 
     # --- adversarial review: git show/diff -s/--stat/--oneline is not a read -----
     ([PROMPT, tool_use("Bash", command="git show -s --format=%s 2d37c48")],
@@ -218,13 +238,33 @@ CASES = [
     ([PROMPT, tool_use("Bash", command="git diff --stat 2d37c48^..2d37c48")],
      bash(f'gh pr comment 155 --body "{CITED_ONE}"'), True,
      "adversarial review: git diff --stat (no patch) does not discharge"),
+    ([PROMPT, tool_use("Bash", command="git show --format=fuller 2d37c48")],
+     bash(f'gh pr comment 155 --body "{CITED_ONE}"'), False,
+     "adversarial review round 2: git show --format=fuller still prints "
+     "the patch and must still discharge (only a one-line format value "
+     "counts as no-patch)"),
+    ([PROMPT, tool_use("Bash", command="git show -p --stat 2d37c48")],
+     bash(f'gh pr comment 155 --body "{CITED_ONE}"'), False,
+     "adversarial review round 2: an explicit -p wins over a co-occurring "
+     "--stat (real git still prints the patch)"),
 
     # --- adversarial review: a single hand-written indented claim still fires ----
     ([PROMPT, ONELINE],
      edit("memory/rampp-cases.md",
-          "Investigating:\n\n    the commit 2d37c48 is where it broke, per my reading.\n"),
-     True, "adversarial review: a lone indented hand-written claim (not a "
-           "multi-line paste, no strong log marker) is not silenced"),
+          "Investigating:\n\n    2d37c48a is where it broke, per my reading.\n"),
+     True, "adversarial review round 2: a lone indented hand-written claim "
+           "STARTING with a bare hex run (the exact fixture that failed to "
+           "distinguish pre-fix from post-fix behaviour in round 1) is not "
+           "silenced -- caught because the line ends in sentence-final "
+           "punctuation, not the --oneline shape"),
+    ([PROMPT, ONELINE],
+     edit("memory/rampp-cases.md",
+          "    2d37c48a is where pkg::fn() support went in.\n"
+          "    08f5a73b is where it was narrowed.\n"), True,
+     "adversarial review round 2: an indented HAND-WRITTEN two-line claim "
+     "(each line ends in a period, unlike --oneline output) is not "
+     "silenced merely for having two bare-hex-prefixed lines -- this is "
+     "the ai-config#3471 measurement's own shape, written as a list"),
 
     # --- adversarial review: an unreadable comment body still warns --------------
     ([PROMPT, ONELINE],
@@ -317,6 +357,33 @@ def check_sentinel():
     return 0 if ok else 1
 
 
+def check_unreadable_sentinel_distinguishes_calls():
+    """Round 2: two DIFFERENT unreadable posts in one transcript both warn
+    (keying on the tool payload, not the unreadable "" body -- the prior
+    keying collapsed every unreadable post in a transcript onto one
+    sentinel, silencing all but the first)."""
+    tpath = write_transcript([PROMPT, ONELINE])
+    tmpdir = tempfile.mkdtemp()
+    try:
+        env = dict(os.environ, TMPDIR=tmpdir)
+        env.pop("ANTIGRAVITY_AGENT", None)
+        first = dict(bash("gh pr comment 155 --body-file -"),
+                     transcript_path=tpath, cwd=os.getcwd())
+        second = dict(bash("gh issue comment 96 --body-file -"),
+                      transcript_path=tpath, cwd=os.getcwd())
+        out1 = subprocess.run([sys.executable, HOOK], input=json.dumps(first),
+                              capture_output=True, text=True, env=env).stdout
+        out2 = subprocess.run([sys.executable, HOOK], input=json.dumps(second),
+                              capture_output=True, text=True, env=env).stdout
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        os.unlink(tpath)
+    ok = "systemMessage" in out1 and "systemMessage" in out2
+    print(f"{'ok  ' if ok else 'FAIL'}  two DIFFERENT unreadable posts in one "
+          f"transcript both warn (round 2)")
+    return 0 if ok else 1
+
+
 def check_malformed_stdin():
     r = subprocess.run([sys.executable, HOOK], input="not json",
                        capture_output=True, text=True)
@@ -342,6 +409,7 @@ def main():
     failures += check_output_shape()
     failures += check_dry_run()
     failures += check_sentinel()
+    failures += check_unreadable_sentinel_distinguishes_calls()
     failures += check_malformed_stdin()
     case_failures = 0
     for events, payload, want, label in CASES:

@@ -867,7 +867,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unread-commit-citation.py\"",
             "timeout": 10,
             "script": "flag-unread-commit-citation.py",
-            "why": "The Write half of the Bash entry above. ai-config#3471: warns when writing a commit SHA citation into a non-scratch prose file (.md/.markdown/.txt/.rst/.qmd/.rmd -- a case entry, a memory file) with no read of that commit in the transcript since the current turn began. Scoped to those extensions, not every tracked file, after adversarial review found a GitHub Actions SHA pin and a lockfile hash both false-positive under a broader scope."
+            "why": "The Write half of the Bash entry above. ai-config#3471: warns when writing a commit SHA citation into a non-scratch prose file (.md/.markdown/.txt/.rst/.qmd/.rmd/.ipynb -- a case entry, a memory file) with no read of that commit in the transcript since the current turn began. Scoped to those extensions, not every tracked file, after adversarial review found a GitHub Actions SHA pin and a lockfile hash both false-positive under a broader scope."
           }
         ]
       },
@@ -893,7 +893,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unread-commit-citation.py\"",
             "timeout": 10,
             "script": "flag-unread-commit-citation.py",
-            "why": "The Edit half of the Bash entry above. ai-config#3471: warns when editing a commit SHA citation into a non-scratch prose file (.md/.markdown/.txt/.rst/.qmd/.rmd) with no read of that commit in the transcript since the current turn began."
+            "why": "The Edit half of the Bash entry above. ai-config#3471: warns when editing a commit SHA citation into a non-scratch prose file (.md/.markdown/.txt/.rst/.qmd/.rmd/.ipynb) with no read of that commit in the transcript since the current turn began."
           }
         ]
       },
@@ -919,7 +919,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unread-commit-citation.py\"",
             "timeout": 10,
             "script": "flag-unread-commit-citation.py",
-            "why": "The NotebookEdit half of the Bash entry above. ai-config#3471: warns when a notebook cell edit writes a commit SHA citation into a non-scratch prose file (.md/.markdown/.txt/.rst/.qmd/.rmd) with no read of that commit in the transcript since the current turn began."
+            "why": "The NotebookEdit half of the Bash entry above. ai-config#3471: warns when a notebook cell edit writes a commit SHA citation into a non-scratch prose file (.md/.markdown/.txt/.rst/.qmd/.rmd/.ipynb) with no read of that commit in the transcript since the current turn began."
           }
         ]
       },

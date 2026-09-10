@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Tests for warn-stderr-suppressed-then-parsed.py."""
 import importlib.util
+import json
 import os
+import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -56,6 +58,39 @@ check("file descriptor 12 is not mistaken for 2", fires("cmd 12>/dev/null > out.
 check("redirecting stdout to stderr is not mistaken for file", fires("cmd 2>/dev/null >&2"), False)
 check("closed stderr with stdout to file fires", fires("cmd 2>&- > out.json"), True)
 check("redirecting to something that includes /dev/null but isnt it fires", fires("cmd 2>/dev/null > /dev/null-file"), True)
+
+
+
+def run_hook(command, tool_name="Bash"):
+    payload = json.dumps({
+        "tool_name": tool_name,
+        "tool_input": {"command": command},
+    })
+    return subprocess.run([sys.executable, HOOK], input=payload,
+                          capture_output=True, text=True, timeout=10)
+
+
+# End-to-end: the payload handling and the output shape, which is what
+# scripts/check-hook-output-shape.py requires a warn-only hook's test to pin.
+proc = run_hook(INCIDENT)
+check("firing command exits 0", proc.returncode, 0)
+check("firing command prints no traceback", "Traceback" in proc.stderr, False)
+payload = json.loads(proc.stdout)
+check("emits PreToolUse context",
+      payload["hookSpecificOutput"]["hookEventName"], "PreToolUse")
+check("carries additionalContext",
+      "stderr" in payload["hookSpecificOutput"]["additionalContext"], True)
+check("carries a systemMessage outside Antigravity",
+      "suppressed" in payload.get("systemMessage", ""), True)
+check("never emits permissionDecision",
+      "permissionDecision" in payload["hookSpecificOutput"], False)
+
+proc = run_hook("git status --short")
+check("non-firing command prints nothing", proc.stdout.strip(), "")
+check("non-firing command exits 0", proc.returncode, 0)
+
+proc = run_hook(INCIDENT, tool_name="Read")
+check("a non-shell tool is ignored", proc.stdout.strip(), "")
 
 if failures:
     print("FAILED:")

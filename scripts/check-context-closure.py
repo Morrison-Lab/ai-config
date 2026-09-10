@@ -1165,10 +1165,15 @@ def main(argv=None) -> int:
     if root_growth_over:
         # NOT gated on --strict, and not on --max-growth either. This one
         # defends the harness's own hard cap rather than a budget of ours,
-        # so it takes the same stance as root_over above: an operator who
-        # wants it off says so with --root-growth-gate-fraction, and the
-        # default is on. Requiring an opt-in flag would reproduce the
-        # advisory step this ratchet exists because of.
+        # so it takes the same stance as root_over above: on by default,
+        # with --no-root-growth-gate as the way to turn it off. Making it
+        # opt-IN instead would reproduce the advisory step this ratchet
+        # exists because of.
+        #
+        # The flag named here was --root-growth-gate-fraction until that
+        # flag stopped being a disable route: an out-of-range fraction never
+        # reliably disabled anything (a file past the cap is past 1.5 * cap
+        # too) and is now rejected by unit_fraction outright.
         return 1
     if growth_over:
         # Not gated on --strict either, but for the opposite reason to the

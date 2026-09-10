@@ -971,8 +971,8 @@ Tracked as [ai-config#3502](https://github.com/Morrison-Lab/ai-config/issues/350
 The "standing not-clean can be your own" section above describes the same per-reviewer scan from the other side;
 this is the case where the not-clean statement was never a verdict at all.
 The "author filter gates formal reviews and not comments" passage further down explains why the comment was admitted to the scan in the first place:
-a comment enters on body text alone,
-with no author check.
+the comment loop admits on a bot author or on a review-header marker in the body,
+so a human's comment carrying verdict-shaped text enters on body text alone.
 
 - **Do:** name the finding in a disposition bullet
   ("the `command(*)` finding: Addressed in `<sha>`"),

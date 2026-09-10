@@ -87,12 +87,14 @@ See [`pr-on-claim.cases.md`](pr-on-claim.cases.md),
 **Request the external reviewer in the same stride.** Opening a PR or marking a draft ready can trigger the repo's own review workflow, but that does not summon every reviewer.
 
 **Run that `requested_reviewers` POST as the sole command in its Bash call.**
-Sole, not merely last: a request last after `||` is skipped when the left operand succeeds, and the call still exits 0, so the hook discharges the obligation on a request that never ran ([ai-config#3139](https://github.com/Morrison-Lab/ai-config/issues/3139)).
-That is the one chaining form that silently satisfies the guard while making no request at all, and it is worse than the form the Don't below names, which merely keeps warning.
+Sole, not merely last: a request last after `||` is skipped when the left operand succeeds, and the call still exits 0, so that status is evidence about the read rather than about the request.
+The hook now withholds the discharge there, treating the request as unattributable exactly as it treats a non-last one ([ai-config#3139](https://github.com/Morrison-Lab/ai-config/issues/3139));
+until that fix it discharged the obligation on a request that never ran.
+So every chaining form now costs a warning, and none of them silently clears.
 
 - **Do:** issue the Copilot-request POST as its own Bash call, with nothing chained before or after it.
 - **Don't:** fold the `--json reviews` / `gh pr checks` verification into the same call --- that makes the request non-last, and the hook cannot discharge it.
-- **Don't:** put the request after `||`, as a fallback to a read --- the guard clears and no reviewer is requested.
+- **Don't:** put the request after `||`, as a fallback to a read --- a succeeding read skips it, so no reviewer is requested and the hook cannot discharge it either.
 
 **"Nothing chained before or after it" includes a pipe added purely to trim the output.**
 

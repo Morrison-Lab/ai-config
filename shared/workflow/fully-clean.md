@@ -954,7 +954,7 @@ NOT clean over a clean verdict.**
   finding without reading the verdict body it matched.
 
 **Your own disposition comment is a third surface,
-and it is the one a `review-data` payload cannot reach:
+and it is the one a later `review-data` payload from another identity cannot supersede:
 the instrument can read the PR author's ARD comment as a not-clean verdict from a reviewer,
 and then hold the per-reviewer gate on it.**
 Measured 2026-09-09 on [ai-config#3493](https://github.com/Morrison-Lab/ai-config/pull/3493).
@@ -964,6 +964,7 @@ A later plain status comment from the same author did not count as a clean state
 Tracked as [ai-config#3502](https://github.com/Morrison-Lab/ai-config/issues/3502).
 The "standing not-clean can be your own" section above describes the same per-reviewer scan from the other side;
 this is the case where the not-clean statement was never a verdict at all.
+The "author filter gates formal reviews and not comments" passage further down explains why the comment was admitted to the scan in the first place: a comment enters on body text alone, with no author check.
 
 - **Do:** name the finding in a disposition bullet ("the `command(*)` finding: Addressed in `<sha>`"), never its severity label.
 - **Do:** when the instrument names *you* as the not-clean reviewer, read the matched pattern and reword your own comment, rather than requesting another bot round that cannot supersede it.

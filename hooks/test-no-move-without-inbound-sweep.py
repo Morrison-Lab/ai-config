@@ -242,6 +242,17 @@ def test_swept():
     check("a non-dict record yields no commands",
           guard.commands("not a dict") == [])
 
+    # `RecursionError` is a `RuntimeError`, not a `ValueError`, so a catch
+    # written for malformed JSON does not cover deeply nested JSON.
+    deep = "[" * 998 + "]" * 998
+    rec = {"message": {"content": [{"name": "Bash", "input": deep}],
+                       "_x": "preferences.md"}}
+    try:
+        ok = guard.commands(rec) == []
+    except Exception:
+        ok = False
+    check("a deeply nested input string does not crash", ok)
+
     # A bad record must not hide a real sweep on a LATER line either.
     fd, p2 = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w") as fh:
@@ -251,6 +262,18 @@ def test_swept():
                 "command": "grep -rn 'preferences.md' --include='*.md' ."}}]}}) + "\n")
     check("a bad record does not hide a later real sweep",
           guard.swept(p2, "preferences.md"))
+    os.unlink(p2)
+
+    # The basename must appear as a LEAF, or the line filter short-circuits
+    # before the parse and the probe exercises nothing.
+    fd, p2 = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        fh.write("[" * 998 + '"preferences.md"' + "]" * 998 + "\n")
+    try:
+        ok = guard.swept(p2, "preferences.md") is False
+    except Exception:
+        ok = False
+    check("a deeply nested transcript line does not crash", ok)
     os.unlink(p2)
 
     # Found by adversarial review of this guard: each of the four below was a
@@ -377,6 +400,31 @@ def test_end_to_end():
     check("silent on an empty payload", out.stdout.strip() == "")
     check("exits 0 on an empty payload", out.returncode == 0)
 
+    # Every field a payload carries is harness-shaped, and `json.load`
+    # guarantees only the syntax. Four crash sites came from assuming types.
+    for label, pay in (
+            ("tool_input is a list",
+             {"tool_name": "Bash", "tool_input": ["a", "list"]}),
+            ("command is a list",
+             {"tool_name": "Bash", "tool_input": {"command": ["a", "b"]}}),
+            ("command is a number",
+             {"tool_name": "Bash", "tool_input": {"command": 42}}),
+            ("transcript_path is a list",
+             {"tool_name": "Bash", "tool_input": {"command": "git commit -m x"},
+              "cwd": d, "transcript_path": ["not", "a", "string"]}),
+            ("cwd is a list",
+             {"tool_name": "Bash", "tool_input": {"command": "git commit -m x"},
+              "cwd": ["x"], "transcript_path": ""})):
+        out = _run(pay)
+        check(f"exits 0 when {label}", out.returncode == 0)
+
+    e2 = dict(os.environ)
+    e2.pop("ANTIGRAVITY_AGENT", None)
+    out = subprocess.run([sys.executable, TARGET],
+                         input="[" * 998 + "]" * 998,
+                         capture_output=True, text=True, env=e2, timeout=30)
+    check("exits 0 on a deeply nested payload", out.returncode == 0)
+
     # A syntactically valid payload that is not an object.
     e = dict(os.environ)
     e.pop("ANTIGRAVITY_AGENT", None)
@@ -415,17 +463,22 @@ MUTATIONS = [
     ("git pre-subcommand options not skipped",
      "    while i < len(words) and words[i].startswith(\"-\"):",
      "    while False:"),
-    ("message not type-checked", "    if not isinstance(msg, dict):",
-     "    if False:"),
-    # Anchored with its following line: `except ValueError:` alone now appears
-    # twice, since `commands()` narrowed its own catch in the same round.
+    # Anchored with its following lines: the catch clause alone appears three
+    # times now, so the anchor carries what makes this one the swept() loop.
     ("a bad record clears the transcript",
-     "            except ValueError:\n                continue\n            for cmd in commands(rec):",
-     "            except ValueError:\n                return True\n            for cmd in commands(rec):"),
-    ("tool input not type-checked", "        if not isinstance(args, dict):",
-     "        if False:"),
+     "            except (ValueError, RecursionError):\n                continue\n            for cmd in commands(rec):",
+     "            except (ValueError, RecursionError):\n                return True\n            for cmd in commands(rec):"),
     ("payload not type-checked", "    if not isinstance(payload, dict):",
      "    if False:"),
+    ("as_dict passes non-dicts through",
+     "    return value if isinstance(value, dict) else {}",
+     "    return value"),
+    ("as_str passes non-strings through",
+     "    return value if isinstance(value, str) else \"\"",
+     "    return value"),
+    ("RecursionError not caught at the payload parse",
+     "    except (ValueError, RecursionError):\n        # `RecursionError` is a",
+     "    except ValueError:\n        # `RecursionError` is a"),
 ]
 
 

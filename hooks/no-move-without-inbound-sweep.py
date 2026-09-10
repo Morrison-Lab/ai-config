@@ -241,6 +241,28 @@ stale too". This is a reminder, not a refusal.\
 """
 
 
+def as_str(value) -> str:
+    """`value` when it is a string, otherwise the empty string.
+
+    Every field in a hook payload is attacker- or harness-shaped: `json.load`
+    guarantees the SYNTAX and nothing about the types inside. Four crash sites
+    in this module came from assuming otherwise, so each boundary reads through
+    here rather than through `or ""`, which passes a truthy non-string straight
+    to whatever consumes it.
+    """
+    return value if isinstance(value, str) else ""
+
+
+def as_dict(value) -> dict:
+    """`value` when it is a dict, otherwise an empty one.
+
+    The `or {}` idiom this replaces is the specific bug: it substitutes for a
+    FALSY value and passes a truthy non-dict through, so `(x or {}).get(...)`
+    raises `AttributeError` on exactly the input the guard was meant to absorb.
+    """
+    return value if isinstance(value, dict) else {}
+
+
 def significant(line: str) -> bool:
     """Is this line distinctive enough to count as evidence of a move?"""
     body = line[1:]
@@ -250,12 +272,23 @@ def significant(line: str) -> bool:
 
 
 def staged_diff(cwd: str) -> str:
-    """The staged diff, with renames detected so they can be skipped."""
+    """The staged diff, with renames detected so they can be skipped.
+
+    The catch is narrowed to what running a subprocess can actually raise --- a
+    missing or unreadable directory, a missing `git`, a timeout. It used to be
+    a blanket `except Exception`, and review established that the blanket was
+    doing undocumented work: `main()` passed an untyped `cwd` straight through,
+    so a non-string one raised `TypeError` inside `subprocess.run` and was
+    absorbed here rather than at the boundary where it belonged. `main()` now
+    coerces `cwd` through `as_str`, which is what makes narrowing this safe --
+    the order matters, and narrowing first would have converted that silent
+    no-op into a crash.
+    """
     try:
         out = subprocess.run(
             ["git", "diff", "--cached", "-M", "--no-color"],
             cwd=cwd or None, capture_output=True, text=True, timeout=10)
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         return ""
     return out.stdout if out.returncode == 0 else ""
 
@@ -339,6 +372,7 @@ def swept(transcript: str, basename: str) -> bool:
     """
     if not transcript or not os.path.isfile(transcript):
         return True
+
     try:
         fh = open(transcript, errors="ignore")
     except OSError:
@@ -349,7 +383,7 @@ def swept(transcript: str, basename: str) -> bool:
                 continue
             try:
                 rec = json.loads(line)
-            except ValueError:
+            except (ValueError, RecursionError):
                 continue
             for cmd in commands(rec):
                 if is_sweep(cmd, basename):
@@ -360,12 +394,7 @@ def swept(transcript: str, basename: str) -> bool:
 def commands(rec) -> list:
     """Every Bash command string in one transcript record."""
     out = []
-    if not isinstance(rec, dict):
-        return out
-    msg = rec.get("message")
-    if not isinstance(msg, dict):
-        return out
-    content = msg.get("content")
+    content = as_dict(as_dict(rec).get("message")).get("content")
     if not isinstance(content, list):
         return out
     for block in content:
@@ -375,17 +404,9 @@ def commands(rec) -> list:
         if isinstance(args, str):
             try:
                 args = json.loads(args)
-            except ValueError:
+            except (ValueError, RecursionError):
                 continue
-        # Every `.get()` target gets type-checked, not only the ones a review
-        # has named. Narrowing this module's blanket `except Exception` closed
-        # the reported hole and removed the net that had been absorbing this
-        # sibling one, turning a silent fail-open into a crash -- so the
-        # obligation the narrowing creates is to enumerate what the blanket was
-        # covering, rather than to fix the single case that was reported.
-        if not isinstance(args, dict):
-            continue
-        cmd = args.get("command")
+        cmd = as_dict(args).get("command")
         if isinstance(cmd, str):
             out.append(cmd)
     return out
@@ -426,7 +447,10 @@ def is_commit(command: str) -> bool:
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
-    except ValueError:
+    except (ValueError, RecursionError):
+        # `RecursionError` is a `RuntimeError`, not a `ValueError`, so deeply
+        # nested JSON (~1000 levels, a couple of kilobytes) slips past a catch
+        # written for malformed input. Named at all three parse sites.
         return 0
     if not isinstance(payload, dict):
         # Valid JSON that is not an object: a bare list, string, or number.
@@ -434,16 +458,16 @@ def main() -> int:
 
     if payload.get("tool_name") != "Bash":
         return 0
-    command = (payload.get("tool_input") or {}).get("command") or ""
+    command = as_str(as_dict(payload.get("tool_input")).get("command"))
     if not is_commit(command):
         return 0
 
-    cwd = payload.get("cwd") or os.getcwd()
+    cwd = as_str(payload.get("cwd")) or os.getcwd()
     diff = staged_diff(cwd)
     if not diff:
         return 0
 
-    transcript = payload.get("transcript_path") or ""
+    transcript = as_str(payload.get("transcript_path"))
     for src, dst, n in moves(diff):
         base = os.path.basename(src)
         if swept(transcript, base):

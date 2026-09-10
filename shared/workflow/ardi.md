@@ -321,7 +321,7 @@ rounds should change, and the loop keeps running either way.
 So the deliverable is a changed procedure, never a stop, and never a sentence
 ending "shall we accept the current state?".
 
-"Reflect on the process" decides nothing on its own, so examine three specific
+"Reflect on the process" decides nothing on its own, so examine four specific
 things:
 
 - **The local checks.**
@@ -365,6 +365,31 @@ things:
   at `claude`, so name an engine rather than invoking it unqualified;
   [`adv`](../../skills/adv/SKILL.md) already names one:
   `--engine alternate --exclude-engine "$AGENT_NAME"`.
+- **The remit, when the diff is prose.**
+  On a prose change, some finding classes are exhaustible (a factual error,
+  an internal contradiction, an instruction that cannot be followed as
+  written) and some are not (style preference, further trimming, one more
+  caveat).
+  The other two remedies fix a reviewer that is missing something; this one
+  fixes a reviewer that is finding something real and unbounded, which
+  neither a local check nor a cross-family round changes --- a different,
+  independent reviewer still has a style opinion and a caveat to add.
+  Addressing every round's findings looks like progress and is not: rounds
+  1-5 of the source measurement each returned a comparable count (5, 4, 6,
+  3, 6) with every finding addressed, because the inexhaustible classes
+  regenerate at whatever rate the reviewer is allowed to report them.
+  Narrow the brief to the exhaustible classes only, tell the reviewer
+  explicitly not to report style preference, further trimming, or additional
+  caveats, and to return clean if only those remain.
+  The narrowed round on that same PR returned 0 findings.
+  [`adversarial-self-review`](adversarial-self-review.md) states a rule with
+  no such round-count condition: "brief the reviewer to report every
+  finding in one round, style findings included," and "don't brief the
+  reviewer to leave style findings for a later pass."
+  This remedy overrides that rule, deliberately and only, once a diff has
+  already reached three finding-bearing rounds and the remaining classes
+  have proven inexhaustible round over round --- narrow the remit there
+  even though the general rule says not to.
 
 Read the three rounds' findings together rather than round by round, because
 the classes are the evidence and no single round carries them.
@@ -385,9 +410,16 @@ Three rounds of unrelated classes point at the approach instead.
 - **Do:** at that round, escalate the *independence* of the pre-push review
   already required below, dispatching a different model family through a CLI
   rather than repeating the same-family pass.
+- **Do:** on a prose diff, narrow a later round's brief to exhaustible
+  finding classes and tell the reviewer plainly to withhold style
+  preference, further trimming, and additional caveats.
 - **Don't:** turn the count into a question to the user about whether to
   accept unaddressed findings --- that is the stopping guard, and it is still
   banned.
+- **Don't:** read a shrinking finding count across rounds 1-5 as convergence
+  on a prose diff when the remit was never narrowed; a comparable count next
+  round is the more likely reading while style, trimming, and caveat
+  findings remain in scope.
 - **Don't:** read the cross-family round as where local review begins;
   [`adversarial-self-review`](adversarial-self-review.md) requires a local pass
   on every push, from the first.
@@ -401,7 +433,20 @@ we're doing something wrong", asking whether more local checks belong before
 the push, whether the whole approach is wrong, and whether cheap or free
 models run through CLIs could give a rough preliminary review before a more
 expensive forge review.
-Tracked as ai-config#3110.)
+Tracked as ai-config#3110.
+
+Measured 2026-09-10 on [PR #3536](https://github.com/Morrison-Lab/ai-config/pull/3536),
+a roughly 30-line memory entry: six adversarial-reviewer rounds, findings
+5, 4, 6, 3, 6, 0.
+Rounds 1-4 each had every finding addressed and the next round found a
+comparable number again, catching real defects along the way (a false
+framing claim, an unfollowable `git worktree list` instruction, a timezone
+mismatch); round 5's findings were stale counts, a reused noun phrase, and
+requests for more caveats, yet the pattern still held through that round --
+every finding addressed, no narrowing applied.
+Round 6's brief was the only one that named the remit above, and it
+returned 0 findings and a clean verdict on the same commit shape round 5
+had returned 6 findings against.)
 
 ### Pre-push checklist
 

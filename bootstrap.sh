@@ -77,10 +77,12 @@ if [ -d "$SCRIPT_DIR/plugins/ai-config" ]; then
   # verbatim left the Windows install needing a hand repair, and that repair
   # introduced the quoting that broke every run_command hook (ai-config#3091).
   # The renderer refuses to emit a manifest it cannot prove launchable, so a
-  # failure here leaves hooks.json missing or stale rather than broken. That
-  # is warned about and not fatal, so the installer loop and the symlinks
-  # below still run; scripts/check-agy-hook-commands.py and doctor.py report
-  # the missing manifest afterwards.
+  # failure here leaves hooks.json missing on a first install, or whatever
+  # the last successful render wrote on a re-run. That is warned about and
+  # not fatal, so the installer loop and the symlinks below still run.
+  # scripts/check-agy-hook-commands.py and doctor.py report the missing
+  # case; neither compares a present manifest against the canonical one, so
+  # a stale-but-valid manifest is only caught by this warning.
   python3 "$SCRIPT_DIR/scripts/render-agy-hooks.py" --output "$PLUGIN_STAGING_DIR/hooks.json" ||
     printf 'warn  %s exited %d\n' "scripts/render-agy-hooks.py" "$?"
 

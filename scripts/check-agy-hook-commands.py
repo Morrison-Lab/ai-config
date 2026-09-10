@@ -106,8 +106,8 @@ def check_file(path: Path, canonical: bool, check_program: bool = False) -> dict
 
 
 def installed_manifest_path() -> Path:
-    """Return the staged manifest path bootstrap.sh writes."""
-    return Path(os.path.expanduser(agy_hooks.STAGED_MANIFEST))
+    """Return the staged manifest path bootstrap.sh writes on this machine."""
+    return Path(agy_hooks.staged_manifest_path())
 
 
 def main(argv: list[str]) -> int:

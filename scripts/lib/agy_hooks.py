@@ -43,7 +43,34 @@ ESCAPED_QUOTE = BACKSLASH + '"'
 
 CANONICAL_INTERPRETER = "python3"
 CANONICAL_PLUGIN_DIR = "~/.gemini/config/plugins/ai-config"
-STAGED_MANIFEST = "~/.gemini/config/plugins/ai-config/hooks.json"
+PLUGIN_SUBPATH = "plugins/ai-config"
+MANIFEST_NAME = "hooks.json"
+
+
+def gemini_config_dir() -> str:
+    """Return the Antigravity config directory bootstrap.sh installs into.
+
+    bootstrap.sh honours GEMINI_CONFIG_HOME and GEMINI_HOME, so a checker
+    that hard-codes ~/.gemini reads the wrong file on a machine that sets
+    either one, and reports a missing manifest instead of the real install.
+    """
+    config_home = os.environ.get("GEMINI_CONFIG_HOME")
+    if config_home:
+        return config_home
+    gemini_home = os.environ.get("GEMINI_HOME")
+    if gemini_home:
+        return gemini_home + "/config"
+    return "~/.gemini/config"
+
+
+def install_plugin_dir() -> str:
+    """Return the plugin directory this machine installs into."""
+    return gemini_config_dir() + "/" + PLUGIN_SUBPATH
+
+
+def staged_manifest_path() -> str:
+    """Return the staged manifest path bootstrap.sh writes on this machine."""
+    return os.path.expanduser(install_plugin_dir() + "/" + MANIFEST_NAME)
 
 CommandVisitor = Callable[[str], str]
 
@@ -226,9 +253,10 @@ def resolve_plugin_dir(windows: bool | None = None) -> str:
     """
     if windows is None:
         windows = is_windows()
+    plugin_dir = install_plugin_dir()
     if not windows:
-        return CANONICAL_PLUGIN_DIR
-    expanded = os.path.expanduser(CANONICAL_PLUGIN_DIR).replace(BACKSLASH, "/")
+        return plugin_dir
+    expanded = os.path.expanduser(plugin_dir).replace(BACKSLASH, "/")
     if not is_native_windows_path(expanded):
         raise ValueError(
             f"expanded the plugin directory to {expanded!r}, which cmd.exe "

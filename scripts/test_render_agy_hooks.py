@@ -122,5 +122,36 @@ class TestEnvironmentResolution(unittest.TestCase):
             agy_hooks.resolve_python_exe(True)
         self.assertIn("cannot name a Windows interpreter", str(ctx.exception))
 
+
+class TestInstallLocationOverrides(unittest.TestCase):
+    """bootstrap.sh honours GEMINI_CONFIG_HOME and GEMINI_HOME."""
+
+    def test_default_config_dir(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(agy_hooks.gemini_config_dir(), "~/.gemini/config")
+
+    def test_gemini_home_moves_the_config_dir(self):
+        with patch.dict(os.environ, {"GEMINI_HOME": "/opt/ag"}, clear=True):
+            self.assertEqual(agy_hooks.gemini_config_dir(), "/opt/ag/config")
+
+    def test_gemini_config_home_wins_over_gemini_home(self):
+        env = {"GEMINI_HOME": "/opt/ag", "GEMINI_CONFIG_HOME": "/etc/ag"}
+        with patch.dict(os.environ, env, clear=True):
+            self.assertEqual(agy_hooks.gemini_config_dir(), "/etc/ag")
+
+    def test_staged_manifest_follows_the_override(self):
+        with patch.dict(os.environ, {"GEMINI_CONFIG_HOME": "/etc/ag"}, clear=True):
+            self.assertEqual(
+                agy_hooks.staged_manifest_path(),
+                "/etc/ag/plugins/ai-config/hooks.json",
+            )
+
+    def test_rendered_plugin_dir_follows_the_override(self):
+        with patch.dict(os.environ, {"GEMINI_CONFIG_HOME": "/etc/ag"}, clear=True):
+            self.assertEqual(
+                agy_hooks.resolve_plugin_dir(windows=False),
+                "/etc/ag/plugins/ai-config",
+            )
+
 if __name__ == "__main__":
     unittest.main()

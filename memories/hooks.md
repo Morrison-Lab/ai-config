@@ -293,6 +293,35 @@ When authoring a new hook:
    python3 scripts/test_hooks.py
    ```
 
+## 5.5 A hook test that invokes the real hook is not hermetic against live git state
+
+A test that runs the real script as a subprocess is the right design for testing what the hook actually emits --- but when the hook branches on live repository state (current branch, dirty/unpushed status), a fixture covering only one branch of that decision fails, in its ordinary and correct way, the moment the checkout is on the other branch.
+The defect sits in the *shared* dry-run suite rather than in the per-hook file: `test_flag_unassigned_worktree` lives at `scripts/test_pretooluse_dry_run.py:179`, which invokes each hook once against whatever checkout it happens to run in.
+The dedicated `hooks/test-flag-unassigned-worktree.py` is not the offender --- it already builds scratch repos with a real `origin`, branch, and dirty/clean state, which is exactly the hermetic construction this section argues for.
+This is not a flake: it is the hook doing exactly what it was written to do, against a checkout the test never controlled.
+
+`flag-unassigned-worktree.py` warns on a default-branch, clean checkout and denies on a non-default-branch checkout carrying uncommitted or unpushed work.
+Its test asserted only the warn shape (`additionalContext` present).
+Run from an ordinary feature-branch worktree with committed-but-unpushed work --- the normal state of any active PR-development worktree in this repo --- the hook correctly returns `deny`, and the test correctly fails, reading exactly like a regression.
+
+**When a test like this fails, the first question is not "is the test wrong" but "which of two different things happened": did a concurrent edit change the git state mid-run, or does the test's fixture simply not cover the branch the checkout happens to be on right now?**
+Both produce the identical failure text pattern, so the failure alone cannot distinguish them.
+
+The discriminator is a run on a quiet, committed tree: `git status --short` empty, no other process touching the worktree, verified immediately before the run.
+A failure that disappears there was contamination from concurrent editing.
+A failure that survives it is not --- it is a real gap in what the test covers, however plausible "just contamination, re-run it" sounds when several worktrees are active at once and re-running is the path of least resistance.
+
+- **Do:** mock or explicitly construct the git-state precondition (branch name, dirty/unpushed status) for each branch of a hook's own decision, rather than asserting against whatever the ambient checkout happens to be.
+- **Do:** before dismissing a live-git-state test failure as contamination, commit and stop editing, then re-run once on that quiet tree --- a failure that survives is real.
+- **Don't:** read "several worktrees were active" as sufficient explanation for a test failure without the quiet-tree re-run;
+  that reasoning explains away a real defect exactly as easily as a contaminated one.
+- **Don't:** write a test for a git-state-branching hook that exercises only the branch whichever checkout you happened to test from was on.
+
+(Measured 2026-09-09 on `Morrison-Lab/ai-config` PR #3426's worktree: three consecutive `run-local-validation.py` runs hit `test_flag_unassigned_worktree`'s failure.
+The natural reading was contamination from the several worktrees active at once, and [ai-config#3431](https://github.com/Morrison-Lab/ai-config/issues/3431) rules that out for all three: the failure text varied only between "uncommitted tracked changes" and "unpushed commits", tracking whichever pending-work condition held at that moment, and "both are real, live facts about the checkout, not stale or racing state."
+Every run was `flag-unassigned-worktree.py` correctly returning `deny` against a fixture that only ever constructed the `warn` case.
+The quiet-tree run is what makes that distinguishable: without a control run on a committed, unedited tree, "several worktrees were active" explains a real defect exactly as comfortably as a contaminated one.)
+
 ## 6. A guard that keeps firing after you satisfied it: stop, and read the copy that runs
 
 [`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md) already carries this defect in full --- the fail-open direction of a dated constant, why the newest cache directory is not a valid proxy for the loaded copy, and the `ps -eo args` capture that resolved it.

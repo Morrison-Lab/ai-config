@@ -360,3 +360,7 @@ Flag these with the same weight as the other standing review checks:
   test.
 - A "we will do this properly later" note with no statement of what ships
   wrong in the meantime.
+- A fix that makes a check stop firing by removing the input it flagged, when the diagnosis shows that input was correct and the check's real target was the defect.
+  Explaining *why* a warning fired is a different claim from confirming the diff addresses it: a review can get the mechanism right and still endorse the wrong response to it.
+  Ask whether the diff acts on the cause just named, or only on the thing that detected it. (`ucdavis/rampp` [#154](https://github.com/ucdavis/rampp/pull/154): a review diagnosed `@noRd` as the source of "no visible Rd target" warnings, then endorsed a commit deleting the cross-reference links that triggered them rather than removing `@noRd` so the topics gained `.Rd` pages.
+  See [`metacognitive-monitoring.cases.md`](../workflow/metacognitive-monitoring.cases.md)'s "A review endorsed a workaround it had correctly diagnosed, then verified the fix by spot-check" for the full case.)

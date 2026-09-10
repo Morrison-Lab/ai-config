@@ -788,3 +788,88 @@ The fourth adversarial round on this change caught it.
 The transferable step is cheap: when a query is used to judge a dated claim, read the artifact's own timestamp --- `createdAt` on a label, `created_at` on a comment --- rather than only its present value.
 
 Tracked as ai-config[#3271](https://github.com/Morrison-Lab/ai-config/issues/3271).
+
+## A review endorsed a workaround it had correctly diagnosed, then verified the fix by spot-check
+
+`ucdavis/rampp` [#154](https://github.com/ucdavis/rampp/pull/154), [#165](https://github.com/ucdavis/rampp/issues/165), [#166](https://github.com/ucdavis/rampp/pull/166), [#167](https://github.com/ucdavis/rampp/issues/167), [#168](https://github.com/ucdavis/rampp/pull/168), 2026-09-09.
+
+A commit (`f6b4475`) downgraded roxygen cross-reference links `[fn()]` to plain code spans `` `fn()` `` across 18 `R/` files, to silence "no visible Rd target" warnings that `@noRd` was producing. (The review under scrutiny said "~13 files";
+18 is the derived figure, from `git show f6b4475 -- 'R/*.R'` filtered for removed lines carrying a `[fn()]` link.
+Repeating the review's own uncounted number would have reproduced the defect this entry is about.)
+The correct fix was to drop `@noRd` so the topics gained `.Rd` pages;
+the commit instead deleted the markup the check complained about.
+Only one reviewer actually read that diff.
+Copilot had been requested, and every Copilot review on the PR from 2026-09-04T17:37Z onward --- `f6b4475` landed at 23:26Z --- carried the quota-skip stub body, "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit", which [`self-review-fallback`](self-review-fallback.md) already names as a non-verdict.
+So the PR looked doubly reviewed while one reviewer had read nothing;
+counting review-shaped activity is not counting reviews.
+The Claude review did read it, did not flag it as a regression, and actively endorsed it:
+
+> "Doc-link fixes: complete [...]
+> I checked the remaining `[func()]`-style links left in `R/` and confirmed every one now points at an exported, documented function [...] so this fix is complete rather than partial."
+
+Two distinct failures follow, and they belong to two different reviews.
+Attributing both to the first review took three adversarial rounds to dislodge, which is the part of this case worth keeping.
+
+**The first review's failure is the endorsement, and only the endorsement.**
+The scope claim in that quoted sentence looks like the classic underived sweep, and the first draft of this entry built its whole argument on it.
+Three rounds of adversarial review took that argument apart in stages: first that all three of the checker's findings were evidence, then that one of them was, then that none of them was.
+Running the checker at `f6b4475` itself settles it --- `Scanned 123 R file(s) against 63 documented topic(s). No roxygen cross-reference downgrades found.` `man/strip_rv.Rd` and `man/build_failure_survival.Rd` are both first created by `bd987b9`, four days later, so at `f6b4475` neither name was a documented topic and neither span was detectable.
+`f6b4475` never touched `R/find_failures_not_enrolled.R` either;
+`4a7bb49d` had downgraded that link six hours earlier, before even the base of the diff range the review named.
+So the review's "every one" was, as far as any instrument can tell, true of the population that existed when it was made.
+
+That is worth stating plainly because the instinct runs the other way.
+An underived universal claim is *usually* wrong, the vocabulary for saying so was ready, and a checker producing three hits looked like the measurement that closed it.
+The hits were real and were measuring a later tree.
+Being right that a claim is underived is not the same as having a counterexample, and the second is what an enumeration argument needs.
+
+**The scope-claim failure belongs entirely to the second review, where it is well supported.**
+Six commits later, `bd987b9` dropped `@noRd`, generated the `.Rd` pages, and restored the links.
+Its review asserted "restores the `[func()]` markdown links" on the basis of an explicitly stated sample --- "Spot-checked a few of the restored pages" --- and missed the leftover in `R/find_failures_not_enrolled.R`.
+At *that* commit the checker finds three, so a derived sweep was available and a sample was used instead.
+A human caught one of the three by hand.
+This is the worked instance of ["Search for the artifact instead of arguing about whether it would exist"](metacognitive-monitoring.md#search-for-the-artifact-instead-of-arguing-about-whether-it-would-exist)'s "sharpest instance" bullet, and an instance of the existing rule rather than a new one.
+
+**The checker also measures a different property from the one either review asserted.**
+Both reviews claimed something about links that exist --- that they resolve, that they were restored.
+The checker reports code spans that *could* be links and never inspects an existing link at all.
+Keeping that straight is what makes the second review's case hold and the first one's collapse.
+
+**The genuinely new observation is that the reviewer was not blind to the change -- the review read the diff correctly and endorsed the wrong fix anyway.**
+[`dont-incur-technical-debt`](../principles/dont-incur-technical-debt.md) already carried reviewer-facing bullets, so the gap was narrower than a missing audience: none of them covered a *reviewer* correctly diagnosing why a change was made (the warning) and then certifying the change that merely stops the symptom from being visible, rather than asking whether the underlying condition (`@noRd` on a topic with real, working links) was itself the defect.
+The review did the hard part --- it understood the mechanism --- and then treated "the warning is gone" as evidence the fix was right, instead of asking what produced the warning and whether removing it was the correct response.
+`dont-incur-technical-debt.md`'s "In review" section now carries a bullet for this case: flag a fix that makes a check pass by removing the input the check was flagging, when the diagnosis shows the input was correct and the check's target (the missing `.Rd` page) was the actual defect.
+
+**The domain-specific rule, however, was already written -- and that is the more useful half of this case.**
+[`reuse-docs-and-args`](../coding/reuse-docs-and-args.md) states the whole thing: use `@keywords internal`, **never `@noRd`**, because `@noRd` suppresses the `.Rd` page a `[helper()]` link needs;
+and then, naming the exact remedy the commit chose,
+
+> The fix is **not** to strip the doc-reuse syntax (retyping the `@param` descriptions, spelling out the `...` forwards, or downgrading the link to plain code font) [...]
+> Use `@keywords internal` on the helper and keep the `@inheritDotParams`/`@inheritParams`/`[helper()]` references intact.
+
+That passage is authoring guidance, and the same fragment's separate "In review" section turns it on reviewers too, listing "an internal function marked `@noRd` instead of `@keywords internal`" among the findings to flag.
+`f6b4475` left every `@noRd` in place and deleted the links instead, so it was flaggable on that bullet as written.
+The repo eventually arrived at the fragment's own remedy on its own: `bd987b9` dropped `@noRd` and restored the links, six commits and four days after `f6b4475` (2026-09-04T16:26 PDT to 2026-09-08T23:29 PDT).
+
+**The rule was not loaded, and finding that out is the actionable half.**
+The first draft of this entry asserted the reviewing workflow had this corpus installed as a plugin, so that a loaded rule had failed to fire.
+The adversarial review checked, and `ucdavis/rampp`'s `claude-code-review.yml` installs `plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'` with `plugins: 'code-review@claude-code-plugins'` --- a different plugin.
+`git log --all -p` over that repo's workflow files returns no match for `ai-config` at any point in its history, and as of 2026-09-09 the repo's `main` carried no `CLAUDE.md` either. (That last clause is already moving: the install gap was filed as [#167](https://github.com/ucdavis/rampp/issues/167), and a `claude[bot]` session opened [#168](https://github.com/ucdavis/rampp/pull/168) adding a `CLAUDE.md` three minutes later, which is why the clause is dated rather than stated flat --- see [`timestamp-volatile-claims`](../writing/timestamp-volatile-claims.md).)
+So the review had no access to the rule that named its exact case, and the gap is an install rather than a lapse.
+
+Two things follow, and the second is the general one.
+
+A lab rule only governs the repos that load it, so a repo running an AI review without this corpus installed gets a reviewer with none of the lab's standards --- which looks identical from the outside to one that has them and ignored them.
+Check what a review workflow actually installs before concluding anything about why it missed something.
+
+And [`deterministic-tools`](../principles/deterministic-tools.md) still decides the deliverable, for a reason the install gap does not touch.
+Even installed, a written rule is only as good as the reader noticing that this moment is the one it governs, and a de-linking diff does not announce itself --- it looks like a warning being fixed.
+A checker that maps `\alias{}` to declaring file and reports the population cannot fail to notice, and at `bd987b9` it reports all three where a spot-check found none and a human found one.
+
+- **Do:** enumerate the population a review claim quantifies over (`grep`/an instrument over every file, not the files the diff already named) before writing "every one" or "all of them".
+- **Do:** ask, once a review has correctly named *why* a diff exists, whether the diff addresses that cause or only removes the thing that detected it -- a warning silenced and a defect fixed are not the same outcome even when both diffs are one line.
+- **Don't:** accept a stated sample --- "spot-checked a few" --- as support for a universal claim when the population was derivable at that commit.
+- **Don't:** read a correct mechanism diagnosis in a review as license to skip asking whether the fix under review acts on that mechanism or merely hides its symptom.
+- **Do:** run the instrument against the commit the claim was made at, not against the branch head, before offering its output as a counterexample.
+- **Don't:** treat "this claim was underived" as equivalent to "this claim was false" --- the first is about method and is usually right, the second needs an artifact that existed at the time.
+- **Don't:** author a new rule for a case without first searching for an existing one --- and check whether the existing rule was even loaded, since an uninstalled rule wants an install and a bypassed one wants an instrument.

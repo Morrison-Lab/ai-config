@@ -1928,6 +1928,17 @@ def main() -> int:
           checker.classify_verdict(
               "### Verdict\nReady for merge. no-rejected nit noted.\n", "")
           == "not-clean")
+    # #3497 review round 4: the lookbehinds had no word boundary, so any
+    # longer word ending in "no"/"not" swallowed the phrase after it.
+    for _word in ("volcano", "casino", "domino"):
+        check(f"classify_verdict: '{_word}-changes requested' stays not-clean",
+              checker.classify_verdict(
+                  f"### Verdict\n{_word.capitalize()}-changes requested.\n",
+                  "") == "not-clean")
+        check(f"classify_verdict: '{_word} blocking' stays not-clean",
+              checker.classify_verdict(
+                  f"### Verdict\nReady for merge. {_word} blocking issue "
+                  "remains.\n", "") == "not-clean")
     check("classify_verdict: 'no-changes requested' stays exempt (#2369)",
           checker.classify_verdict(
               "### Verdict\nNo-changes requested.\n", "") != "not-clean")

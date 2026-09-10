@@ -85,6 +85,10 @@ check("an unquoted Windows path keeps its backslashes",
 check("a drive path elsewhere in the command leaves an escaped space alone",
       hp.script_token("python3 /path/with\\ space/x.py --root C:\\Users\\me")
       == "/path/with space/x.py")
+check("a drive path glued to a flag by = keeps its backslashes",
+      hp.script_token(r"python3 --file=C:\x\y.py") == r"--file=C:\x\y.py")
+check("a mixed-separator drive path keeps its backslashes",
+      hp.script_token(r"python3 C:/Users\me\x.py") == r"C:/Users\me\x.py")
 check("script_token reads the script past its interpreter",
       hp.script_token('python3 "/a/b/guard.py"') == "/a/b/guard.py")
 check("registered_hooks yields one row per bound command",

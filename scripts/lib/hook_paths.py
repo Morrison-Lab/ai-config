@@ -29,11 +29,13 @@ from typing import Iterator
 SCRIPT_SUFFIXES = (".py", ".sh")
 # The one variable the plugin loader sets and a shell does not.
 PLUGIN_ROOT_VAR = "CLAUDE_PLUGIN_ROOT"
-# A BARE Windows drive-letter path: the one shape whose backslashes are
-# separators that a POSIX shlex would eat. Inside double quotes shlex keeps
+# A BARE Windows drive-letter path, at the start, after whitespace or after
+# a flag's `=`, with either separator after the colon: the one shape whose
+# backslashes are separators that a POSIX shlex would eat. Inside double
+# quotes shlex keeps
 # a backslash unless it precedes a quote, a backslash, a dollar sign or a
 # backtick, so a quoted Windows path needs no help.
-RX_BARE_DRIVE_PATH = re.compile(r"(?:^|(?<=\s))[A-Za-z]:\\\S*")
+RX_BARE_DRIVE_PATH = re.compile(r"(?:^|(?<=[\s=]))[A-Za-z]:[/\\]\S*")
 
 
 def script_token(command: str) -> str | None:

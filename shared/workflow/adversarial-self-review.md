@@ -1214,7 +1214,7 @@ across three rounds.
 Asked plainly, the reviewer said drop; dropping was right and ended the loop.
 The companion half of that session --- concluding a silent subagent had
 stalled when it was alive and twelve rounds ahead --- is recorded in
-[`git-worktrees`](../../memories/git-worktrees.md), "A quiet worktree is not
+[`subagent-worktrees`](../../memories/subagent-worktrees.md), "A quiet worktree is not
 evidence the session working it has stopped".)
 
 ### Ask it whether ANOTHER ROUND earns its place, which is a different question

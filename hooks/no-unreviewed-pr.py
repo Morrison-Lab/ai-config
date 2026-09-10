@@ -2359,7 +2359,7 @@ def scan(path):
                     # rather than naming failure as the only possibility
                     # -- it deliberately does NOT claim which of chaining and
                     # failure occurred, since the transcript cannot tell them
-                    # apart, and neither does it distinguish the two reasons
+                    # apart, and neither does it distinguish the three reasons
                     # above, which differ in nothing the reader would act on
                     # (ai-config#3017).
                     #
@@ -2509,9 +2509,10 @@ def main() -> int:
     # the `sole_failed` arm exists to prevent, arriving through the other door
     # (adversarial review on ai-config#3071).
     #
-    # One sentence rather than a branch per reason: the two differ in WHY the
-    # status is unattributable, and not at all in what the reader does about
-    # it, so a second branch would buy a distinction with no action behind it.
+    # One sentence rather than a branch per reason: the three differ in WHY
+    # the status is unattributable, and not at all in what the reader does
+    # about it, so a further branch would buy a distinction with no action
+    # behind it.
     chained = ((
         "A reviewer request for %s appears in the transcript and was not "
         "credited: it shared a call with another command, so this guard "

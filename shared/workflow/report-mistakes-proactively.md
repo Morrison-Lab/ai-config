@@ -80,6 +80,59 @@ the new evidence onto an open one --- not **whether** to make it.
 Those are different questions, and only the first has a discretionary
 answer.
 
+## How many you have already filed is not an input
+
+The section above at least asks about the finding.
+This one does not: it accepts the finding as valid, then withholds it on a
+budget the session invented.
+
+It reads as restraint rather than avoidance, which is why it survives
+self-review.
+It sounds like consideration for the tracker, for the reader's attention, for
+a maintainer who will have to triage.
+But a valid finding does not become less true because it is the ninth.
+
+**Volume is a real problem, and it is decided somewhere else.**
+[`triage-backlog`](triage-backlog.md) exists precisely as the counterweight to
+this rule, and it does not claim the cost of filing is small --- it measures
+the opposite, an open count going from 15 to 410 in six weeks with 67% of
+those issues never commented on.
+So the answer to volume is a weekly pass that assigns `P1`/`P2`/`P3` or
+closes, run by someone with the standing to decide.
+It is not a session silently raising its own bar partway through a sweep,
+which produces no triage decision and no record of the thing it declined to
+file.
+
+A high count is evidence the sweep is working, not evidence to stop.
+A session that surfaces nine defects and files eight of them has not been
+disciplined;
+it has produced an eight-item record and one thing nobody can find.
+
+- **Do:** file the ninth exactly as you filed the first, and let the count
+  land where it lands.
+- **Do:** say what the volume suggests, if it suggests something --- a
+  cluster of guard findings in one session is itself worth a filed
+  observation, which is filing more rather than less.
+- **Don't:** withhold a finding you have already judged valid because you
+  judge you have filed enough --- the count is not a criterion, and deciding
+  it is not the filer's job.
+- **Don't:** read a long list of issues from one session as a reason to
+  raise the bar partway through; the bar is whether the finding is valid.
+
+(Directive from the user, 2026-09-10 --- "it doesn't matter how many issues
+you've already filed" --- after a session that filed eight issues and then
+handed the ninth back rather than filing it.
+The withheld finding was filed as ai-config#3519 once the correction landed,
+which is the measure of what the deferral was protecting: nothing.
+Neither [`no-offer-to-file.py`](../../hooks/no-offer-to-file.py) nor
+[`no-unfiled-finding.py`](../../hooks/no-unfiled-finding.py) fired on it:
+the first wants an interrogative or a `let me know if you'd like` shape, and
+the sentence was a declarative preference;
+the second matches the artifact by name, and the sentence referred to it by
+count.
+ai-config#3520 carries the sentence verbatim and two candidate pattern
+families.)
+
 ## The issue and "land it in this PR instead" are not alternatives
 
 A specific offer shape earns its own section because the false choice inside

@@ -12,10 +12,10 @@ A section here and the section it answers now sit in different files, so "above"
 
 ## A quiet worktree is not evidence the session working it has stopped
 
-Every worktree section in [`git-worktrees.md`](git-worktrees.md) assumes the
-peer worktree is dead.
-This one is about telling that apart from a peer worktree that only *looks*
-dead, before you edit it, delete it, or reassign its branch.
+Ordinary worktree mechanics assume nobody else is working in the tree, so a
+peer worktree that has gone quiet reads as one that is finished with.
+This section is about telling that apart from a peer worktree that only
+*looks* dead, before you edit it, delete it, or reassign its branch.
 The operative rule --- ask the agent, never infer --- is restated in
 `CLAUDE.md`'s "Subagent worktrees are assigned" section; this section carries
 the evidence and the case record behind it.

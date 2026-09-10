@@ -1249,7 +1249,7 @@ Neither was a round happening to come back empty --- which, per the convergence 
 ### Do not write to the tree a dispatched reviewer is reading
 
 The reviewer reads the working tree, so any write to it moves the ground under a read already in progress.
-The trigger is not `git checkout` specifically, which is the narrower form [`memories/git-worktrees.md`](../../memories/git-worktrees.md)'s "Switching a shared worktree's branch under a live dispatched reviewer breaks its reads" section records.
+The trigger is not `git checkout` specifically, which is the narrower form [`memories/subagent-worktrees.md`](../../memories/subagent-worktrees.md)'s "Switching a shared worktree's branch under a live dispatched reviewer breaks its reads" section records.
 An ordinary in-place edit does it too: same worktree, same paths, different bytes underneath them mid-read.
 
 The dispatcher cannot detect the damage afterwards, and the reviewer usually cannot either.

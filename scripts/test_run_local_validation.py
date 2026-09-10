@@ -5,7 +5,6 @@ import io
 import os
 import subprocess
 import sys
-import pathlib
 import tempfile
 from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
@@ -366,9 +365,23 @@ def test_missing_tool_skips():
                 rc = rlv.main(["--workflow", str(wf), "--root", tmp, "--only", "lint-markdown"])
         finally:
             subprocess.run = old_run
+            rlv._REQUIRES_CACHE.clear()
 
         text_out = out.getvalue()
         check("gate skipped when requires exits 1", "skipped: lint-markdown (missing tool; fix:" in text_out)
+
+def test_list_shows_availability_note():
+    """Under --list a step with a requires probe says availability is unchecked."""
+    with tempfile.TemporaryDirectory() as tmp:
+        wf = Path(tmp) / "validate.yml"
+        wf.write_text(FIXTURE)
+        rlv._REQUIRES_CACHE.clear()
+        out = io.StringIO()
+        with redirect_stdout(out), redirect_stderr(io.StringIO()):
+            rlv.main(["--workflow", str(wf), "--root", tmp, "--only", "lint-markdown", "--list"])
+        check("--list renders the availability note on the PARTIAL step",
+              "(availability checked at run time)" in out.getvalue())
+
 
 def test_scope_matching():
     import yaml
@@ -413,13 +426,13 @@ def test_changed_end_to_end():
         wf = _write_fixture(tmp)
         subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp, check=True)
         # Create a file and commit it
-        (pathlib.Path(tmp) / "test.md").write_text("x")
+        (Path(tmp) / "test.md").write_text("x")
         subprocess.run(["git", "add", "test.md"], cwd=tmp, check=True)
         subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=tmp, check=True)
         # Create a new branch
         subprocess.run(["git", "checkout", "-q", "-b", "feature"], cwd=tmp, check=True)
         # Modify the file and commit
-        (pathlib.Path(tmp) / "test.md").write_text("y")
+        (Path(tmp) / "test.md").write_text("y")
         subprocess.run(["git", "commit", "-q", "-am", "mod"], cwd=tmp, check=True)
 
         out = io.StringIO()
@@ -456,6 +469,7 @@ def main():
     test_missing_tool_skips()
     print('running test_scope_matching()', flush=True)
     test_scope_matching()
+    test_list_shows_availability_note()
     print('running test_changed_end_to_end()', flush=True)
     test_changed_end_to_end()
     print('running test_live_workflow_derives_every_python_test_suite()', flush=True)

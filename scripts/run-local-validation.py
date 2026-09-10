@@ -444,6 +444,13 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     return p.parse_args(argv)
 
 
+
+def availability_note(step):
+    """The parenthetical a listed step carries when its tool was not probed."""
+    if step.note == "availability checked at run time":
+        return f" ({step.note})"
+    return ""
+
 def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(argv)
     root = Path(args.root)
@@ -509,11 +516,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             elif s.partial:
                 tag = "PARTIAL"
                 detail = s.command.splitlines()[0] + f" (misses {s.partial})"
+                detail += availability_note(s)
             else:
                 tag = "RUN"
-                detail = s.command.splitlines()[0]
-                if s.note == "availability checked at run time":
-                    detail += f" ({s.note})"
+                detail = s.command.splitlines()[0] + availability_note(s)
             print(f"{tag:8} [{s.source}] {s.name}: {detail}")
         print(_denominator(len(plan), sum(1 for s, _, _ in plan if s.kind == "workflow-file"), args.workflow,
                           broken=sum(1 for s, _, _ in plan if s.broken)))

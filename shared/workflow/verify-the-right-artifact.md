@@ -1613,3 +1613,47 @@ The record and its measurements live in
 [`mistake-patterns.cases.md`](../../memories/mistake-patterns.cases.md)'s
 Pattern 43 entry; this section states the transferable rule the incident
 does not itself generalize.)
+
+## A negative lookup cannot tell "never existed" from "no longer reachable"
+
+The shapes above all substitute one artifact for another.
+This one substitutes a *result* for a claim: an absence lookup returns nothing, and nothing is read as proof the thing was never there.
+
+`git cat-file -t <sha>` answering `Not a valid object name` is the worked case.
+It means only that the object is not in **this** clone **now**.
+It does not distinguish an invented SHA from a real commit that has since become unreachable, and the difference is the whole finding: one is a fabrication to chase, the other a stale reference to re-point.
+
+The trap is that the lookup feels like a *measurement* rather than an inference, so it escapes the claim-checking a stated fact would get.
+It also arrives with the grammar of proof --- a command, a definite answer, no hedging --- which is exactly `grep-is-not-coverage`'s error one level down: there a search's silence is read as corpus coverage, here a lookup's silence is read as an artifact's nonexistence.
+
+**GitHub's pull refs are the common generator.**
+A `pull_request`-triggered workflow checks out `refs/pull/N/merge`, an ephemeral merge of the head into the base whose SHA is neither:
+
+```console
+$ git fetch origin 'refs/pull/N/merge:refs/remotes/origin/pr-merge'
+$ git log -1 --format='%h parents: %p' origin/pr-merge
+356e7cb5 parents: f3611051 4edc93a2
+          ^ base    ^ PR head
+```
+
+That ref is replaced on every push, so a previous run's merge SHA is unreachable within minutes.
+Anything a CI job reports about "the commit it ran on" is therefore unverifiable from an ordinary clone shortly afterwards --- and comes back looking fabricated.
+
+The same shape covers a force-pushed commit, a deleted branch's tip, a dangling object past `gc`, and a rev in a shallow clone --- which is the sharpest, because the object exists on the remote and the local answer is still nothing.
+
+The remedy is not a better lookup but a different question: ask what else would produce this exact silence, and whether the artifact you queried could hold the answer at all.
+Where the reference is ephemeral, capture it **while it is current** rather than testing afterwards.
+Where it is not, fetch the namespace that would carry it before concluding anything --- a clone that has never fetched `refs/pull/*` cannot see a pull ref, so its silence about one is a fact about the clone.
+
+- **Do:** name what else explains the empty result, before reporting it as absence.
+- **Do:** fetch the namespace or deepen the clone that would hold the object, and say which you did.
+- **Do:** capture an ephemeral reference at the moment it is live.
+- **Don't:** read `Not a valid object name`, a 404, or an empty query as evidence the thing never existed.
+- **Don't:** treat a lookup as exempt from claim-checking because it ran a command --- the command measured this clone, and the claim was about the world.
+
+(Measured 2026-09-10, ai-config#3508.
+Three CI reviews on ai-config#3548 emitted a `commit_sha` that did not resolve locally, and I reported them on the tracking issue as SHAs that "do not exist" and abbreviate "nothing real".
+The third carried a full 40-character value and prose saying "the merge commit introduces no further diff", which identified the mechanism: the job runs on the pull merge ref, so the JSON names a real commit that the next push made unreachable.
+The clone I tested in had never fetched a pull ref, so it would have answered identically for every candidate explanation.
+The defect is real and is a stale-reference one;
+the fabrication reading was mine, and it pointed at the wrong fix.)

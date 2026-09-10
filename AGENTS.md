@@ -332,7 +332,8 @@ Never activate a hook before its PR merges: writing and testing the script is au
 ## Context budget
 
 `CLAUDE.md` plus the transitive closure of its `@path` imports loads in full at every session start.
-The root file's character cap and a per-fragment cap gate CI (`scripts/check-context-closure.py`), so an addition there can redden an unrelated-feeling PR.
+The root file's character cap, a per-fragment cap, and a near-cap growth ratchet on the root file all gate CI (`scripts/check-context-closure.py`), so an addition there can redden an unrelated-feeling PR.
+The ratchet is the one that bites in normal authoring: once `CLAUDE.md` is at 90% of its cap it may shrink or hold but not grow, so a new section has to go into an `@`-imported fragment or trade against prose trimmed from the root.
 Prefer an on-demand memory file under `memories/`.
 
 ## Worktree isolation

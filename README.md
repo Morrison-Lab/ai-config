@@ -330,7 +330,12 @@ python3 scripts/check-context-closure.py            # this repo's closure
 python3 scripts/check-context-closure.py --base ../consumer-repo
 ```
 
-Advisory: it reports the total against `--budget` and exits 0 over it, so it serves as a trend line on every PR rather than a gate.
+The `--budget` total is advisory: it reports and exits 0 over it, serving as a trend line on every PR rather than a gate.
+Three things do gate, all without `--strict`.
+The root file's hard character cap (`--root-char-cap`, 150,000 -- the harness's own limit, past which the file is not loaded whole) and the per-fragment byte cap (`--fragment-cap`) both fail on the level.
+The **growth ratchet** fails on the delta: under `--baseline REV`, once the root file sits at or above `--root-growth-gate-fraction` of its cap (0.90 by default), the branch may not grow it at all.
+Below that line the ratchet is inactive and reports so;
+`--no-root-growth-gate` turns it off for a caller whose baseline is not a merge base.
 A dangling **anchored** import (one written on its own line) does exit non-zero, being a defect rather than a size finding.
 An unresolved **inline** `@token` is reported but does *not* fail, since most are prose (`@claude` mentions, email addresses) rather than mistyped imports --- so don't rely on this command to gate those.
 

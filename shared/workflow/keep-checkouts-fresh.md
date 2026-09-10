@@ -37,8 +37,8 @@ In every session --- at session start, and again periodically during long sessio
    - **Do:** run `claude plugin update` (per scope) once staleness is confirmed, then restart to apply it.
    - **Do:** confirm a CLI remedy exists (`claude plugin --help`) on the machine in question before writing that none does.
    - **Don't:** read "auto-updates at session start" as meaning the currently-running session's cache is already current --- that is exactly the claim this check tests.
-   - **Don't:** treat `installed_plugins.json`'s `lastUpdated` field as the pin's age.
-     It is only when the pin was last written, not how far behind it now sits.
+   - **Don't:** read `installed_plugins.json`'s `lastUpdated` field as a freshness measure.
+     It says when the pin was last written, and nothing about how many commits `origin/main` has gained since the pinned SHA.
    `shared/`, `hooks/`, and `memories/` have no plugin-equivalent replacement yet ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), so anyone relying on `~/.claude/shared`, `~/.claude/hooks`, or `~/.claude/memories` today is on a symlink or copy placed by an install predating that change, or by a manual step --- `bootstrap.sh` no longer places any of them.
    **`skills/` belongs in that sweep too, and the plugin serving them is not a reason to skip it.**
    A leftover `~/.claude/skills` from a pre-plugin install loads alongside the plugin, listing every skill twice --- bare `ums` beside `ai-config:ums` --- which crowds the skill listing and can cost entries their descriptions, the text routing selects on.

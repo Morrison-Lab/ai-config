@@ -39,7 +39,7 @@ import sys
 # (source path, generator argv) -- the generator must support a --check mode
 # that exits non-zero when its output is stale.
 GENERATED = [
-    ("hooks/hooks.json", ["python3", "scripts/gen-hooks-plugin.py", "--check"]),
+    ("hooks/hooks.json", [sys.executable, "scripts/gen-hooks-plugin.py", "--check"]),
 ]
 
 _ENV = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:'[^']*'|"[^"]*"|\S*)\s+)*"""
@@ -122,7 +122,8 @@ def main() -> int:
         "",
     ]
     for source, argv in stale:
-        lines.append(f"  {source} -> run: {' '.join(argv[:-1])}")
+        shown = ["python3" if a == sys.executable else a for a in argv[:-1]]
+        lines.append(f"  {source} -> run: {' '.join(shown)}")
     lines += [
         "",
         "CI runs the same check and will fail on the mismatch, so this costs a "

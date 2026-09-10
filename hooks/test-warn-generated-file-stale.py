@@ -64,8 +64,8 @@ def build_repo(source_edited, regenerated, only_output_edited=False, no_generato
 def warned(d, command):
     env = dict(os.environ)
     patched = open(HOOK).read().replace(
-        '("hooks/hooks.json", ["python3", "scripts/gen-hooks-plugin.py", "--check"]),',
-        '("src.json", ["python3", "scripts/gen.py", "--check"]),',
+        '("hooks/hooks.json", [sys.executable, "scripts/gen-hooks-plugin.py", "--check"]),',
+        '("src.json", [sys.executable, "scripts/gen.py", "--check"]),',
     ).replace('"origin/HEAD", "origin/main"', '"main", "main"'
     ).replace('"@{upstream}", ', '')
     hook_copy = os.path.join(d, "hook.py")

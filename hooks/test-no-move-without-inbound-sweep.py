@@ -203,6 +203,38 @@ def test_swept():
     check("an unreadable transcript is treated as swept",
           guard.swept("/nonexistent/path.jsonl", "preferences.md"))
 
+    # A malformed RECORD must not clear the whole transcript. Found by review:
+    # `commands()` raised AttributeError on a truthy non-dict `message`, an
+    # outer `except Exception` caught it, and the guard reported everything
+    # swept when nothing had been searched. The record must MENTION the
+    # basename, or the line filter short-circuits before `commands()` runs and
+    # the probe exercises nothing -- which is how the first attempt at this
+    # test passed against the broken code.
+    fd, p2 = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        fh.write(json.dumps({"message": "mentions preferences.md as a string"}) + "\n")
+    check("a non-dict message does not clear the transcript",
+          not guard.swept(p2, "preferences.md"))
+    os.unlink(p2)
+
+    fd, p2 = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        fh.write("{not json at all, preferences.md}\n")
+    check("an unparseable line does not clear the transcript",
+          not guard.swept(p2, "preferences.md"))
+    os.unlink(p2)
+
+    # A bad record must not hide a real sweep on a LATER line either.
+    fd, p2 = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        fh.write(json.dumps({"message": "preferences.md as a string"}) + "\n")
+        fh.write(json.dumps({"message": {"content": [
+            {"name": "Bash", "input": {
+                "command": "grep -rn 'preferences.md' --include='*.md' ."}}]}}) + "\n")
+    check("a bad record does not hide a later real sweep",
+          guard.swept(p2, "preferences.md"))
+    os.unlink(p2)
+
     # Found by adversarial review of this guard: each of the four below was a
     # real defect in the first draft, in one direction or the other.
     p = _transcript(["grep --recursive 'preferences.md' ."])
@@ -357,6 +389,10 @@ MUTATIONS = [
     ("git pre-subcommand options not skipped",
      "    while i < len(words) and words[i].startswith(\"-\"):",
      "    while False:"),
+    ("message not type-checked", "    if not isinstance(msg, dict):",
+     "    if False:"),
+    ("a bad record clears the transcript", "            except ValueError:",
+     "            except ValueError:\n                return True\n            except TypeError:"),
 ]
 
 

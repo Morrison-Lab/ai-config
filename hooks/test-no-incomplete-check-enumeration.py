@@ -332,6 +332,14 @@ CONTENT_CASES = [
      "a `git push` landed after it",
      "with the subagent's report as the LAST evidence, the subagent reason "
      "is the true one and the push reason must not appear"),
+    ([PARTIAL, UNRELATED_AGENT_DISPATCH, UNRELATED_AGENT_REPORT,
+      say("#651 is fully clean at a5f4f3f2.")],
+     "not something the transcript settles",
+     "The most recent evidence in this transcript for that claim is a "
+     "dispatched",
+     "the TIMING arm settles when a report arrived, not what it concerns "
+     "-- an #9999 subagent must not be named as the evidence for a #651 "
+     "claim just because it landed after the CI reading"),
     ([AGENT_100_DISPATCH, AGENT_100_REPORT,
       say("#100 was closed as a duplicate. #200 is fully clean.")],
      "not something the transcript settles",

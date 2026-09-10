@@ -441,9 +441,14 @@ def main() -> int:
     # second is a reason to look, not a fact about the claim's evidence,
     # and asserting it produced a false sentence on "#100 was closed as a
     # duplicate. #200 is fully clean." (#3475 round 9).
+    # Topic only. Ordering is deliberately NOT a disjunct here: landing
+    # after the CI reading settles WHEN a report arrived and nothing about
+    # WHAT it concerns, so admitting it asserted the round-9 false sentence
+    # again through the timing arm -- an "#9999, nothing to do with 651"
+    # subagent named as the evidence for a #651 claim (#3475 round 10).
     subagent_on_topic = any(
         idx == last_subagent and pr_label in refs
-        for idx, refs in subagent_events) or last_subagent == subagent_timed
+        for idx, refs in subagent_events)
 
     reading_needed_since = max(last_push, last_subagent)
     if last_complete > reading_needed_since:

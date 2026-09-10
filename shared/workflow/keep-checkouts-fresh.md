@@ -24,7 +24,7 @@ In every session --- at session start, and again periodically during long sessio
    Read the `gitCommitSha` of the entry whose `scope` and `projectPath` match the session, then count how far `main` has moved past it:
 
    ```bash
-   python3 -c "import json; [print(e['scope'], e.get('projectPath', '-'), e['gitCommitSha']) for e in json.load(open('$HOME/.claude/plugins/installed_plugins.json'))['plugins']['ai-config@Morrison-Lab']]"
+   python3 -c "import json; d = json.load(open('$HOME/.claude/plugins/installed_plugins.json')); es = d.get('plugins', {}).get('ai-config@Morrison-Lab') or []; print('no ai-config@Morrison-Lab entry in installed_plugins.json') if not es else [print(e.get('scope'), e.get('projectPath', '-'), e.get('gitCommitSha', '?')) for e in es]"
    git -C <ai-config checkout> fetch -q origin && git -C <ai-config checkout> rev-list --count <gitCommitSha>..origin/main
    ```
 

@@ -125,7 +125,7 @@ from new `main`, not a prior occurrence of this failure.
 A correctly-handled case, not a third occurrence of the failure: 2026-09-09, [ai-config#3432](https://github.com/Morrison-Lab/ai-config/issues/3432) -> [#3436](https://github.com/Morrison-Lab/ai-config/pull/3436).
 A fix agent was dispatched to address a Copilot finding on [PR #3363](https://github.com/Morrison-Lab/ai-config/pull/3363), found that PR already merged with its branch auto-deleted, did not recreate the branch, and instead filed the issue and opened the follow-up PR as a fresh branch off `origin/main`.
 
-- **Do:** re-home a pending fix as a new PR off main once `gh pr list --state all --head <branch>` reads MERGED.
+- **Do:** re-home a pending fix as a new PR off `origin/<default-branch>` (`origin/main` in ai-config) once `gh pr list --state all --head <branch>` reads MERGED.
 - **Don't:** recreate the deleted branch or push the fix onto it.
 
 So `ALLOW_FORCE_PUSH=1` is a deliberate escape valve for a case this rule did not foresee, not a shortcut for a known one.

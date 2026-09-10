@@ -521,6 +521,9 @@ not to teach the reviewer that style is someone else's job.
   before the repo's mechanical style checkers have run on that diff.
 - **Don't:** brief the reviewer to leave style findings for a later pass.
 
+[`ardi`](ardi.md)'s "Three or more review rounds" section carries the one exception, and it is narrow: on a **prose** diff that has already reached three finding-bearing rounds whose remaining findings are style preference, further trimming, or one more caveat, that section directs a later round's brief to withhold exactly those classes.
+The rule above governs every other case, including the first round of any diff.
+
 (Measured 2026-09-02 driving
 [#3025](https://github.com/Morrison-Lab/ai-config/pull/3025),
 a 20-line addition to `memories/reviewing-prs.md`.

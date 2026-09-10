@@ -165,10 +165,22 @@ def _mask_heredocs(command):
 
 def _close_substitution(out, spans, stack, index):
     """Record the substitution `stack` is holding as closing at `index`."""
-    start, saved = stack.pop()
+    start, saved, _kind = stack.pop()
     spans.append((start, index))
     _blank(out, index, index + 1)
     return saved
+
+
+def _enclosing_quote(stack):
+    """Return the quote state a closing quoted span should return to.
+
+    A backtick substitution is its own quote state, so a `"` span opened and
+    closed inside one must restore it rather than fall to None -- otherwise the
+    substitution's own closing backtick reads as opening a second one.
+    """
+    if stack and stack[-1][2] == "`":
+        return "`"
+    return None
 
 
 def _mask(command):
@@ -192,7 +204,7 @@ def _mask(command):
         char = text[index]
         if quote == "'":
             if char == "'":
-                quote = None
+                quote = _enclosing_quote(stack)
             else:
                 _blank(out, index, index + 1)
             index += 1
@@ -208,7 +220,7 @@ def _mask(command):
             index += 2
             continue
         if char == "$" and index + 1 < size and text[index + 1] == "(":
-            stack.append((index + 2, quote))
+            stack.append((index + 2, quote, "("))
             _blank(out, index, index + 2)
             quote = None
             index += 2
@@ -217,7 +229,7 @@ def _mask(command):
             if quote == "`" and stack:
                 quote = _close_substitution(out, spans, stack, index)
             else:
-                stack.append((index + 1, quote))
+                stack.append((index + 1, quote, "`"))
                 _blank(out, index, index + 1)
                 quote = "`"
             index += 1
@@ -228,7 +240,7 @@ def _mask(command):
             continue
         if quote == '"':
             if char == '"':
-                quote = None
+                quote = _enclosing_quote(stack)
             else:
                 _blank(out, index, index + 1)
             index += 1
@@ -241,7 +253,7 @@ def _mask(command):
             quote = "#"
             _blank(out, index, index + 1)
         index += 1
-    for start, _saved in stack:      # unterminated substitution: take the rest
+    for start, _saved, _kind in stack:      # unterminated substitution: take the rest
         spans.append((start, size))
     return "".join(out), spans
 

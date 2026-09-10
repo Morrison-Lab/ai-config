@@ -129,6 +129,40 @@ check("non-firing command exits 0", proc.returncode, 0)
 proc = run_hook(INCIDENT, tool_name="Read")
 check("a non-shell tool is ignored", proc.stdout.strip(), "")
 
+# A quoted span inside a backtick substitution must restore the backtick as the
+# enclosing context. Without that, the substitution's own closing backtick reads
+# as opening a second one and the whole command scans as unterminated.
+check(
+    "quoted span inside backticks still fires",
+    fires('cmd 2>/dev/null > `echo "my file"`.json'),
+    True,
+)
+check(
+    "single-quoted span inside backticks still fires",
+    fires("cmd 2>/dev/null > `echo 'my file'`.json"),
+    True,
+)
+check(
+    "quoted capture inside backticks names the substitution",
+    reported('result=`curl -s "$url" 2>/dev/null` ; echo "$result" > out.json')[1],
+    "captured by a command substitution",
+)
+check(
+    "backticked target with a quoted span is reported whole",
+    reported('cmd 2>/dev/null > `echo "my file"`.json')[1],
+    'redirected to ``echo "my file"`.json`',
+)
+check(
+    "merged stderr with a quoted span inside backticks stays silent",
+    fires('cmd 2>&1 > `echo "my file"`.json'),
+    False,
+)
+check(
+    "discarded output with a quoted span inside backticks stays silent",
+    fires('cmd 2>/dev/null > `echo "my file"` >/dev/null'),
+    False,
+)
+
 if failures:
     print("FAILED:")
     for line in failures:

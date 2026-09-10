@@ -177,23 +177,12 @@ pre-empt these when authoring shell, especially under `set -euo pipefail`:
   Separately, the `-name` glob must match the `mktemp` prefix you chose,
   or it silently misses every orphan (`.tmp.XXXXXX` -> `'.tmp.*'`;
   mktemp's bare `tmp.XXXXXX` default -> `'tmp.*'`).
-- **`grep -qxF "$var" file` silently fails to match when `$var` starts with `-`
-  --- unlike `find` above, `--` DOES fix it here.**
-  A value beginning with `-` (a Claude session-project directory name, which
-  encodes a filesystem path with every `/`, `.` and `_` mapped to `-`, e.g.
-  `-Users-ezramorrison-...`) is parsed as an option by `grep`, so the match
-  silently fails even though the file provably contains that exact line
-  (verified: `grep -qxF "$var" file` returned no match; `grep -qxF -- "$var"
-  file` matched). This is the opposite of the `find` case just above --- there
-  `--` does NOT help because `find`'s own expression parser still reads a
-  dash-prefixed argument as an expression after it; for `grep`, `--` is the
-  ordinary POSIX end-of-options marker and works as documented. Don't
-  generalize either finding to the other command: always pass `--` before a
-  variable operand to `grep`, and separately verify the target of `<dir>`
-  itself for `find`, per the bullet above.
-  (Self-hit during a `clean-git` session, 2026-09-10: a safety filter meant to
-  skip live sessions' worktrees under-matched silently because of this,
-  reading a genuinely live session's registration as absent.)
+- **`grep -qxF "$var" file` silently fails to match when `$var` starts with `-` --- unlike `find` above, `--` DOES fix it here.**
+  A value beginning with `-` (a Claude session-project directory name, which encodes a filesystem path with every `/`, `.` and `_` mapped to `-`, e.g. `-Users-ezramorrison-...`) is parsed as an option by `grep`, so the match silently fails even though the file provably contains that exact line (verified: `grep -qxF "$var" file` returned no match;
+  `grep -qxF -- "$var" file` matched).
+  This is the opposite of the `find` case just above --- there `--` does NOT help because `find`'s own expression parser still reads a dash-prefixed argument as an expression after it;
+  for `grep`, `--` is the ordinary POSIX end-of-options marker and works as documented.
+  Don't generalize either finding to the other command: always pass `--` before a variable operand to `grep`, and separately verify the target of `<dir>` itself for `find`, per the bullet above. (Self-hit during a `clean-git` session, 2026-09-10: a safety filter meant to skip live sessions' worktrees under-matched silently because of this, reading a genuinely live session's registration as absent.)
 - **Bounds-check value-taking flags before `shift 2`.**
   In a `set -e` arg parser, `--flag` as the last arg makes `${2:-}` expand to "" but the following `shift 2` fail (count out of range) -> script aborts with a cryptic error.
   Guard with the `set -u`-safe presence test:

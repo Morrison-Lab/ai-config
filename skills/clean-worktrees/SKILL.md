@@ -69,16 +69,10 @@ Each block gives `worktree <path>`, `HEAD <sha>`, and `branch <ref>` (or
 `dirname` of `git rev-parse --git-common-dir` when `.git` is a directory) and
 the **current** worktree (`git rev-parse --show-toplevel`). Never remove either.
 
-**Capture each linked worktree's directory mtime now, before any further
-`git` command touches it.**
-Running `git -C <path> status` (step 3a below, and `git worktree prune`, and
-`git fetch`) writes to the index and bumps that worktree's own directory
-mtime as a side effect --- destroying it as a liveness signal before it is
-ever read.
-The recency guard (step 3e) reads the last **commit** date, which this does
-not replace; this is a *corroborating* signal for the case step 3d cannot
-answer (an unregistered harness- or `Agent`-created worktree), where mtime
-is sometimes the only evidence that a session is actively writing there:
+**Capture each linked worktree's directory mtime now, before any further `git` command touches it.**
+Running `git -C <path> status` (step 3a below, and `git worktree prune`, and `git fetch`) writes to the index and bumps that worktree's own directory mtime as a side effect --- destroying it as a liveness signal before it is ever read.
+The recency guard (step 3e) reads the last **commit** date, which this does not replace;
+this is a *corroborating* signal for the case step 3d cannot answer (an unregistered harness- or `Agent`-created worktree), where mtime is sometimes the only evidence that a session is actively writing there:
 
 ```bash
 MTIME_SNAPSHOT=$(mktemp)
@@ -87,9 +81,7 @@ for wt in <linked-worktree-paths>; do
 done > "$MTIME_SNAPSHOT"
 ```
 
-A worktree directory mtime newer than a few minutes ago, captured here
-before classification runs, is worth treating as a live-session signal even
-when step 3d reports nothing registered.
+A worktree directory mtime newer than a few minutes ago, captured here before classification runs, is worth treating as a live-session signal even when step 3d reports nothing registered.
 
 ### 2. Prune admin stubs (safe)
 
@@ -175,11 +167,9 @@ checks above say. (Hit on `Lacaedemon/sparta`, 2026-07-02: ~40 of 48 worktrees
 slated for cleanup showed `ahead=2` to `ahead=15` on the naive check — every
 one had actually merged via squash minutes to hours earlier.)
 
-**`git cherry origin/main <branch>` fails the same way and for the same
-reason** — it also answers by local ancestry, so it reports every commit as
-`+` (not on `main`) on a squash-merged branch, exactly as `git branch
---merged` and the ahead-of-main count do. Don't reach for it as a "more
-precise" alternative to those two; it inherits the same blind spot.
+**`git cherry origin/main <branch>` fails the same way and for the same reason** — it also answers by local ancestry, so it reports every commit as `+` (not on `main`) on a squash-merged branch, exactly as `git branch --merged` and the ahead-of-main count do.
+Don't reach for it as a "more precise" alternative to those two;
+it inherits the same blind spot.
 
 **A detached worktree has no branch, so the squash-merge escape hatch above
 does not apply to it --- and the naive check it falls back to is the one that
@@ -228,24 +218,10 @@ the other's two commits were both present in `jules-review.yml` on `main`.
 The whole-tree diff for the same pair reported 222 and 221 changed files,
 which is why the narrowing matters.)
 
-**A non-empty result here is not proof of non-landing --- only an empty one
-is proof of landing.**
-The remedy above states this correctly (empty diff → Dead) and it is easy
-to read as the converse too, which is false: `main` in an active repo keeps
-changing, including files a landed worktree's own commits touched, so a
-file this worktree changed can differ from `main` for reasons that have
-nothing to do with whether the worktree's specific commits landed.
-Measured on a 2026-09-10 `clean-git` sweep of 9 detached worktrees: the
-scoped content diff reported DIFFERS for every one of them, none of which
-this test could then resolve --- a drifting `main` had touched the same
-files again after each worktree's own change landed.
-Treat a non-empty result here as **inconclusive**, not as Dirty, and fall
-back to the tip-vs-`mergedAt` epoch comparison in step 3e (via the PR
-found from the worktree's own commit subject, since a detached worktree
-carries no branch for `gh pr list --head` to key on) --- that is the one
-landed-detection test in this section that a drifting `main` does not
-defeat, because it compares two fixed points in time rather than current
-tree content.
+**A non-empty result here is not proof of non-landing --- only an empty one is proof of landing.**
+The remedy above states this correctly (empty diff → Dead) and it is easy to read as the converse too, which is false: `main` in an active repo keeps changing, including files a landed worktree's own commits touched, so a file this worktree changed can differ from `main` for reasons that have nothing to do with whether the worktree's specific commits landed.
+Measured on a 2026-09-10 `clean-git` sweep of 9 detached worktrees: the scoped content diff reported DIFFERS for every one of them, none of which this test could then resolve --- a drifting `main` had touched the same files again after each worktree's own change landed.
+Treat a non-empty result here as **inconclusive**, not as Dirty, and fall back to the tip-vs-`mergedAt` epoch comparison in step 3e (via the PR found from the worktree's own commit subject, since a detached worktree carries no branch for `gh pr list --head` to key on) --- that is the one landed-detection test in this section that a drifting `main` does not defeat, because it compares two fixed points in time rather than current tree content.
 
 #### d. Live-session check — is another session using it?
 
@@ -261,28 +237,14 @@ tree content.
 (If `session-lock` isn't installed, skip this check — fall back to the dirty and
 recency guards.)
 
-**An empty result here is not evidence of no live session --- it is only
-evidence of no *registered* one.**
-`ai-session.sh list` sees exclusively worktrees created through
-`session-lock`'s own `worktree` subcommand.
-The harness's own per-session worktrees and the `Agent` tool's
-`isolation: "worktree"` (see `CLAUDE.md`'s "Subagent worktrees are
-assigned") are never registered, so this check returns
-`(no live sessions registered)` for one of those whether or not a session
-is actively working in it --- the empty result reads as a passed check while
-answering a narrower question than the step's own heading asks.
-Cross-check the mtime snapshot from step 1 and, before removing anything,
-re-run the dirty check (step 3a) immediately before `git worktree remove`
-in step 5 --- see that step's own re-check, which is what actually catches
-this case in practice.
+**An empty result here is not evidence of no live session --- it is only evidence of no *registered* one.**
+`ai-session.sh list` sees exclusively worktrees created through `session-lock`'s own `worktree` subcommand.
+The harness's own per-session worktrees and the `Agent` tool's `isolation: "worktree"` (see `CLAUDE.md`'s "Subagent worktrees are assigned") are never registered, so this check returns `(no live sessions registered)` for one of those whether or not a session is actively working in it --- the empty result reads as a passed check while answering a narrower question than the step's own heading asks.
+Cross-check the mtime snapshot from step 1 and, before removing anything, re-run the dirty check (step 3a) immediately before `git worktree remove` in step 5 --- see that step's own re-check, which is what actually catches this case in practice.
 
-- **Do:** read an empty `ai-session.sh list` result as "no *registered*
-  session", not as "no live session".
-- **Do:** treat a worktree directory mtime bumped since step 1's snapshot
-  as a live-session signal this check cannot supply on its own.
-- **Don't:** classify a harness- or `Agent`-created worktree Dead on 3d
-  alone, without the step 5 re-check confirming the tree is still clean
-  immediately before removal.
+- **Do:** read an empty `ai-session.sh list` result as "no *registered* session", not as "no live session".
+- **Do:** treat a worktree directory mtime bumped since step 1's snapshot as a live-session signal this check cannot supply on its own.
+- **Don't:** classify a harness- or `Agent`-created worktree Dead on 3d alone, without the step 5 re-check confirming the tree is still clean immediately before removal.
 
 #### e. Recency check — too fresh to judge
 
@@ -312,11 +274,8 @@ every merged branch reports `remote=GONE` there.
 That is equally consistent with "merged and cleaned up" and with "merged,
 then you committed something else locally", and only the second is unsafe.
 
-**A detached worktree has no `<branch>` to run `gh pr list --head` against,
-so find `<N>` from the commit instead.**
-A squash merge preserves the PR title as the squash commit's subject line
-(GitHub's default template is `"<title> (#N)"`), so grep `origin/main`'s
-log for the worktree's own first commit subject:
+**A detached worktree has no `<branch>` to run `gh pr list --head` against, so find `<N>` from the commit instead.**
+A squash merge preserves the PR title as the squash commit's subject line (GitHub's default template is `"<title> (#N)"`), so grep `origin/main`'s log for the worktree's own first commit subject:
 
 ```bash
 h=$(git -C <path> rev-parse HEAD)
@@ -324,8 +283,8 @@ subject=$(git -C <path> log -1 --format='%s' "$h")
 git log origin/main --fixed-strings --grep="$subject" --format='%H %s'
 ```
 
-The matching `origin/main` commit's subject carries the `(#N)` GitHub
-appends; that `N` is the PR to pass to `gh pr view` below.
+The matching `origin/main` commit's subject carries the `(#N)` GitHub appends;
+that `N` is the PR to pass to `gh pr view` below.
 
 Compare the branch tip's date against the PR's `mergedAt`:
 
@@ -392,14 +351,9 @@ The skill's own safety preconditions are unchanged, and anything carrying commit
 
 ### 5. Remove dead worktrees
 
-**Re-check `git status --porcelain` immediately before removing --- not the
-step 3a reading, which can be stale.**
-Step 3's classification and this step can be separated by the time it takes
-to classify every other worktree in the sweep, during which another session
-(unregistered per step 3d's caveat above) can start writing into a worktree
-this step is about to delete.
-This is the one check that actually catches that case, because it is the
-last thing that runs before the mutation:
+**Re-check `git status --porcelain` immediately before removing --- not the step 3a reading, which can be stale.**
+Step 3's classification and this step can be separated by the time it takes to classify every other worktree in the sweep, during which another session (unregistered per step 3d's caveat above) can start writing into a worktree this step is about to delete.
+This is the one check that actually catches that case, because it is the last thing that runs before the mutation:
 
 ```bash
 git -C <path> status --porcelain    # any output NOW → re-classify as Dirty, skip; do not remove
@@ -411,24 +365,12 @@ If `git worktree remove` reports the tree is dirty, that worktree was
 misclassified — re-inspect, don't reach for `--force`. Only `--force` after the
 user explicitly OKs discarding that worktree's changes.
 
-**Never fall back to `--force` on a plain refusal**, whether written as an
-explicit `||` retry or a loop that forces every iteration.
-The refusal itself is the signal that the tree changed since classification
---- reaching past it with `--force` discards exactly what the re-check
-above exists to catch, and it is the same mistake as skipping the re-check
-in the first place, just moved one line down.
-(`hooks/warn-blanket-worktree-force-remove.py` warns on exactly this shape
-in a Bash command --- a plain removal `||`-chained to a forced retry, or a
-loop that forces every iteration.)
+**Never fall back to `--force` on a plain refusal**, whether written as an explicit `||` retry or a loop that forces every iteration.
+The refusal itself is the signal that the tree changed since classification --- reaching past it with `--force` discards exactly what the re-check above exists to catch, and it is the same mistake as skipping the re-check in the first place, just moved one line down. (`hooks/warn-blanket-worktree-force-remove.py` warns on exactly this shape in a Bash command --- a plain removal `||`-chained to a forced retry, or a loop that forces every iteration.)
 
-- **Do:** treat a `git worktree remove` refusal as new information and
-  re-inspect the worktree (`git -C <path> status --short`, the mtime
-  snapshot) before deciding what to do next.
-- **Do:** reserve `--force` for the one case step 5's own exception names
-  --- a genuinely clean tree refused only because it contains a submodule.
-- **Don't:** write `git worktree remove <path> || git worktree remove
-  --force <path>` (or the loop equivalent) as a batch-removal shortcut ---
-  it discards the refusal's own signal before anyone reads it.
+- **Do:** treat a `git worktree remove` refusal as new information and re-inspect the worktree (`git -C <path> status --short`, the mtime snapshot) before deciding what to do next.
+- **Do:** reserve `--force` for the one case step 5's own exception names --- a genuinely clean tree refused only because it contains a submodule.
+- **Don't:** write `git worktree remove <path> || git worktree remove --force <path>` (or the loop equivalent) as a batch-removal shortcut --- it discards the refusal's own signal before anyone reads it.
 
 **Exception — a worktree containing a submodule:** the error `fatal: working
 trees containing submodules cannot be moved or removed` is a *different*

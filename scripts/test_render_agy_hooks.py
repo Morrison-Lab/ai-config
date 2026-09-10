@@ -87,7 +87,7 @@ class TestEnvironmentResolution(unittest.TestCase):
             self.assertTrue(agy_hooks.is_windows())
         with patch("os.name", "posix"), patch("sys.platform", "linux"), patch.dict("os.environ", {}, clear=True):
             self.assertFalse(agy_hooks.is_windows())
-            
+
     def test_resolve_plugin_dir(self):
         with patch("os.path.expanduser", return_value="C:/Users/u/.gemini/config/plugins/ai-config"):
             self.assertEqual(
@@ -113,7 +113,7 @@ class TestEnvironmentResolution(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             agy_hooks.assert_cmd_safe(resolved, "interpreter")
         self.assertIn("space", str(ctx.exception))
-        
+
     @patch.dict(os.environ, {}, clear=True)
     @patch("sys.executable", "/mingw64/bin/python.exe")
     @patch("shutil.which", return_value=None)

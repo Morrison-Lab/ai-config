@@ -2525,7 +2525,7 @@ def main() -> int:
         "credited: each shared a call with another command, so this guard "
         "does not attribute any call's exit status to its own request. What "
         "each request did is therefore unknown from here -- one may have "
-        "returned 200 with a review landing, one may have failed, and a `&&` "
+        "returned 200 with a review landing, one may have failed, and a `&&` or `||` "
         "chain may have short-circuited before it ran at all. That is why "
         "this looks identical to requests that failed.\n\n" % names
     )) if flagged else ""

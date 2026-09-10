@@ -273,7 +273,7 @@ The existing "`agy --print` CONSUMES THE NEXT TOKEN" rule above still applies --
 **Headless mode cannot satisfy a tool's permission prompt, and it fails with a named cause rather than hanging.**
 A tool needing a permission it hasn't been granted (`read_file` is the one observed) makes the run print `jetski: no output produced --- a tool required the "read_file" permission that headless mode cannot prompt for` and produce nothing.
 The available escapes are `--mode plan` (read-only), `--mode accept-edits`, `--dangerously-skip-permissions`, or an allow-rule under `permissions.allow` in `settings.json` --- but this file's own auto-mode classifier section already found `--dangerously-skip-permissions` and `--mode accept-edits` denied by Claude Code's permission classifier, so those two may not be reachable from an orchestrated dispatch even where they solve the headless problem.
-**Measured 2026-09-09: a `command(*)` rule under `permissions.allow` in this file is honoured in headless mode.**
+**Measured 2026-09-09: a `command(*)` rule under `permissions.allow` in `~/.gemini/antigravity-cli/settings.json` is honoured in headless mode.**
 `--dangerously-skip-permissions` stays denied by Claude Code's classifier, and `--mode plan` is still untested.
 With this in `~/.gemini/antigravity-cli/settings.json` (agy 1.1.28, Windows 11;
 `<user>` and `<repo>` stand for the real account and checkout):
@@ -484,8 +484,15 @@ only these specific commands, on this one session and date, were denied.
 - **Do:** look for `agy`'s settings file at
   `~/.gemini/antigravity-cli/settings.json` first,
   not under a `~/.antigravity/` or `~/.agy/` guess.
-- **Don't:** assume editing `permissions.allow` from inside the orchestrating Claude Code session is a reachable escape for a headless `agy` permission denial -- as of 2026-09-07 that edit itself was denied by Claude Code's own auto-mode classifier, the same as `--dangerously-skip-permissions` was (on Windows, 2026-09-09, the same edit passed via the Write tool after the user asked for it in so many words;
-  see the measured section above).
+- **Don't:** assume editing `permissions.allow`
+  from inside the orchestrating Claude Code session
+  is a reachable escape for a headless `agy` permission denial --
+  as of 2026-09-07 that edit itself was denied
+  by Claude Code's own auto-mode classifier,
+  the same as `--dangerously-skip-permissions` was.
+  On Windows, 2026-09-09, the same edit passed via the Write tool,
+  after the user asked for it in so many words;
+  see the measured section above.
 - **Don't:** reach for a `daytb`/`mwc`/`away` grant
   to clear this kind of denial --
   it is Claude Code's permission system reacting

@@ -6,15 +6,26 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
-def load_checker():
-    """Import the hyphenated checker script as a module."""
-    path = REPO_ROOT / "scripts" / "check-agy-hook-commands.py"
-    spec = importlib.util.spec_from_file_location("check_agy_hook_commands", path)
+def load_script(stem):
+    """Import a hyphenated script under scripts/ as a module."""
+    path = REPO_ROOT / "scripts" / (stem + ".py")
+    spec = importlib.util.spec_from_file_location(stem.replace("-", "_"), path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
+
+def load_checker():
+    """Import the hyphenated checker script as a module."""
+    return load_script("check-agy-hook-commands")
+
+
+def load_renderer():
+    """Import the hyphenated renderer script as a module."""
+    return load_script("render-agy-hooks")
+
 CHECKER = load_checker()
+RENDERER = load_renderer()
 
 BACKSLASH = chr(92)
 PYTHON_EXE = "C:/Users/u/AppData/Local/Programs/Python/Python312/python.exe"

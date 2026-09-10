@@ -124,6 +124,12 @@ def main(argv: list[str]) -> int:
     if args.installed:
         reports.append(check_file(installed_manifest_path(), canonical=False, check_program=True))
 
+    for report in reports:
+        if report["present"] and not report["commands"]:
+            report["findings"].append(
+                "carries no hook commands; a truncated or half-written "
+                "manifest parses as JSON and would otherwise report OK"
+            )
     failed = any(report["findings"] for report in reports)
 
     if args.json:

@@ -147,7 +147,7 @@ def canonical_problems(command: str) -> list[str]:
     be copied onto machines it does not fit.
     """
     problems = command_problems(command)
-    if not problems and not command.startswith(CANONICAL_INTERPRETER + " "):
+    if not command.startswith(CANONICAL_INTERPRETER + " "):
         problems.append(
             f"does not start with '{CANONICAL_INTERPRETER} '; the canonical "
             "manifest stays portable and scripts/render-agy-hooks.py resolves "

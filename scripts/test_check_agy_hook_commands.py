@@ -2,9 +2,13 @@
 """Tests for the Antigravity hook command checker and renderer."""
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import sys
+import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -58,6 +62,24 @@ class TestCanonicalProblems(unittest.TestCase):
         self.assertTrue(any("hooks[" in w for w in found))
         self.assertTrue(any("Stop" in w for w in found))
 
+
+
+class TestEmptyManifestFails(unittest.TestCase):
+    """A manifest that parses but carries no commands must not report OK."""
+
+    def run_main(self, argv):
+        sink = io.StringIO()
+        with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
+            return CHECKER.main(argv), sink.getvalue()
+
+    def test_a_command_less_manifest_is_a_finding(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            empty = Path(tmp) / "hooks.json"
+            empty.write_text("{}", encoding="utf-8")
+            with patch.object(CHECKER, "CANONICAL_MANIFEST", empty):
+                rc, out = self.run_main([])
+        self.assertEqual(rc, 1)
+        self.assertIn("carries no hook commands", out)
 
 if __name__ == "__main__":
     unittest.main()

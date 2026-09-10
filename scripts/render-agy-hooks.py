@@ -56,7 +56,7 @@ def main(argv: list[str]) -> int:
     windows = agy_hooks.is_windows() if args.platform == "auto" else args.platform == "windows"
     try:
         text = render(Path(args.source), windows)
-    except ValueError as e:
+    except (ValueError, OSError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
 

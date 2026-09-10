@@ -2,8 +2,11 @@
 """Tests for the Antigravity hook command checker and renderer."""
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
+import tempfile
 import sys
 import unittest
 from pathlib import Path
@@ -14,6 +17,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from lib import agy_hooks  # noqa: E402
 from lib.agy_hooks_fixtures import (
+    RENDERER,
     ADAPTER,
     BACKSLASH,
     CHECKER,
@@ -152,6 +156,40 @@ class TestInstallLocationOverrides(unittest.TestCase):
                 agy_hooks.resolve_plugin_dir(windows=False),
                 "/etc/ag/plugins/ai-config",
             )
+
+
+class TestRendererCli(unittest.TestCase):
+    """main() is the entry point bootstrap.sh invokes."""
+
+    def run_main(self, argv):
+        """Run the CLI with its own output captured, and return the exit code."""
+        sink = io.StringIO()
+        with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
+            return RENDERER.main(argv)
+
+    def test_output_writes_the_rendered_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "nested" / "hooks.json"
+            rc = self.run_main(["--platform", "posix", "--output", str(out)])
+            self.assertEqual(rc, 0)
+            self.assertTrue(out.exists())
+            self.assertTrue(list(agy_hooks.iter_commands(json.loads(out.read_text()))))
+
+    def test_missing_source_reports_one_line_and_exits_one(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            missing = Path(tmp) / "absent.json"
+            rc = self.run_main(["--platform", "posix", "--source", str(missing)])
+            self.assertEqual(rc, 1)
+
+    def test_a_render_failure_writes_no_output_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "hooks.json"
+            missing = Path(tmp) / "absent.json"
+            rc = self.run_main(
+                ["--platform", "posix", "--source", str(missing), "--output", str(out)]
+            )
+            self.assertEqual(rc, 1)
+            self.assertFalse(out.exists())
 
 if __name__ == "__main__":
     unittest.main()

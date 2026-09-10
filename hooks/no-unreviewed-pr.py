@@ -2337,7 +2337,7 @@ def scan(path):
                     # so a call requesting reviewers for two PRs named only
                     # one of them (Copilot on ai-config#3024).
                     #
-                    # Each is undischargeable for one of two reasons. It is
+                    # Each is undischargeable for one of three reasons. It is
                     # followed by another simple command, so the status the
                     # discharge reads is that chain's combined status and
                     # cannot be attributed to the request -- and whether it ran
@@ -2345,7 +2345,11 @@ def scan(path):
                     # `&&` chain short-circuits it away. Or it sits last but is
                     # not the request `pending` was keyed on, because an
                     # earlier request in the same chain took that slot, so
-                    # nothing offers it a status to be judged by. That
+                    # nothing offers it a status to be judged by. Or it is
+                    # last and owns the slot, but sits after `||`, where a
+                    # succeeding left operand skips it while the call still
+                    # exits 0 (ai-config#3139), so the status says nothing
+                    # about whether it ran. That
                     # is indistinguishable, from inside the turn, from a request
                     # that failed -- the POST returns 200, the reviewer may even
                     # review -- and the block message otherwise names only
@@ -2513,7 +2517,7 @@ def main() -> int:
         "credited: it shared a call with another command, so this guard "
         "does not attribute that call's exit status to it. What the request "
         "itself did is therefore unknown from here -- it may have returned "
-        "200 with a review landing, it may have failed, and a `&&` chain may "
+        "200 with a review landing, it may have failed, and a `&&` or `||` chain may "
         "have short-circuited before it ran at all. That is why this looks "
         "identical to a request that failed.\n\n" % names
     ) if len(flagged) == 1 else (

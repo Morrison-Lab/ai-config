@@ -390,6 +390,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-blanket-worktree-force-remove.py\"'",
+            "timeout": 20,
+            "script": "warn-blanket-worktree-force-remove.py",
+            "why": "skills/clean-worktrees/SKILL.md step 5: a `git worktree remove` refusal is a safety net -- do NOT blindly --force it; the refusal means the worktree was likely misclassified (dirty tree, unpushed work), so the prescribed response is to re-inspect, not retry forced. Self-hit during a clean-git session on 2026-09-10: a blanket `git worktree remove \"$p\" || git worktree remove --force \"$p\"` fallback was written, contradicting the skill's own explicit warning read earlier the same session -- flagged by hooks/no-mistake-without-a-hook.py as a mistake worth mechanizing, and the auto-mode permission classifier's denial of the command is the only reason nothing was lost. WARNS, never blocks: the skill documents one legitimate single-shot --force (a genuinely clean worktree that merely contains a submodule, refused with a DIFFERENT error -- 'fatal: working trees containing submodules cannot be moved or removed' -- not the dirty-tree refusal), and that exact case occurred later in the same session and was correct, so this hook can never safely deny; it only ever adds context naming the fallback/loop shape and the submodule exception. Fires on the tokenized argv (via scripts/lib/shellcmd.py's git_subcommand, plus its own bespoke operator/segment tokenizer -- not simple_commands, which drops the operator tokens this hook needs), not raw text, so a command merely quoting or documenting the pattern (a commit message, a heredoc writing this file) does not trip it."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-commit-chained-to-push.py\"'",
             "timeout": 10,
             "script": "no-commit-chained-to-push.py",

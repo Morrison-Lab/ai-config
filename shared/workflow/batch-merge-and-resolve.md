@@ -798,6 +798,98 @@ is empty, so it was corrected inside the merge itself.
 `b7e4b8d32` are pre-squash and reachable only from `refs/pull/3180/head`, so
 fetch that ref before running `git show` or `git log` on them.)
 
+## A scripted resolver rebuilds from the parents, and the batch multiplies its bug
+
+The section above governs a recovery you write by hand, once.
+Its scripted cousin arrives from the batch pass itself: when every PR in the
+queue appends to one shared file, each pair collides there, the resolution is
+always "keep both", and something that mechanical asks to be automated.
+
+Two ways to automate it, and only one is sound.
+
+**Parsing the conflict markers reconstructs the file from the hunks.**
+That is authorship rather than resolution, and it loses whatever lies between
+the hunks: the separators between records are *context*, not conflicted
+content, so a re-emitter that joins records with a single newline deletes every
+blank line in the file while reporting that it kept both sides.
+A record-matching regex can also stop short on the last entry, truncating it.
+Neither shows up as a lost record, which is the only loss such a script is
+usually written to guard against.
+
+**Rebuilding from the two parent versions cannot do either**, because both
+inputs are complete, well-formed files rather than fragments.
+While the path is conflicted the index holds them --- `:2:` ours, `:3:` theirs,
+`:1:` the base, as the section above sets out --- so the resolver's whole job
+is a union by record key over two parsed files, emitted in the base side's own
+order and formatting:
+
+```bash
+git show :3:references.bib > theirs.bib   # the base side, formatting to preserve
+git show :2:references.bib > ours.bib
+# then: parse both, emit theirs entries in their own order, append ours
+# whose keys are absent, and fail loudly on a key present in both with
+# differing bodies.
+```
+
+The union step itself is repo-specific, since only the consuming repo knows
+what a record is, so it belongs in that repo's `scripts/` rather than here.
+
+**Then validate with the consumer, not with a diff.**
+A resolved file is an artifact some tool parses, and that tool is the only
+instrument that sees a malformed record:
+
+```bash
+printf 'x [@some_key]
+' > /tmp/cite.md
+pandoc --citeproc -t plain -o /dev/null --bibliography references.bib /tmp/cite.md
+```
+
+The diff check that feels equivalent is not.
+`git diff origin/main -- <file> | grep -c '^-[^-]'` counts removed **non-blank**
+lines, so a resolver that deleted every separator scores zero on it ---
+[`sync-with-main`](sync-with-main.md)'s deleted-line blindness, arriving through
+the pattern rather than through the check's scope.
+Tightening the pattern does not fix it: `'^-[^-]*$'` misses any removed line
+carrying a hyphen after its first character, which in a Markdown corpus is
+most bullet lines.
+Ask git for the number instead, which counts every removed line and needs no
+pattern at all:
+
+```bash
+git diff --numstat origin/main -- <file>   # added <TAB> deleted <TAB> path
+```
+
+**Validate on one branch, and let its CI finish, before fanning the resolver
+out.**
+This is what distinguishes the scripted case from the hand-written one.
+A hand recovery damages the branch you are on; a resolver applied across the
+queue damages every branch at once, and the batch pass is precisely the context
+that invites applying it that way.
+
+- **Do:** union the two parent versions by record key, keeping the base side's
+  formatting.
+- **Do:** run the artifact's own parser over the result before committing.
+- **Do:** push one resolved branch, wait for its build, and only then run the
+  resolver across the rest.
+- **Don't:** reconstruct a file from conflict markers --- the separators
+  between records are context, so they vanish with nothing to report them.
+- **Don't:** accept `grep '^-[^-]'` as proof nothing was removed; it excludes
+  exactly the blank lines this bug deletes, and no tightening of the pattern
+  is as reliable as `git diff --numstat`.
+
+(Morrison-Lab/wai, 2026-09-10.
+Twenty-three open PRs each appended entries to one `references.bib`.
+A pairwise sweep scored all 253 pairs and found 231 of them colliding in that
+file; the 22 that did not are exactly the pairs formed by the single PR that
+touched the bibliography not at all.
+A marker-parsing resolver was then fanned across the 21 branches that needed
+a sync: it joined entries with a single newline and truncated one, pandoc
+refused the file, and the `build` check went red on all twenty-one branches
+in the same push.
+The `^-[^-]` check had reported zero removals against 35 deleted blank lines.
+The repair was a union over `:2:`/`:3:` validated by a real citation render.
+Tracked as Morrison-Lab/wai#236.)
+
 ## The batch pass
 
 1. **Measure the two intervals** above, once, and say which is larger.

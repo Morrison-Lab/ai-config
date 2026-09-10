@@ -26,6 +26,10 @@ Worked-example case records for the rules below live in
   R's `try()`, `suppressWarnings()`, and `suppressMessages()` belong in
   the same category: each mutes a whole class of condition rather than
   the one you know about.
+- Do not use `2>/dev/null` on a command whose output is then consumed.
+  This shape is a member of the silent fallback family.
+  Silencing the one channel carrying the failure turns a diagnosable error into an empty result.
+  An empty result is indistinguishable from a legitimately empty one.
 - When a fallback is genuinely wanted --- graceful degradation at a
   system boundary, a retry for a known-transient failure --- make it
   explicit and observable: message the degradation, bound the retries,

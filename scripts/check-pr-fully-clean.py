@@ -33,7 +33,8 @@ Copilot finding inside a collapsed `<details>` block is invisible too
 count performed here can see it. The one exception is a Copilot review
 carrying its own heading verdict (ai-config#3066): `copilot_verdict` matches
 `Suppressed comments` anywhere in that body, so a collapsed block there
-reads as not-clean; every other path is still blind to it. Measured on ai-config#3167, where this
+reads as not-clean; every other path is still blind to it.
+Measured on ai-config#3167, where this
 script printed FULLY CLEAN twice over a standing finding -- an inline comment
 at head 16544c50, and a suppressed "previously missed" item at head 7e1294b0.
 Both are pre-squash heads, reachable from no branch: fetch them from

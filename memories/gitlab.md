@@ -16,41 +16,27 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
 - **`glab` opens a pager (alternate buffer) too, most often on `glab api` and
   `glab issue list`.**
   [`gh-cli.md`](gh-cli.md) records the `gh` half --- there the pager *hangs*
-  the agent terminal --- and its `GH_PAGER=cat` fix.
-  `glab` was observed in a VS Code terminal leaving output garbled rather than
-  hanging, so treat the symptom as varying by terminal and the cause as the
-  same one.
-  `GH_PAGER` does not reach `glab`, so the `gh` fix does not cover it.
+  the agent terminal, where `glab` was seen garbling output instead --- and
+  its `GH_PAGER=cat` fix, which does not reach `glab`.
   - **Do:** pipe through `| cat`, export `PAGER=cat`, or ask for JSON with
-    `--output json`; redirect to a file and read that back when a command
-    still takes the terminal.
-    The long form is the portable one --- `-O` is a shorthand on
-    `glab issue list` and **not** on `glab api`, where it fails with
-    `Unknown shorthand flag: 'O' in -O` while `--output json` gets as far as
-    `Unauthenticated`.
-    Read the *message* to tell those apart;
-    both exit 1 on a machine with no GitLab remote, so the exit code cannot
-    (`glab 1.106.0`, 2026-09-09).
-  - **Don't:** reach for `--output-format json`, and don't expect it to
-    fail loudly.
-    It is not a deprecated spelling of `--output` --- on `glab issue list`
-    it is a *different* flag taking `details`, `ids`, or `urls`, so `json`
-    is not one of its values, and on `glab api` it does not exist at all
-    (`Unknown flag: --output-format`).
-    What `glab issue list` does with an unrecognized `-F` value is
-    **unconfirmed** --- this machine has no GitLab remote, so the command
-    dies on the host lookup before the flag matters.
-    One reviewer, running against a live remote, reported that the value is
-    silently ignored and the default `details` table is printed.
-    Confirm that before relying on it;
-    if it holds, the wrong flag is a *quiet* wrong answer on the very
-    command you are likeliest to type it on
-    (`glab 1.106.0`, 2026-09-09).
-  - **Don't:** read an empty or garbled capture as the command having
-    returned nothing --- the pager, not the query, ate the output.
-  (Recovered 2026-09-09 from a stash dated 2026-06-22 during a `/cb` sweep of
-  the stash stack; it was the one entry of thirteen whose content had never
-  reached `main`.)
+    the long `--output json`, which both commands accept.
+  - **Don't:** write `-O json` for `glab api`; that shorthand exists only on
+    `glab issue list` (`Unknown shorthand flag: 'O' in -O`).
+  - **Don't:** write `--output-format json` anywhere.
+    It is a *different* flag, not a deprecated spelling: on `glab issue list`
+    it takes `details`, `ids`, or `urls`, and `glab api` has no such flag.
+    One reviewer reports `glab issue list` silently ignoring an unrecognized
+    value rather than rejecting it --- unconfirmed, so don't count on a loud
+    failure.
+  - **Don't:** read an empty or garbled capture as the query having returned
+    nothing --- the pager ate the output.
+  Diagnose all of these from stderr's **message**, never its exit code:
+  without a configured GitLab remote every one of these commands exits 1,
+  so only the text separates a rejected flag (`Unknown shorthand flag`) from
+  a command that parsed fine and died later (`Unauthenticated`, or
+  `Accepts 1 arg(s), received 0` when the endpoint path is missing).
+  (`glab 1.106.0`, 2026-09-09; recovered from a 2026-06-22 stash, the one
+  entry of thirteen whose content had never reached `main`.)
 - `glab issue list --opened` is deprecated --- `--opened` is the default when `--closed` is not used.
   Just use `glab issue list` (no flag needed).
 - `glab mr list` also defaults to open items, and the installed CLI may reject

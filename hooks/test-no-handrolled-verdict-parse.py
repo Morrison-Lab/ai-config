@@ -11,6 +11,8 @@ docs for the phrase, an echo of it, a grep of this hook's own source, a careful
 read followed by an honest report, and a parse discharged by the instrument all
 have to pass.
 
+Filter files passed via -f / --from-file are also tested (ai-config#3494).
+
 Run: python3 hooks/test-no-handrolled-verdict-parse.py \\
          hooks/no-handrolled-verdict-parse.py
 """
@@ -20,7 +22,11 @@ import subprocess
 import sys
 import tempfile
 
-HOOK = sys.argv[1]
+HOOK = (
+    sys.argv[1]
+    if len(sys.argv) > 1
+    else os.path.join(os.path.dirname(__file__), "no-handrolled-verdict-parse.py")
+)
 
 # ---------------------------------------------------------------------------
 # The incident. `CAPTURE` is verbatim from ai-config#1297.
@@ -114,8 +120,52 @@ def mention_checker():
             "command": "echo 'next step: check-pr-fully-clean.py 1278'"}}]}}
 
 
+# Temporary filter files for jq -f / --from-file tests.
+_filter_dir = tempfile.TemporaryDirectory()
+_phrase_filter = os.path.join(_filter_dir.name, "verdict.jq").replace("\\", "/")
+with open(_phrase_filter, "w", encoding="utf-8") as _fh:
+    _fh.write(
+        '[.[] | select(.body|test("\\*\\*Claude finished"))] '
+        '| last | .body | ' + CAPTURE
+    )
+
+_plain_filter = os.path.join(_filter_dir.name, "plain.jq").replace("\\", "/")
+with open(_plain_filter, "w", encoding="utf-8") as _fh:
+    _fh.write(".[-1].body\n")
+
+_missing_filter = os.path.join(_filter_dir.name, "missing.jq").replace("\\", "/")
+
+_home_dir = tempfile.TemporaryDirectory()
+_home_phrase_filter = os.path.join(_home_dir.name, "verdict.jq").replace("\\", "/")
+with open(_home_phrase_filter, "w", encoding="utf-8") as _fh:
+    _fh.write(
+        '[.[] | select(.body|test("\\*\\*Claude finished"))] '
+        '| last | .body | ' + CAPTURE
+    )
+_home_env = {"HOME": _home_dir.name, "USERPROFILE": _home_dir.name}
+
 # (command, transcript events, should_block, label)
 CASES = [
+    # -- filter files: -f and --from-file ----------------------------------
+    (f"gh api repos/Morrison-Lab/ai-config/issues/1278/comments | jq -f {_phrase_filter}",
+     [], True,
+     "a comments fetch piped to jq -f <tmpfile> with phrase filter blocks"),
+    (f"gh api repos/Morrison-Lab/ai-config/issues/1278/comments | jq --from-file {_phrase_filter}",
+     [], True,
+     "same with --from-file"),
+    (f"gh api repos/Morrison-Lab/ai-config/issues/1278/comments | jq --from-file={_phrase_filter}",
+     [], True,
+     "same with --from-file="),
+    (f"gh api repos/Morrison-Lab/ai-config/issues/1278/comments | jq -f {_missing_filter}",
+     [], False,
+     "-f pointing at a missing file stays silent"),
+    (f"gh api repos/Morrison-Lab/ai-config/issues/1278/comments | jq -f {_plain_filter}",
+     [], False,
+     "-f file whose contents carry no verdict phrase stays silent"),
+    ("gh api repos/Morrison-Lab/ai-config/issues/1278/comments | jq -f ~/verdict.jq",
+     [], True,
+     "a comments fetch piped to jq -f ~/verdict.jq with ~ expansion blocks",
+     _home_env),
     # -- the incident, both directions ------------------------------------
     (INCIDENT, [], True,
      "THE INCIDENT: verbatim capture() over #1278's comments, no instrument"),
@@ -313,10 +363,16 @@ MUTANTS = [
      'r"(?:python3?\\s+|\\./)\\S*check-pr-fully-clean\\.py"',
      'r"\\S*check-pr-fully-clean\\.py"',
      INCIDENT, [mention_checker()], True, False),
+
+    ("jq -f filter-file resolution",
+     "    if not _in_file:\n        for content in jq_filter_contents(cmd, cwd):",
+     "    if False:\n        for content in jq_filter_contents(cmd, cwd):",
+     f"gh api repos/Morrison-Lab/ai-config/issues/1278/comments | jq -f {_phrase_filter}",
+     [], True, False),
 ]
 
 
-def run(command, events, hook=None, tool_name="Bash"):
+def run(command, events, hook=None, tool_name="Bash", env=None):
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w") as fh:
         for e in events:
@@ -329,6 +385,7 @@ def run(command, events, hook=None, tool_name="Bash"):
             "transcript_path": path,
         }),
         capture_output=True, text=True,
+        env=dict(os.environ, **(env or {})),
     ).stdout.strip()
     os.remove(path)
     return bool(out)
@@ -378,8 +435,10 @@ def mutate():
 
 def main():
     failures = 0
-    for command, events, want_block, label in CASES:
-        got = run(command, events)
+    for case in CASES:
+        command, events, want_block, label = case[:4]
+        case_env = case[4] if len(case) > 4 else None
+        got = run(command, events, env=case_env)
         ok = got == want_block
         if not ok:
             failures += 1

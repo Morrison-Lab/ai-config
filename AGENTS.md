@@ -37,10 +37,10 @@ Membership or approval does not override
 a stricter repository contribution or AI-agent policy.
 
 After positive membership verification, the user grants standing authorization
-across sessions and workspaces for normal, non-destructive GitHub operations
-in that repository, including non-force pushes, issue and PR comments, opening
-or updating issues and PRs, requesting reviews, and other ordinary repository
-workflow actions.
+across sessions and workspaces for normal, non-destructive GitHub and GitLab
+forge operations in that repository, including non-force pushes, issue and PR
+or MR comments, opening or updating issues and PRs or MRs, requesting reviews,
+and other ordinary repository workflow actions.
 This does not authorize force pushes or merges; merge
 authority remains governed by the strict merge policy below.
 
@@ -52,6 +52,16 @@ and standing authorization to open PRs or file issues
 do not grant permission to communicate with a non-member repository.
 This gate takes precedence
 over automatic filing, PR-opening, review, and follow-up rules.
+
+## Graph and display equation defaults
+
+When authoring analysis figures, prefer `ggplot2` over base graphics wherever
+the dependency is available or appropriate to add.
+For each plot, consider whether an axis should be extended to show important
+reference values such as zero.
+When writing display equations, avoid placing multiple equations on one display
+line unless a special reason makes that layout clearer.
+Label every display equation so it receives an equation number and a stable URL.
 
 ## Check external repository guidelines and PR template before filing
 

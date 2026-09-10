@@ -508,3 +508,147 @@ that nothing is there.
   is not evidence the session working it has stopped" section settles --- a worktree
   can hold real unpushed work whether or not the session that wrote it is
   still running, and this check is worth running either way.
+
+## A delegated subagent shares the parent's working tree unless you isolate it, and isolation has a precondition
+
+Two rules moved here from [`preferences.md`](preferences.md) at the 1250-line gate, kept in the bullet form they were written in.
+They belong with the rest of this file: the first says the parent session is a colliding party in its own agent's worktree, and the second says the remedy both `gip` and `ultracode-merge-conflicts` prescribe can fail outright.
+
+- **A delegated subagent runs in the parent session's working tree, so [`preferences.md`](preferences.md)'s "Use ONE worktree per branch/PR" rule governs your own agents, not only other sessions.**
+  The remedy is already written down: [`gip`](../skills/gip/SKILL.md) says to
+  give every subagent `isolation: "worktree"`, and
+  [`ultracode-merge-conflicts`](../shared/workflow/ultracode-merge-conflicts.md)
+  assumes the same parameter.
+  Both frame the hazard as agents colliding with **each other** across a
+  fan-out, though, so the rule reads as inapplicable when you launch exactly
+  one agent and it has no siblings to collide with.
+  It is not.
+  The parent is a colliding party too, and a lone agent is fully exposed to the
+  parent's own `git checkout` or cherry-pick in the shared checkout.
+  An agent you launched also reads as part of your session rather than as a
+  separate consumer of that checkout, which is why switching branches
+  underneath it does not feel like switching branches out from under anybody.
+  Nothing errors when you do.
+  Every read the agent resolves through `HEAD` --- the working tree, the index,
+  and `git show HEAD:<file>` alike --- silently becomes an answer about your
+  branch instead of its own.
+  The symptom is the expensive part: `git show HEAD:<file>` returns the
+  pre-edit text, which is indistinguishable from the agent's own commit having
+  been reverted, so it may redo finished work or report the work as lost, and
+  both readings are wrong.
+  Note what that command is **not**, because the obvious remedy does not fix
+  it: `git show HEAD:<file>` already reads a committed blob and never touches
+  the working tree, so switching from the tree to a commit changes nothing.
+  What moved is the **ref**.
+  `HEAD` follows the parent's `git checkout` or cherry-pick; a branch name does
+  not.
+  So name the branch --- `git show <its-branch>:<file>` and
+  `git ls-remote origin <its-branch>` are unaffected by whatever `HEAD` now
+  points at.
+  - **Do:** pass `isolation: "worktree"` for a single delegated agent that will
+    commit or change branches, not only for a fan-out of several.
+  - **Do:** answer a suspected revert from the branch ref and the remote.
+  - **Don't:** change branches in a checkout one of your own subagents is
+    using, on the grounds that it is your session.
+  - **Don't:** read a working tree that disagrees with a commit you just made
+    as evidence the commit did not happen.
+  (2026-07-31, ai-config: a subagent committing in `/home/user/ai-config` had
+  the parent cherry-pick onto a new branch in the same checkout mid-run.
+  The agent then read `git show HEAD:<file>` as its edits reverted, while its
+  commit `8cc7ae3` in fact carried both files it had touched and its branch ref
+  and `origin` both pointed at it.
+  No `isolation` argument had been passed, which is the whole cause.)
+- **That remedy has a precondition nobody states: `isolation: "worktree"`
+  needs the *session's own cwd* to be inside a git repository, so it errors in
+  a session whose cwd merely holds repos as subdirectories.**
+  The Agent tool refuses with `Cannot create agent worktree: not in a git
+  repository and no WorktreeCreate hooks are configured.`
+  Both clauses of that message are separate preconditions, and a harness can
+  fail the first while providing nothing to satisfy the second.
+  The rule is not wrong, it is stated without its precondition, in both places
+  a reader meets it: the "A delegated subagent runs in the parent session's
+  working tree" bullet that precedes this one, and
+  [`gip`](../skills/gip/SKILL.md)'s "give **every** subagent
+  `isolation: "worktree"`".
+  Read as written, each prescribes a parameter that errors here, which invites
+  the reader to conclude isolation is unavailable and share the checkout after
+  all -- the exact outcome that bullet exists to prevent.
+  The explicit fallback gives identical isolation for two commands, so reach
+  for it rather than standing down:
+  `git -C <repo> fetch origin <default-branch>`, then
+  `git -C <repo> worktree add --detach <path> origin/<default-branch>`.
+  Resolve `<default-branch>` from the repo rather than assuming `main`, the way
+  [`gip`](../skills/gip/SKILL.md)'s step 0 and [`ums`](../skills/ums/SKILL.md)
+  both already do: hard-coding it dies with
+  `fatal: invalid reference: origin/main` wherever the default is `master` or
+  `develop`, which is precisely where a fallback is worth having.
+  Each part of that pair is load-bearing, and the naive spelling
+  `worktree add <path> <default-branch>` is wrong in more than one way at once.
+  Use `git -C` rather than `cd`, because Bash's cwd persists across separate
+  calls in a session, so a `cd` here silently carries into later ones.
+  Name `origin/<default-branch>` rather than the bare branch, because a branch
+  is meant to live in one worktree: `add <path> <default-branch>` refuses
+  whenever that branch is checked out anywhere, which is this corpus's own
+  session-start state, and which after the first subagent is every later one in
+  a fan-out.
+  Worse, that guard is not atomic, so a genuinely concurrent fan-out can slip
+  several worktrees onto that one branch at once and lose the isolation with no
+  error at all -- the loud refusal is the good outcome here.
+  That same substitution fixes the stale-base trap in one stroke, since
+  `fetch origin <default-branch>` advances the remote-tracking ref while
+  leaving the local branch where it was.
+  And prefer `--detach` over a plain `-b <slug>`, because creating a branch
+  *that tracks* a remote ref writes upstream config under a `.git/config` lock
+  that concurrent subagents lose races on; the agent cuts its own branch inside
+  the worktree afterward, which is what its brief already tells it to do.
+  - **Do:** create the worktree explicitly with
+    `git -C <repo> worktree add --detach <path> origin/<default-branch>` when
+    `isolation: "worktree"` errors, and brief the agent with that path.
+  - **Do:** base it on `origin/<default-branch>`, which sidesteps the
+    already-checked-out refusal and the stale local base at the same time.
+  - **Don't:** name the bare branch -- sequentially that refuses from the
+    second agent onward, and concurrently it can silently share one branch
+    across several worktrees instead.
+  - **Don't:** hard-code `main` in either command, which dies outright on a
+    repo whose default branch is named anything else.
+  - **Don't:** read the isolation error as "isolation is unavailable here" and
+    let the agent share the parent's checkout.
+  - **Don't:** infer that the session's cwd is a repository from the fact that
+    the work is in one -- a cwd holding several repos satisfies neither clause.
+  (2026-08-01, this session: `git rev-parse --show-toplevel` in the default cwd
+  `/home/user` returns `fatal: not a git repository`, with `ai-config`, `gha`,
+  `qbt`, `qwt`, `rpt`, and `workflows` one level below it, and no
+  `settings.json` exists at `~/.claude/` or `/root/.claude/` -- so both named
+  preconditions are independently false here.
+  The error text is quoted from the parent session's own attempt; this agent
+  has no Agent tool and did not re-run it.
+  The stale-`main` half was hit directly: `git worktree add /tmp/wt-ums main`
+  checked out `a30a2e1` while `origin/main` was five commits ahead at
+  `d0994c2`.
+  The command shape was then measured on git 2.43.0, five worktrees per run
+  against a throwaway repo whose local `main` sat five commits behind
+  `origin/main`.
+  `add <path> main` scored 0/5 with `main` checked out and 1/5 with it free,
+  the rest refusing with
+  `fatal: 'main' is already used by worktree at ...`.
+  Run **concurrently**, as a fan-out actually launches, that guard races: three
+  or four worktrees landed on `main` at once in every one of six rounds, a state
+  the sequential path refuses outright.
+  Nothing errors, and the isolation is gone -- one worktree committed, the next
+  immediately read `main` at that new commit and stacked on top of it, which is
+  the collision the parameter exists to prevent.
+  `add -b <slug> <path> origin/main`, the form review suggested, scored 5/5
+  sequentially but failed in four of five concurrent rounds with
+  `error: could not lock config file .git/config: File exists` beside
+  `unable to write upstream branch configuration`.
+  `--detach` and `-b <slug> --no-track` each scored 5/5 in all five concurrent
+  rounds, and the full flow -- detach, `checkout -b`, commit, five at once --
+  scored 5/5 in three more, every worktree based on `origin/main` rather than
+  the stale local ref.
+  Those runs all used a repo whose default branch is literally `main`, which is
+  why they are written that way here and why they did not surface the
+  hard-coding: measured separately against one whose default is `develop`,
+  `fetch origin main` returns `fatal: couldn't find remote ref main` and
+  `worktree add --detach <path> origin/main` returns
+  `fatal: invalid reference: origin/main`, while both succeed against
+  `origin/develop`.)

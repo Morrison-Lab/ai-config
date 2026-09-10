@@ -411,6 +411,57 @@ the fix here is a stricter version of the same falsifying-question test, aimed a
 The Pandoc-bypass and the empty-submodule-baseline are also written up in that PR's own thread and in d-morrison/rme#1154's "Two instrument traps" section;
 the bypass produced a wrong "fix" and two issues filed on the false "math does not compile" premise, one of them d-morrison/macros#85, closed not-planned once the Pandoc-expansion mistake was found.)
 
+## A reviewer's counter-measurement needs the same check the claim it rebuts would have needed
+
+The section above is about the same artifact measured at a narrower scope than the claim names.
+This one is a plain substitution, the kind the four shapes above describe --- a different document standing in for the one the claim is about --- and it is worth its own entry only because of *who* commits it: a **reviewer** refuting someone else's claim rather than an author supporting their own.
+That is easy to miss, because a rebuttal reads as skepticism rather than as an assertion --- "I tested this and it isn't true" sounds like diligence applied, not like a new claim that itself owes [`dont-take-my-word-for-it`](../principles/dont-take-my-word-for-it.md).
+A finding backed by a real command is not thereby a finding backed by the *right* command, and nothing about the reviewer's own confidence distinguishes the two.
+
+A commit fixing a broken macro (`\def\v0`/`\def\v1` silently overriding `\renewcommand{\v}`) said only that it was "verified through `pandoc -t latex`" --- true, and unfalsifiable-looking to a reader with no further detail.
+An `adversarial-reviewer` subagent, dispatched to check the fix, ran its own counter-test: appended `\v0` `\v1` `\v{x}` to a document containing **no macro definitions**, ran it through `quarto pandoc -t latex`, and observed every token pass through unexpanded.
+From that it concluded pandoc does not expand TeX macros in math mode at all, so the stated verification could not possibly have discriminated a working macro file from a broken one --- and filed the fix's claim as unsubstantiated.
+
+The reasoning was valid.
+The measurement was real.
+Both were about the wrong case: pandoc's `latex_macros` extension expands a macro only when it is **defined in the same document**, which the reviewer's test document was not.
+Testing an empty document to ask "does pandoc expand macros" is the null case, indistinguishable in outcome whether the extension works or the extension is entirely absent --- [`fail-fast`](../principles/fail-fast.md)'s denominator move again: a test whose passing and failing readings look identical has not tested anything.
+Re-running with the precondition restored (a document that actually defines `\v`) produces the discriminator the claim needed:
+
+| | `\v0` | `\v1` | `\v{x}` |
+| --- | --- | --- | --- |
+| no definitions present | `\v0` | `\v1` | `\v{x}` |
+| `macros.qmd` before the fix | `\v0` | `\tilde{1}` | `\v{x}` |
+| `macros.qmd` after the fix | `\tilde{0}` | `\tilde{1}` | `\tilde{x}` |
+
+The reviewer had measured the top row and read it as the whole truth table.
+The middle row is the bug's actual signature --- only `\v1` expands, because a delimited `\def\v1` survived as the last definition of `\v` --- and the bottom row is the fix.
+Nothing in the reviewer's transcript was fabricated;
+the precondition the original claim depended on was simply never in the reviewer's own test.
+
+**Two things follow, and both are needed --- one about re-measuring a finding, one about where the fix belongs.**
+
+First: a rebuttal is a claim like any other, so the *rebutter* re-measures before publishing it, not only the party being rebutted.
+[`address-every-comment`](address-every-comment.md)'s Rebut disposition already lets an author push back on a reviewer's finding;
+the mirror obligation belongs to the reviewer before the finding is filed --- confirm the counter-test actually carries the precondition the original claim relied on, not merely a test that superficially exercises the same mechanism.
+
+Second: the fix is not to win the rebuttal in a PR comment where it dies with the thread.
+The original message's vagueness --- "verified through `pandoc -t latex`", true and giving the reader nothing to check --- is what invited a plausible wrong finding in the first place.
+Amending the commit message to carry the three-row table above did both jobs at once: it rebutted the finding, and it left the next reader (human or reviewer) unable to repeat the reviewer's mistake, because the null row sits right next to the two rows that discriminate.
+A durable artifact that states its own discriminator is [`quotable-findings`](quotable-findings.md)'s standard turned around --- a claim that names the exact measurement that would falsify it is the one nobody can plausibly misread.
+
+- **Do:** treat a reviewer's own counter-test as a claim requiring the same re-derivation any other claim does, whichever side of the finding you are on.
+- **Don't:** read "the reviewer ran a command" as equivalent to "the reviewer ran the command that could have shown the claim false" --- a command that cannot exhibit the failure mode has not tested the claim, however real its output is.
+- **Do:** when rebutting a finding, name the precondition the original claim relied on and confirm the counter-test carried it.
+- **Don't:** rebut by re-asserting the original claim against the counter-test's bare output;
+  that answers confidence with confidence and settles nothing --- name the specific precondition the counter-test dropped.
+- **Do:** write the discriminating measurement --- including the null case that shows what a non-discriminating test looks like --- into the durable artifact (commit message, PR body) rather than only into a comment thread.
+- **Don't:** leave a verification claim as a bare tool invocation ("verified through X") with no stated discriminator;
+  that vagueness is what makes a plausible-but-wrong counter-finding possible in the first place.
+
+(Measured 2026-09-09 on d-morrison/macros#87: the reviewer's counter-test and its null-case conclusion are the measured half;
+the general rule that a rebuttal is itself a claim requiring re-derivation, and that the fix belongs in the durable artifact rather than a comment, is the inferred half, extending [`address-every-comment`](address-every-comment.md)'s Rebut disposition to the reviewer's own side of it.)
+
 ## A summary is another shape, and the auto-loaded copy is the one you read
 
 [`fact-check-prose`](../writing/fact-check-prose.md)'s "any condensation

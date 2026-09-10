@@ -28,9 +28,10 @@ What does not: the Mistake, Canonical Rule, Fix, or Do/Don't lines, which are wh
   with no relation to the original denial, 2026-09-06/07.**
   Five denials in one session, with no settings change and no restart.
   Three times, an identical re-run of a just-denied command succeeded on the
-  very next attempt --- confirming, without a session restart, what the
-  2026-09-03 occurrence recorded in this file only measured *across* a
-  restart.
+  very next attempt --- confirming, without a session restart, what Pattern
+  43's Fix step in [`mistake-patterns.md`](mistake-patterns.md) had measured
+  only *across* one (2026-09-01: an override the prior session's classifier
+  denied three times was accepted in a fresh session).
   Separately, after several differently-shaped attempts at the same goal,
   the classifier began denying a plainly innocuous, unrelated command
   (`gh run list -R ... --json ...`), which also succeeded on an identical

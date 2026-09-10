@@ -7,6 +7,14 @@ a worktree on any failure of the plain removal, written during a
 `clean-git` session on 2026-09-10 and flagged by
 `hooks/no-mistake-without-a-hook.py` as a mistake worth mechanizing.
 
+An adversarial self-review of the first version of this hook found it
+matched too loosely -- "a forced removal AND a `||` ANYWHERE in the
+command" and "a forced removal AND a loop keyword ANYWHERE in the
+command", neither checking the two ingredients are actually related. S9
+through S12 below are the cases that review added: a forced removal that
+merely SHARES a command with an unrelated `||` or an unrelated loop, which
+the fixed hook must not warn on.
+
 `GWR` builds the string `"git worktree remove"` by concatenation rather
 than as a literal, purely so this test file itself does not read as an
 actual worktree-removal invocation to any OTHER guard scanning the repo
@@ -39,21 +47,28 @@ def bash(command):
 SHOULD_WARN = [
     ("W1", GWR + ' "$p" || ' + GWR + ' --force "$p"',
      "the incident's own shape: plain removal, force-removed on failure "
-     "via ||"),
+     "via ||, adjacent across the ||"),
     ("W2", GWR + ' "$p" || ' + GWR + ' -f "$p"',
      "short `-f` (not `--force`) on the forced side still counts as "
      "forced"),
     ("W3",
      'for p in "${DEAD[@]}"; do ' + GWR + ' --force "$p"; done',
-     "the loop form: forced every iteration, no bare removal needed"),
+     "the loop form: the forced removal's own segment sits between the "
+     "loop's opener and its `done`"),
     ("W4",
      'while read -r p; do ' + GWR + ' --force "$p"; done < list.txt',
      "a `while` loop is also a loop keyword, not only `for`"),
     ("W5",
      GWR + ' "$a"; ' + GWR + ' "$b" || ' + GWR + ' --force "$b"',
-     "the fallback pair need not be the first two commands in the line "
-     "(uses `;`, not `&&`, so this case is sensitive to `||` detection "
-     "specifically, not to any operator)"),
+     "the fallback pair need not be the first two commands in the line, "
+     "as long as the forced side is adjacent to a bare removal across "
+     "`||` (uses `;` for the unrelated prefix, not `&&`, so this case "
+     "is sensitive to `||` detection specifically)"),
+    ("W6",
+     ('for x in a b; do echo "$x"; done; '
+      'for p in "${DEAD[@]}"; do ' + GWR + ' --force "$p"; done'),
+     "a SECOND loop reopens depth after the first one's `done` closed "
+     "it -- the forced removal in the second loop must still be seen"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -79,9 +94,28 @@ SHOULD_STAY_SILENT = [
      "a forced removal followed by an unrelated command, with no || and "
      "no loop anywhere in the line"),
     ("S8", GWR + ' -f "$p" || true',
-     "a single forced removal with an ignore-failure `|| true` tail -- no "
-     "bare removal on the other side, so this is not the retry-harder "
-     "shape the guard targets"),
+     "a single forced removal with an ignore-failure `|| true` tail -- "
+     "the segment on the OTHER side of || is not a worktree removal at "
+     "all, so this is not the retry-harder shape the guard targets"),
+    ("S9",
+     GWR + ' --force "$p"; for x in a b; do echo "$x"; done',
+     "a forced removal followed by an UNRELATED loop that never touches "
+     "a worktree -- the forced removal's own segment is not inside the "
+     "loop's depth"),
+    ("S10",
+     'for x in a b; do echo "$x"; done; ' + GWR + ' --force "$p"',
+     "a forced removal AFTER a loop that already closed (`done` seen) -- "
+     "loop depth is back to zero by the time the removal runs"),
+    ("S11",
+     'true || ' + GWR + ' --force "$p"',
+     "a forced removal chained via || after an UNRELATED failing "
+     "command (not itself a worktree removal) -- there is no bare "
+     "removal being retried, just an unrelated fallback pattern"),
+    ("S12",
+     GWR + ' "$a" && ' + GWR + ' --force "$b"',
+     "&&, not ||, between a bare removal and a forced one -- a "
+     "different worktree, chained on SUCCESS rather than retried on "
+     "failure, is not the fallback shape"),
 ]
 
 NON_COMMAND_PAYLOADS = [
@@ -172,24 +206,27 @@ CASES = {case_id: command
 MUTATIONS = {
     "M1_forced_flag_detection": (
         "`-f`/`--force` on the worktree-remove argv must both count as "
-        "forced -- dropping `--force` from the check misses W1, W3, W4, W5",
-        [('forced = "--force" in rest[1:] or "-f" in rest[1:]',
-          'forced = "-f" in rest[1:]')],
-        {"W1", "W3", "W4", "W5"},
+        "forced -- dropping `--force` from the check misses every case "
+        "whose forced side spells it that way (W1, W3, W4, W5, W6)",
+        [('return "--force" in rest[1:] or "-f" in rest[1:]',
+          'return "-f" in rest[1:]')],
+        {"W1", "W3", "W4", "W5", "W6"},
     ),
     "M2_pipe_operator_detection": (
-        "the raw-token scan must find a literal `||` -- breaking it to "
-        "look for `&&` instead misses the fallback shape (W1, W2, W5)",
-        [('has_pipe = "||" in tokens',
-          'has_pipe = "&&" in tokens')],
-        {"W1", "W2", "W5"},
+        "the segment scan must recognize a `||`-containing preceding op "
+        "-- checking for `&&` instead misses every `||`-fallback case "
+        "(W1, W2, W5) AND wrongly starts firing on S12's `&&`-chained "
+        "pair instead",
+        [('if not op or "||" not in op:',
+          'if not op or "&&" not in op:')],
+        {"W1", "W2", "W5", "S12"},
     ),
     "M3_loop_keyword_detection": (
         "a loop keyword opening a segment must be recognized -- an empty "
-        "loop-keyword set misses the loop shape (W3, W4)",
+        "loop-keyword set misses every loop-shape case (W3, W4, W6)",
         [('_LOOP_KEYWORDS = {"for", "while", "until"}',
           '_LOOP_KEYWORDS = set()')],
-        {"W3", "W4"},
+        {"W3", "W4", "W6"},
     ),
     "M4_worktree_remove_subcommand_match": (
         "only `git worktree remove` (not some other `git worktree` "
@@ -198,26 +235,33 @@ MUTATIONS = {
         "a worktree named `remove`",
         [("if subcommand != \"worktree\" or not rest or rest[0] != \"remove\":",
           "if subcommand != \"worktree\" or not rest or rest[0] != \"list\":")],
-        {"W1", "W2", "W3", "W4", "W5"},
+        {"W1", "W2", "W3", "W4", "W5", "W6"},
+    ),
+    "M5_bare_removal_required_on_pipe_left_side": (
+        "the `||` shape requires the segment BEFORE the `||` to be an "
+        "actual BARE (unforced) worktree removal, not merely anything "
+        "that is not itself forced-True -- dropping that requirement "
+        "fires on a forced removal chained after ANY unrelated command "
+        "via `||` (tested against S11, not a WARN case)",
+        [('if prev_forced is False:  # explicitly bare, not "not a removal"',
+          'if True:  # explicitly bare, not "not a removal"')],
+        set(),  # verified against S11 below, not the fixed WARN table
+    ),
+    "M6_done_closes_loop_depth": (
+        "`done` must decrement loop depth -- without it, a forced "
+        "removal AFTER a loop has already closed (S10) is still read "
+        "as inside one",
+        [('if argv[0] == "done":\n            loop_depth = max(0, loop_depth - 1)',
+          'if argv[0] == "done":\n            pass')],
+        set(),  # verified against S10 below, not the fixed WARN table
     ),
 }
-
-# M5 is checked separately, below the generic loop: it needs a SYNTHETIC
-# command (forced + `||`, no bare removal on the other side) that is not
-# in the fixed CASES table, because none of S1-S7 combines `--force` with
-# a stray `||` on an unrelated command.
-M5_EDITS = [("if has_forced and has_bare and has_pipe:",
-             "if has_forced and has_pipe:")]
-M5_STATEMENT = (
-    "the `||` shape requires an actual BARE (unforced) removal on the "
-    "other side, not just any `||` in the command -- dropping that "
-    "requirement fires on a forced removal chained to an unrelated `||`"
-)
-M5_COMMAND = GWR + ' --force "$a" || true'
 
 print("\nmutation tests (revert one clause, see which cases flip):")
 mutation_wrong = 0
 for clause, (statement, edits, expected_flips) in MUTATIONS.items():
+    if not expected_flips:
+        continue  # M5/M6 verified separately below, against a non-WARN case
     mutated = SOURCE
     for find, replace in edits:
         count = mutated.count(find)
@@ -247,45 +291,61 @@ for clause, (statement, edits, expected_flips) in MUTATIONS.items():
     else:
         note = (f"flipped {sorted(flipped)}, expected "
                 f"{sorted(expected_flips)}")
-    print(f"  {'ok  ' if ok else 'WRONG'} {clause:<38} {statement}\n"
+    print(f"  {'ok  ' if ok else 'WRONG'} {clause:<44} {statement}\n"
           f"         {note}")
+
+
+def _mutate_and_check(edits, command, want_before, want_after, label):
+    """Confirm the UNMUTATED hook gives WANT_BEFORE on COMMAND, then that
+    applying EDITS flips it to WANT_AFTER -- i.e. the clause is
+    load-bearing for this specific synthetic case, checked outside the
+    fixed CASES table."""
+    before = verdict_for_command(HOOK, command)
+    before_ok = before == want_before
+
+    mutated = SOURCE
+    for find, replace in edits:
+        count = mutated.count(find)
+        if count != 1:
+            sys.exit(f"FATAL: {label}'s anchor is not present exactly "
+                     f"once in {HOOK} (found {count}).\n---\n{find}\n---")
+        mutated = mutated.replace(find, replace)
+    fd, path = tempfile.mkstemp(suffix=".py", dir=os.path.dirname(HOOK))
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(mutated)
+    try:
+        after = verdict_for_command(path, command)
+    finally:
+        os.unlink(path)
+    after_ok = after == want_after
+
+    ok = before_ok and after_ok
+    if ok:
+        print(f"  ok    {label:<44}\n"
+              f"         unmutated={before} (want {want_before}), "
+              f"mutated={after} (want {want_after}), as declared")
+    else:
+        print(f"  WRONG {label:<44}\n"
+              f"         unmutated={before} (want {want_before}), "
+              f"mutated={after} (want {want_after})")
+    return not ok
+
+
+S11_COMMAND = 'true || ' + GWR + ' --force "$p"'
+mutation_wrong += _mutate_and_check(
+    MUTATIONS["M5_bare_removal_required_on_pipe_left_side"][1],
+    S11_COMMAND, "silent", "WARN",
+    "M5_bare_removal_required_on_pipe_left_side",
+)
+
+S10_COMMAND = 'for x in a b; do echo "$x"; done; ' + GWR + ' --force "$p"'
+mutation_wrong += _mutate_and_check(
+    MUTATIONS["M6_done_closes_loop_depth"][1],
+    S10_COMMAND, "silent", "WARN",
+    "M6_done_closes_loop_depth",
+)
 
 print(f"\n{len(MUTATIONS) - mutation_wrong}/{len(MUTATIONS)} clauses "
       "behaved as declared under reversion")
-
-# M5, handled separately: confirm the UNMUTATED hook stays silent on a
-# forced removal chained to an unrelated `||` (no bare removal on the
-# other side), then confirm the mutated hook (bare-removal requirement
-# dropped) WARNS on that same command -- i.e. the clause is load-bearing.
-m5_before = verdict_for_command(HOOK, M5_COMMAND)
-m5_before_ok = m5_before == "silent"
-
-m5_mutated = SOURCE
-for find, replace in M5_EDITS:
-    count = m5_mutated.count(find)
-    if count != 1:
-        sys.exit(f"FATAL: M5's anchor is not present exactly once in "
-                 f"{HOOK} (found {count}).\n---\n{find}\n---")
-    m5_mutated = m5_mutated.replace(find, replace)
-fd, m5_path = tempfile.mkstemp(suffix=".py", dir=os.path.dirname(HOOK))
-with os.fdopen(fd, "w", encoding="utf-8") as handle:
-    handle.write(m5_mutated)
-try:
-    m5_after = verdict_for_command(m5_path, M5_COMMAND)
-finally:
-    os.unlink(m5_path)
-m5_after_ok = m5_after == "WARN"
-
-m5_ok = m5_before_ok and m5_after_ok
-if m5_ok:
-    print(f"  ok    M5_bare_removal_required_for_pipe_shape       "
-          f"{M5_STATEMENT}\n"
-          f"         unmutated=silent, mutated=WARN, as declared")
-else:
-    print(f"  WRONG M5_bare_removal_required_for_pipe_shape       "
-          f"{M5_STATEMENT}\n"
-          f"         unmutated={m5_before} (want silent), "
-          f"mutated={m5_after} (want WARN)")
-mutation_wrong += not m5_ok
 
 sys.exit(1 if (wrong or mutation_wrong) else 0)

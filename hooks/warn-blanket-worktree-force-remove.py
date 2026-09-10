@@ -37,18 +37,22 @@ it only ever adds context naming the fallback and the exception.
 ## Scope
 
 Fires when a Bash command's tokens (heredoc bodies and comments stripped,
-same preprocessing `scripts/lib/shellcmd.py` applies before splitting) show:
+same preprocessing `scripts/lib/shellcmd.py` applies before splitting) show
+either:
 
-  - a `git worktree remove` invocation carrying `--force` or `-f`, AND
-  - either (a) a *plain* `git worktree remove` (no force) elsewhere in the
-    same command, connected through a `||` token -- the fallback shape --
-    or (b) a loop keyword (`for`/`while`/`until`) opening a segment in the
-    same command -- the forced-every-iteration shape.
+  - (a) a *plain* `git worktree remove` (no force) immediately followed by
+    a `||`-connected `git worktree remove` that DOES carry `--force`/`-f`
+    -- the two removals adjacent across the `||`, not merely present
+    somewhere in the same command -- or
+  - (b) a `git worktree remove --force`/`-f` invocation whose segment sits
+    between a `for`/`while`/`until` segment and its matching `done`
+    (loop-depth tracked positionally) -- the forced-every-iteration shape.
 
-Matched on the tokenized argv (via `shellcmd.simple_commands` and
-`git_subcommand`), not on raw text, so a command merely *quoting* or
-documenting the pattern (a commit message, a heredoc writing this file)
-does not trip it. Fails OPEN on any parse trouble.
+Matched on the tokenized argv (via `git_subcommand`) and on operator
+adjacency between segments, not on raw text or on "these ingredients
+appear somewhere in the command" -- a forced removal that merely shares a
+command with an unrelated `||` or an unrelated loop does not trip it.
+Fails OPEN on any parse trouble.
 """
 import json
 import os
@@ -62,29 +66,29 @@ try:
         "scripts", "lib")
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
-    from shellcmd import (
-        git_subcommand, simple_commands,
-        _comment_free, _heredoc_free,
-    )
+    from shellcmd import git_subcommand, _comment_free, _heredoc_free
 except Exception as _exc:  # broken install; fail open and say so
     print(f"warn-blanket-worktree-force-remove: cannot load "
           f"scripts/lib/shellcmd.py ({_exc}); not evaluating",
           file=sys.stderr)
-    git_subcommand = simple_commands = None
+    git_subcommand = None
     _comment_free = _heredoc_free = None
 
 _LOOP_KEYWORDS = {"for", "while", "until"}
+# Same literal set `scripts/lib/shellcmd.py`'s `_SHELL_OPS` uses -- an
+# operator token is one whose characters are ALL drawn from here (which
+# includes `;`, despite the name suggesting only parens/pipe/ampersand).
+_OP_CHARS = set("();|&")
 
 
 def _raw_tokens(command):
-    """Tokenize COMMAND (heredoc/comment stripped) keeping operator tokens.
+    """Tokenize COMMAND (heredoc/comment stripped), operator tokens kept.
 
-    `shellcmd.simple_commands` drops `||`/`&&`/`;` once it has used them to
-    split -- exactly the information this hook needs to see a `||` fallback.
-    So this reimplements only the preprocessing-then-tokenize half of
-    `simple_commands_with_scope`, stopping short of the split, and reuses
-    the library's own heredoc/comment stripping rather than a second
-    implementation of it.
+    Mirrors the preprocessing half of `shellcmd.simple_commands_with_scope`
+    (heredoc-free, continuation-joined, comment-free, newlines to `;`, then
+    `shlex` with `punctuation_chars=True`) but stops short of that
+    function's own split, which DISCARDS the operator tokens (`;`, `&&`,
+    `||`) this hook needs to see adjacency across a `||`.
     """
     cmd = _heredoc_free(command)
     cmd = re.sub(r"\\\r?\n", " ", cmd)
@@ -95,7 +99,42 @@ def _raw_tokens(command):
     return list(lex)
 
 
-def _is_worktree_remove(argv):
+def _segments(command):
+    """`[(preceding_op, argv), ...]` for COMMAND, in order.
+
+    `preceding_op` is `None` for the first segment, else the raw operator
+    substring (e.g. `";"`, `"||"`, `"&&"`) immediately before this segment
+    -- `"||"` if that substring CONTAINS `||` (a `);` or `|;` compound is
+    rare and, for this hook's purpose, treated as carrying whichever
+    operator it contains). Subshell parens are consumed as ordinary
+    operator text rather than tracked as nesting, matching
+    `simple_commands`'s own flattening -- this hook does not need scope,
+    only segment order and the operator between adjacent segments.
+    """
+    tokens = _raw_tokens(command)
+    if tokens is None:
+        return None
+    segments = []
+    cur = []
+    cur_op = None       # the operator that precedes `cur`
+    pending_op = ""      # operator text seen since the last segment closed
+    for tok in tokens:
+        if tok and set(tok) <= _OP_CHARS:
+            if cur:
+                segments.append((cur_op, cur))
+                cur = []
+            pending_op += tok
+        else:
+            if not cur:
+                cur_op = pending_op if pending_op else None
+                pending_op = ""
+            cur.append(tok)
+    if cur:
+        segments.append((cur_op, cur))
+    return segments
+
+
+def _worktree_remove_forced(argv):
     """Forced-ness of one simple-command ARGV, or `None` if not a `git
     worktree remove` invocation at all."""
     sub = git_subcommand(argv)
@@ -104,38 +143,45 @@ def _is_worktree_remove(argv):
     subcommand, rest, _env = sub
     if subcommand != "worktree" or not rest or rest[0] != "remove":
         return None
-    forced = "--force" in rest[1:] or "-f" in rest[1:]
-    return forced
+    return "--force" in rest[1:] or "-f" in rest[1:]
 
 
 def find_offense(command):
-    """`(has_forced, has_bare, has_pipe, has_loop)` for COMMAND, or `None`
-    on a parse failure (caller reads that as fail-open)."""
-    if simple_commands is None:
+    """`(pipe_fallback, loop_forced)` booleans for COMMAND, or `None` on a
+    parse failure (caller reads that as fail-open)."""
+    if git_subcommand is None:
         return None
-    cmds = simple_commands(command)
-    if cmds is None:
-        return None
-    tokens = _raw_tokens(command)
-    if tokens is None:
+    segments = _segments(command)
+    if segments is None:
         return None
 
-    has_forced = False
-    has_bare = False
-    for argv in cmds:
-        forced = _is_worktree_remove(argv)
-        if forced is None:
+    pipe_fallback = False
+    for i in range(1, len(segments)):
+        op, argv = segments[i]
+        if not op or "||" not in op:
             continue
-        if forced:
-            has_forced = True
-        else:
-            has_bare = True
+        this_forced = _worktree_remove_forced(argv)
+        if this_forced is not True:
+            continue
+        prev_forced = _worktree_remove_forced(segments[i - 1][1])
+        if prev_forced is False:  # explicitly bare, not "not a removal"
+            pipe_fallback = True
 
-    has_pipe = "||" in tokens
-    has_loop = any(
-        argv and argv[0] in _LOOP_KEYWORDS for argv in cmds
-    )
-    return has_forced, has_bare, has_pipe, has_loop
+    loop_depth = 0
+    loop_forced = False
+    for _op, argv in segments:
+        if not argv:
+            continue
+        if argv[0] in _LOOP_KEYWORDS:
+            loop_depth += 1
+            continue
+        if argv[0] == "done":
+            loop_depth = max(0, loop_depth - 1)
+            continue
+        if loop_depth > 0 and _worktree_remove_forced(argv) is True:
+            loop_forced = True
+
+    return pipe_fallback, loop_forced
 
 
 NOTE = (
@@ -213,12 +259,12 @@ def main() -> int:
 
     if result is None:
         return 0
-    has_forced, has_bare, has_pipe, has_loop = result
+    pipe_fallback, loop_forced = result
 
     shape = None
-    if has_forced and has_bare and has_pipe:
+    if pipe_fallback:
         shape = "`||` fallback (plain removal, forced on failure)"
-    elif has_forced and has_loop:
+    elif loop_forced:
         shape = "loop (forced every iteration)"
     if shape is None:
         return 0

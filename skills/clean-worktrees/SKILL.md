@@ -167,9 +167,11 @@ checks above say. (Hit on `Lacaedemon/sparta`, 2026-07-02: ~40 of 48 worktrees
 slated for cleanup showed `ahead=2` to `ahead=15` on the naive check — every
 one had actually merged via squash minutes to hours earlier.)
 
-**`git cherry origin/main <branch>` fails the same way and for the same reason** — it also answers by local ancestry, so it reports every commit as `+` (not on `main`) on a squash-merged branch, exactly as `git branch --merged` and the ahead-of-main count do.
-Don't reach for it as a "more precise" alternative to those two;
-it inherits the same blind spot.
+**`git cherry origin/main <branch>` fails on the same squash-merged branches, for a different reason than `git branch --merged` does.**
+`git cherry` compares by **patch content** (a patch-id computed per commit), not by ancestry --- so it is not simply "another ancestry check" and could in principle recognize a squashed commit whose diff matches.
+In practice it did not: measured during a 2026-09-10 `clean-git` sweep over several squash-merged worktrees, `git cherry origin/main` reported `+` (not found upstream) for every commit, the same false-Dirty outcome `git branch --merged` and the ahead-of-main count produce.
+Don't reach for it as a "more precise" alternative to those two on the strength of its different mechanism;
+the mechanism differs, the failure mode measured here does not.
 
 **A detached worktree has no branch, so the squash-merge escape hatch above
 does not apply to it --- and the naive check it falls back to is the one that
@@ -275,16 +277,18 @@ That is equally consistent with "merged and cleaned up" and with "merged,
 then you committed something else locally", and only the second is unsafe.
 
 **A detached worktree has no `<branch>` to run `gh pr list --head` against, so find `<N>` from the commit instead.**
-A squash merge preserves the PR title as the squash commit's subject line (GitHub's default template is `"<title> (#N)"`), so grep `origin/main`'s log for the worktree's own first commit subject:
+A squash merge preserves the PR title as the squash commit's subject line (GitHub's default template is `"<title> (#N)"`), and the PR title need not match any single one of the branch's own commit messages --- so try each of the worktree's own unique commits, not just `HEAD`'s, since any one of them could be the match:
 
 ```bash
 h=$(git -C <path> rev-parse HEAD)
-subject=$(git -C <path> log -1 --format='%s' "$h")
-git log origin/main --fixed-strings --grep="$subject" --format='%H %s'
+git -C <path> log --format='%s' "origin/main..$h" | sort -u | while IFS= read -r subject; do
+  git log origin/main --fixed-strings --grep="$subject" --format='%H %s'
+done
 ```
 
-The matching `origin/main` commit's subject carries the `(#N)` GitHub appends;
+A matching `origin/main` commit's subject carries the `(#N)` GitHub appends;
 that `N` is the PR to pass to `gh pr view` below.
+No match at all is inconclusive rather than proof of non-landing --- fall back to the whole-tree content diff two paragraphs up, or ask the user.
 
 Compare the branch tip's date against the PR's `mergedAt`:
 
@@ -361,16 +365,10 @@ git worktree remove <path>          # refuses on a dirty tree — a safety net; 
 git branch -d <branch>              # -d refuses unless merged; the work landed, so this should pass
 ```
 
-If `git worktree remove` reports the tree is dirty, that worktree was
-misclassified — re-inspect, don't reach for `--force`. Only `--force` after the
-user explicitly OKs discarding that worktree's changes.
+If `git worktree remove` reports the tree is dirty, that worktree was misclassified — re-inspect, don't reach for `--force`.
+Only `--force` after the user explicitly OKs discarding that worktree's changes.
 
-**Never fall back to `--force` on a plain refusal**, whether written as an explicit `||` retry or a loop that forces every iteration.
-The refusal itself is the signal that the tree changed since classification --- reaching past it with `--force` discards exactly what the re-check above exists to catch, and it is the same mistake as skipping the re-check in the first place, just moved one line down. (`hooks/warn-blanket-worktree-force-remove.py` warns on exactly this shape in a Bash command --- a plain removal `||`-chained to a forced retry, or a loop that forces every iteration.)
-
-- **Do:** treat a `git worktree remove` refusal as new information and re-inspect the worktree (`git -C <path> status --short`, the mtime snapshot) before deciding what to do next.
-- **Do:** reserve `--force` for the one case step 5's own exception names --- a genuinely clean tree refused only because it contains a submodule.
-- **Don't:** write `git worktree remove <path> || git worktree remove --force <path>` (or the loop equivalent) as a batch-removal shortcut --- it discards the refusal's own signal before anyone reads it.
+**This rules out a blanket fallback, written as either an explicit `||` retry or a loop that forces every iteration** --- `git worktree remove <path> || git worktree remove --force <path>` discards the refusal's own signal before anyone reads it, which is the same mistake as skipping the re-check above, just moved one line down. (`hooks/warn-blanket-worktree-force-remove.py` warns on exactly this shape in a Bash command.)
 
 **Exception — a worktree containing a submodule:** the error `fatal: working
 trees containing submodules cannot be moved or removed` is a *different*

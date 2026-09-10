@@ -358,7 +358,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-deferred-closing-keyword.py\"",
             "timeout": 10,
             "script": "warn-deferred-closing-keyword.py",
-            "why": "shared/workflow/issue-first.md, 'A closing keyword plus #N closes #N even when the sentence negates it'. GitHub's parser is purely lexical, so a body saying a LATER PR will close #N, or that #N is NOT being closed, closes it on merge. Warns when a closing keyword sits next to an issue reference mid-line AND its sentence carries a deferral or negation cue; a bare `Closes #N` line never fires. Three measured occurrences: ai-config#1718/#1717, Morrison-Lab/gha#460/#322, ucdavis/bcs#982/#923. Warns rather than blocks -- the guard cannot read intent and the remedy costs one word. Fails open. Tracked as #3512."
+            "why": "shared/workflow/issue-first.md, 'A closing keyword plus #N closes #N even when the sentence negates it'. GitHub's parser is purely lexical, so a body saying a LATER PR will close #N, or that #N is NOT being closed, closes it on merge. Scoped to a PR/issue DESCRIPTION and a commit message, since GitHub never scans a plain comment. Warns when a closing keyword sits next to an issue reference mid-line AND its sentence carries a deferral or negation cue; a bare `Closes #N` line never fires. Three measured occurrences: ai-config#1718/#1717, Morrison-Lab/gha#460/#322, ucdavis/bcs#982/#923. Warns rather than blocks -- the guard cannot read intent and the remedy costs one word. Fails open. Tracked as #3512."
           },
           {
             "type": "command",
@@ -808,7 +808,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-deferred-closing-keyword.py\"",
             "timeout": 10,
             "script": "warn-deferred-closing-keyword.py",
-            "why": "shared/workflow/issue-first.md, 'A closing keyword plus #N closes #N even when the sentence negates it'. GitHub's parser is purely lexical, so a body saying a LATER PR will close #N, or that #N is NOT being closed, closes it on merge. Warns when a closing keyword sits next to an issue reference mid-line AND its sentence carries a deferral or negation cue; a bare `Closes #N` line never fires. Three measured occurrences: ai-config#1718/#1717, Morrison-Lab/gha#460/#322, ucdavis/bcs#982/#923. Warns rather than blocks -- the guard cannot read intent and the remedy costs one word. Fails open. Tracked as #3512."
+            "why": "shared/workflow/issue-first.md, 'A closing keyword plus #N closes #N even when the sentence negates it'. GitHub's parser is purely lexical, so a body saying a LATER PR will close #N, or that #N is NOT being closed, closes it on merge. Scoped to a PR/issue DESCRIPTION and a commit message, since GitHub never scans a plain comment. Warns when a closing keyword sits next to an issue reference mid-line AND its sentence carries a deferral or negation cue; a bare `Closes #N` line never fires. Three measured occurrences: ai-config#1718/#1717, Morrison-Lab/gha#460/#322, ucdavis/bcs#982/#923. Warns rather than blocks -- the guard cannot read intent and the remedy costs one word. Fails open. Tracked as #3512."
           },
           {
             "type": "command",

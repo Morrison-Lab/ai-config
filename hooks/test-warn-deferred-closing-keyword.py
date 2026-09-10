@@ -156,17 +156,82 @@ class CommandExtraction(unittest.TestCase):
         finally:
             os.unlink(path)
 
-    def test_gh_api_field_file(self):
+    def test_gh_api_issue_body_patch(self):
+        # A PATCH to the issue itself edits its DESCRIPTION, which GitHub does
+        # scan.
         with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as handle:
             handle.write("The follow-up will close #88.\n")
             path = handle.name
         try:
             note = run_hook(bash(
-                f"gh api repos/o/r/issues/1/comments -F body=@{path}"
+                f"gh api -X PATCH repos/o/r/issues/1 -F body=@{path}"
             ))
             self.assertIn("close #88", note)
         finally:
             os.unlink(path)
+
+
+class CommentsAreOutOfScope(unittest.TestCase):
+    """GitHub's closing-keyword parser reads a PR or issue DESCRIPTION and a
+    commit message. It never reads a plain comment, so warning on one would
+    assert something false."""
+
+    BODY = "The follow-up will close #88."
+
+    def test_gh_pr_comment_is_silent(self):
+        self.assertEqual(
+            run_hook(bash(f'gh pr comment 1 --body "{self.BODY}"')), ""
+        )
+
+    def test_gh_issue_comment_is_silent(self):
+        self.assertEqual(
+            run_hook(bash(f'gh issue comment 1 --body "{self.BODY}"')), ""
+        )
+
+    def test_gh_api_comments_endpoint_is_silent(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as handle:
+            handle.write(self.BODY + "\n")
+            path = handle.name
+        try:
+            self.assertEqual(
+                run_hook(bash(
+                    f"gh api repos/o/r/issues/1/comments -F body=@{path}"
+                )),
+                "",
+            )
+        finally:
+            os.unlink(path)
+
+    def test_gh_api_single_comment_patch_is_silent(self):
+        self.assertEqual(
+            run_hook(bash(
+                f'gh api -X PATCH repos/o/r/issues/comments/5 -f body="{self.BODY}"'
+            )),
+            "",
+        )
+
+    def test_add_issue_comment_mcp_tool_is_silent(self):
+        payload = {
+            "tool_name": "mcp__github__add_issue_comment",
+            "tool_input": {"body": "A follow-up PR that closes #923."},
+        }
+        self.assertEqual(run_hook(payload), "")
+
+    def test_pending_review_comment_mcp_tool_is_silent(self):
+        payload = {
+            "tool_name": "mcp__github__add_comment_to_pending_review",
+            "tool_input": {"body": "A follow-up PR that closes #923."},
+        }
+        self.assertEqual(run_hook(payload), "")
+
+    def test_a_real_description_write_alongside_a_comment_still_fires(self):
+        # The exclusion covers a lone `gh api` to a comments endpoint, not a
+        # compound command that also edits a description.
+        note = run_hook(bash(
+            'gh api repos/o/r/issues/1/comments -f body="hi" && '
+            'gh pr edit 2 --body "a follow-up will close #88"'
+        ))
+        self.assertIn("close #88", note)
 
     def test_unrelated_command_is_silent(self):
         self.assertEqual(run_hook(bash('echo "a later PR closes #923"')), "")
@@ -218,4 +283,14 @@ def run_hook_raw(text: str) -> str:
 
 
 if __name__ == "__main__":
-    unittest.main()
+    # argv[1] is the subject path, not a test name -- hide it from unittest.
+    # unittest reports on stderr; scripts/test_hooks.py shows the last stdout
+    # line, so emit a count there too rather than leaving it "(no output)".
+    result = unittest.main(argv=[sys.argv[0]], verbosity=2, exit=False).result
+    bad = len(result.failures) + len(result.errors)
+    print(
+        f"{result.testsRun}/{result.testsRun} passed"
+        if not bad
+        else f"{bad} failure(s) across {result.testsRun} tests"
+    )
+    sys.exit(1 if bad else 0)

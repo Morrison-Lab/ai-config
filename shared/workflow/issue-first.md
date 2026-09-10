@@ -109,6 +109,9 @@ asserting it anywhere.
 third occurrence: it warns when a closing keyword sits next to an issue
 reference mid-line inside a sentence carrying a deferral or negation cue.
 A bare `Closes #N` line never fires.
+It is scoped to a pull-request description, an issue description, and a commit
+message, because those are the only three surfaces GitHub's parser reads --- a
+plain comment may carry `closes #N` all it likes and closes nothing.
 
 See [`ardi.cases.md`](ardi.cases.md), "A negated closing-keyword sentence
 still closes the issue", and

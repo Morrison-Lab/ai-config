@@ -118,13 +118,16 @@ RX_LINE_LEAD = re.compile(r"^[ \t]*(?:[-*+]\s+|>\s*|\d+[.)]\s+)?$")
 
 BASH_TOOLS = ("Bash", "bash", "run_command", "execute_command", "terminal", "shell")
 
+# Only a pull-request DESCRIPTION, an issue DESCRIPTION, or a commit message
+# is scanned by GitHub's closing-keyword parser. A plain comment is not, so a
+# comment-posting tool is deliberately absent here: warning there would assert
+# something false. The Bash path excludes `gh pr comment` / `gh issue comment`
+# and the comments REST endpoints for the same reason.
 MCP_BODY_TOOLS = (
     "mcp__github__create_pull_request",
     "mcp__github__update_pull_request",
     "mcp__github__issue_write",
     "mcp__github__create_issue",
-    "mcp__github__add_issue_comment",
-    "mcp__github__add_comment_to_pending_review",
 )
 
 # `gh pr create`, `gh pr edit`, `gh issue create`, `gh issue edit`, `git commit`
@@ -136,6 +139,17 @@ RX_BODY_COMMAND = re.compile(
     r"|glab\s+(?:mr|issue)\s+(?:create|update)"
     r"|git\s+commit"
     r"|gh\s+api\b)",
+    re.MULTILINE,
+)
+
+# `gh api` reaches both descriptions and comments. Only the first is scanned
+# by GitHub, so a comments endpoint --- `.../issues/1/comments`, or a specific
+# comment at `.../issues/comments/5` --- is not this hook's business.
+RX_COMMENTS_ENDPOINT = re.compile(r"/comments(?:/\d+)?(?:[?\s'\"]|$)")
+
+RX_GH_API = re.compile(
+    r"(?:^|[;&|\n({`])\s*"
+    r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*gh\s+api\b",
     re.MULTILINE,
 )
 
@@ -272,9 +286,24 @@ def bodies_from_command(command: str) -> list:
     return bodies
 
 
+def targets_a_comment_endpoint(command: str) -> bool:
+    """True when the only body-carrying command here is a `gh api` call against
+    a comments endpoint, whose body GitHub never scans for closing keywords."""
+    if not RX_GH_API.search(command):
+        return False
+    if not RX_COMMENTS_ENDPOINT.search(command):
+        return False
+    # A compound command may also carry a real description write; only the
+    # pure-`gh api`-to-comments case is out of scope.
+    without_api = RX_GH_API.sub(" ", command)
+    return not RX_BODY_COMMAND.search(without_api)
+
+
 def evaluate_bash(command: str) -> str | None:
     """Return warning text when a body-carrying command holds a risky reference."""
     if not command or not RX_BODY_COMMAND.search(command):
+        return None
+    if targets_a_comment_endpoint(command):
         return None
     for body in bodies_from_command(command):
         note = evaluate_body(body)

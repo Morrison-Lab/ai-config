@@ -49,6 +49,8 @@ for label, cmd in [
     ("case redirected", "case  in\n  a) cmd 2>/dev/null ;;\n  *) other ;;\nesac > out.json"),
     ("case with parenthesised pattern redirected", "case  in\n  (a) cmd 2>/dev/null ;;\n  *) other ;;\nesac > out.json"),
     ("select redirected", "select x in a b; do cmd 2>/dev/null; done > out.json"),
+    ("single-line case piped", "case $x in a) cmd 2>/dev/null ;; esac | jq ."),
+    ("a stage after a single-line case", "case $o in a) p ;; b) q ;; esac; curl -s u 2>/dev/null | jq ."),
 ]:
     check(f"{label} fires", fires(cmd), True)
 
@@ -60,6 +62,17 @@ for label, cmd in [
     check(f"{label} is ignored", fires(cmd), False)
 
 check("nested substitution reported filename", reported('cmd 2>/dev/null > "$(mktemp)"')[1], 'redirected to `"$(mktemp)"`')
+check("backticked redirect target is reported whole",
+      reported("cmd 2>/dev/null > `echo my file`.json")[1],
+      "redirected to ``echo my file`.json`")
+
+# KNOWN LIMIT: a case statement nested inside a command substitution. The
+# pattern terminator's `)` is indistinguishable here from the substitution's
+# own closing parenthesis, so the group is not recognised and nothing fires.
+# It under-warns, which for an advisory hook is the tolerated direction, and
+# it is pinned so a later parser change reports it rather than hiding it.
+check("KNOWN LIMIT: a case inside a substitution does not fire",
+      fires("x=$(case $y in a) cmd 2>/dev/null ;; esac)"), False)
 
 # The measured incident from ai-config#2998
 INCIDENT = 'glab api "projects/.../pipelines/$p/jobs" > "$SP/j.json" 2>/dev/null'

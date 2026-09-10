@@ -324,7 +324,12 @@ def _get_depths(text):
 
         if is_kw and token in ("do", "then", "else", "elif", "!", "time", "(", ")", "{", "}", "if", "while", "for", "until", "select", "case", "fi", "done", "esac"):
             in_cmd = True
-        elif token in (";", "&", "|", "&&", "||", "\n"):
+        # `;;` ends a case clause, so the next token starts a command and can
+        # be the `esac` that closes the group. Omitting it left an `esac` on
+        # the same line unrecognised, and the depth it should have closed
+        # stayed raised for the rest of the string, so no later stage was
+        # split off or examined (CI review of b41c1f39).
+        elif token in (";", ";;", "&", "|", "&&", "||", "\n"):
             in_cmd = True
         else:
             in_cmd = False
@@ -348,7 +353,7 @@ def _extract_token(text, start):
         if quote:
             quote, index = _handle_quoted_char(char, quote, index, text)
             continue
-        if char in "\"'":
+        if char in "\"'`":
             quote = char
             index += 1
             continue
@@ -418,7 +423,13 @@ def _consumption(stage, is_last, captured, original_stage):
 
 def find_offenses(command):
     """[(stage_text, reason), ...] for every pipeline stage in `command` that
-    suppresses stderr while its own stdout is consumed."""
+    suppresses stderr while its own stdout is consumed.
+    KNOWN LIMIT: a `case` nested inside a command substitution does not fire.
+    A pattern terminator's `)` cannot be told apart there from the
+    substitution's own closing parenthesis, so the group is not
+    recognised. It under-warns, which is the tolerated direction for an
+    advisory hook, and a test pins it.
+    """
     masked, spans = _mask(command)
     out = []
     for base, text, captured in _regions(masked, spans):

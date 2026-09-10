@@ -30,13 +30,15 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
     it is a *different* flag taking `details`, `ids`, or `urls`, so `json`
     is not one of its values, and on `glab api` it does not exist at all
     (`Unknown flag: --output-format`).
-    A reviewer running `glab issue list` against a live GitLab remote
-    reported that an unrecognized `-F` value is silently ignored and the
-    default `details` table is printed, which would make the wrong flag a
-    *quiet* wrong answer on exactly the command you are most likely to type
-    it on.
-    Unverified here for want of a GitLab remote, and worth confirming before
-    relying on either reading (`glab 1.106.0`, 2026-09-09).
+    What `glab issue list` does with an unrecognized `-F` value is
+    **unconfirmed** --- this machine has no GitLab remote, so the command
+    dies on the host lookup before the flag matters.
+    One reviewer, running against a live remote, reported that the value is
+    silently ignored and the default `details` table is printed.
+    Confirm that before relying on it;
+    if it holds, the wrong flag is a *quiet* wrong answer on the very
+    command you are likeliest to type it on
+    (`glab 1.106.0`, 2026-09-09).
   - **Don't:** read an empty or garbled capture as the command having
     returned nothing --- the pager, not the query, ate the output.
   (Recovered 2026-09-09 from a stash dated 2026-06-22 during a `/cb` sweep of

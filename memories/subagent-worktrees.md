@@ -335,14 +335,14 @@ What is actually known, as of 2026-09-02:
   That is a choice this corpus has not revisited, not a limit it has hit.
 - A `SubagentStart`/`SubagentStop` pair is the obvious ledger, and the obvious objection is resumption.
   Whether the objection holds is UNMEASURED: it turns on whether a resumed agent re-emits `SubagentStart`, and on whether the resuming session runs these hooks at all.
-  Neither recorded occurrence names the resuming session, so neither settles it.
+  No recorded occurrence names the resuming session, so none of them settles it.
 
 The measurement that would settle it has to vary the resuming session, or it answers only half the question.
 Register a logger on all five subagent and task events --- they are keyed by name with no wildcard, so "log every event" is itself a step.
 Dispatch an agent and let it report.
 Resume it twice: once from the dispatching session, once from a SECOND session with its own hook configuration.
 Record which session's log each event lands in.
-Resuming only from the dispatcher holds the variable that both occurrences turned on constant.
+Resuming only from the dispatcher holds the variable those occurrences turned on constant.
 Until someone runs that, "no instrument was built" is the honest sentence and "no instrument is possible" is not.
 
 Meanwhile the decidable slice upstream of the failure is already built: `hooks/flag-unassigned-worktree.py` warns on a write-capable `Agent` launch with no `isolation`.
@@ -354,10 +354,10 @@ One cheap check that works today is a message: `SendMessage` to the agent's id c
 - **Do:** ask the agent directly, rather than inferring liveness from a report, a quiet tree, or an absent `ListAgents` row.
 - **Do:** record the branch and commit when a collision happens, so the case can be audited later rather than taken on trust.
 - **Don't:** read a completion report as evidence the agent is even idle;
-  measured twice, and the second time it was still running.
+  measured three times, and on the last two the process was still running.
 - **Don't:** write "no instrument is possible" when what is true is "none was built and the objection is unmeasured" --- two drafts of this entry made exactly that upgrade, and a durable record that forecloses a question stops anyone reopening it.
 
-**Third occurrence, 2026-09-10, and the one that supplies an instrument rather than another anecdote.**
+**Third occurrence, 2026-09-10, and the one that supplies a check independent of the agent's own testimony.**
 A background `Agent` reported `status=completed` and signed off with "**Stopping Point**: Clean stopping point reached --- both PRs this session opened are merged, working tree is clean, no uncommitted changes, no open questions."
 Its process was still alive, and still alive 8h57m later.
 
@@ -370,18 +370,18 @@ An unreaped child stays in the process table, so `ps -p` exits 0 over a process 
 That is the trap [`claude-code`](claude-code.md)'s entry on `kill -0` records, and for the same reason: both read the process table alone.
 This is a distinct signal from `session-lock`'s registry (`ai-session.sh`'s `find_agent_pid` plus `kill -0`), which covers only the sessions that skill registers and never calls `git worktree lock`.
 
-- **Do:** parse the PID from `git worktree list --porcelain`'s lock reason and run `ps -o stat= -p <pid>` before reclaiming a dispatched agent's worktree, treating a `Z` state as dead.
+- **Do:** parse the PID from `git worktree list --porcelain`'s lock reason and run `ps -o stat= -p <pid>` before reclaiming a dispatched agent's worktree, treating both a `Z` state and empty output (exit 1, the PID fully reaped) as dead.
 - **Do:** prefer that read over the agent's own sign-off, however explicit ("Stopping Point: Clean", `status=completed`), since the sign-off is a claim about its output rather than its process.
 - **Don't:** use a bare `ps -p` or `kill -0` for this --- both report an unreaped zombie as alive.
 - **Don't:** read a non-`Z` state as proof the *dispatching* process is the one still running;
-  a reaped PID can be reissued to something unrelated, so compare start times over a long gap --- but convert first, because the lock records UTC while `ps -o lstart=` prints local time, and comparing them raw manufactures the very gap that would read as a reissued PID.
+  a reaped PID can be reissued to something unrelated, so compare start times over a long gap --- but convert first with `TZ=UTC ps -o lstart= -p <pid>`, because the lock records UTC while `ps -o lstart=` otherwise prints local time, and comparing them raw manufactures the very gap that would read as a reissued PID.
 - **Don't:** treat this as closing the `SubagentStop`-ledger question recorded above;
   that question is about a *resumption* by another session, which a PID read cannot see.
 
 (Two separate measurements, both 2026-09-10 on macOS 26.6.2, Darwin 25.6.0.
 The incident: a worktree lock naming `pid 80565`, whose process read alive --- state `S`, never `Z` --- immediately and again 8h57m later.
 The zombie behaviour is a synthetic reproduction rather than something that occurrence exhibited: a forked child calling `os._exit(0)`, left unreaped, exits 0 from `ps -p` and reads `Z` from `ps -o stat= -p`, reproduced independently by a reviewer on the same machine.
-The bare listing shows it as `<defunct>` with no STAT column at all, which is why the state has to be asked for explicitly.
+A bare `ps -p` shows it as `<defunct>` with no STAT column at all, which is why the state has to be asked for explicitly.
 Reap timing and init identity are environment properties rather than properties of Unix, so re-measure under a different init, per [`timestamp-volatile-claims`](../shared/writing/timestamp-volatile-claims.md).)
 
 ## Switching a shared worktree's branch under a live dispatched reviewer breaks its reads

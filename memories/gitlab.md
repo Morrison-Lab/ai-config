@@ -13,11 +13,14 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
 - Installed via Homebrew (macOS) or system package manager --- verify with `which glab`.
 - Authenticated on your GitLab instance --- run `glab auth status` to verify host and username
 - Use for MR comments, pipeline checks, CI job logs, etc.
-- **`glab` opens a pager (alternate buffer) that makes output unreadable in a
-  VS Code terminal, the same way `gh` does** --- most often on `glab api` and
-  `glab issue list`.
-  [`gh-cli.md`](gh-cli.md) records the `gh` half and its `GH_PAGER=cat` fix;
-  `glab` needs its own, since `GH_PAGER` does not reach it.
+- **`glab` opens a pager (alternate buffer) too, most often on `glab api` and
+  `glab issue list`.**
+  [`gh-cli.md`](gh-cli.md) records the `gh` half --- there the pager *hangs*
+  the agent terminal --- and its `GH_PAGER=cat` fix.
+  `glab` was observed in a VS Code terminal leaving output garbled rather than
+  hanging, so treat the symptom as varying by terminal and the cause as the
+  same one.
+  `GH_PAGER` does not reach `glab`, so the `gh` fix does not cover it.
   - **Do:** pipe through `| cat`, export `PAGER=cat`, or ask for JSON with
     `--output-format json`; redirect to a file and read that back when a
     command still takes the terminal.

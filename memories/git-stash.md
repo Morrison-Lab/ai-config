@@ -103,14 +103,21 @@ Because the pop conflicted, the entry was retained and still reads as
   check reported ABSENT for 12 of 13, including one entry whose added lines
   were 95% already on `main` and another at 100%.
   The per-line check in the bullet above scored those two correctly.
+  That stack was dropped in the same sweep, so the figures are not
+  re-derivable from `git stash list`;
+  the entries survive as the local tags `backup/stash-2026-09-09-s0` through
+  `-s12`, which is what makes the measurement auditable at all.
+  Local tags are not pushed, so a clone other than that machine's cannot
+  check it --- read the numbers as a recorded observation rather than as a
+  standing claim about anything a fresh checkout can reproduce.
   - **Do:** index every line of every tracked file once
     (`git ls-files`, read each, build a set of stripped lines), then score
     each stash's added lines against that set --- one pass answers the whole
     stack, where a per-line `git grep` costs a subprocess per line and times
     out.
   - **Do:** read a partial score as a prompt to open the diff, since the
-    residue is the whole question --- a stale count or a debugging edit is a
-    drop, an unlanded feature is a branch.
+    residue is the whole question --- drop a stale count or a debugging edit,
+    and recover an unlanded feature onto a branch before dropping its stash.
   - **Don't:** treat a whole-diff reverse-apply failure as evidence the
     content is unlanded.
   - **Don't:** treat a high percentage as landed without reading the

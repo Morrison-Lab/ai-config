@@ -833,7 +833,11 @@ def main() -> int:
     check(
         "check_latest_verdict: Copilot CHANGES_REQUESTED is not cleared by a "
         "later Claude all-clear (#2274)",
-        (not cr_ok) and any("copilot-pull-request-reviewer[bot]" in i for i in cr_issues),
+        # The blocker names the reviewer IDENTITY, which for every Copilot
+        # login spelling is now "Copilot" (ai-config#3066). The assertion is
+        # unchanged in substance: Copilot's own standing not-clean is still
+        # what has to survive Claude's later all-clear.
+        (not cr_ok) and any("Copilot" in i for i in cr_issues),
     )
     cr_approved_ok, cr_approved_issues = checker.check_latest_verdict(
         [copilot_cr, claude_ready],
@@ -2113,6 +2117,7 @@ def main() -> int:
         checker.classify_verdict(
             "### Verdict\nNeeds more work: non-blocking issue, please rename variable x.\n",
             "",
+            "copilot"
         )
         == "not-clean",
     )
@@ -5702,6 +5707,225 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check(
         "_blank_fences_and_spans on max-length body of double backticks scales linearly (< 1s)",
         _db_secs < 1.0,
+    )
+
+    # ai-config#3066: a current-head Copilot formal review is the authentic
+    # clean external verdict, and its heading vocabulary was unreadable to
+    # every scan in this file, so it counted neither way.
+    #
+    # Fixture provenance, per shared/workflow/fixtures-are-not-evidence.md: a
+    # fixture is not evidence about the system it imitates, so these bodies are
+    # transcribed from real Copilot reviews rather than invented. The issue
+    # cites ucdavis/rampp#161 review 5096969112, which is not readable from
+    # this repo; the wording below is taken from Copilot's reviews on
+    # Morrison-Lab/ai-config#3166, fetched on 2026-09-09 -- review 5108199716
+    # for the affirmative shape and 5108139399 / 5108171770 / 5108621306 for
+    # the three negative ones.
+    copilot_details = (
+        "<details>\n<summary>Review details</summary>\n\n"
+        "- **Files reviewed:** 4/4 changed files\n"
+        "- **Comments generated:** 0 new\n"
+        "- **Review effort level:** Lite\n"
+        "</details>"
+    )
+    copilot_clean_body = (
+        "### \U0001f7e2 Approval recommended\n\n"
+        "The changes are documentation-only, internally consistent within the "
+        "updated sections, and appear to correctly scope and qualify the "
+        "measured claims.\n\n" + copilot_details
+    )
+    copilot_changes_body = (
+        "### \U0001f7e1 Changes recommended\n\n"
+        "The new section title currently omits the required remote argument.\n\n"
+        "<details>\n<summary>Review details</summary>\n\n"
+        "- **Files reviewed:** 4/4 changed files\n"
+        "- **Comments generated:** 2\n"
+        "- **Review effort level:** Lite\n"
+        "</details>"
+    )
+    copilot_closer_look_body = (
+        "### \U0001f535 Needs a closer look\n\n"
+        "The new section uses a command that will not emit patches.\n\n"
+        "<details>\n<summary>Review details</summary>\n\n"
+        "### Suppressed comments (1)\n\n"
+        "**Previously missed (1)** in code that hasn't changed since the last "
+        "review.\n\n"
+        "**memories/git-diffing.md:179**\n"
+        "* Without the patch flag the output is just commit messages.\n\n"
+        "- **Files reviewed:** 4/4 changed files\n"
+        "- **Comments generated:** 0 new\n"
+        "- **Review effort level:** Lite\n"
+        "</details>"
+    )
+    copilot_suppressed_body = copilot_clean_body.replace(
+        "- **Files reviewed:** 4/4 changed files",
+        "### Suppressed comments (1)\n\n"
+        "**memories/git.md:152**\n"
+        "* This file still contains non-ASCII em dashes.\n\n"
+        "- **Files reviewed:** 4/4 changed files",
+    )
+    copilot_nonzero_body = copilot_clean_body.replace(
+        "Comments generated:** 0 new", "Comments generated:** 2"
+    )
+    copilot_countless_body = copilot_clean_body.split("<details>")[0].rstrip()
+
+    check(
+        "copilot_verdict: affirmative heading with zero comments and no "
+        "suppression block is clean",
+        checker.copilot_verdict(copilot_clean_body) == "clean",
+    )
+    check(
+        "copilot_verdict: 'Changes recommended' heading is not clean",
+        checker.copilot_verdict(copilot_changes_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: 'Needs a closer look' heading is not clean",
+        checker.copilot_verdict(copilot_closer_look_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: affirmative heading over a suppression block is "
+        "not clean",
+        checker.copilot_verdict(copilot_suppressed_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: affirmative heading with a nonzero comment count is "
+        "not clean",
+        checker.copilot_verdict(copilot_nonzero_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: affirmative heading with no comment count states no "
+        "verdict rather than a clean one",
+        checker.copilot_verdict(copilot_countless_body) == "",
+    )
+    check(
+        "copilot_verdict: a body carrying no Copilot heading states no verdict",
+        checker.copilot_verdict("### Verdict\n\n**Ready for merge**") == "",
+    )
+    check(
+        "copilot_verdict: 'Approval recommended' in prose is not a heading "
+        "verdict",
+        checker.copilot_verdict(
+            "The reviewer wrote that Approval recommended was its earlier "
+            "verdict.\n\n- **Comments generated:** 0\n"
+        )
+        == "",
+    )
+
+    check(
+        "classify_verdict: Copilot affirmative review classifies clean",
+        checker.classify_verdict(copilot_clean_body, "COMMENTED", "copilot") == "clean",
+    )
+    for _label, _body in (
+        ("changes recommended", copilot_changes_body),
+        ("needs a closer look", copilot_closer_look_body),
+        ("suppressed findings", copilot_suppressed_body),
+        ("nonzero comment count", copilot_nonzero_body),
+    ):
+        check(
+            f"classify_verdict: Copilot {_label} review classifies not-clean",
+            checker.classify_verdict(_body, "COMMENTED", "copilot") == "not-clean",
+        )
+    check(
+        "classify_verdict: a finding stated in a Copilot body's prose beats "
+        "its affirmative heading",
+        checker.classify_verdict(
+            copilot_clean_body.replace(
+                "The changes are documentation-only",
+                "### Verdict\n\n**Needs work**\n\nThe changes are "
+                "documentation-only",
+            ),
+            "COMMENTED",
+            "copilot"
+        )
+        == "not-clean",
+    )
+
+    check(
+        "classify_verdict: a non-Copilot body with that heading and an explicit clean verdict stays clean",
+        checker.classify_verdict("### \U0001f7e2 Approval recommended\n\n### Verdict\n\n**Ready for merge**", "COMMENTED", "someone-else") == "clean",
+    )
+    check(
+        "copilot_verdict: fenced example of Copilot heading is ignored",
+        checker.copilot_verdict('```\n### \U0001f7e1 Changes recommended\n```\n### \U0001f7e2 Approval recommended\n\n- **Comments generated:** 0') == "clean",
+    )
+    check(
+        "copilot_verdict: negated heading is not affirmative",
+        checker.copilot_verdict("### Not Approval recommended\n\n- **Comments generated:** 0") == "",
+    )
+    check(
+        "copilot_verdict: quoted heading is not affirmative",
+        checker.copilot_verdict("## \"Approval recommended\"? No.\n\n- **Comments generated:** 0") == "",
+    )
+    check(
+        "_is_bot_author admits Copilot's bare login as well as the [bot] form",
+        checker._is_bot_author("copilot-pull-request-reviewer")
+        and checker._is_bot_author("copilot-pull-request-reviewer[bot]"),
+    )
+    check(
+        "_reviewer_identity maps every Copilot login spelling to one identity",
+        len(
+            {
+                checker._reviewer_identity(copilot_clean_body, login)
+                for login in (
+                    "Copilot",
+                    "copilot-pull-request-reviewer",
+                    "copilot-pull-request-reviewer[bot]",
+                )
+            }
+        )
+        == 1,
+    )
+
+    # End to end through check_review_comments: the clean shape satisfies a
+    # single-provider quorum, and each negative shape blocks.
+    copilot_review = {
+        "submittedAt": "2026-09-09T18:14:14Z",
+        "state": "COMMENTED",
+        "author": {"login": "copilot-pull-request-reviewer"},
+        "commit": {"oid": "sha123"},
+        "body": copilot_clean_body,
+    }
+    mock_copilot_clean = json.dumps({"comments": [], "reviews": [copilot_review]})
+    with patch.object(checker, "run_cmd", return_value=mock_copilot_clean):
+        cop_ok, cop_issues = checker.check_review_comments("3066", "sha123", TEST_REPO)
+    check(
+        "check_review_comments: a current-head Copilot approval counts toward "
+        "quorum (ai-config#3066)",
+        cop_ok and cop_issues == [],
+    )
+
+    for _label, _body in (
+        ("changes recommended", copilot_changes_body),
+        ("needs a closer look", copilot_closer_look_body),
+        ("suppressed findings", copilot_suppressed_body),
+        ("nonzero comment count", copilot_nonzero_body),
+    ):
+        _review = dict(copilot_review, body=_body)
+        _mock = json.dumps({"comments": [], "reviews": [_review]})
+        with patch.object(checker, "run_cmd", return_value=_mock):
+            _ok, _issues = checker.check_review_comments("3066", "sha123", TEST_REPO)
+        check(
+            f"check_review_comments: Copilot {_label} review blocks",
+            (not _ok) and any(not i.startswith("NOTE: ") for i in _issues),
+        )
+
+    # Quorum: two Copilot login spellings are one provider, not two.
+    _copilot_bot_spelling = dict(
+        copilot_review,
+        submittedAt="2026-09-09T18:20:00Z",
+        author={"login": "copilot-pull-request-reviewer[bot]"},
+    )
+    mock_two_spellings = json.dumps(
+        {"comments": [], "reviews": [copilot_review, _copilot_bot_spelling]}
+    )
+    with patch.object(checker, "run_cmd", return_value=mock_two_spellings):
+        two_ok, two_issues = checker.check_review_comments(
+            "3066", "sha123", TEST_REPO, quorum=2
+        )
+    check(
+        "check_review_comments: two Copilot login spellings do not satisfy a "
+        "two-provider quorum on their own",
+        (not two_ok) and any("quorum" in i.lower() for i in two_issues),
     )
 
     print(f"\n{passes} passed, {failures} failed")

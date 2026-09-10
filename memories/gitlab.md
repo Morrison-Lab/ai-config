@@ -22,8 +22,15 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   same one.
   `GH_PAGER` does not reach `glab`, so the `gh` fix does not cover it.
   - **Do:** pipe through `| cat`, export `PAGER=cat`, or ask for JSON with
-    `--output json` (short form `-O json`); redirect to a file and read that
-    back when a command still takes the terminal.
+    `--output json`; redirect to a file and read that back when a command
+    still takes the terminal.
+    The long form is the portable one --- `-O` is a shorthand on
+    `glab issue list` and **not** on `glab api`, where it fails with
+    `Unknown shorthand flag: 'O' in -O` while `--output json` gets as far as
+    `Unauthenticated`.
+    Read the *message* to tell those apart;
+    both exit 1 on a machine with no GitLab remote, so the exit code cannot
+    (`glab 1.106.0`, 2026-09-09).
   - **Don't:** reach for `--output-format json`, and don't expect it to
     fail loudly.
     It is not a deprecated spelling of `--output` --- on `glab issue list`

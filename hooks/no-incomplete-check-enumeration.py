@@ -436,6 +436,15 @@ def main() -> int:
     # report covers the claim -- a subagent's report is an event that can
     # move the ground out from under an earlier complete read exactly the
     # way a push does (a review can land after the subagent stops).
+    # Did the newest relevant subagent actually work on the PR this claim
+    # names, or did it only match some other reference sitting nearby? The
+    # second is a reason to look, not a fact about the claim's evidence,
+    # and asserting it produced a false sentence on "#100 was closed as a
+    # duplicate. #200 is fully clean." (#3475 round 9).
+    subagent_on_topic = any(
+        idx == last_subagent and pr_label in refs
+        for idx, refs in subagent_events) or last_subagent == subagent_timed
+
     reading_needed_since = max(last_push, last_subagent)
     if last_complete > reading_needed_since:
         return 0
@@ -546,7 +555,21 @@ def main() -> int:
             "its own, so the reading is unambiguously the later one."
         )
     else:
-        if "subagent" in kinds:
+        if "subagent" in kinds and not subagent_on_topic:
+            # Matched by PROXIMITY, not by ordering: the report concerns a PR
+            # mentioned near this claim, which is a reason to look rather than
+            # a fact about what the claim rests on. Asserting otherwise was a
+            # false narrative sentence on "#100 was closed as a duplicate.
+            # #200 is fully clean." (#3475 round 9).
+            reasons.append(
+                "A dispatched subagent's report in this transcript concerns a PR "
+                "mentioned alongside this claim. Whether it is what this claim "
+                "rests on is not something the transcript settles -- but if it "
+                "is, note that a subagent's report is a claim rather than an "
+                "instrument, and it is stale by construction: the agent stops, "
+                "and then reviews and checks keep landing."
+            )
+        elif "subagent" in kinds:
             reasons.append(
                 "The most recent evidence in this transcript for that claim is a "
             "dispatched subagent's OWN report, not a reading you ran yourself. "

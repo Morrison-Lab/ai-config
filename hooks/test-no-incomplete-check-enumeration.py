@@ -332,6 +332,14 @@ CONTENT_CASES = [
      "a `git push` landed after it",
      "with the subagent's report as the LAST evidence, the subagent reason "
      "is the true one and the push reason must not appear"),
+    ([AGENT_100_DISPATCH, AGENT_100_REPORT,
+      say("#100 was closed as a duplicate. #200 is fully clean.")],
+     "not something the transcript settles",
+     "The most recent evidence in this transcript for that claim is a "
+     "dispatched",
+     "a proximity match is a reason to look, not a fact about what the "
+     "claim rests on -- the message must hedge rather than assert that a "
+     "#100 subagent is the #200 claim's evidence"),
     ([AGENT_DISPATCH, AGENT_REPORT, PUSH_AND_CHECKER_SAME_TURN,
       say("#3468 is fully clean.")],
      "SAME turn",

@@ -382,6 +382,18 @@ _ATTRIBUTION_CASES = [
      "the same with a backtick"),
     ("echo \"$(cat ~/.claude/settings.json)\"", {"claude"},
      "inside double quotes the substitution does expand and is followed"),
+    ("rm -rf ~/.claude ; echo \"it's fine\" '$(cat ~/.claude/settings.json)'", set(),
+     "an apostrophe inside double quotes is not a single quote, so the "
+     "separate single-quoted substitution stays inert (twelfth round)"),
+    ("echo \"it's $(cat ~/.claude/settings.json)\"", {"claude"},
+     "the same apostrophe with the substitution inside the double quotes, "
+     "which does expand"),
+    ("echo `it's $(cat ~/.claude/settings.json)`", {"claude"},
+     "an unbalanced quote makes shlex reject the WHOLE command, so this "
+     "takes the issue-mandated whole-command lexical fallback"),
+    ("cat `cat 'x`y'; cat ~/.claude/settings.json`", {"claude"},
+     "a quoted backtick inside a backtick body does not end the body early, "
+     "so the real read after it is still credited"),
     ("cat $(echo \"a)b\"; cat ~/.claude/settings.json)", {"claude"},
      "a quoted close inside the body does not end it early"),
     ("cat $(echo \\( ; cat ~/.claude/settings.json)", {"claude"},

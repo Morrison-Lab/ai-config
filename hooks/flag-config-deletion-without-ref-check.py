@@ -568,26 +568,41 @@ def substitution_bodies(command):
     either, since its value is unknown here; that under-credits, which for a
     DISCHARGE test is the direction that warns. An opener inside a
     single-quoted span is text the shell never expands, so it opens nothing;
-    inside double quotes it does expand, and is followed.
+    inside double quotes it does expand, and is followed. The walk tracks
+    which quote is open, so an apostrophe inside a double-quoted word does
+    not start a single-quoted span (twelfth review round). A backtick body
+    is closed by the first backtick outside its own quotes, so a quoted
+    backtick inside it does not end it early. A command whose quotes never
+    close never reaches here: shlex rejects it and the whole-command lexical
+    fallback runs instead.
     """
     bodies = []
+    quote = None
     index = 0
     while index < len(command):
         char = command[index]
-        if char == "'":
-            close = command.find("'", index + 1)
-            index = len(command) if close < 0 else close + 1
+        if quote == "'":
+            if char == "'":
+                quote = None
+            index += 1
             continue
         if char == "\\":
             index += 2
+            continue
+        if quote == '"' and char == '"':
+            quote = None
+            index += 1
+            continue
+        if quote is None and char in ("'", '"'):
+            quote = char
+            index += 1
             continue
         match = RX_SUBSTITUTION_OPEN.match(command, index)
         if not match:
             index += 1
             continue
         if match.group(0) == "`":
-            close = command.find("`", match.end())
-            close = len(command) if close < 0 else close
+            close = matching_backtick(command, match.end())
             bodies.append(command[match.end():close])
             index = close + 1
             continue
@@ -595,6 +610,31 @@ def substitution_bodies(command):
         bodies.append(command[match.end():close])
         index = match.end()
     return bodies
+
+
+def matching_backtick(text, start):
+    """Index of the backtick closing the body that opened before `start`.
+
+    Quote-aware like `matching_paren`, so a backtick inside a quoted argument
+    of the body does not end it early. Runs to the end of the text when no
+    close exists, which shlex has already ruled out for a parsed command.
+    """
+    quote = None
+    index = start
+    while index < len(text):
+        char = text[index]
+        if char == "\\":
+            index += 2
+            continue
+        if quote:
+            if char == quote:
+                quote = None
+        elif char in ("'", '"'):
+            quote = char
+        elif char == "`":
+            return index
+        index += 1
+    return len(text)
 
 
 def matching_paren(text, start):

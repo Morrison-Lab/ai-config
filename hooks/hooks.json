@@ -526,6 +526,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unread-commit-citation.py\"",
+            "timeout": 10,
+            "script": "flag-unread-commit-citation.py",
+            "why": "ai-config#3471's SHA half: a case entry cited two commit SHAs with a narrative reconstructed from `git log --oneline` alone, and got both backwards -- neither patch was actually opened. Warns, never blocks, when a `gh pr comment`/`gh issue comment`/`gh pr review`/`gh api .../comments` body about to post cites a commit SHA (a word-bounded 7-40 char hex run containing a hex letter, outside a fenced/indented evidence block, not a `Reviewed-Commit:`/`HEAD=` trailer, and -- for a 7-char token -- carrying a nearby cue) and no command reading that commit (`git show`/`git diff`/`git cat-file`/`git log -p`/`gh api .../commits/<sha>`/`gh api .../pulls/N/commits`/`mcp__github__get_commit`) appears in the transcript since the current turn began. A `git log --oneline` that merely lists the SHA does not discharge it -- that is the exact failure this hook exists to catch. Reuses flag-unmeasured-timestamp.py's comment-post detection and no-unmeasured-clock-claim.py's scan() for the turn boundary."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-new-line-breaks-on-push.py\"",
             "timeout": 15,
             "script": "warn-new-line-breaks-on-push.py",
@@ -795,6 +802,13 @@
             "timeout": 10,
             "script": "flag-unmeasured-timestamp.py",
             "why": "The MCP half of the Bash entry above, following require-agent-disclosure.py's precedent. The #2900 claim comments went out through mcp__github__add_issue_comment from a remote session with no `gh` on PATH, and hooks.json matches by tool name, so the Bash entry never sees them. Same script, same warn-only behaviour; it reads tool_input.body directly for every tool in require-agent-disclosure.py's MCP_POST_TOOLS (imported, so the two guards cover the same set) and stays silent when no string body is present."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unread-commit-citation.py\"",
+            "timeout": 10,
+            "script": "flag-unread-commit-citation.py",
+            "why": "The MCP half of the Bash entry above, following require-agent-disclosure.py's and flag-unmeasured-timestamp.py's precedent. A remote/web session has no `gh` on PATH, so an mcp__github__ comment tool is the only way it posts, and hooks.json matches by tool name, so the Bash entry never sees it. Same script, same warn-only behaviour, reading tool_input.body directly. ai-config#3471."
           }
         ]
       },
@@ -847,6 +861,13 @@
             "timeout": 10,
             "script": "flag-unmeasured-timestamp.py",
             "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when writing to session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unread-commit-citation.py\"",
+            "timeout": 10,
+            "script": "flag-unread-commit-citation.py",
+            "why": "The Write half of the Bash entry above. ai-config#3471: warns when writing a commit SHA citation into a non-scratch file (a case entry, a memory file, a comment) with no read of that commit in the transcript since the current turn began."
           }
         ]
       },
@@ -866,6 +887,13 @@
             "timeout": 10,
             "script": "flag-unmeasured-timestamp.py",
             "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when editing session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unread-commit-citation.py\"",
+            "timeout": 10,
+            "script": "flag-unread-commit-citation.py",
+            "why": "The Edit half of the Bash entry above. ai-config#3471: warns when editing a commit SHA citation into a non-scratch file with no read of that commit in the transcript since the current turn began."
           }
         ]
       },
@@ -885,6 +913,13 @@
             "timeout": 10,
             "script": "flag-unmeasured-timestamp.py",
             "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when editing session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unread-commit-citation.py\"",
+            "timeout": 10,
+            "script": "flag-unread-commit-citation.py",
+            "why": "The NotebookEdit half of the Bash entry above. ai-config#3471: warns when a notebook cell edit writes a commit SHA citation into a non-scratch file with no read of that commit in the transcript since the current turn began."
           }
         ]
       },

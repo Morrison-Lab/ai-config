@@ -97,15 +97,25 @@ grants the move, it does not exempt it from what a move costs.
   grep -rn '<source-basename>' --include='*.md' .
   ```
 
-  That list is long in a corpus this size --- 97 hits across 54 markdown files,
-  counting every mention outside the source file itself, in the move this bullet
-  was written for --- so narrow it mechanically rather than by eye: take the
+  That list is long in a corpus this size --- 97 hits across 54 markdown files
+  for `preferences.md` at `18d55aa86`, counting every mention outside the source
+  file itself --- so narrow it mechanically rather than by eye: take the
   distinctive terms of the moved block and keep only the links whose surrounding
   lines contain one.
-  State the exclusion beside the figure, as that sentence does.
-  The first draft of this bullet said "100 hits across 54 files", which paired a
-  hit count that included the source file's own self-mentions with a file count
-  that excluded it --- two populations in one sentence, and neither named.
+
+  Name the exclusion **and the commit** beside such a figure, as that sentence
+  does, because this one needed three tries to state.
+  The first draft said "100 hits across 54 files", pairing a hit count that
+  included the source file's own self-mentions with a file count that excluded
+  it --- two populations in one sentence, neither named.
+  The second fixed the exclusion and left the snapshot implicit, which a
+  reviewer measuring at a later commit read as a fresh error, because the
+  figures collide: 97 excluding the source at `18d55aa86` and 97 *including* it
+  three commits later, once this very sweep had repointed five links away.
+  The same number, two populations, and no way to tell them apart from the
+  sentence.
+  A count is a claim about a population **at a moment**, and a sweep whose own
+  fixes change what it counts moves that moment under you.
   That filter is a heuristic in both directions, and both matter.
   It surfaced two real stale sites here, and it also returned two false
   positives keyed on a phrase as generic as "default branch", so read its

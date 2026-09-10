@@ -22,8 +22,14 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   same one.
   `GH_PAGER` does not reach `glab`, so the `gh` fix does not cover it.
   - **Do:** pipe through `| cat`, export `PAGER=cat`, or ask for JSON with
-    `--output-format json`; redirect to a file and read that back when a
-    command still takes the terminal.
+    `--output json` (short form `-O json`); redirect to a file and read that
+    back when a command still takes the terminal.
+  - **Don't:** reach for `--output-format json`.
+    It is not a deprecated spelling of `--output` --- on `glab issue list`
+    it is a *different* flag taking `details`, `ids`, or `urls`, so `json`
+    is not one of its values, and on `glab api` it does not exist at all.
+    Both spellings exit non-zero, so the failure is at least loud
+    (measured against `glab 1.106.0`, 2026-09-09).
   - **Don't:** read an empty or garbled capture as the command having
     returned nothing --- the pager, not the query, ate the output.
   (Recovered 2026-09-09 from a stash dated 2026-06-22 during a `/cb` sweep of

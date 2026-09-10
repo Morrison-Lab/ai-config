@@ -525,6 +525,11 @@ The contrast that motivated the fix: its CI counterpart,
 design from the start, so a corpus's pre-existing drift is never reflagged.
 The checker got that treatment years before the formatter did.
 
+**It treats every file as prose, regardless of extension --- never point `--write` at a `.py` file.**
+Dry-run against a `.py` file (2026-09-10) showed it merging an `if`/`elif` chain onto one line, syntactically-plausible-looking and semantically broken.
+- **Do:** preview (the default) before ever passing `--write`, `.md` or not.
+- **Don't:** assume the extension gates it --- nothing in the tool checks.
+
 ## macOS disk cleanup: where the space actually goes
 
 Findings from a full sweep of the user's Mac, 2026-07-28, when the data

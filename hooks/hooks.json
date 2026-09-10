@@ -355,6 +355,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-deferred-closing-keyword.py\"",
+            "timeout": 10,
+            "script": "warn-deferred-closing-keyword.py",
+            "why": "shared/workflow/issue-first.md, 'A closing keyword plus #N closes #N even when the sentence negates it'. GitHub's parser is purely lexical, so a body saying a LATER PR will close #N, or that #N is NOT being closed, closes it on merge. Scoped to a PR/issue DESCRIPTION and a commit message, since GitHub never scans a plain comment. Warns when a closing keyword sits next to an issue reference mid-line AND its sentence carries a deferral or negation cue; a bare `Closes #N` line never fires. Three measured occurrences: ai-config#1718/#1717, Morrison-Lab/gha#460/#322, ucdavis/bcs#982/#923. Warns rather than blocks -- the guard cannot read intent and the remedy costs one word. Fails open. Tracked as #3512."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-stale-adjacent-comment.py\"",
             "timeout": 15,
             "script": "flag-stale-adjacent-comment.py",
@@ -397,6 +404,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-blanket-worktree-force-remove.py\"",
+            "timeout": 20,
+            "script": "warn-blanket-worktree-force-remove.py",
+            "why": "skills/clean-worktrees/SKILL.md step 5: a `git worktree remove` refusal is a safety net -- do NOT blindly --force it; the refusal means the worktree was likely misclassified (dirty tree, unpushed work), so the prescribed response is to re-inspect, not retry forced. Self-hit during a clean-git session on 2026-09-10: a blanket `git worktree remove \"$p\" || git worktree remove --force \"$p\"` fallback was written, contradicting the skill's own explicit warning read earlier the same session -- flagged by hooks/no-mistake-without-a-hook.py as a mistake worth mechanizing, and the auto-mode permission classifier's denial of the command is the only reason nothing was lost. WARNS, never blocks: the skill documents one legitimate single-shot --force (a genuinely clean worktree that merely contains a submodule, refused with a DIFFERENT error -- 'fatal: working trees containing submodules cannot be moved or removed' -- not the dirty-tree refusal), and that exact case occurred later in the same session and was correct, so this hook can never safely deny; it only ever adds context naming the fallback/loop shape and the submodule exception. Fires on the tokenized argv (via scripts/lib/shellcmd.py's git_subcommand, plus its own bespoke operator/segment tokenizer -- not simple_commands, which drops the operator tokens this hook needs), not raw text, so a command merely quoting or documenting the pattern (a commit message, a heredoc writing this file) does not trip it."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-commit-chained-to-push.py\"",
             "timeout": 10,
             "script": "no-commit-chained-to-push.py",
@@ -408,6 +422,13 @@
             "timeout": 10,
             "script": "flag-chained-push.py",
             "why": "Lacaedemon/sparta, 2026-09-05: three refusals in one session, each a `git push` either chained after another command with `&&`/`;`/`||` or suffixed by a pipe/redirect. no-clobbering-push.py and the plugin's own no-push-without-self-review.py push policy both parse the WHOLE command text for a push rather than the isolated push segment, so a trailing `2>&1` hands either parser a bare `2` sitting where a commit-ish token would sit in other shapes, and a chained prefix reads as part of the same invocation. A PreToolUse deny rejects the whole Bash call, so a refused chain runs NOTHING -- not the commands before the push either -- and the refusal naming only the push invites the misreading that the prefix succeeded. WARNS, never blocks: neither shape is wrong on its own (an ordinary `git fetch && git push`, a push piped to `tee` for a log), so the message asks the author to run the push alone and, after any refusal, re-check state rather than assume the prefix ran."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-generated-file-stale.py\"",
+            "timeout": 45,
+            "script": "warn-generated-file-stale.py",
+            "why": "algorithmatize-checks -- warns when a push changes a generated file's SOURCE (hooks/hooks.json) while the repo's own generator reports its output stale. Consumes scripts/gen-hooks-plugin.py --check rather than re-deriving; the gap it closes is timing, since validate.yml runs the same check minutes later and costs a red round. Warn-only: the condition is a path in the diff plus a generator exit code, so it is decidable, but a mid-stack push can legitimately be stale. Added after ai-config#3524 went red on exactly this."
           },
           {
             "type": "command",
@@ -798,6 +819,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-deferred-closing-keyword.py\"",
+            "timeout": 10,
+            "script": "warn-deferred-closing-keyword.py",
+            "why": "shared/workflow/issue-first.md, 'A closing keyword plus #N closes #N even when the sentence negates it'. GitHub's parser is purely lexical, so a body saying a LATER PR will close #N, or that #N is NOT being closed, closes it on merge. Scoped to a PR/issue DESCRIPTION and a commit message, since GitHub never scans a plain comment. Warns when a closing keyword sits next to an issue reference mid-line AND its sentence carries a deferral or negation cue; a bare `Closes #N` line never fires. Three measured occurrences: ai-config#1718/#1717, Morrison-Lab/gha#460/#322, ucdavis/bcs#982/#923. Warns rather than blocks -- the guard cannot read intent and the remedy costs one word. Fails open. Tracked as #3512."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-agent-disclosure.py\"",
             "timeout": 10,
             "script": "require-agent-disclosure.py",
@@ -1028,6 +1056,18 @@
             "why": "Warns when a write-capable Agent launch targets a worktree holding uncommitted work, since the agent cannot tell your changes from its own scratch edits and may discard them."
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-move-without-inbound-sweep.py\"",
+            "timeout": 15,
+            "script": "no-move-without-inbound-sweep.py",
+            "why": "Warns when a `git commit` stages a cross-file content move and no repo-wide search for the source file's basename ran this session, so the files citing the source for moved content get enumerated rather than assumed clean (ai-config#3501)."
+          }
+        ]
       }
     ],
     "Stop": [
@@ -1066,7 +1106,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unfiled-finding.py\"",
             "timeout": 10,
             "script": "no-unfiled-finding.py",
-            "why": "report-mistakes-proactively 'Filing is not gated on approval' -- no-offer-to-file.py catches the OFFER (needs a `?`); this catches the DECLARATIVE form, which asks nothing and so slips past it."
+            "why": "report-mistakes-proactively 'Filing is not gated on approval' -- no-offer-to-file.py catches the OFFER, interrogative or not (`want me to file` and `say the word and I will file` both match with no `?`); this catches the DECLARATIVE ASSERTION that a finding is worth an issue, which asks nothing and so slips past it. Neither covers the deferral shape ('I would rather you tell me whether it is worth a ninth'); ai-config#3520 records why a lexical guard for that was attempted and abandoned."
           },
           {
             "type": "command",

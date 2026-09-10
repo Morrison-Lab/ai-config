@@ -359,6 +359,34 @@ _ATTRIBUTION_CASES = [
      "argv[0] membership, so the `cat` inside `locate` cannot match"),
     ("sbatch ~/.claude/config.json", set(),
      "the `bat` inside `sbatch`, the other front-anchoring case"),
+    # Per-verb option grammar. A shared PATTERN_OPTS set read `jq -e`
+    # (--exit-status, a boolean) as having supplied the filter, so the filter
+    # positional survived and a quoted manifest path was credited as a file
+    # operand -- a false DISCHARGE, the one direction a discharge test must
+    # not fail in.
+    ("jq -e '~/.claude/settings.json' README.md", set(),
+     "`jq -e` is --exit-status, not a pattern option: the quoted path is "
+     "still the FILTER positional and jq opens only README.md"),
+    ("jq --arg foo bar --arg baz ~/.claude/settings.json '.a' README.md",
+     set(),
+     "`--arg NAME VALUE` consumes TWO tokens: skipping one leaves the value "
+     "in file position, crediting a manifest the command never opens"),
+    ("jq --args '.' ~/.claude/settings.json", set(),
+     "`--args` rebinds the remaining positionals to $ARGS, so which are "
+     "input files is not decidable from argv: credit none"),
+    ("jq --jsonargs '.' ~/.claude/settings.json", set(),
+     "the same for the JSON spelling"),
+    ("jq -f filter.jq ~/.claude/settings.json", {"claude"},
+     "jq's real pattern option, whose presence DOES make the first "
+     "positional a file"),
+    ("jq --indent 2 . ~/.claude/settings.json", {"claude"},
+     "a genuinely single-valued jq option still skips exactly one token"),
+    # The wrapper limit below is a false NEGATIVE (warns while the author
+    # complied), so it is asserted as the CURRENT behaviour rather than the
+    # desired one; ai-config#3321 tracks the fix in scripts/lib/shellcmd.py.
+    ("sudo -u me cat ~/.claude/settings.json", set(),
+     "strip_env peels a zero-argument wrapper only, so a wrapper carrying "
+     "its own option hides the read verb (ai-config#3321)"),
 ]
 print("(argv parse active: %s)" % (_ns["simple_commands_with_scope"] is not None))
 for _command, _expected, _desc in _ATTRIBUTION_CASES:

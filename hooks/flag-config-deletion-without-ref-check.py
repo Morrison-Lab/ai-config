@@ -53,8 +53,10 @@ regex rather than to silence.
 DISCHARGE: a real manifest read can still fail to clear the guard, which warns
 while the author is complying. A verb outside `READ_VERBS` (`tail`, `wc`), a
 path held in a variable, a `cd` whose target is indeterminate (`cd -`, `popd`),
-and --- most likely in this harness --- a manifest opened with the Read tool
-rather than Bash, since only Bash commands are scanned. Two limits the argv
+a wrapper carrying its own option (`sudo -u me cat ...`, `timeout 5 cat ...`),
+which `strip_env` peels only when the wrapper takes no argument of its own
+(ai-config#3321), and --- most likely in this harness --- a manifest opened
+with the Read tool rather than Bash, since only Bash commands are scanned. Two limits the argv
 parse RETIRED: an already-expanded absolute path under the home directory now
 resolves, and so does `cd <root>/hooks && cat ../settings.json`.
 A command reading two manifests at once now credits both, since every file
@@ -225,8 +227,33 @@ PATTERN_FIRST_VERBS = frozenset({"grep", "rg", "jq", "sed", "awk"})
 
 # Options that supply the pattern or script separately, so the first positional
 # IS a file: `grep -e PAT file`, `awk -f prog.awk file`, `jq -f filter file`.
-PATTERN_OPTS = frozenset({"-e", "--regexp", "-f", "--file", "--expression",
-                          "--from-file"})
+# Per verb for the same reason VALUE_OPTS is: one spelling, several meanings.
+# `jq -e` is --exit-status, a boolean with nothing to do with the filter, so a
+# shared set marked the filter as already supplied and left a quoted path
+# spelling a manifest sitting in file position -- a FALSE DISCHARGE, which is
+# the one direction this guard must not fail in.
+PATTERN_OPTS = {
+    "grep": frozenset({"-e", "--regexp", "-f", "--file"}),
+    "rg": frozenset({"-e", "--regexp", "-f", "--file"}),
+    "sed": frozenset({"-e", "--expression", "-f", "--file"}),
+    "awk": frozenset({"-f", "--file"}),
+    "jq": frozenset({"-f", "--from-file"}),
+}
+
+# Options consuming the NEXT TWO tokens: `jq --arg NAME VALUE`. Skipping only
+# one leaves the other in positional position, where a value that happens to
+# spell a manifest path is read as a file operand the command never opens.
+PAIR_OPTS = {
+    "jq": frozenset({"--arg", "--argjson", "--slurpfile", "--rawfile"}),
+}
+
+# Options after which the remaining positionals are NOT input files: jq's
+# `--args`/`--jsonargs` rebind them to $ARGS. Which of them the filter still
+# consumes is not decidable from argv alone, so credit no operand at all --
+# the fail-toward-warning direction.
+NO_FILE_OPTS = {
+    "jq": frozenset({"--args", "--jsonargs"}),
+}
 
 # Options taking the NEXT token as their value, per verb. Per verb rather than
 # shared, because the same spelling means different things: `sed -n` is
@@ -251,8 +278,9 @@ VALUE_OPTS = {
                       "-l", "--line-length"}),
     "awk": frozenset({"-f", "--file", "-v", "--assign",
                       "-F", "--field-separator"}),
-    "jq": frozenset({"-f", "--from-file", "--arg", "--argjson", "--slurpfile",
-                     "--rawfile", "--indent", "--jsonargs"}),
+    # `--arg` and friends live in PAIR_OPTS, and `--jsonargs` in NO_FILE_OPTS;
+    # neither takes exactly one value, which is all this table can express.
+    "jq": frozenset({"-f", "--from-file", "--indent"}),
     "head": frozenset({"-n", "--lines", "-c", "--bytes"}),
     "xxd": frozenset({"-l", "-s", "-c", "-g"}),
 }
@@ -334,6 +362,9 @@ def read_operands(argv):
     if verb not in READ_VERBS:
         return None
     value_opts = VALUE_OPTS.get(verb, frozenset())
+    pair_opts = PAIR_OPTS.get(verb, frozenset())
+    no_file_opts = NO_FILE_OPTS.get(verb, frozenset())
+    pattern_opts = PATTERN_OPTS.get(verb, frozenset())
     positional = []
     pattern_supplied = False
     end_of_opts = False
@@ -346,9 +377,18 @@ def read_operands(argv):
             continue
         if not end_of_opts and token.startswith("-") and token != "-":
             name = token.split("=", 1)[0]
-            if name in PATTERN_OPTS:
+            if name in pattern_opts:
                 pattern_supplied = True
-            index += 2 if "=" not in token and name in value_opts else 1
+            if name in no_file_opts:
+                return []
+            if "=" in token:
+                index += 1
+            elif name in pair_opts:
+                index += 3
+            elif name in value_opts:
+                index += 2
+            else:
+                index += 1
             continue
         positional.append(token)
         index += 1

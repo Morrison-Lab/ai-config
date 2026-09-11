@@ -244,6 +244,37 @@ check(
     False,
 )
 
+# `&>file` with a NON-null target sends BOTH streams to the file, so it
+# reclaims an earlier stderr discard and is itself the stdout target. Only the
+# /dev/null spelling was recognised before, so a later `&>file.log` reclaimed
+# nothing and the hook warned about a command whose stderr is in the file and
+# whose stdout never reaches the pipe or the capture.
+check(
+    "a later merge to a file reclaims stderr in a capture",
+    fires("x=$(cmd 2>/dev/null &>file.log)"),
+    False,
+)
+check(
+    "a later merge to a file reclaims stderr before a pipe",
+    fires("cmd 2>/dev/null &>file.log | jq ."),
+    False,
+)
+check(
+    "a discard after a merge to a file still fires",
+    fires("cmd &>file.log 2>/dev/null > out.json"),
+    True,
+)
+check(
+    "a merge to a file is itself the reported target",
+    reported("cmd &>file.log 2>/dev/null")[1],
+    "redirected to `file.log`",
+)
+check(
+    "a merge to a file before a plain redirect yields to the later target",
+    reported("cmd &>file.log 2>/dev/null > out.json")[1],
+    "redirected to `out.json`",
+)
+
 if failures:
     print("FAILED:")
     for line in failures:

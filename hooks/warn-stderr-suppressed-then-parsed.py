@@ -115,6 +115,13 @@ RX_STDERR_TO_FILE = re.compile(
     r"(?<![0-9<>&])2>>?\s*(?!/dev/null(?![^\s;|&<>()]))(?![&-])\S")
 RX_STDERR_MERGED = re.compile(r"(?<![0-9<>&])2>&[0-9]+")
 
+# `&>file` / `>&file` with a NON-null target. Both streams go to the file, so
+# this is a stdout file target and an stderr reclaim at once. Only the
+# /dev/null spelling was recognised before, which let a later `&>file.log`
+# fail to reclaim an earlier `2>/dev/null` and produced a false positive.
+RX_MERGE_FILE = re.compile(
+    r"(?:&>>?|>&)\s*(?!/dev/null(?![^\s;|&<>()]))(?![&-])([^\s;|&<>()]+)")
+
 # stdout to /dev/null, with or without its explicit `1` fd. The lookbehind
 # excludes `2>` (preceded by a digit) and `&>` (preceded by `&`), each of
 # which its own pattern above already owns.
@@ -435,7 +442,8 @@ def _stderr_suppressed(stage):
         stage, (RX_MERGE_NULL, RX_STDERR_NULL, RX_STDERR_CLOSED))
     if suppressed is None:
         return False
-    reclaimed = _last_match(stage, (RX_STDERR_TO_FILE, RX_STDERR_MERGED))
+    reclaimed = _last_match(
+        stage, (RX_STDERR_TO_FILE, RX_STDERR_MERGED, RX_MERGE_FILE))
     return reclaimed is None or suppressed > reclaimed
 
 
@@ -446,10 +454,10 @@ def _last_stdout_file(stage):
     one written. Reporting the first names a file the command truncates and
     leaves empty, sending a reader to the wrong place.
     """
-    matches = list(RX_STDOUT_FILE.finditer(stage))
+    matches = [m for p in (RX_STDOUT_FILE, RX_MERGE_FILE) for m in p.finditer(stage)]
     if not matches:
         return None
-    return matches[-1]
+    return max(matches, key=lambda m: m.start())
 
 
 def _stdout_discarded(stage, to_file):

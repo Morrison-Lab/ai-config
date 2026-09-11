@@ -555,6 +555,37 @@ The step names above are what settled it, and they are the artifact to read:
 names the failing step, where the job log's own `FAIL:` lines include ones
 tests print deliberately.)
 
+## The same defect on the fixing side: a review names instances, never the class
+
+Everything above is about **dispatching** work scoped to a list, where the set grows while you work.
+There is a second form, and this fragment did not previously cover it: a reviewer hands you a list, you fix exactly that list, and the instances the reviewer did not happen to look at are still there.
+
+The set has not grown.
+It was never enumerated in the first place.
+A reviewer samples a class and cites what it found, so its list is evidence that the defect exists rather than a census of where.
+Treating it as a census is the error, and it is easy to make because the list arrives looking authoritative: specific files, specific line numbers, quoted code.
+
+**It is worse than the dispatch case in one respect.**
+There, nobody reports the gap.
+Here, the *next review round* reports it, so the same defect comes back with a new instance attached and the round reads as progress.
+Three rounds of that is three pushes, three review cycles, and a defect still present.
+
+Measured 2026-09-10/11 on `Lacaedemon/sparta`, three times in one session:
+
+- A fix threaded a new argument through the two call sites a reviewer named.
+  A third call site existed, and the next round found it.
+- A function got a guard for a partial tick, then a second round for zero speed, then a third for zero distance --- each the branch the previous fix had not visited.
+- An all-or-nothing validation pass was added, and its one early `continue` kept the very non-atomicity it was written to prevent.
+
+The remedy is the same shape as the one above: derive the set rather than accept it.
+
+- **Do:** treat a reviewer's cited instances as a sample, and derive the full set before fixing --- `git grep -n '<symbol>'` for a call site, an enumeration of every branch for a control-flow fix.
+- **Do:** paste the deriving command and its output in the reply, so the reviewer can check the *set* rather than re-finding members of it.
+- **Do:** make that enumeration the deliverable when a defect has already recurred once.
+  The one-line fix is the cheap half.
+- **Don't:** read "the reviewer found two" as "there are two".
+- **Don't:** count a round that fixed exactly what was cited as having addressed the finding, when the finding was about a class.
+
 ## In review
 
 Flag a brief, a plan, or a skill step that hands an agent a hard-coded list of PR or issue numbers to work through, where the tracker could gain another before the work finishes.

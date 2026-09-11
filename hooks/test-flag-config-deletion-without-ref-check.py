@@ -545,5 +545,27 @@ _ok = _proc.returncode == 0 and not _proc.stdout.strip()
 wrong += not _ok
 print("%-7s a missing transcript fails open" % ("silent" if _ok else "WARN"))
 
+# A broken install is the SECOND route to the lexical fallback, alongside a
+# shlex raise. It is worth pinning because on that path the guard reverts
+# wholesale to the approximation this hook replaced, false discharges and all,
+# and nothing else in this suite exercises it.
+_BREAK_IMPORT = (
+    "import sys; sys.modules['shellcmd'] = None; "
+    "exec(open(sys.argv[1], encoding='utf-8').read())")
+_BROKEN = subprocess.run(
+    [sys.executable, "-c", _BREAK_IMPORT, HOOK],
+    input=json.dumps({"transcript_path": "/nonexistent"}),
+    capture_output=True, text=True)
+total += 1
+_ok = _BROKEN.returncode == 0
+wrong += not _ok
+print("%-7s a broken shellcmd import still fails open"
+      % ("silent" if _ok else "WARN"))
+total += 1
+_ok = "using the lexical fallback" in _BROKEN.stderr
+wrong += not _ok
+print("%-7s a broken shellcmd import says so on stderr"
+      % ("ok" if _ok else "WARN"))
+
 print("\n%d/%d correct" % (total - wrong, total))
 sys.exit(1 if wrong else 0)

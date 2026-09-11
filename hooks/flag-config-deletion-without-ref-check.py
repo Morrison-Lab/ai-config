@@ -46,8 +46,12 @@ nothing; and the split means a verb and an operand in different commands cannot
 pair.
 
 The lexical path below is kept as the FALLBACK, not as the decision, and it is
-narrower than it used to be. Only an actual parse failure reaches it: `shlex`
-raises on unbalanced quotes. A command substitution does NOT fall back --- its
+narrower than it used to be. Two conditions reach it, and neither is a shape
+the argv parse merely dislikes. One is an actual parse failure: `shlex` raises
+on unbalanced quotes. The other is a broken install, where importing
+`scripts/lib/shellcmd.py` fails and there is no argv parse to run at all --- on
+that path the guard reverts wholesale to the approximation this change
+replaced, including its false discharges. A command substitution does NOT fall back --- its
 body is recursed through `read_roots`, so the argv path runs on the inner text
 too, bounded by MAX_SUBSTITUTION_DEPTH. A heredoc body does not fall back
 either; `_heredoc_free` blanks it before the scan, since its text is data for
@@ -156,8 +160,9 @@ RX_DESTRUCTIVE = re.compile("(?:" + "|".join(_DESTRUCTIVE_PARTS) + ")")
 
 # FALLBACK ONLY, since ai-config#3126. Everything from here to `RX_REF_CHECK`
 # is the lexical approximation the argv parse below replaced, and it now runs
-# on ONE condition: `shlex` raising, which means the command does not parse at
-# all. A command substitution does not reach it -- `read_roots` recurses over
+# on two conditions: `shlex` raising, which means the command does not parse at
+# all, and a failed import of `scripts/lib/shellcmd.py`, which leaves no argv
+# parse to attempt. A command substitution does not reach it -- `read_roots` recurses over
 # each body, so the argv path runs on the inner text too. Nor does a heredoc,
 # whose body `_heredoc_free` blanks before the parse. Read its comments as a
 # record of which boundary each narrowing bought, not as the live decision.

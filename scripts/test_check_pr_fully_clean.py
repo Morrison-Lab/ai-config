@@ -624,6 +624,73 @@ def main() -> int:
         and any("Claude" in i for i in xr_issues),
     )
 
+    # ai-config#3587: a reviewer that reports it CANNOT review this head is
+    # unavailable, not pending, so its stale not-clean must stop blocking --
+    # waiting on it cannot end. The notice is not a clean verdict, so the
+    # release is reported as a NOTE that still demands ARD of its findings.
+    QUOTA_NOTICE = (
+        "Copilot was unable to review this pull request because the user who "
+        "requested the review has reached their quota limit."
+    )
+    COPILOT_BLOCKS = (
+        "### Changes recommended\n\nTwo findings remain.\n\n"
+        "### Verdict\n\n**Needs more work**"
+    )
+    CLAUDE_CLEAR = (
+        "**Claude finished** review\n\n### Verdict\n\n**Ready for merge**"
+    )
+
+    def _review(when, body, author):
+        return ("review", when, body, "", "", author)
+
+    items_outage_cross = [
+        _review("2026-09-11T05:00:00Z", COPILOT_BLOCKS, "copilot-pull-request-reviewer"),
+        _review("2026-09-11T06:00:00Z", QUOTA_NOTICE, "copilot-pull-request-reviewer"),
+        _review("2026-09-11T07:00:00Z", CLAUDE_CLEAR, "github-actions"),
+    ]
+    oc_ok, oc_issues = checker.check_latest_verdict(items_outage_cross)
+    check(
+        "check_latest_verdict: an outage newer than a reviewer's stale not-clean "
+        "releases the per-reviewer block (#3587)",
+        oc_ok and any(i.startswith("NOTE: ") and "UNAVAILABLE" in i for i in oc_issues),
+    )
+
+    # The same release has to reach the global-latest branch, which is the case
+    # a PR hits when the unavailable reviewer is the ONLY one that ever posted.
+    items_outage_sole = [
+        _review("2026-09-11T05:00:00Z", COPILOT_BLOCKS, "copilot-pull-request-reviewer"),
+        _review("2026-09-11T06:00:00Z", QUOTA_NOTICE, "copilot-pull-request-reviewer"),
+    ]
+    os_ok, os_issues = checker.check_latest_verdict(items_outage_sole)
+    check(
+        "check_latest_verdict: an outage releases the global-latest branch too, "
+        "for a sole unavailable reviewer (#3587)",
+        os_ok and any(i.startswith("NOTE: ") and "UNAVAILABLE" in i for i in os_issues),
+    )
+
+    # The negative control, and the one that decides whether the release is
+    # sound: an outage that PRECEDES the finding says nothing about the
+    # reviewer's ability to have produced it, so the finding still blocks.
+    items_outage_stale = [
+        _review("2026-09-11T04:00:00Z", QUOTA_NOTICE, "copilot-pull-request-reviewer"),
+        _review("2026-09-11T05:00:00Z", COPILOT_BLOCKS, "copilot-pull-request-reviewer"),
+        _review("2026-09-11T07:00:00Z", CLAUDE_CLEAR, "github-actions"),
+    ]
+    ost_ok, ost_issues = checker.check_latest_verdict(items_outage_stale)
+    check(
+        "check_latest_verdict: an outage OLDER than the not-clean still blocks (#3587)",
+        (not ost_ok) and any("NOT clean" in i for i in ost_issues),
+    )
+
+    check(
+        "is_reviewer_unavailable_notice: a review quoting the outage it stands "
+        "in for is still a review (#3587)",
+        checker.is_reviewer_unavailable_notice(QUOTA_NOTICE)
+        and not checker.is_reviewer_unavailable_notice(
+            "**Claude finished** review\n\n" + QUOTA_NOTICE + "\n\n### Verdict\n\nClean"
+        ),
+    )
+
     items_same_reviewer = [
         (
             "comment",

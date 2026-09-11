@@ -527,3 +527,29 @@ that never mentioned that repo.
 (Measured 2026-09-04 in a `ucdavis/hac.sap` session: invoking `/daytb` armed
 the guard on `Morrison-Lab/gha#240`, cited only in that skill's own case
 record, which then fired on the next unrelated memory-file edit.)
+
+## A hook defect you observe may be a stale installed copy, not a bug
+
+Four of the five guards installed under `~/.claude/hooks/` on this machine were far behind the repo on 2026-09-11: `no-unshipped-commit.py` at 196 lines against 1002, `no-clobbering-push.py` at 615 against 1240, `no-unreviewed-pr.py` at 1747 against 2602, and `no-stale-pr-status.py` at 328 against 619.
+Only the one refreshed by hand earlier that night matched.
+
+Two apparent defects came from that gap, and both looked exactly like live bugs.
+A session driving several pull requests pushes branches checked out in other worktrees, with `git -C <path> push`.
+The installed `no-unshipped-commit.py` matched only `git\s+push`, so such a push did not count and its Stop guard blocked a fully-pushed session three times running.
+The installed `no-clobbering-push.py` compared the remote tip against the session's own HEAD rather than the ref being pushed, so an exact no-op push was reported as dozens of commits about to be discarded, listing the session's own commits back to it as another agent's work.
+
+The repo had fixed both.
+`hooks/no-unshipped-commit.py` gained a `_GIT_FLAGS` run that admits `-C` before the verb on 2026-09-04, and `hooks/no-clobbering-push.py` reads each `-C` value back out precisely so that `git -C <other-worktree> push origin HEAD` is not resolved against the session's own HEAD.
+An issue was filed against both before either file was read, and had to be corrected.
+
+The trap is that a hook's behaviour is the strongest possible evidence about a hook, and it is evidence about the **installed** copy while the issue you file is against the **repo** copy.
+Nothing in the output says which one ran.
+This is the adjacent-artifact substitution [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md) names, in the one place where the wrong artifact is the one actually executing.
+
+- **Do:** diff the installed copy against the repo's before filing a hook defect, and quote the repo's line in the issue.
+- **Do:** read a guard that fires wrongly and repeatedly as a freshness question first, since the corpus's own freshness check covers exactly this.
+- **Don't:** infer a repo hook's matcher from what a guard did to you.
+- **Don't:** file against the repo on behaviour alone --- an installed copy can be hundreds of lines and several fixes behind.
+
+(Measured 2026-09-11.
+[ai-config#3577](https://github.com/Morrison-Lab/ai-config/issues/3577) was filed on the behaviour and corrected once the repo files were read.)

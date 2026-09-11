@@ -175,6 +175,13 @@ _ANY_OUT_OP = r"(?:&>>?|>&|1?(?:>>?\||>>?))"
 # stdout to /dev/null, with or without its explicit `1` fd. The lookbehind
 # excludes `2>` (preceded by a digit) and `&>` (preceded by `&`), each of
 # which its own pattern above already owns.
+
+# stdout closed outright
+RX_STDOUT_CLOSED = re.compile(r"(?<![0-9<>&])1?>&-")
+
+# stdout duplicated to stderr
+RX_STDOUT_TO_STDERR = re.compile(r"(?<![0-9<>&])1?>&2(?![0-9])")
+
 RX_STDOUT_NULL = re.compile(
     r"(?<![0-9<>&])1?" + _OUT_OP + r"\s*/dev/null(?![^\s;|&<>()])")
 
@@ -529,16 +536,14 @@ def _stdout_discarded(stage, to_file):
     shell applies redirects in order. An earlier file redirect superseded by a
     later discard is the reverse case and still discards.
     """
-    discards = [
-        match
-        for pattern in (RX_MERGE_NULL, RX_STDOUT_NULL)
-        for match in pattern.finditer(stage)
-    ]
-    if not discards:
+    discard = _last_match(
+        stage, (RX_MERGE_NULL, RX_STDOUT_NULL, RX_STDOUT_CLOSED, RX_STDOUT_TO_STDERR)
+    )
+    if discard is None:
         return False
     if to_file is None:
         return True
-    return max(match.start() for match in discards) > to_file.start()
+    return discard > to_file.start()
 
 
 def _consumption(stage, is_last, captured, original_stage):

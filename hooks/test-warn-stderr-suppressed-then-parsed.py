@@ -96,6 +96,12 @@ check("redirecting to something that includes /dev/null but isnt it fires", fire
 
 
 
+
+check("stdout duplicated to stderr after file target is ignored", fires("cmd 2>/dev/null > out.json 1>&2"), False)
+check("stdout closed after file target is ignored", fires("cmd 2>/dev/null > out.json >&-"), False)
+check("stdout duplicated to stderr before file target fires", fires("cmd 2>/dev/null 1>&2 > out.json"), True)
+check("stderr to file with stdout to stderr is ignored", fires("cmd 2>err.log > out.json 1>&2"), False)
+
 def run_hook(command, tool_name="Bash"):
     payload = json.dumps({
         "tool_name": tool_name,

@@ -2110,7 +2110,7 @@ There the information was genuinely absent from the artifact.
 Here the information is present, but the regex is shaped as an **allowlist** --- it enumerates the separators, qualifiers, or punctuation that may follow a keyword before matching --- and prose has more of those shapes than any enumeration anticipates.
 Every round adds one more admitted separator (a colon, a dash, a parenthesis) and every addition reopens the false-positive side, because each new admitted character is also a character that appears inside an unrelated word.
 
-Five rounds on one such regex, each wrong in a different direction (`Morrison-Lab/gha#857`, deciding whether a `### Verdict` heading qualifies an existing statement or supersedes it): a bare word-boundary prefix matched `### Verdict rationale`, an ordinary section title, and mis-fired on every uncorrected review that happened to use the word.
+Four rounds on one such regex, each wrong in a different direction (`Morrison-Lab/gha#857`, deciding whether a `### Verdict` heading qualifies an existing statement or supersedes it): a bare word-boundary prefix matched `### Verdict rationale`, an ordinary section title, and mis-fired on every uncorrected review that happened to use the word.
 Requiring the word to end the line then let `### Verdict: Needs more work` through unmatched, which is the unsafe direction here --- the qualifier case that must be caught was excluded by the exact fix meant to narrow false positives.
 Admitting a bare dash as a separator then matched `### Verdict-bearing span rule`, because "verdict-bearing" was itself vocabulary the surrounding review corpus wrote constantly, so the regex's own test-writing repository was the likeliest producer of a false positive.
 Requiring whitespace before that dash excluded `### Verdict (revised)` and `### Verdict, revised`, re-opening the unsafe direction again.
@@ -2123,7 +2123,7 @@ hyphen-joins with no space) where the allowed-shapes characterization has an ope
 
 - **Do:** when a match/no-match regex needs a third round of "also admit this separator" or "also exclude this word", rewrite it as a small, named set of DISQUALIFYING shapes instead of a growing set of QUALIFYING ones.
 - **Do:** ask, for each round's fix, whether it grew an allowed set or named a forbidden one --- a fix that adds one more permitted character is the symptom, not the cure.
-- **Don't:** keep refining an allowlist past its second false-positive/ false-negative flip;
+- **Don't:** keep refining an allowlist past its second false-positive/false-negative flip;
   that oscillation is the tell that the allowed set is open-ended rather than merely incomplete.
 - **Don't:** treat the two directions as equally safe to be wrong in --- state which one is (per the corpus this classifier serves) before choosing which way to err while the rule is still incomplete.
 

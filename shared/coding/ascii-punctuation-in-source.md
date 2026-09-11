@@ -409,7 +409,8 @@ This rule bans the glyph in source;
 it does not ban a JSON fixture's *content* from containing one, since that content is data a reviewer's real prose produced, not prose this repo authored.
 Writing that byte from a bash heredoc or `printf` without typing the literal glyph is the same problem the `chr()` bullet solves for Python, one layer down.
 
-`$'\uXXXX'` (ANSI-C quoting's Unicode escape, POSIX/bash since 4.2) reads as the obvious answer and is not reliable: measured on GNU bash 5.1.16 (MSYS2, Windows), `$'\u2014'` is left as the six literal characters `\`, `u`, `2`, `0`, `1`, `4` rather than decoded to the glyph.
+`$'\uXXXX'` (ANSI-C quoting's Unicode escape, in bash since 4.2 in 2011;
+POSIX itself did not standardize ANSI-C quoting until the later Issue 8 revision, so "bash supports it" and "POSIX requires it" are separate, differently-dated claims) reads as the obvious answer and is not reliable: measured on GNU bash 5.1.16 (MSYS2, Windows), `$'\u2014'` is left as the six literal characters `\`, `u`, `2`, `0`, `1`, `4` rather than decoded to the glyph.
 A test case built this way still **passes**, for a reason that has nothing to do with the logic it means to exercise: the assertion under test turned on the character not being a word character, and a literal backslash satisfies that condition exactly as well as an em-dash does.
 So the case looks green and tests nothing.
 

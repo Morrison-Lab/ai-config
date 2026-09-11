@@ -539,8 +539,9 @@ only a comparison against what the fix was supposed to contain would catch it, a
 
 (Measured 2026-09, `Morrison-Lab/gha#857`: a `git checkout -- <file>` run to undo a mutation reverted the session's own uncommitted fix to that file, and a later `git add -A && git commit` captured the reverted state with the suite not re-run in between.
 The loss surfaced only several steps later.
-`hooks/flag-reset-hard-uncommitted-work.py` already matches this exact command shape --- `git checkout <path>` discarding a tracked, uncommitted change unrelated to the mutation --- and warns before the restore runs;
-this recurrence is recorded as a gap in *heeding* the warning rather than in the hook's coverage.)
+`hooks/flag-reset-hard-uncommitted-work.py` already matches this exact command shape --- `git checkout <path>` discarding a tracked, uncommitted change unrelated to the mutation --- and its own match condition (M3'/M4) covers it, so this is not a coverage gap in the hook.
+Whether the hook actually fired and its warning was seen and set aside in this instance, versus not firing for some other reason, is not established here;
+either way the remedy below --- re-verify before the next commit --- holds regardless of what a warning did or did not do.)
 
 ## A "moved content" exemption keyed on base-tree membership is a bypass -- key it on the same diff's deleted lines
 

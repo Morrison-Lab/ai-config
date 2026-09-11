@@ -95,6 +95,15 @@ a session or nag on a babysitting loop that re-reads the same reply.
 
 KNOWN, DELIBERATELY UNFIXED GAP
 --------------------------------
+The widest spurious-warn surface, listed first because it is the most
+likely to fire in ordinary work: when a hazard's PR is known but the
+clean-claim sentence names no PR number at all, the correlation guard
+cannot exclude it, so an unrelated, un-numbered clean claim later in the
+same session warns and cites the hazard's PR. Erring toward warning is
+deliberate where either side is unknown, but the three narrower items
+below were previously listed as though they were the whole surface, which
+understated it (round 8, finding 6).
+
 `_hedge_attaches` reuses `no-stale-pr-status.py`'s clause-separator word
 list (`RX_LEADING_SEPARATOR`), which matches a bare `\bso\b` as the
 coordinating conjunction ("...that PR #42 is Ready for merge, so it's
@@ -470,6 +479,38 @@ def _blocks(m):
     return blocks
 
 
+def _result_text(block):
+    """Flatten a tool_result's content to text, whatever transport shape it uses.
+
+    `content` is a plain string in some transports and a list of content blocks
+    in others -- `no-push-without-self-review.py::_result_text` documents the
+    same split. `str()` on the list form yields a Python repr in which every
+    real newline becomes the two characters backslash-n, and the imported
+    `classify_verdict`/`_unresolved_finding_pattern` both need real newlines to
+    see a heading or a marked line. So the list form scored as no verdict and no
+    finding, and the hook went silent on the exact shape it was written for
+    (round 8, finding 1).
+    """
+    raw = block.get("content")
+    if raw is None:
+        raw = block.get("output")
+    if isinstance(raw, str):
+        return raw
+    if isinstance(raw, list):
+        parts = []
+        for sub in raw:
+            if isinstance(sub, str):
+                parts.append(sub)
+            elif isinstance(sub, dict):
+                val = sub.get("text")
+                if val is None:
+                    val = sub.get("content")
+                if isinstance(val, str):
+                    parts.append(val)
+        return "\n".join(parts)
+    return "" if raw is None else str(raw)
+
+
 def scan(path):
     """Return (hazards, last_text).
 
@@ -515,7 +556,7 @@ def scan(path):
 
             elif btype == "tool_result":
                 tool_id = b.get("tool_use_id") or b.get("id") or ""
-                body_text = str(b.get("content") or b.get("output") or "")
+                body_text = _result_text(b)
                 if len(body_text) < _MIN_BODY_LEN:
                     continue
                 if not REVIEW_PASTE.search(body_text):
@@ -528,13 +569,36 @@ def scan(path):
                     finding = _cpfc._unresolved_finding_pattern(body_text)
                 except Exception:
                     continue
-                if verdict != "clean" or not finding:
-                    continue
                 pr_refs = set()
                 for rx in _PR_IN_COMMAND:
                     pr_refs.update(rx.findall(cmd_blob))
                 pr_refs.update(PR_NUMBER_JSON.findall(cmd_blob))
-                hazards.append({"index": i, "pr_refs": pr_refs})
+                if verdict == "clean" and finding:
+                    hazards.append({"index": i, "pr_refs": pr_refs})
+                elif verdict == "clean":
+                    # A later fetch of the same PR that is genuinely clean
+                    # SUPERSEDES an earlier hazard for it. Without this the
+                    # ordinary loop -- fetch, fix, re-fetch clean, report clean
+                    # -- warned on correct behaviour, citing a hazard the
+                    # session had already resolved, and only an explicit
+                    # check-pr-fully-clean.py run could discharge it (round 8,
+                    # finding 3). That is this corpus's central workflow, so
+                    # nagging there is the failure that gets a hook switched
+                    # off.
+                    #
+                    # Only a CLEAN re-read supersedes. A not-clean one leaves
+                    # the hazard standing, which is the safe direction: the
+                    # claim being guarded against is a clean claim.
+                    #
+                    # An unattributed re-read (no PR reference recoverable from
+                    # the command) clears nothing, since it cannot be shown to
+                    # be about the hazard's PR.
+                    if pr_refs:
+                        hazards = [
+                            h for h in hazards
+                            if not (h["pr_refs"] and h["pr_refs"] & pr_refs)
+                        ]
+                continue
 
             elif btype == "text" and rec_type == "assistant":
                 txt = b.get("text") or ""
@@ -744,12 +808,17 @@ def _sentence_end(prose, pos):
 
 
 def main() -> int:
+    # Both the load AND the lookup live in one try, matching the sibling hooks
+    # this borrows from. json.load succeeds for `[1,2,3]`, `42`, `null` and a
+    # bare string, each of which is valid JSON and none of which has .get, so
+    # splitting them turned a fail-open hook into one that raised (round 8,
+    # finding 2).
     try:
         payload = json.load(sys.stdin)
+        path = payload.get("transcript_path") or ""
     except Exception:
         return 0
 
-    path = payload.get("transcript_path") or ""
     if not path or not os.path.isfile(path):
         return 0
 

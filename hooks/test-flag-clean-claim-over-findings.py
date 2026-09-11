@@ -60,11 +60,33 @@ def result(tool_id, content):
         {"type": "tool_result", "tool_use_id": tool_id, "content": content}]}}
 
 
+def result_blocks(tool_id, content):
+    """A tool_result whose `content` is a LIST of content blocks.
+
+    The other transport shape. `str()` on it yields a Python repr in which every
+    newline is escaped, which defeats the heading and marked-line detection the
+    hazard scan relies on (round 8, finding 1).
+    """
+    return {"type": "user", "message": {"content": [
+        {"type": "tool_result", "tool_use_id": tool_id,
+         "content": [{"type": "text", "text": content}]}]}}
+
+
 def checker(pr):
     return {"type": "assistant", "message": {"content": [
         {"type": "tool_use", "name": "Bash",
          "input": {"command": f"python3 scripts/check-pr-fully-clean.py {pr}"}}]}}
 
+
+HAZARD_42_BLOCKS = [
+    fetch("gh api repos/o/r/pulls/42/reviews", "tb1"),
+    result_blocks("tb1", HAZARD_BODY),
+]
+
+CLEAN_REFETCH_42 = [
+    fetch("gh api repos/o/r/pulls/42/reviews", "t9"),
+    result("t9", CLEAN_BODY),
+]
 
 HAZARD_42 = [
     fetch("gh api repos/o/r/pulls/42/reviews", "t1"),
@@ -362,6 +384,33 @@ CASES = [
     ([fetch("git status --short", "t8"), result("t8", "clean"),
       say("All done, everything looks good.")], False,
      "an unrelated recap with no review activity never warns"),
+    # Round 8, finding 1: the list-shaped transport must be scanned like the
+    # string one. Before the flattener this produced NO warning at all, on the
+    # hook's own primary scenario.
+    (HAZARD_42_BLOCKS + [say("Reported to the user: Ready for merge.")],
+     True, "a list-shaped tool result is still scanned for the hazard"),
+
+    # Round 8, finding 3: the ordinary loop must not warn. Fetch a hazard, fix
+    # it, re-fetch genuinely clean, then report clean. This is the corpus's
+    # central workflow, so nagging here is what gets a hook switched off.
+    (HAZARD_42 + [say("Pushed a fix; requesting re-review.")] + CLEAN_REFETCH_42
+     + [say("Ready for merge -- the re-review came back with nothing open.")],
+     False, "a clean re-fetch of the same PR supersedes an earlier hazard"),
+
+    # Only a CLEAN re-read supersedes. A second hazard leaves it standing,
+    # which is the safe direction.
+    (HAZARD_42 + [say("Pushed a fix; requesting re-review.")]
+     + [fetch("gh api repos/o/r/pulls/42/reviews", "t10"),
+        result("t10", HAZARD_BODY)]
+     + [say("Ready for merge.")],
+     True, "a second hazard for the same PR does not supersede the first"),
+
+    # A clean re-read of a DIFFERENT PR clears nothing.
+    (HAZARD_42 + [fetch("gh api repos/o/r/pulls/99/reviews", "t11"),
+                  result("t11", CLEAN_BODY)]
+     + [say("Ready for merge.")],
+     True, "a clean re-fetch of a different PR does not supersede the hazard"),
+
 ]
 
 
@@ -400,9 +449,15 @@ def main():
     with os.fdopen(fd, "w") as fh:
         for e in HAZARD_42 + [say("Reported to the user: Ready for merge.")]:
             fh.write(json.dumps(e) + "\n")
+    # Fresh sentinel dir, like the once-per-message case below: without it the
+    # hook can short-circuit on a sentinel left by an earlier run of this same
+    # reply text and never reach the print this case inspects. Reproduced in
+    # round 8 -- a mutation emitting a block decision left the suite fully
+    # green.
     out = subprocess.run(
         [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
         capture_output=True, text=True,
+        env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
     ).stdout
     os.unlink(path)
     if '"decision"' not in out and '"block"' not in out:
@@ -411,6 +466,26 @@ def main():
     else:
         print("FAIL: emitted a block decision -- this hook must warn only")
         failures += 1
+
+    # A valid-JSON payload that is not an object must fail OPEN, not raise.
+    # json.load succeeds for each of these; only the following .get would fail,
+    # which is why the load and the lookup belong in one try (round 8,
+    # finding 2).
+    for bad in ("[1,2,3]", "42", "null", '"hello"'):
+        proc = subprocess.run(
+            [sys.executable, HOOK], input=bad,
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
+        )
+        if proc.returncode == 0 and not proc.stdout.strip() and "Traceback" not in proc.stderr:
+            passes += 1
+        else:
+            print(
+                "FAIL: non-dict payload %s did not fail open "
+                "(rc=%s, stderr=%r)" % (bad, proc.returncode, proc.stderr[:200])
+            )
+            failures += 1
+    print("PASS: a valid-JSON non-dict payload fails open")
 
     # Fires at most once per distinct message.
     fd, path = tempfile.mkstemp(suffix=".jsonl")

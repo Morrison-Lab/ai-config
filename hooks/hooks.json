@@ -681,6 +681,13 @@
             "if": "Bash(git commit *)",
             "script": "flag-unchanged-test-sibling.py",
             "why": "Warns when a commit stages a file whose conventionally-named test sibling is left unstaged, so the suite gets opened rather than reasoned about (ai-config#3419)."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-indirect-gnu-grep-flag.py\"",
+            "timeout": 10,
+            "script": "flag-indirect-gnu-grep-flag.py",
+            "why": "Measured 2026-09-10 on Morrison-Lab/qwt: `git ls-files -z | xargs -0 grep -lP ...` hit BSD grep in the xargs child (the session's ugrep is a shell function and does not cross a child-process boundary), printed a usage error to stderr, and exited 1 -- the same status as an honest no-match -- so the empty stdout was reported as 'no tracked file contains an em dash' and the false claim reached a commit message. Warns only; which grep resolves in the child is not decidable from the command text."
           }
         ]
       },

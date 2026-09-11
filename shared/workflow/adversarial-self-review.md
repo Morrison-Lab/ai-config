@@ -961,6 +961,40 @@ It is adjacent to [#2483](https://github.com/Morrison-Lab/ai-config/issues/2483)
 - **Don't:** read the sentinel as part of the payload-last contract.
   It is a mitigation for the ordering that contract rules out, so a conforming report needs none.
 
+**Confirmed again, 2026-09-10, with the persona's existing "read that sha
+yourself" instruction already in place and still not enough on its own.**
+A dispatch against an unpushed commit reported `Reviewed-Commit:
+b7f1d0c62d3a83c98d0cc4d17ac8ea7dbfe1ff67`, matching the real commit
+(`b7f1d0c3f459eb7ac75b4453470d3e5b8046c298`) in its first 7 characters and
+disagreeing in the remaining 33.
+The persona file already carried "Read that sha yourself rather than taking
+it from the brief," which names the *source* to avoid but not the *method*
+that avoids it --- it does not say to run `git rev-parse HEAD` specifically,
+and it does not forbid extending a short sha it already has (from `git log
+--oneline`, or from the hook's own error text) out to 40 characters.
+The review's surrounding content was independently verified and sound,
+which is what made the fabricated fingerprint easy to miss: nothing else in
+the report read as unreliable.
+The pre-push guard's prefix-tolerant compare still caught it, because the two
+strings share only 7 characters and neither is a prefix of the other beyond
+that point, so `verify_review`'s mismatch check fired as designed.
+The in-session fix was to re-dispatch with the real full sha supplied and an
+explicit "do NOT invent or pad any SHA; report only a SHA a command you ran
+printed in full, and paste that command's output," which held for every
+later round.
+[`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md)
+now carries that instruction directly, so a future dispatch does not depend
+on the brief-writer remembering to add it.
+
+- **Do:** read this as confirmation that "read the sha yourself" needs the
+  method spelled out (`git rev-parse HEAD`, verified with `git rev-parse
+  --verify --quiet <sha>^{commit}`) and an explicit padding ban, not as a
+  reason to distrust the prefix-tolerant guard --- the guard worked.
+- **Don't:** treat a reviewer's otherwise sound, well-evidenced findings as
+  proof its fingerprint is real; the two are independent, and a fabricated
+  identifier can sit inside an accurate report undetected until something
+  else (here, the guard) compares it.
+
 ## Structured review data (JSON payload)
 
 Every reviewer emits two representations of one verdict: the human-readable Markdown report, then a machine-readable JSON payload in a trailing HTML comment.

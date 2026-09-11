@@ -1,9 +1,7 @@
 # Timestamp recaps in local time
 
-Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps the rule and its pattern/anti-pattern pairs;
-this file carries the platform mechanics, the surfaces the drift reaches, and the measured cases.
-Nothing here was rewritten in the move.
-
+Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps the rule and its pattern/anti-pattern pairs and links here for the platform mechanics, the surfaces the drift reaches, and the measured cases.
+The move changed three things and nothing else: one relative link was repointed for the new depth, two em-dashes were converted to the corpus's spaced ` --- `, and every paragraph was reflowed by `scripts/semantic-line-breaks.py`.
 
 When printing a status recap or summary, include a timestamp in the user's local time zone (Pacific Time, `America/Los_Angeles` --- get it from `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`;
 the explicit `TZ` enforces PT on a machine set to any other zone).

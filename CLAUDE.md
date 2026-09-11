@@ -264,7 +264,10 @@ The fragment above carries the mechanics, the failure modes each check catches, 
 
 [`shared/workflow/timestamp-local-recaps.md`](shared/workflow/timestamp-local-recaps.md)
 
-Every clock time you write down --- a status recap, a date typed into a file, a time stamped on a forge comment, a session-notebook heading --- comes from a reading taken **in that moment**, in the user's zone (`TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
+A status recap or summary carries a timestamp in the user's local zone, so "as of when" is unambiguous when they read it later.
+That is the obligation;
+the rest of this section governs where the time comes from.
+Every clock time you write down --- that recap, a date typed into a file, a time stamped on a forge comment, a session-notebook heading --- comes from a reading taken **in that moment**, in the user's zone (`TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
 A reading expires immediately, and the thing that most reliably licenses an invented stamp later is the memory of having honestly measured one earlier: the clock keeps moving while a count of elapsed tool calls does not, so the two drift apart and the drift compounds across comments posted in sequence.
 The risk peaks after about 17:00 Pacific, once UTC has already rolled over.
 
@@ -571,7 +574,7 @@ So `#316 session title convention`, not `PR #316 session title convention` or `P
 Before reporting on a PR --- and especially before calling one clean or ready --- pull the review state fresh.
 Never answer from chat context or from a verdict you cached, which applies equally to any other question about that live PR ("did you fix it", "why haven't you responded").
 
-Four traps, each of which returns something that reads exactly like good news:
+Five traps, each of which returns something that reads exactly like good news:
 
 - **CI green is not a review verdict.**
   `gh pr checks` reports check state and says nothing about findings.
@@ -584,11 +587,15 @@ Four traps, each of which returns something that reads exactly like good news:
 - **A formal review's finding can sit where a comments-only scan never looks.**
   Its top-level body is often empty with the finding in an inline comment on a different endpoint, and the mirror case puts the finding in the body itself, possibly inside a collapsed `<details>`.
   A bot's `COMMENTED` review carrying a finding is blocking exactly as a human's `CHANGES_REQUESTED` is.
+- **A later clean bot verdict does not clear a human's `CHANGES_REQUESTED`.**
+  Only that human, or an explicit dismissal, resolves a review *state*, and an automated "Ready for merge" posted afterwards does not touch it.
+  It feeds the merge gate directly, so it binds under `mwc` as much as under any other grant.
 
 A review-gating check run can also read green over a `NOT_CLEAN` verdict, so a check named for the verdict is not the verdict --- see [`review-verdict-pitfalls`](shared/workflow/review-verdict-pitfalls.md).
 
 - **Do:** read every round since the one you last processed, every formal review's state and body whoever posted it, and the inline comments.
 - **Don't:** treat green checks, a login-filtered query, or a named verdict-gating check as evidence the review is clean.
+- **Don't:** read a review's *state* as blocking on its own, nor read a later clean verdict as clearing a standing `CHANGES_REQUESTED` --- state and finding are separate axes, each blocking for its own reason.
 
 (A specific case of the standing **never assume;
 always verify** rule in `memories/preferences.md` --- confirm the verdict with a fresh query, don't recall it.)
@@ -1783,11 +1790,9 @@ Open the PR.
 The sibling of the backtick hazard above, and the same class: content silently transformed between what you type and what the interpreter receives.
 On some transports a doubled `\\` inside a Bash-tool heredoc body arrives as a single `\`, **even with a quoted delimiter** that should make the body literal.
 
-It fails silently and plausibly.
-A patch script's `assert target in s` fails, which reads as a slightly-wrong anchor rather than a corrupted one, so retyping the anchor fails identically.
-The worse case is not a failed assert: a heredoc that writes `\\d` into a regex emits `\d`, a broken matcher with no syntax error and a green suite.
+It fails silently and plausibly: the worst case is not a failed assert but a corrupted regex with no syntax error and a green suite.
 
-**It is a property of the environment, not of heredocs**, so measure yours rather than trusting either answer --- it reproduced on Windows MINGW64 and did not reproduce in two Linux runners.
+**It is a property of the environment, not of heredocs**, so measure yours rather than trusting either answer --- it reproduced on Windows MINGW64, and did not reproduce either in a GitHub Actions Linux runner or in a Linux remote Claude Code container --- two different environments, and the second is where many sessions actually execute.
 Knowing the rule also does not stop you tripping it, since nothing about typing an escape sequence announces itself as the trigger.
 
 - **Do:** build the character with `chr(92)` or a placeholder token before it enters a heredoc body, and print `repr()` of the constructed string.
@@ -1795,8 +1800,6 @@ Knowing the rule also does not stop you tripping it, since nothing about typing 
 - **Don't:** type a doubled backslash directly inside a heredoc body, quoted delimiter or not.
 - **Don't:** treat having read this rule as the check --- it was loaded, and the collapse happened anyway.
 
-A **raw** string needs none of this: `r"^\d+$"` is single backslashes
-throughout, and those survive.
 `hooks/warn-heredoc-doubled-backslash.py` scans a command's heredoc bodies at `PreToolUse` and names the offending line (ai-config#1923, #3362).
 
 ## Strict Merge Control Policy

@@ -873,7 +873,7 @@ the recurring shape here is reading a gate's printed verdict while the shell rea
 A clock read at 19:54 PDT against the commit times of the pushes each entry describes showed the last five headings running up to 31 minutes fast:
 the entries stamped 19:44, 19:52, 19:57, 20:12 and 20:22 were written at about 19:36, 19:39, 19:41, 19:46 and 19:51, the times of `d8c507a8`'s merge and of the `709bc612`, `7e7c80b0`, `ee05069e` and `ced1937b` pushes.
 Two chat recaps in the same stretch said 20:03 and 20:24 for the same reason.
-Each stamp was extrapolated from the sense of elapsed work since the 19:36 reading, which is the near-miss `CLAUDE.md`'s "Timestamp recaps in local time" section names in its 2026-09-01 measurement, recurring here on the same day it was last written down.
+Each stamp was extrapolated from the sense of elapsed work since the 19:36 reading, which is the near-miss [`timestamp-local-recaps`](../shared/workflow/timestamp-local-recaps.md) names in its 2026-09-01 measurement, recurring here on the same day it was last written down.
 The headings are corrected to the commit-anchored times;
 this entry's own time is a fresh reading.
 

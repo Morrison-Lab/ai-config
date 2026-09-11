@@ -1,9 +1,7 @@
 # Re-check for latest review findings before reporting PR status
 
-Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps the rule and its pattern/anti-pattern pairs;
-this file carries the queries, the login-versus-body-marker trap, the formal-review blind spots and the cases.
-Nothing here was rewritten in the move.
-
+Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps the rule and its pattern/anti-pattern pairs and links here for the queries, the login-versus-body-marker trap, the formal-review blind spots and the cases.
+The move changed four things and nothing else: three relative links were repointed for the new depth, three em-dashes were converted to the corpus's spaced ` --- `, the closing cross-reference to `memories/preferences.md` was dropped as a duplicate of the copy kept in `CLAUDE.md`, and every paragraph was reflowed by `scripts/semantic-line-breaks.py`.
 
 **Before** reporting status on a PR (especially "clean" / "ready to merge"), re-read the **most recent** review comment on the PR.
 The same fetch applies to any other question about that live PR ("why didn't you wait", "did you fix it", "why haven't you responded").
@@ -20,7 +18,7 @@ Diff the round list against what you last handled: fetch all `**Claude finished`
 
 **Filter on the body marker, not on an author login.**
 The login a review posts under varies by repo and by run --- `claude`, `claude[bot]`, and `github-actions[bot]` have each been observed carrying a real, complete verdict --- so a login-filtered query silently returns the *previous* round's comment and reads exactly like "no new review yet".
-That is a false negative on the one question this section exists to answer, and nothing in the output announces it.
+That is a false negative on the one question this file exists to answer, and nothing in the output announces it.
 Completed runs start the body with `**Claude finished`, so match that instead:
 
 ```bash
@@ -51,13 +49,11 @@ The unfiltered listing comes first: the state filter answers only whether a revi
 See [`CLAUDE.cases.md`](../../CLAUDE.cases.md), "A bot's `COMMENTED` review is the same blind spot".
 
 **The review's own required check run can itself read green over a `NOT_CLEAN` verdict --- a distinct failure from "CI green isn't the review verdict".**
-The `gh pr checks` paragraph at the top of this section treats check state and the review verdict as two signals that both need checking.
+The `gh pr checks` paragraph at the top of this file treats check state and the review verdict as two signals that both need checking.
 This one says the review's *own* gate, e.g. `review / require-clean-verdict`, does not always track the outcome it is named for.
 [`review-verdict-pitfalls`](review-verdict-pitfalls.md) carries the measured case and the analysis, and is where further cases go.
 
 - **Do:** treat a green review-gating check run as unverified until the latest review comment's own verdict field confirms it, even when that check run's name implies it enforces the verdict directly.
 - **Don't:** read a named review-verdict check (e.g. `require-clean-verdict`) as SUCCESS meaning the review is clean --- name and outcome can disagree.
 
-(A specific case of the standing **never assume;
-always verify** rule in `memories/preferences.md` --- confirm the verdict with a fresh query, don't recall it.)
 

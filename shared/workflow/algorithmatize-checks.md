@@ -1323,7 +1323,7 @@ The first separates an inapplicable mutation from everything else;
 the second is the pass-condition entry's own identity check, and it is what separates a faulty mutation from a suite that cannot see a good one.
 
 The one thing worth adding is **when** to check the anchor.
-It carried escape sequences and did not match the file's own escaping, which is the failure `CLAUDE.md`'s "Tool transport collapses doubled backslashes" section already covers --- read it for the mechanism, the remedy, and the platform caveat.
+It carried escape sequences and did not match the file's own escaping, which is the failure [`heredoc-backslash-collapse`](../coding/heredoc-backslash-collapse.md) already covers --- read it for the mechanism, the remedy, and the platform caveat.
 What that section does not say is that a mutation harness is where the check has to move earlier.
 There the tell is a match that inexplicably fails, and you react to it;
 here the same failure produces a green suite and a `MISSED` row that reads as a finding, so nothing prompts a reaction at all.

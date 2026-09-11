@@ -683,5 +683,23 @@ wrong += not _ok
 print("%-7s broken install falsely discharges a quoted grep PATTERN,"
       " as the lexical approximation always did" % _verdict)
 
+# cluster_supplies_pattern asks whether ANY letter of a short cluster supplies
+# the pattern, while takes_no_value asks whether EVERY letter is bare. The two
+# can only agree while no verb lists one letter in both tables. That is true
+# today and nothing enforced it, so a later table edit could reopen a false
+# discharge with no test going red. PATTERN_OPTS' own comment records that a
+# shared table caused exactly that once, with `jq -e`.
+_BARE = _ns["BARE_OPTS"]
+_PATTERN = _ns["PATTERN_OPTS"]
+for _verb in sorted(set(_BARE) | set(_PATTERN)):
+    _overlap = sorted(_BARE.get(_verb, frozenset())
+                      & _PATTERN.get(_verb, frozenset()))
+    total += 1
+    _ok = not _overlap
+    wrong += not _ok
+    print("%-7s %s lists no option as both bare and pattern-supplying%s"
+          % ("ok" if _ok else "WRONG", _verb,
+             "" if _ok else (": " + ", ".join(_overlap))))
+
 print("\n%d/%d correct" % (total - wrong, total))
 sys.exit(1 if wrong else 0)

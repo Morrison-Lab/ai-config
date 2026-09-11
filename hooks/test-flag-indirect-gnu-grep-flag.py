@@ -164,6 +164,12 @@ CASES = [
      "the per-file -exec form; it warns, and its rc story differs from the "
      "+ form's (find exits 0, discarding the child's status entirely)"),
 
+    ("C21-nested-xargs-over-sh",
+     "ls | xargs -0 sh -c " + chr(39) + "grep -P x f" + chr(39),
+     True,
+     "an inner sh -c runs the grep and an outer xargs runs the sh; it warns, "
+     "and the rc story must come from the outer link"),
+
     ("C15-z-portable",
      "git ls-files -z | xargs -0 grep -lz 'x'",
      False,
@@ -202,10 +208,10 @@ def baseline():
 # rather than a pass, per the harness note above.
 MUTATIONS = [
     ("M1-drop-indirection-requirement",
-     # Treat every grep as indirect: the pipe and bare cases must now warn.
-     ('    if via is None:' + chr(10) + '        return None',
-      '    if via is None:' + chr(10) + '        via = via or "xargs"'
-       + chr(10) + '        via_at = 0 if via_at is None else via_at'),
+     # Accept a command with no indirection chain reaching the grep: the bare
+     # and piped cases must now warn.
+     ('    if not chain:' + chr(10) + '        return None',
+      '    if not chain:' + chr(10) + '        chain = [0]'),
      {"C6-bare-grep-P", "C7-pipe-to-grep"}),
 
     ("M2-drop-find-exec-handling",
@@ -220,7 +226,7 @@ MUTATIONS = [
     ("M3-drop-flag-requirement",
      # Any indirect grep warns, flag or not.
      ('    for t in toks[grep_at + 1:]:',
-      '    return "-P", via, command, invoked, pinned, GNU_ONLY_FLAGS[\"-P\"], RC_LAUNDERED' + chr(10) + '    for t in toks[grep_at + 1:]:'),
+      '    return "-P", via, command, invoked, pinned, GNU_ONLY_FLAGS[\"-P\"], RC_LAUNDERED, "xargs"' + chr(10) + '    for t in toks[grep_at + 1:]:'),
      # C12 carries no grep token at all, so it returns before the
      # mutated line is reached -- excluded rather than faked.
      {"C8-xargs-portable-grep", "C9-grep-in-pattern",
@@ -245,12 +251,10 @@ MUTATIONS = [
      {"C16-ggrep-is-gnu"}),
 
     ("M7-decouple-utility-check",
-     # Accept any indirection paired with any grep token, instead of
-     # requiring the indirection to actually RUN that grep. The
-     # grep-as-argument case must start warning, which is the false positive
-     # a reviewer found.
-     ('        if _utility_after(toks, i) == grep_at:',
-      '        if True:'),
+     # Let any indirection join the chain without running the next link, so
+     # `xargs -0 python3 script.py grep -P f` is attributed again.
+     ('            if t in INDIRECTIONS and _utility_after(toks, i) == cur:',
+      '            if t in INDIRECTIONS:'),
      {"C18-grep-as-argument"}),
 
     ("M4-drop-tool-gate",
@@ -349,6 +353,17 @@ def rc_story_matches_indirection():
         ("env grep -P x f", "rc=2", "preserved"),
         ("find . -exec grep -lP x {} +", "rc=1", "laundered"),
         ("find . -exec grep -lP x {} " + B + ";", "rc=0", "discarded"),
+        # Nested chains. The observable status is the chain composed outward,
+        # so an inner `sh -c` that preserves rc=2 is overridden by whatever
+        # the outer link does -- measured, not inferred. An earlier draft
+        # reported the INNERMOST link's behaviour and so promised rc=2 here,
+        # pointing a reader at a `case $rc` branch that never fires.
+        ("ls | xargs -0 sh -c " + chr(39) + "grep -P x f" + chr(39),
+         "rc=1", "nested: xargs over sh"),
+        ("find . -exec sh -c " + chr(39) + "grep -P x {}" + chr(39) + " " + B + ";",
+         "rc=0", "nested: find ; over sh"),
+        ("find . -exec sh -c " + chr(39) + "grep -P x" + chr(39) + " +",
+         "rc=1", "nested: find + over sh"),
     ]
     failures = []
     for cmd, want_rc, label in expect:
@@ -384,7 +399,49 @@ def rc_story_matches_indirection():
     return failures
 
 
+def composition_clause_is_load_bearing():
+    """Mutate the chain composition and confirm the rc story regresses.
+
+    This clause cannot be covered by the MUTATIONS harness above, which
+    compares warn-versus-silent: reporting the wrong rc story still warns, so
+    nothing there flips. Declaring an empty expected-flip set for it would be
+    an admission of no coverage rather than coverage, so the check lives here
+    and asserts the regression directly.
+
+    The mutation is the exact defect a reviewer measured: take the innermost
+    link's behaviour instead of the composed chain's, and
+    `xargs -0 sh -c 'grep -P ...'` goes back to promising rc=2 where the
+    caller sees 1.
+    """
+    src = open(HOOK, encoding="utf-8").read()
+    old = "    rc_kind = _observable_rc(toks, chain)"
+    new = "    rc_kind = _rc_behaviour(toks, chain[-1])"
+    if old not in src:
+        print("  FAIL composition anchor not found; mutation not applied")
+        return ["composition"]
+    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False,
+                                     encoding="utf-8") as fh:
+        fh.write(src.replace(old, new, 1))
+        path = fh.name
+    nested = "ls | xargs -0 sh -c " + chr(39) + "grep -P x f" + chr(39)
+    payload = {"tool_name": "Bash", "tool_input": {"command": nested}}
+    try:
+        proc = subprocess.run([sys.executable, path],
+                              input=json.dumps(payload),
+                              capture_output=True, text=True)
+        sm = (json.loads(proc.stdout or "{}")).get("systemMessage", "")
+    finally:
+        os.unlink(path)
+    # Mutated, it must claim the WRONG story (rc=2) for this command.
+    regressed = "rc=2" in sm
+    print("  %s composition mutant claims rc=2 for a chain measured rc=1: %s"
+          % ("PASS" if regressed else "FAIL", regressed))
+    return [] if regressed else ["composition"]
+
+
 def main():
+
+
 
 
     print("Baseline cases:")
@@ -396,8 +453,11 @@ def main():
     print("Per-indirection rc story:")
     base_fail += rc_story_matches_indirection()
     print()
+    print("Composition coverage:")
+    mut_fail = composition_clause_is_load_bearing()
+    print()
     print("Mutation coverage:")
-    mut_fail = mutate()
+    mut_fail += mutate()
     if base_fail or mut_fail:
         print("FAILED: baseline=%s mutation=%s" % (base_fail, mut_fail))
         return 1

@@ -66,6 +66,19 @@ find ... {} +    rc=1   laundered
 ```
 
 A draft of the guard asserted "laundered" for all seven, having measured only `xargs`.
+
+Nested chains compose, and the outer link wins:
+
+```
+sh -c                        rc=2
+xargs -0 sh -c ...           rc=1   outer xargs launders the preserved 2
+find ... -exec sh -c ... \;   rc=0   outer find discards it
+find ... -exec sh -c ... +    rc=1   outer find launders it
+```
+
+A second draft reported the *innermost* link's behaviour, so `xargs -0 sh -c 'grep -P ...'` was told "rc=2, branch on it" while the caller sees 1.
+That is worse than the uniform claim it replaced: it pointed a reader at the `case $rc` remedy in the one shape where that remedy never fires.
+A per-item subshell is the ordinary idiom once the per-invocation logic needs more than one command, so the shape is common rather than exotic.
 Four of them are the opposite, and `find`'s semicolon form is worse than either: a rejected flag then looks like complete success rather than an empty result.
 
 The four preserved cases are the ones worth getting right.

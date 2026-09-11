@@ -279,6 +279,61 @@ def _rc_behaviour(toks, vi):
     return RC_DISCARDED
 
 
+# What each behaviour does to a status on its way out, so a CHAIN of
+# indirections can be composed rather than having one of them stand for all.
+# Measured 2026-09-10, nested cases included:
+#
+#     sh -c                       rc=2   (grep's own)
+#     xargs -0 sh -c ...          rc=1   outer xargs launders the preserved 2
+#     find ... -exec sh -c ... ;   rc=0   outer find discards it
+#     find ... -exec sh -c ... +   rc=1   outer find launders it
+#
+# An earlier draft took the INNERMOST indirection's behaviour and reported it
+# as the whole story, so `xargs -0 sh -c 'grep -P ...'` was told "rc=2,
+# branch on it" when the caller actually sees 1. That is worse than the
+# uniform claim it replaced: it pointed a reader at the `case $rc` remedy in
+# a shape where that remedy silently never fires.
+_APPLY = {
+    RC_PRESERVED: lambda rc: rc,
+    RC_LAUNDERED: lambda rc: 1 if rc != 0 else 0,
+    RC_DISCARDED: lambda rc: 0,
+}
+_CLASSIFY = {2: RC_PRESERVED, 1: RC_LAUNDERED, 0: RC_DISCARDED}
+
+
+def _chain_to(toks, target):
+    """Indirection indices that transitively run `toks[target]`, outermost
+    first.
+
+    `xargs -0 sh -c 'grep ...'` gives [xargs, sh]: `sh` runs the grep and
+    `xargs` runs the `sh`. Only the utility slot is followed, so an
+    indirection that merely appears earlier in the line is not in the chain.
+    """
+    chain = []
+    cur = target
+    # Bounded by the token count, and each step moves strictly left.
+    for _ in range(len(toks)):
+        found = None
+        for i in range(cur):
+            t = toks[i].rsplit("/", 1)[-1]
+            if t in INDIRECTIONS and _utility_after(toks, i) == cur:
+                found = i
+                break
+        if found is None:
+            break
+        chain.insert(0, found)
+        cur = found
+    return chain
+
+
+def _observable_rc(toks, chain):
+    """Compose the chain outward from grep's own rc=2, and classify."""
+    rc = 2
+    for i in reversed(chain):
+        rc = _APPLY[_rc_behaviour(toks, i)](rc)
+    return _CLASSIFY[rc]
+
+
 def indirect_gnu_grep(payload):
     """Return (flag, via, command) when a GNU-only grep flag is reached
     through a child-process boundary, else None."""
@@ -322,20 +377,22 @@ def indirect_gnu_grep(payload):
     # independently is what let `xargs -0 python3 script.py grep -P f`
     # through: an indirection was present, a grep token was present, and
     # nothing established that the second was what the first ran.
-    via = None
-    via_at = None
-    for i, t in enumerate(toks[:grep_at]):
-        base = t.rsplit("/", 1)[-1]
-        if base not in INDIRECTIONS:
-            continue
-        # A bare `find ... | grep` is a pipe, where grep is the shell's own
-        # child and the function DOES apply; only -exec/-execdir spawns it.
-        if _utility_after(toks, i) == grep_at:
-            via = base
-            via_at = i
-            break
-    if via is None:
+    # A bare `find ... | grep` is a pipe, where grep is the shell's own child
+    # and the function DOES apply; only -exec/-execdir spawns it, which
+    # `_utility_after` encodes.
+    chain = _chain_to(toks, grep_at)
+    if not chain:
         return None
+    # The PATH story belongs to the indirection that actually runs grep (the
+    # innermost), since that is the name being resolved in a fresh child.
+    via = toks[chain[-1]].rsplit("/", 1)[-1]
+    # The rc story belongs to the whole chain, because the status the caller
+    # reads has passed through every link. For a single-link chain these
+    # agree, which is why taking the innermost looked right.
+    rc_kind = _observable_rc(toks, chain)
+    # Name the outermost link when it is the one transforming the status, so
+    # the message does not attribute a laundering to the inner shell.
+    rc_via = toks[chain[0]].rsplit("/", 1)[-1]
 
     # The flag must belong to the grep, so only look after it.
     # An explicit path is a different situation from a bare name, and the
@@ -353,11 +410,11 @@ def indirect_gnu_grep(payload):
         bare = t.split("=", 1)[0]
         if bare in GNU_ONLY_FLAGS:
             return (bare, via, command, invoked, pinned,
-                    GNU_ONLY_FLAGS[bare], _rc_behaviour(toks, via_at))
+                    GNU_ONLY_FLAGS[bare], rc_kind, rc_via)
         # Clustered short flags: -lP, -rlP, etc.
         if re.fullmatch(r"-[A-Za-z]{2,}", t) and "P" in t[1:]:
             return ("-P", via, command, invoked, pinned,
-                    GNU_ONLY_FLAGS["-P"], _rc_behaviour(toks, via_at))
+                    GNU_ONLY_FLAGS["-P"], rc_kind, rc_via)
     return None
 
 
@@ -383,8 +440,10 @@ def main():
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
-    flag, via, command, invoked, pinned, stderr, rc_kind = found
-    rc_sentence = RC_SENTENCE[rc_kind].format(via=via)
+    flag, via, command, invoked, pinned, stderr, rc_kind, rc_via = found
+    # The rc sentence names the link that transforms the status, which is the
+    # outermost one and only equals `via` on a single-link chain.
+    rc_sentence = RC_SENTENCE[rc_kind].format(via=rc_via)
     template = NOTE_PINNED if pinned else NOTE_RESOLVED
     # No `permissionDecision` key: an absent decision defers to the normal
     # permission flow. Naming "allow" would suppress a prompt the user would
@@ -410,14 +469,15 @@ def main():
         if pinned:
             out["systemMessage"] = (
                 "`%s %s` via `%s` pins that binary: if it is macOS's BSD grep "
-                "the flag is rejected, with empty stdout and %s."
-                % (invoked, flag, via, rc_clause)
+                "the flag is rejected, with empty stdout and %s (through `%s`)."
+                % (invoked, flag, via, rc_clause, rc_via)
             )
         else:
             out["systemMessage"] = (
                 "`%s %s` via `%s` resolves by PATH in the child, past this "
                 "session's own `%s`: BSD grep rejects the flag, with empty "
-                "stdout and %s." % (invoked, flag, via, invoked, rc_clause)
+                "stdout and %s (through `%s`)."
+                % (invoked, flag, via, invoked, rc_clause, rc_via)
             )
     print(json.dumps(out))
     return 0

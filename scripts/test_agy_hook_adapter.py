@@ -290,6 +290,56 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertEqual(out.get("reason"), "Unauthorized command")
 
     @patch('os.path.exists', return_value=True)
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_run_command_parallel_multiple_hooks_and_order(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_exists):
+        multi_hooks_def = {
+            "hooks": {
+                "PreToolUse": [
+                    {
+                        "matcher": "Bash",
+                        "hooks": [
+                            {"type": "command", "command": "python3 /fake/hook1.py", "timeout": 10},
+                            {"type": "command", "command": "python3 /fake/hook2.py", "timeout": 10},
+                            {"type": "command", "command": "python3 /fake/hook3.py", "timeout": 10}
+                        ]
+                    }
+                ]
+            }
+        }
+
+        def fake_run(cmd, *args, **kwargs):
+            if "hook1.py" in cmd:
+                return MagicMock(returncode=0, stdout=json.dumps({"systemMessage": "Notice 1", "hookSpecificOutput": {}}), stderr="")
+            elif "hook2.py" in cmd:
+                return MagicMock(returncode=0, stdout=json.dumps({"systemMessage": "Notice 2", "hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": "Blocked by hook2"}}), stderr="")
+            elif "hook3.py" in cmd:
+                return MagicMock(returncode=0, stdout=json.dumps({"systemMessage": "Notice 3", "hookSpecificOutput": {}}), stderr="")
+            return MagicMock(returncode=0, stdout=json.dumps({}), stderr="")
+
+        mock_run.side_effect = fake_run
+
+        with patch('builtins.open', new_callable=mock_open, read_data=json.dumps(multi_hooks_def)):
+            payload = {
+                "toolCall": {
+                    "name": "run_command",
+                    "args": {"CommandLine": "git push origin main"}
+                }
+            }
+            mock_stdin.write(json.dumps(payload))
+            mock_stdin.seek(0)
+            self.adapter.main()
+
+            out = json.loads(mock_stdout.getvalue())
+            self.assertEqual(out.get("decision"), "deny")
+            self.assertIn("Blocked by hook2", out.get("reason"))
+            self.assertIn("Notice 1", out.get("reason"))
+            self.assertIn("Notice 2", out.get("reason"))
+            self.assertEqual(mock_run.call_count, 3)
+
+    @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
     @patch('sys.stdin', new_callable=io.StringIO)
     @patch('sys.stdout', new_callable=io.StringIO)
@@ -2326,6 +2376,7 @@ class TestAgyHookAdapter(unittest.TestCase):
             self.assertTrue(os.path.islink(os.path.join(staging_dir, "scripts")))
             self.assertTrue(os.path.islink(os.path.join(staging_dir, "skills")))
             self.assertTrue(os.path.islink(os.path.join(staging_dir, "shared")))
+            self.assertTrue(os.path.islink(os.path.join(staging_dir, "rules")))
 
             plugins_json_path = os.path.join(config_dir, "plugins.json")
             self.assertTrue(os.path.isfile(plugins_json_path))

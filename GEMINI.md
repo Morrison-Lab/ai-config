@@ -11,5 +11,6 @@ integration work.
 ## Antigravity Plugin & Customization Integration
 
 - **Plugin manifest**: `plugins/ai-config/plugin.json` defines the `ai-config` plugin bundle for Google Antigravity.
+- **Plugin rules**: `plugins/ai-config/rules/` provides ambient rules (`ai-config.md`) loaded across all Antigravity workspaces.
 - **Workspace discovery**: `.agents/skills.json` and `.agents/plugins.json` configure workspace-level skill and plugin discovery when opening this repository directly in Antigravity.
 - **Global configuration**: Running `bootstrap.sh` stages the plugin layout under `~/.gemini/config/plugins/ai-config` and registers it in `~/.gemini/config/plugins.json` for user-wide Antigravity sessions.

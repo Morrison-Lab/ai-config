@@ -110,9 +110,14 @@ Three layers had to fail together, and each is worth checking separately when au
 - Two path layers decide which hook code agy actually runs:
   `~/.gemini/config/plugins.json` registers the plugin in a **staging runtime directory** (`~/.gemini/config/plugins/ai-config`),
   where `hooks.json` and `plugin.json` are copied so Antigravity runtime rewrites do not dirty the git checkout.
-  Executable scripts and repository directories (`hooks/`, `scripts/`, `skills/`, `shared/`) are symlinked from the checkout into the staging directory,
+  Executable scripts and repository directories (`hooks/`, `scripts/`, `skills/`, `shared/`, `rules/`) are symlinked from the checkout into the staging directory,
   so adapter and gate updates take effect live while canonical source remains pristine.
   (Updated 2026-08-31 for Issue #2673).
+
+## Antigravity plugin rules discovery
+
+- Antigravity plugins discover ambient and conditional rules from `<plugin_dir>/rules/*.md` containing YAML frontmatter with `trigger:` and `description:`.
+- Packaging rules under `plugins/ai-config/rules/` (and staging them into `~/.gemini/config/plugins/ai-config/rules`) delivers universal instructions and Antigravity operating guidelines across all host workspaces without requiring manual submodule or local repo configuration.
 
 ## Reactive wakeup vs background task polling
 
@@ -140,5 +145,11 @@ The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-anti
 - Consequently, client-side pre-tool hooks (such as `no-push-without-self-review.py`) that parse the direct tool-result output of the subagent tool call will not find the verdict embedded in the initial dispatch step result.
 - Once the asynchronous subagent has finished and returned its verified clean review report and fingerprint, use the authorized prefix `ALLOW_UNREVIEWED_PUSH=1` for the `git push` invocation (the guard's `AGENT_TOOLS` set intentionally rejects `Bash`/`run_command` outputs to prevent unauthenticated reviews).
   (Observed in live Antigravity sessions 2026-09-01.)
+
+## Antigravity hook runner 30s timeout and adapter parallelism
+
+- Antigravity enforces an ambient ~30-second timeout on command hooks declared in `hooks.json`.
+- When an adapter (such as `claude-hook-adapter.py`) runs multiple matching hooks sequentially (e.g. 25+ Python scripts on `run_command` matching `Bash`), cumulative process startup and I/O latency can exceed 30 seconds, causing Antigravity to kill the hook with `signal: killed` (`JSON hook ... failed: command failed: signal: killed`).
+- Command adapters must execute matched hook scripts concurrently (e.g. via `concurrent.futures.ThreadPoolExecutor`) to keep execution latency under ~1-2s and prevent timeouts.
 
 

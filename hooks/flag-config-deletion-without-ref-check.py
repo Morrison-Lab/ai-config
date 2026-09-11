@@ -516,7 +516,7 @@ def read_operands(argv):
             continue
         if not end_of_opts and token.startswith("-") and token != "-":
             name = token.split("=", 1)[0]
-            if name in pattern_opts:
+            if cluster_supplies_pattern(name, pattern_opts):
                 pattern_supplied = True
             if name in no_file_opts:
                 return []
@@ -539,6 +539,21 @@ def read_operands(argv):
     if verb in SCRIPT_ONLY_VERBS:
         positional = positional[:1]
     return positional + redirected
+
+
+def cluster_supplies_pattern(name, pattern_opts):
+    """True when `name` supplies the pattern, whole or as a clustered letter.
+
+    `takes_no_value` already decomposes a short cluster letter by letter, and
+    this has to as well: `sed -ne '1,5p' <manifest>` carries `-e` inside `-ne`,
+    so testing the whole token left `pattern_supplied` false and the PATTERN
+    drop then took the one real file operand.
+    """
+    if name in pattern_opts:
+        return True
+    if not name.startswith("-") or name.startswith("--") or len(name) < 3:
+        return False
+    return any("-" + letter in pattern_opts for letter in name[1:])
 
 
 def takes_no_value(name, bare_opts):

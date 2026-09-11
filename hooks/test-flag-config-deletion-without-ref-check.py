@@ -560,6 +560,15 @@ _ATTRIBUTION_CASES = [
     # keeps the common shapes discharging.
     ("grep -rn pattern ~/.claude/settings.json", {"claude"},
      "a cluster of known bare flags does not swallow the pattern"),
+    # A cluster can also CARRY the pattern option. `sed -ne` is the canonical
+    # idiom, and testing the whole token left pattern_supplied false, so the
+    # PATTERN drop took the one real file operand and lost the discharge.
+    ("sed -ne '1,5p' ~/.claude/settings.json", {"claude"},
+     "a clustered -e supplies the pattern, so the file is not dropped for it"),
+    ("grep -ne pattern ~/.claude/settings.json", {"claude"},
+     "the same cluster on grep reads the same way"),
+    ("sed -n -e '1,5p' ~/.claude/settings.json", {"claude"},
+     "the unclustered spelling of the same command agrees"),
     ("rg -i pattern ~/.claude/settings.json", {"claude"},
      "a known bare rg flag still leaves its search target credited"),
     ("jq -r .x ~/.claude/settings.json", {"claude"},

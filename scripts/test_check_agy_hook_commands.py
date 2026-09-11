@@ -98,6 +98,14 @@ class TestWindowsStaleAndMetacharacters(unittest.TestCase):
         self.assertTrue(any("still starts with" in f for f in findings))
         self.assertTrue(any("does not expand" in f for f in findings))
 
+    def test_msys_style_path_is_rejected_on_windows(self):
+        findings = agy_hooks.windows_problems("/mingw64/bin/python3.exe C:/Users/x/.gemini/hooks/x.py")
+        self.assertTrue(any("not a native Windows path" in f for f in findings))
+
+    def test_native_windows_path_is_accepted_as_program(self):
+        findings = agy_hooks.windows_problems("C:/Python313/python.exe C:/Users/x/.gemini/hooks/x.py")
+        self.assertEqual(findings, [])
+
     def test_a_rendered_windows_command_passes(self):
         rendered = "C:/Python313/python.exe C:/Users/x/.gemini/hooks/x.py"
         self.assertEqual(agy_hooks.windows_problems(rendered), [])

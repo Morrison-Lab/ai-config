@@ -299,6 +299,9 @@ def windows_problems(command: str) -> list[str]:
             "a quoted path arrives with a leading backslash and does not "
             "resolve (https://github.com/Morrison-Lab/ai-config/issues/3091). Use unquoted paths."
         )
+    program = program_token(command)
+    if program and not is_native_windows_path(program):
+        problems.append(f"the program {program!r} is not a native Windows path; cmd.exe cannot resolve it")
     problems.extend(unrendered_posix_problems(command))
     problems.extend(cmd_metacharacter_problems(command))
     return problems

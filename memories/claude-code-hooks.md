@@ -527,3 +527,25 @@ that never mentioned that repo.
 (Measured 2026-09-04 in a `ucdavis/hac.sap` session: invoking `/daytb` armed
 the guard on `Morrison-Lab/gha#240`, cited only in that skill's own case
 record, which then fired on the next unrelated memory-file edit.)
+
+## Two push guards misread a push issued from a sibling worktree
+
+A session driving several pull requests at once usually holds one worktree and pushes branches checked out in others, with `git -C <path> push`.
+Both pre-push guards get that case wrong, and their errors compound.
+
+`hooks/no-unshipped-commit.py` looks for the verb immediately after `git`, so `git -C <path> push` does not match its `PUSH` pattern and the commit stays pending.
+Its `COMMIT` pattern has the same shape, so the arming half is blind in the same way.
+The symptom is a Stop hook that blocks a fully-pushed session, repeatedly, with no push able to clear it.
+Re-running the identical push as `cd <worktree> && git push ...` reports `Everything up-to-date` and satisfies the guard.
+
+`hooks/no-clobbering-push.py` compares the remote tip against the **session's** HEAD rather than the ref being pushed, so an exact no-op push from another worktree is reported as dozens of commits about to be discarded, listing the session's own commits back to it as another agent's work.
+It fired on four consecutive pushes in one session, under both spellings, so this half is not the option-position blindness above.
+
+The compounding is the part worth remembering: every push from a sibling worktree prints a false divergence and then fails to count, which teaches the session to skip exactly the warning that will one day be real.
+
+- **Do:** read a divergence warning's named SHAs before acting on it, and check whether the head it names is the branch you are pushing.
+- **Do:** re-run a push as `cd <worktree> && git push` when the Stop guard insists a pushed commit is unshipped.
+- **Don't:** reconcile or merge on the strength of that warning --- confirm the remote tip against the pushed ref first, where a no-op push says `Everything up-to-date`.
+
+(Measured 2026-09-11 while driving three ai-config pull requests.
+Tracked as [ai-config#3577](https://github.com/Morrison-Lab/ai-config/issues/3577), which carries the patterns and a suggested fix per guard.)

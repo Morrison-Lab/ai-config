@@ -755,5 +755,46 @@ The canonical trade-off analysis, context-budget rationale, and Do/Don't directi
 - **Don't:** duplicate the full trade-off rationale across multiple files ---
   keep the normative guidance in [`use-subagents`](../shared/workflow/use-subagents.md).
 
+## The push guard's accepted agy shape forbids every flag, which caps a review at five minutes
 
+`hooks/no-push-without-self-review.py` accepts a cross-family review only as a recognized reviewer, a print-mode flag, and one single-quoted prompt, matched against the whole raw command.
+Its own docstring explains why the shape is compared rather than parsed, and names the costs it accepts: a double-quoted prompt, a leading `cd`, a prompt containing an apostrophe, and **any extra flag**, `--model` included.
 
+One consequence of that last item is not stated there and is worth knowing before briefing a reviewer.
+`--print-timeout` is a flag, so it cannot be passed either, and the review runs at the CLI's five-minute default.
+A run that exceeds it returns `print timeout after 5m0s with turn in progress; returning partial output`, which carries no verdict and so discharges nothing.
+
+The budget can be spent on the reviewer's own reading rather than on the diff.
+The same commit was reviewed twice on 2026-09-11, so its size was constant across both runs.
+The first brief named the `git show` command and asked five questions, and the reviewer opened further files and timed out.
+The second told it to run that one command, to open no other file, and asked three questions, and it returned a verdict in under two minutes.
+Two things changed at once, the reading instruction and the question count, so which of them mattered is not established.
+What the pair does establish is that a brief can bring the same diff in under budget, which is the actionable half.
+
+So write the brief to bound the reading: name the one command, forbid opening anything else, and keep the question list short.
+
+- **Do:** name the exact command a guard-discharging agy review should run, and tell it to open no other file.
+- **Do:** re-issue a timed-out review with a shorter question list and a narrower reading instruction, rather than reaching for a timeout flag the guard will refuse.
+- **Don't:** push on a partial-output timeout --- it is the absence of a verdict, not a lenient one.
+- **Don't:** assume a small diff is enough to fit the budget;
+  an unbounded brief spends it on reading around the diff.
+
+## agy dies with no output when it reaches for its own file tools
+
+A brief can forbid the native file tools in its first line, in capital letters, and agy will still reach for one.
+Headless mode cannot prompt for the permission, so the call is auto-denied and the whole run ends having produced nothing:
+
+```
+jetski: no output produced -- a tool required the "read_file" permission that
+headless mode cannot prompt for, so it was auto-denied.
+```
+
+The failure is total rather than partial, and it costs the whole dispatch.
+It is likeliest on a job whose first act is exploratory reading --- a corpus search, a "find the right file" pass --- and least likely on a job handed one file and one change.
+
+- **Do:** hand a job the exact paths it should read, so the shell route is the obvious one.
+- **Do:** check a finished job's log for that line before reading its silence as no findings.
+- **Don't:** rely on a brief's prohibition alone for a job that has to go looking for files.
+
+(Measured 2026-09-11: an exploratory memories pass died this way while a single-file fix job briefed identically succeeded.
+The standing remedy is an allow-rule under `permissions.allow` in the Antigravity settings, which is the user's call to make.)

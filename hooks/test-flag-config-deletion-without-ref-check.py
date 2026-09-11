@@ -415,9 +415,10 @@ _ATTRIBUTION_CASES = [
      "a backslash-escaped parenthesis is text too"),
     ("cat file 2<> ~/.claude/settings.json", {"claude"},
      "a read-write redirect opens its target for reading"),
-    ("grep 5 < ~/.claude/settings.json", set(),
-     "documented limit: the digit pattern is read as a descriptor once the "
-     "tokenizer has dropped the whitespace, so this under-credits (warns)"),
+    ("grep 5 < ~/.claude/settings.json", {"claude"},
+     "a redirect target is credited even where the digit before it is read as "
+     "a descriptor, since the target is no longer a positional the PATTERN "
+     "drop can reach"),
     ("grep 2>&1 ~/.claude/settings.json", set(),
      "a descriptor digit is joined to its operator, not left as a positional "
      "that would shield the pattern slot of a pattern-first verb"),
@@ -511,6 +512,21 @@ _ATTRIBUTION_CASES = [
      "a read verb with its own option does not absorb a substitution's tokens"),
     ("cat <(cat ~/.claude/settings.json)", {"claude"},
      "a process substitution that really reads the manifest still credits it"),
+    # Bash performs process substitution only OUTSIDE double quotes: the
+    # quoted form is literal text the shell never runs, so scanning it
+    # credited a read that never happened.
+    ('echo "<(cat ~/.claude/settings.json)"', set(),
+     "a quoted process substitution is literal text, not a read"),
+    ('echo ">(cat ~/.claude/settings.json)"', set(),
+     "a quoted output process substitution is literal text too"),
+    ('echo "$(cat ~/.claude/settings.json)"', {"claude"},
+     "a command substitution DOES expand inside double quotes"),
+    # A redirect may appear anywhere in a simple command, so its target must
+    # not sit where a pattern-first verb's PATTERN drop can remove it.
+    ("grep < README.md '~/.claude/settings.json'", set(),
+     "a redirect before the pattern does not shield the pattern from the drop"),
+    ("grep '~/.claude/settings.json' < README.md", set(),
+     "the same command with its redirect last reads the same way"),
     ("cat `cat ~/.claude/settings.json`", {"claude"},
      "a backtick body that really reads the manifest still credits it"),
     # The `=`-joined long-option form, which advances by exactly one token

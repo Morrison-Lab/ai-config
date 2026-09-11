@@ -341,7 +341,8 @@ MAX_SUBSTITUTION_DEPTH = 8
 # rather than letting the digit fall through as a positional. The tokenizer
 # also drops the whitespace that distinguishes `5<file` (descriptor 5) from
 # `grep 5 < file` (pattern 5, then stdin), so the second shape loses its
-# pattern and under-credits: a DISCHARGE limit, in the direction that warns.
+# pattern. It no longer loses the FILE with it: a redirect target is collected
+# apart from the positionals, so the PATTERN drop below cannot reach it.
 # `<>` opens for reading as well as writing and is credited like `<`.
 RX_OUT_REDIRECT = re.compile(r"^(?:>>?[|&]?|&>>?)(.*)$")
 RX_IN_REDIRECT = re.compile(r"^<(&?)>?(.*)$")
@@ -418,6 +419,7 @@ def read_operands(argv):
     no_file_opts = NO_FILE_OPTS.get(verb, frozenset())
     pattern_opts = PATTERN_OPTS.get(verb, frozenset())
     positional = []
+    redirected = []
     pattern_supplied = False
     end_of_opts = False
     index = 1
@@ -447,9 +449,18 @@ def read_operands(argv):
                 index += 1 if target else 2
                 continue
             if not target:
-                index += 1
+                # Detached form: the target is the NEXT token. Consuming it
+                # here is what keeps it out of `positional`, where the
+                # PATTERN drop below could reach it.
+                if index + 1 < len(argv):
+                    redirected.append(argv[index + 1])
+                index += 2
                 continue
-            positional.append(target)
+            # Kept apart from `positional`: a redirect may appear anywhere
+            # in a simple command, so `grep < README.md '<manifest>'` would
+            # otherwise put the target at index 0 and the PATTERN drop below
+            # would remove the file actually opened and credit the pattern.
+            redirected.append(target)
             index += 1
             continue
         if not end_of_opts and token.startswith("-") and token != "-":
@@ -471,7 +482,7 @@ def read_operands(argv):
         index += 1
     if verb in PATTERN_FIRST_VERBS and not pattern_supplied and positional:
         positional = positional[1:]
-    return positional
+    return positional + redirected
 
 
 def scope_cwd(cwd_by_scope, scope):
@@ -674,6 +685,12 @@ def substitution_spans(command):
             continue
         match = RX_SUBSTITUTION_OPEN.match(command, index)
         if not match:
+            index += 1
+            continue
+        # `$( )` and a backtick expand inside double quotes; `<( )` and `>( )`
+        # do not -- bash leaves them as literal text there, so scanning one
+        # credited a read the shell never performs.
+        if quote == '"' and match.group(0) in ("<(", ">("):
             index += 1
             continue
         if match.group(0) == "`":

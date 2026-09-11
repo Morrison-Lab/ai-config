@@ -719,7 +719,8 @@ What it rules out is the case here, where a delegated edit's own account of itse
 Nothing here settles whether the worker authored the malformed line or a transport mangled one it wrote correctly, and the check is the same either way.
 
 - **Do:** run the suite that executes an edited script, not only a parser over it, before trusting a delegated commit that touched shell.
-- **Do:** run the script yourself against a throwaway fixture when no suite executes it, which is the common case --- `upload_skills.sh` and `scripts/inventory.sh` have none --- and treat that gap as worth a filed issue rather than a reason to skip the check.
+- **Do:** run the script yourself against a throwaway fixture when no suite executes it, and treat that gap as worth a filed issue rather than a reason to skip the check.
+  Derive which scripts those are rather than recalling them: on 2026-09-10, 11 of this repo's 18 tracked `.sh` files were named by no test, `scripts/inventory.sh` and `scripts/lib/link-one.sh` among them, while `bootstrap.sh` and `upload_skills.sh` each had one.
 - **Do:** treat a test you cannot run locally as an unchecked artifact, and say so, rather than reading the parser's silence as coverage.
 - **Don't:** read `bash -n` (or `py_compile`) passing as evidence that a delegated edit is correct --- it reports grammar, and dropped quoting is grammatical.
 - **Don't:** rely on the commit message agreeing with the diff here;

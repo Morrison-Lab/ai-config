@@ -1479,6 +1479,18 @@ def main() -> int:
         ) == "clean",
     )
     check(
+        "classify_verdict: Anthropic code-review plugin clean comment with bold prefix is clean",
+        checker.classify_verdict(
+            "## Review Summary\n\n**No issues found.** Checked for bugs and CLAUDE.md compliance."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: Anthropic code-review plugin clean comment with bold prefix and AGENTS.md is clean",
+        checker.classify_verdict(
+            "## Review Summary\n\n**No issues found.** Checked for bugs and AGENTS.md compliance."
+        ) == "clean",
+    )
+    check(
         "classify_verdict: code-review clean comment with trailing qualifier is NOT clean",
         checker.classify_verdict(
             "## Code review\n\nNo issues found. Checked for bugs and CLAUDE.md compliance once tests pass."

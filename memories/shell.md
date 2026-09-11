@@ -200,7 +200,7 @@ So the same substitution the bullets above prescribe fixes both hazards at once,
 
   ```sh
   name=msg.txt   # the repository-relative path, bound before the pipeline
-  git log --diff-filter=A --name-only --format= origin/<default-branch>..HEAD \n    | grep -qxF -- "$name"
+  git log --diff-filter=A --name-only --format= origin/<default-branch>..HEAD | grep -qxF -- "$name"
   ```
 
   Bind `name` rather than inheriting it.

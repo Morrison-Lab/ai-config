@@ -50,6 +50,12 @@ CANONICAL_PLUGIN_DIR = "~/.gemini/config/plugins/ai-config"
 PLUGIN_SUBPATH = "plugins/ai-config"
 MANIFEST_NAME = "hooks.json"
 
+# The repo's own copy of the manifest, the one CI checks and the renderer reads.
+# Exported here rather than re-derived per caller, beside the constants it is
+# built from.
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+CANONICAL_MANIFEST = REPO_ROOT / PLUGIN_SUBPATH / MANIFEST_NAME
+
 
 def gemini_config_dir() -> str:
     """Return the Antigravity config directory bootstrap.sh installs into.

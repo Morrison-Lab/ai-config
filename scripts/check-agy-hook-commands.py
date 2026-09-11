@@ -42,7 +42,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -50,8 +49,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from lib import agy_hooks  # noqa: E402
 
-ROOT = Path(__file__).resolve().parent.parent
-CANONICAL_MANIFEST = ROOT / "plugins" / "ai-config" / "hooks.json"
+CANONICAL_MANIFEST = agy_hooks.CANONICAL_MANIFEST
 
 
 def load_manifest(path: Path) -> dict:

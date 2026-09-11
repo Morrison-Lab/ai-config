@@ -997,7 +997,7 @@ Reset to the real commit, amend it, and redo the merge:
 ```bash
 TREE_BEFORE=$(git rev-parse HEAD^{tree})
 git reset --hard <fix-commit>
-git commit --amend -F /tmp/message.txt
+git commit --amend -F /path/to/session-scratchpad/message.txt   # not /tmp, not the worktree
 git merge origin/main --no-edit
 [ "$TREE_BEFORE" = "$(git rev-parse HEAD^{tree})" ] && echo "TREES IDENTICAL"
 ```

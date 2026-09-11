@@ -1832,7 +1832,7 @@ Open the PR.
   Measured 2026-08-17: an unescaped span inside a bash double-quoted string runs, so `` `echo SUBSTITUTED` `` became `SUBSTITUTED` in the resulting message.
   The same day a `-m` message quoting a merge command in backticks was refused by `hooks/no-unauthorized-merge.py`; those backticks were backslash-escaped, so what actually matched is unverified, and blocking is the safe direction rather than a defect.
   `git commit -F <file>` succeeded immediately either way, which is why the remedy needs no diagnosis first.
-  - **Do:** write a commit message carrying backticks to a file and commit it with `git commit -F <file>`.
+  - **Do:** `git commit -F` a backtick-carrying message from a scratchpad file, not the worktree.
   - **Don't:** pass a backtick-carrying message through `git commit -m "..."`, or spend a round diagnosing a guard refusal when the file route costs one command.
 
 ## Tool transport collapses doubled backslashes

@@ -607,6 +607,28 @@ BACKSLASH = chr(92)
 INERT = chr(2)
 
 
+def _heredoc_body(command, match):
+    """(start, end) of the body `match` opens, or (None, None).
+
+    The terminator is matched as a WHOLE LINE, honouring the `<<-` dash flag
+    that permits leading tabs, exactly as `shellcmd._heredoc_free` does. A
+    plain substring search got both wrong: a tab-indented terminator was never
+    found, so the rest of the command read as body, and a first body line
+    merely starting with the delimiter matched at the body's own start, which
+    produced a region mapping its start to itself and hung the caller's walk.
+    """
+    line_end = command.find("\n", match.end())
+    if line_end == -1:
+        return None, None
+    start = line_end + 1
+    indent = r"[\t]*" if match.group(1) else ""
+    term = re.compile(r"^" + indent + re.escape(match.group(3)) + r"$", re.M)
+    found = term.search(command, start)
+    if found is None:
+        return start, len(command)
+    return start, found.end()
+
+
 def _inert_regions(command):
     """{start: end} for each span this walk must not read as shell text.
 
@@ -636,12 +658,9 @@ def _inert_regions(command):
         elif quote is None and command.startswith("<<", index):
             match = RX_HEREDOC_OPEN.match(command, index)
             if match:
-                body = command.find("\n", match.end())
-                if body != -1:
-                    terminator = command.find(
-                        "\n" + match.group(3), body)
-                    end = len(command) if terminator == -1 else terminator + 1
-                    regions[body + 1] = end
+                start, end = _heredoc_body(command, match)
+                if start is not None:
+                    regions[start] = end
                 index = match.end()
                 continue
         index += 1
@@ -677,7 +696,9 @@ def neutralize_quoted_expansions(command):
         # real opening quote of a later operand read as a close and its trigger
         # survived un-neutralized: a false discharge from the word "it's".
         if index in skip_to:
-            index = skip_to[index]
+            # max(): a region that did not advance would spin forever, and
+            # this walk runs on every earlier Bash command in the transcript.
+            index = max(skip_to[index], index + 1)
             continue
         char = command[index]
         # A backslash escapes at top level and inside double quotes, where a

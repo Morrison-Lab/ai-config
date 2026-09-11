@@ -575,6 +575,16 @@ _ATTRIBUTION_CASES = [
      "an apostrophe in a heredoc body does not either"),
     ("echo ok # it's fine\ncat ~/.claude/settings.json", {"claude"},
      "and a real unquoted read after such a comment still credits"),
+    # The terminator is a WHOLE LINE, and `<<-` permits leading tabs. A plain
+    # substring search missed a tab-indented terminator, so everything after
+    # it read as body and a quoted operand there was never neutralized.
+    ("cat <<-EOF\n\tEOF\ngrep -rn foo '~/.claude/settings.json'", set(),
+     "a tab-indented terminator closes a dash heredoc"),
+    # A first body line merely starting with the delimiter matched at the
+    # body's own start, producing a region that mapped its start to itself and
+    # hung the walk. This walk runs on every earlier command in a transcript.
+    ("cat <<EOF\nEOFxyz\nreal\nEOF\ngrep foo bar", set(),
+     "a body line that merely starts with the delimiter does not terminate it"),
     # An unquoted `#` starts a comment, and bash expands nothing after it.
     ("echo ok # $(cat ~/.claude/settings.json)", set(),
      "a substitution inside a comment is never run"),

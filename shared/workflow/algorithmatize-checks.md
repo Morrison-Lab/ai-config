@@ -2232,8 +2232,9 @@ So count rounds rather than judging progress.
 When a third round produces a third spelling of the same class, the finding is the count, and the deliverable changes: write into the module's own docstring what the check does not see, which direction each error runs, and why the false passes are tolerable given what the check is for.
 Then leave the remaining spellings open, and say so.
 
-Three files in this repo reached that resolution, at sixteen rounds, at six, and at three.
-The last one cost least because the count was read as the finding rather than as bad luck.
+Three checkers in this corpus reached that resolution, each after a series of rounds.
+As of 2026-09-11 only `hooks/flag-config-deletion-without-ref-check.py` had reached `main`;
+the other two are [ai-config#3439](https://github.com/Morrison-Lab/ai-config/pull/3439) and [ai-config#3440](https://github.com/Morrison-Lab/ai-config/pull/3440).
 
 **A bound has to weigh its false passes, not merely list them.**
 An approximation section that enumerates gaps and stops reads as candour while deciding nothing.
@@ -2247,7 +2248,7 @@ State each gap's direction too: a false failure is seen and rewritten around, wh
 - **Don't:** call an enumeration of gaps a bound when it never says which of them matter.
 
 (Measured 2026-09-11 on `scripts/check-split-push-blocks.py`, ai-config#3440, whose three rounds found in turn a call inside a command substitution, a branch name containing the option being matched, and a chained second call riding behind an anchored first.
-`hooks/flag-config-deletion-without-ref-check.py` (ai-config#3469) ran sixteen rounds to the same resolution and `hooks/warn-stderr-suppressed-then-parsed.py` (ai-config#3439) six.
+`hooks/flag-config-deletion-without-ref-check.py` (ai-config#3469) and `hooks/warn-stderr-suppressed-then-parsed.py` (ai-config#3439) reached the same resolution, each after its own series of rounds.
 The class is tracked as ai-config#3565.)
 
 ## Run a tightened predicate over the whole corpus before committing it

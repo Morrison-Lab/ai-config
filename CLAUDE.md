@@ -595,7 +595,9 @@ A review-gating check run can also read green over a `NOT_CLEAN` verdict, so a c
 
 - **Do:** read every round since the one you last processed, every formal review's state and body whoever posted it, and the inline comments.
 - **Don't:** treat green checks, a login-filtered query, or a named verdict-gating check as evidence the review is clean.
-- **Don't:** read a review's *state* as blocking on its own, nor read a later clean verdict as clearing a standing `CHANGES_REQUESTED` --- state and finding are separate axes, each blocking for its own reason.
+- **Don't:** read a `COMMENTED` state as making a review blocking on its own --- what blocks is the finding inside it.
+- **Don't:** read a later clean verdict as clearing a standing `CHANGES_REQUESTED`, which blocks on its own until that human or an explicit dismissal resolves it.
+  The two run opposite ways, which is why they are separate bullets: one state does not block by itself and the other does.
 
 (A specific case of the standing **never assume;
 always verify** rule in `memories/preferences.md` --- confirm the verdict with a fresh query, don't recall it.)

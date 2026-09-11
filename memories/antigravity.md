@@ -61,7 +61,8 @@ backed by a staging directory created in `bootstrap.sh`.
   - Context injection in Antigravity uses `{"injectSteps": [{"ephemeralMessage": "..."}]}`.
   - Claude `UserPromptSubmit` hooks may output raw text, or JSON carrying a `systemMessage`/`additionalContext` field, to stdout.
     The adapter parses JSON when present (falling back to the raw text otherwise), reading `systemMessage`, top-level `additionalContext`, or the nested `hookSpecificOutput.additionalContext` form, and emits one `ephemeralMessage` `injectSteps` entry per hook --- it does not join multiple hooks' output into a single joined string.
-    The caps default to 10KB per message, 30KB total, and 20 messages, and are overridable via `AGY_ADAPTER_MSG_BYTE_CAP`, `AGY_ADAPTER_TOTAL_BYTE_CAP`, and `AGY_ADAPTER_MSG_CAP` (the subagent fanout cap is `AGY_ADAPTER_FANOUT_CAP`, default 50).
+    The caps default to 10KB per message, 30KB total, and 20 messages, and are overridable via `AGY_ADAPTER_MSG_BYTE_CAP`, `AGY_ADAPTER_TOTAL_BYTE_CAP`, and `AGY_ADAPTER_MSG_CAP` (the subagent fanout cap is `AGY_ADAPTER_FANOUT_CAP`, default 50;
+    max hook execution worker threads is `AGY_ADAPTER_MAX_WORKERS`, default 16, clamped to at least 1).
 
 ### Fail-open on a hook subprocess timeout or crash is intentional, not a gap
 
@@ -156,5 +157,6 @@ The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-anti
 - Antigravity enforces an ambient ~30-second timeout on command hooks declared in `hooks.json`.
 - When an adapter (such as `claude-hook-adapter.py`) runs multiple matching hooks sequentially (e.g. 25+ Python scripts on `run_command` matching `Bash`), cumulative process startup and I/O latency can exceed 30 seconds, causing Antigravity to kill the hook with `signal: killed` (`JSON hook ... failed: command failed: signal: killed`).
 - Command adapters must execute matched hook scripts concurrently (e.g. via `concurrent.futures.ThreadPoolExecutor`) to keep execution latency under ~1-2s and prevent timeouts.
+- Concurrency worker pool size defaults to 16 and is configurable via `AGY_ADAPTER_MAX_WORKERS` (clamped to at least 1).
 
 

@@ -1,5 +1,5 @@
 ---
-trigger: always
+trigger: always_on
 description: Universal AI Agent Instructions (AGENTS.md) and Antigravity operating rules for Morrison-Lab repositories.
 ---
 

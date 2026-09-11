@@ -973,7 +973,7 @@ Reviewing file A's diff in isolation cannot find it, because file A is correct o
 - **Don't:** stop at asserting the new output shape in the producer's tests;
   that confirms emission, not that anything downstream handles it.
 
-(Measured on `Morrison-Lab/gha#857`: a span-selection script was changed to keep a corrected review's tail alongside the review it corrects, so a single posted comment could now carry two verdict statements.
+(Measured 2026-09-11, `Morrison-Lab/gha#857`: a span-selection script was changed to keep a corrected review's tail alongside the review it corrects, so a single posted comment could now carry two verdict statements.
 The classifier script that reads the posted comment picks its last match over a payload marker, which is correct for the one-statement case it was written against and wrong the moment two statements can coexist.
 Both suites were green --- the span suite asserts what gets posted, the classifier suite feeds it hand-written bodies that never carried two statements --- and the fix that closed the gap was a cross-script test that classifies each producer fixture's actual posted text.)
 

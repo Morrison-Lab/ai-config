@@ -429,7 +429,7 @@ Explicit UTF-8 byte escapes are the reliable form, because `\xHH` is a raw byte 
 - **Don't:** assume `$'\uXXXX'` is decoded --- it is left literal on at least one measured bash build, and the failure is silent because the literal backslash still satisfies a "not a word character" test.
 - **Don't:** treat a passing case built this way as evidence about the logic under test until the actual bytes have been checked.
 
-(Measured 2026-09, `Morrison-Lab/gha#857`: a fixture meant to exercise a `\b`-terminated regex boundary against a real em-dash was written three ways before it worked.
+(Measured 2026-09-11, `Morrison-Lab/gha#857`: a fixture meant to exercise a `\b`-terminated regex boundary against a real em-dash was written three ways before it worked.
 The first, an escape inside an ordinary double-quoted string, is left literal by bash with no ANSI-C quoting involved at all.
 The second, `$'\u2014'`, is the case above.
 Both passed on the backslash not being a word character;

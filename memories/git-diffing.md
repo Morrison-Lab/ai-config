@@ -537,7 +537,7 @@ only a comparison against what the fix was supposed to contain would catch it, a
 - **Don't:** trust that a prior recurrence's fast detection generalizes;
   the same command sequence with one more automated step in between (an unattended commit) removes the detection opportunity entirely.
 
-(Measured 2026-09, `Morrison-Lab/gha#857`: a `git checkout -- <file>` run to undo a mutation reverted the session's own uncommitted fix to that file, and a later `git add -A && git commit` captured the reverted state with the suite not re-run in between.
+(Measured 2026-09-11, `Morrison-Lab/gha#857`: a `git checkout -- <file>` run to undo a mutation reverted the session's own uncommitted fix to that file, and a later `git add -A && git commit` captured the reverted state with the suite not re-run in between.
 The loss surfaced only several steps later.
 `hooks/flag-reset-hard-uncommitted-work.py` already matches this exact command shape --- `git checkout <path>` discarding a tracked, uncommitted change unrelated to the mutation --- and its own match condition (M3'/M4) covers it, so this is not a coverage gap in the hook.
 Whether the hook actually fired and its warning was seen and set aside in this instance, versus not firing for some other reason, is not established here;

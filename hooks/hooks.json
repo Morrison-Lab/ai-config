@@ -334,6 +334,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-paginate-without-slurp.py\"",
+            "timeout": 10,
+            "script": "warn-paginate-without-slurp.py",
+            "why": "mwc's \"Another session's PR\" section states that the -s and the double flatten are load-bearing, and that their absence is invisible on any resource small enough to test on: gh api --paginate emits one array PER PAGE, so an aggregating jq filter (last, first, length, max_by, add, sort_by, ...) runs once per page and returns one answer per page. The rule is read at load time and broken at composition time. Measured 2026-09-10 on Morrison-Lab/wai: a session that had read that rule ran `gh api ... --paginate --jq '[...] | last'` across twelve PRs to check which reviews named a real commit, got an empty result for every one, and reported a false conclusion (that the defect was systemic when it affected two of twelve). WARNS rather than denies: a non-aggregating --jq filter streams correctly across pages and is common, and the aggregator list cannot be exhaustive, so a refusal would block correct commands. Fails open."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-handrolled-verdict-parse.py\"",
             "timeout": 10,
             "script": "no-handrolled-verdict-parse.py",

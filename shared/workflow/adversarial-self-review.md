@@ -158,9 +158,12 @@ round is judgment-heavy: once a review-shaped dispatch is known to repeat
 against the same PR, prefer the cheap or cross-family route from the first
 round rather than the fifth.
 [`delegation.md`](../../memories/delegation.md)'s "agy as a cheap
-adversarial-review lane" measurement already shows this pays off beyond
-cost: across nine rounds on two PRs, `agy --print` caught real defects a
-same-family Sonnet round had missed, at no Claude quota cost.
+adversarial-review lane on macOS" measurement already shows this pays off
+beyond cost: across nine rounds on two PRs, `agy --print` caught real defects
+a same-family Sonnet round had missed, at no Claude quota cost.
+The platform qualifier is part of the heading and is kept here deliberately,
+since that measurement was taken on macOS and this section's own worked
+example is a Windows checkout.
 
 **This narrows `delegation.md`'s "Claude subagents are for reviewers only"
 carve-out rather than repealing it.**

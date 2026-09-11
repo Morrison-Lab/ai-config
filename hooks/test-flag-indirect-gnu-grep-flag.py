@@ -711,11 +711,38 @@ def every_platform_claim_is_hedged():
     naming a platform or implementation to carry its own hedge. A claim about
     which binary resolves is only ever conditional, because the module warns
     rather than blocks precisely to say it cannot know.
+
+    ## What this check cannot do, stated rather than implied
+
+    It is a tripwire, not a proof, and the gap is structural rather than a
+    missing token. It verifies a LEXICAL property (this sentence contains one
+    of N words) standing in for a SEMANTIC one (this assertion is
+    appropriately conditional), so:
+
+    * `PLATFORM` is a closed list. A claim phrased without any of its tokens
+      -- "the shipped grep", "Apple's grep", "/usr/bin/grep has no -P" -- is
+      invisible to this check entirely. Demonstrated by a reviewer, 2026-09-10.
+    * No token list can mark conditionality in English reliably. Narrowing
+      `HEDGE` reduces false passes and risks excluding a genuine hedge;
+      widening it does the reverse.
+
+    Extending those lists phrasing-by-phrasing is what produced ten findings
+    over nineteen review rounds on this file, so do not. Two things bound the
+    real risk instead: the guarded surface is a handful of hand-authored
+    templates in one file, edited under the same review that caught all ten;
+    and the hook only ever warns, so a wrong sentence misleads a reader rather
+    than blocking anyone. Read a pass here as "no instance of the shapes we
+    have actually seen", and read the templates.
     """
     PLATFORM = ("BSD", "macOS", "GNU", "FreeBSD", "Homebrew", "Linux")
-    HEDGE = ("if ", "If ", "typically", "may ", "not decidable", "noise",
-             "unless", "when ", "differs by", "its own", "not measured",
-             "not recorded")
+    # Deliberately NOT including "its own", "when " or "may ": a reviewer
+    # demonstrated each matching incidentally in a sentence that hedges
+    # nothing ("The rejection is its own kind of failure, and BSD grep always
+    # rejects -P outright." passed as hedged). A token that can be satisfied by
+    # an unrelated use makes the check unsound in the permissive direction,
+    # which is the direction that ships a wrong claim.
+    HEDGE = ("if ", "If ", "typically", "not decidable", "noise",
+             "unless", "differs by", "not measured", "not recorded")
     # Probes covering all three rc classes, in both pinned and resolved form.
     probes = [
         ("laundered/resolved", "ls | xargs -0 grep -lP " + chr(39) + "x" + chr(39)),

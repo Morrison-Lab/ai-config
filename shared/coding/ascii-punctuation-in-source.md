@@ -403,3 +403,34 @@ Fixing multiple flagged glyphs across several files in one pass invites
 running one `str.replace()` loop over all of them, rather than a separate
 targeted edit per occurrence --- and the same "does the diff size match the
 finding" check catches it just as cheaply here as it does for a single file.
+
+**A shell test fixture that must exercise a real em-dash BYTE (not source prose) needs the same "build it, don't type its escape" discipline as the `chr()` workaround above, and bash's own Unicode escape is not the safe way to build it.**
+This rule bans the glyph in source;
+it does not ban a JSON fixture's *content* from containing one, since that content is data a reviewer's real prose produced, not prose this repo authored.
+Writing that byte from a bash heredoc or `printf` without typing the literal glyph is the same problem the `chr()` bullet solves for Python, one layer down.
+
+`$'\uXXXX'` reads as the obvious answer and is not reliable.
+`$'...'` (ANSI-C quoting) is old bash, predating 4.2 by over a decade;
+the `\uXXXX`/`\UXXXXXXXX` Unicode-escape form specifically was added inside it in bash 4.2 (2011), and POSIX has never standardized that Unicode-escape form at all -- Issue 8's own Dollar-Single-Quotes section lists `\'`, `\\`, `\n`, `\t`, `\xXX`, and `\ddd`, with no `\uXXXX` among them.
+Measured on GNU bash 5.1.16 (MSYS2, Windows): `$'\u2014'` is left as the six literal characters `\`, `u`, `2`, `0`, `1`, `4` rather than decoded to the glyph.
+A test case built this way still **passes**, for a reason that has nothing to do with the logic it means to exercise: the assertion under test turned on the character not being a word character, and a literal backslash satisfies that condition exactly as well as an em-dash does.
+So the case looks green and tests nothing.
+
+Confirm what a shell actually produced by reading the bytes back, the same `repr()` discipline [`CLAUDE.md`](../../CLAUDE.md)'s "Tool transport collapses doubled backslashes" section already asks for after a heredoc:
+
+```bash
+printf '%s' "$'\u2014'" | od -c | head -1   # confirm before trusting, don't assume
+```
+
+Explicit UTF-8 byte escapes are the reliable form, because `\xHH` is a raw byte in every bash version rather than a Unicode code point some versions decode and others don't: `$'\xe2\x80\x94'` is U+2014's three-byte UTF-8 encoding and lands as the actual glyph on every build tested.
+
+- **Do:** build a non-ASCII byte a shell fixture needs with explicit UTF-8 byte escapes (`$'\xe2\x80\x94'`), never `$'\uXXXX'`.
+- **Do:** read the produced bytes back with `od -c` (or `repr()` after loading the fixture) before trusting that a case exercises the character it names.
+- **Don't:** assume `$'\uXXXX'` is decoded --- it is left literal on at least one measured bash build, and the failure is silent because the literal backslash still satisfies a "not a word character" test.
+- **Don't:** treat a passing case built this way as evidence about the logic under test until the actual bytes have been checked.
+
+(Measured 2026-09-11, `Morrison-Lab/gha#857`: a fixture meant to exercise a `\b`-terminated regex boundary against a real em-dash was written three ways before it worked.
+The first, an escape inside an ordinary double-quoted string, is left literal by bash with no ANSI-C quoting involved at all.
+The second, `$'\u2014'`, is the case above.
+Both passed on the backslash not being a word character;
+`od -c` is what showed neither produced the glyph.)

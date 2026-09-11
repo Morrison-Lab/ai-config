@@ -2098,6 +2098,35 @@ one echoed by the run that depends on it is checked on every execution.**
 - **Don't:** leave a validity assumption as prose in a README while the run
   that depends on it logs nothing.
 
+## When an allowlist regex keeps leaking, stop enumerating and state the complement
+
+The section above moves a discriminator to the producer when refining a consumer-side heuristic keeps failing.
+That fix is unavailable when there is no producer to move it to --- the input is free-form prose an LLM reviewer wrote, and the classifier has to infer a structural fact (is this heading a fresh statement or a qualified one) from the words alone.
+When refinement is the only lever left, this is the shape it should take.
+
+**The tell is the same as the producer section's: a classifier that keeps being wrong in new ways, one fix per round, each closing the case just found and opening a different one.**
+What differs is the *cause*.
+There the information was genuinely absent from the artifact.
+Here the information is present, but the regex is shaped as an **allowlist** --- it enumerates the separators, qualifiers, or punctuation that may follow a keyword before matching --- and prose has more of those shapes than any enumeration anticipates.
+Every round adds one more admitted separator (a colon, a dash, a parenthesis) and every addition reopens the false-positive side, because each new admitted character is also a character that appears inside an unrelated word.
+
+Four rounds on one such regex, each wrong in a different direction (measured 2026-09-11, `Morrison-Lab/gha#857`, deciding whether a `### Verdict` heading qualifies an existing statement or supersedes it): a bare word-boundary prefix matched `### Verdict rationale`, an ordinary section title, and misfired on every uncorrected review that happened to use the word.
+Requiring the word to end the line then let `### Verdict: Needs more work` through unmatched, which is the unsafe direction here --- the qualifier case that must be caught was excluded by the exact fix meant to narrow false positives.
+Admitting a bare dash as a separator then matched `### Verdict-bearing span rule`, because "verdict-bearing" was itself vocabulary the surrounding review corpus wrote constantly, so the regex's own test-writing repository was the likeliest producer of a false positive.
+Requiring whitespace before that dash excluded `### Verdict (revised)` and `### Verdict, revised`, re-opening the unsafe direction again.
+The pattern in all four: each fix named one more member of the allowed set, and the members left out (or the ones re-admitted to fix a false negative) kept landing on real prose.
+
+**The fix was to stop enumerating what MAY follow the keyword and state what may NOT**: a heading whose word continues, into a following word or through a hyphen joined directly to it with no whitespace, is a section title;
+everything else --- with or without a qualifier, of any separator shape --- is the construct being matched.
+A forbidden-shapes characterization has a fixed, small membership (word continues;
+hyphen-joins with no space) where the allowed-shapes characterization has an open one (every separator any reviewer might type), so the enumeration that keeps growing is the wrong one to be enumerating.
+
+- **Do:** when a match/no-match regex needs a third round of "also admit this separator" or "also exclude this word", rewrite it as a small, named set of DISQUALIFYING shapes instead of a growing set of QUALIFYING ones.
+- **Do:** ask, for each round's fix, whether it grew an allowed set or named a forbidden one --- a fix that adds one more permitted character is the symptom, not the cure.
+- **Don't:** keep refining an allowlist past its second false-positive/false-negative flip;
+  that oscillation is the tell that the allowed set is open-ended rather than merely incomplete.
+- **Don't:** treat the two directions as equally safe to be wrong in --- state which one is (per the corpus this classifier serves) before choosing which way to err while the rule is still incomplete.
+
 ## A log's file order is an assumption, so state it before keying an instrument on position
 
 The sections above test an instrument's matcher.

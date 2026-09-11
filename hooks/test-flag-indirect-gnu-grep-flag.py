@@ -27,6 +27,7 @@ cases expected to flip are checked against what actually flipped.
 Run:  python3 hooks/test-flag-indirect-gnu-grep-flag.py \
           hooks/flag-indirect-gnu-grep-flag.py
 """
+import importlib.util
 import json
 import os
 import re
@@ -65,6 +66,22 @@ def verdict(command, hook=None, tool="Bash"):
                              % (proc.stdout, exc))
     return "additionalContext" in (out.get("hookSpecificOutput") or {})
 
+
+# Read the per-utility notes out of the hook itself, so this check tracks the
+# source rather than duplicating it -- and assert they are distinct, since a
+# check for "its own note" is vacuous if two utilities share one.
+def _load_laundered_notes():
+    spec = importlib.util.spec_from_file_location("_h", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    notes = dict(mod.LAUNDERED_NOTE)
+    assert len(set(notes.values())) == len(notes), (
+        "two utilities share a laundered note; the per-utility check would "
+        "pass vacuously")
+    return notes
+
+
+LAUNDERED_NOTES = _load_laundered_notes()
 
 # (id, command, expect_warning, why)
 CASES = [
@@ -503,7 +520,43 @@ def laundering_is_not_platform_asserted():
     return failures
 
 
+def laundered_note_names_only_its_own_utility():
+    """A laundered warning must not describe one utility with another's numbers.
+
+    The gap this closes: the sentence was corrected for `xargs` and kept
+    rendering verbatim for `parallel` and `find ... {} +`, telling a reader the
+    value came from "the BSD/macOS xargs" for commands that invoke no xargs.
+    Every earlier check looked for the class label, which all three share, so
+    none of them could see it.
+    """
+    expect = [
+        ("ls | xargs -0 grep -lP 'x'", "xargs", ["parallel"]),
+        ("ls | parallel grep -lP 'x'", "parallel", ["xargs"]),
+        ("find . -exec grep -lP x {} +", "find", ["xargs", "parallel"]),
+    ]
+    failures = []
+    for cmd, own, foreign in expect:
+        payload = {"tool_name": "Bash", "tool_input": {"command": cmd}}
+        proc = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
+                              capture_output=True, text=True)
+        ctx = (json.loads(proc.stdout or "{}")
+               ).get("hookSpecificOutput", {}).get("additionalContext", "")
+        note = LAUNDERED_NOTES.get(own)
+        has_own = note in ctx if note else False
+        # No OTHER utility's note may appear.
+        leaked = [f for f in foreign
+                  if LAUNDERED_NOTES.get(f) and LAUNDERED_NOTES[f] in ctx]
+        ok = has_own and not leaked
+        print("  %s %-9s carries its own note=%s  foreign notes leaked=%s"
+              % ("PASS" if ok else "FAIL", own, has_own, leaked or "none"))
+        if not ok:
+            failures.append(own)
+    return failures
+
+
 def main():
+
+
 
 
 
@@ -518,6 +571,9 @@ def main():
     print()
     print("Per-indirection rc story:")
     base_fail += rc_story_matches_indirection()
+    print()
+    print("Laundered note names only its own utility:")
+    base_fail += laundered_note_names_only_its_own_utility()
     print()
     print("Laundering is measured, not asserted:")
     base_fail += laundering_is_not_platform_asserted()

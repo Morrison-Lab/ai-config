@@ -131,15 +131,35 @@ RC_BEHAVIOUR = {
     # than looked up here.
 }
 
+# The laundered VALUE is each utility's own, so it is recorded per utility
+# rather than described by `xargs`'s numbers. An earlier fix corrected the
+# number for `xargs` and left that same sentence rendering for `parallel` and
+# `find`, which invoke no xargs at all -- the same over-generalization one
+# layer down.
+LAUNDERED_NOTE = {
+    "xargs": ("Measured 2026-09-10 on BSD/macOS `xargs`: a child exiting 1 and "
+              "one exiting 2 both give **1**. GNU findutils documents **123** "
+              "for any child exiting 1-125."),
+    "find": ("Measured 2026-09-10 on BSD/macOS `find`: with `+`, a child "
+             "exiting 1 and one exiting 2 both give **1**. The GNU findutils "
+             "value is not measured here."),
+    # GNU Parallel is not installed on the machine these measurements come
+    # from, and it documents its own exit-status convention rather than
+    # xargs's. Only the collapse is claimed for it, and the source of that
+    # claim is named rather than implied.
+    "parallel": ("The specific value is not measured here -- `parallel` keeps "
+                 "its own exit-status convention, and only the collapse is "
+                 "claimed for it."),
+}
+_DEFAULT_LAUNDERED_NOTE = "The specific value is not measured for this utility."
+
+
 RC_SENTENCE = {
     RC_LAUNDERED: """and `{via}` replaces the child's status with one of its own
 for any non-zero exit, so grep's distinguishable **2** and an honest
-no-match's **1** arrive as the same value. Which value is
-implementation-specific -- **1** on the BSD/macOS `xargs` (measured
-2026-09-10: a child exiting 1 and one exiting 2 both give 1), **123** on GNU
-findutils, which documents 123 for any child exiting 1-125. The number does
-not matter to the conclusion and the collapse does: whatever it is, branching
-on `rc` cannot separate "rejected the flag" from "found nothing" here.""",
+no-match's **1** arrive as the same value. {laundered_note} Either way the
+collapse rather than the number is what defeats the check: branching on `rc`
+cannot separate "rejected the flag" from "found nothing" here.""",
     RC_PRESERVED: """while `{via}` passes the child's exit status through
 unchanged. So `rc` **does** still tell you: grep's rejection is **2**, an
 honest no-match is **1**. Branch on it (`case $rc in 0) ...;; 1) ...;; *)
@@ -451,7 +471,9 @@ def main():
     flag, via, command, invoked, pinned, stderr, rc_kind, rc_via = found
     # The rc sentence names the link that transforms the status, which is the
     # outermost one and only equals `via` on a single-link chain.
-    rc_sentence = RC_SENTENCE[rc_kind].format(via=rc_via)
+    rc_sentence = RC_SENTENCE[rc_kind].format(
+        via=rc_via,
+        laundered_note=LAUNDERED_NOTE.get(rc_via, _DEFAULT_LAUNDERED_NOTE))
     template = NOTE_PINNED if pinned else NOTE_RESOLVED
     # No `permissionDecision` key: an absent decision defers to the normal
     # permission flow. Naming "allow" would suppress a prompt the user would
@@ -469,8 +491,8 @@ def main():
         # said "rc=1 -- indistinguishable from no match" for every
         # indirection, which is true only of the laundering ones.
         rc_clause = {
-            RC_LAUNDERED: "a status of its own (1 on BSD xargs, 123 on "
-                           "GNU), indistinguishable from no match",
+            RC_LAUNDERED: "a status of its own, indistinguishable from "
+                           "no match",
             RC_PRESERVED: "rc=2, which an rc check CAN still separate from a "
                           "no-match's 1",
             RC_DISCARDED: "rc=0, indistinguishable from full success",

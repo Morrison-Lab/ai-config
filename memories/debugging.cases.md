@@ -49,7 +49,12 @@ printf 'a.md' | xargs -0 /usr/bin/grep -l ZZZ rc=1   (honest no-match, same valu
 
 The second and third are indistinguishable, which is the whole defect.
 
-**The laundered value is `xargs`'s own and differs by implementation: 1 on BSD/macOS, 123 on GNU findutils, which documents 123 for any child exiting 1-125.**
+**The laundered value is each utility's own, and differs by implementation.**
+BSD/macOS `xargs` gives 1 for any non-zero child (measured).
+GNU findutils documents 123 for a child exiting 1-125.
+BSD/macOS `find ... {} +` also gives 1 (measured); its GNU value is not measured here.
+`parallel` is not installed on the machine these measurements come from and keeps its own exit-status convention, so only the collapse is claimed for it.
+A later round caught the `xargs` numbers being rendered for `parallel` and `find` too, which is the same over-generalization one layer down: the fix corrected the number and left the sentence describing every laundering utility with one utility's measurements.
 Every figure in this record was measured on macOS, so the BSD value is the one here.
 A review caught the unqualified `1` being shipped in the guard's warning text and in this file, after five earlier rounds had corrected the same class of over-generalization on other axes --- this one on the host implementation, which none of those rounds had thought to vary.
 What made it survivable: the test asserting the guard's rc story compared the rendered text against expectations written from the same measurements the guard encodes, so a wrong table and a wrong expectation agreed and neither ran `xargs`.

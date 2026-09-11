@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Stop-hook guard: recommending deletion of config files without checking refs.
 
-Measured 2026-09-02 (ai-config#3096). I recommended
+Measured 2026-09-02 (https://github.com/Morrison-Lab/ai-config/issues/3096). I recommended
 
     find "$HOME/.claude/hooks" -maxdepth 1 -name '*.py' -delete
 
 believing those files were orphaned leftovers the plugin superseded. They were
 the LIVE guard set: `~/.claude/settings.json` registers 46 hooks by explicit
 `$HOME/.claude/hooks/<name>.py` path, so the command would have unregistered
-every one. The remedy was to refresh the copies, not remove them (#3094).
+every one. The remedy was to refresh the copies, not remove them (https://github.com/Morrison-Lab/ai-config/issues/3094).
 
 Why a rule did not reach it. The corpus already says to look before deleting,
 and a content diff over all 94 files HAD been run --- so the removal felt like
@@ -31,10 +31,10 @@ QUOTES a destructive command in order to warn against it still fires --- this
 file's own message text included. The sentinel bounds that to one warning per
 message.
 
-THE DISCHARGE SIDE IS PARSED, NOT MATCHED (ai-config#3126). Whether an earlier
+THE DISCHARGE SIDE IS PARSED, NOT MATCHED (https://github.com/Morrison-Lab/ai-config/issues/3126). Whether an earlier
 command READ a manifest is a parsing question --- "is this path the operand of
 a reading command?" --- and a regex has no notion of argument position, so each
-narrowing traded one boundary case for another over eight rounds on #3101. The
+narrowing traded one boundary case for another over eight rounds on https://github.com/Morrison-Lab/ai-config/issues/3101. The
 question is now asked of an argv: `scripts/lib/shellcmd.py` splits the command
 into simple commands, `read_operands` drops each verb's options and its
 pattern/script argument, and a discharge needs a FILE operand that both
@@ -62,10 +62,10 @@ while the author is complying. A verb outside `READ_VERBS` (`tail`, `wc`), a
 path held in a variable, a `cd` whose target is indeterminate (`cd -`, `popd`),
 a wrapper carrying its own option (`sudo -u me cat ...`, `timeout 5 cat ...`),
 which `strip_env` peels only when the wrapper takes no argument of its own
-(ai-config#3321), and --- most likely in this harness --- a manifest opened
+(https://github.com/Morrison-Lab/ai-config/issues/3321), and --- most likely in this harness --- a manifest opened
 with the Read tool rather than Bash, since only Bash commands are scanned.
 
-One DISCHARGE limit runs the other way and is tracked as ai-config#3564:
+One DISCHARGE limit runs the other way and is tracked as https://github.com/Morrison-Lab/ai-config/issues/3564:
 the parser carries no operator between simple commands, so a read the
 shell never reaches --- `false && cat <manifest>` --- is credited.
 Deciding it needs an exit status the text does not carry.
@@ -164,7 +164,7 @@ _DESTRUCTIVE_PARTS = [
 ]
 RX_DESTRUCTIVE = re.compile("(?:" + "|".join(_DESTRUCTIVE_PARTS) + ")")
 
-# FALLBACK ONLY, since ai-config#3126. Everything from here to `RX_REF_CHECK`
+# FALLBACK ONLY, since https://github.com/Morrison-Lab/ai-config/issues/3126. Everything from here to `RX_REF_CHECK`
 # is the lexical approximation the argv parse below replaced, and it now runs
 # on two conditions: `shlex` raising, which means the command does not parse at
 # all, and a failed import of `scripts/lib/shellcmd.py`, which leaves no argv
@@ -232,7 +232,7 @@ _REF_ORDERS = [
 RX_REF_CHECK = re.compile("(?:" + "|".join(_REF_ORDERS) + ")")
 
 # ---------------------------------------------------------------------------
-# The argv path (ai-config#3126). Everything below decides "is this manifest
+# The argv path (https://github.com/Morrison-Lab/ai-config/issues/3126). Everything below decides "is this manifest
 # path the operand of a reading command?" from argument position rather than
 # from the shape of the surrounding text.
 # ---------------------------------------------------------------------------
@@ -280,13 +280,67 @@ PATTERN_OPTS = {
 # one leaves the other in positional position, where a value that happens to
 # spell a manifest path is read as a file operand the command never opens.
 PAIR_OPTS = {
-    "jq": frozenset({"--arg", "--argjson", "--slurpfile", "--rawfile"}),
+    "jq": frozenset({"--arg", "--argjson"}),
 }
 
 # Options after which the remaining positionals are NOT input files: jq's
 # `--args`/`--jsonargs` rebind them to $ARGS. Which of them the filter still
 # consumes is not decidable from argv alone, so credit no operand at all --
 # the fail-toward-warning direction.
+
+NO_INPUT_OPTS = {
+    "grep": frozenset({"--help", "--version", "-V"}),
+    "rg": frozenset({"--files", "--help", "--version", "-V"}),
+    "sed": frozenset({"--help", "--version", "-V"}),
+    "awk": frozenset({"--help", "--version", "-V"}),
+    "jq": frozenset({"-n", "--null-input", "--help", "--version", "-V"}),
+    "head": frozenset({"--help", "--version", "-V"}),
+    "cat": frozenset({"--help", "--version", "-V"}),
+    "xxd": frozenset({"--help", "--version", "-V"}),
+    "python": frozenset({"--help", "--version", "-V"}),
+    "python3": frozenset({"--help", "--version", "-V"}),
+}
+
+FILE_PAIR_OPTS = {
+    "jq": frozenset({"--slurpfile", "--rawfile"}),
+}
+
+
+NO_INPUT_OPTS = {
+    "grep": frozenset({"--help", "--version", "-V"}),
+    "rg": frozenset({"--files", "--help", "--version", "-V"}),
+    "sed": frozenset({"--help", "--version", "-V"}),
+    "awk": frozenset({"--help", "--version", "-V"}),
+    "jq": frozenset({"-n", "--null-input", "--help", "--version", "-V"}),
+    "head": frozenset({"--help", "--version", "-V"}),
+    "cat": frozenset({"--help", "--version", "-V"}),
+    "xxd": frozenset({"--help", "--version", "-V"}),
+    "python": frozenset({"--help", "--version", "-V"}),
+    "python3": frozenset({"--help", "--version", "-V"}),
+}
+
+FILE_PAIR_OPTS = {
+    "jq": frozenset({"--slurpfile", "--rawfile"}),
+}
+
+
+NO_INPUT_OPTS = {
+    "grep": frozenset({"--help", "--version", "-V"}),
+    "rg": frozenset({"--files", "--help", "--version", "-V"}),
+    "sed": frozenset({"--help", "--version", "-V"}),
+    "awk": frozenset({"--help", "--version", "-V"}),
+    "jq": frozenset({"-n", "--null-input", "--help", "--version", "-V"}),
+    "head": frozenset({"--help", "--version", "-V"}),
+    "cat": frozenset({"--help", "--version", "-V"}),
+    "xxd": frozenset({"--help", "--version", "-V"}),
+    "python": frozenset({"--help", "--version", "-V"}),
+    "python3": frozenset({"--help", "--version", "-V"}),
+}
+
+FILE_PAIR_OPTS = {
+    "jq": frozenset({"--slurpfile", "--rawfile"}),
+}
+
 NO_FILE_OPTS = {
     "jq": frozenset({"--args", "--jsonargs"}),
     # `-c CODE` and `-m MODULE` leave no script path, so every remaining
@@ -380,7 +434,7 @@ CD_VERBS = frozenset({"cd", "pushd", "popd"})
 # an argv whose `argv[0]` is the outer program, so
 # `diff <(cat <manifest>) <(cat other)` presents `diff` where `cat` ran. The
 # lexical scan runs over the text INSIDE each such construct and nothing else
-# (see `substitution_bodies`), per the issue's "fall back to the lexical path
+# (see `substitution_spans`), per the issue's "fall back to the lexical path
 # rather than to silence". A heredoc is NOT in this set: its body is never
 # executed, so nothing inside it is a read, and the argv path sees the command
 # with the body blanked by `shellcmd._heredoc_free`.
@@ -428,7 +482,7 @@ def config_root_of(abs_path):
     return None
 
 
-def expand_path(path, cwd):
+def expand_path(path, cwd, home_reassigned=False):
     """`path` as a normalized absolute path, or `None` when indeterminate.
 
     `~`, `$HOME` and `${HOME}` expand; any other `$` or a backtick makes the
@@ -443,10 +497,16 @@ def expand_path(path, cwd):
     elif path.startswith("~/"):
         path = os.path.join(HOME, path[2:])
     elif path in ("$HOME", "${HOME}"):
+        if home_reassigned:
+            return None
         path = HOME
     elif path.startswith("$HOME/"):
+        if home_reassigned:
+            return None
         path = os.path.join(HOME, path[len("$HOME/"):])
     elif path.startswith("${HOME}/"):
+        if home_reassigned:
+            return None
         path = os.path.join(HOME, path[len("${HOME}/"):])
     elif "$" in path or "`" in path or path.startswith("~"):
         return None
@@ -474,6 +534,8 @@ def read_operands(argv):
     bare_opts = BARE_OPTS.get(verb, frozenset())
     pair_opts = PAIR_OPTS.get(verb, frozenset())
     no_file_opts = NO_FILE_OPTS.get(verb, frozenset())
+    no_input_opts = NO_INPUT_OPTS.get(verb, frozenset())
+    file_pair_opts = FILE_PAIR_OPTS.get(verb, frozenset())
     pattern_opts = PATTERN_OPTS.get(verb, frozenset())
     positional = []
     redirected = []
@@ -525,6 +587,8 @@ def read_operands(argv):
             name = token.split("=", 1)[0]
             if cluster_supplies_pattern(name, pattern_opts):
                 pattern_supplied = True
+            if name in no_input_opts:
+                return []
             if name in no_file_opts:
                 # No POSITIONAL operand is a file this command opens, but a
                 # redirect still is: `python3 -c '...' < <manifest>` opens it
@@ -535,7 +599,13 @@ def read_operands(argv):
                 index += 1
             elif name in pair_opts:
                 index += 3
+            elif name in file_pair_opts:
+                if index + 2 < len(argv):
+                    redirected.append(argv[index + 2])
+                index += 3
             elif takes_no_value(name, bare_opts):
+                index += 1
+            elif not token.startswith("--") and len(token) > 2:
                 index += 1
             else:
                 # Unknown option: assume it consumes the next token. A wrong
@@ -696,6 +766,16 @@ def argv_read_roots(command):
         return None
     found = set()
     cwd_by_scope = {}
+    
+    home_reassigned = False
+    for _, argv in parsed:
+        for token in argv:
+            if token.startswith("HOME="):
+                home_reassigned = True
+                break
+        if home_reassigned:
+            break
+
     for scope, argv in parsed:
         cwd = scope_cwd(cwd_by_scope, scope)
         _env, rest = strip_env(argv)
@@ -704,8 +784,10 @@ def argv_read_roots(command):
         if os.path.basename(rest[0]) in CD_VERBS:
             cwd_by_scope[scope] = resolve_cd_target(rest, cwd)
             continue
+        if "builtin" in argv[:len(argv) - len(rest)]:
+            continue
         for operand in read_operands(rest) or ():
-            resolved = expand_path(operand, cwd)
+            resolved = expand_path(operand, cwd, home_reassigned)
             if resolved is None:
                 continue
             if os.path.basename(resolved) not in MANIFEST_NAMES:
@@ -818,39 +900,10 @@ def blank_substitutions(command, spans):
     return "".join(out)
 
 
-def substitution_bodies(command):
-    """The text INSIDE each command or process substitution in `command`.
-
-    The argv parse cannot see what runs inside `$( )`, backticks, `<( )` or
-    `>( )`, so `read_roots` recurses over exactly that text and nothing
-    else. Scanning the whole segment instead handed the regex the outer
-    command too, which the argv parse had already decided: a grep whose
-    PATTERN spells a manifest path, with a substitution among its arguments,
-    credited the manifest (review rounds on #3469). A manifest path that a
-    substitution merely PRODUCES (`jq . $(echo <manifest>)`) is not credited
-    either, since its value is unknown here; that under-credits, which for a
-    DISCHARGE test is the direction that warns. An opener inside a
-    single-quoted span is text the shell never expands, so it opens nothing;
-    inside double quotes it does expand, and is followed. The scan resumes
-    AFTER each body rather than inside it, since `read_roots` recurses into
-    the body and would otherwise re-extract every nested substitution once
-    per enclosing level, which is exponential in the nesting depth (CI
-    review of a60a5f1a: 15 seconds on a 187-character command). The walk tracks
-    which quote is open, so an apostrophe inside a double-quoted word does
-    not start a single-quoted span (twelfth review round). A backtick body
-    is closed by the first backtick outside its own quotes, so a quoted
-    backtick inside it does not end it early. A command whose quotes never
-    close never reaches here: shlex rejects it and the whole-command lexical
-    fallback runs instead.
-    """
-    return [command[start:end] for start, end in substitution_spans(command)]
-
-
 def substitution_spans(command):
     """[(body_start, body_end), ...] for each substitution in `command`.
 
-    The walk is `substitution_bodies`' own, factored out so the same pass can
-    both recurse into a body and blank it out of the text the argv parse sees.
+    The walk blanks substitutions out of the text the argv parse sees.
     """
     bodies = []
     quote = None
@@ -943,7 +996,7 @@ def matching_paren(text, start):
     Quote-aware, since a parenthesis inside a quoted argument of the
     substitution is text rather than structure: counting it would carry the
     body past the real close and into a later, unrelated command, which the
-    lexical scan would then read (review round on #3469). A single-quoted
+    lexical scan would then read (review round on https://github.com/Morrison-Lab/ai-config/issues/3469). A single-quoted
     span ends at the next quote; a double-quoted span ends at the next quote
     that is not backslash-escaped; a backslash outside quotes escapes the
     character after it.
@@ -1047,7 +1100,7 @@ REASON = (
     "references them.\n\n"
     "Staleness is a property of a file. Safety-to-delete is a property of the "
     "graph around it, and a content diff answers only the first.\n\n"
-    "Measured 2026-09-02 (ai-config#3096): `find \"$HOME/.claude/hooks\" "
+    "Measured 2026-09-02 (https://github.com/Morrison-Lab/ai-config/issues/3096): `find \"$HOME/.claude/hooks\" "
     "-name '*.py' -delete` was recommended over what turned out to be the live "
     "guard set --- `settings.json` registered 46 of those files by explicit "
     "path, so the command would have unregistered every one. The fix was to "

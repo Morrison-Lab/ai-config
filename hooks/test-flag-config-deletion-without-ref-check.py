@@ -143,7 +143,7 @@ WARN_CASES = [
     (DELETE_REPLY, ("ls -la ~/.claude/hooks", "wc -l ~/.claude/hooks/a.py"),
      "listing and counting the files is NOT a reference check -- staleness is "
      "a property of the file, safety-to-delete a property of the graph"),
-    # ai-config#3126: the boundary the lexical approach could not reach. A
+    # https://github.com/Morrison-Lab/ai-config/issues/3126: the boundary the lexical approach could not reach. A
     # quoted pattern DEQUOTES into an argv element indistinguishable from a
     # path, so only its POSITION says it opens nothing.
     (DELETE_REPLY, ("grep -rn '~/.claude/settings.json' README.md",),
@@ -203,7 +203,7 @@ SILENT_CASES = [
      "naming a config path without proposing deletion"),
     ("Use `git clean -fd` in the worktree.", (),
      "a destructive verb with no config-root operand"),
-    # ai-config#3126: reads the lexical approach could not credit, so the
+    # https://github.com/Morrison-Lab/ai-config/issues/3126: reads the lexical approach could not credit, so the
     # guard warned while the author was complying.
     (DELETE_REPLY, ("cd ~/.claude/hooks && cat ../settings.json",),
      "a cd into a SUBdirectory then a relative `..` read: the path resolves "
@@ -341,6 +341,29 @@ if not _ok:
 print("\n--- root attribution (read_roots)")
 _HOME = os.path.expanduser("~")
 _ATTRIBUTION_CASES = [
+    ("jq . ~/.claude/settings.json", {"claude"}, "vacuous case: normal jq reads"),
+    ("jq -n . ~/.claude/settings.json", set(), "jq -n does not read inputs"),
+    ("rg src ~/.claude/settings.json", {"claude"}, "vacuous case: normal rg reads"),
+    ("rg --files src ~/.claude/settings.json", set(), "rg --files reads no inputs"),
+    ("cat --help ~/.claude/settings.json", set(), "cat --help reads no inputs"),
+
+    # Finding 2: HOME reassignment
+    ("cat \"$HOME/.claude/settings.json\"", {"claude"}, "vacuous case: normal $HOME expands to real HOME"),
+    ("export HOME=/tmp; cat \"$HOME/.claude/settings.json\"", set(), "HOME reassignment makes $HOME indeterminate"),
+    ("HOME=/tmp cat \"$HOME/.claude/settings.json\"", set(), "inline HOME reassignment makes $HOME indeterminate"),
+
+    # Finding 3: builtin wrapper
+    ("builtin cd ~/.claude && cat settings.json", {"claude"}, "vacuous case: builtin cd still changes dir for subsequent cat"),
+    ("builtin cat ~/.claude/settings.json", set(), "wrapper builtin cannot read since cat is not a builtin"),
+
+    # Finding 4: PAIR_OPTS second value
+    ("jq --arg name value . ~/.claude/settings.json", {"claude"}, "vacuous case: jq --arg skips both and reads manifest"),
+    ("jq --slurpfile refs ~/.claude/settings.json .", {"claude"}, "jq --slurpfile reads the file as second argument"),
+    ("jq --rawfile refs ~/.claude/settings.json .", {"claude"}, "jq --rawfile reads the file as second argument"),
+
+    # Finding 5: attached short option
+    ("grep -e foo ~/.claude/settings.json", {"claude"}, "vacuous case: grep -e takes value in next token"),
+    ("grep -efoo ~/.claude/settings.json", {"claude"}, "grep -efoo has attached value, consuming no extra tokens"),
     ("cat <<< '~/.claude/settings.json'", set(),
      "a here-string is the opener's literal text, not a file it opens"),
     ("cat <<<~/.claude/settings.json", set(),
@@ -349,7 +372,7 @@ _ATTRIBUTION_CASES = [
      "a dash heredoc opener followed by a real file operand still credits it"),
     ("cat <<EOF\ngrep -rn '~/.claude/settings.json' README.md\nEOF", set(),
      "a heredoc BODY is never executed, so a manifest it mentions is not "
-     "read (review of #3469: a scratch script or commit message discharged "
+     "read (review of https://github.com/Morrison-Lab/ai-config/issues/3469: a scratch script or commit message discharged "
      "the guard)"),
     ("cat > /tmp/x.py <<'PY'\nCASES = [(\"cat ~/.claude/settings.json\",)]\nPY",
      set(), "the same with a quoted delimiter and an output redirect"),
@@ -361,7 +384,7 @@ _ATTRIBUTION_CASES = [
      "a real read chained after a heredoc opener is still credited"),
     ("grep -rn '~/.claude/settings.json' README.md && echo `date`", set(),
      "a backtick in a NEIGHBOURING segment does not hand the lexical fallback "
-     "a segment the argv parse already decided (review round on #3469)"),
+     "a segment the argv parse already decided (review round on https://github.com/Morrison-Lab/ai-config/issues/3469)"),
     ("cat ~/.codex/config.toml; jq . $(echo ~/.claude/settings.json)", {"codex"},
      "a manifest path a substitution PRODUCES is unknown here and not "
      "credited: the fallback scans the substitution's text, not its value"),
@@ -379,7 +402,7 @@ _ATTRIBUTION_CASES = [
      "costs one pass per level and a deep read is still credited"),
     ("grep -rn '~/.claude/settings.json' $(git diff --name-only)", set(),
      "a substitution among a grep's arguments does not hand the fallback the "
-     "grep whose pattern spells a manifest (CI review round on #3469)"),
+     "grep whose pattern spells a manifest (CI review round on https://github.com/Morrison-Lab/ai-config/issues/3469)"),
     ("grep -rn '~/.claude/settings.json' README.md `date`", set(),
      "the same with a backtick"),
     ("diff <(cat ~/.claude/settings.json) <(cat $(echo x))", {"claude"},
@@ -487,10 +510,10 @@ _ATTRIBUTION_CASES = [
      "a genuinely single-valued jq option still skips exactly one token"),
     # The wrapper limit below is a false NEGATIVE (warns while the author
     # complied), so it is asserted as the CURRENT behaviour rather than the
-    # desired one; ai-config#3321 tracks the fix in scripts/lib/shellcmd.py.
+    # desired one; https://github.com/Morrison-Lab/ai-config/issues/3321 tracks the fix in scripts/lib/shellcmd.py.
     ("sudo -u me cat ~/.claude/settings.json", set(),
      "strip_env peels a zero-argument wrapper only, so a wrapper carrying "
-     "its own option hides the read verb (ai-config#3321)"),
+     "its own option hides the read verb (https://github.com/Morrison-Lab/ai-config/issues/3321)"),
     # Process substitution is the third construct whose argv is not the
     # shell's: the split leaves `diff` in argv[0] where `cat` ran, so the outer
     # parse SUCCEEDS and credits nothing. The fallback is not what saves this.
@@ -623,7 +646,7 @@ _ATTRIBUTION_CASES = [
      "-c leaves no script path, and stdin still opens the manifest"),
     ("jq --args . < ~/.claude/settings.json", {"claude"},
      "jq --args suppresses its file operands, not its stdin"),
-    # KNOWN LIMIT, tracked as ai-config#3564: the parser carries no operator
+    # KNOWN LIMIT, tracked as https://github.com/Morrison-Lab/ai-config/issues/3564: the parser carries no operator
     # between simple commands, so a read the shell never reaches is credited.
     # Deciding it needs an exit status, which the text does not carry.
     ("false && cat ~/.claude/settings.json", {"claude"},

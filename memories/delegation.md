@@ -223,6 +223,18 @@ since each fails silently in its own way.
   Quota and a working invocation are separate facts,
   and the second took five probes plus a review round to establish.
 
+**Recurrence, 2026-09-06 (`d-morrison/rme` ardia sweep).**
+`agy --print --model X < file` fails with `--print took --model as its prompt`.
+Two things in that one line are not covered above.
+`--print-timeout` is a further flag, absent from the `--effort`/`--model`/`--sandbox`
+list this file gives for the CLI's shape.
+And the prompt here arrives on **stdin**, which the unconsumed-positional mechanism
+above does not describe --- note that the stdin route documented earlier for the
+Windows command-line length limit supplies the prompt with no `--print` flag at all,
+so it does not collide with this trap.
+The confirmed working invocation:
+`agy --model X --print-timeout 8m --print="$(cat prompt.txt)"`.
+
 Stated 2026-07-02 ("exhaust its tokens before using our own"),
 reaffirmed 2026-07-06 ("always use codex first
 (until we hit the 5-hour limits) before using up claude quota"),
@@ -261,7 +273,56 @@ The existing "`agy --print` CONSUMES THE NEXT TOKEN" rule above still applies --
 **Headless mode cannot satisfy a tool's permission prompt, and it fails with a named cause rather than hanging.**
 A tool needing a permission it hasn't been granted (`read_file` is the one observed) makes the run print `jetski: no output produced --- a tool required the "read_file" permission that headless mode cannot prompt for` and produce nothing.
 The available escapes are `--mode plan` (read-only), `--mode accept-edits`, `--dangerously-skip-permissions`, or an allow-rule under `permissions.allow` in `settings.json` --- but this file's own auto-mode classifier section already found `--dangerously-skip-permissions` and `--mode accept-edits` denied by Claude Code's permission classifier, so those two may not be reachable from an orchestrated dispatch even where they solve the headless problem.
-**Which of these actually works for a read-only review dispatch is unmeasured as of 2026-09-02** --- probe it and update this section with a result before relying on any one of them, rather than assuming `--mode plan` is the safe default merely because it sounds read-only.
+**Measured 2026-09-09: a `command(*)` rule under `permissions.allow` in `~/.gemini/antigravity-cli/settings.json` is honoured in headless mode.**
+`--dangerously-skip-permissions` stays denied by Claude Code's classifier, and `--mode plan` is still untested.
+With this in `~/.gemini/antigravity-cli/settings.json` (agy 1.1.28, Windows 11;
+`<user>` and `<repo>` stand for the real account and checkout):
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "command(*)",
+      "read_file(C:\\Users\\<user>\\path\\to\\<repo>)",
+      "write_file(C:\\Users\\<user>\\path\\to\\<repo>)"
+    ]
+  },
+  "trustedWorkspaces": ["C:\\Users\\<user>\\path\\to\\<repo>"]
+}
+```
+
+A plain `agy --print "<prompt>" --effort low` ran a shell command and reported its stdout, from the user's own terminal and then from a Claude Code Bash call.
+That contradicts upstream issue [google-antigravity/antigravity-cli#548](https://github.com/google-antigravity/antigravity-cli/issues/548), whose reports through agy 1.1.27 say `command()` grants in this file are loaded but never consulted by `--print`, and that only `~/.gemini/config/config.json` (`userSettings.globalPermissionGrants.allow`) is honoured.
+So the measurement was discriminated against that confound rather than taken on faith.
+This machine's `config.json` carried 17 grants from earlier interactive sessions (`command(gh)`, `command(godot)`, three `bash.exe` invocations, three `read_url` hosts), none of which covers `hostname` or `whoami`, and a headless probe ran both.
+The same probe had been denied for the `command` permission minutes before the `settings.json` edit, with `config.json` unchanged.
+`cli.log` shows the two stores loaded separately (`applyUserSettings: stored shared config permissions: allow=17` from `config.json`, then `CLI settings initialized: permissions=&{Allow:[command(*) ...]}` from `settings.json`), and no `ApplyProjectPermissionGrants` entry for the project.
+On a build older than 1.1.28, or if a `command(*)` rule here is ignored, read those two `cli.log` lines to tell "loaded" from "applied", and fall back to a `command()` entry under `globalPermissionGrants.allow` in `config.json`, per #548.
+`command(*)` is the form to use.
+As of 2026-09-09, upstream issue [google-antigravity/antigravity-cli#614](https://github.com/google-antigravity/antigravity-cli/issues/614) reports two Windows defects: `command(git)` never matches, because the resolved `C:\Program Files\Git\...` path is split at the space, and a `\*` glob inside a `read_file`/`write_file` rule crashes the sandbox.
+So directory rules are written bare (they are recursive).
+`command(*)` is a broad grant, so pair it with a `trustedWorkspaces` list that names only the repos the dispatch should touch.
+Before the rules existed, `-p "/permissions"` itself was denied for `read_file`, so headless mode cannot even list its own rules until one is granted.
+
+Two facts about the run that every brief has to account for:
+
+- **agy's shell is PowerShell 5.1**, so `a && b` is a parser error.
+  agy recovered by re-running under `cmd /c`, but a brief should say `;` or `cmd /c "..."` up front rather than spending a turn on the failure.
+
+- **agy's working directory is `~/.gemini/antigravity-cli/scratch`, not the caller's cwd**, so `git rev-parse` there fails with `not a git repository`.
+  Start every brief with `Set-Location <absolute repo path>` or pass `--add-dir`.
+
+And one fact concerns the dispatch shape from Git Bash: `cmd /c "type brief.txt | agy.exe"` does not work there, because MSYS rewrites `/c` into a `C:\` path, so `cmd` opens an interactive shell, prints its banner, and exits on the piped brief with exit 0 and a 265-byte "output".
+Write `cmd //c` from Git Bash, or pass a short brief directly with `--print "$(cat brief.txt)"`.
+
+The Claude Code classifier is the other half.
+As of 2026-09-09, `--dangerously-skip-permissions` was denied on every attempt (three, across two sessions).
+Writing the `permissions.allow` block into `settings.json` was denied once via the Edit tool and then accepted via the Write tool in the next turn, after the user said "you paste it for me" --- so the file edit is reachable, and the flag has not been.
+The "Don't" bullet further down, measured 2026-09-07 on macOS, records the opposite outcome for the same edit;
+both are dated samples of the classifier, and the Write tool after an explicit user instruction is the shape that passed.
+After those denials the classifier escalated: it denied twice the plain `agy --print` probe it had accepted once earlier in the same session;
+the classifier accepted the identical command again once the user had run it in their own terminal and reported the result.
+Read that as the mistake-patterns Pattern 43 escalation rather than as a property of the command.
 
 **A `language_server.exe agentapi` fallback exists for when no CLI is installed but the Antigravity IDE is already open.**
 This is not a CLI dispatch at all --- it talks to the IDE's own running language server:
@@ -423,12 +484,15 @@ only these specific commands, on this one session and date, were denied.
 - **Do:** look for `agy`'s settings file at
   `~/.gemini/antigravity-cli/settings.json` first,
   not under a `~/.antigravity/` or `~/.agy/` guess.
-- **Don't:** assume editing `permissions.allow` from inside
-  the orchestrating Claude Code session is a reachable escape
-  for a headless `agy` permission denial --
+- **Don't:** assume editing `permissions.allow`
+  from inside the orchestrating Claude Code session
+  is a reachable escape for a headless `agy` permission denial --
   as of 2026-09-07 that edit itself was denied
   by Claude Code's own auto-mode classifier,
   the same as `--dangerously-skip-permissions` was.
+  On Windows, 2026-09-09, the same edit passed via the Write tool,
+  after the user asked for it in so many words;
+  see the measured section above.
 - **Don't:** reach for a `daytb`/`mwc`/`away` grant
   to clear this kind of denial --
   it is Claude Code's permission system reacting
@@ -592,6 +656,84 @@ so all thirteen inherited Fable.
 Nothing in any call recorded it;
 what made the inheritance visible was the last dispatch dying with
 `rate_limit ... model sent to the API: claude-fable-5-1`.
+
+## Claude subagents are for reviewers only; every other subagent runs on agy
+
+**Directive from the user, 2026-09-09, during a quota sprint that hit the 5-hour Claude limit twice in one day: "use agy only for subagents;
+no claude subagents except reviewers".**
+It arrived after two caps in the same day (five machine-wide, then two machine-wide with one per session), so read it as the standing rule rather than as a throttle for that afternoon.
+The one carve-out is the `adversarial-reviewer`, and it is narrower than it first looked.
+`hooks/no-push-without-self-review.py` on `main` accepts a cross-family review as a discharge when the review ran as the sole command of one Bash call in the shape `agy --print '<single-quoted prompt>'` (its `EXTERNAL_REVIEWER_COMMAND_RE`), so a session whose installed copy is current needs no Claude reviewer at all.
+The copy this session ran under refused every `agy` review because it predated that acceptance: 67 of the 86 hook copies under `~/.claude/hooks` differed from `main` on 2026-09-10, the drift [ai-config#3094](https://github.com/Morrison-Lab/ai-config/issues/3094) tracks, and the first response to a refusal that names no `agy` form is to diff the installed copy against `main` before spending a Claude reviewer on it.
+
+**Headless `agy` does the implementation work on this machine now.**
+The `command(*)` allow-rule in `~/.gemini/antigravity-cli/settings.json`, added at the user's request through another session on 2026-09-09, is what made that true;
+the same session measured the caveats (PowerShell 5.1 with no `&&`, a scratch cwd so every brief starts with `Set-Location`, file tools scoped to the sparta tree so an ai-config brief does its file I/O through shell commands).
+Three implementation dispatches and one review dispatch in this session ran that way at zero Claude cost, each returning a local commit in its worktree.
+
+**A worker subagent cannot push, whichever family it runs on, so brief it to commit locally and never push.**
+`no-push-without-self-review.py` reads the orchestrator's transcript for the reviewer dispatch.
+A subagent thread has no transcript under `~/.claude/projects/` for the subagent's worktree, so the reviewer rounds the subagent runs are invisible to the guard, and the guard refuses every push the subagent attempts.
+Measured 2026-09-09 on ai-config#3469: the worker ran two clean `adversarial-reviewer` rounds and was still refused, then tried the guard's documented `ALLOW_UNREVIEWED_PUSH=1` escape and had it denied by the auto-mode classifier.
+The orchestrator dispatches the reviewer against the worker's diff, addresses the findings itself, and pushes;
+that round is not redundant, since it found two false discharges the worker's rounds had missed.
+
+- **Do:** launch `agy` for implementation, triage, and any other dispatchable work, and reserve the `Agent` tool for `adversarial-reviewer`.
+- **Do:** end every worker brief with "commit locally, do not push, do not mark the PR ready", and run the reviewer and the push from the orchestrator.
+- **Don't:** dispatch a Claude `general-purpose` worker for implementation while this directive stands, however small the task.
+- **Don't:** brief a worker to push and ARDI its own PR;
+  the guard refuses it by construction, and the retry burns the worker's whole budget.
+
+## A syntax check does not catch a delegated edit whose quoting was dropped
+
+[`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md) already says to run a parser over a scripted edit *and* run the relevant tests before trusting it.
+What this case adds is which of those two halves decides, for delegated shell, and that the cheap half carries no partial credit.
+A dropped quote can leave a *different valid program* rather than an invalid one, and did here, so the parser passes and the artifact is still wrong.
+
+Measured 2026-09-10 on [ai-config#3435](https://github.com/Morrison-Lab/ai-config/pull/3435).
+An `agy` worker asked to guard a call in `bootstrap.sh` emitted a line of this shape:
+
+```sh
+cmd || printf warn  render-agy-hooks.py exited %d
+ "$?"
+```
+
+The format string lost its quotes and gained a real newline, so `"$?"` became its own command.
+Under that script's `set -euo pipefail` it expands to `0`, runs `0`, and aborts the bootstrap before the symlink creation that follows it and, much later, the dotfiles installer loop.
+
+`bash -n` exits 0 on that file.
+Verified on the reduced case: `bash -n` reports nothing, and running it dies with `0: command not found` and status 127.
+Nothing about the text is ungrammatical --- `printf` simply took different arguments than the author meant.
+That is what happened here;
+whether a lost quote usually lands that way rather than producing a syntax error is not measured, and running the edited script is worth doing either way.
+
+**Executing the artifact is the check that works, and this repo already had it.**
+`scripts/test_agy_hook_adapter.py` runs `bash bootstrap.sh` and asserts a zero exit, and `validate.yml` gates it, so CI would have failed on the mangled line.
+It could not run on the Windows machine that wrote it, for an unrelated path-quoting bug in the test itself ([ai-config#3551](https://github.com/Morrison-Lab/ai-config/issues/3551)) --- so the local loop was blind and the adversarial reviewer was the only detector before push.
+
+The transferable part is which check answers which question.
+A parser answers whether the file is *well-formed*.
+Only running it can expose a failure that lives in the *behaviour* rather than in the grammar, which is the class this defect belongs to.
+It is not proof the change is right: an execution test asserts what it happens to assert, so a semantically wrong edit passes wherever the relevant behaviour is untested.
+What it rules out is the case here, where a delegated edit's own account of itself is accurate and the text it wrote is not.
+Nothing here settles whether the worker authored the malformed line or a transport mangled one it wrote correctly, and the check is the same either way.
+
+- **Do:** run the suite that executes an edited script, not only a parser over it, before trusting a delegated commit that touched shell.
+- **Do:** run the script yourself against a throwaway fixture when no suite executes it, and file an issue for the missing coverage rather than skipping the check.
+  Derive the candidates rather than recalling them, and say the output is a candidate list rather than the set of uncovered scripts.
+  It finds a literal filename mention and nothing else, so a script covered only by a glob would print.
+  None does today: the one `hooks/*.sh`, which `scripts/test_hooks.py` pairs by glob, is also named literally in its own test.
+  The gap is in what the query can decide, not in what it currently reports:
+
+  ```bash
+  for s in $(git ls-files '*.sh'); do
+    grep -rqlF "$(basename "$s")" scripts/test_*.py hooks/test-*.py || echo "$s"
+  done
+  ```
+- **Do:** say in the report that a test you could not run locally is unchecked, rather than counting a passing parser toward it.
+- **Don't:** read `bash -n` (or `py_compile`) passing as evidence that a delegated edit is correct --- it reports grammar, and dropped quoting is grammatical.
+- **Don't:** rely on the commit message agreeing with the diff here;
+  the message was accurate and the code was not.
 
 ## opencode free tier: a full authoring task, validated mechanically
 

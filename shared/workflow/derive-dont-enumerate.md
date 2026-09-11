@@ -425,6 +425,136 @@ specifically rather than to file contents or a corpus fact.
   population is closed --- closedness rules out the set growing, not the
   summary being wrong.
 
+**The same shape recurs with no review comment in it at all: a brief can hand over an enumeration of a fixed schema, and the recipient inherits an incomplete one exactly as it inherits an incomplete finding-summary above.**
+
+Review findings are one instance of a closed population that still needs deriving rather than summarizing;
+a static specification --- a schema's set of element names, a config's list of valid keys, an API's set of fields --- is another.
+Both are closed in the sense the test above means (nothing adds a member while the work runs), and both fail the same way: the enumeration was simply incomplete *when written*, the recipient has no way to tell a complete list from a truncated one, and every artifact built on it inherits the gap.
+
+A brief listing 18 OOXML math structure tags, meant as the complete set an implementation had to handle, omitted `m:m`.
+The list originated in scratch tooling that had never been checked against the schema itself, and was carried faithfully from there into an issue filed as the specification, and from there into an implementation that handled exactly the 18 tags named and no others --- each artifact agreeing with the one before it, because each inherited that source rather than checking it.
+The fix that worked was not adding `m:m` to the list;
+it was telling the recipient to re-derive the tag set from the schema instead of from the list, which turned up a second gap nobody had found by reading the list at all.
+
+- **Do:** when a brief needs a fixed schema, config, or API's full set of names, point at the authoritative source (the schema file, the spec, the API reference) and ask the recipient to derive the set from it, rather than pasting the set you already have.
+- **Don't:** trust an enumeration merely because it is long, specific, and already agreed with by every artifact that copied it --- agreement among copies is evidence about the copying, not about the source.
+
+## Which local checks predict CI is itself a derivable set, not a remembered one
+
+Everything above governs a set of **work items** --- PRs, issues, files,
+findings.
+The same failure recurs one level down, over a set of **checks**: which
+local commands to run before a push, so CI comes back green on the first
+try.
+That list looks closed --- it is fixed by `.github/workflows/validate.yml`
+at the commit you are pushing, not something a bot or a peer can add to
+mid-task --- and the closedness test above would wave it through on that
+basis.
+What breaks is the same gap [`A derivation is still an enumeration of one
+pattern`](#a-derivation-is-still-an-enumeration-of-one-pattern) names for a
+search pattern: a hand-picked subset of the checks is a **narrower**
+enumeration than the population, chosen from memory of which checks matter
+rather than derived from what CI actually runs, and it is non-empty and
+plausible in exactly the way that section says makes an incomplete match
+invisible.
+
+Picking checks by hand fails in the ordinary way: a check that exists locally
+and is simply not chosen.
+Two pushes on one PR each hit this, on a different check both times ---
+`check-ascii-punctuation.py` first, then `gen-hooks-plugin.py --check` ---
+because each pre-push pass reconstructed "the checks that matter" from
+recollection of the diff rather than from the workflow file CI actually
+reads.
+
+`scripts/run-local-validation.py` is the instrument, and it already exists
+for exactly this reason (ai-config#1940, ai-config#1262): it parses
+`validate.yml` and runs every step it finds, rather than a curated subset,
+and reports what it could not run locally and why, so a check it skipped is
+visible rather than silently absent.
+
+```bash
+python3 scripts/run-local-validation.py                # every derivable step
+python3 scripts/run-local-validation.py --only 'punctuation|hooks'   # scope a slow run
+python3 scripts/run-local-validation.py --list          # show the derived plan without running it
+```
+
+**A fix sitting uncommitted in the working tree looks identical to a fix
+that shipped, and this is the same substitution
+[`verify-the-right-artifact`](verify-the-right-artifact.md) names for every
+other artifact --- the local tree is an adjacent copy of what actually gets
+pushed, not the thing itself.**
+Running the deriving script against an uncommitted edit proves the edit
+would pass, and says nothing about the commit that is about to leave the
+machine.
+Commit before the derived run, the same way that fragment's own "a local
+composite is not yet the reusable-workflow chain" caution applies to
+checking the wrong revision generally.
+
+- **Do:** derive the pre-push check list from `scripts/run-local-validation.py`
+  rather than reconstructing it from memory of the diff.
+- **Do:** commit before running the derived list, so a pass proves something
+  about the commit that will actually be pushed.
+- **Don't:** hand-pick a subset of checks because the diff "obviously" only
+  touches one of them --- that is the narrow-pattern failure this fragment
+  already names, applied to a check list instead of a search term.
+- **Don't:** trust a clean local run against uncommitted changes as evidence
+  about what CI will see.
+
+(Morrison-Lab/ai-config, 2026-09-09, manuscript-review session: two
+successive pushes on one PR each ran a hand-picked subset of local checks
+and each failed CI on a check that was never in that subset --- first
+`check-ascii-punctuation.py`, over a curly apostrophe inside a new hook's
+regex character class; then `gen-hooks-plugin.py --check`, over the
+generated plugin mirror left stale after registering that hook.
+`scripts/run-local-validation.py` derives the full step list from
+`validate.yml` and was available the whole time.
+
+That availability is the sharp part.
+[ai-config#1940](https://github.com/Morrison-Lab/ai-config/issues/1940),
+the issue that built the script, records three occurrences of this same
+hand-picking failure in a single session on 2026-08-22, and diagnoses one
+of them in terms that apply unchanged here: the rule "existed, was loaded,
+and did not fire".
+The two failures above are the fourth and fifth, and they happened after
+the instrument written in response to the first three already shipped.
+So a further rule is not what this needs.
+Read it instead as the case `deterministic-tools` names: once an
+instrument exists, the remaining failure is not knowing the rule but
+reaching for the instrument, and the only fix that generalizes is to make
+the derived run the default pre-push action rather than a thing to
+remember.
+
+Sixth and seventh, 2026-09-10, on two consecutive PRs of one session.
+The sixth is
+[ai-config#3524](https://github.com/Morrison-Lab/ai-config/pull/3524),
+failing the `Check the hooks-only skills-directory plugin is in sync` step ---
+`gen-hooks-plugin.py --check`, the *same* check as the fifth occurrence above,
+missed again with this section already written.
+
+The seventh is
+[ai-config#3528](https://github.com/Morrison-Lab/ai-config/pull/3528), which
+went red twice on `Run hook-runner tests` --- `test_test_hooks.py`, enforcing a
+no-bare-`python3` convention from ai-config#2098 that the author had never
+read.
+It is worth separating from the six before it, because it is not the
+hand-picking this section describes.
+What had been run was the new hook's own suite,
+`hooks/test-warn-generated-file-stale.py` --- complete and correct *for the
+artifact*, and passing honestly.
+A file's own tests are written by whoever wrote the file, so they encode what
+that author already understood, which is exactly the set of conventions they
+were never going to violate;
+the unread ones live in the suites that range over a whole *class* of file.
+So the population narrowed here is not the check list but the class the checks
+range over, and picking the artifact's own suite feels like having checked in a
+way that picking three checks from memory does not.
+
+The first draft of this very entry attributed both failures to #3528.
+The step names above are what settled it, and they are the artifact to read:
+`gh run view <id> --json jobs --jq '.jobs[].steps[] | select(.conclusion=="failure") | .name'`
+names the failing step, where the job log's own `FAIL:` lines include ones
+tests print deliberately.)
+
 ## In review
 
 Flag a brief, a plan, or a skill step that hands an agent a hard-coded list of PR or issue numbers to work through, where the tracker could gain another before the work finishes.

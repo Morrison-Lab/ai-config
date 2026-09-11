@@ -35,6 +35,19 @@ Check for this once per repo, right after the first push, rather than waiting to
 Treat "not configured" the same as the other two failure modes: self-review immediately, held to the same fact-check rigor "A fallback self-review is prone to being shallow, so hold it to the same bar as the bot it stands in for" requires (fact-check-prose, the cause check, the cited-source rule).
 Because a genuine config gap is a standing property of the repo rather than a one-off outage, also file a tracking issue on it per [`report-mistakes-proactively`](report-mistakes-proactively.md) --- wiring up review coverage is worth fixing, not just working around on every push.
 
+**A workflow that exists and never fires is a different failure mode, and the remedy above is the wrong one for it.**
+The check just prescribed asks whether the review job exists.
+A repo that ships the workflow with its `pull_request:` trigger commented out, and its agent job carrying `if: false`, answers yes while still never reviewing.
+So it produces the third mode's exact symptom and passes the third mode's exact test.
+Measured 2026-09-08 on `UCD-SERG/serocalculator` and `UCD-SERG/serodynamics`.
+Telling this case apart from a genuine config gap decides both of the third mode's instructions, and reverses each.
+Do not self-review: a real reviewer is one comment away, and posting a fallback instead leaves the PR reviewed by nobody who could have been asked.
+Do not file a tracking issue either.
+The third mode files one because a config gap went unnoticed;
+here both repos' disabling commits say in so many words that the agent is off "for now" by choice, so the issue would re-report a decision already on the record rather than surface a gap.
+Read the `on:` block rather than the filename.
+See [`claude-review-dispatch`](../../memories/claude-review-dispatch.md) for the deriving loop and the per-repo comment gates, which differ between repos that look identically configured.
+
 **Repository configuration defect (unusable API credential) is a fourth failure mode.**
 The pre-flight credential shape check in `Morrison-Lab/gha` (`check-credential-shape`, gha#686) detects when every configured API credential (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) carries INTERIOR whitespace --- a pasted PEM block, a JSON credential, or a wrapped terminal copy.
 Interior is the operative word: a trailing newline is trimmed and tolerated, because `gh secret set < file` writes one routinely, so stripping one is not the repair.
@@ -49,8 +62,25 @@ The PR then carries a comment reading:
 Unlike a transient network failure or timeout, this is a deterministic repository defect: re-running the job without repairing the secret fails identically.
 Treat this the same as other verdict-blocking failures: perform a fallback adversarial self-review to keep the PR moving, but recognize that the PR is **not** externally clean and the required check remains red until a repository admin updates the secret under **Settings -> Secrets and variables -> Actions** to a single-line value carrying no interior whitespace (for example one from `claude setup-token`).
 
+**Reviewer capability is a distinct axis from reviewer judgment, and every failure mode above is about the first while this is about the second.**
+Quota-skip, a stub review, no workflow at all, and a bad credential all describe cases where the reviewer produced no usable verdict.
+A capability-limited reviewer produces a confident, well-formed verdict --- the judgment in it can be sound --- while being unable to observe some of what the verdict claims to cover, and nothing in the comment's shape distinguishes that from a fully-capable review.
+Three concrete gaps, each filed as its own issue on `ucdavis/rampp` after a review workflow's actual setup was checked rather than assumed: the review workflow installs a different plugin marketplace (`code-review@claude-code-plugins`, not this corpus) and had no `CLAUDE.md` in the repo, so it had none of the lab's standards loaded (rampp#167);
+the review workflow cannot execute `Rscript`, so R code --- including a checker script under review --- is read rather than run, which is exactly the gap [`fail-fast.cases.md`](../principles/fail-fast.cases.md)'s "A checker written to catch silent fallback acquired three instances of it" needed adversarial execution to close (rampp#169);
+and the review emits no machine-readable verdict block at all, which is the *capability* half of a rule already stated: [`fully-clean`](fully-clean.md)'s "A later comment stating no verdict does not supersede an earlier one" tells a reader what to do about it, and assumes some review eventually states one.
+Where a workflow structurally never does, that rule's remedy has nothing to land on, and the first review's inferred impression stands permanently (rampp#172;
+[`review-verdict-pitfalls.md`](review-verdict-pitfalls.md) carries the general shape).
+None of the three is a quota-skip, a stub, a missing workflow, or a bad credential --- the workflow ran, completed, and posted prose that reads as a real review each time.
+
+- **Do:** before trusting a review workflow's verdicts on a repo you have not reviewed before, check what it actually installs (which plugin/marketplace, whether the repo's own `CLAUDE.md`/standards doc is present) and what it can execute (can the job run the language under test, or only read it).
+- **Do:** file each capability gap as its own issue once found, rather than folding it into a one-off note about that PR --- a missing `CLAUDE.md` install or a can't-execute-R limitation is a standing property of the repo's review setup, not of the PR that happened to expose it.
+- **Don't:** read a review's confident, on-topic prose as evidence it observed everything the verdict claims --- a reviewer with no execution access can still write "I traced this by hand" and be right about the trace and wrong about what the trace could catch.
+- **Don't:** treat a capability gap as the same finding as a quota-skip or stub --- a capability-limited review still needs the ARD treatment (address/rebut/defer) and possibly a fallback self-review for the parts it structurally cannot cover, not just a re-run.
+
 **Post the self-review before doing anything else --- don't stall the PR waiting for the bot.
 Then, before writing the check off as permanently broken, try one manual re-run of the failed job --- even after the workflow's own built-in same-run retry (e.g. gha#185's stub-retry) also stubbed.**
+That is scoped to a reviewer that was meant to run and failed.
+It does not reach the deliberately-on-request case above, where the remedy is to post the request rather than to substitute for it.
 Two stubs back to back is a stronger signal than one, but it's still not conclusive: a separately-triggered re-run (`rerun_failed_jobs` via the GitHub Actions API/MCP tool, not just re-reading the same run) is an independent LLM invocation, and the failure modes behind stubs (permission-denial spirals, timing) don't always repeat.
 If the check is a **required** one, spend the one manual re-run before reporting the workflow as broken for that PR.
 

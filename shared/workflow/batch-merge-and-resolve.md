@@ -679,6 +679,71 @@ Note that `git show :<path>` reads stage 0, which holds *your* staged content
 once you have staged anything, so it is a record of what you did rather than of
 what git computed.
 
+**The conflict stages exist only for a CONFLICTED path, so the count-delta instrument above cannot read its inputs that way for a file git merged cleanly.**
+This is the trap the two sections meet in.
+The count delta is prescribed for exactly the silent, cleanly-resolved loss that has nothing red to point at, and the stage refs are the obvious place to get its three inputs --- but a path git resolved on its own has no stage 1, 2 or 3 at all.
+
+**Git says so, loudly, and the check is what throws the message away.**
+This is the part worth getting right, because the obvious reading blames the wrong component.
+`git show :1:path/to/file.md` on such a path exits **128** and prints:
+
+```text
+fatal: path 'path/to/file.md' is in the index, but not at stage 1
+hint: Did you mean ':0:path/to/file.md'?
+```
+
+Nothing about that is quiet.
+What silences it is the counter wrapped around it: the fatal goes to **stderr**, a `2>/dev/null` in the helper discards it outright, and without `pipefail` the pipeline reports `grep`'s status rather than `git show`'s.
+So the diagnostic is destroyed by the measurement, which is [`fail-fast`](../principles/fail-fast.md)'s no-silent-failures rule pointed at one's own instrument rather than at the code under test.
+Measured 2026-09-08 while syncing a PR: a `## ` heading count over a cleanly auto-merged `CLAUDE.md` came back `base=0 ours=0 theirs=0 merged=136`, which reads as catastrophic loss and is a count of nothing at all --- and the helper that produced it carried exactly that `2>/dev/null`.
+The absurdity is what caught it;
+a subtler file would have produced a wrong number that looked ordinary.
+
+Take the three inputs from the COMMITS instead, which works whether or not the path conflicted:
+
+```bash
+FILE=path/to/file.md                     # the merged path being counted
+
+# While the merge is still UNCOMMITTED, MERGE_HEAD names theirs.
+BASE=$(git merge-base HEAD MERGE_HEAD)
+THEIRS=MERGE_HEAD
+
+# Once the merge has COMMITTED, MERGE_HEAD is gone -- see below.
+# BASE=$(git merge-base 'HEAD^1' 'HEAD^2'); THEIRS='HEAD^2'; OURS='HEAD^1'
+
+cnt() { git show "$1:$FILE" | grep -c '^## '; }   # no 2>/dev/null: let it fail loudly
+echo "base=$(cnt "$BASE") ours=$(cnt HEAD) theirs=$(cnt "$THEIRS") merged=$(grep -c '^## ' "$FILE")"
+```
+
+Define `FILE` before running it.
+An unset one is not an error you will see: `git show "HEAD:"` succeeds, prints a **tree listing**, and `grep -c` returns 0 for every call --- reproducing the very row of zeroes this passage exists to warn about, from the snippet meant to cure it.
+
+**`MERGE_HEAD` exists only while the merge is uncommitted, which is narrower than it sounds.**
+A merge with no conflict ANYWHERE commits itself immediately and deletes the ref, so `git merge-base HEAD MERGE_HEAD` then fails with `fatal: Not a valid object name MERGE_HEAD`.
+The mid-merge form therefore applies when some OTHER path in the same merge conflicted and is holding the merge open --- which is the common case for this instrument, since you are usually here resolving a batch.
+After the merge commits, the merge commit's own parents carry the same information: `HEAD^1` is ours, `HEAD^2` is theirs, and their merge-base is the base.
+Both forms are in the snippet above.
+
+Pair the count with a set difference, which localizes what a bare count cannot: every heading present in ours or theirs must appear in the merged file.
+A count delta and a set difference fail on different things --- a count survives one line dropped and one added, and the set difference names which line went.
+
+- **Do:** take the count-delta inputs from the commits --- `merge-base`/`HEAD`/`MERGE_HEAD` mid-merge, or `HEAD^1`/`HEAD^2` once it has committed.
+- **Do:** let `git show` fail loudly in a measuring helper, rather than wrapping it in `2>/dev/null`.
+- **Do:** run a set difference beside the count, so a dropped entry is named rather than merely implied.
+- **Don't:** read a zero from a stage ref as a measurement --- on a cleanly-merged path the stage does not exist, and git said so on stderr.
+- **Don't:** leave the path variable unset --- `git show "<rev>:"` lists a tree instead of failing, so every count silently returns zero.
+
+**A GENERATED file in a conflict is regenerated, never merged.**
+Resolving it by hand is doing by eye what a generator already computes, and the hand result is only accidentally right.
+The tell is a mirror pair whose two halves are edited together in every commit;
+the repository usually ships both the generator and a `--check` mode that CI runs, so the correct resolution is to fix the canonical file, run the generator, and let `--check` confirm.
+Measured 2026-09-08: `skills/ai-config-hooks/hooks/hooks.json` is `scripts/gen-hooks-plugin.py`'s output, and a conflict there was hand-resolved before the file was recognized as generated.
+The hand-merge happened to match the generator byte for byte, which is the point --- nothing in the diff, the tests, or the review would have said otherwise had it not.
+
+- **Do:** ask whether a conflicted file is generated before resolving it, and regenerate rather than merge when it is.
+- **Do:** run the generator's `--check` mode afterwards, since that is the check CI runs.
+- **Don't:** treat a hand-merge that agrees with the generator as evidence the hand-merge was sound --- agreement was luck, and the next one is not owed it.
+
 **A wholesale restore also reinstates every claim the file made at the old
 commit**, and those claims are stale by construction, since something about
 the file changed in between or you would not be restoring it.
@@ -732,6 +797,98 @@ is empty, so it was corrected inside the merge itself.
 `65b538bd6` is on `main`; `9ccf8dbc3`, `ca9d31bbe`, `e89ee1e9d` and
 `b7e4b8d32` are pre-squash and reachable only from `refs/pull/3180/head`, so
 fetch that ref before running `git show` or `git log` on them.)
+
+## A scripted resolver rebuilds from the parents, and the batch multiplies its bug
+
+The section above governs a recovery you write by hand, once.
+Its scripted cousin arrives from the batch pass itself: when every PR in the
+queue appends to one shared file, each pair collides there, the resolution is
+always "keep both", and something that mechanical asks to be automated.
+
+Two ways to automate it, and only one is sound.
+
+**Parsing the conflict markers reconstructs the file from the hunks.**
+That is authorship rather than resolution, and it loses whatever lies between
+the hunks: the separators between records are *context*, not conflicted
+content, so a re-emitter that joins records with a single newline deletes every
+blank line in the file while reporting that it kept both sides.
+A record-matching regex can also stop short on the last entry, truncating it.
+Neither shows up as a lost record, which is the only loss such a script is
+usually written to guard against.
+
+**Rebuilding from the two parent versions cannot do either**, because both
+inputs are complete, well-formed files rather than fragments.
+While the path is conflicted the index holds them --- `:2:` ours, `:3:` theirs,
+`:1:` the base, as the section above sets out --- so the resolver's whole job
+is a union by record key over two parsed files, emitted in the base side's own
+order and formatting:
+
+```bash
+git show :3:references.bib > theirs.bib   # the base side, formatting to preserve
+git show :2:references.bib > ours.bib
+# then: parse both, emit theirs entries in their own order, append ours
+# whose keys are absent, and fail loudly on a key present in both with
+# differing bodies.
+```
+
+The union step itself is repo-specific, since only the consuming repo knows
+what a record is, so it belongs in that repo's `scripts/` rather than here.
+
+**Then validate with the consumer, not with a diff.**
+A resolved file is an artifact some tool parses, and that tool is the only
+instrument that sees a malformed record:
+
+```bash
+printf 'x [@some_key]
+' > /tmp/cite.md
+pandoc --citeproc -t plain -o /dev/null --bibliography references.bib /tmp/cite.md
+```
+
+The diff check that feels equivalent is not.
+`git diff origin/main -- <file> | grep -c '^-[^-]'` counts removed **non-blank**
+lines, so a resolver that deleted every separator scores zero on it ---
+[`sync-with-main`](sync-with-main.md)'s deleted-line blindness, arriving through
+the pattern rather than through the check's scope.
+Tightening the pattern does not fix it: `'^-[^-]*$'` misses any removed line
+carrying a hyphen after its first character, which in a Markdown corpus is
+most bullet lines.
+Ask git for the number instead, which counts every removed line and needs no
+pattern at all:
+
+```bash
+git diff --numstat origin/main -- <file>   # added <TAB> deleted <TAB> path
+```
+
+**Validate on one branch, and let its CI finish, before fanning the resolver
+out.**
+This is what distinguishes the scripted case from the hand-written one.
+A hand recovery damages the branch you are on; a resolver applied across the
+queue damages every branch at once, and the batch pass is precisely the context
+that invites applying it that way.
+
+- **Do:** union the two parent versions by record key, keeping the base side's
+  formatting.
+- **Do:** run the artifact's own parser over the result before committing.
+- **Do:** push one resolved branch, wait for its build, and only then run the
+  resolver across the rest.
+- **Don't:** reconstruct a file from conflict markers --- the separators
+  between records are context, so they vanish with nothing to report them.
+- **Don't:** accept `grep '^-[^-]'` as proof nothing was removed; it excludes
+  exactly the blank lines this bug deletes, and no tightening of the pattern
+  is as reliable as `git diff --numstat`.
+
+(Morrison-Lab/wai, 2026-09-10.
+Twenty-three open PRs each appended entries to one `references.bib`.
+A pairwise sweep scored all 253 pairs and found 231 of them colliding in that
+file; the 22 that did not are exactly the pairs formed by the single PR that
+touched the bibliography not at all.
+A marker-parsing resolver was then fanned across the 21 branches that needed
+a sync: it joined entries with a single newline and truncated one, pandoc
+refused the file, and the `build` check went red on all twenty-one branches
+in the same push.
+The `^-[^-]` check had reported zero removals against 35 deleted blank lines.
+The repair was a union over `:2:`/`:3:` validated by a real citation render.
+Tracked as Morrison-Lab/wai#236.)
 
 ## The batch pass
 

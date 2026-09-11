@@ -321,8 +321,7 @@ rounds should change, and the loop keeps running either way.
 So the deliverable is a changed procedure, never a stop, and never a sentence
 ending "shall we accept the current state?".
 
-"Reflect on the process" decides nothing on its own, so examine three specific
-things:
+"Reflect on the process" decides nothing on its own, so examine four specific things:
 
 - **The local checks.**
   The self-apply-your-conventions rule directly above already requires running
@@ -365,6 +364,15 @@ things:
   at `claude`, so name an engine rather than invoking it unqualified;
   [`adv`](../../skills/adv/SKILL.md) already names one:
   `--engine alternate --exclude-engine "$AGENT_NAME"`.
+- **The remit, when the diff is prose.**
+  On a prose change, some finding classes are exhaustible (a factual error, an internal contradiction, an instruction that cannot be followed as written) and some are not (style preference, further trimming, one more caveat).
+  The other two remedies fix a reviewer that is missing something;
+  this one fixes a reviewer that is finding something real and unbounded, which neither a local check nor a cross-family round changes --- a different, independent reviewer still has a style opinion and a caveat to add.
+  Addressing every round's findings looks like progress and is not: rounds 1-5 of the source measurement each returned a comparable count (5, 4, 6, 3, 6) with every finding addressed, because the inexhaustible classes regenerate at whatever rate the reviewer is allowed to report them.
+  Narrow the brief to the exhaustible classes only, tell the reviewer explicitly not to report style preference, further trimming, or additional caveats, and to return clean if only those remain.
+  The narrowed round on that same PR returned 0 findings.
+  [`adversarial-self-review`](adversarial-self-review.md) states a rule with no such round-count condition: "Brief the reviewer to report every finding in one round, style findings included", and the bullet "**Don't:** brief the reviewer to leave style findings for a later pass".
+  This remedy overrides that rule, deliberately and only, once a diff has already reached three finding-bearing rounds and the remaining classes have proven inexhaustible round over round --- narrow the remit there even though the general rule says not to.
 
 Read the three rounds' findings together rather than round by round, because
 the classes are the evidence and no single round carries them.
@@ -385,9 +393,12 @@ Three rounds of unrelated classes point at the approach instead.
 - **Do:** at that round, escalate the *independence* of the pre-push review
   already required below, dispatching a different model family through a CLI
   rather than repeating the same-family pass.
+- **Do:** on a prose diff, narrow a later round's brief to exhaustible finding classes and tell the reviewer plainly to withhold style preference, further trimming, and additional caveats.
 - **Don't:** turn the count into a question to the user about whether to
   accept unaddressed findings --- that is the stopping guard, and it is still
   banned.
+- **Don't:** read a shrinking finding count across rounds 1-5 as convergence on a prose diff when the remit was never narrowed;
+  a comparable count next round is the more likely reading while style, trimming, and caveat findings remain in scope.
 - **Don't:** read the cross-family round as where local review begins;
   [`adversarial-self-review`](adversarial-self-review.md) requires a local pass
   on every push, from the first.
@@ -401,11 +412,19 @@ we're doing something wrong", asking whether more local checks belong before
 the push, whether the whole approach is wrong, and whether cheap or free
 models run through CLIs could give a rough preliminary review before a more
 expensive forge review.
-Tracked as ai-config#3110.)
+Tracked as ai-config#3110.
+
+Measured 2026-09-10 on [PR #3536](https://github.com/Morrison-Lab/ai-config/pull/3536), a roughly 30-line memory entry: six adversarial-reviewer rounds, findings 5, 4, 6, 3, 6, 0.
+Rounds 1-4 each had every finding addressed and the next round found a comparable number again, catching real defects along the way (a false framing claim, an unfollowable `git worktree list` instruction, a timezone mismatch);
+round 5's findings were stale counts, a reused noun phrase, and requests for more caveats, yet the pattern still held through that round -- every finding addressed, no narrowing applied.
+Round 6's brief was the only one that named the remit above, and it returned 0 findings and a clean verdict on the same commit shape round 5 had returned 6 findings against.)
 
 ### Pre-push checklist
 
 **Pause point: after committing, before `git push`.**
+
+Run `python3 scripts/run-local-validation.py --changed` to execute the local checks derived from CI.
+Run `python3 scripts/run-local-validation.py --changed --list` to see them without execution.
 
 - [ ] **A separate `adversarial-reviewer` subagent reviewed this diff and returned a clean verdict** --- dispatched in the foreground against `git diff origin/<default-branch>...HEAD`, briefed with the standards rather than with your rationale for the change, with every finding Addressed, Rebutted, or Deferred to a tracked issue, and re-dispatched after the last commit so its `Reviewed-Commit:` fingerprint names the commits the push would ship ([`adversarial-self-review`](adversarial-self-review.md)).
   An inline pass under a reviewer framing does not satisfy this, and reads identically in the output --- the test is whether an `Agent` call was made.
@@ -736,6 +755,102 @@ measurement is a function of the tree rather than the commit.
 [`dont-incur-technical-debt`](../principles/dont-incur-technical-debt.md)'s
 "The one exception" section carries that mechanic, and the deferral it licenses.
 
+**A verification transcript carries the table's staleness defect in a form
+that resists its own remedy, because there is no count in it to re-derive.**
+
+A table's figures are wrong or stale; a pasted block of live command output
+--- a redirect trace, a curl response, a rendered page's contents --- makes the
+same claim about a **behavior or configuration** instead of a number, and it
+goes stale the identical way: honestly captured against a diff that a later
+round then changes underneath it.
+"Re-derive every count" has nothing to act on here.
+The only check is to re-run the exact command the transcript shows and
+compare its current output against what is printed.
+
+That absence of a re-derivable number is also what makes a transcript
+outlive a table's own staleness.
+Its evidentiary weight comes from being real output rather than an assertion,
+so it reads as **more** rigorous than an unverified claim would --- and that
+is exactly what suppresses the impulse to re-run it.
+A reader has less reason to doubt genuine command output than a bare
+sentence, so the artifact that most needs re-running is the one least likely
+to get it.
+
+- **Do:** treat a pasted command-output block in a PR body as a claim with the
+  same shelf life as a count, and re-run the exact command at push time before
+  reporting the PR ready.
+- **Do:** read a later round that changes the config, file, or behavior a
+  transcript demonstrates as invalidating that transcript, even when the
+  round's own findings have nothing to do with it.
+- **Don't:** let a transcript's realism substitute for re-running it --- the
+  same honesty that made it true when captured is what makes a reader trust it
+  after it stops being true.
+- **Don't:** assume an unverified prose claim is the riskier artifact in a
+  body; a measured transcript decays identically and reads as more
+  trustworthy while doing it.
+
+Whether this is mechanizable splits in two.
+The general case --- does a body's transcript still describe the diff's
+current behavior --- is not lexically decidable: answering it means re-running
+arbitrary shown commands and judging the output semantically, which is a
+job for a reader rather than a pattern match.
+A narrower slice is decidable as a **flag**, not a verifier: a PR body
+containing a fenced block shaped like command output, on a PR whose
+config-shaped paths changed in a commit after the body was last edited.
+That reaches the shape of this case without executing anything the body
+contains, which running the transcript's own command would require.
+No such check exists yet; naming the boundary here is the record of that gap,
+per `gha`'s CLAUDE.md precedent that a judgment not to mechanize belongs in
+the corpus as plainly as a mechanism does.
+
+See [`ardi.cases.md`](ardi.cases.md), "A verification transcript in the PR
+body outlived the config it demonstrated".
+
+**A body sentence narrating what the diff does is the third member of that
+family, and a user asking you to REMOVE something is the moment it goes
+false.**
+
+The two entries above cover figures and pasted output, artifacts that read as
+evidence, which is what makes their staleness worth naming.
+A plain sentence --- "I added a short note recording what the engine does" ---
+carries no count to re-derive and no command to re-run, so neither remedy
+reaches it, and it is the commonest thing a PR body contains.
+
+The trigger is what earns it its own entry.
+Every other staleness in this family arrives through a *round*: a finding
+addressed, a fix that moves what an earlier round measured.
+The impulse to re-read the body rides along with the review loop, because the
+loop is what changed the diff.
+A user instruction to drop, hold, or defer content arrives from outside that
+loop.
+Removing the content *is* the whole task as stated, the commit lands, the
+reply reports it, and nothing in that sequence passes near the body.
+So the body goes on describing an addition the diff no longer makes.
+A reviewer reads that first-person sentence as a claim about the current diff
+rather than as an account of an earlier head.
+
+The same paragraph usually carries a second stale artifact, and it is the
+worse of the two: the **offer** that invited the instruction.
+"If you would rather that note not appear, say so and I will drop it" is a
+question the user has already answered, and a reviewer cannot tell that from
+the body --- it reads as an open decision the PR is waiting on, which is the
+exact inverse of the truth.
+
+- **Do:** edit the PR body in the same push that removes content at a user's
+  request, so it says what the diff does now rather than what an earlier head
+  did.
+- **Do:** delete the offer that prompted the instruction, since an answered
+  offer left standing reads as an open question.
+- **Don't:** treat the removal commit and the chat reply as having discharged
+  the request --- the body is a third artifact, and nothing in the request
+  names it.
+- **Don't:** wait for the next round to catch it: the reviewer reads the body
+  before producing findings, so a stale body shapes that round rather than
+  being corrected by it.
+
+See [`ardi.cases.md`](ardi.cases.md), "A PR body still claiming an addition
+the user had asked to withdraw".
+
 **The read side of that comparison can lag a push by a few seconds, so test
 the two *local* refs against each other before concluding anything failed.**
 
@@ -842,6 +957,25 @@ will actually use it.**
 
 See [`ardi.cases.md`](ardi.cases.md), "Validating against a real consumer repo
 covers what fixtures cannot".
+
+**A defect can live in the SEAM between two files, where neither file's own suite can see it --- one script decides what gets posted, a second classifies what it receives, and each can be fully covered while the pair is wrong.**
+The producer's suite asserts what it emits;
+the consumer's suite classifies inputs it is handed by hand.
+Neither one ever hands the consumer the producer's actual output, so a change that widens what the producer can now emit --- a second statement in one posted body, an added field, a longer array --- is invisible to both suites at once: the producer's tests never classify, and the consumer's tests never see the new shape, because nobody wrote a case for it there either.
+
+This is not the general "test the integration, not just the units" advice.
+It is a *specific* tell: the change under review touches file A, file A's own tests stay green, and the actual defect is a decision file B already made under an assumption file A's change just broke.
+Reviewing file A's diff in isolation cannot find it, because file A is correct on its own terms.
+
+- **Do:** when a change widens what a producer emits, ask what reads that output and add a case there feeding it the new shape --- not just a case in the producer's own suite asserting the new shape gets emitted.
+- **Do:** where the seam is exercised at all, prefer a test that runs both scripts in sequence (or classifies the producer's real fixtures) over one that hand-writes an input to the consumer, since a hand-written input encodes the same assumption the defect broke.
+- **Don't:** treat "both files have green suites" as evidence the pair is correct --- that is exactly the state a seam defect leaves behind.
+- **Don't:** stop at asserting the new output shape in the producer's tests;
+  that confirms emission, not that anything downstream handles it.
+
+(Measured 2026-09-11, `Morrison-Lab/gha#857`: a span-selection script was changed to keep a corrected review's tail alongside the review it corrects, so a single posted comment could now carry two verdict statements.
+The classifier script that reads the posted comment picks its last match over a payload marker, which is correct for the one-statement case it was written against and wrong the moment two statements can coexist.
+Both suites were green --- the span suite asserts what gets posted, the classifier suite feeds it hand-written bodies that never carried two statements --- and the fix that closed the gap was a cross-script test that classifies each producer fixture's actual posted text.)
 
 **Verify a blocker you assert in a PR body or a reply, with the same rigor
 you apply to a reviewer's claims --- a stated blocker becomes a premise

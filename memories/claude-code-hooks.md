@@ -397,6 +397,63 @@ To keep warnings legible and avoid visual clutter:
 - **Remote / web session boundary**: In remote/web cloud sessions (such as `claude.ai/code`), plugin `Stop` hooks may not be dispatched by the cloud container across turn completions or context summarizations (ai-config#2943).
   Do not treat local `Stop` hook enforcement as an active safety net in remote web sessions --- follow instruction rules like "Always produce a reply" directly in model reasoning.
 
+## In a remote session the corpus's prose loads and NONE of its hooks exist
+
+The bullet above says plugin `Stop` hooks "may not be dispatched" in a
+remote/web session.
+Measured 2026-09-08 in a Claude Code remote container, the situation is both
+simpler and worse: **no plugin is installed at all**, so no hook of any event
+type is present to dispatch.
+
+```bash
+cat ~/.claude/plugins/installed_plugins.json   # -> {"version": 2, "plugins": {}}
+ls ~/.claude/hooks/                            # -> no such directory
+find ~/.claude -name hooks.json                # -> nothing
+ls /home/user/ai-config/hooks/*.py | wc -l     # -> 123
+```
+
+So all 123 hooks in the checkout are inert, for `PreToolUse` and
+`UserPromptSubmit` as much as for `Stop`.
+The only hooks that run are the harness's own, which in that container were
+`stop-hook-git-check.sh`, `stop-hook-reply-gate.py` and
+`user-prompt-submit-reply-reminder.py`.
+
+**The trap is that the corpus still feels fully present, because its prose
+is.**
+`CLAUDE.md` and every `@`-imported fragment load normally --- not through the
+plugin, but because the repository is checked out as a session source and read
+as project instructions.
+So a rule arrives complete, *including the sentence naming the hook that
+enforces it*, while that hook does not exist.
+Reading "two hooks are this rule's mechanism" is then actively misleading: it
+reads as an assurance that a mistake would be caught, at the one moment
+nothing is watching.
+
+That inverts the usual risk.
+A rule with no mechanism at least reads as unenforced.
+A rule that *documents* its mechanism reads as enforced, so the reader relaxes
+exactly where the guard is absent --- and remote sessions are where the long,
+many-wake, easily-drifting work happens.
+
+**Measured consequence, same session.**
+`CLAUDE.md`'s "Timestamp recaps in local time" section was loaded, had been
+read, and names `hooks/no-unmeasured-clock-claim.py` as its `Stop`-time guard.
+Five consecutive status recaps were stamped 18:04, 18:11, 18:37, 18:51 and
+19:05 PDT, every one inferred from elapsed work rather than measured.
+The next real clock read returned **17:58 PDT** --- the last genuine reading
+having been 17:47.
+Nothing warned, because nothing could.
+
+- **Do:** verify hook presence before relying on any rule whose stated
+  mechanism is a hook, with the four commands above.
+- **Do:** run the rules that name hooks by hand in a remote session, the clock
+  read especially, and treat every documented mechanism as absent until shown
+  otherwise.
+- **Don't:** read a rule's "this hook enforces it" sentence as evidence the
+  hook is running here.
+- **Don't:** scope this to `Stop` hooks, or to dispatch --- the failure is
+  presence, and it covers every event.
+
 ## A non-blocking hook must write `additionalContext` on stdout, not stderr
 
 A hook that exits 0 and prints its warning to stderr is a no-op.

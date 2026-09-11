@@ -70,7 +70,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 | [`warn-nonglobal-substitution.py`](../hooks/warn-nonglobal-substitution.py) | Warn | Warns on in-place `perl -i` / `sed -i` substitutions lacking the global `g` flag or occurrence specifier. | Ensure substitution expressions include `g` (e.g. `s/pattern/replacement/g`) when replacing across files. | None. |
 | [`warn-dupe-check-chained-to-create.py`](../hooks/warn-dupe-check-chained-to-create.py) | Warn | Warns when a duplicate search and a `gh pr create` / `gh issue create` share the same Bash command string. | Execute the search command first, inspect the results, and then execute the create command in a separate, subsequent tool call. | None. |
 | [`warn-status-read-after-pipe.py`](../hooks/warn-status-read-after-pipe.py) | Warn | Warns when checking `$?` immediately after a pipeline without `pipefail` enabled. | Add `set -o pipefail` before executing pipelines whose non-tail exit status must be checked, or use `$PIPESTATUS`. | None. |
-| [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py) | **Block** | Blocks `git push` unless an adversarial self-review subagent produced a clean verdict for the exact commit being pushed. | Dispatch the `adversarial-reviewer` subagent against `HEAD`, address any findings, and obtain a clean verdict matching `Reviewed-Commit: <HEAD_SHA>` before pushing. | Set `ALLOW_UNREVIEWED_PUSH=1 git push ...` for initial empty PR branches, external CLI reviews, or unregistered personas. |
+| [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py) | **Block** | Blocks `git push` unless a clean verdict for the exact commit being pushed came from an adversarial self-review subagent or from a review by a CLI the guard recognizes (today `agy --print`, and no other). | Dispatch the `adversarial-reviewer` subagent against `HEAD`, address any findings, and obtain a clean verdict matching `Reviewed-Commit: <HEAD_SHA>` before pushing. | Set `ALLOW_UNREVIEWED_PUSH=1 git push ...` for initial empty PR branches, a review by a CLI the guard does not recognize, or unregistered personas. An `agy --print` review needs no override: the guard admits it directly. |
 | [`flag-uncited-rebuttal.py`](../hooks/flag-uncited-rebuttal.py) | Warn | Warns when posting a comment disputing a finding that cites an external URL when no `WebFetch` or `WebSearch` fetched that URL. | Fetch and inspect the external URL cited by the reviewer before posting a rebuttal comment. | None. |
 | [`require-agent-disclosure.py`](../hooks/require-agent-disclosure.py) | Warn | Warns when posting a forge comment lacking the agent disclosure trailer. | Append `\n\n_Posted by <Agent Name> (AI agent) --- not written by a human._` to every posted comment. Never use the robot emoji. | None. |
 | [`flag-uncounted-comment-claims.py`](../hooks/flag-uncounted-comment-claims.py) | Warn | Warns when a forge comment asserts file counts or lists identifiers without a deriving command. | Run deriving commands (`grep -c`, `wc -l`, `ls`, etc.) in the session and cite the deriving command when stating cardinality. | None. |
@@ -292,3 +292,76 @@ When authoring a new hook:
    python3 scripts/check-hook-output-shape.py
    python3 scripts/test_hooks.py
    ```
+
+## 5.5 A hook test that invokes the real hook is not hermetic against live git state
+
+A test that runs the real script as a subprocess is the right design for testing what the hook actually emits --- but when the hook branches on live repository state (current branch, dirty/unpushed status), a fixture covering only one branch of that decision fails, in its ordinary and correct way, the moment the checkout is on the other branch.
+The defect sits in the *shared* dry-run suite rather than in the per-hook file: `test_flag_unassigned_worktree` lives at `scripts/test_pretooluse_dry_run.py:179`, which invokes each hook once against whatever checkout it happens to run in.
+The dedicated `hooks/test-flag-unassigned-worktree.py` is not the offender --- it already builds scratch repos with a real `origin`, branch, and dirty/clean state, which is exactly the hermetic construction this section argues for.
+This is not a flake: it is the hook doing exactly what it was written to do, against a checkout the test never controlled.
+
+`flag-unassigned-worktree.py` warns on a default-branch, clean checkout and denies on a non-default-branch checkout carrying uncommitted or unpushed work.
+Its test asserted only the warn shape (`additionalContext` present).
+Run from an ordinary feature-branch worktree with committed-but-unpushed work --- the normal state of any active PR-development worktree in this repo --- the hook correctly returns `deny`, and the test correctly fails, reading exactly like a regression.
+
+**When a test like this fails, the first question is not "is the test wrong" but "which of two different things happened": did a concurrent edit change the git state mid-run, or does the test's fixture simply not cover the branch the checkout happens to be on right now?**
+Both produce the identical failure text pattern, so the failure alone cannot distinguish them.
+
+The discriminator is a run on a quiet, committed tree: `git status --short` empty, no other process touching the worktree, verified immediately before the run.
+A failure that disappears there was contamination from concurrent editing.
+A failure that survives it is not --- it is a real gap in what the test covers, however plausible "just contamination, re-run it" sounds when several worktrees are active at once and re-running is the path of least resistance.
+
+- **Do:** mock or explicitly construct the git-state precondition (branch name, dirty/unpushed status) for each branch of a hook's own decision, rather than asserting against whatever the ambient checkout happens to be.
+- **Do:** before dismissing a live-git-state test failure as contamination, commit and stop editing, then re-run once on that quiet tree --- a failure that survives is real.
+- **Don't:** read "several worktrees were active" as sufficient explanation for a test failure without the quiet-tree re-run;
+  that reasoning explains away a real defect exactly as easily as a contaminated one.
+- **Don't:** write a test for a git-state-branching hook that exercises only the branch whichever checkout you happened to test from was on.
+
+(Measured 2026-09-09 on `Morrison-Lab/ai-config` PR #3426's worktree: three consecutive `run-local-validation.py` runs hit `test_flag_unassigned_worktree`'s failure.
+The natural reading was contamination from the several worktrees active at once, and [ai-config#3431](https://github.com/Morrison-Lab/ai-config/issues/3431) rules that out for all three: the failure text varied only between "uncommitted tracked changes" and "unpushed commits", tracking whichever pending-work condition held at that moment, and "both are real, live facts about the checkout, not stale or racing state."
+Every run was `flag-unassigned-worktree.py` correctly returning `deny` against a fixture that only ever constructed the `warn` case.
+The quiet-tree run is what makes that distinguishable: without a control run on a committed, unedited tree, "several worktrees were active" explains a real defect exactly as comfortably as a contaminated one.)
+
+## 6. A guard that keeps firing after you satisfied it: stop, and read the copy that runs
+
+[`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md) already carries this defect in full --- the fail-open direction of a dated constant, why the newest cache directory is not a valid proxy for the loaded copy, and the `ps -eo args` capture that resolved it.
+Read that section for the mechanism;
+this one adds only what a second occurrence measured.
+
+Confirmed again 2026-09-07, and it is the same artifact that fragment names:
+
+```
+.../local-agent-mode-sessions/<s>/<s>/rpm/plugin_<id>/hooks/no-unreviewed-pr.py
+    MORATORIUM_END = 2026-09-01   mtime Sep  1 22:42
+```
+
+one such file across the tree, while the repo, the marketplace clone and `~/.claude/hooks` all carry `2026-12-01`.
+Derive the cache split rather than citing a remembered number, since the classes are three and not two:
+
+```bash
+cd ~/.claude/plugins/cache/<marketplace>/<plugin>
+for f in */hooks/no-unreviewed-pr.py; do
+  grep -q "2026, 12, 1" "$f" && echo new \
+    || { grep -q "2026, 9, 1" "$f" && echo old || echo no-constant; }
+done | sort | uniq -c
+```
+
+Here that gave 3 new, 5 old and 1 carrying no `MORATORIUM_END` at all --- and a first pass that branched on the new date alone scored the constant-less copy as old, reporting 6.
+Several directories sharing a value is exactly why that fragment rules the newest-directory proxy out.
+
+**The increment: the demanded action was not free, and not idempotent.**
+`no-unreviewed-pr.py` fired four times, each firing naming one to three PRs, and each was satisfied with the prescribed command and verified landing at the current head.
+Four firings is therefore ten REQUESTS, not four: the guard names every PR still outstanding on each firing, so the cost per firing grows with the number of PRs open.
+The ten resolve as 4 requests on one PR and 3 on each of two others, matching the review counts observed (4, 3 and 3).
+Ten requests later the account-level Copilot quota was exhausted and every resulting review read `Copilot was unable to review this pull request because the user ... has reached their quota limit` --- a skip notice, which [`mwc`](../skills/mwc/SKILL.md)'s Scope Limit says clears nothing.
+So all ten spent a shared quota and moved no PR toward merge.
+
+That is what makes repeating a demand costly rather than merely tedious, and it is the reason to break the loop at the first satisfied-and-verified attempt rather than the fourth.
+
+- **Do:** after satisfying a guard's demand ONCE and verifying the result, read a repeated demand as evidence about the guard, not about your compliance.
+- **Do:** resolve the loaded copy by the method [`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md) prescribes before concluding anything about which file is stale.
+- **Don't:** repeat a demanded action that spends a quota, a rate limit, or any outward-facing side effect, merely because the guard asked again.
+- **Don't:** infer the running hook's logic from the repo checkout, `~/.claude/hooks`, or the newest cache directory --- on a plugin install none of the three is necessarily what executes.
+
+(Tracked as [#3141](https://github.com/Morrison-Lab/ai-config/issues/3141), the original defect report;
+[#3156](https://github.com/Morrison-Lab/ai-config/issues/3156) is its corpus record and [#3185](https://github.com/Morrison-Lab/ai-config/issues/3185) a later recurrence.)

@@ -122,6 +122,16 @@ live-push tell.
 Morrison-Lab/ai-config#857 -> #872 is the *correct* same-name follow-up
 from new `main`, not a prior occurrence of this failure.
 
+A correctly-handled case, not a third occurrence of the failure.
+2026-09-09 PDT, [ai-config#3432](https://github.com/Morrison-Lab/ai-config/issues/3432) -> [#3436](https://github.com/Morrison-Lab/ai-config/pull/3436).
+A fix agent was dispatched to address a Copilot finding on [PR #3363](https://github.com/Morrison-Lab/ai-config/pull/3363),
+found that PR already merged with its branch auto-deleted,
+did not recreate the branch,
+and instead filed the issue and opened the follow-up PR as a fresh branch off `origin/<default-branch>` (`origin/main` there).
+
+- **Do:** re-home a pending fix as a new PR off `origin/<default-branch>` (`origin/main` in ai-config) once `gh pr list --state all --head <branch>` reads MERGED.
+- **Don't:** recreate the deleted branch or push the fix onto it.
+
 So `ALLOW_FORCE_PUSH=1` is a deliberate escape valve for a case this rule did not foresee, not a shortcut for a known one.
 If you reach for it, say in the same breath what the lease refused and why forcing is right --- and if the answer is `stale info`, it is not.
 
@@ -195,8 +205,14 @@ confirmed it fixed.)
 Never chain a `git commit` into a `git push` in one shell invocation:
 
 ```
-git add -A && git commit -F msg.txt && git push -u origin my-branch
+git add src/thing.py && git commit -F /path/to/session-scratchpad/msg.txt && git push -u origin my-branch
 ```
+
+The message file sits in the session scratchpad in that example for a separate reason,
+not as a stylistic choice:
+`git add -A` stages an unignored message file written inside the worktree before `git commit` reads it,
+so the file ships.
+[`memories/shell.md`](../../memories/shell.md)'s heredoc section carries that case.
 
 A `PreToolUse` guard denies the **whole invocation**, before any part of it runs.
 [`memories/claude-code-hooks.md`](../../memories/claude-code-hooks.md)'s "A hook's deny rejects the WHOLE call" section states that mechanism in general and measured it on 2026-08-17 (ai-config#1609, a `git checkout -b` lost to an unrelated deny).

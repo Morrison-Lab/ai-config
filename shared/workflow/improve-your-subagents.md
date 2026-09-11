@@ -4,6 +4,32 @@ Correcting each output as it arrives keeps the work moving and leaves the mistak
 The measured shape (2026-09-02, thirteen `agy` dispatches on one Godot repo): every one of eight extra fix rounds was an omission the brief had not named, and the one mistake the agent repeated after recording it had been recorded in a PR worktree its next dispatch never read.
 The agent was not the weak link; the briefing was.
 
+## A completion report is not evidence that every item of a multi-part brief was done
+
+Improving a subagent over time still assumes its report tells you what happened.
+It does not, for the specific and easy-to-miss case of a brief with more than one deliverable in it.
+
+[`issue-first`](issue-first.md)'s deferral section already names this failure for your own replies to the user: doing two of three requested things and describing only the two is a silent partial delivery, indistinguishable from having done all three unless the reader rereads their own original request.
+The same shape arrives from a dispatched agent, and there the orchestrator is the one who must notice it, because the agent that stopped short has no reason to flag what it never attempted.
+
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "A subagent's report arrives in the same position" section governs a related but different failure: a factual *claim* inside the report that turns out wrong when re-derived.
+This is about an item the brief asked for that the report never mentions at all --- there is no claim to fact-check, because the report simply does not address it, and a report that is silent about an item reads exactly like one where that item went smoothly.
+
+A three-part dispatch --- fix the code, fix the tests, correct a filed issue's body to match the fix --- came back describing the first two in detail and never mentioning the third.
+Nothing in the report's tone or completeness signaled an omission;
+it read as a normal, finished piece of work.
+`updated_at == created_at` on the issue, checked directly, settled it in one query: the issue had never been touched.
+
+- **Do:** before accepting a subagent's completion report, list the distinct items the brief asked for and name, for each one, the query that would show it done --- a diff touching the right file, a timestamp that moved, a comment posted.
+- **Do:** run that query for every item, not only the ones the report discusses at length.
+- **Don't:** read a report's silence about an item as evidence that item needed no separate mention because it went fine.
+- **Don't:** treat a report that is detailed and correct about two of three items as evidence about the third;
+  detail on the covered items says nothing about the uncovered one.
+
+(Measured 2026-09-09: a dispatched agent given a three-part instruction reported back on the first two parts only.
+The third --- correcting a filed issue's body --- was never done and never mentioned as skipped or deferred.
+`updated_at == created_at` on the issue via a single API read confirmed it had not been touched since filing.)
+
 ## What to change, in order of payoff
 
 **Keep a per-agent mistake ledger and prepend it to every brief.**
@@ -58,6 +84,20 @@ one concrete answer to "keep going, but change what you are asking for."
 - **Don't:** read a string of small, individually-valid findings as evidence
   the loop is converging on its own --- a trickle can be the brief's shape,
   not the diff's.
+- **Do:** phrase any named checks as *additional* to the reviewer's standing
+  checklist rather than as the checklist --- an enumerated brief reads as the
+  more rigorous one and silently replaces
+  [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md)'s own
+  step 2, so the claims you name get verified and their siblings do not.
+  (Measured on [ai-config#3481](https://github.com/Morrison-Lab/ai-config/pull/3481),
+  2026-09-09: three CI reviewer rounds, two bearing a single finding about one
+  `glab` claim while sibling claims in the same six lines sat unchecked, plus
+  local adversarial rounds countable only from the session transcript.
+  Every brief had named the claims to verify.)
+- **Don't:** hand over a bare list of things to verify.
+  A reviewer reads an enumeration as the scope of the task, so the round comes
+  back clean having checked your list and nothing else --- which is
+  indistinguishable from a round that found nothing.
 
 **Measure the agent.**
 Rounds to clean per PR, and mistakes per dispatch, by class.

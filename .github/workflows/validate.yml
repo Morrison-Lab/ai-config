@@ -28,6 +28,11 @@ jobs:
       - name: Run check-links tests
         # ai-config#2881: CommonMark autolinks and relative link verification.
         run: python3 scripts/test_check_links.py
+      - name: Run resolve-equation-anchors tests
+        # The page-side script numbers unlabeled display equations by
+        # position, so a cited `#eq-anchor-N` silently renames when an
+        # earlier equation is added. This replays that assignment.
+        run: python3 scripts/test_resolve_equation_anchors.py
       - name: Check ASCII punctuation in source files
         # ai-config#2550: ensure .py and .R source files obey the ASCII punctuation policy.
         run: python3 scripts/check-ascii-punctuation.py
@@ -91,6 +96,11 @@ jobs:
         run: python3 scripts/test_check_python_escapes.py
       - name: Run git command regex helper tests
         run: python3 scripts/test_git_cmd.py
+      - name: Run hook path resolution tests
+        # ai-config#2392: a registered hook whose script path does not resolve
+        # denies every tool call its matcher names, since python3 exits 2 and
+        # exit 2 is the PreToolUse deny signal.
+        run: python3 scripts/test_install_hooks.py
       - name: Run orchestrator tests
         # ai-config#2627: this suite existed and ran nowhere, so the
         # orchestrator's own behaviour was unpinned -- which is how a literal
@@ -123,6 +133,15 @@ jobs:
         run: python3 scripts/test_check_verdict_scan_parity.py
       - name: Run check-user-quote tests
         run: python3 scripts/test_check_user_quote.py
+      - name: Run check-ambiguous-referents tests
+        # scripts/check-ambiguous-referents.py is a candidate finder like
+        # check-user-quote.py, not a gate: "is the nearest antecedent the
+        # intended one" has no decidable condition
+        # (shared/writing/ambiguous-reference.md), so it is not run against
+        # the corpus here. Its tests do run, pinning the measured incident
+        # (a four-referent sentence) as the positive case and two
+        # single-referent sentences as negative controls.
+        run: python3 scripts/test_check_ambiguous_referents.py
       - name: Check lead-in counts against their enumerations
         # ai-config#3005. A lead-in count goes stale when a later edit splits
         # or merges one item, and a reader who counts along never reaches the
@@ -371,7 +390,7 @@ jobs:
         # An unresolved INLINE @token is reported but does not fail, since
         # most are prose -- see the script's docstring.
         run: python3 scripts/check-context-closure.py
-      - name: Report this PR's own context-closure delta (advisory)
+      - name: Report this PR's context-closure delta; gate root-file growth near the cap
         # ai-config#1373. The step above reports the closure's LEVEL against a
         # budget; this reports what THIS branch did to it. Those are different
         # questions, and only the second is attributable to an author: the
@@ -384,17 +403,65 @@ jobs:
         # about. Reporting the number where a reviewer already looks is the
         # whole intervention.
         #
-        # `|| true` is not swallowing a failure here: the script's own baseline
-        # mode never exits non-zero for a delta, so the only statuses it can
-        # return are usage errors (2) on a rev this runner cannot resolve --
-        # a shallow clone, a force-push -- which must not redden an unrelated
-        # PR. The delta itself is in the log either way.
+        # The delta stays advisory, for the reason above. What is NOT advisory
+        # is the root file's near-cap ratchet (ai-config#3367): once CLAUDE.md
+        # reaches 90% of the harness's hard 150,000-character cap, a PR may not
+        # grow it further. That fires on one file, only inside a band it is
+        # not normally in, so it does not reproduce the cry-wolf failure the
+        # paragraph above rules out -- and the cap it defends has been breached
+        # for real once already (ai-config#1258), while this step's advisory
+        # delta ran throughout and did not prevent the regrowth.
         #
-        # The base has to be fetched explicitly. `actions/checkout` above sets
-        # no `fetch-depth`, so it clones at depth 1 and `origin/<base>` does
-        # not resolve at all -- the step would print "cannot resolve" on every
-        # run and read as working. Fetching here rather than deepening the
-        # shared checkout keeps the clone cost on the one step that needs it.
+        # A blanket `|| true` cannot stay, because it would swallow that gate
+        # along with the environment errors it was added for. The exit codes
+        # already separate the two, so discriminate rather than suppress:
+        # 1 is a finding this PR owns, 2 is a rev this runner could not resolve
+        # (a shallow clone, a force-push) and must not redden an unrelated PR.
+        #
+        # `|| STATUS=$?` rather than a bare call followed by `STATUS=$?`. This
+        # step declares no `shell:` and the workflow no `defaults:`, so GitHub
+        # runs the body as `bash -e {0}` -- and `set -uo pipefail` adds to that
+        # rather than clearing errexit. A bare non-zero call therefore kills
+        # the script before the assignment, making the whole discrimination
+        # below dead code and failing the job on exactly the exit 2 the
+        # paragraph above says must not fail it. Putting the call in an `||`
+        # list also suspends errexit for it, which is the point.
+        #
+        # The ratchet is DISABLED unless the baseline is a real merge base.
+        # The tip fallback counts whatever the base gained since this branch
+        # diverged, which the comment above already concedes "reads as a
+        # shrink" -- tolerable for an advisory number, not for a gate, since a
+        # trim that merged to main after the branch diverged would be charged
+        # to this branch as growth. Near the cap main's root file can only
+        # shrink or hold, so that skew runs consistently in the failing
+        # direction. With a depth-50 fetch against a base taking tens of
+        # first-parent commits a day, the fallback is the ordinary case rather
+        # than the exception, so this is not a corner.
+        #
+        # BOTH sides have to be deepened, and the paragraph that used to sit
+        # here named only one. `actions/checkout` above sets no `fetch-depth`,
+        # so it clones at depth 1: the base does not resolve, which that
+        # paragraph caught, and THIS BRANCH has no ancestry either, which it
+        # did not. `git merge-base HEAD FETCH_HEAD` cannot succeed against a
+        # one-commit HEAD however deep the base fetch goes, so the tip
+        # fallback below was not the rare case its own comment assumed -- it
+        # was every run.
+        #
+        # Measured on run 34537469691, the first CI execution of the growth
+        # gate: "baseline: tip of origin/main (no merge base within 50
+        # commits)", on a branch whose merge base is ZERO first-parent commits
+        # back. Nothing about main's commit rate was involved. Since the tip
+        # fallback disables the ratchet (below), the gate would have reported
+        # forever and never once fired -- an instrument wired into CI and
+        # silently advisory, which is the exact failure
+        # `shared/workflow/algorithmatize-checks.md` gained a section about in
+        # this same PR.
+        #
+        # Unshallowing is cheap and bounded here: this repo is a few thousand
+        # commits of markdown, and the `new-line-breaks` job in this same file
+        # already takes `fetch-depth: 0` for the same reason, its comment
+        # making the same argument -- a shallow clone "would turn the gate
+        # vacuous without turning anything red".
         #
         # The rev used is echoed rather than assumed. A merge base is the right
         # subject (it asks what this branch added), but a bounded fetch may not
@@ -405,17 +472,37 @@ jobs:
         run: |
           set -uo pipefail
           BASE="${{ github.base_ref || github.event.repository.default_branch }}"
-          git fetch --quiet --depth=50 origin "$BASE" || true
+          # Deepen this branch first: with HEAD at depth 1 there is no
+          # ancestry for a merge base to be found in, whatever the base
+          # fetch retrieves. `--unshallow` errors on an already-complete
+          # clone, so it is guarded on the shallow marker rather than by
+          # `|| true`, which would hide a real fetch failure too.
+          if [ -f "$(git rev-parse --git-dir)/shallow" ]; then
+            git fetch --quiet --unshallow origin || true
+          fi
+          git fetch --quiet origin "$BASE" || true
+          GATE=""
           if REV="$(git merge-base HEAD FETCH_HEAD 2>/dev/null)"; then
             echo "baseline: merge base with origin/$BASE ($REV)"
           elif git rev-parse --verify --quiet FETCH_HEAD >/dev/null; then
             REV=FETCH_HEAD
-            echo "baseline: tip of origin/$BASE (no merge base within 50 commits)"
+            GATE="--no-root-growth-gate"
+            echo "::warning::context-closure baseline fell back to the tip" \
+              "of origin/$BASE (no merge base even after unshallowing), so" \
+              "the root-file growth ratchet REPORTED WITHOUT GATING here."
           else
             echo "baseline: origin/$BASE unreachable; skipping the delta report"
             exit 0
           fi
-          python3 scripts/check-context-closure.py --baseline "$REV" || true
+          STATUS=0
+          python3 scripts/check-context-closure.py --baseline "$REV" $GATE \
+            || STATUS=$?
+          if [ "$STATUS" -eq 2 ]; then
+            echo "::warning::context-closure baseline could not be measured" \
+              "(exit 2); the growth ratchet did not run on this PR."
+            exit 0
+          fi
+          exit "$STATUS"
       - name: Check for oversized memory files
         # ai-config#695, #2970: memory files are read on demand, so length is
         # a real per-use cost. Gated strictly at 1250 lines in CI so the pre-push
@@ -430,6 +517,16 @@ jobs:
         run: python3 scripts/test_check_bare_fragment_mentions.py
       - name: Run backlog-triage instrument tests
         run: python3 scripts/test_triage_backlog.py
+      - name: Run check-rendered-page tests
+        # The suite pins two decisions that a later edit would otherwise
+        # silently undo: exact class-TOKEN exclusion (substring matching
+        # swallowed a real `gt_footnotes` div), and keeping `citation` OUT of
+        # the exclusion set (Quarto puts a literal `?@fig-x` inside one, so
+        # excluding it makes the checker call a broken page clean). Neither
+        # is visible in the checker's output, only in its silence.
+        run: python3 scripts/test_check_rendered_page.py
+      - name: Run docx tracked-change checker tests
+        run: python3 scripts/test_check_docx_tracked_changes.py
       - name: Check for stale and orphaned records (advisory)
         # ai-config#1544. Non-blocking, and for two separate reasons.
         #

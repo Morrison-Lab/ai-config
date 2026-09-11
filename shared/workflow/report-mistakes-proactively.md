@@ -48,6 +48,9 @@ a product one.
    step 1's flag, or as one combined flag-plus-link message when filing is
    quick — and in a PR comment when the mistake surfaced while working a
    PR, so the record is discoverable from both sides.
+   `CLAUDE.md`'s "Link PRs in tables" section covers the mechanics for any
+   forge artifact, issues included: the link belongs in the comment itself,
+   not merely in a later chat recap the PR thread never sees.
 
 ## Filing is not gated on approval
 
@@ -76,6 +79,101 @@ It decides **where** the report lands --- a new issue, or a comment carrying
 the new evidence onto an open one --- not **whether** to make it.
 Those are different questions, and only the first has a discretionary
 answer.
+
+## How many you have already filed is not an input
+
+The section above at least asks about the finding.
+This one does not: it accepts the finding as valid, then withholds it on a
+budget the session invented.
+
+It reads as restraint rather than avoidance, which is why it survives
+self-review.
+It sounds like consideration for the tracker, for the reader's attention, for
+a maintainer who will have to triage.
+But a valid finding does not become less true because it is the ninth.
+
+**Volume is a real problem, and it is decided somewhere else.**
+[`triage-backlog`](triage-backlog.md) exists precisely as the counterweight to
+this rule, and it does not claim the cost of filing is small --- it measures
+the opposite, an open count going from 15 to 410 in six weeks with 67% of
+those issues never commented on.
+So the answer to volume is a weekly pass that assigns `P1`/`P2`/`P3` or
+closes, run by someone with the standing to decide.
+It is not a session silently raising its own bar partway through a sweep,
+which produces no triage decision and no record of the thing it declined to
+file.
+
+A high count is evidence the sweep is working, not evidence to stop.
+A session that surfaces nine defects and files eight of them has not been
+disciplined;
+it has produced an eight-item record and one thing nobody can find.
+
+- **Do:** file the ninth exactly as you filed the first, and let the count
+  land where it lands.
+- **Do:** say what the volume suggests, if it suggests something --- a
+  cluster of guard findings in one session is itself worth a filed
+  observation, which is filing more rather than less.
+- **Don't:** withhold a finding you have already judged valid because you
+  judge you have filed enough --- the count is not a criterion, and deciding
+  it is not the filer's job.
+- **Don't:** read a long list of issues from one session as a reason to
+  raise the bar partway through; the bar is whether the finding is valid.
+
+(Directive from the user, 2026-09-10 --- "it doesn't matter how many issues
+you've already filed" --- after a session that filed eight issues and then
+handed the ninth back rather than filing it.
+The withheld finding was filed as ai-config#3519 once the correction landed,
+which is the measure of what the deferral was protecting: nothing.
+Neither [`no-offer-to-file.py`](../../hooks/no-offer-to-file.py) nor
+[`no-unfiled-finding.py`](../../hooks/no-unfiled-finding.py) fired on it:
+the first wants an interrogative or a `let me know if you'd like` shape, and
+the sentence was a declarative preference;
+the second matches the artifact by name, and the sentence referred to it by
+count.
+ai-config#3520 carries the sentence verbatim and two candidate pattern
+families.)
+
+## The issue and "land it in this PR instead" are not alternatives
+
+A specific offer shape earns its own section because the false choice inside
+it is easy to miss: "I will open the issue unless you would rather it just
+land here."
+That reads as consideration for scope, not as the standalone offer the
+section above rules out, because it names a real alternative --- the work
+could genuinely land in the current PR instead of a separate one.
+
+It is a false dichotomy wearing that real alternative as cover.
+Filing the issue and landing the work in this PR are not competing
+outcomes; they compose in sequence, per
+[`avoid-false-dichotomies`](avoid-false-dichotomies.md)'s "offer composable
+options as steps with an order when they simply sequence rather than
+compete": file the issue now, and if the work then lands in the PR anyway,
+close the issue as completed once that PR merges.
+Posing them as either/or is what manufactures the exclusivity --- nothing
+about the underlying work forces the choice, and the "unless you'd rather"
+half of the sentence is already on
+[`no-cop-out-offers`](no-cop-out-offers.md)'s list of offer phrasings.
+
+- **Do:** file the issue immediately, whatever answer later arrives about
+  where the work lands.
+- **Do:** close the issue as completed when the PR that ends up containing
+  the fix merges, rather than treating the PR as having made the issue
+  unnecessary retroactively.
+- **Don't:** phrase filing as conditional on the user preferring it over
+  landing the work in the current PR --- state the filed issue as done, then
+  ask separately whether the fix belongs here or in its own PR.
+
+(User directive, 2026-09-09, verbatim: "file that issue; you should have
+filed it immediately, and then if I told you to land it in 688, you could
+have just closed the issue as completed once 688 merged.
+never hesitate to file an issue for a valid problem or extension."
+The incident: a PR comment on `UCD-SERG/serocalculator#688` closed with "I
+will open the issue unless you would rather it just land here."
+The issue was filed 11 minutes later as `UCD-SERG/serocalculator#693`, so
+step 3 above was not skipped --- but the PR thread was never told, and read
+as though nothing had been filed until corrected.
+See step 4's linking-back requirement, and `CLAUDE.md`'s "Link PRs in
+tables" section, for that second half of the same incident.)
 
 ## A gated action bundled into a discretionary one is still an offer
 
@@ -184,6 +282,89 @@ So a guard matching one instance of a class is not a guard on the class, and "th
 Widening it is tracked in [ai-config#2017](https://github.com/Morrison-Lab/ai-config/pull/2017), separately and deliberately.
 The rule above stands on its own and does not depend on the guard: a mechanized check is what makes a rule cheap to obey, never what makes it true.
 That separation is worth stating rather than leaving implicit, because the reverse reading -- that an unmechanized rule is somehow provisional -- is what turns a hard guard into a reason to stop writing the rule down.
+
+## Repeating an "unfiled" status report is not tracking, however many times it gets said
+
+The two sections above are about a message that carries an assertion --- a
+fresh claim that something is worth an issue, or a fresh deferral of the
+decision to someone else.
+This one has no assertion in it at all.
+It is a status report, said again: the same known gap, described as still
+unfiled, once more.
+
+> That set of stale equation-number comments is still unfiled.
+
+Nothing about that sentence is false.
+The gap really is unfiled, and saying so reads as diligence --- the kind of
+line a careful stopping-point recap is supposed to carry.
+That is exactly what makes it the worse failure rather than a milder one:
+each repetition puts the omission on the record again, and each repetition
+makes it feel more handled than the last, while the tracker still holds
+nothing.
+A reader scanning six such lines across six replies sees six honest
+disclosures.
+Nobody sees that the same sentence was never once acted on.
+
+The near-miss is composition-time, and it is a habit rather than a single
+bad sentence.
+Step 3 above says file it in the same stride as noticing it, and the first
+time the gap was noticed, it likely was flagged correctly.
+What repeats is not the discovery --- it is the *report of the discovery*,
+carried forward into every later stopping point as though restating the
+status were itself an update to it.
+Nothing about a repeated status line invites the question "did I ever
+actually file this", because the sentence answers a different question
+("is this still open") truthfully every time it is asked.
+
+- **Do:** file the issue the moment a known gap is about to be described as
+  unfiled again, before writing the sentence that reports it.
+- **Do:** treat a stopping-point line naming an unfiled item as the trigger
+  to file it, not as evidence that it is being tracked.
+- **Don't:** repeat an "unfiled" disclosure across replies --- repetition is
+  not tracking, and it reads as diligence while the omission persists.
+- **Don't:** defer filing because the item is small, out of scope for the
+  current task, or belongs to work still in progress; per
+  [`issue-first`](issue-first.md)'s deferral section, an out-of-scope item
+  may be deferred, but only by filing it, never by restating its status.
+
+`hooks/flag-unfiled-issue.py` is the mechanism, and it is a WARN rather than
+a BLOCK, unlike `no-unfiled-finding.py` above.
+The two hooks answer different questions.
+`no-unfiled-finding.py` matches a FORWARD assertion (`worth an issue`,
+`needs a tracking issue`) and blocks, because the message is making a fresh
+claim and nothing yet contradicts it.
+This hook matches a RETROSPECTIVE status report (`is/was still unfiled`,
+`hasn't been filed`) and warns, because whether the item should have been
+filed is not lexically decidable from the phrase alone --- the reply may be
+narrating an item already filed, or one this session cannot file into.
+The two share almost no trigger vocabulary: a message built entirely from
+this section's phrasing sails straight past `no-unfiled-finding.py`'s
+`worth`/`needs`/`deserves`/`warrants` list, which is the same "a guard
+matching one instance of a class is not a guard on the class" lesson the
+section above already draws, arrived at independently and about a
+differently-shaped near-miss.
+
+(Directive from the user, 2026-09-09, verbatim: "always file issues
+immediately; 'is still unfiled.' should be a hook trigger?"
+The incident: across roughly six consecutive replies in one session, a
+closing stopping-point line reported a known defect --- a set of stale
+equation-number comments in a C source file --- as "still unfiled".
+The rule requiring it was already loaded: this file's own procedure above,
+and CLAUDE.md's "Status requests do not make issues report-only" section,
+which says "File it before reporting it."
+The issue was filed only once the user asked for it directly, as
+[UCD-SERG/serocalculator#694](https://github.com/UCD-SERG/serocalculator/issues/694).)
+
+**The sibling case, for a memory or skill update rather than a GitHub
+issue, lives in [`no-empty-promises`](no-empty-promises.md)'s "Repeating
+the disclosure across turns is not the discharge either."**
+That section covers a stopping-point line describing a memory entry as
+"owed," where the remedy is to dispatch a subagent rather than to file an
+issue.
+The two sections share the shape --- a truthful, repeated status report that
+reads as diligence while nothing gets done --- and differ in the artifact
+and the remedy, so a recap naming both an "owed" memory entry and a "still
+unfiled" issue is caught in full only by reading both.
 
 ## Offering to hand over work you have already finished
 
@@ -337,6 +518,56 @@ See
   GitHub scope, no network path), file in the current working repo, state
   plainly which repo it really belongs to, and ask the user to transfer it
   — the same fallback the `config-ai` skill's step 3 uses.
+
+## A defect that resolved itself on a retry is still a defect
+
+The rules above all govern a finding you can still see.
+This one governs the finding that stops reproducing while you are deciding
+what to do about it, which is the shape most likely to go unfiled --- not
+because anyone judged it unimportant, but because the reason to file it
+disappeared before the filing did.
+
+The reasoning that dismisses it sounds like proportion rather than avoidance:
+the thing recovered, nothing is broken now, and filing an issue for a state
+that no longer exists looks like noise.
+Every clause there is true and the conclusion is still wrong, because a
+defect that fires intermittently is *harder* to diagnose than one that fires
+every time, not easier.
+Self-resolution is evidence about this attempt.
+It is no evidence at all about recurrence, and it destroys the artifact a
+later investigator would have started from.
+
+The transient case also carries diagnostic information the reproducible one
+does not, and only a filed record preserves it: how often it fired, what the
+population was, and what made it stop.
+"Two of twelve, and re-dispatching fixed both" tells a maintainer that the
+cause is intermittent rather than a formatting bug, and hands them a
+workaround.
+"It happened and then it did not" tells them nothing.
+
+So file it, or add the measurement to the issue that already covers it, on
+the same terms as any other finding.
+The rate and the recovery step belong in the report, since those are the
+parts that expire.
+
+- **Do:** file a defect that stopped reproducing, and state the rate
+  (how many of how many) and what made it stop.
+- **Do:** dupe-check first --- a transient defect is disproportionately
+  likely to be already known, precisely because it recurs.
+- **Don't:** treat a successful retry as closing the finding; it closes the
+  incident.
+- **Don't:** reach for "it resolved itself" as a reason to skip the filing
+  step --- that phrase describes the evidence, not the defect.
+
+(Morrison-Lab/wai, 2026-09-10.
+Two of twelve PR reviews emitted a `Reviewed commit` fingerprint naming a
+commit absent from the repository, disqualifying both from an otherwise
+authorized merge.
+Re-dispatching the review produced correct fingerprints and the session
+moved on, calling it "transient rather than a defect worth filing".
+`hooks/no-unfiled-finding.py` caught the sentence, and the finding turned
+out to be already tracked as ai-config#3508, where the rate and the
+re-dispatch workaround were genuinely new information.)
 
 ## Scope discipline
 

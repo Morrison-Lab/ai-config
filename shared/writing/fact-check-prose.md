@@ -863,6 +863,57 @@ This entry's own first draft then quoted that `err()` line as
 script --- caught in this fragment's own review, the failure mode illustrating
 itself.)
 
+**3rd occurrence, and the one that generalizes the rule past "program
+output": the same failure hits a quoted line from a tracked *source* file
+used as illustrative evidence in prose, not only a block claiming to be a
+command's stdout.**
+`Morrison-Lab/ai-config`'s own `memories/claude-review-dispatch.md` carries a
+section titled "Derive it rather than recalling it", arguing that a
+per-repo trigger fact must come from a live command rather than from memory.
+A paragraph inside that very section, illustrating why the derivation loop
+strips comments before grepping, quoted a commented-out workflow trigger line
+as `` `#   pull_request:` `` (three spaces after the `#`).
+The real line, in both repos cited, is `` `  # pull_request:` `` --- two spaces
+of indent, then `#`, then one space --- verified with `od -c` against each
+repo's `claude-code-review.yml`.
+An adversarial reviewer caught it; no check did, because none of this corpus's
+prose checkers (markdownlint, `check-links.py`,
+[`check-ascii-punctuation.py`](../../scripts/check-ascii-punctuation.py)) know
+what a quoted code span is supposed to be a quote *of* --- each passes a
+mis-quoted span exactly as it passes a correct one.
+
+The claim the paragraph made was true and reproducible under either spelling;
+only the copy-pasteable artifact supporting it was wrong.
+That is what makes this a case of the rule stated above rather than an
+unrelated typo: a quoted artifact is a separate assertion from the claim it
+supports, so verifying the claim does not verify the quote, and the section
+this happened inside exists specifically to make that distinction for facts
+derived from repo state.
+Writing the rule and applying it to your own prose are different acts, the
+same gap [`challenge-the-assignment`](../workflow/challenge-the-assignment.md)
+names for an assignment's author.
+
+- **Do:** when prose quotes a specific line from a file (not just a claimed
+  command's output), derive that quote from the file in the same command that
+  writes it into the doc, rather than typing it from an earlier read --- the
+  same shape `CLAUDE.md`'s clock-timestamp rule uses for a time written into a
+  file.
+- **Don't:** treat "I already read this file today" as license to retype a
+  line from memory; the read and the transcription are separate acts, and
+  only a fresh derivation in the writing command catches drift between them.
+
+(`Morrison-Lab/ai-config`, 2026-09-09, fixed in
+[#3378](https://github.com/Morrison-Lab/ai-config/pull/3378), which
+squash-merged to `main` as `d482b528`.
+Whether an instrument could catch this --- something that finds fenced or
+code-span content attributed to a named `file:line` and diffs it against that
+file --- is worth asking, per
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md); filed as
+[ai-config#3380](https://github.com/Morrison-Lab/ai-config/issues/3380)
+rather than built here, since this corpus rarely attributes a quote to a
+specific line and a general-purpose version would need to parse several
+citation shapes.)
+
 ## A contrast sentence imports the neighbouring rule's parameters
 
 [`Check a general claim against the concrete numbers in the same
@@ -1315,6 +1366,34 @@ So: deriving a number is not the whole of it.
 An integer division is an estimate wearing a computation's clothes, and a figure
 derived FROM derived figures needs its own arithmetic run rather than an
 eyeball.)
+
+**A third case, and the arithmetic was right.**
+The operand was stale.
+
+2026-09-09, during a scheduled sweep.
+A peer session's claim comment on [#3340](https://github.com/Morrison-Lab/ai-config/issues/3340) was reported as "~3 hours ago".
+It was **45 minutes** old --- 45m15s, from a claim at `10:51:46Z` read at `11:37:01Z` --- an over-estimate by a factor of 3.98, the same direction and magnitude class as the 2026-08-21 pair above.
+
+What makes it worth a separate entry is that none of the remedies above would have caught it.
+A clock reading was taken in that very turn, and the subtraction from it was sound.
+The timestamp it subtracted came from a query run an hour earlier, when the newest comment on that issue was a **different** one --- a new comment had arrived between the two checks.
+So the age was computed correctly, from an operand that had silently expired.
+
+The general shape is worse than misremembering an interval, because every instinct that guards against that fires and passes: a clock was read, a timestamp was on hand, arithmetic was performed.
+What was never checked is whether the two operands describe the same moment in the same artifact.
+A repeated query against a moving collection --- an issue's comments, a PR's reviews, a run list --- returns a different last element each time it is run, so `[-1]` is not a stable referent across turns.
+
+The remedy is the one this whole section already prescribes, applied to the operand rather than the clock: read both numbers in the turn that uses them.
+Pairing a body fetched now with a timestamp fetched earlier is the same class of error as [`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md) names for a cached copy standing in for an origin, at field granularity.
+
+- **Do:** re-read the timestamp in the same turn as the content whose age you are reporting, not only the clock.
+- **Do:** treat `[-1]` on a growing collection as a query result rather than an identifier --- it names a different element after anything is appended.
+- **Don't:** carry a timestamp across turns and subtract a fresh clock reading from it;
+  the arithmetic will be right and the answer wrong.
+- **Don't:** read "I measured this" as covering the operands --- it usually covers only the clock.
+
+(Tracked as [#3455](https://github.com/Morrison-Lab/ai-config/issues/3455), which proposes extending `hooks/no-unmeasured-clock-claim.py` to relative-age claims keyed on a timestamp read in the same turn.
+That hook currently matches absolute Pacific times only, so it guards "as of 04:37 PDT" and not "45 minutes ago" --- the harder of the two, since only the second requires arithmetic.)
 
 ## An instrument named in a rule must be one that exists
 

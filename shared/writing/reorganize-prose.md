@@ -69,6 +69,58 @@ grants the move, it does not exempt it from what a move costs.
   "A defect whose surface form varies defeats a phrase grep", for the case
   this generalizes from --- a quoted-heading grep sweep still left two more
   rounds' worth of differently-worded instances for reviewers to find.
+- **Inbound links to the SOURCE file go stale too, and the sweep that finds
+  them is an enumeration rather than a search.**
+  The bullet above sweeps the moved block and the survivor left behind.
+  Both are searches over *text you moved*, so both are blind to the other
+  direction: a third file that links to the source file and describes content
+  that has just left it.
+  Nothing turns red, because the link still resolves to a file that still
+  exists, and the reader who follows it lands somewhere real and finds no trace
+  of what was cited, with no pointer onward.
+
+  A phrase search over the moved content **sometimes** finds these, and cannot
+  be relied on to.
+  A citing file that quotes the moved block's own distinctive string --- an
+  error message, a command --- does match.
+  One that paraphrases in its own words does not, and neither does one that
+  cites the *file* for a claim it states differently.
+  So a clean phrase sweep is evidence about the sites that quote, and says
+  nothing about the rest, which is exactly the reading that makes it feel
+  finished.
+
+  Enumerate instead.
+  List every inbound link to the source file, then ask of each, one at a time,
+  whether the claim it makes still describes something in that file:
+
+  ```bash
+  grep -rn '<source-basename>' --include='*.md' .
+  ```
+
+  That list runs to dozens of files in a corpus this size, so narrow it
+  mechanically rather than by eye: take the distinctive terms of the moved block
+  and keep only the links whose surrounding lines contain one.
+
+  Report that count with its exclusion and its commit, or not at all.
+  A sweep's own fixes change what it counts, so the population moves between
+  the measurement and the sentence about it --- which is why no figure is
+  quoted here.
+  See [`reorganize-prose.cases.md`](reorganize-prose.cases.md), "A sweep's count
+  moves while you write the sentence about it".
+  That filter is a heuristic in both directions, and both matter.
+  It surfaced two real stale sites here, and it also returned two false
+  positives keyed on a phrase as generic as "default branch", so read its
+  output as a shortlist to check by hand rather than as the answer.
+
+  - **Do:** enumerate the inbound links and check each claim against the source
+    file's remaining content.
+  - **Do:** narrow a long list by context overlap with the moved block, then
+    read the survivors.
+  - **Don't:** read a clean phrase sweep as having checked this direction ---
+    it covers only the citing sites that happen to quote.
+  - **Don't:** write this rule and skip running it, which is how the move that
+    prompted it left two stale links standing after the sweep was codified.
+
 - **A downstream count or position reference can silently break**, even
   though you touched neither its sentence nor its file.
   [`forward-references.md`](forward-references.md)'s "Inserting prose makes a
@@ -76,6 +128,39 @@ grants the move, it does not exempt it from what a move costs.
   inserted or removed ahead of a count-based pointer ("the two sections
   above", "the previous chapter") changes what that pointer resolves to.
   Prefer naming a target over counting to it, in prose you touch either way.
+- **A relocation can hand a reference a new, closer, wrong antecedent,
+  without the original target moving or vanishing at all.**
+  The two checks above both ask whether a reference still resolves, which is
+  a question about the reference's own target.
+  This failure resolves fine by that test --- the intended target is still
+  there, several entries up, untouched --- and breaks anyway, because
+  something nearer moved in front of it and reads as the referent instead.
+  The two checks above are answered by looking *at the reference's target*;
+  this one is answered by looking *at what now precedes the reference*, which
+  is why finishing them does not catch it.
+  It hits a moved block's own opening sentence hardest, because a mover
+  naturally checks the seams they created --- what now follows the block,
+  what the block now follows --- while the block's first few words get read
+  as content rather than as a reference in their own right.
+  A demonstrative ("this", "that", "the same X") at the very start of a
+  relocated entry is the shape to check first: read only the text now
+  directly above it and ask whether it could pass as that demonstrative's
+  antecedent, even wrongly.
+  Fixing it by moving again just relocates the same exposure; naming the
+  referent at first mention (instead of pointing at "the same defect" or
+  "this pattern") holds wherever the entry ends up, so prefer that repair.
+  **Do:** name the referent explicitly in a relocated block's opening
+  sentence, and re-check that opening sentence against whatever now
+  immediately precedes it after every move.
+  **Don't:** treat "the target still exists somewhere earlier" as clearing a
+  relocated block's own opening reference --- a nearer, wrong antecedent can
+  capture it even when the real one is untouched.
+  (Morrison-Lab/ai-config#3375, 2026-09-09: a paragraph opening "the same
+  defect" landed just below an unrelated paragraph describing a case where a
+  figure does *not* go stale, so its nearest antecedent read as the opposite
+  of what it meant, even though the entry's real referent sat unmoved several
+  entries earlier and every mechanical check --- an identical sorted line
+  multiset, all five repo checks --- was clean.)
 - **Line-level checks are diff-scoped, so a moved line is a line you just
   wrote.**
   [`ascii-punctuation-in-source.md`](../coding/ascii-punctuation-in-source.md)
@@ -111,6 +196,34 @@ grants the move, it does not exempt it from what a move costs.
   comparison reports nothing lost --- correctly --- while every "see below"
   whose target went to the sibling file now resolves to nothing.
   The two checks are independent, and only one of them can see this.
+
+  **A pointer's target is one relational property;
+  a rule's scope and its location are two more, and a condensing move breaks those with the vocabulary conserved exactly.**
+  Measured on Morrison-Lab/ai-config#3572, which moved three sections out of `CLAUDE.md` and ran this comparison at line and then token granularity: two rules were damaged while it reported the words accounted for.
+  One had moved wholly into the fragment, so the totals balanced and what was lost was only its availability to a reader who never opens that fragment.
+  The other left its section no longer stating its own titular obligation, with the original sentence intact in the fragment, so nothing read as missing.
+  A third arrived later and is the sharpest, because it damaged a rule by **adding** words: the fix for the first widened a qualifier from one review state to every review state, contradicting a paragraph a few lines above it in the same bullet list.
+  A removal-oriented diff cannot show that at all.
+
+  Three checks follow, and none of them counts words.
+
+  1. **Scope.**
+     For each qualifier in the condensed text, name what it qualified in the original.
+     This is [`fact-check-prose`](fact-check-prose.md)'s condensation rule --- a shorter sentence is under pressure to choose the claim's scope wider --- reached here by a different route, so run that rule rather than a second copy of it.
+  2. **Location.**
+     Ask which rules the move took *out of loading*, not merely out of one file.
+     `python3 scripts/check-context-closure.py` already decides this: it lists the auto-loaded root as `d0` and each `@`-imported file as `d1`, and a file that is only *linked* appears nowhere in it.
+     A rule that leaves that listing is available on demand and unavailable by default, whatever a content total says.
+  3. **Neighbours.**
+     Read each rewritten statement against the paragraphs now adjacent to it in the destination.
+     This one stays human: a contradiction between two claims is a property of the pairing, and no lexical rule decides it.
+
+  The obvious shortcut for the first check was built and measured before being claimed, and the measurement did not support shipping it.
+  Flagging a heading when *any* distinctive word of it is absent from its body fires on roughly three quarters of this corpus's level-2 headings;
+  requiring that *no* word be shared still fires on about a quarter, and misses the case above, whose body kept two of the heading's four words.
+  Those proportions hold across stopword list, stem length and whether fenced blocks are skipped, though the exact counts move with each.
+  What that measurement does **not** establish is the claim it is tempting to draw from it: the check would run over a move's own diff, where the population is a handful of sections rather than thousands, so the whole-corpus rate is the wrong denominator and the diff-scoped experiment is still open (Morrison-Lab/ai-config#3575).
+
 - **A line's "pre-existing" status is a fact about a destination, not about a
   file.**
   A line that has sat in the source file for months is an **added** line in the
@@ -247,10 +360,7 @@ See [`reorganize-prose.cases.md`](reorganize-prose.cases.md),
 - **Do:** run the self-reference and back-reference sweeps, the line-level checks, the asset migration check, and a bidirectional content-preservation diff on anything you relocate, and on any scripted whole-file rewrite (asserting file growth is a cheap pre-filter for an intended insertion, but the bidirectional word diff is the actual gate).
 - **Don't:** treat a section as anchored to its current file or position
   merely because that is where it was originally drafted.
-- **Don't:** relocate content and stop at "the words are all still there
-  somewhere" --- a move that breaks a self-reference, a count-based
-  back-reference, or a cross-file crossref is a defect the move introduced,
-  not a pre-existing one.
+- **Don't:** relocate content and stop at "the words are all still there somewhere" --- a move that breaks a self-reference, a count-based back-reference, or a cross-file crossref, or that widens a rule's scope or takes it out of loading, is a defect the move introduced, not a pre-existing one.
 - **Do:** run the directional sweep over both the companion and the fragment
   when a cap breach forces a `.cases.md` split, before opening the PR ---
   the failing check is the pause point, not a topic to remember.

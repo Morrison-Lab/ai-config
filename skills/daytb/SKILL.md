@@ -73,8 +73,7 @@ That is what keeps countermanding cheap.
     neither says whether the session working that directory has stopped ---
     ask the agent directly first, per `CLAUDE.md`'s "Subagent worktrees are
     assigned, and an incident never silently repeals a decision" and
-    [`memories/git-worktrees.md`](../../memories/git-worktrees.md), which
-    records a quiet worktree misread as dead while it was live.
+    [`memories/subagent-worktrees.md`](../../memories/subagent-worktrees.md), which records a quiet worktree misread as dead while it was live.
     A long quiet stretch is a reason to ask sooner, not evidence of
     abandonment.
     Then check the content: HEAD reachable from a remote, or demonstrably

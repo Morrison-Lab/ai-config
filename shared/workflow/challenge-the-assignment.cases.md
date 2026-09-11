@@ -194,3 +194,82 @@ it says nothing about which of that run's jobs had already finished.
 brief measured the first while asserting the second, which is why running a
 query did not protect it.
 `list_workflow_jobs` on any one of those four runs settles it.)
+
+## A Word-comment-length instruction generalized to GitHub comments
+
+A user instruction reviewing Word document comments -- "keep comments to one
+or two short paragraphs where you can?" -- was applied to GitHub PR comments
+in the same session, and drew the correction: "my instructions about comment
+length were word-specific; do NOT apply that rule to github".
+
+The unexamined premise was that "comments" named one category across both
+surfaces, so a stylistic rule scoped to one carried to the other by the shared
+word.
+Nothing about the original instruction asserted that scope, and nothing
+required checking it: the instruction was true and specific about the surface
+it was given on, and taking it as general felt like consistency rather than
+like an assumption.
+
+This is the exact inverse of `CLAUDE.md`'s "Generalize instructions to every
+AI agent by default" section, and the two read as contradictory unless the
+axis each governs is stated.
+That section generalizes across **agents/tools executing the same
+behaviour** -- a rule given to Claude applies to Codex, Gemini, and
+Antigravity too, absent an explicit scope.
+This correction is about the **surface the behaviour targets** -- a rule
+about Word comments does not carry to GitHub comments, a Slack message, or a
+commit body, even under the same "comments" label, absent an explicit
+statement that it does.
+An instruction can be unscoped on one axis and narrowly scoped on the other at
+once: "always" (unscoped by agent) "for Word review comments" (scoped by
+surface) is a coherent, common shape, not two rules pulling in opposite
+directions.
+
+- **Do:** before carrying a stylistic or behavioral instruction from the
+  surface it was given on to a different surface, name what makes the two the
+  same kind of thing for the instruction's purpose -- not just that both are
+  loosely called "comments".
+- **Do:** read an instruction as scoped to the concrete context it arrived in
+  (a document, a tool, a channel) by default, and widen it only on an
+  explicit signal ("also do this on GitHub", "in general", "everywhere").
+- **Don't:** treat a shared category word (comments, messages, notes) as
+  proof that a rule scoped to one context applies to every context using that
+  word.
+- **Don't:** read this as narrowing `CLAUDE.md`'s "Generalize instructions to
+  every AI agent by default" -- that section still governs the agent axis in
+  full; this governs the surface axis, which that section never addressed.
+
+(User correction, mid-review of Word document tracked changes and comments:
+"my instructions about comment length were word-specific; do NOT apply that
+rule to github".)
+
+## A "why did you rewrite this" question asserted a premise nobody had checked
+
+(2026-09-09, reviewing a redlined `.docx` supplement.
+The user asked "why did you completely rewrite S4.6?", and the question was
+answered as posed: reasons were supplied for a rewrite that had not
+happened.
+The premise had already been accepted earlier in the same session, on
+weaker grounds --- a character-count diff per paragraph had shown heavy edit
+density in that section, which was read as evidence of authorship rather
+than merely of change (see
+[`memories/office-open-xml.md`](../../memories/office-open-xml.md)'s "A
+tracked change's `w:author` decides who made it, not the size of the diff").
+So the question did not introduce the false belief; it was answered on top
+of one already held, which is why it went unchallenged rather than
+triggering the check.
+
+Reading the `w:author` attribute on the section's `<w:ins>`/`<w:del>`
+elements, once finally run, showed every insertion in S4.6 carried the
+document's own student author's name and a date three weeks before the
+session began.
+The reviewing session's own edits sat in different paragraphs entirely.
+
+The asymmetry this case makes concrete: the check that would have caught it
+was one query against `word/document.xml`, already available and already
+run successfully elsewhere in the same session for the corpus-side
+dupe-check.
+Not running it here cost a confession to work never done, delivered as an
+explanation of intent and method the confessor could not actually have had
+--- and had the user acted on the offered "I'll revert it" that followed,
+it would have cost the student author's own writing.)

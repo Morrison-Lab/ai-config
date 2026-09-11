@@ -361,6 +361,58 @@ Read the reviews.
 - **Don't:** reach for the job-outcome remedy above here.
   It is scoped to a job that failed, and this one succeeded.
 
+**A human reviewer's comments can be live on the PR and invisible to every enumeration keyed on a submitted review, because the review was never submitted.**
+The block above is about filtering a surface wrongly.
+This is a review that is genuinely there and genuinely not *submitted*: GitHub's
+review states are `PENDING`, `COMMENTED`, `APPROVED`, `CHANGES_REQUESTED` and
+`DISMISSED`, and a `PENDING` review is the draft a reviewer accumulates while
+clicking "Start a review" on each comment.
+
+Measured on `UCD-SERG/serocalculator#685`, 2026-09-08.
+`pull_request_read` `get_reviews` returned exactly one entry:
+`state: PENDING`, the author's own login, a `commit_id` matching the head ---
+and **no `body` field and no `submitted_at` field at all**.
+`get_review_comments` on the same PR at the same moment returned two threads
+carrying two substantive findings, created an hour and a half earlier.
+So the two surfaces disagree, and each is telling the truth about a different
+question: no review has been submitted, and two review comments exist.
+
+Two consequences, and the second is the one that changes what you do next.
+
+**Every filter this corpus recommends drops it.**
+`CLAUDE.md`'s own queries select on `.state == "CHANGES_REQUESTED"`, or take
+the first non-empty line of `.body`, or match a body marker --- and a `PENDING`
+review has no body and a state none of those name.
+It is the same false negative the block above describes, reached without
+getting any field name wrong.
+
+**Visibility depends on whose token is reading.**
+A `PENDING` review is a draft, visible only to its author.
+An agent session running under the repository owner's own credentials therefore
+sees that owner's unsubmitted drafts, which nobody else can see --- so "the
+maintainer left me two comments" and "there are two comments on this PR" are
+different claims, and only the first is true.
+Say so when replying, since the reviewer may simply have forgotten to hit
+"Submit review"; the comments stay invisible to every other collaborator until
+they do.
+
+Do not read a draft as a reason to wait.
+The feedback is specific and it is addressed to you; act on it, and reply
+where the whole thread can see the reply rather than into an unpublished
+comment thread.
+
+- **Do:** query `get_review_comments` separately from `get_reviews`, and treat
+  a disagreement between them as information rather than as one of them being
+  wrong.
+- **Do:** name the review's `PENDING` state when you reply, so the reviewer
+  learns their comments are still a draft.
+- **Do:** answer a pending comment in a top-level PR comment, which every
+  collaborator can read.
+- **Don't:** report a count of review surfaces from any query that filters on
+  a submitted state, a body, or a body marker.
+- **Don't:** treat a `PENDING` review as not-yet-feedback and wait for it to
+  be submitted.
+
 **A clean verdict from the counting reviewer does not mean every reviewer's backlog is addressed --- sweep the other reviewer's earlier findings before declaring clean.**
 The cases above are about a reviewer that refuses, goes silent, or last reviewed an earlier commit.
 This is the inverse blind spot: a *second* reviewer that reviewed real, current code several rounds ago, raised findings, and has been silent since --- so its findings sit at a stale head, and the counting reviewer (the one whose verdict gates the merge) never inherited them.
@@ -1502,3 +1554,23 @@ reproduces the failure described here.
 - **Don't:** assume a report is verdict-free just because a guard's refusal
   message says so --- check which vocabulary the guard's own regex accepts
   before concluding the review never reached a verdict.
+
+**A tenth case: the review's own required check run can read green over a `NOT_CLEAN` verdict.**
+The check-shaped cases above include gates that never fail, gates that only report a dispatch,
+and a green check with no review posted at all.
+This one is the check wired specifically to gate on the review outcome --- a `review / require-clean-verdict` job from a shared reusable workflow --- which is the last check a reader would think to distrust, because its name states the very property being checked.
+
+Measured 2026-09-06 on `d-morrison/rme` PRs #1132 and #1133:
+`gh pr view --json statusCheckRollup` showed `review / require-clean-verdict` as `SUCCESS` on both,
+while each PR's latest `**Claude finished review` comment carried `"verdict": "NOT_CLEAN"` in its embedded `review-data:` JSON, with open findings.
+
+Why the two disagreed was not established.
+A stale check run from an earlier head, and a gate that never parses the embedded verdict at all, would both produce this reading, and neither was ruled out.
+Which it is does not matter: the comment is authoritative either way.
+
+The date is load-bearing.
+Both PRs' latest payloads read `CLEAN` by 2026-09-07, so re-running the query now returns the opposite and reads as though the entry were wrong.
+What the entry records is that the two signals *can* disagree, not that they disagree on those PRs today.
+
+- **Do:** name the review-gating check when you report a PR clean, and say which comment's verdict field you read to confirm it.
+- **Don't:** let a check whose name asserts the property stand in for the artifact that carries it --- that naming is what makes this case hard to doubt.

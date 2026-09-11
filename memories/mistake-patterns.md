@@ -178,7 +178,7 @@ When a new entry lands after `main` has appended one of its own, take the next n
 - **Mistake**: Committing directly to the primary checkout --- to `main` or to an existing feature branch already checked out there --- instead of isolating the work in a dedicated `git worktree`.
 - **Example**: 2026-08-19 session (cwd `wai`, working `Morrison-Lab/ai-config`): committed memory updates straight onto `fix/quote-yaml-placeholders` on the primary ai-config checkout, where a parallel session sharing that checkout would have collided with them.
 - **Canonical Rule**: `AGENTS.md` ("Worktree isolation"), which requires a dedicated worktree for write/edit tasks so parallel sessions never clobber each other's working directory or branch state.
-  See also [`git-worktrees.md`](git-worktrees.md) for the liveness rules that decide when a worktree may be touched or reclaimed.
+  See also [`subagent-worktrees.md`](subagent-worktrees.md) for the liveness rules that decide when a peer or subagent worktree may be touched or reclaimed.
 - **Fix**: Create the worktree before the first edit (`git worktree add`), not after the first commit.
   Treat the primary checkout as read-only during a write session, and push early --- a pushed commit survives anything that happens to a working tree.
 
@@ -880,7 +880,7 @@ A clean automated review from every available provider evaluating the current HE
   triggered them --- once several have accumulated in a session, the
   classifier can start denying a plainly innocuous, unrelated command too
   (e.g. `gh run list -R ... --json ...`), which is a widened blast radius
-  the earlier occurrences below did not record.
+  the earlier occurrences in [`mistake-patterns.cases.md`](mistake-patterns.cases.md) did not record.
 - **Example**: 2026-09-01, `Lacaedemon/sparta` [PR #1459](https://github.com/Lacaedemon/sparta/pull/1459) (GIA sweep), tracked as [ai-config#2899](https://github.com/Morrison-Lab/ai-config/issues/2899);
   previously `ucdavis/bcs` 2026-08-28 ([ai-config#2544](https://github.com/Morrison-Lab/ai-config/issues/2544), closed by [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820)).
   In an auto-permission-mode plugin-consumer session where no `adversarial-reviewer` agent is registered (`Agent type not found`),
@@ -920,38 +920,20 @@ A clean automated review from every available provider evaluating the current HE
   followed by `Reviewed-Commit: <HEAD sha>` (the parser accepts 7-40 hex characters; give the full 40).
   A foreground dispatch is the simplest credited path and the one the hook's own refusal message recommends,
   but background fallback dispatches, tracked `TaskOutput` reads, and task notifications are credited too, per Pattern 22.
-- **2nd occurrence of the misidentified-hook-copy class, 2026-09-03** ([#3141](https://github.com/Morrison-Lab/ai-config/issues/3141), recorded in [#3156](https://github.com/Morrison-Lab/ai-config/issues/3156)), and it is an occurrence of **this bullet's own Fix step being skipped** rather than of a new mechanism.
-  `hooks/no-unreviewed-pr.py` demanded a Copilot review while the moratorium ran to `2026-12-01`, and the session identified "the loaded copy" as the newest per-commit directory under `~/.claude/plugins/cache/` --- the exact proxy the Fix above rules out.
-  Several cache directories carried the same value, so newest isolated nothing --- derive the count rather than citing one, since the cache is garbage-collected and it fell from nine to five between 2026-09-03 and 2026-09-04 with no edit in between.
-  The label above names the diagnostic failure rather than a stale cache, and stays right after the resolution below: what recurred was reading the wrong artifact, and the copy captured firing sits outside the cache this pattern is named for.
-  What the resolution order would have surfaced: the copy registered directly in `~/.claude/settings.json` carries the correct date and returns 0 before reading the transcript, `enabledPlugins` for this plugin is `false`, and the user-scope pin in `installed_plugins.json` names a hook with **no `MORATORIUM_END` at all**.
-  Resolved 2026-09-04 by capture rather than by reasoning: `ps -eo args` sampled at 0.05s while deliberately triggering the guard named a snapshot under `~/Library/Application Support/Claude/local-agent-mode-sessions/`, carrying the expired constant.
-  No pass had looked there, and no corpus step named it.
-  Three passes enumerated explanations --- two, then three --- over a candidate set nobody had established, and each list was internally sound while the true answer sat outside all of them.
-  The transferable step is to capture the resolved path (`ps` while the guard fires) instead of deducing it from registration files, since a guard that fires repeatedly hands you the measurement for free.
-  See [`keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md)'s dated-constant section for the resolution order and for the fail-open hazard, and for what the capture leaves unestablished.
-- **3rd occurrence, and a new symptom: the escalation spreads to commands
-  with no relation to the original denial, 2026-09-06/07.**
-  Five denials in one session, with no settings change and no restart.
-  Three times, an identical re-run of a just-denied command succeeded on the
-  very next attempt --- confirming, without a session restart, what the
-  2nd occurrence above only measured *across* a restart.
-  Separately, after several differently-shaped attempts at the same goal,
-  the classifier began denying a plainly innocuous, unrelated command
-  (`gh run list -R ... --json ...`), which also succeeded on an identical
-  retry.
-  ai-config#2994 and this bullet's own prior occurrences already establish
-  that repeated variants of the SAME denied command escalate suspicion;
-  what neither previously recorded is that the escalation is not scoped to
-  that command -- it widens to spend suspicion on unrelated, ordinary reads
-  once several denials have accumulated in the session.
+- **Occurrence ledger**: every occurrence after the first, with its
+  measurements, is in
+  [`mistake-patterns.cases.md`](mistake-patterns.cases.md).
+  Stated as a rule rather than as a list, so a new occurrence does not silently
+  falsify this line --- which is the failure the companion file's own
+  cross-reference rule exists to prevent.
 - **Algorithmatizable?**
   Partially.
   [#2544](https://github.com/Morrison-Lab/ai-config/issues/2544)'s suggested fix 3 --- have the hook's refusal message name a user-approvable permission rule for the override --- would have resolved the measured session in one step, and remains open under [#2899](https://github.com/Morrison-Lab/ai-config/issues/2899).
-  The new symptom above suggests a session-level mitigation too: once a
-  denial has occurred, retry the identical command once before rephrasing
-  or escalating to the user, since an identical retry recovered every time
-  it was measured.
+  The 3rd occurrence's new symptom, recorded in
+  [`mistake-patterns.cases.md`](mistake-patterns.cases.md), suggests a
+  session-level mitigation too: once a denial has occurred, retry the identical
+  command once before rephrasing or escalating to the user, since an identical
+  retry recovered every time it was measured.
 
 ## Pattern 44: `pgrep -f` Self-Matching in Background Waiters and Process Status Pollers
 - **Do**: When monitoring background tasks or long-running scripts,
@@ -1208,3 +1190,43 @@ blindness in a different code shape: there a raw-text subsumption proof was
 used to DELETE a parser branch, here a raw-text scan is used to decide the
 parser never RUNS.
 Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
+
+## Pattern 54: A Briefed "Measured" Claim Ships Unverified Because It Already Sounds Checked
+
+- **Mistake**: publishing a technical claim into a memory file because a task
+  brief stated it as already "measured", instead of reproducing it first.
+  A claim pre-labelled as verified reads as settled input rather than as an
+  assertion to check ---
+  [`dont-take-my-word-for-it.md`](../shared/principles/dont-take-my-word-for-it.md)'s
+  "illusion of prior verification", with the label doing confidence's work.
+- **Direction of failure**: fail-open into the corpus.
+  The false claim was the entry's whole thesis, so shipping it would have
+  taught every later reader a wrong lesson from a "reproduction" that never ran.
+- **Example**: 2026-09-09,
+  [#3379](https://github.com/Morrison-Lab/ai-config/pull/3379).
+  The brief asserted that an unpinned `npx markdownlint-cli2` matched no files
+  and that `Summary: 0 issues in 0 files` was the tell.
+  Reproduction disproved both: an unpinned run lints the whole corpus exactly
+  as a pinned one does, and that string is a later version's wording for the
+  same clean verdict, appearing over 752 files and over an empty match alike.
+  Scope lives on the `Linting:` line above it, and this was caught before
+  review.
+- **A second, narrower miss rode along**, caught by a reviewer rather than by
+  me: the dupe-check grepped only the two files the brief named, missing
+  `shared/principles/fail-fast.rationale.md` and
+  `memories/nested-worktree-instrument-inflation.md`, which already carried the
+  lesson.
+  [`grep-is-not-coverage.md`](../shared/workflow/grep-is-not-coverage.md) names
+  the shape; the specific error was letting the brief set the search scope.
+- **Fix**: treat "measured" in a brief as a claim to re-measure, and scope a
+  dupe-check to the corpus rather than to the files a brief happens to name.
+
+- **Do:** reproduce a brief's own "measured" claim before writing it into a
+  memory file, exactly as for any unverified assertion.
+- **Do:** grep the whole corpus for a dupe-check, not the files the task names.
+- **Don't:** read a stated measurement, a date, or confident phrasing as
+  evidence the claim was checked --- those are the signals
+  [`dont-take-my-word-for-it.md`](../shared/principles/dont-take-my-word-for-it.md)
+  says to distrust.
+- **Don't:** let a brief-scoped grep stand in for a corpus-wide one because it
+  returned zero hits.

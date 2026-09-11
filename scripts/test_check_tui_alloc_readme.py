@@ -9,6 +9,7 @@ failure is attributable rather than merely non-zero.
 """
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import tempfile
@@ -39,9 +40,22 @@ def check(name: str, cond: bool, detail: str = "") -> None:
         failures.append(name)
 
 
+def current_time_default(script_text: str) -> str:
+    """The script's live --time default, so raising it cannot stale these
+    tests. Hard-coding it went stale when the default moved to 7 days, the
+    same way the README line this suite guards had gone stale before."""
+    m = re.search(r'--time="\$\{ALLOC_TIME:-([^}]+)\}"', script_text)
+    if not m:
+        print("FAIL cannot read the script's --time default", file=sys.stderr)
+        sys.exit(1)
+    return m.group(1)
+
+
 def main() -> None:
     script_text = SCRIPT.read_text(encoding="utf-8")
     readme_text = README.read_text(encoding="utf-8")
+    live_time = current_time_default(script_text)
+    time_flag = "${ALLOC_TIME:-" + live_time + "}"
 
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)
@@ -60,7 +74,7 @@ def main() -> None:
         mutations = {
             "cpus": ("${ALLOC_CPUS:-8}", "${ALLOC_CPUS:-16}"),
             "mem": ("${ALLOC_MEM:-32G}", "${ALLOC_MEM:-64G}"),
-            "time": ("${ALLOC_TIME:-48:00:00}", "${ALLOC_TIME:-72:00:00}"),
+            "time": (time_flag, "${ALLOC_TIME:-72:00:00}"),
             "exclude": ("--exclude=c1", "--exclude=c2"),
         }
         for field, (old, new) in mutations.items():
@@ -77,8 +91,7 @@ def main() -> None:
 
         # 3. Parse failures exit 2, never 0 -- a reshaped file must not
         # read as agreement (fail-fast: the vacuous pass is the defect).
-        gutted_script = script_text.replace("${ALLOC_TIME:-48:00:00}",
-                                            "$ALLOC_TIME")
+        gutted_script = script_text.replace(time_flag, "$ALLOC_TIME")
         check("gut mutation applied", gutted_script != script_text)
         gpath = tmp / "tui-alloc-gutted"
         gpath.write_text(gutted_script, encoding="utf-8")
@@ -98,8 +111,7 @@ def main() -> None:
 
         # 4. Time compaction: a non-whole-hour default must not compact,
         # so a README stating the compact form for it is drift.
-        odd_time = script_text.replace("${ALLOC_TIME:-48:00:00}",
-                                       "${ALLOC_TIME:-36:30:00}")
+        odd_time = script_text.replace(time_flag, "${ALLOC_TIME:-36:30:00}")
         check("odd-time mutation applied", "36:30:00" in odd_time)
         opath = tmp / "tui-alloc-oddtime"
         opath.write_text(odd_time, encoding="utf-8")
@@ -107,6 +119,50 @@ def main() -> None:
         check("non-whole-hour time compared raw, caught as drift",
               r.returncode == 1 and "36:30:00" in r.stdout,
               f"rc={r.returncode} out={r.stdout!r}")
+
+        # 5. The day form compacts, so a README stating it in hours is
+        # drift rather than a silent pass.
+        day_readme = readme_text.replace("/ 7d,", "/ 168h,")
+        check("day-form readme mutation applied", day_readme != readme_text)
+        dpath = tmp / "README-days.md"
+        dpath.write_text(day_readme, encoding="utf-8")
+        r = run(SCRIPT, dpath)
+        check("day form compacts, hours spelling caught as drift",
+              r.returncode == 1 and "168h" in r.stdout,
+              f"rc={r.returncode} out={r.stdout!r}")
+
+        # 6. The README's own shorthand is not a SLURM walltime, so a
+        # script carrying it must be refused rather than compared. Left
+        # uncaught it would compact to itself and match the README that
+        # taught it, certifying agreement between two invalid copies.
+        for shorthand in ("7d", "48h"):
+            bad = script_text.replace(time_flag,
+                                      "${ALLOC_TIME:-" + shorthand + "}")
+            check(f"shorthand mutation applied: {shorthand}",
+                  bad != script_text and shorthand in bad)
+            spath = tmp / f"tui-alloc-{shorthand}"
+            spath.write_text(bad, encoding="utf-8")
+            r = run(spath, README)
+            check(f"script shorthand {shorthand} refused with exit 2",
+                  r.returncode == 2 and shorthand in r.stderr,
+                  f"rc={r.returncode} err={r.stderr!r}")
+
+        # 7. A valid SLURM spelling this check cannot compact must reach
+        # the comparison as drift, never be refused as invalid: an earlier
+        # revision validated against a hand-written SLURM grammar and
+        # rejected unpadded fields and the UNLIMITED keyword, failing CI
+        # on values salloc accepts.
+        for valid in ("1:0:0", "UNLIMITED", "7-0:00:00"):
+            ok_script = script_text.replace(time_flag,
+                                            "${ALLOC_TIME:-" + valid + "}")
+            check(f"valid-spelling mutation applied: {valid}",
+                  ok_script != script_text and valid in ok_script)
+            vpath = tmp / ("tui-alloc-v" + valid.replace(":", "-"))
+            vpath.write_text(ok_script, encoding="utf-8")
+            r = run(vpath, README)
+            check(f"valid spelling {valid} reports drift, not refusal",
+                  r.returncode == 1 and valid in r.stdout,
+                  f"rc={r.returncode} out={r.stdout!r} err={r.stderr!r}")
 
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)

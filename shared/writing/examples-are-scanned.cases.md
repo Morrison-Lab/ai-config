@@ -61,3 +61,69 @@ mistake.
 Filed as [ucdavis/bcs#653](https://github.com/ucdavis/bcs/issues/653) and
 shipped as [#655](https://github.com/ucdavis/bcs/pull/655).
 2026-08-19.
+
+## A hook's own remedy text re-triggered on the reply that complied with it
+
+2026-09-08/09, `Morrison-Lab/ai-config#2016` and `#3371`.
+Recorded in the main file under "A compliance report is not an escape either";
+this entry carries the fuller timeline.
+
+`hooks/no-unfiled-finding.py` blocked a reply that named a defect as worth an `<issue-shaped word>` and filed nothing --- a correct firing, matching the anti-pattern the hook exists to catch.
+The finding itself is unrelated to hooks or this file's subject --- a `check-pr-fully-clean.py` attribution gap noticed in passing --- and was then filed as [#3371](https://github.com/Morrison-Lab/ai-config/issues/3371);
+its topic does not matter to what follows, only that filing it is what the next reply had to report.
+
+The very next reply reported that filing.
+To say what had happened, it restated the wording the earlier reply had been blocked over --- there is no other way to describe what a hook caught without naming what it caught.
+`no-unfiled-finding.py` fired again, on a reply that had already done what it demanded, asking for the issue that already existed.
+
+Verified rather than assumed: `gh issue view 3371` returns state `OPEN`, `createdAt: 2026-09-09T01:51:08Z`, which precedes the blocked reply's own turn.
+So the second firing was a false positive on a message reporting a true, already-completed discharge, and the first firing on the identical wording was a true positive.
+Both are confirmed by reading the transcript's own tool calls rather than by trusting either reply's account of itself.
+
+**Why the phrase-list route is closed here in particular.**
+The example case has a remedy that changes the *sentence*: render it so it cannot match.
+The negation and quotation cases have no such remedy --- this file's own guidance for both is to fix the detector or absorb the false positive, never to reword a true sentence to dodge it.
+This case is like the latter two in offering no sentence-level fix, but for a different reason: the sentence's accuracy is exactly what makes it match, so a vaguer report would dodge the hook and also under-report what was caught, which is a worse trade than absorbing the false positive.
+The only fix that does not cost accuracy is behavioural: check the transcript for a filing tool call after the first block and before the second message, which the hook already has the transcript to do.
+
+**Where the finding was tracked.**
+The general shape --- a hook matching a mention of its trigger phrase rather than a live use --- was already open as [#2016](https://github.com/Morrison-Lab/ai-config/issues/2016), filed against a different hook (`no-stale-pr-status.py`) and its title names exactly this property: "fires on a MENTION of its trigger phrase, not only a use."
+Per this repo's own triage policy, a new symptom of a tracked defect family is a comment on the existing issue, not a new issue, so this occurrence was posted there (comment `5594563791`, 2026-09-09T01:52:34Z) rather than filed as a third issue.
+No hook has been fixed as a result of this entry.
+
+## A second guard's quoting exemption had the same gap, reached by two wrong hypotheses first
+
+Morrison-Lab/ai-config#3411, 2026-09-08/09, same session as the case above.
+
+`hooks/no-mistake-without-a-hook.py`'s admission matcher exempts a phrase wrapped in backticks or a fence, matching the parent file's own remedy for a line-oriented checker: strip the code regions before deciding anything.
+It does not exempt a phrase inside plain double quotes, and double quotes are the conventional way to quote a phrase in prose --- including a message explaining what the guard keys on.
+So a reply analyzing the guard, quoting its trigger phrase in quotation marks rather than backticks, re-armed it.
+
+Two wrong beliefs were held about the cause before this was found, in order: first, that hook work has to precede the admission chronologically;
+then, that a later firing was a transcript-flush timing artifact.
+Neither survived running the guard's own `scan()` against the transcript, which was the artifact the claim was actually about and had not yet been read:
+
+```
+visible_prose + ADMISSION, on hooks/no-mistake-without-a-hook.py:
+
+  matched=True    'I misread the block.'
+  matched=False   'the phrase `I misread` is what re-arms it'
+  matched=True    'quoting "I misread" in an explanation'
+  matched=False   '```\nI misread\n```'
+```
+
+`admit_at=1803` pointed at the session's own message analysing the guard --- not a confession, the sentence explaining what the matcher keys on.
+Filed as [Morrison-Lab/ai-config#3411](https://github.com/Morrison-Lab/ai-config/issues/3411).
+
+This is the same class as the case above --- a hook re-arming on text that discusses rather than commits the anti-pattern --- through a different mechanism.
+The `no-unfiled-finding.py` case above needed a **behavioural** discriminator (a filing tool call earlier in the transcript);
+this one needs a **lexical** one the parent file's top-level guidance already names --- a quoting construct the checker's stripper does not yet cover. #3411's own body names a sibling gap in a third instrument, `check-pr-fully-clean.py`'s `match_is_cited` exemption, tracked as [#3418](https://github.com/Morrison-Lab/ai-config/issues/3418): backtick spans covered, blockquotes not.
+That citation read #3402 when this entry was first written, which was wrong and was caught in review before it stood: #3402 is a different mechanism in the same file (a resolved-blocking narration losing its exemption to an affirmative continuation), and the blockquote gap had only ever been a comment on it.
+Worth recording because the wrong citation was inherited from #3411's body rather than invented here --- a durable file propagates an upstream citation error at full confidence, and the reviewer had to re-read both issues to catch it.
+Two hooks with the identical missing construct on the same night is the kind of repetition [`deterministic-tools`](../principles/deterministic-tools.md) treats as the trigger to build one shared exemption implementation rather than patch each matcher separately, which #3411's own suggested-fix section raises and leaves open.
+
+- **Do:** when a guard fires on a message that discusses rather than commits its trigger, read the guard's own matching function against the transcript before hypothesizing about ordering or timing.
+- **Do:** treat a second confirmed instance of the same missing quoting construct, in a different hook, as grounds to consider one shared exemption implementation rather than two separate patches.
+- **Don't:** theorize about *when* an admission was matched before checking *what* was matched --- `scan()`'s own `admit_at`/`admit_txt` output answers that directly.
+- **Don't:** assume backtick/fence coverage generalizes to every way prose quotes a phrase;
+  double quotes and blockquotes are both measured gaps in different instruments.

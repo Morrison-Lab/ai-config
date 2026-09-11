@@ -121,6 +121,30 @@ into this rule.
 - **Don't:** validate a matcher by reading it -- a wrong one reads as correct.
 - **Don't:** trust a comment describing what the pattern cannot match.
 
+**The bad-input test above is not the negative control, and a brand-new
+instrument needs both before its first real finding is trusted.**
+Passing the reported bad input proves the instrument can catch the thing it
+was built for; it says nothing about whether the instrument reports a clean
+result on input that is already fine, which is the direction a hand-rolled
+checker fails silently and dangerously.
+A false **negative** here -- reporting a defect that is not there -- is not
+the safe-side error it usually is: it reads as a rigorous, structural
+finding rather than a guess, so it invites "fixing" content that was never
+broken, which can destroy real work the false positive in the other
+direction never would have.
+
+- **Do:** run a newly built instrument against a known-good input and require
+  a clean (no-op) result before trusting any finding it reports elsewhere.
+- **Don't:** treat an instrument's own careful construction as a substitute
+  for running it against a case where the right answer is "nothing wrong".
+
+See [`memories/office-open-xml.md`](../../memories/office-open-xml.md)'s "A
+hand-built accept/reject simulator is itself an unverified instrument until
+it passes a negative control", where a self-built docx tracked-change
+renderer reported data loss that did not exist, and rewriting it to walk
+the document in order and re-running it against the untouched original
+found the bug immediately.
+
 ### Scale that from one reported input to a corpus of real ones
 
 The rule above fixes the exact input that prompted the guard, and asks for
@@ -427,6 +451,69 @@ as of this writing.
 The corruption was caught and mutation-tested by a later adversarial-review
 round within that same PR, before it ever reached `main`.)
 
+### Confirm a mutation reached the file by its CONTENT, and never by `git diff`
+
+A mutation applied by string replacement can silently fail to match, so the
+sweep has to check that the file changed before reading the suite's verdict.
+`git diff --quiet` is the reflex for that and is wrong for the commonest
+case: it reports no change for an **untracked** file, whatever you wrote into
+it.
+
+The false "did not apply" is not the expensive half.
+A harness that skips the suite on that reading usually skips the **restore**
+with it, so the mutation stays in the file and the next one is applied on top.
+Three mutations then accumulate, every later result is meaningless, and the
+run ends with a broken file and a green-looking log.
+Compare a hash, or the anchor string's presence, instead.
+
+- **Do:** hash the file before and after, and treat an unchanged hash as a
+  harness failure rather than as a finding about the test.
+- **Do:** restore from a pristine copy on every path, including the
+  did-not-apply path.
+- **Don't:** use `git diff` to confirm a mutation on a file the branch has not
+  committed yet --- which is exactly when a new instrument is being mutated.
+
+(Measured 2026-09-08 while adding `scripts/resolve-equation-anchors.py`:
+three mutations of a new, still-untracked script all read as "did not apply",
+all three had in fact applied, and none was restored.
+The suite's final run was against a file carrying all three.)
+
+### A surviving mutation is a question before it is a coverage gap
+
+The natural reading of a mutation nothing catches is that the suite is thin
+there, and the natural fix is another test.
+Both can be wrong at once, and writing the test first hides which.
+
+A mutation also survives when a **second mechanism masks its effect**, and
+then the test you add to kill it either passes vacuously or asserts on the
+wrong observable.
+Diagnose the survivor before treating it: run the mutated code on the
+discriminating input and look at the intermediate state, not just the output.
+
+The distinction matters beyond the test, because a survivor of this kind
+usually means a comment somewhere overstates what the mutated line does.
+That comment is itself a claim-bearing artifact, so it wants correcting in the
+same commit as the test.
+
+- **Do:** print the intermediate state under the mutation before writing a
+  test for it.
+- **Do:** assert on whatever the mutation actually changes, which may be a
+  structure rather than the reported result.
+- **Do:** correct the mutated line's own comment when the diagnosis shows it
+  claimed more than the line does.
+- **Don't:** add a test that pins the output when the output is provably
+  identical either way --- it passes under the mutation and reads as coverage.
+
+(Measured 2026-09-08, same script.
+Removing a void-element guard from an HTML tree builder changed no reported
+anchor, so the guard looked dead.
+It is not: it keeps the tree faithful.
+The effect was masked because a generated `eq-anchor-N` id itself begins with
+`eq-`, so the next equation's ancestor-walk found it and reused it whether or
+not the void tag had reparented anything.
+The first replacement test asserted on anchors and passed under the mutation;
+the one that discriminates asserts on parents.)
+
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 
 "Test the instrument against the incident that prompted it, verbatim"'s closing **Don't** governs a comment claiming *what* a matcher matches.
@@ -568,6 +655,19 @@ A distribution beats a pass/fail here: a property's *signature* is visible in a 
 - **Don't:** treat "two independent checks agree" as corroboration when neither has been shown able to disagree.
 
 See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md), "A citation to a check that answers the same on every tree, and two retractions of it".
+
+**A corollary, measured on [ai-config#3395](https://github.com/Morrison-Lab/ai-config/pull/3395), where the rule above was loaded and the citation was made anyway.**
+
+**Re-enabling the disabled rule is the wrong remedy.**
+The bullets above say to read the configuration, and to measure the property directly when no gate discriminates;
+neither names the move that finding a disabled rule actually invites, and that move makes things worse.
+A rule is disabled repo-wide precisely because the corpus already violates it at scale, so turning it back on floods every future diff with that drift and the disable returns within a release.
+The substitute is a scan over **added lines only**, which is what the disable exists to permit --- the same scoping argument `validate.yml`'s own `check-new-line-breaks` comment makes for `MD013`.
+Measured: `markdownlint-cli2` reported `753 file(s)` and `0 error(s)` over a diff carrying a blanks-around-lists defect, since `.markdownlint-cli2.jsonc` sets `MD032` false;
+an added-lines scan for the same shape found it immediately.
+
+- **Do:** write a diff-scoped scan for the property when the rule is disabled, rather than re-enabling it.
+- **Don't:** re-enable a repo-wide disable to close the gap --- that reflags the drift the disable exists to tolerate.
 
 ## Widening an instrument invalidates every figure it produced, not only the one that exposed it
 
@@ -934,6 +1034,20 @@ unrelated case flips and the row reports caught.
   is a fact about the rows, and only the identity check makes it one about the
   clauses.
 
+**A third mechanism lands on the same shape from neither side named above: a test's own assertions can differ in sensitivity to one mutation, and the insensitive one is satisfied by a DIFFERENT failure the mutant produces, not by a pre-existing needle or an earlier rejection stage.**
+
+Removing an empty-`--reference`-document guard left one of the test's two assertions unchanged: `rc == 1` still holds, because a run with no guard still exits 1 --- now by flagging every nesting triple in the document as novel, which is exactly the false-positive flood the guard exists to prevent, rather than by the guard's own refusal.
+The exit-code assertion cannot tell those two causes apart.
+Only the message assertion, plus a check that `novel-nesting` does not appear in the unmutated output, turned red.
+This is a third route to "a case passing for the wrong reason", alongside the pre-existing-needle and earlier-rejection-stage routes above, and it needs the same remedy the `Do` line already states: designate, per mutation, the one assertion that must fail, and score the mutation on that assertion rather than on whether any assertion in the test changed.
+
+- **Do:** when a test carries more than one assertion on a single mutation, name the discriminating assertion before running the mutation, and score on that assertion alone.
+- **Don't:** read a test as having caught a mutation because the test as a whole failed;
+  an exit code a different, unrelated failure path can also produce is not evidence about the removed clause.
+
+(Measured 2026-09-09: a guard refusing an empty `--reference` document was pinned by an `rc == 1` assertion and a message assertion.
+Removing the guard left `rc == 1` true either way, and only the message assertion --- together with the absence of `novel-nesting` in the mutant's output --- discriminated the mutation.)
+
 **Generalize past mutation: a harness needs a self-check against a quantity it
 did not compute.**
 
@@ -1209,7 +1323,7 @@ The first separates an inapplicable mutation from everything else;
 the second is the pass-condition entry's own identity check, and it is what separates a faulty mutation from a suite that cannot see a good one.
 
 The one thing worth adding is **when** to check the anchor.
-It carried escape sequences and did not match the file's own escaping, which is the failure `CLAUDE.md`'s "Tool transport collapses doubled backslashes" section already covers --- read it for the mechanism, the remedy, and the platform caveat.
+It carried escape sequences and did not match the file's own escaping, which is the failure [`heredoc-backslash-collapse`](../coding/heredoc-backslash-collapse.md) already covers --- read it for the mechanism, the remedy, and the platform caveat.
 What that section does not say is that a mutation harness is where the check has to move earlier.
 There the tell is a match that inexplicably fails, and you react to it;
 here the same failure produces a green suite and a `MISSED` row that reads as a finding, so nothing prompts a reaction at all.
@@ -1984,6 +2098,35 @@ one echoed by the run that depends on it is checked on every execution.**
 - **Don't:** leave a validity assumption as prose in a README while the run
   that depends on it logs nothing.
 
+## When an allowlist regex keeps leaking, stop enumerating and state the complement
+
+The section above moves a discriminator to the producer when refining a consumer-side heuristic keeps failing.
+That fix is unavailable when there is no producer to move it to --- the input is free-form prose an LLM reviewer wrote, and the classifier has to infer a structural fact (is this heading a fresh statement or a qualified one) from the words alone.
+When refinement is the only lever left, this is the shape it should take.
+
+**The tell is the same as the producer section's: a classifier that keeps being wrong in new ways, one fix per round, each closing the case just found and opening a different one.**
+What differs is the *cause*.
+There the information was genuinely absent from the artifact.
+Here the information is present, but the regex is shaped as an **allowlist** --- it enumerates the separators, qualifiers, or punctuation that may follow a keyword before matching --- and prose has more of those shapes than any enumeration anticipates.
+Every round adds one more admitted separator (a colon, a dash, a parenthesis) and every addition reopens the false-positive side, because each new admitted character is also a character that appears inside an unrelated word.
+
+Four rounds on one such regex, each wrong in a different direction (measured 2026-09-11, `Morrison-Lab/gha#857`, deciding whether a `### Verdict` heading qualifies an existing statement or supersedes it): a bare word-boundary prefix matched `### Verdict rationale`, an ordinary section title, and misfired on every uncorrected review that happened to use the word.
+Requiring the word to end the line then let `### Verdict: Needs more work` through unmatched, which is the unsafe direction here --- the qualifier case that must be caught was excluded by the exact fix meant to narrow false positives.
+Admitting a bare dash as a separator then matched `### Verdict-bearing span rule`, because "verdict-bearing" was itself vocabulary the surrounding review corpus wrote constantly, so the regex's own test-writing repository was the likeliest producer of a false positive.
+Requiring whitespace before that dash excluded `### Verdict (revised)` and `### Verdict, revised`, re-opening the unsafe direction again.
+The pattern in all four: each fix named one more member of the allowed set, and the members left out (or the ones re-admitted to fix a false negative) kept landing on real prose.
+
+**The fix was to stop enumerating what MAY follow the keyword and state what may NOT**: a heading whose word continues, into a following word or through a hyphen joined directly to it with no whitespace, is a section title;
+everything else --- with or without a qualifier, of any separator shape --- is the construct being matched.
+A forbidden-shapes characterization has a fixed, small membership (word continues;
+hyphen-joins with no space) where the allowed-shapes characterization has an open one (every separator any reviewer might type), so the enumeration that keeps growing is the wrong one to be enumerating.
+
+- **Do:** when a match/no-match regex needs a third round of "also admit this separator" or "also exclude this word", rewrite it as a small, named set of DISQUALIFYING shapes instead of a growing set of QUALIFYING ones.
+- **Do:** ask, for each round's fix, whether it grew an allowed set or named a forbidden one --- a fix that adds one more permitted character is the symptom, not the cure.
+- **Don't:** keep refining an allowlist past its second false-positive/false-negative flip;
+  that oscillation is the tell that the allowed set is open-ended rather than merely incomplete.
+- **Don't:** treat the two directions as equally safe to be wrong in --- state which one is (per the corpus this classifier serves) before choosing which way to err while the rule is still incomplete.
+
 ## A log's file order is an assumption, so state it before keying an instrument on position
 
 The sections above test an instrument's matcher.
@@ -2063,3 +2206,42 @@ warns.
 - **Don't:** apply the same tuning bias to a blocking guard; both of its
   error directions carry a real cost, so it wants precision, not
   over-triggering.
+
+## Before proposing an instrument, read the one that exists --- and read why it is advisory
+
+This fragment's standing push is to build the instrument.
+The failure that push produces is proposing to build one that is already built, and the corpus is now large enough (125 scripts, measured 2026-09-10) that "nothing measures this" is a claim about repository state rather than an observation.
+It is the shape [`metacognitive-monitoring`](metacognitive-monitoring.md) names: a state claim, owed a query rather than a recollection.
+
+The query is cheap and there is no excuse for skipping it:
+
+```bash
+grep -n 'add_argument' scripts/<instrument>.py     # what it can already do
+grep -rn '<instrument>' .github/workflows/          # whether CI runs it, and how
+```
+
+**The second query is the one that gets skipped**, and it is the more informative of the two.
+An instrument can exist, be wired into CI, and be deliberately **advisory**, which from the outside is indistinguishable from not existing: the check runs, prints, and never fails, so the defect it measures keeps growing and nothing in the log looks wrong.
+Finding it unenforced feels like finding the gap, and it is not --- the gap was decided.
+
+So read the rationale before proposing to gate it.
+A `|| true`, a missing `--strict`, or an unset threshold in this corpus usually carries a comment saying why, and that comment is the actual assignment: it states a constraint any proposal has to satisfy, per [`challenge-the-assignment`](challenge-the-assignment.md).
+The commonest one here is this fragment's own cry-wolf limit --- a gate that fires on most PRs trains everyone past it, and takes the real cases with it.
+A proposal that ignores it is not a stronger version of the existing check, it is the version that was already rejected.
+
+**What survives is usually a narrower gate, not a higher threshold.**
+When the broad check must stay advisory, look for a slice where the failure is unambiguous: one file rather than a whole closure, a hard external limit rather than a budget of ours, a band the artifact is not normally in rather than every change.
+Fired rarely enough and on a limit nobody disputes, a gate costs no PRs until it matters --- which is what makes it survivable where the broad one is not.
+
+- **Do:** grep the instrument's flags and its CI invocation before saying a check is missing.
+- **Do:** read the comment beside a `|| true` or an unset threshold as a constraint on your proposal, not as an oversight.
+- **Do:** propose a narrower gate on a slice with an undisputed limit, when the broad gate is the one that was rejected.
+- **Don't:** infer from a growing defect that nothing measures it --- an advisory check and an absent one produce identical logs.
+- **Don't:** re-propose gating the whole measure at a different number;
+  the cry-wolf objection is about how often it fires, so a threshold tweak does not answer it.
+
+(Measured 2026-09-10, ai-config#3546.
+`CLAUDE.md` grew 84,979 -> 143,827 bytes in the 26 days after the trim of ai-config#1258, to 95.8% of the harness's hard cap, while `check-context-closure.py --baseline` ran advisorily on every PR throughout.
+A recommendation to "add a per-PR gate on closure growth" was posted to ai-config#3367 before either query above had been run;
+both the flag (`--max-growth`) and the CI step already existed, and gating the closure total is precisely what `validate.yml`'s comment rejects.
+The root-file ratchet that shipped instead is the narrower-slice form.)

@@ -202,6 +202,39 @@ explains `blocked`, and it clears on its own once they finish. Only dig into
 branch-protection settings if `blocked` persists after every check is
 `completed`.
 
+**"Persists after every check is `completed`" still needs one more caveat:
+when the same check *name* ran more than once on the same head SHA, GitHub's
+"latest" for that name is decided by `completed_at`, not by which run was
+*triggered* first, last, or most recently.**
+A run dispatched earlier (say, automatically on push) can finish **after** two
+later, label-triggered re-runs of the same check both passed --- and GitHub
+then reports the earlier-triggered-but-later-completing failing run as the
+current result for that check name, leaving the PR `blocked` even though the
+two more recent triggers both came back green.
+Reading "two newer runs passed" as superseding the older one is the wrong
+question: trigger order and completion order are independent, and only
+completion order decides which run's conclusion GitHub currently uses.
+
+Measured on `UCD-SERG/serocalculator#691`, 2026-09-09: three `version-check`
+runs shared one head SHA.
+The two label-triggered re-runs (dispatched 02:11:16Z) both completed and
+passed by 02:11:23Z; the push-triggered run, dispatched 7 seconds earlier
+at 02:11:09Z, did not complete until 02:11:56Z --- 33-35 seconds after the
+two later-triggered runs had already gone green --- and it had failed.
+The PR read `blocked` on that failing run throughout the gap, and only
+cleared once a new head commit fired a fresh `synchronize` event.
+GitHub does not document this tie-break rule anywhere the entries above
+could cite, so treat it as derived from this one observation: re-check
+`completed_at` on a fresh case rather than recalling this paragraph, per
+[`timestamp-volatile-claims`](../shared/writing/timestamp-volatile-claims.md).
+
+- **Do:** when several runs share a check name on one head SHA, sort by each
+  run's own `completed_at` (from `get_check_runs`/`actions_get`) before
+  deciding which one is authoritative --- never by trigger event or listing
+  order.
+- **Don't:** call a failing run "superseded" because two runs that started
+  later already passed; check whether it also *finished* later.
+
 ## A CI job that STALLS looks identical to one that's merely slow -- diff the log twice, don't judge from one sample
 
 - Signature: a required check sits `in_progress` far past its normal
@@ -394,6 +427,52 @@ the exit status explicitly (`rc=$?; case $rc in 0) ...;; 1) ...;; *) echo
 (ai-config#712, 2026-07-24: a pre-push glyph scan reported "clean: no banned
 glyphs" without having scanned anything; caught only by re-reading the
 command's own stderr, which was sitting in the same output.)
+
+**A second route into this section's failure, measured 2026-09-10:
+`xargs` as the child-process boundary, where the remedy above does not reach.**
+
+A glyph scan through `xargs -0 grep -lP` printed `invalid option -- P` to
+stderr and exited 1.
+An interactive shell's `grep` is a `ugrep` function, per
+[`tools.md`](tools.md)'s "`grep` in a Claude Code session is a shell
+function" entry, and a function does not reach a child of `xargs`, so the
+child got the on-`PATH` binary: BSD `grep`, which has no `-P`.
+The empty stdout became "no tracked file contains an em dash", in a commit
+message.
+
+The exit code is the indirection's doing rather than grep's, which is why the
+explicit-`rc`-branch remedy directly above was not enough on its own.
+BSD grep rejects the flag with rc=**2**, exactly like the locale case, so that
+branch would have caught it.
+`xargs` replaces any non-zero child's status with one of its own, so grep's 2
+and a no-match's 1 arrive identical.
+The value is implementation-specific (1 on BSD, 123 on GNU findutils); the
+collapse rather than the number is what defeats the check.
+
+So under `xargs` one boundary swaps the binary and destroys the evidence ---
+the zero-matrix problem
+[`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md) names.
+Only some indirections do: `sh -c`, `bash -c`, `zsh -c` and `env` preserve the
+status, and `find`'s `;` form exits 0.
+The cases file carries the measured table.
+
+- **Do:** treat `xargs`, `find -exec`, a Makefile recipe and a script as one
+  kind of child-process boundary --- a `grep` function or alias reaches none.
+- **Do:** measure a flag, and the host's own utility, before calling either
+  behaviour universal --- the cases file lists which flags BSD grep actually
+  rejects and what each indirection does to the status.
+- **Do:** have a content search report the population it examined alongside
+  the hit count, so a zero differs from a detector that never ran.
+- **Don't:** generalize an indirection's effect on `rc` from one measurement
+  --- `xargs` collapses grep's 2 onto its own value, `find`'s `;` form
+  discards it to 0,
+  and `sh -c`, `bash -c`, `zsh -c` and `env` preserve it, so the branch that
+  is useless under the first two is exactly what works under the last four.
+- **Don't:** read empty stdout under `xargs` as having searched anything,
+  without checking stderr and the exit status together.
+
+See [`debugging.cases.md`](debugging.cases.md), "A GNU-only grep flag in an
+`xargs` child", for the measurements and the guard this produced.
 
 ## An error quotes the failing call, so its ARGUMENTS are not your data
 

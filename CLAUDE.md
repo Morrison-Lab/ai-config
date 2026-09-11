@@ -262,51 +262,26 @@ The fragment above carries the mechanics, the failure modes each check catches, 
 
 ## Timestamp recaps in local time
 
-When printing a status recap or summary, include a timestamp in the user's local time zone (Pacific Time, `America/Los_Angeles` — get it from `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`; the explicit `TZ` enforces PT on a machine set to any other zone).
-This makes "as of when" unambiguous when the user reads the recap later.
-Each reading expires immediately: run the command fresh for every recap rather than extrapolating elapsed time from a prior reading.
-A single honest measurement earlier in the session is what most easily licenses an invented timestamp later, because the memory of having consulted the clock obscures that the measurement has expired.
+[`shared/workflow/timestamp-local-recaps.md`](shared/workflow/timestamp-local-recaps.md)
 
-**The same drift hits a dated claim written into a file, not only a chat recap.**
-A "verified `<date>`" note added to a doc, a code comment, or a changelog entry during a long session is exactly as exposed to the UTC-versus-Pacific gap as a status recap is --- run the same clock check before typing the date into the file, not only before a chat update.
-The risk peaks late in the day Pacific (roughly after 17:00), once UTC has already rolled over to the next calendar date.
+A status recap or summary carries a timestamp in the user's local zone, so "as of when" is unambiguous when they read it later.
+That is the obligation;
+the rest of this section governs where the time comes from.
+Every clock time you write down --- that recap, a date typed into a file, a time stamped on a forge comment, a session-notebook heading --- comes from a reading taken **in that moment**, in the user's zone (`TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
+A reading expires immediately, and the thing that most reliably licenses an invented stamp later is the memory of having honestly measured one earlier: the clock keeps moving while a count of elapsed tool calls does not, so the two drift apart and the drift compounds across comments posted in sequence.
+The risk peaks after about 17:00 Pacific, once UTC has already rolled over.
 
-**Check the `%Z` in the output.** On Windows Git Bash the `TZ` override silently falls back to GMT (any IANA zone name does), so the command above prints GMT, not PT.
-If the suffix isn't PDT/PST, fall back to plain `date` when the machine's system zone is already Pacific.
-Otherwise use PowerShell: `[System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, 'Pacific Standard Time')`.
-Note the output format differs from the bash command — it's a raw `DateTime` with no timezone-abbreviation field, so format it yourself if you need the `PDT`/`PST` suffix or a compact form.
+**Print the reading.**
+A reading captured into a shell variable whose only destination is a heredoc never reaches the transcript, so the next stamp you type still comes from a sense of elapsed work --- a reading you cannot quote is not a reading.
+The fragment carries the platform mechanics (Git Bash silently falls back to GMT, so check the `%Z`, and use the PowerShell form when it does), every surface the drift reaches, and the measured cases.
 
-**The same drift also hits a clock time typed into a forge comment --- an issue or PR comment, and a claim comment especially, since sessions habitually stamp their claims with a start time.**
-A claim comment, a "working on this" status update, or a session-notebook heading is a dated claim exactly like the file edit above, so it needs the same fresh reading, not a reuse of whatever the last real reading said.
-The near-miss is inferring the current time from how much work has happened since that last reading --- counting elapsed tool calls, or a rough sense of "it's been a while" --- rather than running the clock command again.
-That inference feels safe because the earlier reading really was measured, but the clock keeps moving while a tool-call count does not track it, so the two drift apart the same way an unrefreshed chat timestamp does, and the drift compounds across several comments posted in sequence from the same stale reading.
-(Measured 2026-09-01: one real reading at 12:02 PDT was followed by claim comments on wai#81, wai#96, and wai#95 stamped "12:15 PT", "12:40 PT", and "12:58 PT" and by notebook headings "12:25", "12:55", "13:20", all extrapolated from elapsed tool calls.
-The next real reading, taken when a PR head commit's timestamp was needed, came back 12:21 PDT --- up to an hour behind the invented stamps.
-The brief that dispatched this entry itself asserted that `claim-pr` inserts the timestamp, which the skill's templates do not do.
-The review caught it, and it is the same class of unmeasured claim.)
+- **Do:** run the clock command on its own, immediately before typing a time anywhere, and quote what it returned.
+- **Do:** derive a time written into a file from a `date` read in the same command that writes it.
+- **Don't:** infer a clock time from how many tool calls or actions have happened since the last real reading.
+- **Don't:** treat an earlier honest measurement as still valid, or a reading the session never observed as one it did.
 
-**Run the clock so its value lands in the transcript, not only in a file.**
-A command of the shape `t=$(TZ=America/Los_Angeles date "+%H:%M %Z")` followed by a heredoc writing `$t` into a notebook does read the clock, and you still never see the reading --- so the next stamp you type comes from a sense of elapsed work exactly as if no command had run.
-A reading you cannot quote is not a reading, however honestly it was measured.
-
-- **Do:** run the clock command again immediately before typing a time into a forge comment, exactly as before a chat recap or a file edit.
-- **Do:** print the reading --- run the clock command on its own, so the value comes back in a tool result you can read and quote.
-- **Don't:** infer a clock time from the number of tool calls or actions taken since the last real reading.
-- **Do:** derive a time written into a file from a `date` read in the *same* command that writes it, so a heredoc heading cannot be typed from memory.
-- **Don't:** treat a reading captured into a shell variable whose only destination is that file as a measurement for a chat or comment claim ---
-  the session never observes it, so print it as well (`echo "$now"`) when the same reading will be quoted.
-
-See [`CLAUDE.cases.md`](CLAUDE.cases.md), "A notebook heading typed from the last reading, with the rule loaded".
-
-Two hooks are this rule's mechanism, one per surface.
-`hooks/no-unmeasured-clock-claim.py` reads the reply at `Stop`.
-`hooks/flag-unmeasured-timestamp.py` reads a comment body at `PreToolUse`,
-on the `gh` comment and review commands
-and on the `mcp__github__` comment tools that `hooks/require-agent-disclosure.py` covers.
-Each warns, never blocks, when the text states a Pacific clock time
-and no clock read appears in the transcript since the turn began,
-naming the stamp and the command to run before restating it
-(ai-config#2903, filed on the same day the rule above was written and broken again).
+`hooks/no-unmeasured-clock-claim.py` reads the reply at `Stop` and `hooks/flag-unmeasured-timestamp.py` reads a comment body at `PreToolUse`;
+both warn, never block, when a Pacific clock time appears with no clock read in the transcript since the turn began (ai-config#2903).
 
 ## State the actual time when reporting a scheduled check-in
 
@@ -348,6 +323,15 @@ See [`finish-wave`](skills/finish-wave/SKILL.md).
 
 When listing PRs in a table (or anywhere they could be clickable), make each PR number a markdown link to the PR URL — `[#237](https://github.com/<owner>/<repo>/pull/237)`.
 The plain text form forces the user to copy/paste; the linked form lets them open the PR in one click.
+
+**The same rule covers any forge artifact I reference, not just a PR number in a table.**
+Telling the user I replied to a comment, filed an issue, posted a review, or kicked off a run --- in a table or in ordinary chat prose --- and naming it without a link leaves them to go find it themselves, which is the exact cost the table-only version of this rule already removes for PR numbers.
+A comment has no number to recognize the way a PR does, so its link is the *only* way the user can locate it without re-deriving the search themselves.
+
+- **Do:** link every comment, review, issue, PR, or run I mention having acted on, wherever the mention occurs --- table or prose.
+- **Don't:** report "I replied to that" or "filed the issue" as a bare fact with no URL attached.
+
+(Directive from the user, 2026-09-09: telling them a reply had been posted without linking it made them go find it themselves.)
 
 ## Tag chat output by category so long recaps stay scannable
 
@@ -585,54 +569,38 @@ So `#316 session title convention`, not `PR #316 session title convention` or `P
 
 ## Re-check for latest review findings before reporting PR status
 
-**Before** reporting status on a PR (especially "clean" / "ready to merge"), re-read the **most recent** review comment on the PR.
-The same fetch applies to any other question about that live PR
-("why didn't you wait", "did you fix it", "why haven't you responded").
-Don't answer from chat context alone.
-Don't trust an earlier "verdict" you've cached — a new review may have been posted since (by the @claude bot, by a human, or by a re-trigger), and that newer review may contain findings the old one missed.
+[`shared/workflow/recheck-review-findings.md`](shared/workflow/recheck-review-findings.md)
 
-Specifically: when scanning checks (`gh pr checks`) shows green or "no failures", that's about CI state, **not** review verdict.
-Always pull the latest review comment and parse it for any "Findings", "Issues", "Remaining" sections before declaring a PR ready.
+Before reporting on a PR --- and especially before calling one clean or ready --- pull the review state fresh.
+Never answer from chat context or from a verdict you cached, which applies equally to any other question about that live PR ("did you fix it", "why haven't you responded").
 
-**Read every round since the one you last processed, not only the newest.**
-Several rounds can land during a monitoring gap, and "read the latest" alone fails exactly then.
-A test-only push between two substantive rounds gets a fresh verdict that says nothing about the earlier round's unaddressed findings, so the latest comment reads clean while older findings sit open
-(measured 2026-08-24 on sparta#1375 --- three rounds landed in one gap, and acting on the newest alone would have reported clean over an open regression finding).
-Diff the round list against what you last handled: fetch all `**Claude finished` comments, note each `Reviewed commit:` SHA, and treat any round newer than your last processed one as unread input.
+Five traps, each of which returns something that reads exactly like good news:
 
-**Filter on the body marker, not on an author login.**
-The login a review posts under varies by repo and by run --- `claude`, `claude[bot]`, and `github-actions[bot]` have each been observed carrying a real, complete verdict --- so a login-filtered query silently returns the *previous* round's comment and reads exactly like "no new review yet".
-That is a false negative on the one question this section exists to answer, and nothing in the output announces it.
-Completed runs start the body with `**Claude finished`, so match that instead:
+- **CI green is not a review verdict.**
+  `gh pr checks` reports check state and says nothing about findings.
+- **The newest round is not the only unread one.**
+  Several can land in one monitoring gap, and a test-only push gets a fresh clean verdict that says nothing about the earlier round's open findings.
+  Diff the round list against what you last handled.
+- **Filtering by author login silently returns the previous round.**
+  The login varies by repo and by run (`claude`, `claude[bot]`, `github-actions[bot]` have each carried a real verdict), and the stale result is indistinguishable from "no new review yet".
+  Match on the body marker `**Claude finished`.
+- **A formal review's finding can sit where a comments-only scan never looks.**
+  Its top-level body is often empty with the finding in an inline comment on a different endpoint, and the mirror case puts the finding in the body itself, possibly inside a collapsed `<details>`.
+  A bot's `COMMENTED` review carrying a finding is blocking exactly as a human's `CHANGES_REQUESTED` is.
+- **A later clean bot verdict does not clear a human's `CHANGES_REQUESTED`.**
+  Only that human, or an explicit dismissal, resolves a review *state*, and an automated "Ready for merge" posted afterwards does not touch it.
+  It feeds the merge gate directly, so it binds under `mwc` as much as under any other grant.
 
-```bash
-gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
-  | jq -s '[.[][] | select(.body | test("\\*\\*Claude finished|### Verdict"))] | last | .body'
-```
+A review-gating check run can also read green over a `NOT_CLEAN` verdict, so a check named for the verdict is not the verdict --- see [`review-verdict-pitfalls`](shared/workflow/review-verdict-pitfalls.md).
 
-`memories/gh-cli.md` carries the full statement, including the placeholder-wording trap when polling a run still in flight.
+- **Do:** read every round since the one you last processed, every formal review's state and body whoever posted it, and the inline comments.
+- **Don't:** treat green checks, a login-filtered query, or a named verdict-gating check as evidence the review is clean.
+- **Don't:** read a `COMMENTED` state as making a review blocking on its own --- what blocks is the finding inside it.
+- **Don't:** read a later clean verdict as clearing a standing `CHANGES_REQUESTED`, which blocks on its own until that human or an explicit dismissal resolves it.
+  The two run opposite ways, which is why they are separate bullets: one state does not block by itself and the other does.
 
-**Also check formal GitHub reviews, not just issue-style comments --- a review's findings can sit where a comments-only scan never looks, whoever posted it and whatever state it carries.**
-A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** --- the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments).
-The mirror case is a finding in the top-level `body` itself, plainly or inside a collapsed `<details>` suppression block: neither shape produces a comment object, so `pulls/N/comments` and a thread query both return nothing over it.
-[`fully-clean`](shared/workflow/fully-clean.md) carries the matcher for the collapsed block, and what fails that bar is the finding rather than the state.
-So a bot's `COMMENTED` review carrying a finding fails that bar exactly as a human's `CHANGES_REQUESTED` does.
-Checking `--json comments` alone can miss the review's existence entirely.
-Before declaring a PR ready, also run:
-```
-gh pr view N --json reviews --jq '.reviews[] | [.state, .author.login, .submittedAt, ((.body // "") | split("\n") | map(select(length > 0)) | .[0] // "(empty body)")] | @tsv'
-gh pr view N --json reviews --jq '.reviews[] | select(.state == "CHANGES_REQUESTED") | "\(.author.login) \(.submittedAt)"'
-gh api repos/<owner>/<repo>/pulls/N/comments --jq '.[] | "\(.path):\(.line // .original_line // "?") \(.user.login) \(.body)"'
-```
-A `CHANGES_REQUESTED` state is blocking regardless of whether an automated re-review later says "Ready for merge" — that bot verdict doesn't clear a human's own review state, which only the human (or an explicit dismissal) can resolve.
-The unfiltered listing comes first: the state filter answers only whether a review *state* blocks the merge button, which the forge lets `CHANGES_REQUESTED` alone do.
-
-- **Do:** read every formal review's state and body, whoever posted it, and treat a finding in a review body --- a collapsed suppression block included --- as blocking.
-- **Don't:** pass over a review because its author is a bot or its state is `COMMENTED`, nor read that state as blocking on its own.
-
-See [`CLAUDE.cases.md`](CLAUDE.cases.md), "A bot's `COMMENTED` review is the same blind spot".
-
-(A specific case of the standing **never assume; always verify** rule in `memories/preferences.md` — confirm the verdict with a fresh query, don't recall it.)
+(A specific case of the standing **never assume;
+always verify** rule in `memories/preferences.md` --- confirm the verdict with a fresh query, don't recall it.)
 
 ## Post in-chat feedback to the PR
 
@@ -1070,11 +1038,11 @@ Leaving it unmarked is what is not.
 A clean `git status` and an unlisted agent both describe one instant.
 Neither says whether the session working that worktree has actually stopped, and a quiet worktree can mean either "finished" or "between edits".
 Ask the agent directly (`SendMessage` to its id, or the equivalent for a peer session) before editing or reclaiming its worktree, including one that has sat quietly for hours --- a long stretch is a reason to ask sooner, not evidence of abandonment.
-[`memories/git-worktrees.md`](memories/git-worktrees.md) carries the case where both directions of that misreading --- read as live when quiet, read as dead when live --- happened to the same agent in one session.
+[`memories/subagent-worktrees.md`](memories/subagent-worktrees.md) carries the case where both directions of that misreading --- read as live when quiet, read as dead when live --- happened to the same agent in one session.
 
 **"Stay inside the worktree it was given" holds only while the agent works in the session's own repo.**
 `isolation: "worktree"` places that worktree in the **session's primary repository**, never in a repository the brief happens to name --- so a dispatch into a different clone hands the agent a worktree of the wrong repo, and the instruction above is unfollowable as written.
-Name the target clone by path instead, and tell the agent to create its own worktree there off `origin/<default-branch>` --- resolved from that repo, never hard-coded, per `memories/preferences.md`'s measured `fatal: invalid reference: origin/main` failure on a repo whose default is named otherwise.
+Name the target clone by path instead, and tell the agent to create its own worktree there off `origin/<default-branch>` --- resolved from that repo, never hard-coded, per `memories/subagent-worktrees.md`'s measured `fatal: invalid reference: origin/main` failure on a repo whose default is named otherwise.
 Measured 2026-08-07.
 [`memories/git-worktrees.md`](memories/git-worktrees.md) carries the evidence.
 [`shared/workflow/challenge-the-assignment.md`](shared/workflow/challenge-the-assignment.md) covers the general form --- a brief must not assert anything about the recipient's environment, which the author cannot query even in principle.
@@ -1502,6 +1470,27 @@ The remedy is to replace the pronoun with the noun, not to reword around it.
 This is distinct from [`challenge-ambiguous-terminology`](shared/workflow/challenge-ambiguous-terminology.md), which governs a word whose **meaning** is unresolved rather than a word whose **antecedent** is.
 Apply it wherever `code-review`/`ard`/`ardi` already reviews a prose diff, alongside the other prose-review rules in this file.
 
+## Writing style: don't build a model only to retract it
+
+A "rug-pull" presents a model, claim, or picture and a sentence or two later
+retracts or replaces it --- "X.
+However, the implementation actually Y."
+Every sentence can be individually true and cited; the defect is in the
+order, which no fact-check or read-through inspects.
+It is also the natural shape to write when the facts were discovered in
+that order, which is why it survives self-review: the prose narrates the
+author's own path rather than exposing the subject to a reader who never
+walked it.
+Lead with what is actually the case, and present an idealization or a
+prior approach afterward as an extension, not a correction --- except when
+the **reader** already holds the wrong model and the passage exists to
+correct it, in which case presenting it first is the point.
+
+[shared/writing/no-rug-pulls.md](shared/writing/no-rug-pulls.md)
+
+Check this at composition time as much as in review: the order is fixed while drafting,
+and a read-through inspects each sentence rather than the sequence.
+
 ## Writing style: semantic line breaks in prose
 
 [`shared/writing/semantic-line-breaks.md`](shared/writing/semantic-line-breaks.md)
@@ -1561,6 +1550,32 @@ self-review confirms the claim, which was never the defect.
 
 [`shared/writing/citations.md`](shared/writing/citations.md)
 
+## Check the renders, not just the source
+
+[shared/workflow/check-the-renders.md](shared/workflow/check-the-renders.md)
+
+Where a repo publishes a website or a book, the deliverable is the rendered
+page, and a correct source diff is not evidence the published page is
+correct.
+An unexpanded macro, a citation key pandoc renders as `key?`, a crossref
+resolving to nothing, a list that lost its blank line, a swallowed KaTeX
+error --- none shows in the diff, none makes CI red.
+The worst case is a fixed source over an unfixed deployed page, served from a
+stale render cache; every other check in this corpus passes on it.
+`python3 scripts/check-rendered-page.py <url-or-file>` is the instrument for
+the pattern failures, taking a preview URL, a published URL, or a local
+`_site/` file.
+It cannot detect staleness, which is a relation between a page and a commit
+rather than a property of the page: for that, grep the render for the exact
+text the diff added and removed.
+
+- **Do:** check the rendered page, and the deployed preview rather than only a
+  local render where the repo caches renders.
+- **Don't:** read a correct source diff as evidence about the published page.
+
+(Directive from the user, 2026-09-07: "for repos that render websites and
+books, always check the renders".)
+
 ## Fact-check prose and internal reasoning in review
 
 [`shared/writing/fact-check-prose.md`](shared/writing/fact-check-prose.md)
@@ -1582,7 +1597,7 @@ re-verify it.
 
 [`shared/writing/math-derivation-steps.md`](shared/writing/math-derivation-steps.md)
 
-Two axes.
+Three axes.
 *Between* displayed lines, write out every step, and flag gaps in review.
 *Within* one line, decompose complicated internal structure out into extra
 notation, then reapply that until each line carries one operation.
@@ -1592,6 +1607,15 @@ silently duplicated across sections.
 Stop unfolding at a modeled quantity the reader already accepts at that point
 in the argument, which is a test against the exposition rather than a class
 of expression.
+*Whether a line is displayed at all*: ask this explicitly for every equation written or edited,
+rather than inheriting the form of the nearest neighbouring equation ---
+display when the prose returns to it or it carries the argument,
+inline when it is a grammatical constituent of its own sentence,
+and the same form as its counterpart for any equation meant to be compared against another.
+A display equation running into its own introducing sentence is ambiguous between two causes with opposite fixes ---
+check the markup before changing anything.
+Format-general: applies to `$...$` versus `$$...$$`/an `equation` environment in Quarto/LaTeX,
+exactly as it applies to `<m:oMath>` versus `<m:oMathPara>` in Word/OOXML.
 
 When running `code-review` or the `ard`/`ardi` loop on a diff that touches
 math, apply this in addition to the fact-check above.
@@ -1758,116 +1782,27 @@ Open the PR.
   Measured 2026-08-17: an unescaped span inside a bash double-quoted string runs, so `` `echo SUBSTITUTED` `` became `SUBSTITUTED` in the resulting message.
   The same day a `-m` message quoting a merge command in backticks was refused by `hooks/no-unauthorized-merge.py`; those backticks were backslash-escaped, so what actually matched is unverified, and blocking is the safe direction rather than a defect.
   `git commit -F <file>` succeeded immediately either way, which is why the remedy needs no diagnosis first.
-  - **Do:** write a commit message carrying backticks to a file and commit it with `git commit -F <file>`.
+  - **Do:** `git commit -F` a backtick-carrying message from the session scratchpad, outside the worktree.
   - **Don't:** pass a backtick-carrying message through `git commit -m "..."`, or spend a round diagnosing a guard refusal when the file route costs one command.
 
 ## Tool transport collapses doubled backslashes
 
-The sibling of the backtick hazard above, and the same class: content silently
-transformed between what I type and what the interpreter receives.
+[`shared/coding/heredoc-backslash-collapse.md`](shared/coding/heredoc-backslash-collapse.md)
 
-Inside a Bash-tool heredoc with a **quoted** delimiter (`<<'PY'`), which
-should be entirely literal, a doubled backslash `\\` arrives as a single `\`.
-A single `\` survives intact.
-So one level of unescaping is applied somewhere in transport.
+The sibling of the backtick hazard above, and the same class: content silently transformed between what you type and what the interpreter receives.
+On some transports a doubled `\\` inside a Bash-tool heredoc body arrives as a single `\`, **even with a quoted delimiter** that should make the body literal.
 
-**Scope it before relying on it: this is a property of the environment, not of
-heredocs.**
-Measured 2026-08-22 on Windows 11 / MINGW64 through the Claude Code Bash tool.
-A reviewer running the same cases in a GitHub Actions Linux runner could **not**
-reproduce any of it, and was right not to --- so a claim stated unconditionally
-here is false there, which is how a true observation becomes a wrong rule.
-Test your own environment before trusting either answer.
+It fails silently and plausibly: the worst case is not a failed assert but a corrupted regex with no syntax error and a green suite.
 
-The reproducer is one command and needs no interpreter, which is what rules out
-Python's own string parsing as the cause:
+**It is a property of the environment, not of heredocs**, so measure yours rather than trusting either answer --- it reproduced on Windows MINGW64, and did not reproduce either in a GitHub Actions Linux runner or in a Linux remote Claude Code container --- two different environments, and the second is where many sessions actually execute.
+Knowing the rule also does not stop you tripping it, since nothing about typing an escape sequence announces itself as the trigger.
 
-```
-cat <<'EOF' > out.txt
-a\\nb
-c\nd
-EOF
-```
+- **Do:** build the character with `chr(92)` or a placeholder token before it enters a heredoc body, and print `repr()` of the constructed string.
+- **Do:** parse-check or read back any file a heredoc just wrote with escapes in it.
+- **Don't:** type a doubled backslash directly inside a heredoc body, quoted delimiter or not.
+- **Don't:** treat having read this rule as the check --- it was loaded, and the collapse happened anyway.
 
-Both lines land in `out.txt` carrying **one** backslash: the doubled form
-collapsed, the single form survived.
-Nothing but the transport touched it.
-
-It fails silently and plausibly.
-A patch script's `assert target in s` fails, which reads as a slightly-wrong
-anchor string --- so the natural response is to re-dump the region and retype
-the anchor, which fails identically.
-The tell only appears on printing `repr()` of the constructed string.
-
-The worse case is not a failed assert.
-A heredoc that *writes* `\\d` into a regex emits `\d` --- a corrupted matcher with no
-syntax error and a green suite.
-Anything writing regexes, escape sequences, or Windows paths through a heredoc
-is exposed, including a `jq` filter: `test("\\*\\*Claude finished")` reaches
-`jq` as `test("\*\*...")` and dies with `Invalid escape`.
-
-Build the character rather than typing it:
-
-```
-B = chr(92)
-def bs(t): return t.replace("@@", B)
-
-# A NON-RAW literal is where this bites. Expressing one backslash inside one
-# requires typing two, and that doubled form is exactly what collapses -- so
-# the placeholder is doing real work here.
-target = bs('print("done@@n")')
-# -> the 15 characters  print("done\n")  ... with a real backslash,
-#    which is what the file being patched actually contains.
-```
-
-The same collapse is already described twice.
-[`algorithmatize-checks.rationale.md`](shared/workflow/algorithmatize-checks.rationale.md)
-records it for **this same transport** --- a shell heredoc feeding Python ---
-where `\\b` arrives as `\b` and becomes a **backspace**, worked through as
-a mutation that silently corrupts a guard's own regex.
-[`address-every-comment.rationale.md`](shared/workflow/address-every-comment.rationale.md)
-records a genuinely different one, backslash quoting collapsing across nested
-shell layers.
-What is new here is the trigger context --- a Bash-tool heredoc whose delimiter
-is quoted, so it should be literal --- and the placeholder remedy.
-Cross-linked because a dupe-check keyed on this section's vocabulary would
-otherwise miss both.
-
-A **raw** string needs none of this: `r"^\d+$"` is single backslashes
-throughout, and those survive.
-The machinery is for the doubled form --- a non-raw literal, or any target that
-must itself contain a backslash escape.
-
-- **Do:** route every literal backslash through `chr(92)` (or a placeholder
-  token) when heredoc content must survive verbatim.
-- **Do:** print `repr()` of a constructed string when a match inexplicably
-  fails, rather than retyping the anchor.
-- **Don't:** assume a quoted heredoc delimiter guarantees literal content ---
-  on this platform, measured 2026-08-22, it does not.
-- **Don't:** carry the claim to another platform without re-measuring; it did
-  not reproduce in a Linux CI runner.
-  It also did not reproduce in a Linux remote Claude Code container on
-  2026-09-01: the same reproducer left both backslashes of `a\\nb` intact
-  under `repr()`.
-- **Don't:** trust a green suite after writing a regex through a heredoc; read
-  the emitted line back.
-
-**Knowing this rule does not stop you tripping it, so add a check rather than trusting recall.**
-Measured 2026-09-01: this section was loaded and had just been read
-when a heredoc'd Python edit wrote `'\\n\\n'` into a file,
-which arrived as the literal text `\n` and corrupted the script it was patching.
-`ast.parse` caught it immediately, and the fix was the `chr(92)` placeholder this entry prescribes.
-So the remedy works; what fails is noticing that the moment has arrived,
-because nothing about typing an escape sequence announces itself as the trigger.
-Run a parse or round-trip check after any heredoc'd edit that writes escape sequences.
-
-- **Do:** parse-check (or read back) a file a heredoc just wrote with escapes in it.
-- **Don't:** treat having read this section as the check --- it was, and the collapse happened anyway.
-
-(Measured 2026-08-22; tracked as
-[ai-config#1923](https://github.com/Morrison-Lab/ai-config/issues/1923).
-Cost three identical failed patch attempts before the cause was visible, then
-recurred immediately in a `jq` filter reading a PR review body.)
+`hooks/warn-heredoc-doubled-backslash.py` scans a command's heredoc bodies at `PreToolUse` and names the offending line (ai-config#1923, #3362).
 
 ## Strict Merge Control Policy
 

@@ -200,6 +200,26 @@
     the login-filtered version of this command was flagged as stale by review on ai-config#636;
     the unscoped-across-reruns version was flagged by a follow-up review on ai-config#637 and confirmed concretely on gha#278, whose thread holds two separate `**Claude finished` comments, one per run;
     and the `gh api --jq --argjson`/pagination gaps in *that* fix were themselves flagged by a still-later review on the same PR, caught only after #637 had already merged.)
+- **Triaging many open PRs at once: extract each PR's `review-data:` payload with one `jq` pipeline instead of dispatching a subagent to read each review.**
+  Every completed `**Claude finished` review body ends with a machine-readable `<!-- review-data: {"schema_version": ..., "verdict": ..., ...} -->` comment (the same payload `scripts/lib/review_payload.py` parses).
+  For a quick multi-PR scan, capture it directly:
+  ```bash
+  gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
+    | jq -s '[.[][] | select(.body | test("\\*\\*Claude finished"))] | last.body
+             | capture("review-data:\\s*(?<j>\\{[\\s\\S]*?\\})\\s*-->").j
+             | fromjson | {verdict, findings: (.findings | length)}'
+  ```
+  The `fromjson` is load-bearing and easy to drop: `capture(...).j` yields a jq
+  *string*, so a trailing bare `| jq .` re-emits it still escaped rather than
+  parsing it, and nothing downstream (`.verdict`, `.findings`) is queryable.
+  The failure is quiet --- the output still looks like JSON.
+  Loop that over every open PR's issue-comments endpoint and the whole set's verdicts and finding counts come back without reading a single comment body by eye or spending a subagent per PR --- the deterministic-tool default [`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md) asks for, applied to review triage specifically.
+  **Do not treat this raw regex capture as the final gating signal, though** --- it has none of `review_payload.py`'s code-fence masking, so a verdict quoted inside a fenced example in the review body (an ARD template, a quoted prior round) can be captured instead of the real one.
+  Use the raw pipeline to decide *which* PRs need a closer look.
+  For an actual clean/not-clean call on one PR, read the comment through `scripts/check-pr-fully-clean.py` (or `review_payload.py` directly), the same masking-aware path `fully-clean.md` already requires.
+  - **Do:** run the jq pipeline across all open PRs first, to triage which need attention, before dispatching per-PR analysis.
+  - **Don't:** use the naive jq capture's verdict as the basis for declaring a specific PR clean or not-clean --- re-read it through the masking-aware extractor for that call.
+  (`d-morrison/rme` ardia sweep, 2026-09-06.)
 - **`jq empty` exits 0 on empty stdin: pair it with an emptiness check `[ -n "$out" ]` when validating JSON.**
   `printf "" | jq empty` exits `0`, so using `echo "$out" | jq empty` alone to validate API responses accepts an empty response body as valid JSON.
   For robust validation of API responses (e.g. `gh api`), check both non-emptiness and JSON validity: `[ -n "$out" ] && echo "$out" | jq empty 2>/dev/null`.
@@ -469,6 +489,16 @@
   On `ucdavis/bcs` (2026-07-30) ruleset `19248641`, scoped to `~DEFAULT_BRANCH`, returns `{"review_on_push":true,"review_draft_pull_requests":true}` -- which is why draft PRs there get Copilot reviews at all.
   Check this before concluding that a Copilot review was requested by a person, or that its absence means nobody asked.
 
+  **`required_approving_review_count: 1` plus no automated reviewer that ever issues `APPROVE` is a permanent block, and it looks identical to reviewers merely being slow.**
+  `reviewDecision` in `gh pr view --json reviewDecision` is `REVIEW_REQUIRED` until some review lands in the `APPROVED` state --- and `@claude`'s review workflow posts a plain `COMMENTED` review (see [`self-review-fallback.md`](../shared/workflow/self-review-fallback.md)), never `APPROVE`, while a quota-stubbed Copilot review is also `COMMENTED`.
+  So on a repo whose ruleset sets `required_approving_review_count: 1` with no human or approving bot in the loop, every PR sits `REVIEW_REQUIRED` forever, with green CI and a clean-reading review comment, and nothing distinguishes that from "waiting on a reviewer who hasn't gotten to it yet."
+  Diagnose it in one pass: `gh pr view <N> --json reviewDecision,mergeStateStatus,reviews --jq '{reviewDecision, mergeStateStatus, reviews: [.reviews[] | {author: .author.login, state: .state}]}'` alongside `gh api "repos/<o>/<r>/rulesets/<id>" --jq '.rules[] | select(.type=="pull_request") | .parameters.required_approving_review_count'` --- a `REVIEW_REQUIRED` decision with every review in the list `COMMENTED` and a nonzero required count means the block is structural, not a queue position. (`ucdavis/rampp` ruleset `3889405`, 2026-09-09: `required_approving_review_count: 1`, and on PR #166 five `copilot-pull-request-reviewer` reviews, every one `COMMENTED` and carrying the identical quota-stub body.
+  The `@claude` responses are worse for this purpose than a `COMMENTED` review: `gh api repos/ucdavis/rampp/pulls/166/reviews` returns **zero** entries for `claude[bot]`, because that workflow posts plain issue comments rather than submitting reviews.
+  A reviewer that files no review object cannot move `reviewDecision` however clean its prose is, so check `pulls/<N>/reviews` rather than `issues/<N>/comments` when asking whether a reviewer can satisfy an approval rule.
+  `mergeStateStatus` is the field that points at it, and only before the merge: it read `BLOCKED` with all 16 check runs green, which is the tell --- green checks plus `BLOCKED` means a rule other than status checks, and `reviewDecision` then names which.
+  After the merge the same field reads `UNKNOWN`, so take the reading while the PR is still open.
+  A human clicking Approve is the only way past it, or an admin bypass where the ruleset's `bypass_actors` allow one on pull requests.)
+
   **A required-context STRING is derivable from the default branch's workflow files, and a PR's check-run names are not the place to read it.**
   A caller job invoking a reusable workflow publishes `<caller job> / <inner job>`, where each half is a **job** display name -- its `name:` where one is set, its key otherwise -- and the caller *workflow*'s `name:` appears nowhere.
   So `check: {uses: Morrison-Lab/gha/.github/workflows/spellcheck.yml@v2}` in a workflow whose `name:` is `Spellcheck` publishes `check / spellcheck`, not `Spellcheck`.
@@ -737,6 +767,12 @@
   Derived rather than recalled, by counting `review_requested` events for Copilot across that session's PRs: six PRs received requests (`#3004`, `#3007`, `#3016`, `#3036`, `#3044`, `#3076`), nine request events in total, and only the PR carrying this extension received none.
   That is the mechanism working, not failing --- a date that re-arms is the whole reason the switch is a date and not an env flag --- but it does show the cost of a short window, since the re-arm lands mid-session with no announcement.
   So the new window is three months rather than a fortnight, far enough from the day-to-day that its expiry is unlikely to surprise an active session.
+
+  **Reconfirmed 2026-09-10.**
+  The directive, verbatim: "copilot is unavailable until october;
+  remember this and stop trying to use it".
+  Logged for the date and the wording, as each prior directive is.
+  `MORATORIUM_END` is deliberately unchanged: December already covers October, so the constant remains the operative window and editing it down to the stated month would shorten the guard rather than extend it.
 
   `MORATORIUM_END` in [`hooks/no-unreviewed-pr.py`](../hooks/no-unreviewed-pr.py) is the live value and this paragraph is its prose pair;
   the constant's own comment requires editing both together, and an extension that moves one is a silent divergence.

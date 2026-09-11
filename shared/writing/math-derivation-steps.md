@@ -2,7 +2,7 @@ When writing or reviewing a mathematical derivation --- an algebraic
 manipulation, a proof, a statistical argument --- hold it to a stricter
 completeness bar than ordinary prose reasoning.
 
-This fragment covers two axes.
+This fragment covers three axes.
 The first is **between** displayed lines: how much happens from one line to
 the next.
 The second is **within** a single line: how much structure is packed inside
@@ -10,6 +10,7 @@ one expression.
 That second axis applies to any displayed equation, a standalone definition
 included, not only to a line inside a running derivation, and its remedy
 reaches document scope even though the defect shows up in one line.
+The third is **whether** a line is displayed at all: display versus inline, a decision that is usually never made on purpose rather than made wrongly.
 
 ## Writing: don't skip steps
 
@@ -413,9 +414,64 @@ The stopping rule came out of a follow-up exchange on the same example, from
 the question of whether the atoms of statistical notation are essentially
 always single probability expressions, and the user approved encoding the
 answer.
-It is stated here as a test rather than as a taxonomy because complication 3
-is real and checkable in this very document: `@prp-marginal-likelihood` at
-:746 unfolds `$\dens(Y=y)$` into `$\int_0^a \dens(Y=y\mid
-T=t)\,\lambda\expf{-\lambda t}\,dt$` plus a never-infected term, so the
-expression that is the floor in the sandwich-variance section is composite
-two propositions earlier.)
+It is stated here as a test rather than as a taxonomy because complication 3 is real and checkable in this very document: `@prp-marginal-likelihood` at :746 unfolds `$\dens(Y=y)$` into `$\int_0^a \dens(Y=y\mid T=t)\,\lambda\expf{-\lambda t}\,dt$` plus a never-infected term, so the expression that is the floor in the sandwich-variance section is composite two propositions earlier.)
+
+## Choose display or inline, deliberately
+
+The two axes above ask what happens between displayed lines and what happens inside one.
+This third axis asks whether a line should be displayed at all --- a decision that, left unasked, is usually never made on purpose.
+
+The failure here is not choosing wrong.
+It is never posing the question.
+An equation's form gets inherited from whatever neighbouring equation the author copied it from, so the new equation is correct, it renders, and nothing about it looks unfinished --- which is exactly why it survives self-review.
+Ask the question at write time and again at edit time, for every equation you touch: does this want to be display, or inline?
+
+**Display marks an equation the reader will return to.**
+An equation the surrounding prose cites again later, or that carries the step the section's argument turns on, is display --- set apart from the running text and, wherever the format supports it, labeled so a later mention can point back to it rather than restate it (Quarto's `{#eq-...}` div, a LaTeX `\label{}` inside an `equation` environment).
+A named quantity that is never cited again does not automatically earn this: the test is whether the *argument* returns to it, not merely whether it happens to have a name.
+
+**Inline marks an equation that is a grammatical constituent of its own sentence.**
+"the density $f(t)$ is decreasing on $(0, a)$" reads as one sentence with a symbol standing in for a noun phrase;
+setting $f(t)$ on its own display line breaks that sentence in two for no reason the reader can find, and running prose directly into a display line on either side is the specific defect that neighbour-copying habit produces.
+If removing the equation and reading the sentence aloud with a plain noun phrase in its place still parses, the equation belongs inline.
+
+**Two equations meant to be compared must be given the same form as each other.**
+A reader can weigh two expressions side by side only when both are shown at the same scale and in the same position relative to the surrounding text --- both inline, or both display, never one of each.
+Mismatched form silently withdraws the comparison the passage is asking the reader to make, even when each individual equation renders correctly on its own.
+
+### The mechanics are format-specific; the question is not
+
+The decision is the same question on every authoring surface this corpus touches, only the syntax differs:
+
+- **Quarto/LaTeX**: `$...$` for inline, `$$...$$` or an `equation`/`align` environment for display --- and in Quarto specifically, display is also what makes an equation crossreferenceable at all (`{#eq-...}`), so choosing inline for an equation the prose later needs to cite forecloses that citation before it is written.
+- **Word/OOXML**: `<m:oMath>` in a normal run for inline, `<m:oMathPara>` wrapping the `<m:oMath>` for display.
+  The two are structurally distinct elements rather than a style applied to one element, so converting between them means moving the equation into (or out of) the paragraph-level wrapper, not toggling an attribute.
+  `m:oMathPara` does not claim its own line by itself: two separate `w:br` elements do that work, one immediately before it and one as the last child inside `m:oMath`, and either can be missing on its own --- see [`memories/office-open-xml.md`](../../memories/office-open-xml.md)'s "`m:oMathPara` does not claim its own line" section for the exact shape and why that gap looks like a display/inline mistake without being one.
+
+### Do and don't: display versus inline
+
+- **Do:** ask "display or inline?" explicitly for every equation you author or edit, rather than copying the form of the nearest neighbouring equation.
+- **Do:** make an equation display, and label it, when the prose returns to it or when it carries the step the argument is making.
+- **Do:** make an equation inline when it is a grammatical constituent of the sentence around it --- test this by reading the sentence aloud with the equation replaced by a plain noun phrase.
+- **Do:** give two equations meant to be compared the same form and scale as each other.
+- **Don't:** let a fresh equation's form default to whatever markup the equation before it happened to use.
+- **Don't:** treat "it renders correctly" as evidence the display/inline choice was made deliberately --- a correct render is fully compatible with the form having never been decided at all.
+- **Don't:** compare two equations set at different scales and expect the reader to do the normalizing.
+
+### In review: display versus inline
+
+A display equation running directly into the sentence that introduces it, with no separating punctuation or paragraph break, is a symptom rather than a diagnosis, and that symptom is ambiguous between two causes with opposite remedies.
+Either the display/inline choice was wrong and the equation should be inline, or the choice was right and the display mechanics are incomplete --- in Quarto/LaTeX a missing blank line around `$$...$$`, in Word/OOXML a missing `w:br` (see the Word/OOXML bullet above).
+**Check the underlying markup before changing anything.**
+Converting a correctly-display equation to inline because it looks glued to its introducing sentence removes the display form the argument actually needed, and does not fix the missing break that caused the symptom.
+
+Flag the inverse too --- an equation the prose cites again later, written inline with no way to reference it.
+And flag a pair of compared equations set at different scales, since that finding is invisible on the diff of either equation alone;
+it shows only once both are read together.
+
+(Directive from the user, 2026-09-09: "let's make a cai policy: every time you write or edit an equation, ask yourself if it should be a display equation or inline".
+A Word manuscript supplement authored three new equations in one section that session, each correctly authored as display, and each rendering ran directly into the sentence introducing it because the equation's `m:oMathPara` was missing one or both of the surrounding `w:br` breaks described above --- the display/inline choice itself was right throughout.
+A checker written afterward --- per file, counting display equations examined and how many missing-break findings each had on either side --- ran first as a negative control over the three untouched original documents, examining 14 display equations in the supplement, 13 in the response letter and none in the manuscript, and finding nothing in any of them.
+On the supplement's working build it then found 7 missing-break findings across 5 defective equations, and 0 after repair, with the repair keeping all five equations display and adding the missing breaks.
+The finding count and the equation count differ because a single equation can be missing a break on either side or both: three of the five were missing only one side, two were missing both, which is 1 + 1 + 1 + 2 + 2 = 7.
+Two of the five defective equations sat in a different section from the three the author knew about, and neither the author nor the user had noticed those two: the defect carries no text of its own, so a build check that only compares accepted versus rejected text was blind to the defect by construction.)

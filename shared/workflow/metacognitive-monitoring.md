@@ -1165,6 +1165,28 @@ Those four rules belong to this case alone, in the same way the three above it d
 the section's standing Do/Don't list is the one that follows this paragraph.
 [`A correction inherits its instrument`](#a-correction-inherits-its-instrument-so-a-second-reading-is-not-a-check) above reaches the same place from the other direction, governing the retraction itself rather than the evidence offered for it.
 
+**An attribution is a claim like any other, and a verified fact about an artifact does not verify who is on record asserting its opposite.**
+The cases above all concern a measurement licensing too wide, or too different, a claim about the same artifact.
+This one licenses a claim about a second artifact entirely: which document carries a stale claim, when several sibling documents describe the same fact and only one of them gets it wrong.
+
+Confirming that a file is untouched by a PR settles a fact about the file.
+It settles nothing about whether that PR's own body states otherwise, or whether the wrong sentence lives somewhere else entirely --- a sibling PR's overlap section, a brief handed to you, a session's own recollection.
+Naming the wrong source is a second, unverified claim riding on the first, and it inherits none of the first claim's soundness because it was never checked at all: the writer never opened the accused document's own text before naming it as the source.
+
+(Measured 2026-09-09 on [Morrison-Lab/ai-config#3434](https://github.com/Morrison-Lab/ai-config/pull/3434).
+`get_files` on a sibling PR correctly established that `memories/git-worktrees.md` was untouched by it --- a sound, directly-verified fact.
+The sentence built on it named that PR's "own summary line" as the source of an earlier overclaim about the file.
+That PR's actual body says the opposite, correctly: "`memories/git-worktrees.md` itself is untouched".
+The stale claim was in a different sibling PR's own overlap section, and originated further back in the brief that had listed the file among the first PR's files --- neither of which was checked before the attribution was written.
+A coordinator caught it by reading the accused PR's own text.)
+
+- **Do:** open the document you are naming as a claim's source, before naming it --- an attribution is a claim about that document's text, checkable only by reading it.
+- **Do:** treat a claim about *who said what* as a separate claim from the fact it stands beside, needing its own check even when the fact is solid.
+- **Don't:** infer a document's own wording from a brief, a memory, or a sibling document that describes it --- each of those is a copy, and a copy is not the source.
+
+Those three rules belong to this case alone, in the same way the sets above it do;
+the section's standing Do/Don't list resumes below.
+
 - **Do:** write what the measurement establishes and what you are claiming as
   two separate sentences, and confirm the second does not reach past the first.
 - **Do:** measure the illustrating instance separately whenever a verified
@@ -1519,5 +1541,27 @@ Where the routes differ but the observable defect is identical, say so: pre-exis
 - **Do:** report "pre-existing, reached by a different route" when that is what the counterfactual shows.
 - **Don't:** treat an admission as exempt from the cause check --- candour is a property of the tone, not of the evidence.
 - **Don't:** accept a reviewer's attribution, in either direction, without the same counterfactual you would demand of your own.
+
+**2nd occurrence, a different domain: a multi-author document rather than a
+commit history, and the counterfactual is a different attribute rather than
+a different checkout.**
+The candidate here was not "my change broke this code" but "my edit produced
+these tracked changes" --- read off a paragraph's edit density, in a document
+another author had also edited.
+Proximity did the same work it does for a commit: the reviewing edits sat in
+the same document, so they were the available explanation for insertions
+found nearby.
+The counterfactual is not a `git show <parent>:<path>` here, because there is
+no prior version to check out --- the authoritative record sits inside the
+same artifact, as the `w:author` attribute on each `<w:ins>`/`<w:del>`
+element.
+Reading it showed a different author's name and a date three weeks earlier.
+[`memories/office-open-xml.md`](../../memories/office-open-xml.md)'s "A
+tracked change's `w:author` decides who made it, not the size of the diff"
+carries the mechanics and the query.
+The transferable point is the same one this section already makes: a cause
+claim about your own most recent action needs its authoritative record
+checked, whatever form that record takes in the artifact at hand, and
+"the effect sits near where I was working" is proximity, not that record.
 
 See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md), "A defect attributed to the fix that merely sits beside it".

@@ -30,7 +30,11 @@ review comments are invisible here, resolved or not (ai-config#3079). No
 `<summary>`-scoped match on `suppressed` exists in this file either, so a
 Copilot finding inside a collapsed `<details>` block is invisible too
 (ai-config#3170): it creates no inline comment and states no verdict, so no
-count performed here can see it. Measured on ai-config#3167, where this
+count performed here can see it. The one exception is a Copilot review
+carrying its own heading verdict (ai-config#3066): `copilot_verdict` matches
+`Suppressed comments` anywhere in that body, so a collapsed block there
+reads as not-clean; every other path is still blind to it.
+Measured on ai-config#3167, where this
 script printed FULLY CLEAN twice over a standing finding -- an inline comment
 at head 16544c50, and a suppressed "previously missed" item at head 7e1294b0.
 Both are pre-squash heads, reachable from no branch: fetch them from
@@ -303,7 +307,20 @@ def _is_bot_author(login: Optional[str]) -> bool:
     if not login_str:
         return False
     return (
-        login_str in ("github-actions", "github-actions[bot]", "claude[bot]", "claude", "cursor")
+        login_str
+        in (
+            "github-actions",
+            "github-actions[bot]",
+            "claude[bot]",
+            "claude",
+            "cursor",
+            # `gh pr view --json reviews` returns Copilot's login WITHOUT the
+            # `[bot]` suffix the REST endpoint carries (memories/gh-cli.md,
+            # measured 2026-09-01), so the suffix test below misses it and a
+            # real Copilot review was never admitted from that surface.
+            "copilot",
+            "copilot-pull-request-reviewer",
+        )
         or login_str.endswith("[bot]")
     )
 
@@ -337,6 +354,15 @@ EXCLUSIVE_BOT_IDENTITY: Dict[str, str] = {
     "jules": "Jules",
     "jules[bot]": "Jules",
     "cursor": "Cursor",
+    # Copilot posts under three spellings across the three surfaces that carry
+    # it: `copilot-pull-request-reviewer[bot]` on the REST reviews endpoint,
+    # `copilot-pull-request-reviewer` on `gh pr view --json reviews`, and
+    # `Copilot` on the inline review comments (memories/gh-cli.md). Mapping all
+    # three to one identity is what stops two spellings of one reviewer
+    # satisfying `--quorum 2` on their own.
+    "copilot": "Copilot",
+    "copilot-pull-request-reviewer": "Copilot",
+    "copilot-pull-request-reviewer[bot]": "Copilot",
 }
 
 
@@ -1232,20 +1258,45 @@ def strip_cited_finding_vocab(text: str) -> str:
 # `Block(?:ed|ing)?` needs lookbehinds because `\b` treats a hyphen as a
 # boundary, so "non-blocking" -- how a reviewer marks a nit as NOT blocking
 # -- read a Ready-for-merge review as not-clean (ai-config#2369, measured
-# 2026-08-26 on #2288). Only the `non-`/`non ` compounds are exempted.
-# "previously-blocking" is deliberately NOT exempted, although it produces a
-# safe-direction false positive when narrating a fixed finding: "the
-# previously-blocking finding remains open; do not merge" is a real
-# not-clean statement, and a lexical lookbehind cannot tell it from "the
-# previously-blocking error was fixed". Missing a not-clean is the dangerous
-# direction, so the narration form stays an over-flag -- as does any other
-# `-blocking` compound ("merge-blocking" is a real signal) and the
-# emphasized form ("non-**blocking**": the char before `blocking` is `*`,
-# which the lookbehind cannot see through).
+# 2026-08-26 on #2288). "non-"/"non " were the only compounds exempted at
+# first; "not blocking" and "no blocking findings remain" reproduced the
+# identical false positive on #3468 (ai-config#3487, measured 2026-09-09),
+# because a hyphen or space after "non" is not the only way a reviewer
+# negates the word -- "not " and "no " immediately before it are the same
+# statement in different words. Four prefixes are now guarded: `non-`,
+# `non `, `not `, `no `. The hyphenated forms of the latter two --
+# "not-blocking", "no-blocking" -- are deliberately NOT exempted and stay
+# flagged: this is the same over-flag-rather-than-swallow direction as
+# "previously-blocking" just below, not an oversight (adding them would mean
+# widening word-boundary lookbehinds the same blanket way that, on the
+# `NOT_CLEAN_NEGATION_PREFIX` guard a few hundred lines down, turned out to
+# swallow real not-clean statements like "Not-negligible changes requested."
+# -- see that guard's own comment). "previously-blocking" is deliberately NOT
+# exempted either, although it produces a safe-direction false positive when
+# narrating a fixed finding: "the previously-blocking finding remains open;
+# do not merge" is a real not-clean statement, and a lexical lookbehind
+# cannot tell it from "the previously-blocking error was fixed". Missing a
+# not-clean is the dangerous direction, so the narration form stays an
+# over-flag -- as does any other `-blocking` compound ("merge-blocking" is
+# a real signal) and the emphasized form ("non-**blocking**": the char
+# before `blocking` is `*`, which the lookbehind cannot see through). A
+# negator that is NOT immediately adjacent also stays flagged, on purpose:
+# "this is not a nit -- it is blocking" has "not" five words away from
+# "blocking", so none of the fixed-width lookbehinds below fire on it, and
+# the sentence is correctly read as a live finding.
+#
+# `Rejected` and `Unapproved` were checked for the same treatment
+# (ai-config#3487's own question) and deliberately left unguarded: unlike
+# "non-blocking", there is no established review idiom "non-rejected" or
+# "not unapproved" -- a grep of this corpus's own prose and test fixtures
+# turns up no such usage anywhere. Adding a speculative guard for a phrasing
+# that does not occur would only buy risk (silently swallowing a genuine
+# "Rejected" or "Unapproved" finding) for zero real benefit. Revisit if a
+# real occurrence ever surfaces.
 _BARE_REJECTION = (
     r"\b(?:Rejected|Unapproved|"
-    r"(?<!non-)(?<!non\s)Block(?:ed|ing)?"
-    r"|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings"
+    r"(?<!\bnon-)(?<!\bnon\s)(?<!\bnot\s)(?<!\bno\s)Block(?:ed|ing)?"
+    r"|Impasse|Deadlock|(?<!\bno-)Changes\s+requested|Actionable\s+findings"
     r"|Partial\s+review)\b"
 )
 
@@ -1820,7 +1871,7 @@ VERDICT_NOT_CLEAN_PATTERNS = [
     # already existed for `no changes requested`.
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
     r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock|Partial review)",
-    r"changes\s+requested\b",
+    r"(?<!\bno-)changes\s+requested\b",
     _BARE_REJECTION,
     r"\[FINDINGS_COUNT:\s*[1-9]\d*\]",  # Machine-readable finding count > 0
     r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm|approval)\b",
@@ -1828,22 +1879,25 @@ VERDICT_NOT_CLEAN_PATTERNS = [
     r"\bnot\s+(?:an\s+)?approval\s+of\s+the\s+(?:MR|PR)\s+as\s+a\s+whole\b",
 ]
 
-# Applies to EVERY not-clean pattern, not to one named member.
+# Space-only, deliberately. This guard is consulted for EVERY pattern in
+# `VERDICT_NOT_CLEAN_PATTERNS` / `FINDING_PATTERNS`, so a hyphen alternative
+# here does not stay near the phrase it was written for: granting `non-`/`no-`
+# silently read `non-rejected`, `no-rejected`, `non-unapproved`, `non-impasse`
+# and `non-deadlock` as clean, which is a swallowed not-clean and the
+# dangerous direction (ai-config#3497 review).
 #
-# This guard already existed, as an `if pat == r"changes\s+requested\b"` branch
-# inside the matching loop -- so a sibling pattern added to the list above got
-# no negation handling at all, which is precisely what happened. Enumerating
-# which patterns need the guard is the same failure this file has already lost
-# to twice on the clean side.
+# Hyphen handling belongs on the phrase that needs it. `no-changes requested`
+# is one phrase, so it carries its own `(?<!\bno-)`, in `_BARE_REJECTION` and
+# in both pattern lists. `non-blocking` -- the case ai-config#3487 is about --
+# needs nothing here either: `_BARE_REJECTION`'s own `(?<!\bnon-)` lookbehind
+# already covers it.
 #
-# Adjacency-anchored rather than a bare negator search anywhere in the prefix,
-# and that is what keeps it in the safe direction. Missing a not-clean signal
-# is the dangerous direction here, so the guard must not fire on a negator
-# belonging to an earlier clause: the `\w+\s+` filler cannot cross punctuation,
-# so `This is not done. Needs work` and `It is not ready; needs more work` both
-# stay not-clean.
+# The filler-word branch stays space-separated. `not-negligible` and
+# `no-nonsense` are compound adjectives whose hyphen does not negate what
+# follows, and reading them as negated filler swallows a real finding.
 NOT_CLEAN_NEGATION_PREFIX = re.compile(
-    r"\b(?:no|not|nothing|none|never)\s+(?:\w+\s+){0,2}$", re.IGNORECASE
+    r"\b(?:no|not|nothing|none|never)\s+(?:\w+\s+){0,2}$",
+    re.IGNORECASE,
 )
 # Two alternation groups on purpose. Emphasis markers are tolerated ONLY
 # before the alternatives that are unambiguous negations when they open the
@@ -1915,7 +1969,7 @@ FINDING_PATTERNS = [
     r"\*\*Location:\*\*",
     r"Verdict:\s*(?:Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock|Partial review)",
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
-    r"changes\s+requested\b",
+    r"(?<!\bno-)changes\s+requested\b",
     _BARE_REJECTION,
     r"\[FINDINGS_COUNT:\s*[1-9]\d*\]",  # Machine-readable finding count > 0
     r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm|approval)\b",
@@ -2040,7 +2094,83 @@ def _is_marked_or_in_verdict_section(scan: str, match_start: int) -> bool:
     return False
 
 
-def classify_verdict(body: str, state: str = "") -> str:
+# Copilot's formal-review verdict lives entirely in the body's opening heading
+# (`### <emoji> Approval recommended`), measured on this repo's own #3166 on
+# 2026-09-09. Such a body carries no `review-data:` payload, no `Verdict:`
+# label, and none of the heading vocabulary FINDING_PATTERNS knows, so nothing
+# else in this file can read it: every Copilot review classified as "no verdict"
+# and was dropped before it could count either way (ai-config#3066).
+#
+# The heading prefix is bounded rather than open, so a `Approval recommended`
+# mentioned in prose lower down cannot be read as the verdict. The bound is
+# characters, not a character class, because the decorating emoji varies with
+# the verdict and a class enumerating today's three would silently stop
+# matching a fourth.
+_COPILOT_HEADING_PREFIX = r"(?:^|\n)[ \t]*#{1,6}[ \t]*(?:[^\w\n\"\']+[ \t]*)?"
+COPILOT_AFFIRMATIVE_HEADER = re.compile(
+    _COPILOT_HEADING_PREFIX + r"\bApproval\s+recommended\b", re.IGNORECASE
+)
+COPILOT_NEGATIVE_HEADER = re.compile(
+    _COPILOT_HEADING_PREFIX
+    + r"\b(?:Changes\s+recommended|Needs\s+a\s+closer\s+look)\b",
+    re.IGNORECASE,
+)
+# A `Suppressed comments` section carries real findings that appear in NO other
+# surface -- not in the inline comments, not in the check run
+# (memories/copilot-reviews.md, rounds 35 and 36 on ai-config#2913). An
+# affirmative header standing over one is therefore not a clean round.
+COPILOT_SUPPRESSED_BLOCK = re.compile(r"\bSuppressed\s+comments\b", re.IGNORECASE)
+# Copilot reports its own inline-finding count in the `Review details` block, as
+# `0`, `0 new`, or a positive integer. This is the only count available to a
+# body-only classifier, and its absence is not evidence of zero.
+COPILOT_COMMENT_COUNT = re.compile(
+    r"\bComments\s+generated:\**[ \t]*(\d+)", re.IGNORECASE
+)
+
+
+def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str:
+    """Classify a Copilot formal review body as 'not-clean', 'clean', or ''.
+
+    Returns ``clean`` only when all three of the issue's conditions hold at
+    once: the overview heading is affirmative, the body reports zero inline
+    findings, and it carries no suppressed-findings block. Anything else that
+    is recognisably a Copilot verdict returns ``not-clean``, and a body this
+    function does not recognise returns ``''`` so the ordinary scans decide.
+
+    Fails closed on a missing comment count. An affirmative heading with no
+    `Comments generated:` field states an approval this function cannot confirm
+    is finding-free, so it yields no verdict rather than a clean one -- the
+    same direction ``_is_bot_author`` and the quorum tag already take.
+    """
+    if not body:
+        return ""
+    if scan is None or cited is None:
+        scan, cited = strip_cited_finding_vocab_with_mask(body)
+
+    def _has_valid_match(pattern, text):
+        for m in pattern.finditer(text):
+            if not match_is_cited(cited, m.start(), m.end()):
+                return m
+        return None
+
+    # Checked first: a negative heading is a verdict on its own, and reading it
+    # before the affirmative test means a body carrying both spellings (a
+    # re-review quoting its own earlier round) cannot resolve to clean.
+    if _has_valid_match(COPILOT_NEGATIVE_HEADER, scan):
+        return "not-clean"
+    if not _has_valid_match(COPILOT_AFFIRMATIVE_HEADER, scan):
+        return ""
+    if _has_valid_match(COPILOT_SUPPRESSED_BLOCK, scan):
+        return "not-clean"
+    count = _has_valid_match(COPILOT_COMMENT_COUNT, scan)
+    if count is None:
+        return ""
+    if int(count.group(1)) != 0:
+        return "not-clean"
+    return "clean"
+
+
+def classify_verdict(body: str, state: str = "", author: str = "") -> str:
     """Classify one automated review item as 'not-clean', 'clean', or '' (none).
 
     Returns '' when the item states no verdict at all. That case is the whole
@@ -2048,22 +2178,76 @@ def classify_verdict(body: str, state: str = "") -> str:
     is NOT an approval, and must not supersede an earlier verdict. Its very
     thoroughness is what makes it read as a sign-off.
 
-    A not-clean signal wins over a clean one within a single body, matching
-    fully-clean.md's rule that when a verdict line and the findings beneath it
-    disagree, the findings win.
+    For a body without a well-formed ``review-data`` payload, a not-clean
+    signal wins over a clean one within that body, matching fully-clean.md's
+    rule that when a verdict line and the findings beneath it disagree, the
+    findings win. A well-formed payload is the exception described below: it
+    decides on its own and the prose is not consulted.
+
+    A Copilot heading verdict is read by ``copilot_verdict`` (ai-config#3066):
+    its blocking form returns before the prose scans, and its clean form only
+    after the not-clean scan has run, so an affirmative heading never
+    outranks a finding stated in the same body.
 
     Cited finding vocabulary is blanked first (see strip_cited_finding_vocab),
     so a clean verdict that merely quotes "Needs more work" is not misread as
     stating it -- the #1202 false positive, one surface over.
+
+    A well-formed ``review-data`` payload -- one carrying a ``schema_version``
+    key, the contract's own version marker -- decides directly whenever
+    ``payload_is_blocking`` or ``payload_is_clean`` applies to it, and the
+    prose scan below never runs for that comment (ai-config#3054); a payload
+    that is neither (a clean verdict with the ``findings`` key missing, say)
+    still falls to the prose scan. Three measured
+    false positives (d-morrison/rme#1128, #1130, #1132) and a fourth on the
+    gha side (Lacaedemon/sparta#1547) each carried a payload of
+    ``"verdict": "CLEAN", "findings": []`` that flatly contradicted a phrase
+    the scan below matched anyway -- a retrospective "blocking issues ...
+    addresses all of them", a negated "don't block merge", a heading whose own
+    parenthetical says "(all clean)". The payload is the reviewer's own
+    machine-readable verdict; letting a retrospective or negated prose match
+    override it is backwards.  ``NOT_CLEAN`` always wins this way.  ``CLEAN``
+    only wins when ``findings`` is present, a list, and empty -- a CLEAN label
+    next to a non-empty or malformed ``findings`` field is self-contradicting,
+    so it is NOT trusted here and falls through to ``payload_is_blocking``
+    immediately below, which already treats a non-empty/malformed
+    ``findings`` field as blocking regardless of the stated verdict.
     """
     if state in ("CHANGES_REQUESTED", "REJECTED"):
         return "not-clean"
 
     structured = extract_structured_review(body)
+    if isinstance(structured, dict) and "schema_version" in structured:
+        # Reuse the SAME helpers `payload_is_blocking`/`payload_is_clean`
+        # already use a few lines below (and that `pre-push-review.py` and
+        # the pre-push hook also share) rather than re-deriving a narrower
+        # literal "CLEAN"/"NOT_CLEAN" string check here. A hand-rolled
+        # comparison silently missed the CLEAN_VERDICTS/NOT_CLEAN_VERDICTS
+        # synonyms (`READY_FOR_MERGE`, `APPROVED`, `NEEDS_WORK`, `BLOCKED`,
+        # ...) that this same file already treats as equivalent everywhere
+        # else, leaving exactly the false-positive class this fast path
+        # exists to close only half-closed for a reviewer that spells its
+        # verdict any other accepted way (review finding, PR #3359).
+        if payload_is_blocking(structured):
+            return "not-clean"
+        if payload_is_clean(structured):
+            return "clean"
+
     if payload_is_blocking(structured):
         return "not-clean"
 
     scan, cited = strip_cited_finding_vocab_with_mask(body)
+
+    # Copilot's heading verdict, read in two halves around the prose scans
+    # below rather than in one place. The blocking half returns immediately,
+    # because a Copilot not-clean must not be reachable past any later guard.
+    # The clean half waits until the not-clean scan has had its chance, so a
+    # finding stated in the body's prose still wins over an affirmative
+    # heading, exactly as fully-clean.md's "findings win" rule requires.
+    is_copilot = _reviewer_identity(body, author) == "Copilot"
+    copilot = copilot_verdict(body, scan, cited) if is_copilot else ""
+    if copilot == "not-clean":
+        return "not-clean"
 
     for pat in VERDICT_NOT_CLEAN_PATTERNS:
         for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
@@ -2088,6 +2272,9 @@ def classify_verdict(body: str, state: str = "") -> str:
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
                     continue
             return "not-clean"
+
+    if copilot == "clean":
+        return "clean"
 
     for pat in VERDICT_CLEAN_PATTERNS:
         for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
@@ -2220,6 +2407,17 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
     Same scan criterion 3 uses on HEAD items. A ``## Nits`` heading with
     real items is a finding even when ``classify_verdict`` returns clean
     because the same body also says Ready for merge (#2274).
+
+    A well-formed ``review-data`` payload (``schema_version`` present) with
+    an exact ``CLEAN`` verdict and a confirmed-empty ``findings`` list is
+    trusted directly, and the ``FINDING_PATTERNS`` prose scan below never
+    runs for that comment (ai-config#3054) -- the same payload-first rule
+    ``classify_verdict`` applies for criterion 4. This DELIBERATELY
+    supersedes the #2945 "findings win over a same-comment CLEAN payload"
+    stance for the exact case that rule covered (a resolution log under a
+    bare ``### Findings`` heading): the issue thread that requested this
+    change names #2945 as one of the false positives the new rule is meant
+    to subsume, alongside #3307, #2452, #1690 and #2523.
     """
     structured = extract_structured_review(body)
     findings = payload_findings(structured)
@@ -2242,6 +2440,19 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
         )
     if payload_is_blocking(structured):
         return f"structured blocking verdict ({normalize_verdict(structured.get('verdict'))})"
+    if (
+        isinstance(structured, dict)
+        and "schema_version" in structured
+        and payload_is_clean(structured)
+    ):
+        # `payload_is_clean`, not a literal `verdict == "CLEAN"` string
+        # check: the latter silently missed the `CLEAN_VERDICTS` synonyms
+        # (`READY_FOR_MERGE`, `APPROVED`, `APPROVE`) this same file already
+        # treats as clean everywhere else (review finding, PR #3359).
+        # `findings` is confirmed empty and well-formed by the two checks
+        # above (a non-empty or malformed list already returned above), so
+        # this is exactly the well-formed CLEAN payload #3054 asks to trust.
+        return None
 
     scan_body, cited = strip_cited_finding_vocab_with_mask(body)
     for pat in FINDING_PATTERNS:
@@ -2277,11 +2488,6 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
                     continue
                 suffix = scan_body[match.end():match.end() + 60]
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
-                    continue
-            if pat == r"changes\s+requested\b":
-                start = match.start()
-                pfx = scan_body[max(0, start - 25):start].lower()
-                if re.search(r"\bno\s+(\w+\s+)?$", pfx):
                     continue
             return pat
     return None
@@ -2415,10 +2621,11 @@ def check_latest_verdict(
             last_seen_by_author[login] = when_c
 
     expired_ledgers = []
+    payload_decided = []
     for item in dated:
         _kind, when, body, _oid, state = item[:5]
         author = item[5] if len(item) > 5 else ""
-        verdict = classify_verdict(body, state)
+        verdict = classify_verdict(body, state, author)
         identity = _reviewer_identity(body, author)
         finding_pat = _unresolved_finding_pattern(body)
         if (verdict == "not-clean" or finding_pat) and \
@@ -2426,6 +2633,25 @@ def check_latest_verdict(
                     body, author, when, last_seen_by_author):
             expired_ledgers.append((when, identity))
             continue
+        # Report when the payload -- not the prose scan -- decided this
+        # item's verdict (ai-config#3054), so a reader can see the phrase
+        # scan never ran rather than inferring it from a clean scan line.
+        # Uses payload_is_blocking/payload_is_clean, not a literal
+        # "CLEAN"/"NOT_CLEAN" string check, for the same reason
+        # classify_verdict's own fast path does (review finding, PR #3359):
+        # a hand-rolled comparison would silently under-report this NOTE for
+        # a CLEAN_VERDICTS/NOT_CLEAN_VERDICTS synonym spelling.
+        # Not gated on `finding_pat`: a NOT_CLEAN payload makes
+        # `_unresolved_finding_pattern` return its "structured blocking
+        # verdict" string, so gating on an empty finding_pat would suppress
+        # the NOTE for exactly the not-clean half (review finding, PR #3359).
+        if state not in ("CHANGES_REQUESTED", "REJECTED"):
+            payload = extract_structured_review(body)
+            if isinstance(payload, dict) and "schema_version" in payload:
+                if payload_is_blocking(payload) and verdict == "not-clean":
+                    payload_decided.append((when, identity, "not-clean"))
+                elif payload_is_clean(payload) and verdict == "clean":
+                    payload_decided.append((when, identity, "clean"))
         # Findings win over unreadable: a known-agent body with ## Nits and no
         # classifiable verdict line is a standing not-clean, not a NOTE.
         if verdict == "not-clean" or finding_pat:
@@ -2459,6 +2685,12 @@ def check_latest_verdict(
         "dispositioned in that comment itself"
         for when, identity in expired_ledgers
     ]
+    payload_notes = [
+        f"NOTE: verdict for {identity} ({when}) came from its review-data "
+        f"payload ({verdict}); the prose phrase scan did not run for this "
+        "comment (ai-config#3054)"
+        for when, identity, verdict in payload_decided
+    ]
     if (
         latest_verdict == "not-clean"
         and not _approval_clears(latest_identity, latest_author, approved_authors)
@@ -2466,7 +2698,7 @@ def check_latest_verdict(
         return False, [
             f"Latest verdict-bearing review statement ({latest_when}) is NOT clean, "
             "and no later comment supersedes it with a clean verdict"
-        ] + ledger_notes
+        ] + ledger_notes + payload_notes
 
     # Global latest is clean (or NONE), but another reviewer's latest may
     # still be not-clean -- the #2274 hole: a later all-clear from a
@@ -2495,6 +2727,7 @@ def check_latest_verdict(
             "classifier cannot read -- not treated as 'no review'"
         )
     issues.extend(ledger_notes)
+    issues.extend(payload_notes)
     blocking = [i for i in issues if not i.startswith("NOTE: ")]
     return len(blocking) == 0, issues
 
@@ -2657,7 +2890,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         is_bot_author = _is_bot_author(author_login) or (
             author_assoc in ("OWNER", "MEMBER") and _reviewer_identity(body, author_login) not in (author_login, "unknown")
         )
-        verdict = classify_verdict(body)
+        verdict = classify_verdict(body, "", author_login)
 
         # Automated reviews must be authored by a recognized bot author or contain a known review agent marker.
         # A comment that is neither from a bot account nor carrying a review agent marker is admitted
@@ -2803,7 +3036,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
     dated_matching = sorted(matching_items, key=lambda it: it[1] or "")
     latest_by_provider = {}
     for item in dated_matching:
-        if classify_verdict(item[2], item[4]) in ("clean", "not-clean") or _unresolved_finding_pattern(item[2]):
+        if classify_verdict(item[2], item[4], item[5] if len(item) > 5 else "") in ("clean", "not-clean") or _unresolved_finding_pattern(item[2]):
             provider = _reviewer_identity(item[2], item[5] if len(item) > 5 else "")
             latest_by_provider[provider] = item
     matching_items = list(latest_by_provider.values())
@@ -2812,6 +3045,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
     for item in matching_items:
         body = item[2]
         state = item[4]
+        author = item[5] if len(item) > 5 else ""
         if state in ("CHANGES_REQUESTED", "REJECTED"):
             has_findings = True
             issues.append(f"Matching review for SHA {sha[:8]} has state '{state}'")
@@ -2823,7 +3057,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
                 f"Review comment for SHA {sha[:8]} contains findings "
                 f"(matched pattern '{matched}')"
             )
-        elif classify_verdict(body, state) == "not-clean":
+        elif classify_verdict(body, state, author) == "not-clean":
             has_findings = True
             issues.append(f"Review comment for SHA {sha[:8]} explicitly blocks.")
 
@@ -2839,7 +3073,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
             # and keep their previous (bot-pooled) eligibility.
             if len(item) > 6 and item[6] is False:
                 continue
-            if len(item) > 5 and classify_verdict(item[2], item[4]) == "clean":
+            if len(item) > 5 and classify_verdict(item[2], item[4], item[5]) == "clean":
                 login = item[5]
                 identity = _reviewer_identity(item[2], login)
                 unique_authors.add(identity)

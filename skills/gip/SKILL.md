@@ -126,7 +126,7 @@ refuses for every one after it, and when the wave is genuinely concurrent its
 guard can race and put several agents on that branch at once, silently costing
 the isolation this step exists to buy.
 Leave the branch to the subagent, which cuts its own inside the worktree.
-See [`memories/preferences.md`](../../memories/preferences.md) for the full
+See [`memories/subagent-worktrees.md`](../../memories/subagent-worktrees.md) for the full
 precondition, the measured concurrency numbers, and the stale local base this
 form also avoids.
 

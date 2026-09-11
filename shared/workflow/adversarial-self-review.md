@@ -119,6 +119,96 @@ The merge-side rules live with the gate they serve:
   evaluating the shipping head.
 
 
+## Round repetition is a third axis, orthogonal to cost and independence
+
+(Directive from the user, 2026-09-10, given while a session drove a `gha`
+pull request through five straight rounds of push-gate self-review, each
+dispatched to the same-harness `adversarial-reviewer` subagent on the
+conductor's own Opus tier at roughly 350k subagent tokens per round: "always
+use agy or other cheap subagents whenever feasible, to avoid draining claude
+quota".)
+
+[`when-to-orchestrate`](when-to-orchestrate.md)'s "Route each agent's
+model/effort" section already names two axes for a dispatched call.
+**Cost** says mechanical work gets a cheap tier and judgment-heavy work
+inherits or escalates; a self-review is judgment-heavy, so this axis alone
+argues for keeping it on the conductor's own tier by default.
+**Independence** says a judgment-heavy verify stage wants a different model
+family, not just a different prompt; the merge gate above already applies
+this to review specifically.
+The push-gate floor's own same-harness permission rests on neither axis: it
+buys independence of intent, a subagent reading the diff without the
+author's account of it, which any dispatched subagent supplies regardless of
+its tier or family.
+
+Neither axis, and not the push-gate's own intent-independence reasoning
+either, prices in **repetition**.
+ARDI drives a PR through however many rounds it takes to reach a clean
+verdict, and each round dispatches the identical shape of call: the same
+brief structure, the same reviewer persona, a diff that has usually only
+shrunk.
+The cost of that shape is the per-round cost times the round count, and the
+round count is exactly the number nobody knows in advance.
+Five rounds at roughly 350k tokens each is 1.75M tokens spent on one PR's
+push-gate reviews alone, all of it against a task the push-gate floor never
+required to run same-harness in the first place --- it only allowed it.
+
+So repetition is a signal on its own, independent of whether any single
+round is judgment-heavy: once a review-shaped dispatch is known to repeat
+against the same PR, prefer the cheap or cross-family route from the first
+round rather than the fifth.
+[`delegation.md`](../../memories/delegation.md)'s "agy as a cheap
+adversarial-review lane on macOS" measurement already shows this pays off
+beyond cost: across nine rounds on two PRs, `agy --print` caught real defects
+a same-family Sonnet round had missed, at no Claude quota cost.
+The platform qualifier is part of the heading and is kept here deliberately,
+since that measurement was taken on macOS and this section's own worked
+example is a Windows checkout.
+
+**This narrows `delegation.md`'s "Claude subagents are for reviewers only"
+carve-out rather than repealing it.**
+That entry (2026-09-09) reserves the `Agent` tool for the
+`adversarial-reviewer` persona and routes every other subagent to `agy`.
+Read on its own, the heading can sound like a standing preference for
+Claude on review work specifically.
+The same paragraph already says the opposite three sentences later: `main`'s
+`hooks/no-push-without-self-review.py` accepts an `agy --print '<prompt>'`
+discharge directly, so a current hook install needs no Claude reviewer for
+the push gate at all.
+The carve-out is a ceiling on non-review Claude dispatch, not a floor under
+review dispatch --- check which of the two a given sentence in that entry
+actually states before reading it either way.
+
+Before assuming a Claude dispatch is required, check whether the pre-push
+hook that would gate the push is actually current.
+The installed copy on a given machine can be a symlink to a checkout that
+has fallen behind `origin/main`, in which case it silently reverts to
+requiring an `Agent`-tool reviewer regardless of what `main`'s own hook
+source supports
+([ai-config#3094](https://github.com/Morrison-Lab/ai-config/issues/3094)
+tracks the drift).
+When the installed hook is stale, satisfy it as it actually behaves rather
+than as it should --- the fix for staleness belongs to that issue, not to
+the push in front of you.
+
+- **Do (from the user):** default to `agy` or another cheap, cross-family
+  route for review-shaped dispatch whenever it is feasible, rather than
+  reaching for the same-harness Claude subagent by habit.
+- **Do (inferred):** treat a review known to repeat --- an ARDI loop driving
+  a PR to clean, not a one-off pass --- as a stronger case for the cheap
+  route than a single isolated review, since the cost is the per-round cost
+  times the round count.
+- **Do (inferred):** verify the active pre-push hook's actual behavior (the
+  installed copy, not `main`'s source) before assuming it requires or
+  forbids a given reviewer shape, and satisfy the hook as installed.
+- **Don't (inferred):** read "Claude subagents are for reviewers only" as a
+  reason to prefer Claude for review; it restricts non-review Claude
+  dispatch and says nothing about preferring Claude over a cheaper
+  discharge for review itself.
+- **Don't (inferred):** keep dispatching the same-harness reviewer round
+  after round on the strength of the push-gate floor's "any harness is
+  fine" --- permitted is not preferred once the round count passes one.
+
 ## Availability is a per-route question, and `command -v` answers one route
 
 The inventory above is a **machine** inventory:
@@ -521,6 +611,9 @@ not to teach the reviewer that style is someone else's job.
   before the repo's mechanical style checkers have run on that diff.
 - **Don't:** brief the reviewer to leave style findings for a later pass.
 
+[`ardi`](ardi.md)'s "Three or more review rounds" section carries the one exception, and it is narrow: on a **prose** diff that has already reached three finding-bearing rounds whose remaining findings are style preference, further trimming, or one more caveat, that section directs a later round's brief to withhold exactly those classes.
+The rule above governs every other case, including the first round of any diff.
+
 (Measured 2026-09-02 driving
 [#3025](https://github.com/Morrison-Lab/ai-config/pull/3025),
 a 20-line addition to `memories/reviewing-prs.md`.
@@ -671,8 +764,11 @@ How Cursor Cloud obtains the child's structured report is in
 [`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) gates the pre-push case on Claude Code, per [`algorithmatize-checks`](algorithmatize-checks.md).
 It answers three questions rather than one, because provenance alone is not enough.
 
-*Who said it*: a verdict is admitted only from the `tool_result` of an `Agent` call whose `subagent_type` is the reviewer, and only when that result is not an error.
+*Who said it*: a verdict is admitted from the `tool_result` of an `Agent` call whose `subagent_type` is the reviewer, and only when that result is not an error.
 So an inline pass, a verdict quoted out of a file, the guard's own denial message, and a clean report from some other subagent all fail.
+
+There is a **second** admitted provenance, which this paragraph read as the only one until the round-repetition section above was written: a `Bash` call matching the guard's own external-reviewer pattern, which today recognizes `agy --print` and not the other delegation CLIs.
+Both statements have to live in one file, so read the paragraph above as the rule for a Claude-side review and this as the rule for the external lane, rather than as two populations of what the guard accepts.
 
 *What it said*: restricting provenance does not make a phrase search sound **inside** the admitted body, which is the same failure one layer in --- a review whose closing note quotes the clean verdict it is withholding would read as clean.
 So the verdict is the last line that **is** a verdict line, anchored at line start, and a quotation mid-sentence is not one.
@@ -958,6 +1054,40 @@ It is adjacent to [#2483](https://github.com/Morrison-Lab/ai-config/issues/2483)
 - **Don't:** read the sentinel as part of the payload-last contract.
   It is a mitigation for the ordering that contract rules out, so a conforming report needs none.
 
+**Confirmed again, 2026-09-10, with the persona's existing "read that sha
+yourself" instruction already in place and still not enough on its own.**
+A dispatch against an unpushed commit reported `Reviewed-Commit:
+b7f1d0c62d3a83c98d0cc4d17ac8ea7dbfe1ff67`, matching the real commit
+(`b7f1d0c3f459eb7ac75b4453470d3e5b8046c298`) in its first 7 characters and
+disagreeing in the remaining 33.
+The persona file already carried "Read that sha yourself rather than taking
+it from the brief," which names the *source* to avoid but not the *method*
+that avoids it --- it does not say to run `git rev-parse HEAD` specifically,
+and it does not forbid extending a short sha it already has (from `git log
+--oneline`, or from the hook's own error text) out to 40 characters.
+The review's surrounding content was independently verified and sound,
+which is what made the fabricated fingerprint easy to miss: nothing else in
+the report read as unreliable.
+The pre-push guard's prefix-tolerant compare still caught it, because the two
+strings share only 7 characters and neither is a prefix of the other beyond
+that point, so `verify_review`'s mismatch check fired as designed.
+The in-session fix was to re-dispatch with the real full sha supplied and an
+explicit "do NOT invent or pad any SHA; report only a SHA a command you ran
+printed in full, and paste that command's output," which held for every
+later round.
+[`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md)
+now carries that instruction directly, so a future dispatch does not depend
+on the brief-writer remembering to add it.
+
+- **Do:** read this as confirmation that "read the sha yourself" needs the
+  method spelled out (`git rev-parse HEAD`, verified with `git rev-parse
+  --verify --quiet <sha>^{commit}`) and an explicit padding ban, not as a
+  reason to distrust the prefix-tolerant guard --- the guard worked.
+- **Don't:** treat a reviewer's otherwise sound, well-evidenced findings as
+  proof its fingerprint is real; the two are independent, and a fabricated
+  identifier can sit inside an accurate report undetected until something
+  else (here, the guard) compares it.
+
 ## Structured review data (JSON payload)
 
 Every reviewer emits two representations of one verdict: the human-readable Markdown report, then a machine-readable JSON payload in a trailing HTML comment.
@@ -1214,7 +1344,7 @@ across three rounds.
 Asked plainly, the reviewer said drop; dropping was right and ended the loop.
 The companion half of that session --- concluding a silent subagent had
 stalled when it was alive and twelve rounds ahead --- is recorded in
-[`git-worktrees`](../../memories/git-worktrees.md), "A quiet worktree is not
+[`subagent-worktrees`](../../memories/subagent-worktrees.md), "A quiet worktree is not
 evidence the session working it has stopped".)
 
 ### Ask it whether ANOTHER ROUND earns its place, which is a different question
@@ -1245,3 +1375,26 @@ Neither was a round happening to come back empty --- which, per the convergence 
   "Should this exist" and "should this iterate further" have different right answers, and a change worth shipping is the usual situation in which the continue-or-stop question arises at all.
 - **Don't:** treat an empty round as the answer to either question;
   a converging series narrows its own search space, so the empty round is the least informative one.
+
+### Do not write to the tree a dispatched reviewer is reading
+
+The reviewer reads the working tree, so any write to it moves the ground under a read already in progress.
+The trigger is not `git checkout` specifically, which is the narrower form [`memories/subagent-worktrees.md`](../../memories/subagent-worktrees.md)'s "Switching a shared worktree's branch under a live dispatched reviewer breaks its reads" section records.
+An ordinary in-place edit does it too: same worktree, same paths, different bytes underneath them mid-read.
+
+The dispatcher cannot detect the damage afterwards, and the reviewer usually cannot either.
+A reviewer that trusts a plain file read for the length of a long review reviews a mix of two states and reports no error at all, so the finding it returns may be about a line that no longer exists and the line it passes over may never have been in the tree it read.
+Nothing in the resulting report says which.
+
+The remedy is procedural rather than git-level, and it is the dispatcher's: dispatch the review, wait for it to report, then touch the files.
+Fixing findings while the round is still running is what produces this, and it feels like promptness rather than a mistake.
+On the reviewer's side, pin the target to a commit and read `git show <sha>:<path>` rather than the working copy.
+
+- **Do:** treat "don't touch the tree under review" as covering every write to it, an edit and a `git add` and a formatter run alike.
+- **Do:** have the reviewer read a pinned commit, so a dispatcher's slip degrades into a stale review rather than an incoherent one.
+- **Don't:** assume a live reviewer is safe from ordinary editing because no branch switch occurred.
+- **Don't:** start fixing a round's findings before that round has reported.
+
+(Measured 2026-09-09, `Morrison-Lab/ai-config`: an adversarial-reviewer subagent reading `scripts/check-docx-tracked-changes.py` reported the file "began changing under me (uncommitted)" while the dispatching session applied fixes to the same tree.
+It recovered by comparing `git show HEAD:<path>` against a copy saved at the start of its read, and said so in its report;
+that recovery is what surfaced the drift, not anything the dispatcher noticed.)

@@ -51,7 +51,10 @@ Nothing in this fragment fires on that, because there is no wrong object to name
 So when a check of yours came back clean and the claim still feels under-supported, ask which of the two is happening: whether you read the wrong thing, or read the right thing and then took a step.
 
 - **Do:** send a claim to that section instead of this one when the artifact is the correct one and the doubt is about the step taken from it.
-- **Don't:** read a shape here failing to match as evidence the claim is supported --- these shapes cover substitutions only.
+- **Don't:** read a shape here failing to match as evidence the claim is supported --- every substitution shape in this fragment covers substitutions only.
+
+One case sits between the two, and has its own section below --- "A measurement of the right artifact can still be scoped narrower than the claim made from it": the artifact is right, the reading is right, and the claim is the *same* proposition at a wider scope than the measurement covered.
+That is not a step taken from the measurement, so it is not the neighbouring rule either.
 
 ## The four shapes
 
@@ -355,6 +358,109 @@ It warns and never blocks, because a bare local base is entirely correct for an 
 It has no fetch-based discharge on purpose: [`keep-checkouts-fresh`](keep-checkouts-fresh.md) mandates a fetch at session start, so keying on one would silence the hook in exactly the sessions that follow the corpus.
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale local base that nearly quadrupled a review diff's file count".
+
+## A measurement of the right artifact can still be scoped narrower than the claim made from it
+
+Every shape above is a *substitution*: the thing read is not the thing the claim is about.
+This one is about the **sentence** rather than the object: whatever was measured, the claim reported covers more than the measurement did.
+Nothing about it feels like guessing, because the number really was derived by a real command.
+
+The two failures overlap, and the four instances below show it.
+Two are substitutions as well --- a build path the system never uses, and a baseline read that returned nothing --- so the shapes above would have caught them had anyone asked.
+Two are not: the display-math and `microtype` cases read exactly the right document, and only the sentence overreached.
+What they share is the tell, not the mechanism: a scope decision made once during setup, and never repeated in the sentence that reports the result.
+
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "A sound measurement does not license the claim standing next to it" already names the general gap between a measurement and a neighbouring claim, including cases where the claim is about a different proposition entirely.
+What follows is the narrow case where the claim is about the *same* proposition as the measurement, just at a wider scope along one identifiable axis --- build path, ref, math subset, package set --- so the fix is naming that one axis rather than restating the whole claim.
+
+Four instances from one session, all against the same PR, none of which felt like a guess at the time:
+
+- **A build path that bypasses the real pipeline.**
+  A harness extracted `$$...$$` math blocks from a `.qmd` chapter and ran `pdflatex` on them directly, to check whether the chapter's math compiles.
+  The book never builds that way --- Pandoc reads the source, expands the `macros.qmd` LaTeX macros the chapter actually uses, and only then hands TeX to the renderer.
+  Compiling the raw source with `pdflatex` measures an artifact the build never produces, so "the chapter's math does not compile" was a claim about a document nobody ships.
+  Two issues were filed on that premise before the mismatch surfaced.
+- **A submodule path read through `git show`, with the error thrown away.**
+  The same harness fetched the comparison baseline's macros with `git show <ref>:latex-macros/macros.qmd`.
+  `latex-macros` is a submodule, so that path is a gitlink in `<ref>`'s tree rather than a blob.
+  Git says so, loudly: measured `rc=128` and
+  `fatal: path 'latex-macros/macros.qmd' exists on disk, but not in 'HEAD'` on stderr.
+  Only *stdout* was empty --- and the harness read stdout alone, discarding both the status and stderr,
+  so the baseline arm compiled with zero macros defined and inflated every figure built against it
+  (a "153pt worst case" that was really 47pt once the real baseline macros loaded).
+  The lesson is the harness's, not git's: an empty read is only silent if you silence it.
+- **Display math measured, inline math assumed included.**
+  An overfull-box measurement scanned only `$$...$$` display blocks and was reported as covering "the chapter" --- it never touched the inline `$...$` math in the parent file, some of which also overflowed.
+- **A required package left out of the harness, silently changing the answer.**
+  The same overfull-box measurement ran without `microtype` loaded, reporting 0 overfull boxes where the `microtype`-loaded run of the same document reported 1 --- `microtype` changes line-breaking, so the count is not a rounding difference, it is a different measurement wearing the same label.
+  Measured in-session on `d-morrison/rme#1138` rather than in a filed artifact, unlike the figures above: rme#1154 carries the corrected overfull table but records nothing about package configuration, so this arm is anchored here and nowhere else.
+
+The shared shape: a scope decision --- which build path, which ref, which subset of the math, which packages --- gets made once while setting up the measurement, and then the sentence that reports the result names the whole claim ("the chapter's math", "0 overfull boxes") rather than the slice that was actually run --- or, where the slice was a comparison baseline, reports a difference against it ("a 153pt worst case") as though the baseline had loaded.
+"The test" section above already supplies the fix for a substituted artifact;
+the fix here is a stricter version of the same falsifying-question test, aimed at scope rather than identity: **what does this measurement cover, and is that the same thing the claim names?**
+
+- **Do:** state a measurement's scope in the same sentence as its number --- which build path, which ref, which subset, which flags --- rather than in a paragraph the reader has to reconstruct.
+- **Do:** confirm the artifact measured is produced by the same path the real system uses, not a hand-rolled shortcut that happens to consume the same source file.
+- **Do:** check a read's exit status, not just whether it returned bytes --- the one empty read among these four instances carried a non-zero status and a `fatal:` message, both of which the harness discarded.
+- **Don't:** report a subset measurement under the claim's full name without naming the subset.
+  Display blocks only, reported as "the chapter's math".
+  One package configuration, reported as "0 overfull boxes".
+- **Don't:** trust a comparison baseline's absolute number without confirming its own inputs loaded --- an empty or under-configured baseline arm inflates every relative claim built on it.
+
+(d-morrison/rme#1138, 2026-09-09: all four measured in one long session on the same PR.
+The Pandoc-bypass and the empty-submodule-baseline are also written up in that PR's own thread and in d-morrison/rme#1154's "Two instrument traps" section;
+the bypass produced a wrong "fix" and two issues filed on the false "math does not compile" premise, one of them d-morrison/macros#85, closed not-planned once the Pandoc-expansion mistake was found.)
+
+## A reviewer's counter-measurement needs the same check the claim it rebuts would have needed
+
+The section above is about the same artifact measured at a narrower scope than the claim names.
+This one is a plain substitution, the kind the four shapes above describe --- a different document standing in for the one the claim is about --- and it is worth its own entry only because of *who* commits it: a **reviewer** refuting someone else's claim rather than an author supporting their own.
+That is easy to miss, because a rebuttal reads as skepticism rather than as an assertion --- "I tested this and it isn't true" sounds like diligence applied, not like a new claim that itself owes [`dont-take-my-word-for-it`](../principles/dont-take-my-word-for-it.md).
+A finding backed by a real command is not thereby a finding backed by the *right* command, and nothing about the reviewer's own confidence distinguishes the two.
+
+A commit fixing a broken macro (`\def\v0`/`\def\v1` silently overriding `\renewcommand{\v}`) said only that it was "verified through `pandoc -t latex`" --- true, and unfalsifiable-looking to a reader with no further detail.
+An `adversarial-reviewer` subagent, dispatched to check the fix, ran its own counter-test: appended `\v0` `\v1` `\v{x}` to a document containing **no macro definitions**, ran it through `quarto pandoc -t latex`, and observed every token pass through unexpanded.
+From that it concluded pandoc does not expand TeX macros in math mode at all, so the stated verification could not possibly have discriminated a working macro file from a broken one --- and filed the fix's claim as unsubstantiated.
+
+The reasoning was valid.
+The measurement was real.
+Both were about the wrong case: pandoc's `latex_macros` extension expands a macro only when it is **defined in the same document**, which the reviewer's test document was not.
+Testing an empty document to ask "does pandoc expand macros" is the null case, indistinguishable in outcome whether the extension works or the extension is entirely absent --- [`fail-fast`](../principles/fail-fast.md)'s denominator move again: a test whose passing and failing readings look identical has not tested anything.
+Re-running with the precondition restored (a document that actually defines `\v`) produces the discriminator the claim needed:
+
+| | `\v0` | `\v1` | `\v{x}` |
+| --- | --- | --- | --- |
+| no definitions present | `\v0` | `\v1` | `\v{x}` |
+| `macros.qmd` before the fix | `\v0` | `\tilde{1}` | `\v{x}` |
+| `macros.qmd` after the fix | `\tilde{0}` | `\tilde{1}` | `\tilde{x}` |
+
+The reviewer had measured the top row and read it as the whole truth table.
+The middle row is the bug's actual signature --- only `\v1` expands, because a delimited `\def\v1` survived as the last definition of `\v` --- and the bottom row is the fix.
+Nothing in the reviewer's transcript was fabricated;
+the precondition the original claim depended on was simply never in the reviewer's own test.
+
+**Two things follow, and both are needed --- one about re-measuring a finding, one about where the fix belongs.**
+
+First: a rebuttal is a claim like any other, so the *rebutter* re-measures before publishing it, not only the party being rebutted.
+[`address-every-comment`](address-every-comment.md)'s Rebut disposition already lets an author push back on a reviewer's finding;
+the mirror obligation belongs to the reviewer before the finding is filed --- confirm the counter-test actually carries the precondition the original claim relied on, not merely a test that superficially exercises the same mechanism.
+
+Second: the fix is not to win the rebuttal in a PR comment where it dies with the thread.
+The original message's vagueness --- "verified through `pandoc -t latex`", true and giving the reader nothing to check --- is what invited a plausible wrong finding in the first place.
+Amending the commit message to carry the three-row table above did both jobs at once: it rebutted the finding, and it left the next reader (human or reviewer) unable to repeat the reviewer's mistake, because the null row sits right next to the two rows that discriminate.
+A durable artifact that states its own discriminator is [`quotable-findings`](quotable-findings.md)'s standard turned around --- a claim that names the exact measurement that would falsify it is the one nobody can plausibly misread.
+
+- **Do:** treat a reviewer's own counter-test as a claim requiring the same re-derivation any other claim does, whichever side of the finding you are on.
+- **Don't:** read "the reviewer ran a command" as equivalent to "the reviewer ran the command that could have shown the claim false" --- a command that cannot exhibit the failure mode has not tested the claim, however real its output is.
+- **Do:** when rebutting a finding, name the precondition the original claim relied on and confirm the counter-test carried it.
+- **Don't:** rebut by re-asserting the original claim against the counter-test's bare output;
+  that answers confidence with confidence and settles nothing --- name the specific precondition the counter-test dropped.
+- **Do:** write the discriminating measurement --- including the null case that shows what a non-discriminating test looks like --- into the durable artifact (commit message, PR body) rather than only into a comment thread.
+- **Don't:** leave a verification claim as a bare tool invocation ("verified through X") with no stated discriminator;
+  that vagueness is what makes a plausible-but-wrong counter-finding possible in the first place.
+
+(Measured 2026-09-09 on d-morrison/macros#87: the reviewer's counter-test and its null-case conclusion are the measured half;
+the general rule that a rebuttal is itself a claim requiring re-derivation, and that the fix belongs in the durable artifact rather than a comment, is the inferred half, extending [`address-every-comment`](address-every-comment.md)'s Rebut disposition to the reviewer's own side of it.)
 
 ## A summary is another shape, and the auto-loaded copy is the one you read
 
@@ -812,6 +918,27 @@ case, which is why all three were off by the same amount.
 Note the detector here was a second party re-running the measurement, not a
 check: nothing in CI could have caught it.)
 
+**Reading the right line does not settle what the line's number counts, and a wrong reading there survives every faithful copy that follows.**
+
+The section above corrects a *derivation* error: grepping the wrong line instead of the summary.
+This corrects an error in the summary line itself --- correctly read, correctly quoted, and still wrong, because its wording names one population while its number counts another.
+
+A checker reporting "N display equation(s) missing a line break" is ambiguous between two claims: N *equations* are affected, or N *findings* occurred (an equation can be missing a break on either side, so one equation can produce two findings).
+The tool's own sentence grammatically asserts the first while its counter tracks the second, and nothing about reading that line "correctly" resolves which one a downstream reader inherits.
+Everyone who then repeats the number is being faithful to the source, which is exactly why the error survives: a copy cannot be more careful than the thing it copies, and each faithful copy looks like independent confirmation without being one.
+
+- **Do:** before repeating a checker's summary count, read the noun in its own sentence and ask whether the counter beside it tracks that noun or a different one (a finding versus the distinct items it can occur on).
+- **Do:** fix the wording at the tool once an ambiguity like this is found, not only the prose that repeated it --- the next reader inherits the tool's sentence, not your correction of it.
+- **Don't:** treat "I read the suite's own summary line, not a grep-derived count" as sufficient;
+  that rules out one substitution and not the one where the line itself names the wrong population.
+- **Don't:** read several faithful copies of one number as corroboration --- they share a single source and inherit its error together.
+
+(Measured 2026-09-09 on [Morrison-Lab/ai-config#3426](https://github.com/Morrison-Lab/ai-config/pull/3426): a per-file checker counting missing line breaks around display equations printed a summary of the shape "N display equation(s) missing a line break" where N counted findings (an equation missing breaks on both sides counts twice).
+The true equation count was smaller.
+The findings-count, under the equation-shaped sentence, was copied verbatim into a status report, a subagent brief, a filed issue, the corpus fragment recording the incident, a companion memory file, and the PR body describing all of it --- six artifacts, each a faithful transcription of the one before it, all wrong in the same direction.
+A review round caught it at the sixth.
+The fix reached the tool itself, which now prints both counts under distinct labels, rather than only correcting the prose that had repeated the conflated one.)
+
 **An eighth: what a change TRANSFORMS, standing in for what it CONCLUDES.**
 
 The shapes above substitute one artifact, environment, or property for another, and this one substitutes a property too --- so what distinguishes it is not *what* gets swapped but *where* the swap happens.
@@ -898,6 +1025,33 @@ The converted view is evidence about what a reader sees, which is a different cl
 - **Don't:** read two derived views agreeing as corroboration when both drop the same class of content;
   that is [`grep-is-not-coverage`](grep-is-not-coverage.md)'s guaranteed-either-way null in a new surface.
 - **Don't:** treat "lossy" as "stale" --- refetching a conversion returns the same omissions.
+
+**Recurrence, 2026-09-09, on the same manuscript and the same link.**
+Asked whether the Shiny-app link had survived an edit, a sweep collected
+`w:hyperlink` elements and visible text, found neither, and reported to the
+user that the manuscript advertised the app twice while linking to it
+nowhere --- recommending the link be restored.
+Both readings are derived views that drop a field code, which is the
+agreement-by-shared-omission this section already names, and the Do-list
+above already prescribes the fix: grep the stored form when the claim is
+that something is absent.
+The rule existed, named this exact link, and did not fire.
+
+A second instance the same day generalizes it past hyperlinks.
+Asked whether a script `L` was used anywhere, a search over Unicode
+math-alphanumeric codepoints and over `m:sty` returned nothing, and the
+report was that no script letter existed in any of the three files.
+Word stores that styling as `m:rPr/m:scr val="script"`, a third
+representation neither query touched, and the supplement had been using it
+for the likelihood symbol all along.
+So the failure is not specific to hyperlinks or to pandoc: any absence
+claim about a `.docx` is a claim about the representations searched, and
+OOXML stores most things more than one way.
+
+- **Do:** enumerate which representations a `.docx` absence claim covers,
+  and say so in the claim.
+- **Don't:** report an absence from one attribute or element name when the
+  format has a second spelling for the same thing.
 
 (Measured 2026-09-01 while adding tracked changes and comments to three `.docx` files for a journal resubmission.
 A manuscript's Shiny-app link was absent from the rels listing and absent from pandoc's markdown output,
@@ -1199,3 +1353,307 @@ Neither tells you which branch this run took.
 Only running the reader against the exact artifact does, and
 [`mistake-patterns`](../../memories/mistake-patterns.md) Pattern 17 names that move ---
 which is worth stating twice, because it was cited in the same change that failed to perform it.)
+
+## A content diff verifies WHAT CHANGED, not whether the markup is valid
+
+[`memories/office-open-xml.md`](../../memories/office-open-xml.md)'s "Two pandoc diffs verify a redlined docx" section already gives the standard content-level check for a tracked edit: diff the accept/reject conversions, and treat a clean pair as evidence the edit is right.
+That is a check applied correctly and answering a narrower question than it looks like it answers -- related to the ninth shape above (a lossy conversion) and still distinct from it.
+The ninth shape is about a conversion that *drops information it cannot carry*, such as a hyperlink target.
+This is about a conversion that reports success over markup that is *outright invalid* -- the derived text comes out looking exactly right, and the file that produced it does not open.
+
+The mechanism is specific to any format where an annotation is supposed to **gate** whether some content counts as present.
+A tracked-change marker in OOXML gates a run's text under accept versus reject.
+When the marker itself is malformed -- written as an empty child of a run's properties instead of wrapping those properties and the text (see `memories/office-open-xml.md`'s "Writing a NEW OMML tracked-change marker..." entry) -- a walker that simulates accept/reject has nothing to gate: the malformed marker sits *beside* the text rather than *around* it, so the same text is emitted whichever mode the walker simulates, and the diff between the edited file and the original comes out exactly as intended.
+The check passes not because the markup is valid, but because content identity and markup validity are two different properties, and the check was only ever measuring the first.
+A namespace defect can be just as invisible to the same diff for an unrelated reason: a part whose `mc:Ignorable` attribute names a prefix that part no longer declares (the same manuscript's second, independent defect) changes nothing about any run's text at all, so a text-level diff has no way to notice it regardless of how carefully it is read.
+
+That is [`The test`](#the-test) above, applied to a check rather than to a claim: what would have to be true for this diff to be non-empty, and could a genuinely malformed file ever produce that?
+For both defects here, no.
+The malformed marker is symmetric under both readings, and the namespace defect touches no text a diff examines, so the diff cannot distinguish "the edit is correct" from "the edit corrupted the file's markup while leaving its rendered text (or its namespace-unrelated content) alone" -- the two states produce an identical diff.
+
+- **Do:** run a structural/schema-level check (parse every part;
+  verify the shapes an annotation is allowed to take;
+  verify a prefix-list attribute against what is actually declared) *in addition to* a content diff, on any edit to a format where an annotation can be malformed without changing the content it annotates.
+- **Do:** treat a clean content diff as evidence about content only, never as evidence that the file is well-formed or that its consuming application will open it.
+- **Don't:** infer markup validity from a passing accept/reject (or any other rendered-content) comparison -- a malformed gate and a working one can render identically, and a namespace defect can sit entirely outside what the comparison looks at.
+- **Don't:** trust a hand-rolled accept/reject walker's silence as confirmation;
+  per [`memories/office-open-xml.md`](../../memories/office-open-xml.md)'s
+  "A hand-built accept/reject simulator is itself an unverified instrument..."
+  section, run it against a document you know is malformed and confirm it actually flags something, not only against documents you expect to pass.
+
+(Measured 2026-09-09: a repair pass on a manuscript's tracked-change OMML equations swapped a `w:ins`/`w:del` marker from an invalid child-of-`w:rPr` position to the valid wrapping position across five successive delivered copies, while the verification in use throughout was `word/document.xml`'s accept/reject text diff (comparing paragraph text under each mode).
+That diff reported the documents clean at every delivery -- the malformed marker was an empty element with no children, so neither the accept walk nor the reject walk treated it as gating anything, and the run's text simply always appeared.
+A second, unrelated defect in the same manuscript -- `word/comments.xml`'s `mc:Ignorable` naming ten namespace prefixes it no longer declared, after a generic XML library re-serialized the part -- was equally invisible to the same text diff, for the unrelated reason that it touches no run text at all.
+[`scripts/check-docx-tracked-changes.py`](../../scripts/check-docx-tracked-changes.py) in this repo is the structural check that would have caught both: it parses the actual XML and flags a `w:ins`/`w:del` sitting as a `w:rPr` child outside the one legal `w:pPr` exception, and a `mc:Ignorable` prefix with no matching namespace declaration in scope -- exactly the two properties a content diff cannot see.)
+
+## A scripted edit's own PRINT and exit status, standing in for the file it changed
+
+A heredoc'd or one-off patch script reports success two ways that are neither of them the artifact it was supposed to change: its exit status, and an `assert` or print statement it writes about its own progress.
+Both describe the SCRIPT's control flow.
+Neither describes the file on disk, because the write step, the encoding, or the target string the script matched against can each be wrong in a way that leaves the script's own report satisfied while the file is unchanged or corrupted.
+
+Two heredoc'd Python patch scripts in one session printed a completion message and exited 0 while a re-grep of the target file immediately afterward showed the intended text unchanged.
+The specific point of failure inside either script was never established --- only that the script's own report and the file's actual content disagreed, which is the fact this section is about regardless of which particular bug produced it in either case.
+
+A third, in the same session, produced a more dangerous silence.
+It replaced a one-line triple-quoted Python docstring, `"""..."""`, with replacement text that opened a new triple-quote delimiter without closing it.
+The `str.replace` call itself succeeded exactly as instructed: the target string was found, and the swap at that one line looked sane on its own, since a single-line docstring edit is not the kind of change that reads as alarming.
+What went wrong was not local to the edited line.
+Every character of the file from that unclosed delimiter onward -- roughly 100 lines, an unrelated function among them -- silently became part of one Python string literal, until the next `"""` anywhere in the file happened to close it.
+Counting quote marks would not have caught it either, since three triple-quote delimiters (balanced) is exactly what an *unclosed-then-reclosed-elsewhere* swallow also produces.
+What caught it was `py_compile` raising at the point the file actually stopped parsing, together with a targeted re-grep for code that should have appeared in the swallowed region and did not.
+
+- **Do:** after any scripted edit, verify from the artifact rather than from the script's own report -- grep the file for the new text and confirm the old text is gone, run a parser or compiler over it (`py_compile`, an R `parse()` call, the language's own syntax check), and run the relevant tests, before trusting that the change landed.
+- **Do:** when a scripted edit replaces a delimited region (a docstring, a fenced block, a quoted string), verify the delimiters on both sides of the substitution are still balanced in context, not only that the substring search matched -- a replacement that opens a delimiter without closing it can leave the file syntactically parseable right up to the point it silently is not, with nothing at the edit site itself looking wrong.
+- **Don't:** trust a script's own `assert`, print, or exit status as evidence the target file changed -- an assert can pass against the string it was handed without that string ever having matched the live file, and an exit 0 says only that the script's own control flow completed.
+- **Don't:** read "the diff at the edit site looks fine" as sufficient for a delimiter-swap edit;
+  the corruption in this shape is not local to the edited line, it is everything between the newly opened delimiter and wherever the file next happens to close one.
+
+(Measured 2026-09-09: three heredoc'd Python patch scripts applied during one manuscript-review session.
+Two reported success with the file unchanged on re-grep, cause unestablished.
+The third swallowed roughly 100 lines of an unrelated function into a docstring by leaving a replacement's opening triple-quote unclosed;
+`py_compile` and a targeted re-grep for the swallowed code were what caught it, not the script's own output.)
+
+## A tracked-change DISPLAY VIEW, standing in for the resolved document a finding means
+
+[`memories/office-open-xml.md`](../../memories/office-open-xml.md)'s "Two pandoc diffs verify a redlined docx" section already gives the producer-side use of accept/reject extraction: verify your own edit against both.
+This is the same mechanism read from the other side --- a reviewer's finding, rather than an author's self-check --- and it is a different substitution from the ninth shape above.
+The ninth shape is about a conversion that DROPS content it cannot carry.
+This is about a rendering mode that SHOWS content that will not survive: Word's "All Markup" view (or an equivalent raw read of `word/document.xml` with no accept/reject simulation applied) displays a tracked insertion and the tracked deletion it replaces at once, stacked in the same place, which is exactly what a genuine stray duplicate would also look like.
+
+Two review comments drafted for a manuscript told the author to repair a stray equation object and a doubled symbol.
+Both were visible only in that display mode.
+One sat inside a `<w:del>` the author had already used to remove it;
+the other was the old half of a `<w:ins>`/`<w:del>` pair from an edit that replaced one symbol with another.
+Extracting the resolved (accept-mode) text -- the same pandoc extraction the producer-side section already uses -- showed neither object survives: the equation and the doubled symbol are both absent once the tracked changes are resolved, and the finding was wrong.
+
+The general shape: a display mode that shows pending edits inline is a genuine, CURRENT artifact of the file.
+It is not stale, and it is not lossy in the ninth shape's sense.
+It still is not the document a finding about "the document" is ordinarily understood to be about.
+A reader who has not resolved the tracked changes is reading the union of two document states -- before the edits and after them -- and a finding drawn from that union has to say which state it is about before it means anything.
+
+- **Do:** before reporting a finding about a redlined document, extract or view the RESOLVED (accept-mode) text and confirm the finding still holds there, not only in a display mode that shows pending changes inline.
+- **Do:** when a finding is genuinely about the pre-edit or in-progress state -- a comment on the edit itself, not on its outcome -- say so explicitly ("in All Markup view", "before this deletion is accepted"), so the two states are never conflated silently.
+- **Don't:** treat what an "All Markup" screen shows as the document a reader will eventually see;
+  it is the union of two states, and "the document" defaults to the one a reader gets once changes are resolved.
+- **Don't:** assume a stray-looking object or a doubled symbol found this way is a defect without first checking whether it is the visible half of a change the author already made.
+
+(Measured 2026-09-09: two draft review comments for a manuscript resubmission named a stray equation object and a doubled symbol, both visible only in Word's "All Markup" display.
+Extracting accept-mode and reject-mode text separately showed both were already-deleted tracked changes, and the accept-mode text was clean.
+`memories/office-open-xml.md`'s "Two pandoc diffs verify a redlined docx" section gives the identical two extractions for a self-check on an edit;
+this is the same mechanism applied to a finding about someone else's edit instead.)
+
+## A correction's baseline is another artifact, and the nearest one in view is not it
+
+["A drift claim is relational, so one read cannot settle it"](#a-drift-claim-is-relational-so-one-read-cannot-settle-it)
+above already names the shape: a claim about two artifacts at once needs two
+reads, and reading only one leaves the sentence feeling complete anyway.
+Naming something a correction, a fix, a patch, or a workaround is that same
+two-place claim, in the shape it takes most often in ordinary technical
+writing rather than in an install or a config.
+It names what changed AND what the change is against, and the artifact in
+front of you, the corrected form, only ever supplies the first half.
+The baseline lives somewhere else: an earlier paper, an earlier revision of
+the same document, the pre-fix branch, last quarter's release.
+
+That is what lets the failure survive careful reading.
+The natural verification move is to reread the artifact you have, and doing
+so genuinely confirms what the correction IS, its formula, its scope, its
+effect.
+It says nothing about what it corrects, because the document in hand was
+never the baseline.
+The nearest candidate actually in view, your own document's earlier draft, a
+neighbouring equation, whatever you last edited, gets silently substituted
+for the real one, because it is available and the real one takes a separate
+retrieval to reach.
+
+The check: before writing "X corrects/fixes/omits Y", name Y explicitly, say
+where Y is written down, and read Y there.
+If Y is not retrievable, describe what X does rather than what it corrects.
+
+- **Do:** name the baseline a correction claim is against, cite where it is
+  written down, and read it there before asserting the relationship.
+- **Do:** describe what a correction term does, on its own, when the
+  baseline it is said to correct cannot be retrieved and confirmed.
+- **Don't:** confirm a correction's own content and treat that as having
+  confirmed what it corrects.
+- **Don't:** let the nearest document in view, your own earlier draft, a
+  neighbouring section, stand in for a baseline a source names explicitly
+  elsewhere.
+
+(Measured 2026-09-09, in the same manuscript-resubmission session as the
+shape above.
+A response-to-reviewers letter and the manuscript's own supplement each
+misnamed the baseline for a "correction term" in a cited paper (Teunis and
+van Eijkeren, 2020, *Statistics in Medicine* 39:2799-2814).
+That paper's "age dependent correction term" (p. 2801) corrects the age-free
+density of an earlier 2012 Teunis et al. paper.
+The letter instead said the term corrected an omission in the supplement's
+own prior equation, which already carried the age restriction, an Iverson
+indicator confining the relevant interval to the participant's age;
+what that equation actually lacked was a different pair of factors.
+The supplement separately mislabelled a term in the same formula: it called
+one factor "the age-truncation term", when the truncation is a distinct
+Iverson bracket and the named factor is instead the contribution of
+inter-event intervals longer than the participant's age, vanishing as that
+age grows.
+Rereading the supplement, however closely, could confirm only what the
+formula does; it could not show which paper's baseline the cited correction
+was against, since that fact lives in the cited paper rather than in the
+supplement.
+Both were caught by the user asking "are you sure about that?", not by a
+reread, which is the same discovery path
+[`run-ums-proactively.cases.md`](run-ums-proactively.cases.md)'s "Are you
+sure about that?" case record already names as invisible to a hook keyed on
+a first-person admission: the wrongness surfaced as an answer to a question,
+with no admission attached.)
+
+## Naming a reference is not verifying it
+
+Repairing a stale reference by making it durable and repairing it by making
+it true are two different edits, and only the first one feels urgent when
+the passage under repair is about references.
+
+A positional cross-reference ("the 2nd occurrence above") breaks the moment
+a record moves, which is exactly the failure this corpus's own
+[`mistake-patterns.cases.md`](../../memories/mistake-patterns.cases.md)
+header rules out by writing every cross-reference by name.
+Swapping the position for a name is the correct fix for durability, and it
+supplies none of the fix for accuracy: a named target is checkable, not
+checked, and the check is a separate step that a reference-repair pass has
+no built-in reason to take, since references are already the subject.
+The named artifact still has to be opened and read against the specific
+claim the reference is standing in for, the same substitution
+[`The four shapes`](#the-four-shapes) already names for every other
+adjacent-artifact case.
+
+- **Do:** open the named target and confirm it contains the specific claim
+  the reference stands in for, as a step separate from naming it.
+- **Do:** treat "the reference is now durable" and "the reference is now
+  true" as two claims needing two checks, even in a pass whose subject is
+  references.
+- **Don't:** replace a positional pointer with a named one and read the
+  improvement in form as evidence of the content underneath.
+- **Don't:** assume a reference-repair pass is exempt from this file's own
+  rule merely because references, not facts, are what is being edited.
+
+(Measured 2026-09-09, ai-config#3484: a stale positional reference reading
+"the 2nd occurrence above" was replaced with a named pointer to "the
+2026-09-03 occurrence recorded in this file" without opening that occurrence
+to confirm it carried the claim being cited.
+It did not.
+The named occurrence was
+[`mistake-patterns.cases.md`](../../memories/mistake-patterns.cases.md)'s
+misidentified-hook-copy record, which carries no restart measurement at
+all; the actual measurement lived in Pattern 43's own Fix step, in
+[`mistake-patterns.md`](../../memories/mistake-patterns.md), a different
+file entirely.
+The repair converted an arguable pointer into a confidently false one, and
+the confidence was new: a vague positional reference invites a reader to
+check it, while a specific named one reads as already checked.)
+
+## A diagnostic returning clean is evidence about the diagnostic, not the fault
+
+A clean result from a targeted check answers "does this specific thing show
+the problem", not "is the problem absent" --- and the gap between those two
+questions is invisible exactly when every individual check was reasonable to
+run.
+
+The tell is a fault that keeps firing after every registration path a
+diagnosis names comes back clean.
+Each clean read gets spent arguing the fault must be elsewhere, when it is
+equally consistent with the diagnosis having examined the wrong population:
+a check that is sound on the artifact it reads says nothing about whether
+that artifact is the one actually responsible.
+Ruling out three registration paths in turn is real work and reads as
+progress, but a fault that persists through all three is telling you about
+the paths checked, not about the fault --- the same shape
+[`fail-fast`](../principles/fail-fast.md) names for a pass path that isn't
+provably disjoint from the failure path, applied here to a diagnostic
+instead of to a guard.
+
+The fix is not a sharper check on the same candidate set; it is capturing
+the fault directly while it fires (a process sample, a live trace) rather
+than continuing to deduce the culprit from registration files that have
+already all read clean.
+
+- **Do:** treat a clean result from every registration path checked so far
+  as evidence about which paths were examined, not as evidence the fault
+  sits elsewhere.
+- **Do:** capture the fault live (a process sample taken while deliberately
+  triggering it) once the obvious registration paths have all read clean,
+  rather than adding a fourth path to the same deduction.
+- **Don't:** read "every check I ran came back clean" as narrowing the
+  search space --- it narrows the set of *checked* paths, not the set of
+  *possible* ones.
+- **Don't:** keep refining the diagnostic technique against a candidate set
+  established by guesswork, when a direct capture would name the actual
+  path without needing the set enumerated at all.
+
+(ai-config#3141 is the worked incident, and it turned on the diagnostic twice
+over.
+Chasing which copy of `hooks/no-unreviewed-pr.py` was firing an expired
+moratorium, a first pass reported the copy registered in
+`~/.claude/settings.json` as current, all three `installed_plugins.json` pins as
+containing no hook file, and `enabledPlugins` as `false` --- every registration
+clean while the guard misbehaved.
+That reading was itself an instrument artifact.
+The probe initialised each pin's result to the string `(no hook file)` and
+overwrote it only when a `MORATORIUM_END` line was found, so a pin whose hook
+file exists but carries no moratorium constant printed as though the file were
+missing.
+Re-derived with the two conditions separated, one pin does hold the hook ---
+user-scope, with no `MORATORIUM_END` at all, which is a copy predating the
+moratorium and therefore one that demands the review unconditionally.
+A registration did explain it.
+So the incident supplies the rule twice: once for the diagnostic that returned
+clean while the fault stood, and once for the probe whose defaulted variable
+described a condition it never tested.
+The record and its measurements live in
+[`mistake-patterns.cases.md`](../../memories/mistake-patterns.cases.md)'s
+Pattern 43 entry; this section states the transferable rule the incident
+does not itself generalize.)
+
+## A negative lookup cannot tell "never existed" from "no longer reachable"
+
+The shapes above all substitute one artifact for another.
+This one substitutes a *result* for a claim: an absence lookup returns nothing, and nothing is read as proof the thing was never there.
+
+`git cat-file -t <sha>` answering `Not a valid object name` is the worked case.
+It means only that the object is not in **this** clone **now**.
+It does not distinguish an invented SHA from a real commit that has since become unreachable, and the difference is the whole finding: one is a fabrication to chase, the other a stale reference to re-point.
+
+The trap is that the lookup feels like a *measurement* rather than an inference, so it escapes the claim-checking a stated fact would get.
+It also arrives with the grammar of proof --- a command, a definite answer, no hedging --- which is exactly `grep-is-not-coverage`'s error one level down: there a search's silence is read as corpus coverage, here a lookup's silence is read as an artifact's nonexistence.
+
+**GitHub's pull refs are the common generator.**
+A `pull_request`-triggered workflow checks out `refs/pull/N/merge`, an ephemeral merge of the head into the base whose SHA is neither:
+
+```console
+$ git fetch origin 'refs/pull/N/merge:refs/remotes/origin/pr-merge'
+$ git log -1 --format='%h parents: %p' origin/pr-merge
+356e7cb5 parents: f3611051 4edc93a2
+          ^ base    ^ PR head
+```
+
+That ref is replaced on every push, so a previous run's merge SHA is unreachable within minutes.
+Anything a CI job reports about "the commit it ran on" is therefore unverifiable from an ordinary clone shortly afterwards --- and comes back looking fabricated.
+
+The same shape covers a force-pushed commit, a deleted branch's tip, a dangling object past `gc`, and a rev in a shallow clone --- which is the sharpest, because the object exists on the remote and the local answer is still nothing.
+
+The remedy is not a better lookup but a different question: ask what else would produce this exact silence, and whether the artifact you queried could hold the answer at all.
+Where the reference is ephemeral, capture it **while it is current** rather than testing afterwards.
+Where it is not, fetch the namespace that would carry it before concluding anything --- a clone that has never fetched `refs/pull/*` cannot see a pull ref, so its silence about one is a fact about the clone.
+
+- **Do:** name what else explains the empty result, before reporting it as absence.
+- **Do:** fetch the namespace or deepen the clone that would hold the object, and say which you did.
+- **Do:** capture an ephemeral reference at the moment it is live.
+- **Don't:** read `Not a valid object name`, a 404, or an empty query as evidence the thing never existed.
+- **Don't:** treat a lookup as exempt from claim-checking because it ran a command --- the command measured this clone, and the claim was about the world.
+
+(Measured 2026-09-10, ai-config#3508.
+Three CI reviews on ai-config#3548 emitted a `commit_sha` that did not resolve locally, and I reported them on the tracking issue as SHAs that "do not exist" and abbreviate "nothing real".
+The third carried a full 40-character value and prose saying "the merge commit introduces no further diff", which identified the mechanism: the job runs on the pull merge ref, so the JSON names a real commit that the next push made unreachable.
+The clone I tested in had never fetched a pull ref, so it would have answered identically for every candidate explanation.
+The defect is real and is a stale-reference one;
+the fabrication reading was mine, and it pointed at the wrong fix.)

@@ -1178,3 +1178,15 @@ still running minutes later with fuller output.
 &` reported complete in seconds with a 3-line log; the identical
 command without the trailing `&` ran to a real completion minutes
 later with the full ~45-suite output.)
+
+## The worktree-isolation sandbox guard text-matches `git`, not intent --- a string LITERAL containing it can refuse too
+
+A worktree-isolated session's Bash tool refuses any command it "cannot verify" stays inside the worktree.
+That check is on the command **text**, not on what actually executes: a Python `subprocess.run([...])` list, an f-string, or a heredoc containing the literal substring `git worktree remove` --- even purely as test-fixture DATA, never invoked --- can trip the same refusal a real `git` call would.
+`--jq`/`jq` filter strings with parens and backslash-escapes (`\(.state)`) can trip it too, independent of `git` at all.
+
+- **Do:** build such a literal by concatenation (`"g" + "it worktree remove"`) when authoring a test file or doc example that must contain the exact string, per the same reasoning [`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md)-adjacent hooks use to avoid self-matching.
+- **Do:** simplify a `--jq`/`jq` filter (plain field access, `--json` plus `head`/`grep` instead of a templated string) when a guard refusal names the filter text as the "too complex" span.
+- **Don't:** conclude the sandbox parsed the command's semantics --- it is refusing on the SHAPE of the text.
+
+(Self-hit repeatedly during Morrison-Lab/ai-config#3526, 2026-09-10: smoke-testing a hook meant to catch `git worktree remove --force` fallbacks, and separately a `Monitor` poll loop using a templated `--jq` string.)

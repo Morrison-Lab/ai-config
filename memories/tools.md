@@ -525,6 +525,11 @@ The contrast that motivated the fix: its CI counterpart,
 design from the start, so a corpus's pre-existing drift is never reflagged.
 The checker got that treatment years before the formatter did.
 
+**It treats every file as prose, regardless of extension --- never point `--write` at a `.py` file.**
+Dry-run against a `.py` file (2026-09-10) showed it merging an `if`/`elif` chain onto one line, syntactically-plausible-looking and semantically broken.
+- **Do:** preview (the default) before ever passing `--write`, `.md` or not.
+- **Don't:** assume the extension gates it --- nothing in the tool checks.
+
 ## macOS disk cleanup: where the space actually goes
 
 Findings from a full sweep of the user's Mac, 2026-07-28, when the data
@@ -830,6 +835,38 @@ The repair it prescribes is already satisfied, and the answer is still misread, 
 
 (2026-08-06, drafting `Morrison-Lab/ai-config#1224`: a citation style was reported as having "9 existing instances" from a listing showing 9 distinct paths, several of which occurred more than once.
 The real total was 17.)
+
+**Plain `grep -c` has the identical failure with no dedup step in sight, and it undercounts even before any file-level deduplication happens.**
+The paragraphs above start from `-l`/`uniq -c`, where a deliberate deduplication step is what collapses repeats into categories.
+`grep -c` needs no such step: it counts **matching lines** (or, run with `-r`, matching lines per file), and a line carrying the pattern twice still counts once.
+So a `grep -c` reading undercounts by the number of *extra* matches on lines carrying more than one --- a line with three matches contributes two to the shortfall while being one line --- the same silent, plausible-looking shortfall as the dedup case, and it is easy to miss precisely because no dedup command is visible to raise suspicion.
+
+Three miscounts in one PR, with three different causes --- worth separating,
+because "switch `-c` to `-o`" fixes only the first:
+"nine remaining raw `\hat` sites" was 9 matching lines and **10** occurrences;
+"the 17 remaining raw `e^{...}`" was a *patch script's* replacement count,
+where the diff held **18** lines carrying **22** occurrences;
+"103 `\sb` uses across 37 files" was **110** occurrences across **38** files,
+the file half coming from an unmentioned `| grep -v latex-macros` filter
+rather than from `-c` at all.
+Two of the three reached public issue bodies before being corrected.
+All three numbers were genuinely derived, which is why none felt like a guess.
+For a true occurrence count use the parent section's idiom,
+`grep -roh 'PATTERN' . | wc -l`.
+
+- **Do:** use `grep -o` (not `-c`) whenever the number being reported is described with an occurrence noun --- "sites", "uses", "occurrences", "instances".
+- **Don't:** trust `grep -c` as an occurrence count just because no `-l`/`uniq -c` dedup step is visible --- the same line-vs-occurrence gap applies to plain `-c` on its own.
+
+(d-morrison/rme#1138, 2026-09-09.
+A `Stop`-hook guard was written and then deliberately not shipped: an
+adversarial review found its transcript walk excluded every tool call,
+because Claude Code stores tool results as `type: "user"` entries, so the
+19 passing tests had validated a transcript shape the harness never emits.
+The damage also lands in commit messages and issue bodies, turns after the
+`grep -c` runs, which a one-turn `Stop` hook cannot reach.
+ai-config#3450 carries that evidence and the redesign --- a `PreToolUse`
+guard on the publishing commands, modelled on
+`hooks/flag-unmeasured-timestamp.py`.)
 
 ## A hand-rolled verification check is worth nothing until it has caught something
 

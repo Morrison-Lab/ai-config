@@ -813,31 +813,39 @@ def run_broken(reply, prior_commands=()):
     """Run the hook with shellcmd unimportable. Returns (verdict, stderr)."""
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     os.close(fd)
-    with open(path, "w", encoding="utf-8") as stream:
-        for command in prior_commands:
+    try:
+        with open(path, "w", encoding="utf-8") as stream:
+            for command in prior_commands:
+                stream.write(json.dumps({
+                    "type": "assistant",
+                    "message": {"content": [{
+                        "type": "tool_use", "name": "Bash",
+                        "input": {"command": command},
+                    }]},
+                }) + "\n")
             stream.write(json.dumps({
                 "type": "assistant",
-                "message": {"content": [{
-                    "type": "tool_use", "name": "Bash",
-                    "input": {"command": command},
-                }]},
+                "message": {"content": [{"type": "text", "text": reply}]},
             }) + "\n")
-        stream.write(json.dumps({
-            "type": "assistant",
-            "message": {"content": [{"type": "text", "text": reply}]},
-        }) + "\n")
-    env = dict(os.environ)
-    sentinel_dir = tempfile.mkdtemp()
-    _TEMP_DIRS.append(sentinel_dir)
-    env["TMPDIR"] = sentinel_dir
-    proc = subprocess.run(
-        [sys.executable, "-c", _BREAK_IMPORT, HOOK],
-        input=json.dumps({"transcript_path": path}),
-        capture_output=True, text=True, timeout=30, env=env)
-    if proc.returncode != 0:
-        sys.exit("FATAL: broken-install hook exited %d\n%s"
-                 % (proc.returncode, proc.stderr))
-    return ("WARN" if proc.stdout.strip() else "silent"), proc.stderr
+        env = dict(os.environ)
+        sentinel_dir = tempfile.mkdtemp()
+        _TEMP_DIRS.append(sentinel_dir)
+        env["TMPDIR"] = sentinel_dir
+        proc = subprocess.run(
+            [sys.executable, "-c", _BREAK_IMPORT, HOOK],
+            input=json.dumps({"transcript_path": path}),
+            capture_output=True, text=True, timeout=30, env=env)
+        if proc.returncode != 0:
+            sys.exit("FATAL: broken-install hook exited %d\n%s"
+                     % (proc.returncode, proc.stderr))
+        return ("WARN" if proc.stdout.strip() else "silent"), proc.stderr
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+
 
 
 _verdict, _stderr = run_broken(DELETE_REPLY)

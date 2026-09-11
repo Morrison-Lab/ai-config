@@ -439,6 +439,19 @@ def _stderr_suppressed(stage):
     return reclaimed is None or suppressed > reclaimed
 
 
+def _last_stdout_file(stage):
+    """The stdout-to-file redirect that actually takes effect, or None.
+
+    The shell applies redirects left to right, so the LAST file target is the
+    one written. Reporting the first names a file the command truncates and
+    leaves empty, sending a reader to the wrong place.
+    """
+    matches = list(RX_STDOUT_FILE.finditer(stage))
+    if not matches:
+        return None
+    return matches[-1]
+
+
 def _stdout_discarded(stage, to_file):
     """True when this stage's own stdout goes nowhere a reader could see.
 
@@ -469,7 +482,7 @@ def _consumption(stage, is_last, captured, original_stage):
     `cmd &>/dev/null > out.json` leaves stderr at /dev/null and stdout in the
     file, which is the shape this hook exists to name.
     """
-    to_file = RX_STDOUT_FILE.search(stage)
+    to_file = _last_stdout_file(stage)
     if _stdout_discarded(stage, to_file):
         return None
     if to_file is not None:

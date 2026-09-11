@@ -231,6 +231,19 @@ check(
 check("a bare close still fires", fires("cmd 2>&- > out.json"), True)
 check("fd 12 is not fd 2", fires("cmd 12>/dev/null > out.json"), False)
 
+# Two stdout file targets in one stage: the shell writes the LAST one and
+# truncates the first, so naming the first sends a reader to an empty file.
+check(
+    "the reported target is the redirect that takes effect",
+    reported("cmd 2>/dev/null > /tmp/stage.json > /tmp/final.json")[1],
+    "redirected to `/tmp/final.json`",
+)
+check(
+    "two targets with a discard last still stays silent",
+    fires("cmd 2>/dev/null > a.json > b.json >/dev/null"),
+    False,
+)
+
 if failures:
     print("FAILED:")
     for line in failures:

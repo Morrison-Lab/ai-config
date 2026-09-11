@@ -278,6 +278,35 @@ def resolve_plugin_dir(windows: bool | None = None) -> str:
     return expanded
 
 
+def non_native_program_problems(command: str) -> list[str]:
+    """Report a program path `cmd.exe` cannot resolve.
+
+    Only a token carrying a separator is a path. A bare name such as `py` is
+    resolved against PATH by `cmd.exe` itself, so judging it by drive-letter
+    shape would reject a command that launches perfectly well.
+
+    The separators are named literally rather than taken from `os.sep`, since
+    this module reads Windows manifests from a POSIX checker run too, where
+    `os.sep` is `/` and a backslash path would read as a bare name.
+
+    A drive-relative token such as `C:python.exe` is out of reach: it carries
+    no separator, and `cmd.exe` resolves it against that drive's own working
+    directory rather than against PATH. This check is about the MSYS and
+    Cygwin shapes that resolve nowhere at all.
+    """
+    program = program_token(command)
+    if not program:
+        return []
+    if "/" not in program and BACKSLASH not in program:
+        return []
+    if is_native_windows_path(program):
+        return []
+    return [
+        f"the program {program!r} is not a native Windows path, so "
+        "cmd.exe cannot resolve it"
+    ]
+
+
 def windows_problems(command: str) -> list[str]:
     """Return defects that hold only where `cmd.exe` launches the command.
 
@@ -299,9 +328,7 @@ def windows_problems(command: str) -> list[str]:
             "a quoted path arrives with a leading backslash and does not "
             "resolve (https://github.com/Morrison-Lab/ai-config/issues/3091). Use unquoted paths."
         )
-    program = program_token(command)
-    if program and not is_native_windows_path(program):
-        problems.append(f"the program {program!r} is not a native Windows path; cmd.exe cannot resolve it")
+    problems.extend(non_native_program_problems(command))
     problems.extend(unrendered_posix_problems(command))
     problems.extend(cmd_metacharacter_problems(command))
     return problems

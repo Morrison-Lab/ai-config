@@ -102,6 +102,28 @@ class TestWindowsStaleAndMetacharacters(unittest.TestCase):
         findings = agy_hooks.windows_problems("/mingw64/bin/python3.exe C:/Users/x/.gemini/hooks/x.py")
         self.assertTrue(any("not a native Windows path" in f for f in findings))
 
+    def test_a_backslash_msys_path_is_rejected_from_any_host(self):
+        # os.sep is "/" under a POSIX checker run, so the separators are
+        # named literally and a backslash path is a path everywhere.
+        sep = agy_hooks.BACKSLASH
+        msys = sep + "mingw64" + sep + "bin" + sep + "python3.exe"
+        findings = agy_hooks.non_native_program_problems(msys + " C:/x.py")
+        self.assertTrue(any("not a native Windows path" in f for f in findings))
+
+    def test_non_native_program_problems_passes_a_native_path(self):
+        found = agy_hooks.non_native_program_problems("C:/Python313/python.exe C:/x.py")
+        self.assertEqual(found, [])
+
+    def test_non_native_program_problems_passes_a_bare_name(self):
+        self.assertEqual(agy_hooks.non_native_program_problems("py C:/x.py"), [])
+
+    def test_non_native_program_problems_passes_an_empty_command(self):
+        self.assertEqual(agy_hooks.non_native_program_problems("   "), [])
+
+    def test_a_bare_program_name_is_left_to_path_resolution(self):
+        findings = agy_hooks.windows_problems("py C:/Users/x/.gemini/hooks/x.py")
+        self.assertEqual(findings, [])
+
     def test_native_windows_path_is_accepted_as_program(self):
         findings = agy_hooks.windows_problems("C:/Python313/python.exe C:/Users/x/.gemini/hooks/x.py")
         self.assertEqual(findings, [])

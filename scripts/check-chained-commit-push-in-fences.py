@@ -17,7 +17,7 @@ fence, so the deliverable is this instrument rather than a number in an issue.
 
 ## What it does
 
-Extract every fenced block from every tracked Markdown file, tolerating leading
+Extract every fenced block from every tracked Markdown and Quarto file, tolerating leading
 indentation, and feed each block's text --- unchanged, as one string --- to the
 hook's own `evaluate()`.  The predicate is IMPORTED rather than reimplemented:
 a second implementation of "what counts as a chained commit and push" would
@@ -97,8 +97,8 @@ PROMPT_RE = re.compile(r"^\s*(?:\$|#|>|\S+[$#>])\s+(?P<command>.*)$")
 FENCE_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<ticks>```+|~~~+)(?P<info>.*)$")
 
 # Blocks that carry the chained form ON PURPOSE.  Each entry names the reason,
-# and each match is reported rather than hidden.  Only Markdown is scanned, so
-# a path here is a Markdown path: the guard's own docstring quotes the shape it
+# and each match is reported rather than hidden.  Only Markdown and Quarto are scanned, so
+# a path here is a Markdown or Quarto path: the guard's own docstring quotes the shape it
 # refuses, and needs no entry because a `.py` file is never examined.
 # Keyed by (path, body fingerprint) rather than by path and a count. A count
 # alone cannot tell a replacement from the original: delete the anti-example,
@@ -106,7 +106,7 @@ FENCE_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<ticks>```+|~~~+)(?P<info>.*)$")
 # is still one, so the sweep exits clean over a block nobody exempted. The
 # fingerprint is the first 16 hex of the body's SHA-256.
 ALLOWED = {
-    ("shared/workflow/check-before-pushing.md", "2b80d0a06da1c499"):
+    ("shared/workflow/check-before-pushing.md", "66b0ad73970161ca"):
         "the deliberate anti-example the fragment is about (ai-config#3199)",
 }
 
@@ -234,12 +234,14 @@ def scan(root: Path):
     blocks_examined = 0
     blocks_all_languages = 0
     blocks_skipped = 0
+    files_scanned = 0
 
     for name in files:
         try:
             text = (root / name).read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
+        files_scanned += 1
         for line_no, info, body in fenced_blocks(text):
             blocks_all_languages += 1
             language = language_of(info)
@@ -274,7 +276,7 @@ def scan(root: Path):
                 findings.append(hit)
 
     return {
-        "files_scanned": len(files),
+        "files_scanned": files_scanned,
         "blocks_examined": blocks_examined,
         "blocks_all_languages": blocks_all_languages,
         "blocks_skipped": blocks_skipped,

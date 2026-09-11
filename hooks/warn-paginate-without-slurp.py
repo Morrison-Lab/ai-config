@@ -62,7 +62,6 @@ AGGREGATORS = (
 AGG_RE = re.compile(
     r"(?:^|[|\s(\[])(?:" + "|".join(AGGREGATORS) + r")(?:$|[\s|)\].(])"
 )
-SLURP_RE = re.compile(r"(?:^|\s)(?:-s\b|--slurp\b|-[a-zA-Z]*s[a-zA-Z]*\b)")
 
 
 def segments(command):
@@ -82,7 +81,16 @@ def jq_filters(segment):
     while i < len(parts):
         token = parts[i]
         if token == "jq" or token.endswith("/jq"):
-            rest = parts[i + 1:]
+            # Stop at the next pipe. Without this bound, a `-s` belonging to
+            # a LATER stage -- a second `jq -s`, or an unrelated `column -s,`
+            # -- reads as satisfying this jq's slurp requirement and silences
+            # the warning in exactly the case the guard exists for
+            # (ai-config#3557 review).
+            rest = []
+            for token_after in parts[i + 1:]:
+                if token_after == "|":
+                    break
+                rest.append(token_after)
             has_slurp = any(
                 p == "-s" or p == "--slurp" or (p.startswith("-") and not p.startswith("--") and "s" in p[1:])
                 for p in rest

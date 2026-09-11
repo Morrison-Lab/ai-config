@@ -69,6 +69,20 @@ check(
     not warns("gh api x --paginate | jq -f filter.jq"),
 )
 
+# --- a slurp flag in a LATER pipe stage must not silence this jq (review of #3557)
+check(
+    "warns when a later stage carries -s but this jq does not",
+    warns("gh api x --paginate | jq 'last' | column -s,"),
+)
+check(
+    "warns when a SECOND jq slurps but the aggregating one does not",
+    warns("gh api x --paginate | jq '[.[]] | last' | jq -s '.'"),
+)
+check(
+    "still silent when the aggregating jq itself slurps and a later stage does not",
+    not warns("gh api x --paginate | jq -s '[.[][]] | last' | column -t"),
+)
+
 # --- scoping
 check("silent for a non-Bash tool", run("gh api x --paginate | jq 'last'", tool="Edit") is None)
 check("silent on empty input", run("") is None)

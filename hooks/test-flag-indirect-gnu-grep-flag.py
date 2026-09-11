@@ -431,8 +431,8 @@ def composition_clause_is_load_bearing():
     caller sees 1.
     """
     src = open(HOOK, encoding="utf-8").read()
-    old = "    rc_kind = _observable_rc(toks, chain)"
-    new = "    rc_kind = _rc_behaviour(toks, chain[-1])"
+    old = "    rc_kind, rc_at = _observable_rc(toks, chain)"
+    new = ("    rc_kind, rc_at = _rc_behaviour(toks, chain[-1]), chain[-1]")
     if old not in src:
         print("  FAIL composition anchor not found; mutation not applied")
         return ["composition"]
@@ -554,7 +554,80 @@ def laundered_note_names_only_its_own_utility():
     return failures
 
 
+def blames_the_transforming_link():
+    r"""The rc story must name the link that CHANGES the status.
+
+    Not the outermost. The two differ whenever a pass-through wraps a
+    transformer, which every earlier nested case had backwards: each tested a
+    launderer OUTSIDE a shell, so naming the outermost happened to be right and
+    nothing probed the reverse. `sh -c 'xargs -0 grep -P x'` then described
+    `sh` as replacing a status it passes through, and fell back to the generic
+    unmeasured note while `xargs`'s measured one sat unused.
+    """
+    expect = [
+        # (command, utility the message must blame)
+        ("ls | xargs -0 grep -lP " + chr(39) + "x" + chr(39), "xargs", True),
+        ("sh -c " + chr(39) + "grep -P x f" + chr(39), "sh", True),
+        # launderer outside a shell -- the shape the old code got right
+        ("ls | xargs -0 sh -c " + chr(39) + "grep -P x f" + chr(39), "xargs", True),
+        # pass-through outside a launderer -- the shape it got wrong
+        ("sh -c " + chr(39) + "xargs -0 grep -P x" + chr(39), "xargs", True),
+        ("sh -c " + chr(39) + "find . -exec grep -P x {} +" + chr(39), "find", True),
+        # DISCARDED rather than LAUNDERED, so it carries no laundered note --
+        # `want_note` is False here for that reason, not as an exemption.
+        ("sh -c " + chr(39) + "find . -exec grep -P x {} " + B + ";" + chr(39),
+         "find", False),
+    ]
+    failures = []
+    for cmd, blame, want_note in expect:
+        payload = {"tool_name": "Bash", "tool_input": {"command": cmd}}
+        proc = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
+                              capture_output=True, text=True)
+        d = json.loads(proc.stdout or "{}")
+        sm = d.get("systemMessage", "")
+        ctx = d.get("hookSpecificOutput", {}).get("additionalContext", "")
+        blamed = ("(through " + chr(96) + blame + chr(96) + ")") in sm
+        # And a laundering utility must still carry ITS note, not the default.
+        note = LAUNDERED_NOTES.get(blame)
+        note_ok = ((note in ctx) if note else True) if want_note else True
+        ok = blamed and note_ok
+        print("  %s blames %-6s and carries its own note=%s  %s"
+              % ("PASS" if ok else "FAIL", blame, note_ok, cmd[:40]))
+        if not ok:
+            failures.append(cmd)
+    # Prove the responsible-link tracking is load-bearing, rather than
+    # declaring an empty expected-flip set in the MUTATIONS table -- that table
+    # compares warn-versus-silent, and a misattributed rc story still warns.
+    src = open(HOOK, encoding="utf-8").read()
+    old = "        if rc != before:" + chr(10) + "            responsible = i"
+    new = "        if False:" + chr(10) + "            responsible = i"
+    if old not in src:
+        print("  FAIL blame anchor not found; mutation not applied")
+        return failures + ["blame-mutation"]
+    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False,
+                                     encoding="utf-8") as fh:
+        fh.write(src.replace(old, new, 1))
+        path = fh.name
+    try:
+        cmd = "sh -c " + chr(39) + "xargs -0 grep -P x" + chr(39)
+        proc = subprocess.run([sys.executable, path],
+                              input=json.dumps({"tool_name": "Bash",
+                                                "tool_input": {"command": cmd}}),
+                              capture_output=True, text=True)
+        sm = (json.loads(proc.stdout or "{}")).get("systemMessage", "")
+    finally:
+        os.unlink(path)
+    regressed = ("(through " + chr(96) + "sh" + chr(96) + ")") in sm
+    print("  %s blame-outermost mutant misattributes to `sh`: %s"
+          % ("PASS" if regressed else "FAIL", regressed))
+    if not regressed:
+        failures.append("blame-mutation")
+    return failures
+
+
 def main():
+
+
 
 
 
@@ -571,6 +644,9 @@ def main():
     print()
     print("Per-indirection rc story:")
     base_fail += rc_story_matches_indirection()
+    print()
+    print("Blames the transforming link:")
+    base_fail += blames_the_transforming_link()
     print()
     print("Laundered note names only its own utility:")
     base_fail += laundered_note_names_only_its_own_utility()

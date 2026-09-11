@@ -55,6 +55,12 @@ GNU findutils documents 123 for a child exiting 1-125.
 BSD/macOS `find ... {} +` also gives 1 (measured); its GNU value is not measured here.
 `parallel` is not installed on the machine these measurements come from and keeps its own exit-status convention, so only the collapse is claimed for it.
 A later round caught the `xargs` numbers being rendered for `parallel` and `find` too, which is the same over-generalization one layer down: the fix corrected the number and left the sentence describing every laundering utility with one utility's measurements.
+
+And the round after that caught the attribution itself.
+The message named the *outermost* link as the one transforming the status, which is right only while a transformer sits outside a pass-through.
+Reverse the nesting --- `sh -c 'xargs -0 grep -P x'`, an ordinary way to wrap a pipeline for a Makefile recipe or a cron entry --- and `sh` was described as replacing a status it passes through untouched, while `xargs`'s own measured note went unused in favour of the generic unmeasured one.
+Every nested case tested until then had the transformer outside, so naming the outermost happened to be right and nothing probed the reverse.
+The responsible link is now the last one, going outward, that actually changes the value.
 Every figure in this record was measured on macOS, so the BSD value is the one here.
 A review caught the unqualified `1` being shipped in the guard's warning text and in this file, after five earlier rounds had corrected the same class of over-generalization on other axes --- this one on the host implementation, which none of those rounds had thought to vary.
 What made it survivable: the test asserting the guard's rc story compared the rendered text against expectations written from the same measurements the guard encodes, so a wrong table and a wrong expectation agreed and neither ran `xargs`.

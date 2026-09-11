@@ -355,11 +355,29 @@ def _chain_to(toks, target):
 
 
 def _observable_rc(toks, chain):
-    """Compose the chain outward from grep's own rc=2, and classify."""
+    """Compose the chain outward from grep's own rc=2.
+
+    Returns (class, index of the link RESPONSIBLE for it).
+
+    The responsible link is the last one, going outward, that actually changed
+    the value -- not simply the outermost. Those differ whenever a
+    pass-through wraps a transformer: in `sh -c 'xargs -0 grep -P x'` the
+    outermost link is `sh`, which preserves, while `xargs` is what collapses
+    the status. Attributing to the outermost there described `sh` as replacing
+    a status it passes through untouched, and dropped `xargs`'s own measured
+    note for the generic unmeasured one.
+
+    When no link changes anything the whole chain preserves, so every link is
+    equally true and the outermost is named, being the one the caller sees.
+    """
     rc = 2
+    responsible = chain[0]
     for i in reversed(chain):
+        before = rc
         rc = _APPLY[_rc_behaviour(toks, i)](rc)
-    return _CLASSIFY[rc]
+        if rc != before:
+            responsible = i
+    return _CLASSIFY[rc], responsible
 
 
 def indirect_gnu_grep(payload):
@@ -417,10 +435,10 @@ def indirect_gnu_grep(payload):
     # The rc story belongs to the whole chain, because the status the caller
     # reads has passed through every link. For a single-link chain these
     # agree, which is why taking the innermost looked right.
-    rc_kind = _observable_rc(toks, chain)
-    # Name the outermost link when it is the one transforming the status, so
-    # the message does not attribute a laundering to the inner shell.
-    rc_via = toks[chain[0]].rsplit("/", 1)[-1]
+    # Name the link that actually transforms the status, which is not always
+    # the outermost -- see `_observable_rc`.
+    rc_kind, rc_at = _observable_rc(toks, chain)
+    rc_via = toks[rc_at].rsplit("/", 1)[-1]
 
     # The flag must belong to the grep, so only look after it.
     # An explicit path is a different situation from a bare name, and the

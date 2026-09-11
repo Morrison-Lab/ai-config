@@ -45,10 +45,13 @@ quoted pattern is a distinct argv element from the file operand, so
 nothing; and the split means a verb and an operand in different commands cannot
 pair.
 
-The lexical path below is kept as the FALLBACK, not as the decision. `shlex`
-raises on unbalanced quotes, and a command substitution or a heredoc body does
-not parse into the operands the shell would pass, so those fall back to the
-regex rather than to silence.
+The lexical path below is kept as the FALLBACK, not as the decision, and it is
+narrower than it used to be. Only an actual parse failure reaches it: `shlex`
+raises on unbalanced quotes. A command substitution does NOT fall back --- its
+body is recursed through `read_roots`, so the argv path runs on the inner text
+too, bounded by MAX_SUBSTITUTION_DEPTH. A heredoc body does not fall back
+either; `_heredoc_free` blanks it before the scan, since its text is data for
+the command rather than a command of its own.
 
 DISCHARGE: a real manifest read can still fail to clear the guard, which warns
 while the author is complying. A verb outside `READ_VERBS` (`tail`, `wc`), a
@@ -57,8 +60,10 @@ a wrapper carrying its own option (`sudo -u me cat ...`, `timeout 5 cat ...`),
 which `strip_env` peels only when the wrapper takes no argument of its own
 (ai-config#3321), and --- most likely in this harness --- a manifest opened
 with the Read tool rather than Bash, since only Bash commands are scanned.
-Two limits the argv parse RETIRED: an already-expanded absolute path under the home directory now
-resolves, and so does `cd <root>/hooks && cat ../settings.json`.
+
+Two limits the argv parse RETIRED:
+an already-expanded absolute path under the home directory now resolves,
+and so does `cd <root>/hooks && cat ../settings.json`.
 A command reading two manifests at once now credits both, since every file
 operand is examined rather than only the first match.
 An output redirect (`cat payload.json > ~/.claude/settings.json`) no longer
@@ -569,7 +574,7 @@ def substitution_bodies(command):
     """The text INSIDE each command or process substitution in `command`.
 
     The argv parse cannot see what runs inside `$( )`, backticks, `<( )` or
-    `>( )`, so the lexical scan is applied to exactly that text and nothing
+    `>( )`, so `read_roots` recurses over exactly that text and nothing
     else. Scanning the whole segment instead handed the regex the outer
     command too, which the argv parse had already decided: a grep whose
     PATTERN spells a manifest path, with a substitution among its arguments,

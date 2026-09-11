@@ -163,6 +163,17 @@ check("the finding names the file and the opening fence line",
 check("the denominator is reported alongside the finding",
       result["files_scanned"] == 1 and result["blocks_examined"] == 1)
 
+# An empty shell fence reaches evaluate() never, so counting it would inflate
+# the denominator and let one empty fence break the systemic-failure test,
+# which asks whether EVERY examined block raised.
+EMPTY_SHELL_FENCE = "# Demo\n\n```bash\n```\n\n```bash\ngit status\n```\n"
+
+result = scan_fixture({"skills/demo/SKILL.md": EMPTY_SHELL_FENCE})
+check("an empty shell fence is not counted as examined",
+      result["blocks_examined"] == 1)
+check("an empty shell fence still counts in the all-language total",
+      result["blocks_all_languages"] == 2)
+
 result = scan_fixture({"skills/demo/SKILL.md": SPLIT})
 check("the split form the fix applies is NOT reported",
       result["findings"] == [] and result["blocks_examined"] == 2)

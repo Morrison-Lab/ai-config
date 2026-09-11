@@ -194,9 +194,13 @@ def scan(root: Path):
             blocks_all_languages += 1
             if language_of(info) not in SHELL_LANGUAGES:
                 continue
-            blocks_examined += 1
             if not body.strip():
                 continue
+            # Counted after the empty-body guard, so the denominator names the
+            # blocks actually passed to evaluate(). Counting before it would
+            # also let an empty fence break the systemic-failure test below,
+            # which asks whether every examined block raised.
+            blocks_examined += 1
             try:
                 reason = evaluate(body)
             except Exception:

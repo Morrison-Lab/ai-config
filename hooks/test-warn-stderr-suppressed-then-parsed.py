@@ -237,6 +237,35 @@ check(
 check("a bare close still fires", fires("cmd 2>&- > out.json"), True)
 check("fd 12 is not fd 2", fires("cmd 12>/dev/null > out.json"), False)
 
+# An fd prefix is a digit run AT A TOKEN BOUNDARY. A word merely ending in a
+# digit is not one, so the redirect after it is an ordinary stdout redirect
+# and the stage sends nothing down the pipe.
+check(
+    "a word ending in a digit does not hide the stdout redirect after it",
+    reported("cmd 2>/dev/null foo3>out.json | jq .")[1],
+    "redirected to `out.json`",
+)
+check(
+    "a real fd 3 redirect leaves stdout on the pipe",
+    reported("cmd 2>/dev/null 3>other.log | jq .")[1],
+    "piped into the next command",
+)
+check(
+    "a two-digit fd is still an fd",
+    reported("cmd 2>/dev/null 12>other.log | jq .")[1],
+    "piped into the next command",
+)
+check(
+    "a word ending in two digits is a word, not an fd",
+    reported("cmd 2>/dev/null base64>out.json | jq .")[1],
+    "redirected to `out.json`",
+)
+check(
+    "the second angle of an fd append is not a stdout redirect",
+    reported("cmd 2>>/dev/null | jq .")[1],
+    "piped into the next command",
+)
+
 # The append form. `2>>?` let its optional second `>` backtrack away, so this
 # matched as a stderr-to-FILE redirect at the discard's own offset, read as
 # reclaiming it, and never fired -- while the catalog said it was covered.

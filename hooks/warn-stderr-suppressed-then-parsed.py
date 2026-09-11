@@ -181,19 +181,19 @@ _ANY_OUT_OP = r"(?:&>>?|>&|1?(?:>>?\||>>?))"
 # which its own pattern above already owns.
 
 # stdout closed outright
-RX_STDOUT_CLOSED = re.compile(r"(?<![0-9<>&])1?>&-")
+RX_STDOUT_CLOSED = re.compile(r"(?<![\s|&;()<>][0-9])(?<![\s|&;()<>][0-9][0-9])(?<!\A[0-9])(?<!\A[0-9][0-9])(?<![<>&])1?>&-")
 
 # stdout duplicated to stderr
-RX_STDOUT_TO_STDERR = re.compile(r"(?<![0-9<>&])1?>&2(?![0-9])")
+RX_STDOUT_TO_STDERR = re.compile(r"(?<![\s|&;()<>][0-9])(?<![\s|&;()<>][0-9][0-9])(?<!\A[0-9])(?<!\A[0-9][0-9])(?<![<>&])1?>&2(?![0-9])")
 
 RX_STDOUT_NULL = re.compile(
-    r"(?<![0-9<>&])1?" + _OUT_OP + r"\s*/dev/null(?![^\s;|&<>()])")
+    r"(?<![\s|&;()<>][0-9])(?<![\s|&;()<>][0-9][0-9])(?<!\A[0-9])(?<!\A[0-9][0-9])(?<![<>&])1?" + _OUT_OP + r"\s*/dev/null(?![^\s;|&<>()])")
 
 # stdout to a FILE -- anything that is not /dev/null and not an `&fd`
 # duplication. `>&2` and `2>&1` are excluded by the `(?!&)`, so sending stdout
 # to stderr is not mistaken for a file the session reads back.
 RX_STDOUT_FILE = re.compile(
-    r"(?<![0-9<>&])1?" + _OUT_OP + r"\s*(?!/dev/null(?![^\s;|&<>()]))"
+    r"(?<![\s|&;()<>][0-9])(?<![\s|&;()<>][0-9][0-9])(?<!\A[0-9])(?<!\A[0-9][0-9])(?<![<>&])1?" + _OUT_OP + r"\s*(?!/dev/null(?![^\s;|&<>()]))"
     r"(?!&)([^\s;|&<>()]+)")
 
 

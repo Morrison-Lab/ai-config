@@ -256,12 +256,12 @@ with tempfile.TemporaryDirectory() as tmp:
         (REPO / "scripts" / "lib" / "shellcmd.py").read_text(encoding="utf-8"),
         encoding="utf-8",
     )
-    
+
     path = root / "shared" / "workflow" / "check-before-pushing.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(CHAINED_INDENTED + "\n" + CHAINED_INDENTED, encoding="utf-8")
     subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
-    
+
     buffer = io.StringIO()
     with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(io.StringIO()):
         exit_code_excess = cccp.main(["--root", str(root)])

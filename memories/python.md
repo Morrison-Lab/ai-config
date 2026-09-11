@@ -142,7 +142,7 @@ Measured 2026-08-26 on CPython 3.11.15 (Linux), forcing the no-system-data path 
 the mechanism is `Lib/zoneinfo/_common.py`'s `load_tzdata()`, which catches `ImportError`/`FileNotFoundError` and raises `ZoneInfoNotFoundError`.
 
 For dependency-free local-time output on Windows, do not substitute a fixed UTC offset: a DST-observing zone like `America/Los_Angeles` is UTC-7 or UTC-8 depending on the date, so a hard-coded `datetime.timedelta` is wrong for half the year.
-Use the system's own local clock (`datetime.datetime.now().astimezone()`) when the machine's zone is the wanted one, or the DST-aware PowerShell fallback in `CLAUDE.md`'s "Timestamp recaps in local time" section when it is not.
+Use the system's own local clock (`datetime.datetime.now().astimezone()`) when the machine's zone is the wanted one, or the DST-aware PowerShell fallback in [`timestamp-local-recaps`](../shared/workflow/timestamp-local-recaps.md) when it is not.
 
 - **Do:** install the `tzdata` PyPI package when full IANA `zoneinfo` support is needed on Windows.
 - **Do:** catch `zoneinfo.ZoneInfoNotFoundError` when handling a missing time zone database.

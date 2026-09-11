@@ -11,7 +11,7 @@ Each entry writes its complaint to stderr, so stderr is the signal to read.
 That entry was measured on macOS 26.6.2 with zsh 5.9.
 The process-substitution entry was measured on shiva, a Linux host, and its `/proc/self/fd/11` error is a Linux path --- re-run on this macOS host, `diff <(...) <(...) | grep -c` returns the correct count, because `<(...)` names a `/dev/fd/N` path that stays open.
 So that one is zsh-on-Linux rather than zsh-general.
-Take the documented default as carrying across platforms and the measured error path as not, and re-measure before relying on either somewhere new --- the caveat `CLAUDE.md`'s "Tool transport collapses doubled backslashes" section states for itself: a claim stated unconditionally here is false there.
+Take the documented default as carrying across platforms and the measured error path as not, and re-measure before relying on either somewhere new --- the caveat [`heredoc-backslash-collapse`](../shared/coding/heredoc-backslash-collapse.md) states for itself: a claim stated unconditionally here is false there.
 
 The boundary for this file is zsh-specificity, not the false-absence shape.
 [`tools.md`](tools.md) keeps the zsh difference that produces a wrong *value* rather than an empty one --- the unquoted-expansion word-splitting entry --- and it also keeps false-absence entries whose cause is stdin or fd plumbing rather than a zsh expansion rule, notably the `cmd | python3 - <<EOF` heredoc entry.
@@ -175,7 +175,7 @@ So on macOS the two cases are status-identical and on Linux they are not, and ne
 
 Measured 2026-08-24 on macOS 26.6.2 with BSD `ls`, which gives 1 and 1.
 Ubuntu with GNU coreutils and the same zsh 5.9 gives 2 and 1, measured by a reviewer on [#2129](https://github.com/Morrison-Lab/ai-config/pull/2129) who installed zsh 5.9 to check.
-Test your own environment before relying on either, per the same caveat `CLAUDE.md`'s "Tool transport collapses doubled backslashes" section states for itself.
+Test your own environment before relying on either, per the same caveat [`heredoc-backslash-collapse`](../shared/coding/heredoc-backslash-collapse.md) states for itself.
 
 So preserve stderr, fall back to the empty-stdout tell, and treat the exit status as the least reliable of the three.
 

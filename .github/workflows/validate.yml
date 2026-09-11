@@ -590,9 +590,10 @@ jobs:
         # fix, and it costs something the split does not pay: a variable the
         # first block set is gone by the second, and whether the directory
         # survives is unsettled between sessions, so a recipe cannot assume
-        # either answer. Five review rounds on ai-config#3199 each found
+        # either answer. Successive review rounds on ai-config#3199 each found
         # another recipe with that gap after the previous round fixed the ones
-        # it was shown.
+        # it was shown; scripts/check-split-push-blocks.py's docstring carries
+        # the reasoning.
         run: python3 scripts/check-split-push-blocks.py
   lint-qmd:
     uses: Morrison-Lab/gha/.github/workflows/lint-qmd.yml@v2

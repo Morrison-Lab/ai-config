@@ -5,9 +5,10 @@
 `git push` inside one fenced block, and the fix is to split the block in two.
 Splitting has a cost the split itself does not pay. A variable the first block
 set is gone by the second, always. The working directory is the unsettled half:
-`memories/preferences.md` states that Bash's cwd PERSISTS across calls, while
-`memories/git-worktrees.md` records a main session that reset it after every
-call and notes the two accounts disagree. A recipe cannot assume either.
+`memories/preferences.md` and `memories/claude-code.md` both state that Bash's
+cwd PERSISTS across calls, and `memories/git-worktrees.md` records a main
+session that reset it after every call, naming `claude-code.md` as the account
+its measurement contradicts. A recipe cannot assume either.
 
 `git -C <path>` is right under both, which is why `memories/preferences.md`
 recommends it over `cd` even while asserting persistence: there, a stray `cd`
@@ -19,8 +20,8 @@ under persistence: `cd ../sibling` run from inside that sibling does not
 resolve. So this check accepts either spelling rather than demanding a `cd`,
 which would demand the worse one.
 
-Four review rounds on ai-config#3199 each found another recipe with that gap,
-after the previous round had fixed the ones it was shown. The property is
+Successive review rounds on ai-config#3199 each found another recipe with that
+gap, after the previous round had fixed the ones it was shown. The property is
 mechanical, so this checks it instead: a `Push as a separate Bash call` block
 must carry its own `cd` whenever the block above it has one, and must set every
 variable it reads.

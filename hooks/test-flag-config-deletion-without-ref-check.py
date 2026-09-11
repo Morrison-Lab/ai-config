@@ -527,6 +527,32 @@ _ATTRIBUTION_CASES = [
      "a redirect before the pattern does not shield the pattern from the drop"),
     ("grep '~/.claude/settings.json' < README.md", set(),
      "the same command with its redirect last reads the same way"),
+    # shlex strips quotes before the argv parse sees a token, and the quoting
+    # is what decides whether the shell expanded it. Measured against bash: a
+    # tilde expands in neither quote, $HOME in double but not single.
+    ("cat '~/.claude/settings.json'", set(),
+     "a single-quoted tilde is a literal filename, not the home directory"),
+    ('cat "~/.claude/settings.json"', set(),
+     "a double-quoted tilde does not expand either"),
+    ("cat '$HOME/.claude/settings.json'", set(),
+     "a single-quoted $HOME is literal text"),
+    ('cat "$HOME/.claude/settings.json"', {"claude"},
+     "a double-quoted $HOME DOES expand"),
+    # An unquoted `#` starts a comment, and bash expands nothing after it.
+    ("echo ok # $(cat ~/.claude/settings.json)", set(),
+     "a substitution inside a comment is never run"),
+    ('echo "# $(cat ~/.claude/settings.json)"', {"claude"},
+     "a hash inside quotes starts no comment"),
+    # A no-file option suppresses the POSITIONAL operands, not a redirect.
+    ("python3 -c 'x' < ~/.claude/settings.json", {"claude"},
+     "-c leaves no script path, and stdin still opens the manifest"),
+    ("jq --args . < ~/.claude/settings.json", {"claude"},
+     "jq --args suppresses its file operands, not its stdin"),
+    # KNOWN LIMIT, tracked as ai-config#3564: the parser carries no operator
+    # between simple commands, so a read the shell never reaches is credited.
+    # Deciding it needs an exit status, which the text does not carry.
+    ("false && cat ~/.claude/settings.json", {"claude"},
+     "documented limit: a guarded command is credited although it never runs"),
     # An interpreter opens its SCRIPT. Every later token is sys.argv for that
     # script, which may open none of them, so crediting them all discharged
     # the guard over a script that might only delete.

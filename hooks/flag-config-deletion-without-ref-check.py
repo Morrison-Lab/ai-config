@@ -65,6 +65,11 @@ which `strip_env` peels only when the wrapper takes no argument of its own
 (ai-config#3321), and --- most likely in this harness --- a manifest opened
 with the Read tool rather than Bash, since only Bash commands are scanned.
 
+One DISCHARGE limit runs the other way and is tracked as ai-config#3564:
+the parser carries no operator between simple commands, so a read the
+shell never reaches --- `false && cat <manifest>` --- is credited.
+Deciding it needs an exit status the text does not carry.
+
 Two limits the argv parse RETIRED:
 an already-expanded absolute path under the home directory now resolves,
 and so does `cd <root>/hooks && cat ../settings.json`.
@@ -471,6 +476,7 @@ def read_operands(argv):
     pattern_opts = PATTERN_OPTS.get(verb, frozenset())
     positional = []
     redirected = []
+    no_positionals = False
     pattern_supplied = False
     end_of_opts = False
     index = 1
@@ -519,7 +525,11 @@ def read_operands(argv):
             if cluster_supplies_pattern(name, pattern_opts):
                 pattern_supplied = True
             if name in no_file_opts:
-                return []
+                # No POSITIONAL operand is a file this command opens, but a
+                # redirect still is: `python3 -c '...' < <manifest>` opens it
+                # on stdin. Returning here dropped the targets collected so
+                # far and skipped any that follow, which under-credits.
+                no_positionals = True
             if "=" in token:
                 index += 1
             elif name in pair_opts:
@@ -538,6 +548,8 @@ def read_operands(argv):
         positional = positional[1:]
     if verb in SCRIPT_ONLY_VERBS:
         positional = positional[:1]
+    if no_positionals:
+        positional = []
     return positional + redirected
 
 
@@ -585,6 +597,48 @@ def scope_cwd(cwd_by_scope, scope):
     return None
 
 
+BACKSLASH = chr(92)
+
+
+def quoted_literals(command):
+    """(single_quoted, double_quoted) --- the text inside each quoted span.
+
+    `shlex` strips quotes before the argv parse sees a token, and the quoting
+    is what decides whether the shell expanded it. Measured against bash: a
+    tilde expands in neither quote, and `$HOME` expands in double quotes but
+    not single. So a single-quoted tilde path opens a file literally named
+    with a tilde, and crediting the home manifest there is a false discharge.
+
+    Approximate by construction: a token assembled from quoted and unquoted
+    parts is not represented. The caller only ever uses this to REFUSE an
+    expansion, so a miss under-credits rather than over-credits.
+    """
+    single, double = set(), set()
+    quote, start = None, 0
+    index = 0
+    while index < len(command):
+        char = command[index]
+        if quote is None and char == BACKSLASH:
+            index += 2
+            continue
+        if quote is None and char in ("'", '"'):
+            quote, start = char, index + 1
+        elif quote == char:
+            (single if quote == "'" else double).add(command[start:index])
+            quote = None
+        index += 1
+    return single, double
+
+
+def expansion_is_quoted(operand, single, double):
+    """True when the shell would NOT have expanded `operand`'s leading name."""
+    if operand.startswith("~"):
+        return operand in single or operand in double
+    if operand.startswith("$HOME") or operand.startswith("${HOME}"):
+        return operand in single
+    return False
+
+
 def argv_read_roots(command):
     """Roots whose manifest `command` reads, or `None` when it cannot parse."""
     parsed = simple_commands_with_scope(command)
@@ -592,6 +646,7 @@ def argv_read_roots(command):
         return None
     found = set()
     cwd_by_scope = {}
+    single, double = quoted_literals(command)
     for scope, argv in parsed:
         cwd = scope_cwd(cwd_by_scope, scope)
         _env, rest = strip_env(argv)
@@ -601,6 +656,8 @@ def argv_read_roots(command):
             cwd_by_scope[scope] = resolve_cd_target(rest, cwd)
             continue
         for operand in read_operands(rest) or ():
+            if expansion_is_quoted(operand, single, double):
+                continue
             resolved = expand_path(operand, cwd)
             if resolved is None:
                 continue
@@ -753,6 +810,17 @@ def substitution_spans(command):
     index = 0
     while index < len(command):
         char = command[index]
+        # An unquoted `#` at a word boundary starts a comment, and bash
+        # expands nothing after it: `echo ok # $(cat <manifest>)` runs no
+        # `cat`, so following that substitution credited a read that never
+        # happens.
+        if (quote is None and char == "#"
+                and (index == 0 or command[index - 1] in " \t\n;&|(")):
+            newline = command.find("\n", index)
+            if newline == -1:
+                break
+            index = newline + 1
+            continue
         if quote == "'":
             if char == "'":
                 quote = None

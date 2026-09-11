@@ -288,40 +288,8 @@ PAIR_OPTS = {
 # consumes is not decidable from argv alone, so credit no operand at all --
 # the fail-toward-warning direction.
 
-NO_INPUT_OPTS = {
-    "grep": frozenset({"--help", "--version", "-V"}),
-    "rg": frozenset({"--files", "--help", "--version", "-V"}),
-    "sed": frozenset({"--help", "--version", "-V"}),
-    "awk": frozenset({"--help", "--version", "-V"}),
-    "jq": frozenset({"-n", "--null-input", "--help", "--version", "-V"}),
-    "head": frozenset({"--help", "--version", "-V"}),
-    "cat": frozenset({"--help", "--version", "-V"}),
-    "xxd": frozenset({"--help", "--version", "-V"}),
-    "python": frozenset({"--help", "--version", "-V"}),
-    "python3": frozenset({"--help", "--version", "-V"}),
-}
-
-FILE_PAIR_OPTS = {
-    "jq": frozenset({"--slurpfile", "--rawfile"}),
-}
 
 
-NO_INPUT_OPTS = {
-    "grep": frozenset({"--help", "--version", "-V"}),
-    "rg": frozenset({"--files", "--help", "--version", "-V"}),
-    "sed": frozenset({"--help", "--version", "-V"}),
-    "awk": frozenset({"--help", "--version", "-V"}),
-    "jq": frozenset({"-n", "--null-input", "--help", "--version", "-V"}),
-    "head": frozenset({"--help", "--version", "-V"}),
-    "cat": frozenset({"--help", "--version", "-V"}),
-    "xxd": frozenset({"--help", "--version", "-V"}),
-    "python": frozenset({"--help", "--version", "-V"}),
-    "python3": frozenset({"--help", "--version", "-V"}),
-}
-
-FILE_PAIR_OPTS = {
-    "jq": frozenset({"--slurpfile", "--rawfile"}),
-}
 
 
 NO_INPUT_OPTS = {
@@ -493,8 +461,12 @@ def expand_path(path, cwd, home_reassigned=False):
     if not path:
         return None
     if path == "~":
+        if home_reassigned:
+            return None
         path = HOME
     elif path.startswith("~/"):
+        if home_reassigned:
+            return None
         path = os.path.join(HOME, path[2:])
     elif path in ("$HOME", "${HOME}"):
         if home_reassigned:
@@ -587,7 +559,7 @@ def read_operands(argv):
             name = token.split("=", 1)[0]
             if cluster_supplies_pattern(name, pattern_opts):
                 pattern_supplied = True
-            if name in no_input_opts:
+            if cluster_has_no_input(name, no_input_opts):
                 return []
             if name in no_file_opts:
                 # No POSITIONAL operand is a file this command opens, but a
@@ -606,7 +578,10 @@ def read_operands(argv):
             elif takes_no_value(name, bare_opts):
                 index += 1
             elif not token.startswith("--") and len(token) > 2:
-                index += 1
+                if all("-" + letter in bare_opts for letter in token[1:-1]) and "-" + token[-1] not in bare_opts:
+                    index += 2
+                else:
+                    index += 1
             else:
                 # Unknown option: assume it consumes the next token. A wrong
                 # guess here loses a discharge and warns; the opposite guess
@@ -622,6 +597,15 @@ def read_operands(argv):
     if no_positionals:
         positional = []
     return positional + redirected
+
+
+
+def cluster_has_no_input(name, no_input_opts):
+    if name in no_input_opts:
+        return True
+    if not name.startswith("-") or name.startswith("--") or len(name) < 2:
+        return False
+    return any("-" + letter in no_input_opts for letter in name[1:])
 
 
 def cluster_supplies_pattern(name, pattern_opts):
@@ -782,6 +766,11 @@ def argv_read_roots(command):
         if not rest:
             continue
         if os.path.basename(rest[0]) in CD_VERBS:
+            if home_reassigned:
+                target = rest[1] if len(rest) > 1 else "~"
+                if target == "~" or target.startswith("~/") or "$HOME" in target or "${HOME}" in target:
+                    cwd_by_scope[scope] = None
+                    continue
             cwd_by_scope[scope] = resolve_cd_target(rest, cwd)
             continue
         if "builtin" in argv[:len(argv) - len(rest)]:

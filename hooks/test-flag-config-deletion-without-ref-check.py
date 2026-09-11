@@ -341,6 +341,21 @@ if not _ok:
 print("\n--- root attribution (read_roots)")
 _HOME = os.path.expanduser("~")
 _ATTRIBUTION_CASES = [
+    # Finding 2: attached short option (modified)
+    ("grep -nm 1 ~/.claude/settings.json file.txt", set(), "a short cluster ending in a value-taking option consumes the next token, shifting the pattern to the manifest slot"),
+    ("grep -nm 1 pattern ~/.claude/settings.json", {"claude"}, "the same cluster leaves the manifest as a file operand when a real pattern follows"),
+
+    # Finding 3: cluster containing no-input letter
+    ("jq -nc . ~/.claude/settings.json", set(), "a short cluster containing a no-input letter reads no inputs"),
+    ("jq -cr . ~/.claude/settings.json", {"claude"}, "a short cluster without a no-input letter still reads its files"),
+
+    # Finding 4: home reassignment with tilde
+    ("export HOME=/tmp; cat ~/.claude/settings.json", set(), "HOME reassignment makes a tilde path indeterminate"),
+    ("export HOME=/tmp; cat '" + os.path.join(_HOME, ".claude", "settings.json") + "'", {"claude"}, "HOME reassignment does not affect an already-expanded absolute path"),
+
+    # Finding 5: home reassignment with cd target
+    ("export HOME=/tmp; cd ~/.claude && cat settings.json", set(), "a cd target depending on HOME is indeterminate when HOME is reassigned"),
+    ("export HOME=/tmp; cd '" + os.path.join(_HOME, ".claude") + "' && cat settings.json", {"claude"}, "an absolute cd target works even if HOME is reassigned"),
     ("jq . ~/.claude/settings.json", {"claude"}, "vacuous case: normal jq reads"),
     ("jq -n . ~/.claude/settings.json", set(), "jq -n does not read inputs"),
     ("rg src ~/.claude/settings.json", {"claude"}, "vacuous case: normal rg reads"),

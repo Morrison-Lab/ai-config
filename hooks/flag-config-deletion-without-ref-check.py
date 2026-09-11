@@ -249,6 +249,12 @@ VERB_ALIASES = {"egrep": "grep", "fgrep": "grep", "gawk": "awk",
 # exactly like a path, and only its POSITION says it is not one.
 PATTERN_FIRST_VERBS = frozenset({"grep", "rg", "jq", "sed", "awk"})
 
+# An interpreter opens its SCRIPT and nothing else: every later token is
+# sys.argv for that script, which may never open any of them. Crediting them
+# all made `python3 tidy.py <manifest>` discharge the guard over a script that
+# might only delete. Only the first operand is credited.
+SCRIPT_ONLY_VERBS = frozenset({"python", "python3"})
+
 # Options that supply the pattern or script separately, so the first positional
 # IS a file: `grep -e PAT file`, `awk -f prog.awk file`, `jq -f filter file`.
 # Per verb for the same reason VALUE_OPTS is: one spelling, several meanings.
@@ -277,10 +283,21 @@ PAIR_OPTS = {
 # the fail-toward-warning direction.
 NO_FILE_OPTS = {
     "jq": frozenset({"--args", "--jsonargs"}),
+    # `-c CODE` and `-m MODULE` leave no script path, so every remaining
+    # token is an argument to code that may open nothing.
+    "python": frozenset({"-c", "-m"}),
+    "python3": frozenset({"-c", "-m"}),
 }
 
-# Options taking the NEXT token as their value, per verb. Per verb rather than
-# shared, because the same spelling means different things: `sed -n` is
+# Options taking the NEXT token as their value, per verb. These tables are
+# CURATED rather than complete, and cannot be otherwise: each tool's real
+# option surface is larger than any list kept here, and grows. An option
+# missing from a table is read as a bare flag, so its value falls through as a
+# positional and is credited as a file. That is a false DISCHARGE, the
+# dangerous direction, so a new spelling found in review belongs here.
+#
+# Per verb rather than shared, because the same spelling means different
+# things: `sed -n` is
 # `--quiet` and takes nothing, while `head -n` takes a line count. A shared set
 # would consume `sed -n '1,5p' <manifest>`'s script as `-n`'s value, leaving the
 # manifest as the dropped first positional and losing a real discharge.
@@ -297,6 +314,11 @@ VALUE_OPTS = {
         "-A", "--after-context", "-B", "--before-context", "-C", "--context",
         "-g", "--glob", "-t", "--type", "-T", "--type-not", "--color",
         "--colors", "-M", "--max-columns", "--max-depth", "--iglob",
+        "--pre", "--pre-glob", "-r", "--replace", "--sort", "--sortr",
+        "--path-separator", "--context-separator", "--field-context-separator",
+        "--field-match-separator", "--ignore-file", "--max-filesize",
+        "-j", "--threads", "--engine", "--encoding", "-E", "--dfa-size-limit",
+        "--regex-size-limit", "--hostname-bin", "--hyperlink-format",
     }),
     "sed": frozenset({"-e", "--expression", "-f", "--file",
                       "-l", "--line-length"}),
@@ -482,6 +504,8 @@ def read_operands(argv):
         index += 1
     if verb in PATTERN_FIRST_VERBS and not pattern_supplied and positional:
         positional = positional[1:]
+    if verb in SCRIPT_ONLY_VERBS:
+        positional = positional[:1]
     return positional + redirected
 
 

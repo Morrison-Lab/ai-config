@@ -527,6 +527,25 @@ _ATTRIBUTION_CASES = [
      "a redirect before the pattern does not shield the pattern from the drop"),
     ("grep '~/.claude/settings.json' < README.md", set(),
      "the same command with its redirect last reads the same way"),
+    # An interpreter opens its SCRIPT. Every later token is sys.argv for that
+    # script, which may open none of them, so crediting them all discharged
+    # the guard over a script that might only delete.
+    ("python3 tidy.py ~/.claude/settings.json", set(),
+     "an interpreter's script arguments are not files the interpreter opens"),
+    ("python3 -c 'print(1)' ~/.claude/settings.json", set(),
+     "-c leaves no script path at all"),
+    ("python3 -m json.tool ~/.claude/settings.json", set(),
+     "-m leaves no script path either"),
+    ("python3 ~/.claude/settings.json", {"claude"},
+     "the script itself IS opened by the interpreter"),
+    # A value option missing from a curated table is read as a bare flag, so
+    # its value falls through as a positional and is credited as a file.
+    ("rg somepattern --pre ~/.claude/settings.json bar.txt", set(),
+     "rg --pre takes a preprocessor command, not a file it searches"),
+    ("rg somepattern --replace ~/.claude/settings.json bar.txt", set(),
+     "rg --replace takes replacement text, not a file"),
+    ("rg somepattern ~/.claude/settings.json", {"claude"},
+     "an rg search target is still credited"),
     ("cat `cat ~/.claude/settings.json`", {"claude"},
      "a backtick body that really reads the manifest still credits it"),
     # The `=`-joined long-option form, which advances by exactly one token

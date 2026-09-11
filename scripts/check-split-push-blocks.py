@@ -3,18 +3,21 @@
 
 `check-chained-commit-push-in-fences.py` finds a `git commit` chained into a
 `git push` inside one fenced block, and the fix is to split the block in two.
-Splitting has a cost the split itself does not pay. Whether a separate Bash
-call keeps the previous one's working directory is unsettled: the tool's own
-description says a main session persists it and only a subagent thread resets
-it, and `memories/git-worktrees.md` records a main session that reset it after
-every call. So a recipe cannot assume EITHER behaviour, and a variable the
-first block set is gone regardless.
+Splitting has a cost the split itself does not pay. A variable the first block
+set is gone by the second, always. The working directory is the unsettled half:
+`memories/preferences.md` states that Bash's cwd PERSISTS across calls, while
+`memories/git-worktrees.md` records a main session that reset it after every
+call and notes the two accounts disagree. A recipe cannot assume either.
 
-The robust form is `git -C <path>`, which `memories/preferences.md` already
-recommends over `cd` for exactly this reason: it names its directory rather
-than depending on one. A block that re-issues a RELATIVE `cd` is the trap this
-check has to leave room for rather than demand, since re-running
-`cd ../sibling` from inside that sibling fails.
+`git -C <path>` is right under both, which is why `memories/preferences.md`
+recommends it over `cd` even while asserting persistence: there, a stray `cd`
+silently carries into later calls. Under the reset behaviour the directory is
+simply gone. Naming the directory answers both.
+
+A RELATIVE `cd` re-issued in the second block assumes the reset, and fails
+under persistence: `cd ../sibling` run from inside that sibling does not
+resolve. So this check accepts either spelling rather than demanding a `cd`,
+which would demand the worse one.
 
 Four review rounds on ai-config#3199 each found another recipe with that gap,
 after the previous round had fixed the ones it was shown. The property is

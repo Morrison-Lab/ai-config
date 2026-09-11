@@ -29,8 +29,8 @@ SUBAGENT_FANOUT_CAP = _int_env("AGY_ADAPTER_FANOUT_CAP", 50)
 PRE_INVOCATION_MSG_BYTE_CAP = _int_env("AGY_ADAPTER_MSG_BYTE_CAP", 10000)
 PRE_INVOCATION_TOTAL_BYTE_CAP = _int_env("AGY_ADAPTER_TOTAL_BYTE_CAP", 30000)
 PRE_INVOCATION_MSG_CAP = _int_env("AGY_ADAPTER_MSG_CAP", 20)
-# Maximum worker threads for parallel hook execution
-MAX_WORKERS = _int_env("AGY_ADAPTER_MAX_WORKERS", 16)
+# Maximum worker threads for parallel hook execution (must be >= 1)
+MAX_WORKERS = max(1, _int_env("AGY_ADAPTER_MAX_WORKERS", 16))
 
 def run_hook_command(cmd, claude_payload, cwd, timeout_val):
     # A timeout or a launch exception returns None, and every caller below

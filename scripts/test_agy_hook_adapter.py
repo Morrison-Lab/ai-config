@@ -1205,10 +1205,14 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
     def test_multi_subagent_fanout_and_deny(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
-        res1 = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
-        res2 = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
-        res3 = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": "Agent 2 not permitted"}}), stderr="")
-        mock_run.side_effect = [res1, res2, res3, MagicMock()]
+        def fake_run(cmd, *args, **kwargs):
+            payload_str = kwargs.get("input", "{}")
+            payload = json.loads(payload_str)
+            if payload.get("tool_input", {}).get("subagent_type") == "agent2":
+                return MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": "Agent 2 not permitted"}}), stderr="")
+            return MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
+
+        mock_run.side_effect = fake_run
         
         payload = {
             "toolCall": {
@@ -1979,6 +1983,15 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertEqual(adapter.PRE_INVOCATION_MSG_BYTE_CAP, 10000)
         self.assertEqual(adapter.PRE_INVOCATION_TOTAL_BYTE_CAP, 30000)
         self.assertEqual(buf.getvalue(), "")
+
+    def test_max_workers_non_positive_clamped_to_one(self):
+        with patch.dict(os.environ, {"AGY_ADAPTER_MAX_WORKERS": "0"}):
+            adapter = load_adapter()
+            self.assertEqual(adapter.MAX_WORKERS, 1)
+
+        with patch.dict(os.environ, {"AGY_ADAPTER_MAX_WORKERS": "-5"}):
+            adapter = load_adapter()
+            self.assertEqual(adapter.MAX_WORKERS, 1)
 
     # -- Symlink invocation & repo_root resolution (Issue #2681) ---------
 

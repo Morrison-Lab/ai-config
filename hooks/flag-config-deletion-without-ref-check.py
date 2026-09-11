@@ -660,6 +660,9 @@ def _inert_regions(command):
     regions = {}
     quote = None
     index = 0
+    # How far the current opener line's heredocs have already been collected,
+    # so a second `<<` on that line does not recompute the first body.
+    heredocs_done = 0
     while index < len(command):
         char = command[index]
         if char == BACKSLASH and quote in (None, '"'):
@@ -679,9 +682,15 @@ def _inert_regions(command):
         elif quote is None and command.startswith("<<", index):
             match = RX_HEREDOC_OPEN.match(command, index)
             if match:
-                bodies, line_end = _heredoc_bodies(command, match)
-                regions.update(bodies)
-                index = max(line_end, match.end())
+                # Collect this line's bodies ONCE, then keep scanning the
+                # rest of the opener line normally. Jumping to the line end
+                # instead skipped a trailing `#` comment there, and an
+                # apostrophe in it desynchronized the caller's quote walk.
+                if index >= heredocs_done:
+                    bodies, line_end = _heredoc_bodies(command, match)
+                    regions.update(bodies)
+                    heredocs_done = line_end
+                index = match.end()
                 continue
         index += 1
     return regions

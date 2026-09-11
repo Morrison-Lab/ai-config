@@ -593,6 +593,13 @@ _ATTRIBUTION_CASES = [
      "two heredocs on one line consume their bodies in order"),
     ("cat <<A > f1 && cat <<Z > f2\none\nA\ntwo\nZ\ncat ~/.claude/settings.json", {"claude"},
      "and a real read after both still credits"),
+    # A comment can trail a heredoc OPENER. Jumping the scan to that line's
+    # end to collect the bodies skipped the comment, and an apostrophe in it
+    # desynchronized the quote walk exactly as one in a body used to.
+    ("cat <<EOF  # don't stop\nbody\nEOF\ncat '~/.claude/settings.json'", set(),
+     "an apostrophe in a comment trailing a heredoc opener is not a quote"),
+    ("cat > n.md <<'EOF'  # here's a note\nb\nEOF\ngrep -n foo '~/.claude/settings.json'", set(),
+     "the same with a quoted delimiter and a later grep"),
     # An unquoted `#` starts a comment, and bash expands nothing after it.
     ("echo ok # $(cat ~/.claude/settings.json)", set(),
      "a substitution inside a comment is never run"),

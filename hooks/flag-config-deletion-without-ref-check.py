@@ -729,6 +729,8 @@ def neutralize_quoted_expansions(command):
     while index < len(command):
         char = command[index]
         if char == BACKSLASH and quote in (None, '"'):
+            if index + 1 < len(command) and command[index + 1] in ("~", "$"):
+                out[index + 1] = INERT
             index += 2
             continue
         if quote is None and char in ("'", '"'):
@@ -1044,8 +1046,7 @@ def matching_backtick(text, start):
     Quote-aware like `matching_paren`, so a backtick inside a quoted argument
     of the body does not end it early. A backslash escapes nothing inside
     single quotes, so a single-quoted span ending in one still closes at
-    its quote (CI review of 85aa774e). Runs to the end of the text when no
-    close exists, which shlex has already ruled out for a parsed command.
+    its quote (CI review of 85aa774e). Returns -1 when no close exists.
     """
     quote = None
     index = start

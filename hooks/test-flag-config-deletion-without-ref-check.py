@@ -598,6 +598,14 @@ _ATTRIBUTION_CASES = [
      "a single-quoted $HOME is literal text"),
     ('cat "$HOME/.claude/settings.json"', {"claude"},
      "a double-quoted $HOME DOES expand"),
+    (r"cat \~/.claude/settings.json", set(),
+     "an escaped tilde is literal text"),
+    (r"cat \$HOME/.claude/settings.json", set(),
+     "an escaped $HOME is literal text"),
+    ("cat ~/.claude/settings.json", {"claude"},
+     "an unescaped tilde still discharges"),
+    ("cat $HOME/.claude/settings.json", {"claude"},
+     "an unescaped $HOME still discharges"),
     # Quoting the TRIGGER alone is enough, so matching the whole joined
     # operand missed it. Verified against bash: echo '<tilde>'/x prints the
     # tilde literally.

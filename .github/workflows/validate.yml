@@ -585,6 +585,14 @@ jobs:
         run: python3 scripts/check-chained-commit-push-in-fences.py
       - name: Run check-chained-commit-push-in-fences tests
         run: python3 scripts/test_check_chained_commit_push_in_fences.py
+      - name: Check every split push block runs alone
+        # The companion to the sweep above. Splitting a chained block is the
+        # fix, and it costs something the split does not pay: shell state does
+        # not cross a Bash call boundary, so a cd or a variable the first block
+        # set is gone by the second. Four review rounds on ai-config#3199 each
+        # found another recipe with that gap after the previous round fixed
+        # the ones it was shown.
+        run: python3 scripts/check-split-push-blocks.py
   lint-qmd:
     uses: Morrison-Lab/gha/.github/workflows/lint-qmd.yml@v2
 

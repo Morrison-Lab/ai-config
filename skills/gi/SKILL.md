@@ -233,6 +233,7 @@ git commit --allow-empty -m "start: <issue title> (closes #<N>)"   # COMMIT
 Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
 
 ```bash
+cd ../<repo>-<slug>   # re-established: a separate Bash call starts in the caller's directory
 git push -u origin fix/<slug>   # PUSH
 
 # GitHub — draft PR

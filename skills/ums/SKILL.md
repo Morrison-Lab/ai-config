@@ -366,6 +366,7 @@ committed pass.
    Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
 
    ```bash
+   cd "../ai-config-worktrees/<branch>"   # re-established: a separate Bash call starts in the caller's directory
    git push origin HEAD   # PUSH
    ```
 
@@ -385,6 +386,7 @@ committed pass.
    Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
 
    ```bash
+   cd "../ai-config-worktrees/ums-<topic>"   # re-established: a separate Bash call starts in the caller's directory
    git push -u origin HEAD   # PUSH — PR creation is handled by the post-push verification step below
    ```
 
@@ -409,6 +411,7 @@ committed pass.
    Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
 
    ```bash
+   cd "../ai-config-worktrees/ums-<topic>"   # re-established: a separate Bash call starts in the caller's directory
    git push -u origin HEAD   # PUSH -- to your fork; PR creation is handled by the post-push verification step below
    ```
    **CAUTION:** keeping the push in its own call is what makes the commit durable before anything can refuse the push.

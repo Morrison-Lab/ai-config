@@ -173,6 +173,7 @@ git add -A && git commit -m "<conventional commit message>"   # COMMIT
 Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
 
 ```bash
+cd /tmp/upstream-fix   # re-established: a separate Bash call starts in the caller's directory
 git push origin fix/<slug>   # PUSH
 
 # Open PR from your fork to upstream

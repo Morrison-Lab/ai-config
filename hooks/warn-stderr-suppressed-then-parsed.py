@@ -86,6 +86,7 @@ Known gaps, not exhaustive:
 - A redirect target that is a variable or a substitution is recognised as a
   target, but its VALUE is not, so a variable holding `/dev/null` reads as a
   real file. Over-warn.
+
 Two shapes of gap have actually shown up, and `exec` aside both are about
 redirect SPELLINGS rather than about the stage model. One is detection: a
 spelling the patterns do not match. The other is reporting: a spelling the

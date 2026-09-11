@@ -595,6 +595,8 @@ jobs:
         # it was shown; scripts/check-split-push-blocks.py's docstring carries
         # the reasoning.
         run: python3 scripts/check-split-push-blocks.py
+      - name: Run check-split-push-blocks tests
+        run: python3 scripts/test_check_split_push_blocks.py
   lint-qmd:
     uses: Morrison-Lab/gha/.github/workflows/lint-qmd.yml@v2
 

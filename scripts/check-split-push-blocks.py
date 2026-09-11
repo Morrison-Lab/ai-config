@@ -28,6 +28,37 @@ variable it reads.
 
 Reports how many pairs it examined, so a zero is distinguishable from a sweep
 that never ran.
+
+What this check does NOT see, and which way each error runs.
+
+Three review rounds on this file each produced another shell spelling the
+previous round's grammar had missed, and each fix read as closing the class.
+It does not close: a hand-written grammar can always be shown one more
+spelling, and the cost of chasing them is a check nobody can read. So the
+approximation is stated here instead, and the shapes below are left open.
+
+Quoting is not modelled. A `&&`, `|` or `;` inside a quoted argument -- a PR
+body quoting a command, say -- splits the line as though it were an operator.
+That direction is a false FAILURE, which a reader sees and can rewrite around.
+
+A relative path spelled with backslashes, or one whose first segment starts
+with a character outside `[A-Za-z0-9_-]`, reads as not-relative. A subshell
+opened with a bare `(` hides the call inside it, since the opener is only
+recognized after `$`. A `cd` reached through a chain or a conditional is not
+matched at all. In an earlier block that is a false PASS, since the push
+block is then never asked the question. In the push block itself it is a
+false FAILURE, since the block falls through to the git calls and the
+unanchored push fails: a reader sees that one and can rewrite it.
+
+The false passes are the ones to weigh, and they are bounded by what this
+check is for: it decides a property of RECIPES IN THIS CORPUS, which a person
+writes and a reader follows. It is not a shell sandbox and nothing is
+executed on its verdict. A recipe written in one of the accepted shapes is
+checked; one written in a shape below is not, and the remedy is to rewrite it
+into an accepted shape rather than to teach this file more bash.
+
+Fix the general shape rather than the reported command when another spelling
+turns up here (Morrison-Lab/ai-config#3565).
 """
 from __future__ import annotations
 
@@ -41,8 +72,17 @@ MARKER = "Push as a separate Bash call"
 PUSH_BLOCK = re.compile(
     MARKER + r"[^\n]*\n\n[ \t]*```bash\n(?P<body>.*?)```", re.S)
 ANY_BLOCK = re.compile(r"```bash\n(.*?)```", re.S)
-CD = re.compile(r"^[ \t]*cd\s+\S", re.M)
-GIT_CALL = re.compile(r"^[ \t]*git\s+([^\n]*)", re.M)
+CD = re.compile(r"^[ \t]*cd[ \t]+(?P<target>\S+)", re.M)
+COMMENT = re.compile(r"#[^\n]*")
+# Every operator that ends one command and may begin another, so a segment
+# between two of them is at most one command. Splitting on these is what lets
+# a `git` call inside a substitution be seen as the call it is.
+SEGMENT = re.compile(r"[$][(]|[)]|`|&&|\|\||\||;")
+# A target this file can tell is relative by reading it. A leading `.`, or a
+# bare first segment, resolves against wherever the call began. A derived
+# path is accepted: the recipes that use one anchor it on an absolute root
+# and the value is not in the block to inspect.
+RELATIVE = re.compile(r"\A(?:[.]|[A-Za-z0-9_-]+(?:/|\Z))")
 USES = re.compile(r"[$]{?([A-Za-z_][A-Za-z0-9_]*)")
 ASSIGNS = re.compile(r"^[ \t]*([A-Za-z_][A-Za-z0-9_]*)=", re.M)
 FOR_VAR = re.compile(r"\bfor\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\b")
@@ -51,17 +91,68 @@ FOR_VAR = re.compile(r"\bfor\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\b")
 AMBIENT = {"CLAUDE_PLUGIN_ROOT", "HOME", "PATH", "PWD", "USER", "SHELL"}
 
 
+def is_not_relative(token):
+    """Does `token` name a directory independent of where a call began?
+
+    The question is deliberately the negative one. A path built from a
+    variable or a substitution cannot be resolved by reading the block, and
+    the recipes that build one anchor it on an absolute root, so refusing
+    every derived path would reject correct work. What a reader can always
+    tell is that a leading `.` or a bare first segment is relative.
+    """
+    text = token.strip(chr(34) + chr(39))
+    if not text:
+        return False
+    return not RELATIVE.match(text)
+
+
+def git_calls(body):
+    """Every `git` invocation in `body`, as its own list of tokens.
+
+    Comments go first, so a command named in prose is not read as a call.
+    The rest is split on the shell operators that separate commands, which
+    puts a call inside a substitution and a call chained after another on
+    the same footing as one at the start of a line.
+    """
+    text = COMMENT.sub("", body)
+    calls = []
+    for line in text.split(chr(10)):
+        for segment in SEGMENT.split(line):
+            tokens = segment.split()
+            if tokens and tokens[0] == "git":
+                calls.append(tokens)
+    return calls
+
+
+def is_anchored(tokens):
+    """Does this call pass `-C` a directory that is not relative?"""
+    for index, token in enumerate(tokens[:-1]):
+        if token == "-C":
+            return is_not_relative(tokens[index + 1])
+    return False
+
+
 def names_its_directory(body):
     """True when `body` says which directory it acts on.
 
-    Either spelling counts, and `git -C` is the better one: it does not
-    depend on where the call started, so it survives a session that keeps
-    the previous directory and one that resets it alike.
+    Either spelling counts and neither may be relative, since a relative one
+    assumes the reset behaviour: `cd ../sibling` run from inside that sibling
+    does not resolve.
+
+    A `cd` is the right form wherever the block also runs `gh` or `glab`,
+    since neither takes `-C` and both act on the directory the call began in.
+    `git -C` is the right form where only git runs, and it is checked per
+    call, so a second unanchored call cannot ride along behind an anchored
+    one.
     """
-    if CD.search(body):
-        return True
-    gits = GIT_CALL.findall(body)
-    return bool(gits) and all("-C" in call for call in gits)
+    cd = CD.search(body)
+    if cd:
+        above = git_calls(body[:cd.start()])
+        if not all(is_anchored(call) for call in above):
+            return False
+        return is_not_relative(cd.group("target"))
+    calls = git_calls(body)
+    return bool(calls) and all(is_anchored(call) for call in calls)
 
 
 def problems_in(text):

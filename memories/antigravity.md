@@ -138,7 +138,12 @@ The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-anti
 - In Antigravity / Gemini CLI, `invoke_subagent` dispatches subagents asynchronously in the background, returning `{conversationId, ...}` immediately.
 - The subagent's completed report arrives as an incoming reactive message from the subagent's conversation ID, rather than as the synchronous tool step result of `invoke_subagent`.
 - Consequently, client-side pre-tool hooks (such as `no-push-without-self-review.py`) that parse the direct tool-result output of the subagent tool call will not find the verdict embedded in the initial dispatch step result.
-- Once the asynchronous subagent has finished and returned its verified clean review report and fingerprint, use the authorized prefix `ALLOW_UNREVIEWED_PUSH=1` for the `git push` invocation (the guard's `AGENT_TOOLS` set intentionally rejects `Bash`/`run_command` outputs to prevent unauthenticated reviews).
+- Once the asynchronous subagent has finished and returned its verified clean review report and fingerprint, use the authorized prefix `ALLOW_UNREVIEWED_PUSH=1` for the `git push` invocation.
   (Observed in live Antigravity sessions 2026-09-01.)
+- That advice was written when the guard admitted a verdict only from an `Agent`-tool result, and its original parenthetical said the `AGENT_TOOLS` set rejects `Bash`/`run_command` output outright.
+  That is no longer true: since #3327 (merged 2026-09-07, six days after the observation above) the guard also admits a `Bash` call in the shape `agy --print '<prompt>'`.
+  So where `agy` is available, dispatching the review that way discharges the guard directly and needs no override at all.
+  The override above is for the case where it is not.
+  No other delegation CLI is recognized, so `codex`, `opencode` and `adv` still need the override.
 
 

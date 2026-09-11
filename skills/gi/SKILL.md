@@ -236,7 +236,10 @@ Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow
 # `git -C`, not `cd`: whether a separate Bash call keeps the previous one's
 # directory is unsettled between sessions, so a relative `cd` breaks in
 # whichever half it did not assume.
-git -C ../<repo>-<slug> push -u origin fix/<slug>   # PUSH
+repo="$(git rev-parse --show-toplevel)"
+wt="$repo/../<repo>-<slug>"
+[ -d "$wt" ] || wt="$repo"
+git -C "$wt" push -u origin fix/<slug>   # PUSH
 
 # GitHub — draft PR
 gh pr create --draft --title "<title>" --body "Closes #<N>

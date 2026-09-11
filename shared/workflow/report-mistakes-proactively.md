@@ -519,6 +519,56 @@ See
   plainly which repo it really belongs to, and ask the user to transfer it
   — the same fallback the `config-ai` skill's step 3 uses.
 
+## A defect that resolved itself on a retry is still a defect
+
+The rules above all govern a finding you can still see.
+This one governs the finding that stops reproducing while you are deciding
+what to do about it, which is the shape most likely to go unfiled --- not
+because anyone judged it unimportant, but because the reason to file it
+disappeared before the filing did.
+
+The reasoning that dismisses it sounds like proportion rather than avoidance:
+the thing recovered, nothing is broken now, and filing an issue for a state
+that no longer exists looks like noise.
+Every clause there is true and the conclusion is still wrong, because a
+defect that fires intermittently is *harder* to diagnose than one that fires
+every time, not easier.
+Self-resolution is evidence about this attempt.
+It is no evidence at all about recurrence, and it destroys the artifact a
+later investigator would have started from.
+
+The transient case also carries diagnostic information the reproducible one
+does not, and only a filed record preserves it: how often it fired, what the
+population was, and what made it stop.
+"Two of twelve, and re-dispatching fixed both" tells a maintainer that the
+cause is intermittent rather than a formatting bug, and hands them a
+workaround.
+"It happened and then it did not" tells them nothing.
+
+So file it, or add the measurement to the issue that already covers it, on
+the same terms as any other finding.
+The rate and the recovery step belong in the report, since those are the
+parts that expire.
+
+- **Do:** file a defect that stopped reproducing, and state the rate
+  (how many of how many) and what made it stop.
+- **Do:** dupe-check first --- a transient defect is disproportionately
+  likely to be already known, precisely because it recurs.
+- **Don't:** treat a successful retry as closing the finding; it closes the
+  incident.
+- **Don't:** reach for "it resolved itself" as a reason to skip the filing
+  step --- that phrase describes the evidence, not the defect.
+
+(Morrison-Lab/wai, 2026-09-10.
+Two of twelve PR reviews emitted a `Reviewed commit` fingerprint naming a
+commit absent from the repository, disqualifying both from an otherwise
+authorized merge.
+Re-dispatching the review produced correct fingerprints and the session
+moved on, calling it "transient rather than a defect worth filing".
+`hooks/no-unfiled-finding.py` caught the sentence, and the finding turned
+out to be already tracked as ai-config#3508, where the rate and the
+re-dispatch workaround were genuinely new information.)
+
 ## Scope discipline
 
 Filing the issue is the deliverable — don't derail the current task into

@@ -546,6 +546,24 @@ _ATTRIBUTION_CASES = [
      "rg --replace takes replacement text, not a file"),
     ("rg somepattern ~/.claude/settings.json", {"claude"},
      "an rg search target is still credited"),
+    # The option default is INVERTED: a spelling the table does not know is
+    # assumed to consume the token after it. Five rounds each found another
+    # missing value-option, so what matters is not the list's contents but
+    # which way a gap fails. It now loses a discharge and warns.
+    ("rg -e PATTERN --type-add '~/.claude/settings.json' real.txt", set(),
+     "an rg value option missing from the table no longer credits its value"),
+    ("rg -e PATTERN --some-future-option ~/.claude/settings.json f.txt", set(),
+     "an option that does not exist yet fails toward warning"),
+    ("grep --brand-new-flag ~/.claude/settings.json README.md", set(),
+     "an unknown grep option consumes the token after it"),
+    # A short cluster is bare only when every letter in it is, which is what
+    # keeps the common shapes discharging.
+    ("grep -rn pattern ~/.claude/settings.json", {"claude"},
+     "a cluster of known bare flags does not swallow the pattern"),
+    ("rg -i pattern ~/.claude/settings.json", {"claude"},
+     "a known bare rg flag still leaves its search target credited"),
+    ("jq -r .x ~/.claude/settings.json", {"claude"},
+     "a known bare jq flag still leaves its file credited"),
     ("cat `cat ~/.claude/settings.json`", {"claude"},
      "a backtick body that really reads the manifest still credits it"),
     # The `=`-joined long-option form, which advances by exactly one token

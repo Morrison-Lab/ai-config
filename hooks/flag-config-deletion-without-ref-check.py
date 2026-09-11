@@ -257,7 +257,7 @@ SCRIPT_ONLY_VERBS = frozenset({"python", "python3"})
 
 # Options that supply the pattern or script separately, so the first positional
 # IS a file: `grep -e PAT file`, `awk -f prog.awk file`, `jq -f filter file`.
-# Per verb for the same reason VALUE_OPTS is: one spelling, several meanings.
+# Per verb for the same reason BARE_OPTS is: one spelling, several meanings.
 # `jq -e` is --exit-status, a boolean with nothing to do with the filter, so a
 # shared set marked the filter as already supplied and left a quoted path
 # spelling a manifest sitting in file position -- a FALSE DISCHARGE, which is
@@ -289,46 +289,75 @@ NO_FILE_OPTS = {
     "python3": frozenset({"-c", "-m"}),
 }
 
-# Options taking the NEXT token as their value, per verb. These tables are
-# CURATED rather than complete, and cannot be otherwise: each tool's real
-# option surface is larger than any list kept here, and grows. An option
-# missing from a table is read as a bare flag, so its value falls through as a
-# positional and is credited as a file. That is a false DISCHARGE, the
-# dangerous direction, so a new spelling found in review belongs here.
+# Options known to take NO value, per verb. This is the inverse of the table
+# it replaced, and the inversion is the point.
+#
+# Listing the value-TAKING options makes an unlisted option default to bare,
+# so its value falls through as a positional and is credited as a file the
+# command opened. That is a false DISCHARGE, and five review rounds each found
+# another spelling missing from such a list: `rg` alone grew `--pre`,
+# `--replace`, `--sort`, `--type-add`, `--generate`. No curated list converges,
+# because each tool's option surface is larger than the list and grows.
+#
+# Listing the BARE options inverts which way a gap fails. An unlisted option
+# now consumes the token after it, so a forgotten spelling loses a discharge
+# and WARNS rather than crediting a file nothing opened. Under-crediting is the
+# direction this test wants.
 #
 # Per verb rather than shared, because the same spelling means different
-# things: `sed -n` is
-# `--quiet` and takes nothing, while `head -n` takes a line count. A shared set
-# would consume `sed -n '1,5p' <manifest>`'s script as `-n`'s value, leaving the
-# manifest as the dropped first positional and losing a real discharge.
-VALUE_OPTS = {
+# things: `sed -n` is `--quiet` and takes nothing, while `head -n` takes a line
+# count.
+BARE_OPTS = {
     "grep": frozenset({
-        "-e", "--regexp", "-f", "--file", "-m", "--max-count",
-        "-A", "--after-context", "-B", "--before-context", "-C", "--context",
-        "--include", "--exclude", "--exclude-dir", "--exclude-from", "--label",
-        "-d", "--directories", "-D", "--devices", "--binary-files",
-        "--color", "--colour",
+        "-r", "-R", "--recursive", "-n", "--line-number", "-i",
+        "--ignore-case", "-v", "--invert-match", "-l", "--files-with-matches",
+        "-L", "--files-without-match", "-c", "--count", "-q", "--quiet",
+        "-s", "--no-messages", "-w", "--word-regexp", "-x", "--line-regexp",
+        "-F", "--fixed-strings", "-E", "--extended-regexp", "-P",
+        "--perl-regexp", "-G", "--basic-regexp", "-o", "--only-matching",
+        "-a", "--text", "-I", "-H", "--with-filename", "-h",
+        "--no-filename", "-z", "--null-data", "-Z", "--null", "-U",
+        "--binary", "--line-buffered", "--help", "--version", "-V",
     }),
     "rg": frozenset({
-        "-e", "--regexp", "-f", "--file", "-m", "--max-count",
-        "-A", "--after-context", "-B", "--before-context", "-C", "--context",
-        "-g", "--glob", "-t", "--type", "-T", "--type-not", "--color",
-        "--colors", "-M", "--max-columns", "--max-depth", "--iglob",
-        "--pre", "--pre-glob", "-r", "--replace", "--sort", "--sortr",
-        "--path-separator", "--context-separator", "--field-context-separator",
-        "--field-match-separator", "--ignore-file", "--max-filesize",
-        "-j", "--threads", "--engine", "--encoding", "-E", "--dfa-size-limit",
-        "--regex-size-limit", "--hostname-bin", "--hyperlink-format",
+        "-i", "--ignore-case", "-S", "--smart-case", "-s", "--case-sensitive",
+        "-n", "--line-number", "-N", "--no-line-number", "-v",
+        "--invert-match", "-l", "--files-with-matches", "--files-without-match",
+        "-c", "--count", "--count-matches", "-q", "--quiet", "-w",
+        "--word-regexp", "-x", "--line-regexp", "-F", "--fixed-strings",
+        "-P", "--pcre2", "-o", "--only-matching", "-a", "--text", "-u",
+        "--unrestricted", "--hidden", "--no-ignore", "--follow", "-L",
+        "--files", "--no-filename", "-H", "--with-filename", "--json",
+        "--vimgrep", "--null", "--no-heading", "--heading", "--trim",
+        "--stats", "--debug", "--help", "--version", "-V", "-p", "--pretty",
+        "-z", "--search-zip", "--multiline", "-U", "--multiline-dotall",
+        "--crlf", "--no-messages", "--block-buffered", "--line-buffered",
     }),
-    "sed": frozenset({"-e", "--expression", "-f", "--file",
-                      "-l", "--line-length"}),
-    "awk": frozenset({"-f", "--file", "-v", "--assign",
-                      "-F", "--field-separator"}),
-    # `--arg` and friends live in PAIR_OPTS, and `--jsonargs` in NO_FILE_OPTS;
-    # neither takes exactly one value, which is all this table can express.
-    "jq": frozenset({"-f", "--from-file", "--indent"}),
-    "head": frozenset({"-n", "--lines", "-c", "--bytes"}),
-    "xxd": frozenset({"-l", "-s", "-c", "-g"}),
+    "sed": frozenset({
+        "-n", "--quiet", "--silent", "-r", "-E", "--regexp-extended",
+        "-s", "--separate", "-u", "--unbuffered", "-z", "--null-data",
+        "--posix", "--debug", "--help", "--version",
+    }),
+    "awk": frozenset({
+        "--posix", "--traditional", "--re-interval", "--help", "--version",
+        "-V",
+    }),
+    "jq": frozenset({
+        "-r", "--raw-output", "-j", "--join-output", "-c", "--compact-output",
+        "-n", "--null-input", "-s", "--slurp", "-e", "--exit-status",
+        "-a", "--ascii-output", "-S", "--sort-keys", "-R", "--raw-input",
+        "-C", "--color-output", "-M", "--monochrome-output", "--tab",
+        "--seq", "--stream", "--help", "--version",
+    }),
+    "head": frozenset({"-q", "--quiet", "--silent", "-v", "--verbose",
+                       "-z", "--zero-terminated", "--help", "--version"}),
+    "cat": frozenset({
+        "-n", "--number", "-b", "--number-nonblank", "-s",
+        "--squeeze-blank", "-E", "--show-ends", "-T", "--show-tabs",
+        "-v", "--show-nonprinting", "-A", "--show-all", "-e", "-t", "-u",
+        "--help", "--version",
+    }),
+    "xxd": frozenset({"-r", "-p", "-b", "-u", "-i", "-E", "-h"}),
 }
 
 # The basenames that count as a manifest. Compared with `==` against a resolved
@@ -436,7 +465,7 @@ def read_operands(argv):
     verb = VERB_ALIASES.get(verb, verb)
     if verb not in READ_VERBS:
         return None
-    value_opts = VALUE_OPTS.get(verb, frozenset())
+    bare_opts = BARE_OPTS.get(verb, frozenset())
     pair_opts = PAIR_OPTS.get(verb, frozenset())
     no_file_opts = NO_FILE_OPTS.get(verb, frozenset())
     pattern_opts = PATTERN_OPTS.get(verb, frozenset())
@@ -495,10 +524,13 @@ def read_operands(argv):
                 index += 1
             elif name in pair_opts:
                 index += 3
-            elif name in value_opts:
-                index += 2
-            else:
+            elif takes_no_value(name, bare_opts):
                 index += 1
+            else:
+                # Unknown option: assume it consumes the next token. A wrong
+                # guess here loses a discharge and warns; the opposite guess
+                # credits a file nothing opened.
+                index += 2
             continue
         positional.append(token)
         index += 1
@@ -507,6 +539,21 @@ def read_operands(argv):
     if verb in SCRIPT_ONLY_VERBS:
         positional = positional[:1]
     return positional + redirected
+
+
+def takes_no_value(name, bare_opts):
+    """True when `name` is known to take no value.
+
+    A short-option CLUSTER counts when every letter in it does, so `grep -rn`
+    stays bare rather than swallowing the pattern that follows it. An unknown
+    spelling is not bare, which is what makes a gap in the table warn rather
+    than discharge.
+    """
+    if name in bare_opts:
+        return True
+    if not name.startswith("-") or name.startswith("--") or len(name) < 3:
+        return False
+    return all("-" + letter in bare_opts for letter in name[1:])
 
 
 def scope_cwd(cwd_by_scope, scope):

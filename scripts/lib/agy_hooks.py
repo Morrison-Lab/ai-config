@@ -225,11 +225,30 @@ def is_windows() -> bool:
     return sys.platform.startswith("cygwin") or bool(os.environ.get("MSYSTEM"))
 
 
+def checked_override(override: str, windows: bool) -> str:
+    """Return `override`, refusing a Windows path `cmd.exe` cannot resolve."""
+    if not windows:
+        return override
+    native = override.replace(BACKSLASH, "/")
+    if "/" not in native or is_native_windows_path(native):
+        return native
+    raise ValueError(
+        f"AGY_HOOK_PYTHON is {override!r}, which cmd.exe cannot resolve. Set "
+        "it to an absolute drive-letter path such as C:/Python313/python.exe, "
+        "or to a bare name on PATH."
+    )
+
+
 def resolve_python_exe(windows: bool | None = None) -> str:
     """Return the interpreter to name in a rendered hook command.
 
-    `AGY_HOOK_PYTHON` overrides everything, so a machine whose interpreter this
-    cannot infer stays configurable. On Windows only a native drive-letter path
+    `AGY_HOOK_PYTHON` overrides the detection, so a machine whose interpreter
+    this cannot infer stays configurable. It does not override the Windows
+    check: an override naming a path `cmd.exe` cannot resolve reproduces the
+    same failure a detected one would, and it is the likelier of the two to
+    be set from an MSYS shell whose `which python3` answered in MSYS terms.
+    A bare name is left alone, since `cmd.exe` resolves one against PATH.
+    On Windows only a native drive-letter path
     is usable: an MSYS or Cygwin `sys.executable` such as
     `/mingw64/bin/python3.exe` means nothing to a `cmd.exe` launcher, and
     emitting it would reproduce the failure this module fixes. When neither the
@@ -237,10 +256,10 @@ def resolve_python_exe(windows: bool | None = None) -> str:
     guessing a name that may not resolve.
     """
     override = os.environ.get("AGY_HOOK_PYTHON", "").strip()
-    if override:
-        return override
     if windows is None:
         windows = is_windows()
+    if override:
+        return checked_override(override, windows)
     if not windows:
         return CANONICAL_INTERPRETER
     candidates = [sys.executable or ""]

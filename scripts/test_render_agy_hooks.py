@@ -100,6 +100,21 @@ class TestEnvironmentResolution(unittest.TestCase):
     def test_resolve_python_exe_override(self):
         self.assertEqual(agy_hooks.resolve_python_exe(True), "C:/Custom/Python/python.exe")
 
+    @patch.dict(os.environ, {"AGY_HOOK_PYTHON": "/mingw64/bin/python3.exe"})
+    def test_resolve_python_exe_refuses_a_non_native_override(self):
+        # An override is likelier than a detected path to come from an MSYS
+        # shell, so it is checked rather than trusted.
+        with self.assertRaises(ValueError):
+            agy_hooks.resolve_python_exe(True)
+
+    @patch.dict(os.environ, {"AGY_HOOK_PYTHON": "py"})
+    def test_resolve_python_exe_allows_a_bare_name_override(self):
+        self.assertEqual(agy_hooks.resolve_python_exe(True), "py")
+
+    @patch.dict(os.environ, {"AGY_HOOK_PYTHON": "/usr/bin/python3"})
+    def test_resolve_python_exe_leaves_a_posix_override_alone(self):
+        self.assertEqual(agy_hooks.resolve_python_exe(False), "/usr/bin/python3")
+
     @patch.dict(os.environ, {}, clear=True)
     @patch("sys.executable", "/mingw64/bin/python.exe")
     @patch("shutil.which", return_value="C:/Python312/python.exe")

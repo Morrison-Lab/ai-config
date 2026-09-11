@@ -744,6 +744,14 @@ _ATTRIBUTION_CASES = [
     ("grep --include=*.json hooks ~/.claude/settings.json", {"claude"},
      "an `=`-joined value option must NOT also eat the next token, or the "
      "pattern shifts and the manifest is dropped as the pattern positional"),
+    ("echo $(cat ~/.claude/settings.json", set(),
+     "an unterminated substitution paren is treated as unparseable and credits no reads"),
+    ("echo `cat ~/.claude/settings.json", set(),
+     "an unterminated backtick is treated as unparseable and credits no reads"),
+    ("echo $(echo `cat ~/.claude/settings.json)", set(),
+     "a nested unterminated opener inside a balanced outer one makes the whole command unparseable"),
+    ("echo $(cat ~/.claude/settings.json)", {"claude"},
+     "a balanced substitution still discharges as before"),
 ]
 print("(argv parse active: %s)" % (_ns["simple_commands_with_scope"] is not None))
 for _command, _expected, _desc in _ATTRIBUTION_CASES:

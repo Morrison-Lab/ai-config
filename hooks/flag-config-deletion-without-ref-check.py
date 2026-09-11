@@ -70,6 +70,10 @@ the parser carries no operator between simple commands, so a read the
 shell never reaches --- `false && cat <manifest>` --- is credited.
 Deciding it needs an exit status the text does not carry.
 
+A substitution's balance is checked, but not the command's own parens, so an
+unterminated subshell --- `(cat <manifest>` --- still parses and credits its
+inner read even though the shell rejects the missing close.
+
 THE DISCHARGE SIDE IS APPROXIMATE, AND SAYING SO IS PART OF SHIPPING IT.
 Sixteen adversarial review rounds ran on this file, and each found another
 command whose read the parser credited wrongly: a quoted tilde, a substitution
@@ -117,6 +121,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import sys
 import tempfile
 
@@ -871,6 +876,20 @@ def lexical_read_roots(command):
     return found
 
 
+def lexes(command):
+    """Can `shlex` tokenize `command` at all?
+
+    A False here says the text is lexically broken rather than merely
+    unbalanced in its substitutions, which is what decides whether an
+    unclosed opener warns or credits nothing.
+    """
+    try:
+        shlex.split(command, posix=True)
+    except ValueError:
+        return False
+    return True
+
+
 def read_roots(command, depth=0):
     """The roots whose manifest a command actually READS.
 
@@ -889,7 +908,23 @@ def read_roots(command, depth=0):
     # NOT the heredoc-free text: `_heredoc_free` blanks from the opener, so a
     # file operand sitting after `<<-EOF` on the same line would go with it,
     # and `simple_commands_with_scope` applies that blanking itself anyway.
-    outer = blank_substitutions(command, substitution_spans(command))
+    spans = substitution_spans(command)
+    if spans is None:
+        # An opener with no closer. Two causes, and they part ways here.
+        #
+        # The command may be lexically broken in its own right -- an unbalanced
+        # quote, say -- in which case the scan never reached the closer that is
+        # there. That is the `shlex` failure the docstring above sends to the
+        # lexical fallback, and warning is the right direction for it.
+        #
+        # Otherwise the opener genuinely never closes. The shell rejects such a
+        # command outright, so nothing in it runs and nothing in it read a
+        # file: crediting the phantom body would DISCHARGE a read that never
+        # happened, which is the one direction this guard must not err in.
+        if not lexes(command):
+            return lexical_read_roots(command)
+        return set()
+    outer = blank_substitutions(command, spans)
     parsed = argv_read_roots(outer) if simple_commands_with_scope else None
     if parsed is None:
         return lexical_read_roots(command)
@@ -898,7 +933,13 @@ def read_roots(command, depth=0):
     # Recursion reads the heredoc-free text, so an opener inside a heredoc
     # BODY is data rather than a substitution to follow.
     scanned = _heredoc_free(command) if _heredoc_free else command
-    for start, end in substitution_spans(scanned):
+    scanned_spans = substitution_spans(scanned)
+    if scanned_spans is None:
+        # Blanking the heredocs left an opener unclosed although the raw
+        # command balanced. Recurse into nothing rather than guess a body,
+        # and keep the outer parse, which stands on its own.
+        return parsed
+    for start, end in scanned_spans:
         parsed = parsed | read_roots(scanned[start:end], depth + 1)
     return parsed
 
@@ -984,10 +1025,14 @@ def substitution_spans(command):
             continue
         if match.group(0) == "`":
             close = matching_backtick(command, match.end())
+            if close == -1:
+                return None
             bodies.append((match.end(), close))
             index = close + 1
             continue
         close = matching_paren(command, match.end())
+        if close == -1:
+            return None
         bodies.append((match.end(), close))
         index = close + 1
     return bodies
@@ -1022,7 +1067,7 @@ def matching_backtick(text, start):
         elif char == "`":
             return index
         index += 1
-    return len(text)
+    return -1
 
 
 def matching_paren(text, start):
@@ -1059,7 +1104,7 @@ def matching_paren(text, start):
             if depth == 0:
                 return index
         index += 1
-    return len(text)
+    return -1
 
 
 def targeted_roots(text):

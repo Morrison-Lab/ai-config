@@ -1096,5 +1096,176 @@ check(
     "-250 tok" in _save and "-251" not in _save,
 )
 
+# --- near-cap no-growth ratchet on the root file ----------------------------
+# ai-config#3367. The advisory delta report has run on every PR since
+# 2026-08-10 and CLAUDE.md still grew 84,979 -> 143,827 bytes in the 26 days
+# after the trim it was meant to make unnecessary, so "report it where a
+# reviewer looks" is a measured failure rather than an untried option.
+
+# Pure-function states first: the reporter has to distinguish all four, and a
+# check that only speaks when it fails cannot be told from one that never ran.
+_over, _text = ccc.render_root_growth(100, 120, "CLAUDE.md", 130, 0.90)
+check(
+    "growth above the ratchet line fails and names the remaining headroom",
+    _over and "ROOT FILE GREW" in _text and "10" in _text,
+)
+_over, _text = ccc.render_root_growth(130, 120, "CLAUDE.md", 130, 0.90)
+check(
+    "a shrink above the line passes and says so",
+    not _over and "satisfied" in _text,
+)
+_over, _text = ccc.render_root_growth(120, 120, "CLAUDE.md", 130, 0.90)
+check(
+    "holding steady above the line passes: the ratchet forbids growth, not size",
+    not _over and "satisfied" in _text,
+)
+_over, _text = ccc.render_root_growth(10, 50, "CLAUDE.md", 130, 0.90)
+check(
+    "growth well below the line is inactive, not a failure",
+    # The whole answer to validate.yml's cry-wolf objection: a PR that grows
+    # the root file while there is room does not fail, so the gate costs
+    # nothing until the cap is genuinely close.
+    not _over and "inactive" in _text and "+40" in _text,
+)
+_over, _text = ccc.render_root_growth(100, 117, "CLAUDE.md", 130, 0.90)
+check(
+    "growth with the file exactly ON the line fails: the band is closed below",
+    # 130 * 0.90 == 117.0 exactly, so this is the single decision the whole
+    # design rests on, and the one a later `<` -> `<=` refactor would flip
+    # silently with a green suite. Neither case above lands on it: they sit
+    # at 120 and at 50 against the same 117.
+    _over and "ROOT FILE GREW" in _text,
+)
+_over, _text = ccc.render_root_growth(116, 116, "CLAUDE.md", 130, 0.90)
+check(
+    "holding steady just BELOW the line reads inactive, not satisfied",
+    # The other side of the same boundary, and the two words have to differ:
+    # "satisfied" asserts the ratchet looked and approved, "inactive" that it
+    # never applied. Conflating them would hide a mis-set fraction entirely.
+    not _over and "inactive" in _text,
+)
+_over, _text = ccc.render_root_growth(None, 120, "CLAUDE.md", 130, 0.90)
+check(
+    "an unreadable side reports NOT checked rather than scoring it as growth",
+    # Comparing against a missing baseline as zero would report the whole
+    # file as this branch's addition -- the failure `baseline_reader` already
+    # guards for the closure total.
+    not _over and "NOT checked" in _text,
+)
+
+with tempfile.TemporaryDirectory() as tmp:
+    base = Path(tmp)
+    (base / "CLAUDE.md").write_text("@frag.md" + chr(10) + ("x" * 100), encoding="utf-8")
+    (base / "frag.md").write_text("f", encoding="utf-8")
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=base, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=base, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=base, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=base, check=True)
+    subprocess.run(["git", "commit", "-qm", "baseline"], cwd=base, check=True)
+    rev = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=base, capture_output=True, text=True
+    ).stdout.strip()
+
+    check(
+        "root_char_count_at reads the root file at a revision",
+        ccc.root_char_count_at(base, "CLAUDE.md", rev) == 109,
+    )
+    check(
+        "root_char_count_at returns None for a file absent at that revision",
+        ccc.root_char_count_at(base, "nope.md", rev) is None,
+    )
+
+    # Grow the ROOT file in the working tree only. cap=120 puts the 0.90 line
+    # at 108, so the baseline (109) and the working tree are both past it.
+    (base / "CLAUDE.md").write_text("@frag.md" + chr(10) + ("x" * 105), encoding="utf-8")
+    gate = ["--base", str(base), "--budget", "100000000", "--root-char-cap", "120"]
+    check(
+        "the ratchet fails a root-file growth inside the near-cap band",
+        ccc.main(gate + ["--baseline", rev]) == 1,
+    )
+    check(
+        "it still fails under --strict, which it neither needs nor is weakened by",
+        # The check above covers the bare case. Both flags are opt-in and
+        # requiring either would rebuild the advisory step this ratchet exists
+        # because of, so the pair pins "independent of --strict" in both
+        # directions rather than naming one case and running the other.
+        ccc.main(gate + ["--baseline", rev, "--strict"]) == 1,
+    )
+    check(
+        "--no-root-growth-gate reports the growth without failing on it",
+        ccc.main(gate + ["--baseline", rev, "--no-root-growth-gate"]) == 0,
+    )
+    for _bad in ("0", "-1", "nan", "1.5", "abc"):
+        # Each previously passed argparse and made the gate UNCONDITIONAL
+        # while printing a garbled threshold -- fail-fast inverted, bad input
+        # producing maximum strictness rather than a visible error. NaN is
+        # the one nobody predicts: every ordered comparison against it is
+        # false, so `after < line` could not be true and the failure branch
+        # always ran. 1.5 is here because the help text used to call an
+        # out-of-range fraction the way to disable the gate, which it never
+        # reliably was -- a file past the cap is past 1.5 * cap too.
+        #
+        # Through main() rather than calling unit_fraction() directly, per the
+        # --bytes-per-token block above: a direct call stays green against a
+        # `type=float` regression. argparse exits rather than returning, so
+        # SystemExit(2) is the pass condition.
+        try:
+            ccc.main(
+                gate + ["--baseline", rev, "--root-growth-gate-fraction", _bad]
+            )
+            _rejected = False
+        except SystemExit as _exc:
+            _rejected = _exc.code == 2
+        except Exception:
+            # A crash downstream is not "rejected at parse time".
+            _rejected = False
+        check(
+            f"--root-growth-gate-fraction {_bad} is rejected by the parser",
+            _rejected,
+        )
+    check(
+        "a roomier cap makes the same growth inactive",
+        # The negative control for the band itself: identical growth, cap
+        # raised so the file is below the line, and it passes. Without this
+        # the failure above could be growth-detection with no band at all.
+        ccc.main(gate[:-1] + ["100000", "--baseline", rev]) == 0,
+    )
+
+    # A trim above the line must pass, or the gate blocks its own remedy.
+    (base / "CLAUDE.md").write_text("@frag.md" + chr(10) + ("x" * 99), encoding="utf-8")
+    check(
+        "a trim inside the band passes",
+        ccc.main(gate + ["--baseline", rev]) == 0,
+    )
+    # The remedy the failure message prescribes: move prose OUT of the root
+    # and into an @-imported fragment. That must pass, or the gate blocks its
+    # own remedy -- and it is the case the ratchet's whole shape depends on,
+    # since the closure TOTAL does not shrink when bytes merely relocate.
+    #
+    # Constructed rather than inherited. The previous version of this check
+    # reused the already-trimmed root above and changed only frag.md, an
+    # input the ratchet never reads, so its argv was byte-identical to the
+    # check before it and it re-asserted that outcome instead of this one.
+    (base / "CLAUDE.md").write_text(
+        "@frag.md" + chr(10) + ("x" * 99), encoding="utf-8"
+    )
+    (base / "frag.md").write_text("f" * 11, encoding="utf-8")
+    _moved_files, _, _, _ = ccc.walk_closure("CLAUDE.md", ccc.local_reader(base))
+    _moved_total = sum(n for _, n, _ in _moved_files)
+    _at_rev, _, _, _ = ccc.walk_closure(
+        "CLAUDE.md", ccc.baseline_reader(base, rev)
+    )
+    _rev_total = sum(n for _, n, _ in _at_rev)
+    check(
+        "the migration really does relocate bytes rather than delete them",
+        # Without this the check below could pass merely because everything
+        # got smaller, which is the trim case one check above, not this one.
+        _moved_total >= _rev_total,
+    )
+    check(
+        "moving prose from the root into a fragment passes the ratchet",
+        ccc.main(gate + ["--baseline", rev]) == 0,
+    )
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

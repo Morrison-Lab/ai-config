@@ -3,11 +3,18 @@
 
 `check-chained-commit-push-in-fences.py` finds a `git commit` chained into a
 `git push` inside one fenced block, and the fix is to split the block in two.
-Splitting has a cost the split itself does not pay: shell state does not cross
-a Bash call boundary, so a `cd` or a variable the first block established is
-gone by the time the second runs. The push then targets the caller's directory,
-or an empty `-C` path, which git resolves to the current directory rather than
-refusing.
+Splitting has a cost the split itself does not pay. Whether a separate Bash
+call keeps the previous one's working directory is unsettled: the tool's own
+description says a main session persists it and only a subagent thread resets
+it, and `memories/git-worktrees.md` records a main session that reset it after
+every call. So a recipe cannot assume EITHER behaviour, and a variable the
+first block set is gone regardless.
+
+The robust form is `git -C <path>`, which `memories/preferences.md` already
+recommends over `cd` for exactly this reason: it names its directory rather
+than depending on one. A block that re-issues a RELATIVE `cd` is the trap this
+check has to leave room for rather than demand, since re-running
+`cd ../sibling` from inside that sibling fails.
 
 Four review rounds on ai-config#3199 each found another recipe with that gap,
 after the previous round had fixed the ones it was shown. The property is
@@ -31,12 +38,26 @@ PUSH_BLOCK = re.compile(
     MARKER + r"[^\n]*\n\n[ \t]*```bash\n(?P<body>.*?)```", re.S)
 ANY_BLOCK = re.compile(r"```bash\n(.*?)```", re.S)
 CD = re.compile(r"^[ \t]*cd\s+\S", re.M)
+GIT_CALL = re.compile(r"^[ \t]*git\s+([^\n]*)", re.M)
 USES = re.compile(r"[$]{?([A-Za-z_][A-Za-z0-9_]*)")
 ASSIGNS = re.compile(r"^[ \t]*([A-Za-z_][A-Za-z0-9_]*)=", re.M)
 FOR_VAR = re.compile(r"\bfor\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\b")
 
 # Names the shell or the harness supplies, so a block need not set them.
 AMBIENT = {"CLAUDE_PLUGIN_ROOT", "HOME", "PATH", "PWD", "USER", "SHELL"}
+
+
+def names_its_directory(body):
+    """True when `body` says which directory it acts on.
+
+    Either spelling counts, and `git -C` is the better one: it does not
+    depend on where the call started, so it survives a session that keeps
+    the previous directory and one that resets it alike.
+    """
+    if CD.search(body):
+        return True
+    gits = GIT_CALL.findall(body)
+    return bool(gits) and all("-C" in call for call in gits)
 
 
 def problems_in(text):
@@ -49,10 +70,12 @@ def problems_in(text):
         # earlier -- `gi` cds in step 6b and pushes in step 8 -- and checking
         # only the adjacent block missed exactly that case.
         earlier = ANY_BLOCK.findall(text[:match.start()])
-        if any(CD.search(block) for block in earlier) and not CD.search(body):
+        directory_matters = any(CD.search(block) for block in earlier)
+        if directory_matters and not names_its_directory(body):
             found.append(
-                "an earlier block in this recipe changes directory and it "
-                "does not, so it would push from wherever the caller was")
+                "an earlier block in this recipe changes directory and this "
+                "one neither cds nor passes `git -C`, so it would act on "
+                "wherever the caller happened to be")
         reads = set(USES.findall(body))
         writes = set(ASSIGNS.findall(body)) | set(FOR_VAR.findall(body))
         missing = sorted(reads - writes - AMBIENT)

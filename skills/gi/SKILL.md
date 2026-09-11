@@ -233,8 +233,10 @@ git commit --allow-empty -m "start: <issue title> (closes #<N>)"   # COMMIT
 Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
 
 ```bash
-cd ../<repo>-<slug>   # re-established: a separate Bash call starts in the caller's directory
-git push -u origin fix/<slug>   # PUSH
+# `git -C`, not `cd`: whether a separate Bash call keeps the previous one's
+# directory is unsettled between sessions, so a relative `cd` breaks in
+# whichever half it did not assume.
+git -C ../<repo>-<slug> push -u origin fix/<slug>   # PUSH
 
 # GitHub — draft PR
 gh pr create --draft --title "<title>" --body "Closes #<N>

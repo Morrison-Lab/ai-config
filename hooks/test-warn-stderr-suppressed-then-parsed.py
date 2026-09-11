@@ -316,6 +316,31 @@ check(
     True,
 )
 
+# A bare substitution as the SOLE redirect target was blanked to spaces in the
+# outer region, leaving nothing after the operator for the redirect patterns to
+# match. The same target quoted, or with any literal text beside it, fired --
+# so the shape decided the verdict rather than the redirect did.
+check(
+    "a bare command substitution target fires",
+    fires("cmd 2>/dev/null > $(mktemp)"),
+    True,
+)
+check(
+    "a bare backtick target fires",
+    fires("cmd 2>/dev/null > `mktemp`"),
+    True,
+)
+check(
+    "a bare substitution target is reported whole",
+    reported("cmd 2>/dev/null > $(mktemp)")[1],
+    "redirected to `$(mktemp)`",
+)
+check(
+    "the mark does not make /dev/null look like a file",
+    fires("cmd 2>/dev/null > /dev/null"),
+    False,
+)
+
 if failures:
     print("FAILED:")
     for line in failures:

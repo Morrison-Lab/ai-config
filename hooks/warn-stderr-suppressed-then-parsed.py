@@ -86,6 +86,9 @@ Known gaps, not exhaustive:
 - A redirect target that is a variable or a substitution is recognised as a
   target, but its VALUE is not, so a variable holding `/dev/null` reads as a
   real file. Over-warn.
+- `exec` aside, every gap found so far has been in which redirect SHAPES are
+  recognised rather than in the stage model, and each was found by an
+  adversarial reader rather than by a user hitting it.
 
 When a new gap is reported, fix the general shape rather than the literal
 command: the `>|` operator reached this file twice, once as a file target and
@@ -171,11 +174,20 @@ RX_STDOUT_FILE = re.compile(
     r"(?!&)([^\s;|&<>()]+)")
 
 
-def _blank(out, start, end):
-    """Space-fill `out[start:end]`, keeping newlines so line structure holds."""
+# What a blanked-out substitution leaves behind in the OUTER region. A space
+# erases the token entirely, and a bare `> $(mktemp)` then left nothing after
+# the operator for the redirect patterns to match, so it scanned clean while
+# a quoted or prefixed target of the same shape fired. This stands in for the
+# word without carrying any of its text; the reported filename is recovered
+# from the original command, so the mark is never shown.
+SUBSTITUTION_MARK = "\x01"
+
+
+def _blank(out, start, end, fill=" "):
+    """Fill `out[start:end]`, keeping newlines so line structure holds."""
     for index in range(start, min(end, len(out))):
         if out[index] != "\n":
-            out[index] = " "
+            out[index] = fill
 
 
 def _mask_heredocs(command):
@@ -328,7 +340,8 @@ def _regions(masked, spans):
         for inner_start, inner_end in spans:
             inside = inner_start >= start and inner_end <= end
             if inside and (inner_start, inner_end) != (start, end):
-                _blank(local, inner_start - start, inner_end - start)
+                _blank(local, inner_start - start, inner_end - start,
+                       fill=SUBSTITUTION_MARK)
         out.append((start, "".join(local), captured))
     return out
 

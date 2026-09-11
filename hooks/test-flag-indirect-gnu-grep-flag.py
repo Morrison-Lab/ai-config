@@ -694,30 +694,40 @@ def no_platform_integer_in_runtime_text():
 
 
 def every_platform_claim_is_hedged():
-    """Both rendered surfaces must hedge which binary PATH resolves to.
+    r"""Every SENTENCE that commits to a platform must hedge in itself.
 
     The structural guard for the hedging half of this file's recurring class,
     mirroring `no_platform_integer_in_runtime_text` for the numeric half.
 
-    The claim "BSD grep rejects this flag" is only ever conditional: the module
-    warns rather than blocks precisely because which grep resolves in the child
-    is not decidable from the command text. Two rounds fixed that claim in one
-    rendered surface and left the textually-parallel sibling unhedged -- first
-    the two `systemMessage` branches against each other, then `systemMessage`
-    against `NOTE_RESOLVED`. So assert it across every surface at once rather
-    than per location.
+    Two earlier drafts of this check were too weak, in the way the class itself
+    keeps being too weak. The first asserted a hedge somewhere in the whole
+    rendered blob, which the template's own boilerplate hedge always satisfies
+    -- so an unhedged claim injected into `RC_SENTENCE[RC_PRESERVED]` passed the
+    entire suite, demonstrated by mutation. And its probes rendered only the
+    laundered branch, so two of three rc classes were never exercised at all,
+    including the one `sh -c` produces.
+
+    So localize it: split the text into sentences, and require any sentence
+    naming a platform or implementation to carry its own hedge. A claim about
+    which binary resolves is only ever conditional, because the module warns
+    rather than blocks precisely to say it cannot know.
     """
-    # A hedge is any of these, in either surface.
-    HEDGES = ("if it is", "if that resolves", "is not decidable",
-              "this warning is noise")
-    failures = []
+    PLATFORM = ("BSD", "macOS", "GNU", "FreeBSD", "Homebrew", "Linux")
+    HEDGE = ("if ", "If ", "typically", "may ", "not decidable", "noise",
+             "unless", "when ", "differs by", "its own", "not measured",
+             "not recorded")
+    # Probes covering all three rc classes, in both pinned and resolved form.
     probes = [
-        ("resolved", "ls | xargs -0 grep -lP " + chr(39) + "x" + chr(39)),
-        ("pinned", "ls | xargs -0 /usr/bin/grep -lP " + chr(39) + "x" + chr(39)),
-        ("resolved-nested", "sh -c " + chr(39) + "xargs -0 grep -P x" + chr(39)),
-        ("pinned-find",
-         "find . -exec /usr/bin/grep -lP x {} +"),
+        ("laundered/resolved", "ls | xargs -0 grep -lP " + chr(39) + "x" + chr(39)),
+        ("laundered/pinned",
+         "ls | xargs -0 /usr/bin/grep -lP " + chr(39) + "x" + chr(39)),
+        ("preserved/resolved", "sh -c " + chr(39) + "grep -P x f" + chr(39)),
+        ("preserved/pinned", "env /usr/bin/grep -P x f"),
+        ("discarded/resolved", "find . -exec grep -lP x {} " + B + ";"),
+        ("discarded/pinned", "find . -exec /usr/bin/grep -lP x {} " + B + ";"),
+        ("nested", "sh -c " + chr(39) + "xargs -0 grep -P x" + chr(39)),
     ]
+    failures = []
     for label, cmd in probes:
         proc = subprocess.run(
             [sys.executable, HOOK],
@@ -725,13 +735,19 @@ def every_platform_claim_is_hedged():
                               "tool_input": {"command": cmd}}),
             capture_output=True, text=True)
         d = json.loads(proc.stdout or "{}")
-        sm = d.get("systemMessage", "")
-        ctx = d.get("hookSpecificOutput", {}).get("additionalContext", "")
-        sm_ok = any(h in sm for h in HEDGES)
-        ctx_ok = any(h in ctx for h in HEDGES)
-        ok = sm_ok and ctx_ok
-        print("  %s %-16s systemMessage hedged=%s  additionalContext hedged=%s"
-              % ("PASS" if ok else "FAIL", label, sm_ok, ctx_ok))
+        text = (d.get("systemMessage", "") + " "
+                + d.get("hookSpecificOutput", {}).get("additionalContext", ""))
+        # Sentence-ish split. Newlines are not boundaries: these templates wrap.
+        flat = " ".join(text.split())
+        sentences = [x for x in re.split(r"(?<=[.!?])" + chr(92) + "s+", flat) if x.strip()]
+        committing = [x for x in sentences if any(k in x for k in PLATFORM)]
+        unhedged = [x for x in committing if not any(h in x for h in HEDGE)]
+        # A class that names no platform at all is fine -- nothing to hedge.
+        ok = not unhedged
+        print("  %s %-19s platform sentences=%d unhedged=%d%s"
+              % ("PASS" if ok else "FAIL", label, len(committing),
+                 len(unhedged),
+                 "" if ok else "  first: " + unhedged[0][:72]))
         if not ok:
             failures.append(label)
     return failures

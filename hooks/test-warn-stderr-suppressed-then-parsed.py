@@ -341,6 +341,33 @@ check(
     False,
 )
 
+# The mark must never reach a reader. The filename is recovered from the
+# ORIGINAL text starting after the redirect operator, so an operator spelling
+# the recovery did not know fell back to the MASKED capture -- which for a
+# substitution target is the mark itself. Every operator that can introduce a
+# file target is checked, not only the one the report named.
+for _op in (">", ">>", ">|", ">>|", "&>", "&>>", ">&", "1>", "1>>"):
+    for _target in ("$(mktemp)", "`mktemp`", '"$(mktemp)"', "out.json"):
+        _command = "cmd 2>/dev/null " + _op + " " + _target
+        for _found, _why in hook.find_offenses(_command):
+            check(
+                "no substitution mark in the report for " + _op + " " + _target,
+                hook.SUBSTITUTION_MARK not in _why
+                and hook.SUBSTITUTION_MARK not in _found,
+                True,
+            )
+
+check(
+    "a merge redirect to a substitution names it",
+    reported("cmd &> $(mktemp) 2>/dev/null")[1],
+    "redirected to `$(mktemp)`",
+)
+check(
+    "a noclobber override to a substitution names it",
+    reported("cmd 2>/dev/null >|$(mktemp)")[1],
+    "redirected to `$(mktemp)`",
+)
+
 if failures:
     print("FAILED:")
     for line in failures:

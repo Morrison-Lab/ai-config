@@ -86,9 +86,14 @@ Known gaps, not exhaustive:
 - A redirect target that is a variable or a substitution is recognised as a
   target, but its VALUE is not, so a variable holding `/dev/null` reads as a
   real file. Over-warn.
-- `exec` aside, every gap found so far has been in which redirect SHAPES are
-  recognised rather than in the stage model, and each was found by an
-  adversarial reader rather than by a user hitting it.
+Two shapes of gap have actually shown up, and `exec` aside both are about
+redirect SPELLINGS rather than about the stage model. One is detection: a
+spelling the patterns do not match. The other is reporting: a spelling the
+recovery does not match, which used to degrade the named filename to whatever
+the masked stage held. Every operator that can introduce a file target now
+comes from one alternation, and a test sweeps all of them against a
+substitution target. Each was found by an adversarial reader rather than by a
+user hitting it.
 
 When a new gap is reported, fix the general shape rather than the literal
 command: the `>|` operator reached this file twice, once as a file target and
@@ -159,6 +164,12 @@ RX_MERGE_FILE = re.compile(
 # pattern only, so the discard pattern still missed it and a fully discarded
 # stage read as piped.
 _OUT_OP = r"(?:>>?\||>>?)"
+# Every operator that can introduce a stdout file target, including the
+# merge spellings. The recovery below reads the ORIGINAL text starting
+# after one of these, so a spelling missing here degrades the reported
+# filename to whatever the masked stage held -- which since the
+# substitution mark was introduced means the mark itself.
+_ANY_OUT_OP = r"(?:&>>?|>&|1?(?:>>?\||>>?))"
 
 # stdout to /dev/null, with or without its explicit `1` fd. The lookbehind
 # excludes `2>` (preceded by a digit) and `&>` (preceded by `&`), each of
@@ -544,12 +555,18 @@ def _consumption(stage, is_last, captured, original_stage):
     if _stdout_discarded(stage, to_file):
         return None
     if to_file is not None:
-        match = re.match(r"(?:1?>>?)\s*", original_stage[to_file.start():])
+        match = re.match(_ANY_OUT_OP + r"\s*", original_stage[to_file.start():])
         if match:
             target = _extract_token(original_stage, to_file.start() + match.end())
             if target:
                 return "redirected to `{}`".format(target)
-        return "redirected to `{}`".format(to_file.group(1))
+        # Last resort: the capture comes from the MASKED stage, so it can hold
+        # the substitution mark. Naming the redirect without a filename beats
+        # printing a control character at the reader.
+        fallback = to_file.group(1)
+        if SUBSTITUTION_MARK in fallback:
+            return "redirected to a command substitution"
+        return "redirected to `{}`".format(fallback)
     if not is_last:
         return "piped into the next command"
     if captured:

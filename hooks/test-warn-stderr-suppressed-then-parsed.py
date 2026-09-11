@@ -237,6 +237,30 @@ check(
 check("a bare close still fires", fires("cmd 2>&- > out.json"), True)
 check("fd 12 is not fd 2", fires("cmd 12>/dev/null > out.json"), False)
 
+# `|&` is `2>&1 |`, and bash applies that merge after the command has applied
+# its own redirections, so stderr reaches the pipe and nothing stays
+# suppressed. A plain pipe beside it keeps the contrast visible.
+check(
+    "a merging pipe supersedes an earlier discard",
+    fires("cmd 2>/dev/null |& jq ."),
+    False,
+)
+check(
+    "a merging pipe supersedes a close too",
+    fires("cmd 2>&- |& jq ."),
+    False,
+)
+check(
+    "a plain pipe after the same discard still fires",
+    fires("cmd 2>/dev/null | jq ."),
+    True,
+)
+check(
+    "a merging pipe does not excuse a LATER stage that suppresses",
+    fires("a |& b 2>/dev/null | jq ."),
+    True,
+)
+
 # Two stdout file targets in one stage: the shell writes the LAST one and
 # truncates the first, so naming the first sends a reader to an empty file.
 check(

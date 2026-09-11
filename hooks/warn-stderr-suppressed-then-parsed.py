@@ -372,8 +372,15 @@ def _regions(masked, spans):
 # lookahead. Without the `>` in that lookahead the shorthand splits its own
 # command in two, so its suppression never shares a stage with the redirect
 # that consumes stdout, and nothing ever fires.
-RX_SEGMENT = re.compile(r"&&|\|\||;|\n|(?<![>&])&(?![&>])")
-RX_PIPE = re.compile(r"(?<![\|>])\|(?!\|)")
+# `|&` is bash shorthand for `2>&1 |`, and that merge is applied AFTER the
+# command's own redirections, so it supersedes an earlier `2>/dev/null` in the
+# same stage: stderr reaches the pipe rather than the bit bucket. Such a stage
+# is therefore not suppressed at all, whatever its explicit redirections say.
+# Both patterns have to know about it. `RX_SEGMENT` would otherwise split at
+# that `&` and leave a dangling `|` behind, and `RX_PIPE` would read it as a
+# plain pipe and lose the merge.
+RX_SEGMENT = re.compile(r"&&|\|\||;|\n|(?<![>&\|])&(?![&>])")
+RX_PIPE = re.compile(r"(?<![\|>])\|&?(?!\|)")
 
 
 
@@ -492,6 +499,24 @@ def _split(text, separator):
     return out
 
 
+def _split_stages(segment):
+    """[(offset, stage, merged), ...] for one segment's pipeline stages.
+
+    `merged` is True when the operator FOLLOWING that stage is `|&`, whose
+    implicit `2>&1` lands after the stage's own redirections and so undoes
+    any suppression they applied.
+    """
+    depths = _get_depths(segment)
+    out, pos = [], 0
+    for match in RX_PIPE.finditer(segment):
+        if depths[match.start()] != 0:
+            continue
+        out.append((pos, segment[pos:match.start()], match.group(0) == "|&"))
+        pos = match.end()
+    out.append((pos, segment[pos:], False))
+    return out
+
+
 def _last_match(stage, patterns):
     """Position of the last match of any of `patterns`, or None."""
     starts = [m.start() for p in patterns for m in p.finditer(stage)]
@@ -593,9 +618,9 @@ def find_offenses(command):
     out = []
     for base, text, captured in _regions(masked, spans):
         for seg_offset, segment in _split(text, RX_SEGMENT):
-            stages = _split(segment, RX_PIPE)
-            for position, (stage_offset, stage) in enumerate(stages):
-                if not _stderr_suppressed(stage):
+            stages = _split_stages(segment)
+            for position, (stage_offset, stage, merged) in enumerate(stages):
+                if merged or not _stderr_suppressed(stage):
                     continue
                 start = base + seg_offset + stage_offset
                 original_stage = command[start:start + len(stage)]

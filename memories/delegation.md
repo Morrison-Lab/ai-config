@@ -699,13 +699,13 @@ cmd || printf warn  render-agy-hooks.py exited %d
 ```
 
 The format string lost its quotes and gained a real newline, so `"$?"` became its own command.
-Under that script's `set -euo pipefail` it expands to `0`, runs `0`, and aborts the bootstrap before the installer loop and the symlinks below it.
+Under that script's `set -euo pipefail` it expands to `0`, runs `0`, and aborts the bootstrap before the symlink creation that follows it and, much later, the dotfiles installer loop.
 
 `bash -n` exits 0 on that file.
 Verified on the reduced case: `bash -n` reports nothing, and running it dies with `0: command not found` and status 127.
 Nothing about the text is ungrammatical --- `printf` simply took different arguments than the author meant.
 That is what happened here;
-whether a lost quote usually lands that way rather than producing a syntax error is not measured, and the check below is worth running either way.
+whether a lost quote usually lands that way rather than producing a syntax error is not measured, and running the edited script is worth doing either way.
 
 **Executing the artifact is the check that works, and this repo already had it.**
 `scripts/test_agy_hook_adapter.py` runs `bash bootstrap.sh` and asserts a zero exit, and `validate.yml` gates it, so CI would have failed on the mangled line.

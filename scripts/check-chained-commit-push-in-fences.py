@@ -264,12 +264,24 @@ def main(argv=None) -> int:
                   "calls: two fenced blocks, or a prose line between them. "
                   "Nothing about either command needs to change.")
 
-    allowed_excess = False
+    # The allowlist is checked in BOTH directions. More hits than permitted
+    # means a second, unrelated chained block is riding on the exemption. Fewer
+    # means the passage the exemption was written for no longer chains, so the
+    # entry is stale documentation pointing at an example that is gone --
+    # invisible otherwise, since a zero count trips no threshold.
+    allowed_mismatch = False
     allowed_counts = Counter(hit["path"] for hit in result["allowed"])
     for path, (allowed_count, _) in ALLOWED.items():
-        if allowed_counts[path] > allowed_count:
-            print(f"ERROR: {path} has {allowed_counts[path]} allowed hits, but allowlist permits only {allowed_count}", file=sys.stderr)
-            allowed_excess = True
+        found = allowed_counts[path]
+        if found == allowed_count:
+            continue
+        direction = "more than" if found > allowed_count else "fewer than"
+        print(f"ERROR: {path} has {found} allowed hit(s), {direction} the "
+              f"{allowed_count} the allowlist records", file=sys.stderr)
+        if found < allowed_count:
+            print("       the exemption looks stale: either the passage no "
+                  "longer carries the anti-example, or it moved", file=sys.stderr)
+        allowed_mismatch = True
 
     if result["blocks_examined"] == 0:
         print("no fenced shell blocks examined; the sweep found nothing to "
@@ -279,7 +291,7 @@ def main(argv=None) -> int:
     if result["blocks_examined"] > 0 and result["blocks_skipped"] == result["blocks_examined"]:
         print("all examined blocks were skipped because the predicate raised", file=sys.stderr)
         return 1
-    if allowed_excess:
+    if allowed_mismatch:
         return 1
     return 1 if result["findings"] else 0
 

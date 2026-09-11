@@ -267,6 +267,20 @@ with tempfile.TemporaryDirectory() as tmp:
         exit_code_excess = cccp.main(["--root", str(root)])
     check("main exits 1 when a path has more allowed hits than permitted", exit_code_excess == 1)
 
+    # The other direction: the allowlisted passage no longer carries the
+    # anti-example. A zero count trips no threshold, so without this the stale
+    # entry is invisible and the sweep exits 0 over dead documentation.
+    path.write_text("# Fragment\n\nNo fenced block here.\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
+
+    errors = io.StringIO()
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(errors):
+        exit_code_stale = cccp.main(["--root", str(root)])
+    check("main exits 1 when an allowlisted path has no hits left",
+          exit_code_stale == 1)
+    check("the stale-allowlist error says the exemption looks stale",
+          "looks stale" in errors.getvalue())
+
 buffer = io.StringIO()
 with contextlib.redirect_stdout(buffer):
     exit_code = cccp.main(["--root", str(REPO), "--json"])

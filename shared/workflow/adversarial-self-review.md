@@ -119,6 +119,93 @@ The merge-side rules live with the gate they serve:
   evaluating the shipping head.
 
 
+## Round repetition is a third axis, orthogonal to cost and independence
+
+(Directive from the user, 2026-09-10, given while a session drove a `gha`
+pull request through five straight rounds of push-gate self-review, each
+dispatched to the same-harness `adversarial-reviewer` subagent on the
+conductor's own Opus tier at roughly 350k subagent tokens per round: "always
+use agy or other cheap subagents whenever feasible, to avoid draining claude
+quota".)
+
+[`when-to-orchestrate`](when-to-orchestrate.md)'s "Route each agent's
+model/effort" section already names two axes for a dispatched call.
+**Cost** says mechanical work gets a cheap tier and judgment-heavy work
+inherits or escalates; a self-review is judgment-heavy, so this axis alone
+argues for keeping it on the conductor's own tier by default.
+**Independence** says a judgment-heavy verify stage wants a different model
+family, not just a different prompt; the merge gate above already applies
+this to review specifically.
+The push-gate floor's own same-harness permission rests on neither axis: it
+buys independence of intent, a subagent reading the diff without the
+author's account of it, which any dispatched subagent supplies regardless of
+its tier or family.
+
+Neither axis, and not the push-gate's own intent-independence reasoning
+either, prices in **repetition**.
+ARDI drives a PR through however many rounds it takes to reach a clean
+verdict, and each round dispatches the identical shape of call: the same
+brief structure, the same reviewer persona, a diff that has usually only
+shrunk.
+The cost of that shape is the per-round cost times the round count, and the
+round count is exactly the number nobody knows in advance.
+Five rounds at roughly 350k tokens each is 1.75M tokens spent on one PR's
+push-gate reviews alone, all of it against a task the push-gate floor never
+required to run same-harness in the first place --- it only allowed it.
+
+So repetition is a signal on its own, independent of whether any single
+round is judgment-heavy: once a review-shaped dispatch is known to repeat
+against the same PR, prefer the cheap or cross-family route from the first
+round rather than the fifth.
+[`delegation.md`](../../memories/delegation.md)'s "agy as a cheap
+adversarial-review lane" measurement already shows this pays off beyond
+cost: across nine rounds on two PRs, `agy --print` caught real defects a
+same-family Sonnet round had missed, at no Claude quota cost.
+
+**This narrows `delegation.md`'s "Claude subagents are for reviewers only"
+carve-out rather than repealing it.**
+That entry (2026-09-09) reserves the `Agent` tool for the
+`adversarial-reviewer` persona and routes every other subagent to `agy`.
+Read on its own, the heading can sound like a standing preference for
+Claude on review work specifically.
+The same paragraph already says the opposite three sentences later: `main`'s
+`hooks/no-push-without-self-review.py` accepts an `agy --print '<prompt>'`
+discharge directly, so a current hook install needs no Claude reviewer for
+the push gate at all.
+The carve-out is a ceiling on non-review Claude dispatch, not a floor under
+review dispatch --- check which of the two a given sentence in that entry
+actually states before reading it either way.
+
+Before assuming a Claude dispatch is required, check whether the pre-push
+hook that would gate the push is actually current.
+The installed copy on a given machine can be a symlink to a checkout that
+has fallen behind `origin/main`, in which case it silently reverts to
+requiring an `Agent`-tool reviewer regardless of what `main`'s own hook
+source supports
+([ai-config#3094](https://github.com/Morrison-Lab/ai-config/issues/3094)
+tracks the drift).
+When the installed hook is stale, satisfy it as it actually behaves rather
+than as it should --- the fix for staleness belongs to that issue, not to
+the push in front of you.
+
+- **Do (from the user):** default to `agy` or another cheap, cross-family
+  route for review-shaped dispatch whenever it is feasible, rather than
+  reaching for the same-harness Claude subagent by habit.
+- **Do (inferred):** treat a review known to repeat --- an ARDI loop driving
+  a PR to clean, not a one-off pass --- as a stronger case for the cheap
+  route than a single isolated review, since the cost is the per-round cost
+  times the round count.
+- **Do (inferred):** verify the active pre-push hook's actual behavior (the
+  installed copy, not `main`'s source) before assuming it requires or
+  forbids a given reviewer shape, and satisfy the hook as installed.
+- **Don't (inferred):** read "Claude subagents are for reviewers only" as a
+  reason to prefer Claude for review; it restricts non-review Claude
+  dispatch and says nothing about preferring Claude over a cheaper
+  discharge for review itself.
+- **Don't (inferred):** keep dispatching the same-harness reviewer round
+  after round on the strength of the push-gate floor's "any harness is
+  fine" --- permitted is not preferred once the round count passes one.
+
 ## Availability is a per-route question, and `command -v` answers one route
 
 The inventory above is a **machine** inventory:

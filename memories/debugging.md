@@ -444,27 +444,28 @@ The exit code is the indirection's doing rather than grep's, which is why the
 explicit-`rc`-branch remedy directly above was not enough on its own.
 BSD grep rejects the flag with rc=**2**, exactly like the locale case, so that
 branch would have caught it.
-`xargs` reports **1** for a child that exited non-zero, laundering the
-distinguishable 2 into the one value that also means "searched, found
-nothing".
+`xargs` replaces any non-zero child's status with one of its own, so grep's 2
+and a no-match's 1 arrive identical.
+The value is implementation-specific (1 on BSD, 123 on GNU findutils); the
+collapse rather than the number is what defeats the check.
 
-So under `xargs` one boundary swaps the binary and destroys the evidence it
-did --- the zero-matrix problem
-[`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md) names,
-whose prescribed fix is the one that worked here.
-Only some indirections behave that way, though: `sh -c`, `bash -c`, `zsh -c`
-and `env` preserve the status, and `find`'s `;` form exits 0.
+So under `xargs` one boundary swaps the binary and destroys the evidence ---
+the zero-matrix problem
+[`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md) names.
+Only some indirections do: `sh -c`, `bash -c`, `zsh -c` and `env` preserve the
+status, and `find`'s `;` form exits 0.
 The cases file carries the measured table.
 
 - **Do:** treat `xargs`, `find -exec`, a Makefile recipe and a script as one
   kind of child-process boundary --- a `grep` function or alias reaches none.
-- **Do:** measure a flag before calling it GNU-only.
-  Only `-P`/`--perl-regexp` are rejected by BSD grep; `-z`, `--null-data`,
-  `--include`, `--exclude` and `--exclude-dir` all work.
+- **Do:** measure a flag, and the host's own utility, before calling either
+  behaviour universal --- the cases file lists which flags BSD grep actually
+  rejects and what each indirection does to the status.
 - **Do:** have a content search report the population it examined alongside
   the hit count, so a zero differs from a detector that never ran.
 - **Don't:** generalize an indirection's effect on `rc` from one measurement
-  --- `xargs` collapses grep's 2 onto 1, `find`'s `;` form discards it to 0,
+  --- `xargs` collapses grep's 2 onto its own value, `find`'s `;` form
+  discards it to 0,
   and `sh -c`, `bash -c`, `zsh -c` and `env` preserve it, so the branch that
   is useless under the first two is exactly what works under the last four.
 - **Don't:** read empty stdout under `xargs` as having searched anything,

@@ -336,8 +336,8 @@ def rc_story_matches_indirection():
     BSD grep's rejection and exiting 2:
 
         sh -c / bash -c / zsh -c / env  rc=2  preserved
-        xargs -0                        rc=1  laundered
-        find ... {} +                   rc=1  laundered
+        xargs -0                        laundered (1 on BSD, 123 on GNU)
+        find ... {} +                   laundered
         find ... {} \;                  rc=0  discarded
 
     The four preserved cases are the ones that matter most to get right: the
@@ -345,13 +345,13 @@ def rc_story_matches_indirection():
     from a no-match, in exactly the cases where it can.
     """
     expect = [
-        ("ls | xargs -0 grep -lP 'x'", "rc=1", "laundered"),
-        ("ls | parallel grep -lP 'x'", "rc=1", "laundered"),
+        ("ls | xargs -0 grep -lP 'x'", "a status of its own", "laundered"),
+        ("ls | parallel grep -lP 'x'", "a status of its own", "laundered"),
         ("sh -c " + chr(39) + "grep -P x f" + chr(39), "rc=2", "preserved"),
         ("bash -c " + chr(39) + "grep -P x f" + chr(39), "rc=2", "preserved"),
         ("zsh -c " + chr(39) + "grep -P x f" + chr(39), "rc=2", "preserved"),
         ("env grep -P x f", "rc=2", "preserved"),
-        ("find . -exec grep -lP x {} +", "rc=1", "laundered"),
+        ("find . -exec grep -lP x {} +", "a status of its own", "laundered"),
         ("find . -exec grep -lP x {} " + B + ";", "rc=0", "discarded"),
         # Nested chains. The observable status is the chain composed outward,
         # so an inner `sh -c` that preserves rc=2 is overridden by whatever
@@ -359,11 +359,11 @@ def rc_story_matches_indirection():
         # reported the INNERMOST link's behaviour and so promised rc=2 here,
         # pointing a reader at a `case $rc` branch that never fires.
         ("ls | xargs -0 sh -c " + chr(39) + "grep -P x f" + chr(39),
-         "rc=1", "nested: xargs over sh"),
+         "a status of its own", "nested: xargs over sh"),
         ("find . -exec sh -c " + chr(39) + "grep -P x {}" + chr(39) + " " + B + ";",
          "rc=0", "nested: find ; over sh"),
         ("find . -exec sh -c " + chr(39) + "grep -P x" + chr(39) + " +",
-         "rc=1", "nested: find + over sh"),
+         "a status of its own", "nested: find + over sh"),
     ]
     failures = []
     for cmd, want_rc, label in expect:
@@ -439,7 +439,73 @@ def composition_clause_is_load_bearing():
     return [] if regressed else ["composition"]
 
 
+def laundering_is_not_platform_asserted():
+    r"""The laundered message must not name one platform's exit code as the code.
+
+    This is the gap that let a wrong number survive: `rc_story_matches_indirection`
+    compares the hook's rendered text against expectations written from the same
+    measurements the hook itself encodes, so a table that is wrong for the host
+    and an expectation that is wrong for the host agree with each other. The
+    check never ran `xargs`.
+
+    So measure the host's own `xargs` here, and require the message to be
+    consistent with whatever it returns rather than with a constant. BSD xargs
+    returns 1 for any non-zero child; GNU findutils returns 123. Both are
+    laundering, and a message naming only the other platform's value is wrong
+    for this one.
+    """
+    failures = []
+    with tempfile.TemporaryDirectory() as d:
+        stub = os.path.join(d, "exit2")
+        with open(stub, "w", encoding="utf-8") as fh:
+            fh.write("#!/bin/sh" + chr(10) + "exit 2" + chr(10))
+        os.chmod(stub, 0o755)
+        stub1 = os.path.join(d, "exit1")
+        with open(stub1, "w", encoding="utf-8") as fh:
+            fh.write("#!/bin/sh" + chr(10) + "exit 1" + chr(10))
+        os.chmod(stub1, 0o755)
+
+        def through_xargs(path):
+            p1 = subprocess.run(["xargs", "-0", path],
+                                input=b"x" + bytes([0]),
+                                capture_output=True)
+            return p1.returncode
+
+        rc2 = through_xargs(stub)
+        rc1 = through_xargs(stub1)
+        print("  host xargs: child exit 2 -> %s, child exit 1 -> %s" % (rc2, rc1))
+        # The load-bearing property is the COLLAPSE, not the value.
+        if rc2 != rc1:
+            print("  FAIL host xargs distinguishes them; the guard's premise "
+                  "does not hold here")
+            failures.append("collapse")
+        elif rc2 == 2:
+            print("  FAIL host xargs preserved the child's status; `xargs` "
+                  "should not be in RC_BEHAVIOUR as laundered here")
+            failures.append("preserved")
+        else:
+            print("  PASS host xargs collapses both to %s" % rc2)
+
+    # And the message must name this host's value somewhere, not only the other's.
+    payload = {"tool_name": "Bash",
+               "tool_input": {"command": "ls | xargs -0 grep -lP 'x'"}}
+    proc = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
+                          capture_output=True, text=True)
+    ctx = (json.loads(proc.stdout or "{}")
+           ).get("hookSpecificOutput", {}).get("additionalContext", "")
+    names_host = str(rc2) in ctx
+    names_both = "123" in ctx and "**1**" in ctx
+    print("  %s message names this host's value (%s): %s; names both platforms: %s"
+          % ("PASS" if (names_host and names_both) else "FAIL", rc2,
+             names_host, names_both))
+    if not (names_host and names_both):
+        failures.append("platform-naming")
+    return failures
+
+
 def main():
+
+
 
 
 
@@ -452,6 +518,9 @@ def main():
     print()
     print("Per-indirection rc story:")
     base_fail += rc_story_matches_indirection()
+    print()
+    print("Laundering is measured, not asserted:")
+    base_fail += laundering_is_not_platform_asserted()
     print()
     print("Composition coverage:")
     mut_fail = composition_clause_is_load_bearing()

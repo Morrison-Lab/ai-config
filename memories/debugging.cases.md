@@ -43,11 +43,17 @@ That first draft generalized from the one flag that had been tested, which would
 
 ```
 /usr/bin/grep -lP x a.md                      rc=2
-printf 'a.md' | xargs -0 /usr/bin/grep -lP x  rc=1
-printf 'a.md' | xargs -0 /usr/bin/grep -l ZZZ rc=1   (honest no-match)
+printf 'a.md' | xargs -0 /usr/bin/grep -lP x  rc=1   (BSD xargs)
+printf 'a.md' | xargs -0 /usr/bin/grep -l ZZZ rc=1   (honest no-match, same value)
 ```
 
 The second and third are indistinguishable, which is the whole defect.
+
+**The laundered value is `xargs`'s own and differs by implementation: 1 on BSD/macOS, 123 on GNU findutils, which documents 123 for any child exiting 1-125.**
+Every figure in this record was measured on macOS, so the BSD value is the one here.
+A review caught the unqualified `1` being shipped in the guard's warning text and in this file, after five earlier rounds had corrected the same class of over-generalization on other axes --- this one on the host implementation, which none of those rounds had thought to vary.
+What made it survivable: the test asserting the guard's rc story compared the rendered text against expectations written from the same measurements the guard encodes, so a wrong table and a wrong expectation agreed and neither ran `xargs`.
+The check now measures the host's own `xargs` and requires the message to be consistent with whatever it returns.
 
 [`batch-merge-and-resolve`](../shared/workflow/batch-merge-and-resolve.md)'s negative-control section makes the same point for a different detector: a zero matrix and a detector that never ran look alike, so report the population examined rather than only the hits.
 
@@ -60,7 +66,7 @@ sh -c            rc=2   preserved
 bash -c          rc=2   preserved
 zsh -c           rc=2   preserved
 env              rc=2   preserved
-xargs -0         rc=1   laundered
+xargs -0         rc=1   laundered (BSD; GNU findutils gives 123)
 find ... {} \;   rc=0   discarded
 find ... {} +    rc=1   laundered
 ```
@@ -71,7 +77,7 @@ Nested chains compose, and the outer link wins:
 
 ```
 sh -c                        rc=2
-xargs -0 sh -c ...           rc=1   outer xargs launders the preserved 2
+xargs -0 sh -c ...           rc=1   outer xargs launders the preserved 2 (BSD value)
 find ... -exec sh -c ... \;   rc=0   outer find discards it
 find ... -exec sh -c ... +    rc=1   outer find launders it
 ```

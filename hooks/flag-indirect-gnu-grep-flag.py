@@ -105,7 +105,7 @@ INDIRECTIONS = ("xargs", "find", "parallel", "sh", "bash", "zsh", "env")
 #     bash -c          rc=2    preserved
 #     zsh -c           rc=2    preserved
 #     env              rc=2    preserved
-#     xargs -0         rc=1    laundered
+#     xargs -0         rc=1    laundered (BSD; GNU findutils gives 123)
 #     find ... {} \;   rc=0    discarded
 #     find ... {} +    rc=1    laundered
 #
@@ -132,11 +132,14 @@ RC_BEHAVIOUR = {
 }
 
 RC_SENTENCE = {
-    RC_LAUNDERED: """and `{via}` reports **1** for a child that exited
-non-zero -- laundering grep's distinguishable **2** into the one status that
-also means "searched, found nothing". So the boundary that swapped the binary
-also destroyed the evidence it did, and branching on `rc` cannot separate the
-two here.""",
+    RC_LAUNDERED: """and `{via}` replaces the child's status with one of its own
+for any non-zero exit, so grep's distinguishable **2** and an honest
+no-match's **1** arrive as the same value. Which value is
+implementation-specific -- **1** on the BSD/macOS `xargs` (measured
+2026-09-10: a child exiting 1 and one exiting 2 both give 1), **123** on GNU
+findutils, which documents 123 for any child exiting 1-125. The number does
+not matter to the conclusion and the collapse does: whatever it is, branching
+on `rc` cannot separate "rejected the flag" from "found nothing" here.""",
     RC_PRESERVED: """while `{via}` passes the child's exit status through
 unchanged. So `rc` **does** still tell you: grep's rejection is **2**, an
 honest no-match is **1**. Branch on it (`case $rc in 0) ...;; 1) ...;; *)
@@ -293,6 +296,11 @@ def _rc_behaviour(toks, vi):
 # branch on it" when the caller actually sees 1. That is worse than the
 # uniform claim it replaced: it pointed a reader at the `case $rc` remedy in
 # a shape where that remedy silently never fires.
+# These compose CLASSES, not observable exit codes. The 1 below is a marker
+# for "laundered", chosen because BSD xargs happens to use it; GNU findutils
+# uses 123. Nothing reads these numbers out to the user -- the rendered text
+# names both platforms -- so the composition only needs the three states to
+# stay distinct.
 _APPLY = {
     RC_PRESERVED: lambda rc: rc,
     RC_LAUNDERED: lambda rc: 1 if rc != 0 else 0,
@@ -461,7 +469,8 @@ def main():
         # said "rc=1 -- indistinguishable from no match" for every
         # indirection, which is true only of the laundering ones.
         rc_clause = {
-            RC_LAUNDERED: "rc=1, indistinguishable from no match",
+            RC_LAUNDERED: "a status of its own (1 on BSD xargs, 123 on "
+                           "GNU), indistinguishable from no match",
             RC_PRESERVED: "rc=2, which an rc check CAN still separate from a "
                           "no-match's 1",
             RC_DISCARDED: "rc=0, indistinguishable from full success",

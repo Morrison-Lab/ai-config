@@ -326,6 +326,33 @@ def non_native_program_problems(command: str) -> list[str]:
     ]
 
 
+def unquotable_path_problems(command: str) -> list[str]:
+    """Report a rendered command whose paths cannot be handed to `cmd.exe`.
+
+    `assert_cmd_safe` raises on exactly this at render time, so a manifest
+    this repo rendered never carries one. A manifest staged by something else
+    can, and `--installed` reads that one, so the check has to exist on the
+    reading side too.
+
+    The test is the token count, which works here because the canonical form
+    is exactly `<interpreter> <script>` and carries no arguments -- every one
+    of the manifest's commands has two tokens. A third token therefore means
+    whitespace inside a path rather than a flag. That reasoning does not
+    survive a manifest whose commands take arguments, so it is stated rather
+    than left for a reader to infer from the count.
+    """
+    if not command.strip():
+        return []
+    if len(command.split()) <= 2:
+        return []
+    return [
+        "has more than the canonical two tokens, so a path in it contains a "
+        "space; a Windows hook command cannot be quoted "
+        "(https://github.com/Morrison-Lab/ai-config/issues/3091), and "
+        "cmd.exe would split it. Install under a path without spaces."
+    ]
+
+
 def windows_problems(command: str) -> list[str]:
     """Return defects that hold only where `cmd.exe` launches the command.
 
@@ -347,6 +374,7 @@ def windows_problems(command: str) -> list[str]:
             "a quoted path arrives with a leading backslash and does not "
             "resolve (https://github.com/Morrison-Lab/ai-config/issues/3091). Use unquoted paths."
         )
+    problems.extend(unquotable_path_problems(command))
     problems.extend(non_native_program_problems(command))
     problems.extend(unrendered_posix_problems(command))
     problems.extend(cmd_metacharacter_problems(command))

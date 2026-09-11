@@ -130,6 +130,22 @@ class TestWindowsStaleAndMetacharacters(unittest.TestCase):
     def test_non_native_program_problems_passes_an_empty_command(self):
         self.assertEqual(agy_hooks.non_native_program_problems("   "), [])
 
+    def test_a_space_in_a_path_is_reported(self):
+        # assert_cmd_safe refuses this at render time; a manifest staged by
+        # something else can still carry it, and --installed reads that one.
+        findings = agy_hooks.windows_problems(
+            "C:/Program Files/Python/python.exe C:/x.py")
+        self.assertTrue(any("canonical two tokens" in f for f in findings))
+
+    def test_a_space_in_the_script_path_is_reported(self):
+        findings = agy_hooks.windows_problems(
+            "C:/Python313/python.exe C:/Users/x/my hooks/h.py")
+        self.assertTrue(any("canonical two tokens" in f for f in findings))
+
+    def test_the_canonical_two_token_shape_passes(self):
+        self.assertEqual(
+            agy_hooks.windows_problems("C:/Python313/python.exe C:/x.py"), [])
+
     def test_a_bare_program_name_is_left_to_path_resolution(self):
         findings = agy_hooks.windows_problems("py C:/Users/x/.gemini/hooks/x.py")
         self.assertEqual(findings, [])

@@ -118,6 +118,13 @@ def check_file(
             "findings": [f"is not valid JSON: {exc}"],
             "commands": 0,
         }
+    if not isinstance(manifest, dict):
+        return {
+            "path": str(path),
+            "present": True,
+            "findings": [f"is a {type(manifest).__name__} rather than a JSON object"],
+            "commands": 0,
+        }
     return {
         "path": str(path),
         "present": True,

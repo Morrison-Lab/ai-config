@@ -193,6 +193,13 @@ class TestRendererCli(unittest.TestCase):
             rc = self.run_main(["--platform", "posix", "--source", str(missing)])
             self.assertEqual(rc, 1)
 
+    def test_non_dict_manifest_fails_cleanly(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = Path(tmp) / "bad.json"
+            bad.write_text("[]", encoding="utf-8")
+            rc = self.run_main(["--platform", "posix", "--source", str(bad)])
+            self.assertEqual(rc, 1)
+
     def test_a_render_failure_writes_no_output_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "hooks.json"

@@ -33,6 +33,8 @@ CANONICAL_MANIFEST = agy_hooks.CANONICAL_MANIFEST
 def render(source: Path, windows: bool) -> str:
     """Return the rendered manifest text for one platform."""
     manifest = json.loads(source.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict):
+        raise ValueError(f"is a {type(manifest).__name__} rather than a JSON object")
     return json.dumps(agy_hooks.render_manifest(manifest, windows), indent=2) + "\n"
 
 

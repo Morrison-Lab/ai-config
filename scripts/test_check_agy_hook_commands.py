@@ -88,6 +88,16 @@ class TestEmptyManifestFails(unittest.TestCase):
         self.assertIn("carries no hook commands", out)
 
 
+class TestNonDictManifestFails(unittest.TestCase):
+    "A manifest that parses but is not a dict must produce a finding."
+    def test_non_dict_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = Path(tmp) / "hooks.json"
+            bad.write_text("[]", encoding="utf-8")
+            report = CHECKER.check_file(bad, canonical=True)
+        self.assertTrue(report["present"])
+        self.assertTrue(any("rather than a JSON object" in f for f in report["findings"]))
+
 class TestWindowsStaleAndMetacharacters(unittest.TestCase):
     """A staged Windows manifest must not pass in its unrendered POSIX form."""
 

@@ -210,7 +210,7 @@ git add src/thing.py && git commit -F /path/to/session-scratchpad/msg.txt && git
 
 The message file sits in the session scratchpad in that example for a separate reason,
 not as a stylistic choice:
-`git add -A` stages a message file written inside the worktree before `git commit` reads it,
+`git add -A` stages an unignored message file written inside the worktree before `git commit` reads it,
 so the file ships.
 [`memories/shell.md`](../../memories/shell.md)'s heredoc section carries that case.
 

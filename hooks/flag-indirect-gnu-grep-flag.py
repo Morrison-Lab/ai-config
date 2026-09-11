@@ -198,10 +198,13 @@ child process.
 
 In that child the bare name `{invoked}` resolves by PATH, NOT to this
 session's own `{invoked}` -- a shell function or alias does not cross a
-child-process boundary. On macOS the PATH answer is typically
-`/usr/bin/grep`, which has no `{flag}`: measured 2026-09-10 against
-`grep (BSD grep, GNU compatible) 2.6.0-FreeBSD`, it prints
-`{stderr}` and exits 2.
+child-process boundary. Which binary PATH then answers with is not decidable
+from the command text, which is the whole reason this warns rather than
+blocking. If it is macOS's `/usr/bin/grep`, `{flag}` is rejected: measured
+2026-09-10 against `grep (BSD grep, GNU compatible) 2.6.0-FreeBSD`, it prints
+`{stderr}` and exits 2. A Homebrew `ggrep`, or a Linux GNU grep on a CI
+runner, accepts it -- in which case this warning is noise, and the command is
+correct as written.
 
 What that does to the exit status depends on the indirection, so it is
 measured rather than assumed. The usage error goes to **stderr** while

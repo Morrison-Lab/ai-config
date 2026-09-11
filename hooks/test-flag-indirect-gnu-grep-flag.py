@@ -693,7 +693,53 @@ def no_platform_integer_in_runtime_text():
     return failures
 
 
+def every_platform_claim_is_hedged():
+    """Both rendered surfaces must hedge which binary PATH resolves to.
+
+    The structural guard for the hedging half of this file's recurring class,
+    mirroring `no_platform_integer_in_runtime_text` for the numeric half.
+
+    The claim "BSD grep rejects this flag" is only ever conditional: the module
+    warns rather than blocks precisely because which grep resolves in the child
+    is not decidable from the command text. Two rounds fixed that claim in one
+    rendered surface and left the textually-parallel sibling unhedged -- first
+    the two `systemMessage` branches against each other, then `systemMessage`
+    against `NOTE_RESOLVED`. So assert it across every surface at once rather
+    than per location.
+    """
+    # A hedge is any of these, in either surface.
+    HEDGES = ("if it is", "if that resolves", "is not decidable",
+              "this warning is noise")
+    failures = []
+    probes = [
+        ("resolved", "ls | xargs -0 grep -lP " + chr(39) + "x" + chr(39)),
+        ("pinned", "ls | xargs -0 /usr/bin/grep -lP " + chr(39) + "x" + chr(39)),
+        ("resolved-nested", "sh -c " + chr(39) + "xargs -0 grep -P x" + chr(39)),
+        ("pinned-find",
+         "find . -exec /usr/bin/grep -lP x {} +"),
+    ]
+    for label, cmd in probes:
+        proc = subprocess.run(
+            [sys.executable, HOOK],
+            input=json.dumps({"tool_name": "Bash",
+                              "tool_input": {"command": cmd}}),
+            capture_output=True, text=True)
+        d = json.loads(proc.stdout or "{}")
+        sm = d.get("systemMessage", "")
+        ctx = d.get("hookSpecificOutput", {}).get("additionalContext", "")
+        sm_ok = any(h in sm for h in HEDGES)
+        ctx_ok = any(h in ctx for h in HEDGES)
+        ok = sm_ok and ctx_ok
+        print("  %s %-16s systemMessage hedged=%s  additionalContext hedged=%s"
+              % ("PASS" if ok else "FAIL", label, sm_ok, ctx_ok))
+        if not ok:
+            failures.append(label)
+    return failures
+
+
 def main():
+
+
 
 
 
@@ -714,6 +760,9 @@ def main():
     print()
     print("Per-indirection rc story:")
     base_fail += rc_story_matches_indirection()
+    print()
+    print("Every platform claim is hedged:")
+    base_fail += every_platform_claim_is_hedged()
     print()
     print("No platform integer in runtime text:")
     base_fail += no_platform_integer_in_runtime_text()

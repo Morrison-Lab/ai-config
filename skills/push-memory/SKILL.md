@@ -142,7 +142,9 @@ These are exactly
    Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
 
    ```bash
-   wt="$(git -C "$acfg" worktree list --porcelain | awk '/^worktree /{w=$2} /^branch refs\/heads\/memory\/<slug>$/{print w}')"   # re-derived: $wt was an mktemp -d in a separate Bash call
+   acfg="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/push-memory rev-parse --show-toplevel 2>/dev/null)}"   # re-derived: a separate Bash call inherits neither variable
+   wt="$(git -C "$acfg" worktree list --porcelain | awk '/^worktree /{w=$2} /^branch refs\/heads\/memory\/<slug>$/{print w}')"   # $wt was an mktemp -d in that call too
+   [ -n "$wt" ] || { echo "no worktree on memory/<slug>; re-run the previous block"; exit 1; }
    git -C "$wt" push -u origin memory/<slug>
    ```
 

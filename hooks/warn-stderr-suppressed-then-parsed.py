@@ -62,6 +62,34 @@ Fails OPEN on any parse trouble, same as every guard here.
 
 Sibling: `warn-status-read-after-pipe.py` covers the same family -- a shell
 construct that destroys a failure signal -- for a different construct.
+
+## Known approximations
+
+The redirect model here is a set of regexes, not a bash parser, and it is
+approximate on purpose. Six review rounds each found one more gap, and the
+shape of that recurrence is the point: bash's redirect grammar has a case
+space this approach cannot exhaust, so a new gap is expected rather than a
+defect in the design.
+
+What that costs is bounded. The hook warns, never blocks, fails open on any
+parse trouble, and its message tells the reader to re-run without the
+suppression before trusting an empty result -- so a spurious warning is an
+ignorable nag and a missed one leaves the reader exactly where they were.
+
+Known gaps, not exhaustive:
+
+- A `case` nested inside a command substitution does not fire. Under-warn.
+- `exec` redirects apply to the rest of the shell rather than to one command,
+  and are not modelled at all.
+- `/dev/stdout`, `/dev/stderr` and `/proc/self/fd/N` are treated as ordinary
+  file targets rather than as the streams they name.
+- A redirect target that is a variable or a substitution is recognised as a
+  target, but its VALUE is not, so a variable holding `/dev/null` reads as a
+  real file. Over-warn.
+
+When a new gap is reported, fix the general shape rather than the literal
+command: the `>|` operator reached this file twice, once as a file target and
+once as a discard, because the first fix closed the instance and not the class.
 """
 import json
 import os
@@ -123,16 +151,23 @@ RX_MERGE_FILE = re.compile(
     r"(?<![0-9<>&])(?:&>>?|>&)\s*(?!/dev/null(?![^\s;|&<>()]))"
     r"(?![&-])(?![0-9]+-?(?![^\s;|&<>()]))([^\s;|&<>()]+)")
 
+# Every stdout redirect operator, including `>|`, which overrides noclobber and
+# is ONE token. Defined once: the previous round added it to the file-target
+# pattern only, so the discard pattern still missed it and a fully discarded
+# stage read as piped.
+_OUT_OP = r"(?:>>?\||>>?)"
+
 # stdout to /dev/null, with or without its explicit `1` fd. The lookbehind
 # excludes `2>` (preceded by a digit) and `&>` (preceded by `&`), each of
 # which its own pattern above already owns.
-RX_STDOUT_NULL = re.compile(r"(?<![0-9<>&])1?>>?\s*/dev/null(?![^\s;|&<>()])")
+RX_STDOUT_NULL = re.compile(
+    r"(?<![0-9<>&])1?" + _OUT_OP + r"\s*/dev/null(?![^\s;|&<>()])")
 
 # stdout to a FILE -- anything that is not /dev/null and not an `&fd`
 # duplication. `>&2` and `2>&1` are excluded by the `(?!&)`, so sending stdout
 # to stderr is not mistaken for a file the session reads back.
 RX_STDOUT_FILE = re.compile(
-    r"(?<![0-9<>&])1?(?:>>?|>\|)\s*(?!/dev/null(?![^\s;|&<>()]))"
+    r"(?<![0-9<>&])1?" + _OUT_OP + r"\s*(?!/dev/null(?![^\s;|&<>()]))"
     r"(?!&)([^\s;|&<>()]+)")
 
 

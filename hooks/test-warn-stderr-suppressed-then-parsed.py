@@ -301,6 +301,21 @@ check(
     "redirected to `out.json`",
 )
 
+# `>|` is a stdout redirect operator everywhere `>` is, not only where the
+# first fix happened to put it. The previous round taught the FILE pattern
+# about it and left the DISCARD pattern behind, so a fully discarded stage read
+# as piped. Both now come from one operator alternation.
+check(
+    "a discarded noclobber override before a pipe stays silent",
+    fires("cmd 2>/dev/null >|/dev/null | jq"),
+    False,
+)
+check(
+    "a noclobber append override to a file fires",
+    fires("cmd 2>/dev/null >>|out.json"),
+    True,
+)
+
 if failures:
     print("FAILED:")
     for line in failures:

@@ -155,10 +155,12 @@ _DESTRUCTIVE_PARTS = [
 RX_DESTRUCTIVE = re.compile("(?:" + "|".join(_DESTRUCTIVE_PARTS) + ")")
 
 # FALLBACK ONLY, since ai-config#3126. Everything from here to `RX_REF_CHECK`
-# is the lexical approximation the argv parse below replaced; it still runs
-# when `shlex` cannot parse the command, or when a command substitution or a
-# heredoc means the argv is not what the shell would pass. Read its comments as
-# a record of which boundary each narrowing bought, not as the live decision.
+# is the lexical approximation the argv parse below replaced, and it now runs
+# on ONE condition: `shlex` raising, which means the command does not parse at
+# all. A command substitution does not reach it -- `read_roots` recurses over
+# each body, so the argv path runs on the inner text too. Nor does a heredoc,
+# whose body `_heredoc_free` blanks before the parse. Read its comments as a
+# record of which boundary each narrowing bought, not as the live decision.
 #
 # Evidence the author looked for references before proposing removal: an
 # earlier command that read a manifest AND named a config root in the same

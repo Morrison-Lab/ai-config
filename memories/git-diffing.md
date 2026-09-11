@@ -524,6 +524,24 @@ The safe order is: commit the fix first, apply the mutation on top, confirm it i
 It had to be re-applied from the session transcript rather than recovered from git.
 This exact failure recurred while drafting this entry: the drafting session ran `git checkout -- <file>` to test the semantic-line-breaks reformatter's default scope, wiping its own uncommitted additions described here and requiring a redo.)
 
+**A third recurrence added a step this entry did not yet name: the loss can be sealed in, not just left uncommitted, by a broad-add commit that runs before the suite is re-run.**
+Both measured cases above were caught relatively fast, because the wiped file stayed uncommitted and a subsequent look at the working tree (or a failing test) surfaced the gap.
+That detection path is not guaranteed.
+A `git checkout -- <file>` that reverts past an uncommitted fix leaves the file looking exactly like its pre-fix state --- nothing marks it as reverted --- so a routine `git add -A && git commit` run afterward, with no re-run of the suite in between, commits the reverted state as if it were current work.
+The loss is then invisible for as many steps as pass before something notices the fix is missing, because the working tree, the index, and the new commit all agree with each other;
+only a comparison against what the fix was supposed to contain would catch it, and nothing prompts that comparison.
+
+- **Do:** re-run the suite (or at minimum re-read the diff of the file just restored) before the next commit that touches it, whenever a restore ran during the same work --- don't rely on the restore itself having been wrong-file-scoped as the only safeguard.
+- **Do:** treat a commit that follows a mutation-test restore as the next checkpoint to verify, not a step to run on autopilot.
+- **Don't:** run `git add -A` (or any broad add) between a mutation-test restore and the next commit without having first confirmed the restored file still contains the fix --- a broad add does not distinguish "restored the mutation" from "restored past the fix" any more than the checkout did.
+- **Don't:** trust that a prior recurrence's fast detection generalizes;
+  the same command sequence with one more automated step in between (an unattended commit) removes the detection opportunity entirely.
+
+(Measured 2026-09, `Morrison-Lab/gha#857`: a `git checkout -- <file>` run to undo a mutation reverted the session's own uncommitted fix to that file, and a later `git add -A && git commit` captured the reverted state with the suite not re-run in between.
+The loss surfaced only several steps later.
+`hooks/flag-reset-hard-uncommitted-work.py` already matches this exact command shape --- `git checkout <path>` discarding a tracked, uncommitted change unrelated to the mutation --- and warns before the restore runs;
+this recurrence is recorded as a gap in *heeding* the warning rather than in the hook's coverage.)
+
 ## A "moved content" exemption keyed on base-tree membership is a bypass -- key it on the same diff's deleted lines
 
 A diff-scoped checker that wants to exempt genuinely relocated content (a paragraph moved from one file to another, a function moved between modules) needs some test for "this new line is not new content, it just moved here".

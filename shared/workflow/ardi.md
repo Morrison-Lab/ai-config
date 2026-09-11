@@ -958,6 +958,25 @@ will actually use it.**
 See [`ardi.cases.md`](ardi.cases.md), "Validating against a real consumer repo
 covers what fixtures cannot".
 
+**A defect can live in the SEAM between two files, where neither file's own suite can see it --- one script decides what gets posted, a second classifies what it receives, and each can be fully covered while the pair is wrong.**
+The producer's suite asserts what it emits;
+the consumer's suite classifies inputs it is handed by hand.
+Neither one ever hands the consumer the producer's actual output, so a change that widens what the producer can now emit --- a second statement in one posted body, an added field, a longer array --- is invisible to both suites at once: the producer's tests never classify, and the consumer's tests never see the new shape, because nobody wrote a case for it there either.
+
+This is not the general "test the integration, not just the units" advice.
+It is a *specific* tell: the change under review touches file A, file A's own tests stay green, and the actual defect is a decision file B already made under an assumption file A's change just broke.
+Reviewing file A's diff in isolation cannot find it, because file A is correct on its own terms.
+
+- **Do:** when a change widens what a producer emits, ask what reads that output and add a case there feeding it the new shape --- not just a case in the producer's own suite asserting the new shape gets emitted.
+- **Do:** where the seam is exercised at all, prefer a test that runs both scripts in sequence (or classifies the producer's real fixtures) over one that hand-writes an input to the consumer, since a hand-written input encodes the same assumption the defect broke.
+- **Don't:** treat "both files have green suites" as evidence the pair is correct --- that is exactly the state a seam defect leaves behind.
+- **Don't:** stop at asserting the new output shape in the producer's tests;
+  that confirms emission, not that anything downstream handles it.
+
+(Measured on `Morrison-Lab/gha#857`: a span-selection script was changed to keep a corrected review's tail alongside the review it corrects, so a single posted comment could now carry two verdict statements.
+The classifier script that reads the posted comment last-match-wins over a payload marker, which is correct for the one-statement case it was written against and wrong the moment two statements can coexist.
+Both suites were green --- the span suite asserts what gets posted, the classifier suite feeds it hand-written bodies that never carried two statements --- and the fix that closed the gap was a cross-script test that classifies each producer fixture's actual posted text.)
+
 **Verify a blocker you assert in a PR body or a reply, with the same rigor
 you apply to a reviewer's claims --- a stated blocker becomes a premise
 other people build on.**

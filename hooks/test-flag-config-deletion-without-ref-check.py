@@ -600,6 +600,19 @@ _ATTRIBUTION_CASES = [
      "an apostrophe in a comment trailing a heredoc opener is not a quote"),
     ("cat > n.md <<'EOF'  # here's a note\nb\nEOF\ngrep -n foo '~/.claude/settings.json'", set(),
      "the same with a quoted delimiter and a later grep"),
+    # One walk, not two. The region catalogue and the neutralizing walk each
+    # tracked quotes, and the cataloguing one was not protected from the data
+    # it catalogued: an apostrophe in a heredoc body flipped its state, the
+    # following comment went unrecorded, and the other walk then read that
+    # comment as live text and left a later quoted tilde expanding.
+    ("cat <<EOF\nHere's the note\nEOF\n# fix: don't touch prod\ncat '~/.claude/settings.json'", set(),
+     "an apostrophe in a body then one in a following comment"),
+    ("cat <<A > f1 && cat <<B > f2\nit's one\nA\ntwo\nB\n# don't peek\ncat '~/.claude/settings.json'", set(),
+     "the same across two heredocs opened on one line"),
+    ("cat <<EOF\nHere's the note\nEOF\n# fix: don't touch prod\ncat ~/.claude/settings.json", {"claude"},
+     "and the unquoted form of the first still credits"),
+    ("cat <<A > f1 && cat <<B > f2\nit's one\nA\ntwo\nB\n# don't peek\ncat ~/.claude/settings.json", {"claude"},
+     "and the unquoted form of the second still credits"),
     # An unquoted `#` starts a comment, and bash expands nothing after it.
     ("echo ok # $(cat ~/.claude/settings.json)", set(),
      "a substitution inside a comment is never run"),

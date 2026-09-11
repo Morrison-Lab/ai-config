@@ -688,7 +688,7 @@ that round is not redundant, since it found two false discharges the worker's ro
 
 [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md) already says to run a parser over a scripted edit *and* run the relevant tests before trusting it.
 What this case adds is which of those two halves decides, for delegated shell, and that the cheap half carries no partial credit.
-A dropped quote usually leaves a *different valid program* rather than an invalid one, so the parser passes and the artifact is still wrong.
+A dropped quote can leave a *different valid program* rather than an invalid one, and did here, so the parser passes and the artifact is still wrong.
 
 Measured 2026-09-10 on [ai-config#3435](https://github.com/Morrison-Lab/ai-config/pull/3435).
 An `agy` worker asked to guard a call in `bootstrap.sh` emitted a line of this shape:
@@ -720,7 +720,13 @@ Nothing here settles whether the worker authored the malformed line or a transpo
 
 - **Do:** run the suite that executes an edited script, not only a parser over it, before trusting a delegated commit that touched shell.
 - **Do:** run the script yourself against a throwaway fixture when no suite executes it, and treat that gap as worth a filed issue rather than a reason to skip the check.
-  Derive which scripts those are rather than recalling them: on 2026-09-10, 11 of this repo's 18 tracked `.sh` files were named by no test, `scripts/inventory.sh` and `scripts/lib/link-one.sh` among them, while `bootstrap.sh` and `upload_skills.sh` each had one.
+  Derive which scripts those are rather than recalling them, and note that a direct reference is not the only way a script is covered --- `scripts/test_hooks.py` pairs every `hooks/*.sh` to a `test-<stem>.py` by glob, so a name grep alone understates coverage:
+
+  ```bash
+  for s in $(git ls-files '*.sh'); do
+    grep -rqlF "$(basename "$s")" scripts/test_*.py hooks/test-*.py || echo "$s"
+  done
+  ```
 - **Do:** treat a test you cannot run locally as an unchecked artifact, and say so, rather than reading the parser's silence as coverage.
 - **Don't:** read `bash -n` (or `py_compile`) passing as evidence that a delegated edit is correct --- it reports grammar, and dropped quoting is grammatical.
 - **Don't:** rely on the commit message agreeing with the diff here;

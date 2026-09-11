@@ -79,6 +79,9 @@ if [ -d "$SCRIPT_DIR/plugins/ai-config" ]; then
   ln -sfn "$SCRIPT_DIR/scripts" "$PLUGIN_STAGING_DIR/scripts"
   ln -sfn "$SCRIPT_DIR/skills" "$PLUGIN_STAGING_DIR/skills"
   ln -sfn "$SCRIPT_DIR/shared" "$PLUGIN_STAGING_DIR/shared"
+  if [ -d "$SCRIPT_DIR/plugins/ai-config/rules" ]; then
+    ln -sfn "$SCRIPT_DIR/plugins/ai-config/rules" "$PLUGIN_STAGING_DIR/rules"
+  fi
 
   if [ ! -f "$PLUGINS_JSON" ]; then
     cat <<EOF > "$PLUGINS_JSON"

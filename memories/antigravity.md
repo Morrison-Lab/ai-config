@@ -61,7 +61,8 @@ backed by a staging directory created in `bootstrap.sh`.
   - Context injection in Antigravity uses `{"injectSteps": [{"ephemeralMessage": "..."}]}`.
   - Claude `UserPromptSubmit` hooks may output raw text, or JSON carrying a `systemMessage`/`additionalContext` field, to stdout.
     The adapter parses JSON when present (falling back to the raw text otherwise), reading `systemMessage`, top-level `additionalContext`, or the nested `hookSpecificOutput.additionalContext` form, and emits one `ephemeralMessage` `injectSteps` entry per hook --- it does not join multiple hooks' output into a single joined string.
-    The caps default to 10KB per message, 30KB total, and 20 messages, and are overridable via `AGY_ADAPTER_MSG_BYTE_CAP`, `AGY_ADAPTER_TOTAL_BYTE_CAP`, and `AGY_ADAPTER_MSG_CAP` (the subagent fanout cap is `AGY_ADAPTER_FANOUT_CAP`, default 50).
+    The caps default to 10KB per message, 30KB total, and 20 messages, and are overridable via `AGY_ADAPTER_MSG_BYTE_CAP`, `AGY_ADAPTER_TOTAL_BYTE_CAP`, and `AGY_ADAPTER_MSG_CAP` (the subagent fanout cap is `AGY_ADAPTER_FANOUT_CAP`, default 50;
+    max hook execution worker threads is `AGY_ADAPTER_MAX_WORKERS`, default 16, clamped to at least 1).
 
 ### Fail-open on a hook subprocess timeout or crash is intentional, not a gap
 
@@ -110,9 +111,14 @@ Three layers had to fail together, and each is worth checking separately when au
 - Two path layers decide which hook code agy actually runs:
   `~/.gemini/config/plugins.json` registers the plugin in a **staging runtime directory** (`~/.gemini/config/plugins/ai-config`),
   where `hooks.json` and `plugin.json` are copied so Antigravity runtime rewrites do not dirty the git checkout.
-  Executable scripts and repository directories (`hooks/`, `scripts/`, `skills/`, `shared/`) are symlinked from the checkout into the staging directory,
+  Executable scripts and repository directories (`hooks/`, `scripts/`, `skills/`, `shared/`, `rules/`) are symlinked from the checkout into the staging directory,
   so adapter and gate updates take effect live while canonical source remains pristine.
   (Updated 2026-08-31 for Issue #2673).
+
+## Antigravity plugin rules discovery
+
+- Antigravity plugins discover ambient and conditional rules from `<plugin_dir>/rules/*.md` containing YAML frontmatter with `trigger:` and `description:`.
+- Packaging rules under `plugins/ai-config/rules/` (and staging them into `~/.gemini/config/plugins/ai-config/rules`) delivers universal instructions and Antigravity operating guidelines across all host workspaces without requiring manual submodule or local repo configuration.
 
 ## Reactive wakeup vs background task polling
 
@@ -145,5 +151,12 @@ The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-anti
   So where `agy` is available, dispatching the review that way discharges the guard directly and needs no override at all.
   The override above is for the case where it is not.
   No other delegation CLI is recognized, so `codex`, `opencode` and `adv` still need the override.
+
+## Antigravity hook runner 30s timeout and adapter parallelism
+
+- Antigravity enforces an ambient ~30-second timeout on command hooks declared in `hooks.json`.
+- When an adapter (such as `claude-hook-adapter.py`) runs multiple matching hooks sequentially (e.g. 25+ Python scripts on `run_command` matching `Bash`), cumulative process startup and I/O latency can exceed 30 seconds, causing Antigravity to kill the hook with `signal: killed` (`JSON hook ... failed: command failed: signal: killed`).
+- Command adapters must execute matched hook scripts concurrently (e.g. via `concurrent.futures.ThreadPoolExecutor`) to keep execution latency under ~1-2s and prevent timeouts.
+- Concurrency worker pool size defaults to 16 and is configurable via `AGY_ADAPTER_MAX_WORKERS` (clamped to at least 1).
 
 

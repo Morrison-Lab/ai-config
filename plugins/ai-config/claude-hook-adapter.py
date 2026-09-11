@@ -5,6 +5,7 @@ import os
 import re
 import traceback
 import urllib.parse
+from concurrent.futures import ThreadPoolExecutor
 
 def _int_env(name, default):
     """Read an integer config value from the environment, falling back to
@@ -28,6 +29,8 @@ SUBAGENT_FANOUT_CAP = _int_env("AGY_ADAPTER_FANOUT_CAP", 50)
 PRE_INVOCATION_MSG_BYTE_CAP = _int_env("AGY_ADAPTER_MSG_BYTE_CAP", 10000)
 PRE_INVOCATION_TOTAL_BYTE_CAP = _int_env("AGY_ADAPTER_TOTAL_BYTE_CAP", 30000)
 PRE_INVOCATION_MSG_CAP = _int_env("AGY_ADAPTER_MSG_CAP", 20)
+# Maximum worker threads for parallel hook execution (must be >= 1)
+MAX_WORKERS = max(1, _int_env("AGY_ADAPTER_MAX_WORKERS", 16))
 
 def run_hook_command(cmd, claude_payload, cwd, timeout_val):
     # A timeout or a launch exception returns None, and every caller below
@@ -484,39 +487,63 @@ def main():
                 if matches_tool(group.get("matcher", ""), tool_name):
                     tasks_to_run.append((extract_hook_list(group), generic_payload, tool_cwd, tool_name))
 
-        # Execute PreToolUse hooks; if ANY hook denies, block tool execution immediately
+        # Execute PreToolUse hooks in parallel; preserve deterministic output order
         system_messages = []
+        deny_response = None
+
+        flattened_hooks = []
         for hooks_list, c_payload, cwd, desc in tasks_to_run:
             for hook in hooks_list:
                 resolved = resolve_cmd_and_timeout(hook, repo_root)
                 if resolved is None:
                     continue
                 cmd, timeout_val = resolved
+                hook_id = hook.get("script") or cmd
+                flattened_hooks.append((cmd, c_payload, cwd, timeout_val, desc, hook_id))
 
-                result = run_hook_command(cmd, c_payload, cwd, timeout_val)
-                if result and result.returncode == 0 and result.stdout:
-                    try:
-                        hook_out = json.loads(result.stdout)
-                        # systemMessage is a top-level field Claude Code hooks
-                        # may return on every event, shown to the user rather
-                        # than fed back to the model; surface it regardless
-                        # of the deny/allow decision below (via stderr or reason).
-                        if hook_out.get("systemMessage"):
-                            system_messages.append(str(hook_out.get("systemMessage")))
-                        hso = hook_out.get("hookSpecificOutput", {})
-                        if hso.get("permissionDecision") == "deny":
-                            base_reason = hso.get("permissionDecisionReason", "Denied by Claude Code hook")
-                            reason = f"[{desc}] {base_reason}" if desc != "run_command" else base_reason
-                            deny_response = {"decision": "deny", "reason": reason}
-                            if system_messages:
-                                combined_msgs = "\n\n".join(system_messages)
-                                deny_response["reason"] = f"{reason}\n\n{combined_msgs}"
-                            print(json.dumps(deny_response))
-                            return
-                        if hso.get("additionalContext"):
-                            print(f"Warning from {hook.get('script') or cmd}: {hso.get('additionalContext')}", file=sys.stderr)
-                    except Exception as exc:
-                        print(f"claude-hook-adapter: failed to parse output: {exc}", file=sys.stderr)
+        def _run_single_pre_tool(entry):
+            idx, (cmd, c_payload, cwd, timeout_val, desc, hook_id) = entry
+            res = run_hook_command(cmd, c_payload, cwd, timeout_val)
+            return idx, desc, hook_id, res
+
+        results = [None] * len(flattened_hooks)
+        if len(flattened_hooks) == 1:
+            results[0] = _run_single_pre_tool((0, flattened_hooks[0]))
+        elif len(flattened_hooks) > 1:
+            workers = min(MAX_WORKERS, len(flattened_hooks))
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                for idx, desc, hook_id, res in executor.map(_run_single_pre_tool, enumerate(flattened_hooks)):
+                    results[idx] = (idx, desc, hook_id, res)
+
+        for item in results:
+            if item is None:
+                continue
+            idx, desc, hook_id, result = item
+            if result and result.returncode == 0 and result.stdout:
+                try:
+                    hook_out = json.loads(result.stdout)
+                    # systemMessage is a top-level field Claude Code hooks
+                    # may return on every event, shown to the user rather
+                    # than fed back to the model; surface it regardless
+                    # of the deny/allow decision below (via stderr or reason).
+                    if hook_out.get("systemMessage"):
+                        system_messages.append(str(hook_out.get("systemMessage")))
+                    hso = hook_out.get("hookSpecificOutput", {})
+                    if hso.get("permissionDecision") == "deny" and deny_response is None:
+                        base_reason = hso.get("permissionDecisionReason", "Denied by Claude Code hook")
+                        reason = f"[{desc}] {base_reason}" if desc != "run_command" else base_reason
+                        deny_response = {"decision": "deny", "reason": reason}
+                    if hso.get("additionalContext"):
+                        print(f"Warning from {hook_id}: {hso.get('additionalContext')}", file=sys.stderr)
+                except Exception as exc:
+                    print(f"claude-hook-adapter: failed to parse output: {exc}", file=sys.stderr)
+
+        if deny_response is not None:
+            if system_messages:
+                combined_msgs = "\n\n".join(system_messages)
+                deny_response["reason"] = f"{deny_response['reason']}\n\n{combined_msgs}"
+            print(json.dumps(deny_response))
+            return
 
         allow_response = {"decision": "allow"}
         if system_messages:
@@ -614,15 +641,34 @@ def main():
         injected_messages = []
         total_injected_bytes = 0
         hooks_to_run = extract_hook_list(ups_groups)
+        flattened_ups = []
         for hook in hooks_to_run:
-            if len(injected_messages) >= PRE_INVOCATION_MSG_CAP:
-                break
             resolved = resolve_cmd_and_timeout(hook, repo_root)
             if resolved is None:
                 continue
             cmd, timeout_val = resolved
+            flattened_ups.append((cmd, timeout_val))
 
-            result = run_hook_command(cmd, ups_payload, inv_cwd, timeout_val)
+        def _run_single_ups(entry):
+            idx, (cmd, timeout_val) = entry
+            res = run_hook_command(cmd, ups_payload, inv_cwd, timeout_val)
+            return idx, res
+
+        ups_results = [None] * len(flattened_ups)
+        if len(flattened_ups) == 1:
+            ups_results[0] = _run_single_ups((0, flattened_ups[0]))
+        elif len(flattened_ups) > 1:
+            workers = min(MAX_WORKERS, len(flattened_ups))
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                for idx, res in executor.map(_run_single_ups, enumerate(flattened_ups)):
+                    ups_results[idx] = (idx, res)
+
+        for item in ups_results:
+            if item is None:
+                continue
+            if len(injected_messages) >= PRE_INVOCATION_MSG_CAP:
+                break
+            idx, result = item
             if result and result.returncode == 0 and result.stdout:
                 text_out = result.stdout.strip()
                 if text_out:

@@ -271,6 +271,13 @@ with tempfile.TemporaryDirectory() as tmp:
     # anti-example. A zero count trips no threshold, so without this the stale
     # entry is invisible and the sweep exits 0 over dead documentation.
     path.write_text("# Fragment\n\nNo fenced block here.\n", encoding="utf-8")
+    # An unrelated, unchained shell fence keeps blocks_examined above zero.
+    # Without it the scan trips main()'s empty-corpus branch, which returns 1
+    # for its own reason, and the exit-code assertion below would pass even
+    # with the stale-allowlist check removed.
+    other = root / "skills" / "demo" / "SKILL.md"
+    other.parent.mkdir(parents=True, exist_ok=True)
+    other.write_text("# Demo\n\n```bash\ngit status\n```\n", encoding="utf-8")
     subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
 
     errors = io.StringIO()

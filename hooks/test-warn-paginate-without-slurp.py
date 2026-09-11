@@ -33,8 +33,17 @@ def check(name, condition, detail=""):
 
 
 def warns(command):
+    """True when the hook surfaced a warning the session will actually see.
+
+    Checks the payload SHAPE, not merely that something was printed: a
+    warn-only PreToolUse hook has to emit `hookSpecificOutput.additionalContext`
+    (a `systemMessage` alongside it is fine), and output in any other shape is
+    discarded rather than surfaced.
+    """
     out = run(command)
-    return out is not None and "permissionDecisionReason" in out.get("hookSpecificOutput", {})
+    if out is None:
+        return False
+    return "additionalContext" in out.get("hookSpecificOutput", {})
 
 
 # --- the measured case: the exact command shape that produced a false answer
@@ -91,12 +100,23 @@ check(
     not warns("gh api x --paginate --jq '.[].id' && cat y | jq '[.[]] | last'"),
 )
 
-# --- it must never refuse, only warn
+# --- it must never refuse, only warn, and the warning must be surfaced
 out = run("gh api x --paginate | jq 'last'")
 check(
-    "decision is allow, never deny",
-    out["hookSpecificOutput"]["permissionDecision"] == "allow",
-    out["hookSpecificOutput"]["permissionDecision"],
+    "emits additionalContext, the shape a PreToolUse warning is surfaced in",
+    "additionalContext" in out["hookSpecificOutput"],
+    sorted(out["hookSpecificOutput"]),
+)
+check("emits a systemMessage the user sees", bool(out.get("systemMessage")), out.get("systemMessage"))
+check(
+    "names the offending filter in the systemMessage",
+    "jq" in out.get("systemMessage", "") or "paginate" in out.get("systemMessage", ""),
+    out.get("systemMessage"),
+)
+check(
+    "emits no permissionDecision, so it can never refuse",
+    "permissionDecision" not in out["hookSpecificOutput"],
+    sorted(out["hookSpecificOutput"]),
 )
 
 # --- malformed input fails open

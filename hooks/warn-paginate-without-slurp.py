@@ -138,11 +138,15 @@ def main():
     if not hit:
         return 0
     segment, filter_text = hit
+    message = (
+        "gh api --paginate feeds an aggregating jq filter "
+        f"({filter_text.strip()[:60]}) with no -s, so it answers once per page."
+    )
     print(json.dumps({
+        "systemMessage": message,
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
-            "permissionDecision": "allow",
-            "permissionDecisionReason": (
+            "additionalContext": (
                 "This command pipes `gh api --paginate` into an AGGREGATING jq "
                 f"filter with no `-s`:\n\n    {filter_text.strip()[:160]}\n\n"
                 "`--paginate` emits one array PER PAGE, so an aggregation runs "

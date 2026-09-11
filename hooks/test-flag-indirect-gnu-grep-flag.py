@@ -503,20 +503,22 @@ def laundering_is_not_platform_asserted():
         else:
             print("  PASS host xargs collapses both to %s" % rc2)
 
-    # And the message must name this host's value somewhere, not only the other's.
+    # This check used to require the message to NAME both platform values.
+    # That requirement is retired: the runtime text now deliberately states no
+    # replacement value at all, and
+    # `no_platform_integer_in_runtime_text` enforces the absence. What is still
+    # worth asserting here is that the message points somewhere for the number.
     payload = {"tool_name": "Bash",
                "tool_input": {"command": "ls | xargs -0 grep -lP 'x'"}}
     proc = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
                           capture_output=True, text=True)
     ctx = (json.loads(proc.stdout or "{}")
            ).get("hookSpecificOutput", {}).get("additionalContext", "")
-    names_host = str(rc2) in ctx
-    names_both = "123" in ctx and "**1**" in ctx
-    print("  %s message names this host's value (%s): %s; names both platforms: %s"
-          % ("PASS" if (names_host and names_both) else "FAIL", rc2,
-             names_host, names_both))
-    if not (names_host and names_both):
-        failures.append("platform-naming")
+    points_at_record = "debugging.cases.md" in ctx
+    print("  %s message points at the cases file for the measured value: %s"
+          % ("PASS" if points_at_record else "FAIL", points_at_record))
+    if not points_at_record:
+        failures.append("no-pointer-to-record")
     return failures
 
 
@@ -625,7 +627,75 @@ def blames_the_transforming_link():
     return failures
 
 
+def no_platform_integer_in_runtime_text():
+    r"""No implementation-specific laundered value may reach the runtime text.
+
+    This is the structural guard, not another case. Eight findings on this file
+    were one class, and six were per-utility/per-platform exit-code numbers in
+    the warning text. Each was fixed by correcting that number; none stopped
+    the next one. So forbid the surface instead: the runtime message may state
+    grep's OWN codes (2 for a rejection, 1 for a no-match, 0 where a status is
+    discarded), because those are properties of grep and of the three-way
+    classification, and may not state an indirection's replacement value.
+
+    `123` is GNU findutils' value and is the canonical instance. It belongs in
+    `memories/debugging.cases.md`, and this asserts it is there and not here.
+    """
+    own_codes = {"0", "1", "2"}
+    failures = []
+    probes = [
+        "ls | xargs -0 grep -lP " + chr(39) + "x" + chr(39),
+        "ls | parallel grep -lP " + chr(39) + "x" + chr(39),
+        "find . -exec grep -lP x {} +",
+        "find . -exec grep -lP x {} " + B + ";",
+        "sh -c " + chr(39) + "xargs -0 grep -P x" + chr(39),
+        "sh -c " + chr(39) + "grep -P x f" + chr(39),
+    ]
+    for cmd in probes:
+        proc = subprocess.run(
+            [sys.executable, HOOK],
+            input=json.dumps({"tool_name": "Bash",
+                              "tool_input": {"command": cmd}}),
+            capture_output=True, text=True)
+        d = json.loads(proc.stdout or "{}")
+        text = (d.get("systemMessage", "") + chr(10)
+                + d.get("hookSpecificOutput", {}).get("additionalContext", ""))
+        # Match integers in an EXIT-CODE context only. An earlier draft of
+        # this check scanned every integer and flagged the date (2026-09-10)
+        # and the version string (2.6.0-FreeBSD) -- a detector so broad it
+        # could never pass, which is its own failure mode.
+        coded = set()
+        for pat in (r"rc=([0-9]+)", r"exits? (?:to )?[*]{0,2}([0-9]+)[*]{0,2}",
+                    r"give[s]? [*]{0,2}([0-9]+)[*]{0,2}",
+                    r"report[s]? [*]{0,2}([0-9]+)[*]{0,2}",
+                    r"status of [*]{0,2}([0-9]+)[*]{0,2}"):
+            coded.update(re.findall(pat, text))
+        # `123` is GNU findutils' value and the canonical instance, so it is
+        # forbidden outright rather than only in a matched context.
+        suspect = {n for n in coded if n not in own_codes}
+        if "123" in text:
+            suspect.add("123")
+        if suspect:
+            print("  FAIL %-34s platform value(s) in runtime text: %s"
+                  % (cmd[:34], sorted(suspect)))
+            failures.append(cmd)
+        else:
+            print("  PASS %-34s no platform value in runtime text" % cmd[:34])
+    # And the cases file must still carry the number the runtime text dropped.
+    cases = os.path.join(os.path.dirname(os.path.dirname(HOOK)),
+                         "memories", "debugging.cases.md")
+    if os.path.exists(cases):
+        has = "123" in open(cases, encoding="utf-8").read()
+        print("  %s cases file still records GNU findutils' 123: %s"
+              % ("PASS" if has else "FAIL", has))
+        if not has:
+            failures.append("cases-file")
+    return failures
+
+
 def main():
+
+
 
 
 
@@ -644,6 +714,9 @@ def main():
     print()
     print("Per-indirection rc story:")
     base_fail += rc_story_matches_indirection()
+    print()
+    print("No platform integer in runtime text:")
+    base_fail += no_platform_integer_in_runtime_text()
     print()
     print("Blames the transforming link:")
     base_fail += blames_the_transforming_link()

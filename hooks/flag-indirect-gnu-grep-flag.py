@@ -136,30 +136,42 @@ RC_BEHAVIOUR = {
 # number for `xargs` and left that same sentence rendering for `parallel` and
 # `find`, which invoke no xargs at all -- the same over-generalization one
 # layer down.
+# Deliberately no per-utility exit-code NUMBERS here, and that is a decision
+# rather than an omission.
+#
+# Eight of this file's review findings were one class: a value measured for one
+# utility, platform or chain position and rendered for a sibling. Six of the
+# eight were in this sub-table specifically -- 1 versus 123, whose note is
+# whose, which link to attribute it to. The space is 7 utilities by 2
+# implementations by chain position, narrated by hand into a live f-string, and
+# it failed every time it was touched.
+#
+# The classification survives because it changes the REMEDY: under a preserved
+# status an rc branch is the right cheap fix, and under a laundered or
+# discarded one it is not. That distinction needs no integer, and it is pinned
+# by mutation tests. The integers are in
+# `memories/debugging.cases.md`, read deliberately rather than synthesized
+# under a PreToolUse warning, and `test_no_platform_integer_in_runtime_text`
+# keeps them from creeping back.
 LAUNDERED_NOTE = {
-    "xargs": ("Measured 2026-09-10 on BSD/macOS `xargs`: a child exiting 1 and "
-              "one exiting 2 both give **1**. GNU findutils documents **123** "
-              "for any child exiting 1-125."),
-    "find": ("Measured 2026-09-10 on BSD/macOS `find`: with `+`, a child "
-             "exiting 1 and one exiting 2 both give **1**. The GNU findutils "
-             "value is not measured here."),
-    # GNU Parallel is not installed on the machine these measurements come
-    # from, and it documents its own exit-status convention rather than
-    # xargs's. Only the collapse is claimed for it, and the source of that
-    # claim is named rather than implied.
-    "parallel": ("The specific value is not measured here -- `parallel` keeps "
-                 "its own exit-status convention, and only the collapse is "
-                 "claimed for it."),
+    "xargs": ("The replacement value is `xargs`'s own and differs by "
+              "implementation."),
+    "find": ("The replacement value is `find`'s own, and differs between its "
+             "`+` and `;` forms as well as by implementation."),
+    "parallel": ("`parallel` keeps its own exit-status convention, so only the "
+                 "collapse is claimed for it here."),
 }
-_DEFAULT_LAUNDERED_NOTE = "The specific value is not measured for this utility."
+_DEFAULT_LAUNDERED_NOTE = (
+    "The replacement value is that utility's own and is not recorded here.")
 
 
 RC_SENTENCE = {
     RC_LAUNDERED: """and `{via}` replaces the child's status with one of its own
 for any non-zero exit, so grep's distinguishable **2** and an honest
-no-match's **1** arrive as the same value. {laundered_note} Either way the
-collapse rather than the number is what defeats the check: branching on `rc`
-cannot separate "rejected the flag" from "found nothing" here.""",
+no-match's **1** arrive as the same value. {laundered_note} The collapse rather
+than the number is what defeats the check: branching on `rc` cannot separate
+"rejected the flag" from "found nothing" here. `memories/debugging.cases.md`
+records the measured values per utility and platform.""",
     RC_PRESERVED: """while `{via}` passes the child's exit status through
 unchanged. So `rc` **does** still tell you: grep's rejection is **2**, an
 honest no-match is **1**. Branch on it (`case $rc in 0) ...;; 1) ...;; *)
@@ -524,8 +536,8 @@ def main():
         else:
             out["systemMessage"] = (
                 "`%s %s` via `%s` resolves by PATH in the child, past this "
-                "session's own `%s`: BSD grep rejects the flag, with empty "
-                "stdout and %s (through `%s`)."
+                "session's own `%s`: if that resolves to BSD grep the flag is "
+                "rejected, with empty stdout and %s (through `%s`)."
                 % (invoked, flag, via, invoked, rc_clause, rc_via)
             )
     print(json.dumps(out))

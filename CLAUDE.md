@@ -198,20 +198,6 @@ The interactive subscription/extension was never affected and was never at quota
 `memories/delegation.md` carries the rule, the usage-window semantics across `opencode`, `codex`, and `agy`, the prepaid-balance details, and the Windows install/mechanics writeup.
 Ground the recommendation in `assess-model-fit`/`select-model` rather than a guess.
 
-Within this lever, a repeating dispatch compounds the question further:
-[`adversarial-self-review`](shared/workflow/adversarial-self-review.md)'s
-"Round repetition is a third axis, orthogonal to cost and independence"
-section covers a case the mechanical/judgment split above does not, on its
-own --- a review-shaped dispatch known to repeat round after round against
-the same PR (an ARDI loop, not a one-off pass) is a stronger case for the
-cheap or cross-family route than a single isolated dispatch, because the
-cost is the per-round cost times the round count, and the round count is
-not known in advance.
-(Directive from the user, 2026-09-10, given after five same-harness
-`adversarial-reviewer` rounds at roughly 350k tokens each on one PR: "always
-use agy or other cheap subagents whenever feasible, to avoid draining claude
-quota".)
-
 **Compaction.**
 Already covered by the two sections above --- the `/clear` flag for a clean stopping point, and the `compress-session` flag for mid-task bloat.
 Add quota/usage pressure itself as a trigger for both, distinct from context size alone.

@@ -428,6 +428,52 @@ the exit status explicitly (`rc=$?; case $rc in 0) ...;; 1) ...;; *) echo
 glyphs" without having scanned anything; caught only by re-reading the
 command's own stderr, which was sitting in the same output.)
 
+**A second route into this section's failure, measured 2026-09-10:
+`xargs` as the child-process boundary, where the remedy above does not reach.**
+
+A glyph scan through `xargs -0 grep -lP` printed `invalid option -- P` to
+stderr and exited 1.
+An interactive shell's `grep` is a `ugrep` function, per
+[`tools.md`](tools.md)'s "`grep` in a Claude Code session is a shell
+function" entry, and a function does not reach a child of `xargs`, so the
+child got the on-`PATH` binary: BSD `grep`, which has no `-P`.
+The empty stdout became "no tracked file contains an em dash", in a commit
+message.
+
+The exit code is the indirection's doing rather than grep's, which is why the
+explicit-`rc`-branch remedy directly above was not enough on its own.
+BSD grep rejects the flag with rc=**2**, exactly like the locale case, so that
+branch would have caught it.
+`xargs` replaces any non-zero child's status with one of its own, so grep's 2
+and a no-match's 1 arrive identical.
+The value is implementation-specific (1 on BSD, 123 on GNU findutils); the
+collapse rather than the number is what defeats the check.
+
+So under `xargs` one boundary swaps the binary and destroys the evidence ---
+the zero-matrix problem
+[`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md) names.
+Only some indirections do: `sh -c`, `bash -c`, `zsh -c` and `env` preserve the
+status, and `find`'s `;` form exits 0.
+The cases file carries the measured table.
+
+- **Do:** treat `xargs`, `find -exec`, a Makefile recipe and a script as one
+  kind of child-process boundary --- a `grep` function or alias reaches none.
+- **Do:** measure a flag, and the host's own utility, before calling either
+  behaviour universal --- the cases file lists which flags BSD grep actually
+  rejects and what each indirection does to the status.
+- **Do:** have a content search report the population it examined alongside
+  the hit count, so a zero differs from a detector that never ran.
+- **Don't:** generalize an indirection's effect on `rc` from one measurement
+  --- `xargs` collapses grep's 2 onto its own value, `find`'s `;` form
+  discards it to 0,
+  and `sh -c`, `bash -c`, `zsh -c` and `env` preserve it, so the branch that
+  is useless under the first two is exactly what works under the last four.
+- **Don't:** read empty stdout under `xargs` as having searched anything,
+  without checking stderr and the exit status together.
+
+See [`debugging.cases.md`](debugging.cases.md), "A GNU-only grep flag in an
+`xargs` child", for the measurements and the guard this produced.
+
 ## An error quotes the failing call, so its ARGUMENTS are not your data
 
 An error prints the call that raised it, arguments included.

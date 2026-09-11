@@ -70,6 +70,27 @@ the parser carries no operator between simple commands, so a read the
 shell never reaches --- `false && cat <manifest>` --- is credited.
 Deciding it needs an exit status the text does not carry.
 
+THE DISCHARGE SIDE IS APPROXIMATE, AND SAYING SO IS PART OF SHIPPING IT.
+Sixteen adversarial review rounds ran on this file, and each found another
+command whose read the parser credited wrongly: a quoted tilde, a substitution
+inside a comment, an interpreter's script arguments, an option table missing a
+spelling, a cluster hiding a no-input flag, a reassigned HOME, a `cd` target
+behind a flag. Every fix was correct. The count is the point: the surface is
+every way a shell can spell "this command does not open that file", and no
+enumeration closes it.
+
+Two things bound what that costs. This guard WARNS, so a false discharge is a
+missing warning rather than a wrong action taken, and every shape found so far
+came from a reviewer hunting rather than from a command someone wrote. And the
+alternative it replaced was a regex that got the same cases wrong more often,
+which is what https://github.com/Morrison-Lab/ai-config/issues/3126 was filed
+about.
+
+So a new false discharge reported here is expected, not a defect in the design.
+Fix the general shape rather than the reported command --- the option tables
+reached this file three separate times before the default was inverted --- and
+add its case to the suite.
+
 Two limits the argv parse RETIRED:
 an already-expanded absolute path under the home directory now resolves,
 and so does `cd <root>/hooks && cat ../settings.json`.

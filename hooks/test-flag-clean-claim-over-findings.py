@@ -92,6 +92,18 @@ def result_nested(tool_id, content):
          "content": [{"type": "text", "text": [{"type": "text", "text": content}]}]}]}}
 
 
+def result_content_key(tool_id, content):
+    """A tool_result whose nested block carries `content`, not `text`.
+
+    The dict branch tries `text` first and `content` second. Every other fixture
+    reaches a dict by `text`, so the second key was dead as far as the suite
+    could see: dropping it from the tuple left all cases green (round 10).
+    """
+    return {"type": "user", "message": {"content": [
+        {"type": "tool_result", "tool_use_id": tool_id,
+         "content": {"content": content}}]}}
+
+
 def checker(pr):
     return {"type": "assistant", "message": {"content": [
         {"type": "tool_use", "name": "Bash",
@@ -116,6 +128,11 @@ HAZARD_42_BARE_DICT = [
 HAZARD_42_NESTED = [
     fetch("gh api repos/o/r/pulls/42/reviews", "tn1"),
     result_nested("tn1", HAZARD_BODY),
+]
+
+HAZARD_42_CONTENT_KEY = [
+    fetch("gh api repos/o/r/pulls/42/reviews", "tc1"),
+    result_content_key("tc1", HAZARD_BODY),
 ]
 
 HAZARD_42 = [
@@ -460,6 +477,11 @@ CASES = [
     # And a sub-block whose own text is itself a list was silently dropped.
     (HAZARD_42_NESTED + [say("Reported to the user: Ready for merge.")],
      True, "a nested sub-block is still scanned for the hazard"),
+
+    # Round 10: the dict branch's second key. Every other fixture reaches a dict
+    # by `text`, so removing `content` from the tuple reddened nothing.
+    (HAZARD_42_CONTENT_KEY + [say("Reported to the user: Ready for merge.")],
+     True, "a nested block keyed `content` is still scanned for the hazard"),
 
 ]
 

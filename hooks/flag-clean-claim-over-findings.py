@@ -58,7 +58,9 @@ to fire:
 
 DISCHARGE
 ---------
-Two independent outs, checked before the reply is ever inspected:
+Three outs. The first two are checked in `main()` before the reply is ever
+inspected; the third is applied earlier still, during `scan()`, by removing
+the hazard from consideration altogether:
 
   * The reply itself ACKNOWLEDGES findings vocabulary (`finding(s)`, `nit(s)`,
     `unresolved`, `unaddressed`, `non-blocking`, `outstanding`, a Findings-
@@ -71,6 +73,14 @@ Two independent outs, checked before the reply is ever inspected:
     identical instrument. Running the real check after reading the body is
     exactly the corrective action this hook exists to prompt, so a session
     that already did it needs no further nudge.
+
+  * A later review fetch of the SAME PR came back genuinely clean, which
+    supersedes the earlier hazard. Without this the ordinary loop -- fetch,
+    fix, re-fetch clean, report clean -- warned on correct behaviour, and
+    that is the corpus's central workflow, so nagging there is what gets a
+    guard switched off. Only a CLEAN re-read supersedes: a not-clean one
+    leaves the hazard standing, and one whose PR cannot be recovered from
+    the command clears nothing.
 
 Only the MOST RECENT hazard in the transcript is consulted, on the reading
 that a closing recap characterizes the last review round read, not an

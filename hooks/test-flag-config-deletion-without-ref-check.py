@@ -491,11 +491,13 @@ _ATTRIBUTION_CASES = [
      "strip_env peels a zero-argument wrapper only, so a wrapper carrying "
      "its own option hides the read verb (ai-config#3321)"),
     # Process substitution is the third construct whose argv is not the
-    # shell's: the split leaves `diff` in argv[0] where `cat` ran, so without
-    # the union this reads as no verb at all and the lexical path -- which
-    # credits it -- is never consulted.
+    # shell's: the split leaves `diff` in argv[0] where `cat` ran, so the outer
+    # parse SUCCEEDS and credits nothing. The fallback is not what saves this.
+    # `argv_read_roots` returns an empty set rather than None, so `read_roots`
+    # recurses into each substitution body instead, and the inner `cat` is what
+    # credits the root.
     ("diff <(cat ~/.claude/settings.json) <(cat /tmp/other.json)", {"claude"},
-     "a process substitution falls back to the lexical path, not to silence"),
+     "a process substitution is credited by recursing into its body"),
     # The `=`-joined long-option form, which advances by exactly one token
     # whichever table the option belongs to.
     ("grep --regexp='~/.claude/settings.json' README.md", set(),

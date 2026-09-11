@@ -98,7 +98,13 @@ def check_file(
     """
     if not path.is_file():
         findings = []
-        if required:
+        if required and canonical:
+            findings = [
+                "is missing; this manifest is checked into the repo, so its "
+                "absence means the checkout is broken or the path moved, and "
+                "nothing was examined."
+            ]
+        elif required:
             findings = [
                 "is missing although its plugin directory exists, so "
                 "bootstrap.sh ran and its render step did not; Antigravity is "
@@ -137,7 +143,10 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--json", action="store_true", help="emit a machine-readable report")
     args = parser.parse_args(argv)
 
-    reports = [check_file(CANONICAL_MANIFEST, canonical=True)]
+    # The canonical manifest is always required: it is checked into this
+    # repo, so its absence means the checkout is broken or the path moved,
+    # and a SKIP there would let CI pass having examined nothing.
+    reports = [check_file(CANONICAL_MANIFEST, canonical=True, required=True)]
     if args.installed:
         staged = installed_manifest_path()
         reports.append(

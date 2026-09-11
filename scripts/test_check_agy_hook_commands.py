@@ -143,6 +143,20 @@ class TestMissingInstalledManifest(unittest.TestCase):
         self.assertIn("is missing although", sink.getvalue())
         self.assertNotIn("SKIP", sink.getvalue())
 
+    def test_a_missing_canonical_manifest_fails(self):
+        """It is checked into the repo, so absence means nothing was examined."""
+        with tempfile.TemporaryDirectory() as tmp:
+            sink = io.StringIO()
+            original = CHECKER.CANONICAL_MANIFEST
+            CHECKER.CANONICAL_MANIFEST = Path(tmp) / "hooks.json"
+            try:
+                with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
+                    rc = CHECKER.main([])
+            finally:
+                CHECKER.CANONICAL_MANIFEST = original
+        self.assertEqual(rc, 1)
+        self.assertIn("checked into the repo", sink.getvalue())
+
     def test_absent_and_not_required_stays_a_skip(self):
         with tempfile.TemporaryDirectory() as tmp:
             missing = Path(tmp) / "hooks.json"

@@ -159,13 +159,16 @@ there is no standard environment variable that already holds it.
 (Measured 2026-09-04: `git commit --amend -F /tmp/msg.txt` picked up a different concurrent session's message from the same shared path, silently replacing the intended PR's subject and body.)
 
 **The scratchpad is also the answer to a second, independent hazard, and the collision argument above cannot reach it: an unignored message file written inside the worktree is staged by a blanket `git add -A` and committed.**
-(`git add -A` skips ignored paths, so a scratch name covered by `.gitignore` or `.git/info/exclude` escapes this;
-do not rely on that, since a per-PR scratch name is ad hoc and no repository ignores it by default.)
+(`git add -A` skips ignored paths, so a newly created, untracked scratch name covered by `.gitignore` or `.git/info/exclude` escapes this.
+An ignore rule does nothing for a path already tracked, which is what a file shipped by an earlier round has become.
+Do not rely on either way: a per-PR scratch name is ad hoc and no repository ignores it by default.)
 Note what the blanket staging means: [`preferences.md`](preferences.md) already forbids `git add -A` outright, because it sweeps unrelated in-flight edits into the commit.
 So this hazard is a second consequence of a command the corpus had already ruled out.
 Staging only the source paths you edited prevents it independently of where the file lives.
-Note the limit of that: `git add msg.txt` is an explicit path too, so explicitness is not the safeguard.
-Naming only the files the change touches is, and a destination `git add` cannot reach is what makes the mistake unavailable rather than merely avoidable.
+Note the limit of that.
+Explicitness alone is not the safeguard, since `git add msg.txt` names an explicit path and stages the message file.
+The safeguard is naming only the files the change itself touches.
+A destination `git add` cannot reach is the stronger half, because it makes the mistake unavailable rather than merely avoidable.
 Note what the reasoning above would permit.
 It rejects `/tmp/msg.txt` because `/tmp` is shared, so a path nobody else can write --- a file in the worktree you alone are driving --- satisfies every word of it.
 That path is the dangerous one.
@@ -193,7 +196,15 @@ A path outside the worktree is immune by construction rather than by discipline:
 So the same substitution the bullets above prescribe fixes both hazards at once, and no second rule is needed.
 
 - **Do:** pass `git commit -F` an absolute path under the session scratchpad, so no `git add` invocation can stage it.
-- **Do:** audit the round's commits one by one, with `git log --diff-filter=A --name-only --format= origin/<default-branch>..HEAD | grep -qxF -- "$name"`, in every worktree the round touched.
+- **Do:** audit the round's commits one by one, in every worktree the round touched:
+
+  ```sh
+  name=msg.txt   # the repository-relative path, bound before the pipeline
+  git log --diff-filter=A --name-only --format= origin/<default-branch>..HEAD \n    | grep -qxF -- "$name"
+  ```
+
+  Bind `name` rather than inheriting it.
+  `--format=` emits blank separator lines, and an unset variable expands to an empty pattern, so `grep -qxF` matches one of those blanks and the audit reports success without having found anything.
   Two nearer answers both miss the case that matters, which is a file added in one commit and removed by a later cleanup commit.
   `git ls-files` reads the current index.
   A three-dot `git diff` compares the merge base against the final tree, so an add and a later delete cancel.
@@ -204,7 +215,7 @@ So the same substitution the bullets above prescribe fixes both hazards at once,
 - **Don't:** read "the path is private to me" as sufficient;
   that answers the collision hazard and not this one.
 
-(Measured 2026-09-10 on `Lacaedemon/sparta`: the shape above shipped a stray `msg.txt` to three PRs in one turn, because the same command was reused for each.
+(Measured 2026-09-10 on `Lacaedemon/sparta`: the shape above shipped a stray `msg.txt` to three PRs in one turn --- [#1555](https://github.com/Lacaedemon/sparta/pull/1555), [#1556](https://github.com/Lacaedemon/sparta/pull/1556) and [#1560](https://github.com/Lacaedemon/sparta/pull/1560) --- because the same command was reused for each.
 A reviewer caught it on one;
 the other two were found only by grepping `git ls-files` afterwards.
 Tracked as [ai-config#3558](https://github.com/Morrison-Lab/ai-config/issues/3558), which also proposes the guard: refuse a commit whose staged set contains the file passed to `-F`.)

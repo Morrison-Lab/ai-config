@@ -341,6 +341,28 @@ if not _ok:
 print("\n--- root attribution (read_roots)")
 _HOME = os.path.expanduser("~")
 _ATTRIBUTION_CASES = [
+    ("export HOME=/tmp; cd -P ~/.claude && cat settings.json", set(),
+     "a cd flag does not hide the target from the HOME reassignment check"),
+    ("export HOME=/tmp; cd -- ~/.claude && cat settings.json", set(),
+     "an end-of-options marker does not hide the cd target"),
+    ("cd -P ~/.claude && cat settings.json", {"claude"},
+     "a cd flag leaves the target valid when HOME is NOT reassigned"),
+    ("export HOME=/tmp; cd && cat ~/.claude/settings.json", set(),
+     "cd with no target is the home case and respects a reassigned HOME"),
+    ("export HOME=/tmp; cd -P && cat ~/.claude/settings.json", set(),
+     "cd -P with no directory is also the home case"),
+    ("cd && cat ~/.claude/settings.json", {"claude"},
+     "cd with no target goes to the real HOME when not reassigned"),
+
+    ("cat -foo ~/.claude/settings.json", set(),
+     "an unknown option is assumed to consume the next token, losing the file"),
+    ("grep -Xn pattern ~/.claude/settings.json", set(),
+     "a cluster with an unknown option consumes the next token"),
+    ("cat -foo README.md ~/.claude/settings.json", {"claude"},
+     "an unknown option eats only the token after it, leaving a later manifest to be credited"),
+    ("grep -Xn pattern README.md ~/.claude/settings.json", {"claude"},
+     "the same for grep: the unknown cluster eats pattern, README is the search pattern, the manifest is credited"),
+
     # Finding 2: attached short option (modified)
     ("grep -nm 1 ~/.claude/settings.json file.txt", set(), "a short cluster ending in a value-taking option consumes the next token, shifting the pattern to the manifest slot"),
     ("grep -nm 1 pattern ~/.claude/settings.json", {"claude"}, "the same cluster leaves the manifest as a file operand when a real pattern follows"),

@@ -578,10 +578,22 @@ def read_operands(argv):
             elif takes_no_value(name, bare_opts):
                 index += 1
             elif not token.startswith("--") and len(token) > 2:
-                if all("-" + letter in bare_opts for letter in token[1:-1]) and "-" + token[-1] not in bare_opts:
-                    index += 2
-                else:
+                non_bare_idx = -1
+                for j, char in enumerate(token[1:]):
+                    if "-" + char not in bare_opts:
+                        non_bare_idx = j + 1
+                        break
+                attached_value = False
+                if non_bare_idx != -1 and non_bare_idx < len(token) - 1:
+                    opt = "-" + token[non_bare_idx]
+                    if (opt in pair_opts or opt in file_pair_opts or
+                        opt in pattern_opts or opt in no_file_opts or
+                        opt in no_input_opts):
+                        attached_value = True
+                if attached_value:
                     index += 1
+                else:
+                    index += 2
             else:
                 # Unknown option: assume it consumes the next token. A wrong
                 # guess here loses a discharge and warns; the opposite guess
@@ -767,7 +779,16 @@ def argv_read_roots(command):
             continue
         if os.path.basename(rest[0]) in CD_VERBS:
             if home_reassigned:
-                target = rest[1] if len(rest) > 1 else "~"
+                target_idx = 1
+                while target_idx < len(rest):
+                    token = rest[target_idx]
+                    if token == "--":
+                        target_idx += 1
+                        break
+                    if not token.startswith("-") or token == "-":
+                        break
+                    target_idx += 1
+                target = rest[target_idx] if target_idx < len(rest) else "~"
                 if target == "~" or target.startswith("~/") or "$HOME" in target or "${HOME}" in target:
                     cwd_by_scope[scope] = None
                     continue

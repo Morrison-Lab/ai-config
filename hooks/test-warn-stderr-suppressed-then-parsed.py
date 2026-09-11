@@ -275,6 +275,32 @@ check(
     "redirected to `out.json`",
 )
 
+# An ordinary fd duplication touches no file. RX_MERGE_FILE was missing the
+# digit lookbehind every sibling pattern carries, so `3>&2` read as a redirect
+# to a file named `2`. The one pre-existing `>&2` case passed only because its
+# digit happened to match the fd already redirected earlier in that stage.
+check("fd duplication is not a file target", fires("cmd 3>&2 2>/dev/null"), False)
+check("self-duplication is not a file target", fires("cmd >&1 2>/dev/null"), False)
+check("the fd move form is not a file target", fires("cmd 3>&2- 2>/dev/null"), False)
+
+# `>|` overrides noclobber and is ONE redirect operator. Its bar was being
+# consumed as a pipe boundary, so a fully discarded command read as piped.
+check(
+    "a noclobber override to /dev/null discards, and stays silent",
+    fires("cmd 2>/dev/null >|/dev/null"),
+    False,
+)
+check(
+    "a noclobber override to a real file fires",
+    fires("cmd 2>/dev/null >|out.json"),
+    True,
+)
+check(
+    "a noclobber override names its target",
+    reported("cmd 2>/dev/null >|out.json")[1],
+    "redirected to `out.json`",
+)
+
 if failures:
     print("FAILED:")
     for line in failures:

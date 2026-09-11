@@ -120,7 +120,8 @@ RX_STDERR_MERGED = re.compile(r"(?<![0-9<>&])2>&[0-9]+")
 # /dev/null spelling was recognised before, which let a later `&>file.log`
 # fail to reclaim an earlier `2>/dev/null` and produced a false positive.
 RX_MERGE_FILE = re.compile(
-    r"(?:&>>?|>&)\s*(?!/dev/null(?![^\s;|&<>()]))(?![&-])([^\s;|&<>()]+)")
+    r"(?<![0-9<>&])(?:&>>?|>&)\s*(?!/dev/null(?![^\s;|&<>()]))"
+    r"(?![&-])(?![0-9]+-?(?![^\s;|&<>()]))([^\s;|&<>()]+)")
 
 # stdout to /dev/null, with or without its explicit `1` fd. The lookbehind
 # excludes `2>` (preceded by a digit) and `&>` (preceded by `&`), each of
@@ -131,7 +132,8 @@ RX_STDOUT_NULL = re.compile(r"(?<![0-9<>&])1?>>?\s*/dev/null(?![^\s;|&<>()])")
 # duplication. `>&2` and `2>&1` are excluded by the `(?!&)`, so sending stdout
 # to stderr is not mistaken for a file the session reads back.
 RX_STDOUT_FILE = re.compile(
-    r"(?<![0-9<>&])1?>>?\s*(?!/dev/null(?![^\s;|&<>()]))(?!&)([^\s;|&<>()]+)")
+    r"(?<![0-9<>&])1?(?:>>?|>\|)\s*(?!/dev/null(?![^\s;|&<>()]))"
+    r"(?!&)([^\s;|&<>()]+)")
 
 
 def _blank(out, start, end):
@@ -304,7 +306,7 @@ def _regions(masked, spans):
 # command in two, so its suppression never shares a stage with the redirect
 # that consumes stdout, and nothing ever fires.
 RX_SEGMENT = re.compile(r"&&|\|\||;|\n|(?<![>&])&(?![&>])")
-RX_PIPE = re.compile(r"(?<!\|)\|(?!\|)")
+RX_PIPE = re.compile(r"(?<![\|>])\|(?!\|)")
 
 
 

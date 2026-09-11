@@ -196,6 +196,34 @@ grants the move, it does not exempt it from what a move costs.
   comparison reports nothing lost --- correctly --- while every "see below"
   whose target went to the sibling file now resolves to nothing.
   The two checks are independent, and only one of them can see this.
+
+  **A pointer's target is one relational property;
+  a rule's scope and its location are two more, and a condensing move breaks those with the vocabulary conserved exactly.**
+  Measured on Morrison-Lab/ai-config#3572, which moved three sections out of `CLAUDE.md` and ran this comparison at line and then token granularity: two rules were damaged while it reported the words accounted for.
+  One had moved wholly into the fragment, so the totals balanced and what was lost was only its availability to a reader who never opens that fragment.
+  The other left its section no longer stating its own titular obligation, with the original sentence intact in the fragment, so nothing read as missing.
+  A third arrived later and is the sharpest, because it damaged a rule by **adding** words: the fix for the first widened a qualifier from one review state to every review state, contradicting a paragraph a few lines above it in the same bullet list.
+  A removal-oriented diff cannot show that at all.
+
+  Three checks follow, and none of them counts words.
+
+  1. **Scope.**
+     For each qualifier in the condensed text, name what it qualified in the original.
+     This is [`fact-check-prose`](fact-check-prose.md)'s condensation rule --- a shorter sentence is under pressure to choose the claim's scope wider --- reached here by a different route, so run that rule rather than a second copy of it.
+  2. **Location.**
+     Ask which rules the move took *out of loading*, not merely out of one file.
+     `python3 scripts/check-context-closure.py` already decides this: it lists the auto-loaded root as `d0` and each `@`-imported file as `d1`, and a file that is only *linked* appears nowhere in it.
+     A rule that leaves that listing is available on demand and unavailable by default, whatever a content total says.
+  3. **Neighbours.**
+     Read each rewritten statement against the paragraphs now adjacent to it in the destination.
+     This one stays human: a contradiction between two claims is a property of the pairing, and no lexical rule decides it.
+
+  The obvious shortcut for the first check was built and measured before being claimed, and the measurement did not support shipping it.
+  Flagging a heading when *any* distinctive word of it is absent from its body fires on roughly three quarters of this corpus's level-2 headings;
+  requiring that *no* word be shared still fires on about a quarter, and misses the case above, whose body kept two of the heading's four words.
+  Those proportions hold across stopword list, stem length and whether fenced blocks are skipped, though the exact counts move with each.
+  What that measurement does **not** establish is the claim it is tempting to draw from it: the check would run over a move's own diff, where the population is a handful of sections rather than thousands, so the whole-corpus rate is the wrong denominator and the diff-scoped experiment is still open (Morrison-Lab/ai-config#3575).
+
 - **A line's "pre-existing" status is a fact about a destination, not about a
   file.**
   A line that has sat in the source file for months is an **added** line in the
@@ -332,10 +360,7 @@ See [`reorganize-prose.cases.md`](reorganize-prose.cases.md),
 - **Do:** run the self-reference and back-reference sweeps, the line-level checks, the asset migration check, and a bidirectional content-preservation diff on anything you relocate, and on any scripted whole-file rewrite (asserting file growth is a cheap pre-filter for an intended insertion, but the bidirectional word diff is the actual gate).
 - **Don't:** treat a section as anchored to its current file or position
   merely because that is where it was originally drafted.
-- **Don't:** relocate content and stop at "the words are all still there
-  somewhere" --- a move that breaks a self-reference, a count-based
-  back-reference, or a cross-file crossref is a defect the move introduced,
-  not a pre-existing one.
+- **Don't:** relocate content and stop at "the words are all still there somewhere" --- a move that breaks a self-reference, a count-based back-reference, or a cross-file crossref, or that widens a rule's scope or takes it out of loading, is a defect the move introduced, not a pre-existing one.
 - **Do:** run the directional sweep over both the companion and the fragment
   when a cap breach forces a `.cases.md` split, before opening the PR ---
   the failing check is the pause point, not a topic to remember.

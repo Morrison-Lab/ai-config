@@ -2245,3 +2245,55 @@ Fired rarely enough and on a limit nobody disputes, a gate costs no PRs until it
 A recommendation to "add a per-PR gate on closure growth" was posted to ai-config#3367 before either query above had been run;
 both the flag (`--max-growth`) and the CI step already existed, and gating the closure total is precisely what `validate.yml`'s comment rejects.
 The root-file ratchet that shipped instead is the narrower-slice form.)
+
+## Three spellings of one class means the deliverable is a stated bound, not a fourth grammar
+
+The section above is about which direction to bias a matcher.
+This one is about when to stop tuning it at all.
+
+Some checks parse a language they do not own --- a shell command, a markdown fence, a diff.
+A hand-written grammar for such a language is always incomplete, so an adversarial reviewer can always produce one more spelling it misses.
+Each round then has the same shape and the same feel: the finding is real, the fix is correct, the suite goes green, and the class is exactly as open as it was before.
+That is what makes the loop so hard to leave.
+Nothing about round four announces itself as different from round two.
+
+So count rounds rather than judging progress.
+When a third round produces a third spelling of the same class, the finding is the count, and the deliverable changes: write into the module's own docstring what the check does not see, which direction each error runs, and why the false passes are tolerable given what the check is for.
+Then leave the remaining spellings open, and say so.
+
+Three checkers in this corpus reached that resolution, each after a series of rounds.
+As of 2026-09-11 only `hooks/flag-config-deletion-without-ref-check.py` had reached `main`;
+the other two are [ai-config#3439](https://github.com/Morrison-Lab/ai-config/pull/3439) and [ai-config#3440](https://github.com/Morrison-Lab/ai-config/pull/3440).
+
+**A bound has to weigh its false passes, not merely list them.**
+An approximation section that enumerates gaps and stops reads as candour while deciding nothing.
+Say what the check is *for* --- here, a property of recipes a person writes and a reader follows, with nothing executed on the verdict --- so a later reader can tell which gaps matter.
+State each gap's direction too: a false failure is seen and rewritten around, while a false pass is silent, so the two do not deserve equal worry.
+
+- **Do:** stop widening the grammar at the third spelling of one class, and write the bound instead.
+- **Do:** write the bound into the file the check lives in, where the next person to widen the grammar will read it.
+- **Do:** name each gap's error direction, and what the check is for.
+- **Don't:** widen the grammar a fourth time because the fourth finding is as real as the first three.
+- **Don't:** call an enumeration of gaps a bound when it never says which of them matter.
+
+(Measured 2026-09-11 on `scripts/check-split-push-blocks.py`, ai-config#3440, whose three rounds found in turn a call inside a command substitution, a branch name containing the option being matched, and a chained second call riding behind an anchored first.
+`hooks/flag-config-deletion-without-ref-check.py` (ai-config#3469) and `hooks/warn-stderr-suppressed-then-parsed.py` (ai-config#3439) reached the same resolution, each after its own series of rounds.
+The class is tracked as ai-config#3565.)
+
+## Run a tightened predicate over the whole corpus before committing it
+
+The corollary to the section above, and the error it is easiest to make while fixing that one.
+
+A predicate tightened in response to a finding is checked against the finding.
+That is the wrong population.
+The right one is every artifact the predicate already passes, because a tightening's real cost is the correct work it starts rejecting --- and that work is invisible from the finding that prompted the change.
+
+The sweep is usually one command, and it is the same command CI will run.
+A newly failing artifact that predates the change is evidence about the predicate, not about the artifact: the temptation is to rewrite the artifact into the new shape, which converts a false rejection into a real edit to somebody else's correct work.
+
+- **Do:** run the corpus-wide sweep before committing a tightened predicate, and revise the predicate when an established artifact newly fails it.
+- **Don't:** rewrite long-standing correct work to satisfy a predicate you tightened an hour ago.
+
+(Measured 2026-09-11 on ai-config#3440.
+A first attempt refused every derived path, which immediately failed five established recipes in `skills/ums`, `skills/agent-builder` and `skills/skill-builder` that build an absolute path from `CLAUDE_PLUGIN_ROOT` with a fallback.
+The predicate was rewritten to refuse only what a reader can tell is relative, and the five recipes were left alone.)

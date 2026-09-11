@@ -936,6 +936,35 @@ and does NOT clear the all-clear merge gate above.
 - **Do:** address, rebut (with convincing acceptance), or defer every previously raised finding even if the most recent review run skipped.
 - **Don't:** treat a reviewer skip notice or self-review fallback as an all-clear or as permission to ignore open findings on the PR.
 
+**A reviewer that is UNAVAILABLE is not a reviewer that is PENDING, and only the second is worth waiting for** (user directive, 2026-09-11).
+
+Everything above is about what a skip notice **means**, and it is right: the notice is not an approval and it clears nothing.
+It is silent on what to do next, and the two states differ there entirely.
+A pending reviewer resolves by waiting.
+An unavailable one does not resolve at all --- its last real verdict is stale, it cannot produce a new one, and every re-request returns the same notice while consuming an attempt.
+Waiting on that is not caution.
+It is a stall with no terminating condition, and it reads as diligence for exactly as long as nobody asks what would end it.
+
+So the stale verdict of an unavailable reviewer stops blocking, while its findings do not.
+Those still need Address, Rebut or Defer like any others --- what lapses is the demand for a fresh verdict from a provider that cannot give one, not the findings it already gave.
+
+Two things decide whether a release is sound, and both are checkable.
+The unavailability must be **newer** than the verdict it releases: an outage that predates a finding says nothing about the reviewer's ability to have produced it.
+And the other axes must be checked on their own, because this one was quietly carrying them --- unresolved review threads especially, which
+[`check-pr-fully-clean.py`](../../scripts/check-pr-fully-clean.py) does not examine at all
+([ai-config#3586](https://github.com/Morrison-Lab/ai-config/issues/3586)).
+
+The instrument implements this
+([ai-config#3587](https://github.com/Morrison-Lab/ai-config/issues/3587)):
+it recognises the outage notice, releases that reviewer's block only when the notice is newer, and reports a NOTE naming the findings that still need dispositioning.
+
+- **Do:** ask what would end the wait before waiting.
+  If nothing would, the reviewer is unavailable rather than pending.
+- **Do:** disposition every finding the unavailable reviewer already raised, and say so when you merge.
+- **Do:** check the unresolved threads yourself, since the instrument does not.
+- **Don't:** re-request a reviewer that has reported itself out of quota --- the request returns the same notice and costs an attempt.
+- **Don't:** read an outage as a clean verdict, or let one that predates a finding release it.
+
 **Another surface,
 and the one that defeats the gate itself:
 the review check can pass on a blocking verdict.**

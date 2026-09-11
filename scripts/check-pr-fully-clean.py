@@ -398,6 +398,51 @@ NON_REVIEW_NOTICE_MARKERS = (
 
 NOTICE_PREFIX_WINDOW = 200
 
+
+# A reviewer that cannot review THIS head, as opposed to one that has not
+# reviewed it yet. Copilot posts this as an ordinary `COMMENTED` review under
+# its own login, so nothing about its shape distinguishes it from a real one --
+# only the body does.
+#
+# It is deliberately NOT treated as a clean verdict. What it does is release the
+# per-reviewer latest-verdict block in the one case where waiting cannot end:
+# the reviewer's last real statement is stale, and it is unable to produce a new
+# one. Findings from that stale statement still have to be Addressed, Rebutted
+# or Deferred -- that is the ARD loop's job, not this script's.
+#
+# Read that limit precisely, because it decides how much this release costs.
+# The CI and HEAD criteria are checked here and still apply. Unresolved review
+# THREADS are not checked by this script at all (ai-config#3586), so before this
+# change a stale not-clean verdict was the only thing that happened to hold a PR
+# carrying open inline findings. Releasing it removes that accident. Check the
+# threads yourself -- `reviewThreads(...) { isResolved }` over GraphQL -- until
+# #3586 lands.
+#
+# Matched against a prefix window for the same reason the notice markers above
+# are: this corpus quotes the wording, and a real review discussing an outage
+# must stay a review.
+REVIEWER_UNAVAILABLE_MARKERS = (
+    "unable to review this pull request because the user who requested the "
+    "review has reached their quota limit",
+    "unable to review this pull request because the user has reached their "
+    "quota limit",
+)
+
+
+def is_reviewer_unavailable_notice(body: str) -> bool:
+    """True when *body* says the reviewer could not review this head at all.
+
+    Guarded by the same review-body-marker precedence the notice test uses, so
+    a self-review that opens by quoting the outage it stands in for is still
+    read as the review it is.
+    """
+    if not body:
+        return False
+    if has_review_body_marker(body):
+        return False
+    window = body[:NOTICE_PREFIX_WINDOW].lower()
+    return any(marker in window for marker in REVIEWER_UNAVAILABLE_MARKERS)
+
 # The body markers that make a comment look like a review regardless of author.
 # Shared by the admission test and by is_non_review_notice()'s precedence guard,
 # because those two must agree: anything wide enough to be ADMITTED as a review
@@ -2605,6 +2650,8 @@ def check_latest_verdict(
     n_with_verdict = 0
     unreadable_items = []
     per_reviewer: Dict[str, Tuple[str, str, str]] = {}
+    # Latest "I could not review this" notice per reviewer identity (#3587).
+    unavailable_since: Dict[str, str] = {}
     # Latest activity per author, for the expired-ledger test (#2482):
     # a login active on the thread within the claim TTL is a live driver.
     # Comment/review items AND commit authorship both count -- claim-pr's
@@ -2652,6 +2699,12 @@ def check_latest_verdict(
                     payload_decided.append((when, identity, "not-clean"))
                 elif payload_is_clean(payload) and verdict == "clean":
                     payload_decided.append((when, identity, "clean"))
+        # An outage notice carries no verdict, so it has to be recorded before
+        # the verdict branches below rather than inside any of them.
+        if is_reviewer_unavailable_notice(body):
+            if when > unavailable_since.get(identity, ""):
+                unavailable_since[identity] = when
+            continue
         # Findings win over unreadable: a known-agent body with ## Nits and no
         # classifiable verdict line is a standing not-clean, not a NOTE.
         if verdict == "not-clean" or finding_pat:
@@ -2691,9 +2744,15 @@ def check_latest_verdict(
         "comment (ai-config#3054)"
         for when, identity, verdict in payload_decided
     ]
+    # The same outage release the per-reviewer loop applies below has to apply
+    # here too, or it reaches only the case where some OTHER reviewer happened to
+    # post afterwards. A PR whose sole reviewer went unavailable takes this
+    # branch instead, and is exactly the case that can never resolve (#3587).
+    latest_outage = unavailable_since.get(latest_identity, "")
     if (
         latest_verdict == "not-clean"
         and not _approval_clears(latest_identity, latest_author, approved_authors)
+        and not latest_outage > latest_when
     ):
         return False, [
             f"Latest verdict-bearing review statement ({latest_when}) is NOT clean, "
@@ -2708,6 +2767,22 @@ def check_latest_verdict(
         if verdict != "not-clean":
             continue
         if _approval_clears(identity, author, approved_authors):
+            continue
+        # The reviewer reported, AFTER this stale verdict, that it could not
+        # review at all. It is unavailable rather than pending, so waiting on it
+        # cannot end (#3587). This is not a clean verdict and clears no finding:
+        # every finding in the stale statement still needs ARD, and the HEAD,
+        # unresolved-thread and CI criteria all still apply on their own. What it
+        # stops is a verdict nobody is able to refresh blocking indefinitely.
+        outage_when = unavailable_since.get(identity, "")
+        if outage_when > when:
+            issues.append(
+                f"NOTE: {identity} is UNAVAILABLE rather than pending -- its "
+                f"last real verdict ({when}) is NOT clean, and it reported at "
+                f"{outage_when} that it could not review this head. Not blocking "
+                "on it. Confirm every finding in that verdict was Addressed, "
+                "Rebutted or Deferred before merging; the notice clears none."
+            )
             continue
         issues.append(
             f"Latest verdict-bearing statement from {identity} ({when}) is "

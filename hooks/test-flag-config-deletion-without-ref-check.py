@@ -556,6 +556,15 @@ _ATTRIBUTION_CASES = [
     # `)` ends a word, so a `#` after one starts a comment.
     ("(:)# $(cat ~/.claude/settings.json)", set(),
      "a comment after a closing paren is still a comment"),
+    # Quoting is neutralized POSITIONALLY, so two operands with identical text
+    # and different quoting are no longer conflated: the earlier content match
+    # let a quoted mention suppress an unquoted read of the same path.
+    ('echo "~/.claude/settings.json" ; cat ~/.claude/settings.json', {"claude"},
+     "a quoted mention does not suppress an unquoted read of the same path"),
+    # Braces are not shell metacharacters, so `${#x}` starts no comment. The
+    # earlier boundary set included them and swallowed the rest of the line.
+    ("echo ${#x} $(cat ~/.claude/settings.json)", {"claude"},
+     "a parameter length is not a comment"),
     # An unquoted `#` starts a comment, and bash expands nothing after it.
     ("echo ok # $(cat ~/.claude/settings.json)", set(),
      "a substitution inside a comment is never run"),

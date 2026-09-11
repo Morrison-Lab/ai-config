@@ -600,76 +600,78 @@ def scope_cwd(cwd_by_scope, scope):
 BACKSLASH = chr(92)
 
 
-def quoted_literals(command):
-    """(single_quoted, double_quoted) --- the text inside each quoted span.
+# What a quoted expansion trigger is rewritten to before the argv parse. A
+# character no rule recognises, so the operand arrives naming a path that
+# resolves under no config root and credits nothing.
+INERT = chr(2)
+
+
+def neutralize_quoted_expansions(command):
+    """`command` with every QUOTED expansion trigger made inert.
 
     `shlex` strips quotes before the argv parse sees a token, and the quoting
     is what decides whether the shell expanded it. Measured against bash: a
     tilde expands in neither quote, and `$HOME` expands in double quotes but
-    not single. So a single-quoted tilde path opens a file literally named
-    with a tilde, and crediting the home manifest there is a false discharge.
+    not single. So `cat '<tilde>/.claude/settings.json'` opens a file named
+    literally with a tilde, and crediting the home manifest there is a false
+    discharge.
 
-    Approximate by construction: a token assembled from quoted and unquoted
-    parts is not represented. The caller only ever uses this to REFUSE an
-    expansion, so a miss under-credits rather than over-credits.
+    Done by rewriting the raw text POSITIONALLY rather than by recovering the
+    quoted spans and matching operands against them by content. That earlier
+    approach produced four separate defects in three review rounds --- a
+    split-quoted trigger it could not see, an escaped quote that desynchronized
+    it, and two operands with identical text but different quoting that it
+    conflated --- because text content cannot distinguish one occurrence from
+    another. Here each trigger is decided where it sits, so there is nothing to
+    reconcile.
     """
-    single, double = set(), set()
-    quote, start = None, 0
+    out = list(command)
+    quote = None
     index = 0
     while index < len(command):
         char = command[index]
         # A backslash escapes at top level and inside double quotes, where a
         # backslash-quote is a literal quote rather than the span's close.
-        # Missing that desynchronized the scan for the rest of the command, so
-        # a correctly quoted operand further along read as unquoted.
         if char == BACKSLASH and quote in (None, '"'):
             index += 2
             continue
         if quote is None and char in ("'", '"'):
-            quote, start = char, index + 1
-        elif quote == char:
-            (single if quote == "'" else double).add(command[start:index])
-            quote = None
-        index += 1
-    return single, double
-
-
-def expansion_is_quoted(operand, single, double):
-    """True when the shell would NOT have expanded `operand`'s leading name.
-
-    Asks whether the TRIGGER appears quoted, not whether the whole operand
-    does. A split-quoted prefix quotes only the tilde and the shell expands
-    nothing, so matching the joined operand missed it.
-
-    A span counts only when the operand STARTS with it, which is what keeps a
-    quoted tilde in one argument from refusing an unquoted one in another:
-    `grep -rn '<tilde>/.claude' <tilde>/.codex/config.toml` quotes its pattern,
-    and the file operand still expands.
-
-    Approximate, and in the safe direction: an operand assembled from several
-    quoted pieces is not reconstructed, so at worst a span goes unrecognised
-    and the operand expands. That would credit a file nothing opened, which is
-    why the span test is `startswith` rather than equality --- equality missed
-    the split-quoted prefix entirely.
-    """
-    for prefix, blocked_by in (("~", single | double),
-                               ("${HOME}", single),
-                               ("$HOME", single)):
-        if not operand.startswith(prefix):
+            quote = char
+            index += 1
             continue
-        return any(text and operand.startswith(text) and prefix in text
-                   for text in blocked_by)
-    return False
+        if quote == char:
+            quote = None
+            index += 1
+            continue
+        if quote is not None and _trigger_at(command, index, quote):
+            out[index] = INERT
+        index += 1
+    return "".join(out)
+
+
+def _trigger_at(command, index, quote):
+    """True when an expansion trigger starts at `index` under `quote`.
+
+    A tilde only triggers at the start of a word, which inside a quoted span
+    means the character before it opened the span or is a separator. `$HOME`
+    triggers anywhere, and only single quotes suppress it.
+    """
+    char = command[index]
+    if char == "~" and (index == 0 or command[index - 1] in "'\" /:= 	"):
+        return True
+    if char != "$" or quote != "'":
+        return False
+    return command.startswith("$HOME", index) or command.startswith("${HOME}", index)
 
 
 def argv_read_roots(command):
     """Roots whose manifest `command` reads, or `None` when it cannot parse."""
-    parsed = simple_commands_with_scope(command)
+    parsed = simple_commands_with_scope(
+        neutralize_quoted_expansions(command))
     if parsed is None:
         return None
     found = set()
     cwd_by_scope = {}
-    single, double = quoted_literals(command)
     for scope, argv in parsed:
         cwd = scope_cwd(cwd_by_scope, scope)
         _env, rest = strip_env(argv)
@@ -679,8 +681,6 @@ def argv_read_roots(command):
             cwd_by_scope[scope] = resolve_cd_target(rest, cwd)
             continue
         for operand in read_operands(rest) or ():
-            if expansion_is_quoted(operand, single, double):
-                continue
             resolved = expand_path(operand, cwd)
             if resolved is None:
                 continue
@@ -838,7 +838,7 @@ def substitution_spans(command):
         # `cat`, so following that substitution credited a read that never
         # happens.
         if (quote is None and char == "#"
-                and (index == 0 or command[index - 1] in " \t\n;&|(){}")):
+                and (index == 0 or command[index - 1] in " \t\n;&|()")):
             newline = command.find("\n", index)
             if newline == -1:
                 break

@@ -171,7 +171,8 @@ git add -A && git commit -F msg.txt && rm -f msg.txt
 
 `git add -A` stages `msg.txt` before `git commit` reads it, so the file enters the tree, and the `rm` afterwards removes only the working copy.
 Nothing turns red.
-The checks pass and the push succeeds.
+On the occasion measured below, the checks passed and the push succeeded;
+the staging is invisible to both by construction, since neither inspects the committed file set for scratch.
 The `rm` does leave a trace, and it is a weak one: an unstaged deletion (` D msg.txt`) that reads as ordinary scratch cleanup, and that a later `git add -A` silently records.
 So the durable evidence is in the commit rather than in the status.
 
@@ -184,7 +185,8 @@ A path outside the worktree is immune by construction rather than by discipline:
 So the same substitution the bullets above prescribe fixes both hazards at once, and no second rule is needed.
 
 - **Do:** pass `git commit -F` an absolute path under the session scratchpad, so no `git add` invocation can stage it.
-- **Do:** run `git ls-files | grep -x <name>` in every worktree a round touched, when a round used a scratch name, rather than only the one a reviewer flagged.
+- **Do:** run `git ls-files | grep -qxF -- "$name"` in every worktree a round touched, when a round used a scratch name, rather than only the one a reviewer flagged.
+  The `F` and the `--` are load-bearing: an unquoted pattern is a regex, so a scratch name carrying a metacharacter can match the wrong path or miss the tracked one, and a leading `-` is read as an option.
 - **Don't:** write the message file into the worktree and rely on deleting it --- the delete runs after the staging that captured it.
 - **Don't:** read "the path is private to me" as sufficient;
   that answers the collision hazard and not this one.

@@ -588,8 +588,13 @@ The remedy is the same either way.
 Use `git commit -F <file>` with a body file, or a single-quoted `-m '...'`,
 whenever the message carries backticks --- Markdown code spans, identifiers,
 paths.
-Put that body file outside the worktree, since `git add -A` stages one written inside it;
-see [`shell.md`](shell.md)'s heredoc section. (Morrison-Lab/ai-config#1042, 2026-08-03: a `-m` commit message lost its backtick spans this way;
+Write that body file to the session scratchpad,
+not to the worktree and not to a bare `/tmp` path:
+`git add -A` stages one written inside the worktree,
+and `/tmp` is shared with every other concurrent session.
+See [`shell.md`](shell.md)'s heredoc section for both hazards.
+([Morrison-Lab/ai-config#1042](https://github.com/Morrison-Lab/ai-config/issues/1042), 2026-08-03:
+a `-m` commit message lost its backtick spans this way;
 the message landed at `97bf7d4` with the spans executed and deleted.)
 
 ## `gh pr comment` / `gh api ... -f body="..."` run backtick spans too

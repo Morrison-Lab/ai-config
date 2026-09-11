@@ -528,24 +528,28 @@ that never mentioned that repo.
 the guard on `Morrison-Lab/gha#240`, cited only in that skill's own case
 record, which then fired on the next unrelated memory-file edit.)
 
-## Two push guards misread a push issued from a sibling worktree
+## A hook defect you observe may be a stale installed copy, not a bug
 
-A session driving several pull requests at once usually holds one worktree and pushes branches checked out in others, with `git -C <path> push`.
-Both pre-push guards get that case wrong, and their errors compound.
+Four of the five guards installed under `~/.claude/hooks/` on this machine were far behind the repo on 2026-09-11: `no-unshipped-commit.py` at 196 lines against 1002, `no-clobbering-push.py` at 615 against 1240, `no-unreviewed-pr.py` at 1747 against 2602, and `no-stale-pr-status.py` at 328 against 619.
+Only the one refreshed by hand earlier that night matched.
 
-`hooks/no-unshipped-commit.py` looks for the verb immediately after `git`, so `git -C <path> push` does not match its `PUSH` pattern and the commit stays pending.
-Its `COMMIT` pattern has the same shape, so the arming half is blind in the same way.
-The symptom is a Stop hook that blocks a fully-pushed session, repeatedly, with no push able to clear it.
-Re-running the identical push as `cd <worktree> && git push ...` reports `Everything up-to-date` and satisfies the guard.
+Two apparent defects came from that gap, and both looked exactly like live bugs.
+A session driving several pull requests pushes branches checked out in other worktrees, with `git -C <path> push`.
+The installed `no-unshipped-commit.py` matched only `git\s+push`, so such a push did not count and its Stop guard blocked a fully-pushed session three times running.
+The installed `no-clobbering-push.py` compared the remote tip against the session's own HEAD rather than the ref being pushed, so an exact no-op push was reported as dozens of commits about to be discarded, listing the session's own commits back to it as another agent's work.
 
-`hooks/no-clobbering-push.py` compares the remote tip against the **session's** HEAD rather than the ref being pushed, so an exact no-op push from another worktree is reported as dozens of commits about to be discarded, listing the session's own commits back to it as another agent's work.
-It fired on four consecutive pushes in one session, under both spellings, so this half is not the option-position blindness above.
+The repo had fixed both.
+`hooks/no-unshipped-commit.py` gained a `_GIT_FLAGS` run that admits `-C` before the verb on 2026-09-04, and `hooks/no-clobbering-push.py` reads each `-C` value back out precisely so that `git -C <other-worktree> push origin HEAD` is not resolved against the session's own HEAD.
+An issue was filed against both before either file was read, and had to be corrected.
 
-The compounding is the part worth remembering: every push from a sibling worktree prints a false divergence and then fails to count, which teaches the session to skip exactly the warning that will one day be real.
+The trap is that a hook's behaviour is the strongest possible evidence about a hook, and it is evidence about the **installed** copy while the issue you file is against the **repo** copy.
+Nothing in the output says which one ran.
+This is the adjacent-artifact substitution [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md) names, in the one place where the wrong artifact is the one actually executing.
 
-- **Do:** read a divergence warning's named SHAs before acting on it, and check whether the head it names is the branch you are pushing.
-- **Do:** re-run a push as `cd <worktree> && git push` when the Stop guard insists a pushed commit is unshipped.
-- **Don't:** reconcile or merge on the strength of that warning --- confirm the remote tip against the pushed ref first, where a no-op push says `Everything up-to-date`.
+- **Do:** diff the installed copy against the repo's before filing a hook defect, and quote the repo's line in the issue.
+- **Do:** read a guard that fires wrongly and repeatedly as a freshness question first, since the corpus's own freshness check covers exactly this.
+- **Don't:** infer a repo hook's matcher from what a guard did to you.
+- **Don't:** file against the repo on behaviour alone --- an installed copy can be hundreds of lines and several fixes behind.
 
-(Measured 2026-09-11 while driving three ai-config pull requests.
-Tracked as [ai-config#3577](https://github.com/Morrison-Lab/ai-config/issues/3577), which carries the patterns and a suggested fix per guard.)
+(Measured 2026-09-11.
+[ai-config#3577](https://github.com/Morrison-Lab/ai-config/issues/3577) was filed on the behaviour and corrected once the repo files were read.)

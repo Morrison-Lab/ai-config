@@ -18,9 +18,9 @@ verdict is admitted from the `tool_result` of an `Agent` call whose
 `subagent_type` IS the reviewer, and only when that result is not an error.
 A second provenance is admitted alongside it: a `Bash` call matching this
 file's own external-reviewer pattern, which today recognizes `agy --print`
-and none of the other delegation CLIs. Both are narrow for the same reason;
-neither admits a verdict read out of a file or out of this guard's own
-denial.
+and none of the other delegation CLIs.
+Both are narrow for the same reason.
+Neither admits a verdict read out of a file, or out of this guard's own denial.
 
 **WHAT it said.** Restricting provenance does not make a phrase search sound
 INSIDE the admitted body, which is the same #1297 failure one layer in: a

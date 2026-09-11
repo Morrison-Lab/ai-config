@@ -585,6 +585,14 @@ _ATTRIBUTION_CASES = [
     # hung the walk. This walk runs on every earlier command in a transcript.
     ("cat <<EOF\nEOFxyz\nreal\nEOF\ngrep foo bar", set(),
      "a body line that merely starts with the delimiter does not terminate it"),
+    # One line may open several heredocs, and the shell reads their bodies
+    # back to back in opener order. Computing each from the same line end let
+    # the second overwrite the first with a shorter span, so real body text
+    # was scanned as live code and its apostrophes desynchronized the walk.
+    ("cat <<A > f1 && cat <<Z > f2\nit's fine\nZ\ndon't stop\nA\nsome data\nZ\ncat '~/.claude/settings.json'", set(),
+     "two heredocs on one line consume their bodies in order"),
+    ("cat <<A > f1 && cat <<Z > f2\none\nA\ntwo\nZ\ncat ~/.claude/settings.json", {"claude"},
+     "and a real read after both still credits"),
     # An unquoted `#` starts a comment, and bash expands nothing after it.
     ("echo ok # $(cat ~/.claude/settings.json)", set(),
      "a substitution inside a comment is never run"),

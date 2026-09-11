@@ -607,26 +607,47 @@ BACKSLASH = chr(92)
 INERT = chr(2)
 
 
-def _heredoc_body(command, match):
-    """(start, end) of the body `match` opens, or (None, None).
+def _heredoc_bodies(command, first):
+    """{start: end} for every heredoc body opened on `first`'s line.
 
-    The terminator is matched as a WHOLE LINE, honouring the `<<-` dash flag
-    that permits leading tabs, exactly as `shellcmd._heredoc_free` does. A
-    plain substring search got both wrong: a tab-indented terminator was never
-    found, so the rest of the command read as body, and a first body line
-    merely starting with the delimiter matched at the body's own start, which
-    produced a region mapping its start to itself and hung the caller's walk.
+    ONE LINE MAY OPEN SEVERAL, and the shell reads their bodies back to back
+    after the newline, in opener order. Computing each independently from the
+    same line end, as an earlier version did, let a later opener's terminator
+    match inside an EARLIER body and overwrite its span with an under-sized
+    one, so real body text was scanned as live code and its apostrophes
+    desynchronized the caller's quote walk.
+
+    `shellcmd._heredoc_free` collects the delimiters per line for exactly this
+    reason, and this follows it: each terminator is matched as a whole line,
+    honouring the `<<-` dash flag that permits leading tabs, and each body
+    starts where the previous one ended.
+
+    Returns the opener line's end alongside the regions, so the caller can
+    resume past it. Resuming inside it re-ran this for the second opener,
+    which recomputed the FIRST body from the same line end and overwrote its
+    region with a shorter one.
     """
-    line_end = command.find("\n", match.end())
+    line_end = command.find("\n", first.end())
     if line_end == -1:
-        return None, None
-    start = line_end + 1
-    indent = r"[\t]*" if match.group(1) else ""
-    term = re.compile(r"^" + indent + re.escape(match.group(3)) + r"$", re.M)
-    found = term.search(command, start)
-    if found is None:
-        return start, len(command)
-    return start, found.end()
+        return {}, len(command)
+    delimiters = []
+    match = first
+    while match is not None and match.start() < line_end:
+        delimiters.append((match.group(1), match.group(3)))
+        match = RX_HEREDOC_OPEN.search(command, match.end())
+    regions = {}
+    cursor = line_end + 1
+    for dash, delimiter in delimiters:
+        indent = r"[\t]*" if dash else ""
+        term = re.compile(r"^" + indent + re.escape(delimiter) + r"$", re.M)
+        found = term.search(command, cursor)
+        stop = len(command) if found is None else found.end()
+        if stop > cursor:
+            regions[cursor] = stop
+        cursor = stop
+        if found is None:
+            break
+    return regions, line_end
 
 
 def _inert_regions(command):
@@ -658,10 +679,9 @@ def _inert_regions(command):
         elif quote is None and command.startswith("<<", index):
             match = RX_HEREDOC_OPEN.match(command, index)
             if match:
-                start, end = _heredoc_body(command, match)
-                if start is not None:
-                    regions[start] = end
-                index = match.end()
+                bodies, line_end = _heredoc_bodies(command, match)
+                regions.update(bodies)
+                index = max(line_end, match.end())
                 continue
         index += 1
     return regions

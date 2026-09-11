@@ -151,6 +151,8 @@ def canonical_problems(command: str) -> list[str]:
     be copied onto machines it does not fit.
     """
     problems = command_problems(command)
+    if not isinstance(command, str):
+        return problems
     if not command.startswith(CANONICAL_INTERPRETER + " "):
         problems.append(
             f"does not start with '{CANONICAL_INTERPRETER} '; the canonical "
@@ -282,6 +284,8 @@ def windows_problems(command: str) -> list[str]:
     has to carry no quotes at all.
     """
     problems = command_problems(command)
+    if not isinstance(command, str):
+        return problems
     if '"' in command:
         problems.append(
             "contains a double quote; the launcher hands the command to "

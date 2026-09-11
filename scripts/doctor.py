@@ -164,6 +164,7 @@ def check_agy_hook_commands() -> Dict[str, Any]:
     regression the issue measured. A dynamic cmd /c probe would need a
     synthetic stdin payload to avoid firing on a hook's own business logic,
     and a resolvable-but-broken interpreter is therefore out of its reach.
+    That probe is tracked separately as https://github.com/Morrison-Lab/ai-config/issues/3556.
     """
     script = REPO_ROOT / "scripts" / "check-agy-hook-commands.py"
     code, out, err = run_cmd([sys.executable, str(script), "--installed", "--json"])

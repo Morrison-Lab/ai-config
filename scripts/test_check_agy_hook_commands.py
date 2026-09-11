@@ -150,5 +150,34 @@ class TestMissingInstalledManifest(unittest.TestCase):
         self.assertFalse(report["present"])
         self.assertEqual(report["findings"], [])
 
+
+class TestNonStringCommand(unittest.TestCase):
+    """A malformed manifest must produce a finding, never a traceback.
+
+    command_problems already tolerated a non-string value, but both callers
+    then ran string operations on it, so a `"command": null` crashed the
+    checker and doctor.py reported only that it produced no report.
+    """
+
+    NON_STRINGS = (None, 12, 1.5, True, {}, [], ())
+
+    def test_canonical_problems_reports_rather_than_raising(self):
+        for value in self.NON_STRINGS:
+            with self.subTest(value=value):
+                self.assertEqual(agy_hooks.canonical_problems(value), ["command is empty"])
+
+    def test_windows_problems_reports_rather_than_raising(self):
+        for value in self.NON_STRINGS:
+            with self.subTest(value=value):
+                self.assertEqual(agy_hooks.windows_problems(value), ["command is empty"])
+
+    def test_a_null_command_is_a_finding_end_to_end(self):
+        manifest = {"hooks": {"Stop": [{"hooks": [{"command": None}]}]}}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "hooks.json"
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+            report = CHECKER.check_file(path, canonical=True)
+        self.assertTrue(any("command is empty" in f for f in report["findings"]))
+
 if __name__ == "__main__":
     unittest.main()

@@ -34,7 +34,9 @@ pattern inspection and a PATH existence check, and never launches anything. The
 static check catches the quoting regression the issue measured. A dynamic
 cmd /c probe would need a synthetic stdin payload to avoid firing on a hook's
 own business logic, and a resolvable-but-broken interpreter is therefore out of
-its reach.
+its reach. That probe is tracked separately as
+https://github.com/Morrison-Lab/ai-config/issues/3556, so the issue above is
+not closed by it.
 """
 from __future__ import annotations
 

@@ -28,6 +28,7 @@ HAZARD_BODY = (
     "### Findings\n1. `foo()` crashes on empty input.\n"
 )
 CLEAN_BODY = "### Verdict\nReady for merge\n\nNo issues found.\n"
+NOT_CLEAN_BODY = "### Verdict\nNeeds more work\n\nStill investigating.\n"
 RESOLVED_BODY = (
     "### Verdict\nReady for merge\n\n"
     "### Findings (resolved)\n1. Fixed in commit abcdef1.\n"
@@ -410,6 +411,16 @@ CASES = [
                   result("t11", CLEAN_BODY)]
      + [say("Ready for merge.")],
      True, "a clean re-fetch of a different PR does not supersede the hazard"),
+
+    # A re-read that is NOT clean must leave the hazard standing. This reaches
+    # the supersede branch (the second fetch is not itself a hazard, so it falls
+    # past the hazard arm), which the second-hazard case above does not: there
+    # the re-read IS a hazard and never reaches that branch at all. Without this
+    # case, widening the branch to clear on ANY re-read survives mutation.
+    (HAZARD_42 + [fetch("gh api repos/o/r/pulls/42/reviews", "t12"),
+                  result("t12", NOT_CLEAN_BODY)]
+     + [say("Ready for merge.")],
+     True, "a not-clean re-read of the same PR does not supersede the hazard"),
 
 ]
 

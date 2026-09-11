@@ -561,10 +561,10 @@ def read_roots(command, depth=0):
     lexically reinstated the argument-position blindness this hook exists to
     remove, and `echo $(grep -rn '<manifest path>' README.md)` credited a
     manifest that only ever appeared as a grep PATTERN (CI review of
-    c4dd08a2). The lexical scan survives for the one case argv cannot reach,
-    a `shlex` failure, where the fail-open direction is what a warn-only
-    DISCHARGE test wants. `depth` bounds the recursion, since a substitution
-    can nest.
+    c4dd08a2). The lexical scan survives for the two cases the argv path cannot
+    reach: a `shlex` failure, and a broken install where `shellcmd` did not
+    import at all. The fail-open direction is what a warn-only DISCHARGE test
+    wants in both. `depth` bounds the recursion, since a substitution can nest.
     """
     command = command or ""
     parsed = argv_read_roots(command) if simple_commands_with_scope else None

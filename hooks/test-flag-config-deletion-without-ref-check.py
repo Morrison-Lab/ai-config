@@ -546,26 +546,65 @@ wrong += not _ok
 print("%-7s a missing transcript fails open" % ("silent" if _ok else "WARN"))
 
 # A broken install is the SECOND route to the lexical fallback, alongside a
-# shlex raise. It is worth pinning because on that path the guard reverts
-# wholesale to the approximation this hook replaced, false discharges and all,
-# and nothing else in this suite exercises it.
+# shlex raise. On it the guard reverts wholesale to the approximation this
+# hook replaced, so these cases assert that BEHAVIOUR, not merely that the
+# except block does not raise: the quoted grep PATTERN below is the case the
+# argv parse exists to refuse, and the lexical scan credits it.
 _BREAK_IMPORT = (
     "import sys; sys.modules['shellcmd'] = None; "
     "exec(open(sys.argv[1], encoding='utf-8').read())")
-_BROKEN = subprocess.run(
-    [sys.executable, "-c", _BREAK_IMPORT, HOOK],
-    input=json.dumps({"transcript_path": "/nonexistent"}),
-    capture_output=True, text=True)
+
+
+def run_broken(reply, prior_commands=()):
+    """Run the hook with shellcmd unimportable. Returns (verdict, stderr)."""
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    os.close(fd)
+    with open(path, "w", encoding="utf-8") as stream:
+        for command in prior_commands:
+            stream.write(json.dumps({
+                "type": "assistant",
+                "message": {"content": [{
+                    "type": "tool_use", "name": "Bash",
+                    "input": {"command": command},
+                }]},
+            }) + "\n")
+        stream.write(json.dumps({
+            "type": "assistant",
+            "message": {"content": [{"type": "text", "text": reply}]},
+        }) + "\n")
+    env = dict(os.environ)
+    sentinel_dir = tempfile.mkdtemp()
+    _TEMP_DIRS.append(sentinel_dir)
+    env["TMPDIR"] = sentinel_dir
+    proc = subprocess.run(
+        [sys.executable, "-c", _BREAK_IMPORT, HOOK],
+        input=json.dumps({"transcript_path": path}),
+        capture_output=True, text=True, timeout=30, env=env)
+    if proc.returncode != 0:
+        sys.exit("FATAL: broken-install hook exited %d\n%s"
+                 % (proc.returncode, proc.stderr))
+    return ("WARN" if proc.stdout.strip() else "silent"), proc.stderr
+
+
+_verdict, _stderr = run_broken(DELETE_REPLY)
 total += 1
-_ok = _BROKEN.returncode == 0
+_ok = _verdict == "WARN"
 wrong += not _ok
-print("%-7s a broken shellcmd import still fails open"
-      % ("silent" if _ok else "WARN"))
+print("%-7s broken install still WARNs on an undischarged deletion"
+      % _verdict)
 total += 1
-_ok = "using the lexical fallback" in _BROKEN.stderr
+_ok = "using the lexical fallback" in _stderr
 wrong += not _ok
-print("%-7s a broken shellcmd import says so on stderr"
-      % ("ok" if _ok else "WARN"))
+print("%-7s broken install says so on stderr" % ("ok" if _ok else "WARN"))
+
+_verdict, _ = run_broken(
+    DELETE_REPLY,
+    ("grep -rn '~/.claude/settings.json' README.md",))
+total += 1
+_ok = _verdict == "silent"
+wrong += not _ok
+print("%-7s broken install falsely discharges a quoted grep PATTERN,"
+      " as the lexical approximation always did" % _verdict)
 
 print("\n%d/%d correct" % (total - wrong, total))
 sys.exit(1 if wrong else 0)

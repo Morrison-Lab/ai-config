@@ -765,7 +765,7 @@ It answers three questions rather than one, because provenance alone is not enou
 So an inline pass, a verdict quoted out of a file, the guard's own denial message, and a clean report from some other subagent all fail.
 
 There is a **second** admitted provenance, which this paragraph read as the only one until the round-repetition section above was written: a `Bash` call matching the guard's own external-reviewer pattern, which today recognizes `agy --print` and not the other delegation CLIs.
-Both statements have to live in one file, so read "only from an `Agent` call" as the rule for a Claude-side review and this as the rule for the external lane, rather than as two populations of what the guard accepts.
+Both statements have to live in one file, so read the paragraph above as the rule for a Claude-side review and this as the rule for the external lane, rather than as two populations of what the guard accepts.
 
 *What it said*: restricting provenance does not make a phrase search sound **inside** the admitted body, which is the same failure one layer in --- a review whose closing note quotes the clean verdict it is withholding would read as clean.
 So the verdict is the last line that **is** a verdict line, anchored at line start, and a quotation mid-sentence is not one.

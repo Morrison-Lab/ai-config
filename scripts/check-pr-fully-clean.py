@@ -1971,7 +1971,7 @@ VERDICT_CLEAN_PATTERNS = [
     r"Verdict:\s*(?:Clean|Approved|Ready)\b",
     r"\bApproved\s+for\s+merge\b",
     # Anthropic code-review plugin clean template (closes #2147).
-    r"^[ \t]*No\s+issues\s+found\.\s+Checked\s+for\s+bugs\s+and\s+(?:CLAUDE|AGENTS)\.md\s+compliance\.",
+    r"^[ \t]*(?:\*{1,3})?No\s+issues\s+found\.(?:\*{1,3})?\s+Checked\s+for\s+bugs\s+and\s+(?:CLAUDE|AGENTS)\.md\s+compliance\.",
 ]
 
 # The bare patterns above carry no verdict on their own: the phrase survives
@@ -1987,7 +1987,7 @@ VERDICT_CLEAN_PATTERNS = [
 BARE_CLEAN_PATTERNS = {
     r"\bReady\s+for\s+merge\b",
     r"\bApproved\s+for\s+merge\b",
-    r"^[ \t]*No\s+issues\s+found\.\s+Checked\s+for\s+bugs\s+and\s+(?:CLAUDE|AGENTS)\.md\s+compliance\.",
+    r"^[ \t]*(?:\*{1,3})?No\s+issues\s+found\.(?:\*{1,3})?\s+Checked\s+for\s+bugs\s+and\s+(?:CLAUDE|AGENTS)\.md\s+compliance\.",
 }
 BARE_NOT_CLEAN_PATTERNS = {
     _BARE_REJECTION,

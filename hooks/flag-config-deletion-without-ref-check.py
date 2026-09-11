@@ -80,11 +80,15 @@ every way a shell can spell "this command does not open that file", and no
 enumeration closes it.
 
 Two things bound what that costs. This guard WARNS, so a false discharge is a
-missing warning rather than a wrong action taken, and every shape found so far
-came from a reviewer hunting rather than from a command someone wrote. And the
-alternative it replaced was a regex that got the same cases wrong more often,
-which is what https://github.com/Morrison-Lab/ai-config/issues/3126 was filed
-about.
+missing warning rather than a wrong action taken. And the alternative it
+replaced was a regex that got the same cases wrong more often, which is what
+https://github.com/Morrison-Lab/ai-config/issues/3126 was filed about.
+
+What does NOT bound it is rarity, and an earlier draft of this passage claimed
+it did. Several of the shapes fixed here are ordinary: searching a tree for a
+manifest path as a literal string, navigating with `cd` and reading a relative
+path, peeking at a range with `sed -n`. A reviewer found them first, which says
+how they were discovered rather than how often they occur.
 
 So a new false discharge reported here is expected, not a defect in the design.
 Fix the general shape rather than the reported command --- the option tables

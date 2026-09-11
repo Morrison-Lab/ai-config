@@ -5,6 +5,7 @@ Run: python3 hooks/test-warn-paginate-without-slurp.py
 """
 
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -14,10 +15,14 @@ HOOK = pathlib.Path(__file__).resolve().parent / "warn-paginate-without-slurp.py
 failures = []
 
 
-def run(command, tool="Bash"):
+def run(command, tool="Bash", antigravity=False):
     payload = json.dumps({"tool_name": tool, "tool_input": {"command": command}})
+    env = dict(os.environ)
+    env.pop("ANTIGRAVITY_AGENT", None)
+    if antigravity:
+        env["ANTIGRAVITY_AGENT"] = "1"
     proc = subprocess.run(
-        [sys.executable, str(HOOK)], input=payload, capture_output=True, text=True
+        [sys.executable, str(HOOK)], input=payload, capture_output=True, text=True, env=env
     )
     if not proc.stdout.strip():
         return None
@@ -113,6 +118,20 @@ check(
     "jq" in out.get("systemMessage", "") or "paginate" in out.get("systemMessage", ""),
     out.get("systemMessage"),
 )
+# Antigravity's adapter prints additionalContext AND every systemMessage, so a
+# PreToolUse payload carrying both warns twice there (README's warn-only section).
+ag = run("gh api x --paginate | jq 'last'", antigravity=True)
+check(
+    "under ANTIGRAVITY_AGENT the warning still reaches additionalContext",
+    "additionalContext" in ag["hookSpecificOutput"],
+    sorted(ag["hookSpecificOutput"]),
+)
+check(
+    "under ANTIGRAVITY_AGENT no systemMessage is emitted, so it cannot double-warn",
+    "systemMessage" not in ag,
+    sorted(ag),
+)
+
 check(
     "emits no permissionDecision, so it can never refuse",
     "permissionDecision" not in out["hookSpecificOutput"],

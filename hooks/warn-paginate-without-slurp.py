@@ -36,6 +36,7 @@ than the lapse it prevents.
 """
 
 import json
+import os
 import re
 import shlex
 import sys
@@ -138,12 +139,7 @@ def main():
     if not hit:
         return 0
     segment, filter_text = hit
-    message = (
-        "gh api --paginate feeds an aggregating jq filter "
-        f"({filter_text.strip()[:60]}) with no -s, so it answers once per page."
-    )
-    print(json.dumps({
-        "systemMessage": message,
+    out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": (
@@ -161,7 +157,17 @@ def main():
                 "carry on --- this is a warning, not a refusal."
             ),
         }
-    }))
+    }
+    # Antigravity's adapter prints `additionalContext` itself AND separately
+    # prints every collected `systemMessage`, so a PreToolUse payload carrying
+    # both warns twice there. README.md's warn-only hook section states the
+    # convention and owns the census of hooks that follow it.
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = (
+            "gh api --paginate feeds an aggregating jq filter "
+            f"({filter_text.strip()[:60]}) with no -s, so it answers once per page."
+        )
+    print(json.dumps(out))
     return 0
 
 

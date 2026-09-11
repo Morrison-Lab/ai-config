@@ -567,14 +567,54 @@ def read_roots(command, depth=0):
     wants in both. `depth` bounds the recursion, since a substitution can nest.
     """
     command = command or ""
-    parsed = argv_read_roots(command) if simple_commands_with_scope else None
+    # The outer parse sees the raw command with its substitutions blanked.
+    # NOT the heredoc-free text: `_heredoc_free` blanks from the opener, so a
+    # file operand sitting after `<<-EOF` on the same line would go with it,
+    # and `simple_commands_with_scope` applies that blanking itself anyway.
+    outer = blank_substitutions(command, substitution_spans(command))
+    parsed = argv_read_roots(outer) if simple_commands_with_scope else None
     if parsed is None:
         return lexical_read_roots(command)
     if depth >= MAX_SUBSTITUTION_DEPTH:
         return parsed
-    for body in substitution_bodies(_heredoc_free(command)):
-        parsed = parsed | read_roots(body, depth + 1)
+    # Recursion reads the heredoc-free text, so an opener inside a heredoc
+    # BODY is data rather than a substitution to follow.
+    scanned = _heredoc_free(command) if _heredoc_free else command
+    for start, end in substitution_spans(scanned):
+        parsed = parsed | read_roots(scanned[start:end], depth + 1)
     return parsed
+
+
+def blank_substitutions(command, spans):
+    """Replace each substitution, delimiters and all, with a single space.
+
+    The argv parse must not see a substitution's inner tokens. `shlex` opens a
+    fresh scope for `$(` only, an accident of how `punctuation_chars` splits
+    that into two tokens, so a backtick or `<( )` body stayed glued into the
+    enclosing command's own argv. `cat <(grep -rn '<manifest>' README.md)`
+    then credited a manifest that appears only as a grep PATTERN, which is the
+    exact false discharge this hook exists to close.
+
+    A space rather than a filler word, so a substitution embedded in a word
+    splits that word rather than producing a plausible-looking operand: the
+    result credits nothing, and under-crediting is the direction a DISCHARGE
+    test wants.
+    """
+    if not spans:
+        return command
+    out = []
+    cursor = 0
+    for start, end in spans:
+        opener = command.rfind("`", cursor, start)
+        if opener == -1:
+            opener = max(command.rfind("$(", cursor, start),
+                         command.rfind("<(", cursor, start),
+                         command.rfind(">(", cursor, start))
+        out.append(command[cursor:opener])
+        out.append(" ")
+        cursor = min(end + 1, len(command))
+    out.append(command[cursor:])
+    return "".join(out)
 
 
 def substitution_bodies(command):
@@ -601,6 +641,15 @@ def substitution_bodies(command):
     backtick inside it does not end it early. A command whose quotes never
     close never reaches here: shlex rejects it and the whole-command lexical
     fallback runs instead.
+    """
+    return [command[start:end] for start, end in substitution_spans(command)]
+
+
+def substitution_spans(command):
+    """[(body_start, body_end), ...] for each substitution in `command`.
+
+    The walk is `substitution_bodies`' own, factored out so the same pass can
+    both recurse into a body and blank it out of the text the argv parse sees.
     """
     bodies = []
     quote = None
@@ -629,11 +678,11 @@ def substitution_bodies(command):
             continue
         if match.group(0) == "`":
             close = matching_backtick(command, match.end())
-            bodies.append(command[match.end():close])
+            bodies.append((match.end(), close))
             index = close + 1
             continue
         close = matching_paren(command, match.end())
-        bodies.append(command[match.end():close])
+        bodies.append((match.end(), close))
         index = close + 1
     return bodies
 

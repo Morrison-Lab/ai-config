@@ -498,6 +498,21 @@ _ATTRIBUTION_CASES = [
     # credits the root.
     ("diff <(cat ~/.claude/settings.json) <(cat /tmp/other.json)", {"claude"},
      "a process substitution is credited by recursing into its body"),
+    # A backtick or `<( )` body used to GLUE into the enclosing command's own
+    # argv, because shlex opens a fresh scope for `$(` alone. So a read verb
+    # wrapping a grep credited the grep's PATTERN as its own operand, which is
+    # the exact false discharge this hook exists to close. Each of these is
+    # credited only if the INNER command genuinely reads the manifest.
+    ("cat <(grep -rn '~/.claude/settings.json' README.md)", set(),
+     "a process substitution's grep PATTERN is not the outer command's operand"),
+    ("cat `grep -rn '~/.claude/settings.json' README.md`", set(),
+     "a backtick body's grep PATTERN is not the outer command's operand"),
+    ("sed -n '1p' <(grep -rn '~/.claude/settings.json' README.md)", set(),
+     "a read verb with its own option does not absorb a substitution's tokens"),
+    ("cat <(cat ~/.claude/settings.json)", {"claude"},
+     "a process substitution that really reads the manifest still credits it"),
+    ("cat `cat ~/.claude/settings.json`", {"claude"},
+     "a backtick body that really reads the manifest still credits it"),
     # The `=`-joined long-option form, which advances by exactly one token
     # whichever table the option belongs to.
     ("grep --regexp='~/.claude/settings.json' README.md", set(),

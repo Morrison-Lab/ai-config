@@ -107,6 +107,14 @@ RX_STDERR_NULL = re.compile(r"(?<![0-9<>&])2>>?\s*/dev/null(?![^\s;|&<>()])")
 # stderr closed outright.
 RX_STDERR_CLOSED = re.compile(r"(?<![0-9<>&])2>&-")
 
+# stderr reclaimed by a LATER redirect. The shell applies redirects left to
+# right, so `cmd 2>/dev/null 2>err.log` captures stderr to the file and
+# suppresses nothing -- warning there is the over-warning this hook rules out.
+# `2>&-` is excluded from the file form since closing is itself a suppression.
+RX_STDERR_TO_FILE = re.compile(
+    r"(?<![0-9<>&])2>>?\s*(?!/dev/null(?![^\s;|&<>()]))(?![&-])\S")
+RX_STDERR_MERGED = re.compile(r"(?<![0-9<>&])2>&[0-9]+")
+
 # stdout to /dev/null, with or without its explicit `1` fd. The lookbehind
 # excludes `2>` (preceded by a digit) and `&>` (preceded by `&`), each of
 # which its own pattern above already owns.
@@ -408,11 +416,27 @@ def _split(text, separator):
     return out
 
 
+def _last_match(stage, patterns):
+    """Position of the last match of any of `patterns`, or None."""
+    starts = [m.start() for p in patterns for m in p.finditer(stage)]
+    if not starts:
+        return None
+    return max(starts)
+
+
 def _stderr_suppressed(stage):
-    return bool(
-        RX_MERGE_NULL.search(stage)
-        or RX_STDERR_NULL.search(stage)
-        or RX_STDERR_CLOSED.search(stage))
+    """True when this stage's stderr ends up discarded.
+
+    Positional, for the same reason `_stdout_discarded` is: a suppression that
+    a later redirect reclaims never takes effect, so firing on it would warn
+    about a command whose stderr is captured or merged.
+    """
+    suppressed = _last_match(
+        stage, (RX_MERGE_NULL, RX_STDERR_NULL, RX_STDERR_CLOSED))
+    if suppressed is None:
+        return False
+    reclaimed = _last_match(stage, (RX_STDERR_TO_FILE, RX_STDERR_MERGED))
+    return reclaimed is None or suppressed > reclaimed
 
 
 def _stdout_discarded(stage, to_file):

@@ -204,6 +204,33 @@ check(
 )
 check("a bare & still separates segments", fires("cmd 2>/dev/null & other > out.json"), False)
 
+# Redirect order governs stderr exactly as it governs stdout. A suppression a
+# later redirect reclaims never takes effect, so firing on it warns about a
+# command whose stderr is captured or merged -- the over-warning this hook
+# rules out. The reverse order is a real suppression and must still fire.
+check(
+    "a later stderr file redirect supersedes an earlier discard",
+    fires("cmd 2>/dev/null 2>err.log > out.json"),
+    False,
+)
+check(
+    "a later merge supersedes an earlier discard",
+    fires("cmd 2>/dev/null 2>&1 | jq ."),
+    False,
+)
+check(
+    "a later stderr file redirect supersedes an earlier close",
+    fires("cmd 2>&- 2>err.log > out.json"),
+    False,
+)
+check(
+    "a discard after a stderr file redirect still fires",
+    fires("cmd 2>err.log 2>/dev/null > out.json"),
+    True,
+)
+check("a bare close still fires", fires("cmd 2>&- > out.json"), True)
+check("fd 12 is not fd 2", fires("cmd 12>/dev/null > out.json"), False)
+
 if failures:
     print("FAILED:")
     for line in failures:

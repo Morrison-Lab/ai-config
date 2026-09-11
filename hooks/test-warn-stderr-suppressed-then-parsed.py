@@ -183,6 +183,27 @@ check(
     False,
 )
 
+# Bash's `&>` shorthand sends both streams to /dev/null, so it is normally a
+# discard rather than an offense. A LATER stdout redirect reclaims stdout while
+# stderr stays discarded, which is exactly the shape this hook names. Two bugs
+# hid that: the `&` of `&>` matched the segment separator and split the command
+# in two, and the discard was treated as final regardless of what followed it.
+check("merge-null then file redirect fires", fires("cmd &>/dev/null > out.json"), True)
+check("merge-null append then file redirect fires", fires("cmd &>>/dev/null > out.json"), True)
+check(
+    "merge-null then file redirect names the target",
+    reported("cmd &>/dev/null > out.json")[1],
+    "redirected to `out.json`",
+)
+check("merge-null alone stays silent", fires("cmd &>/dev/null"), False)
+check("merge-null into a pipe stays silent", fires("cmd &>/dev/null | jq ."), False)
+check(
+    "a discard after a file redirect still discards",
+    fires("cmd 2>/dev/null > out.json >/dev/null"),
+    False,
+)
+check("a bare & still separates segments", fires("cmd 2>/dev/null & other > out.json"), False)
+
 if failures:
     print("FAILED:")
     for line in failures:

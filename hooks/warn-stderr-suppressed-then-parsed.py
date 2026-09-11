@@ -284,8 +284,11 @@ def _regions(masked, spans):
 # Separators that end a simple command. A single `|` is deliberately absent: a
 # pipe is what makes the stage before it a consumed one, so it has to stay
 # inside the segment and is split out separately. The `&` alternative excludes
-# `2>&1` and `>&-` by lookbehind and `&&` by lookahead.
-RX_SEGMENT = re.compile(r"&&|\|\||;|\n|(?<![>&])&(?!&)")
+# `2>&1` and `>&-` by lookbehind, and `&&` plus the `&>` / `&>>` shorthand by
+# lookahead. Without the `>` in that lookahead the shorthand splits its own
+# command in two, so its suppression never shares a stage with the redirect
+# that consumes stdout, and nothing ever fires.
+RX_SEGMENT = re.compile(r"&&|\|\||;|\n|(?<![>&])&(?![&>])")
 RX_PIPE = re.compile(r"(?<!\|)\|(?!\|)")
 
 
@@ -412,15 +415,39 @@ def _stderr_suppressed(stage):
         or RX_STDERR_CLOSED.search(stage))
 
 
+def _stdout_discarded(stage, to_file):
+    """True when this stage's own stdout goes nowhere a reader could see.
+
+    A later stdout-to-file redirect supersedes an earlier discard, since the
+    shell applies redirects in order. An earlier file redirect superseded by a
+    later discard is the reverse case and still discards.
+    """
+    discards = [
+        match
+        for pattern in (RX_MERGE_NULL, RX_STDOUT_NULL)
+        for match in pattern.finditer(stage)
+    ]
+    if not discards:
+        return False
+    if to_file is None:
+        return True
+    return max(match.start() for match in discards) > to_file.start()
+
+
 def _consumption(stage, is_last, captured, original_stage):
     """Why this stage's stdout is READ, or None if it is not.
 
     Order matters: a stage that also discards its own stdout is parsing
     nothing, so the discard is checked before any consumption shape.
+
+    Order matters within the stage too. The shell applies redirects left to
+    right, so a discard is only final when nothing after it reclaims stdout:
+    `cmd &>/dev/null > out.json` leaves stderr at /dev/null and stdout in the
+    file, which is the shape this hook exists to name.
     """
-    if RX_MERGE_NULL.search(stage) or RX_STDOUT_NULL.search(stage):
-        return None
     to_file = RX_STDOUT_FILE.search(stage)
+    if _stdout_discarded(stage, to_file):
+        return None
     if to_file is not None:
         match = re.match(r"(?:1?>>?)\s*", original_stage[to_file.start():])
         if match:

@@ -607,95 +607,6 @@ BACKSLASH = chr(92)
 INERT = chr(2)
 
 
-def _heredoc_bodies(command, first):
-    """{start: end} for every heredoc body opened on `first`'s line.
-
-    ONE LINE MAY OPEN SEVERAL, and the shell reads their bodies back to back
-    after the newline, in opener order. Computing each independently from the
-    same line end, as an earlier version did, let a later opener's terminator
-    match inside an EARLIER body and overwrite its span with an under-sized
-    one, so real body text was scanned as live code and its apostrophes
-    desynchronized the caller's quote walk.
-
-    `shellcmd._heredoc_free` collects the delimiters per line for exactly this
-    reason, and this follows it: each terminator is matched as a whole line,
-    honouring the `<<-` dash flag that permits leading tabs, and each body
-    starts where the previous one ended.
-
-    Returns the opener line's end alongside the regions, so the caller can
-    resume past it. Resuming inside it re-ran this for the second opener,
-    which recomputed the FIRST body from the same line end and overwrote its
-    region with a shorter one.
-    """
-    line_end = command.find("\n", first.end())
-    if line_end == -1:
-        return {}, len(command)
-    delimiters = []
-    match = first
-    while match is not None and match.start() < line_end:
-        delimiters.append((match.group(1), match.group(3)))
-        match = RX_HEREDOC_OPEN.search(command, match.end())
-    regions = {}
-    cursor = line_end + 1
-    for dash, delimiter in delimiters:
-        indent = r"[\t]*" if dash else ""
-        term = re.compile(r"^" + indent + re.escape(delimiter) + r"$", re.M)
-        found = term.search(command, cursor)
-        stop = len(command) if found is None else found.end()
-        if stop > cursor:
-            regions[cursor] = stop
-        cursor = stop
-        if found is None:
-            break
-    return regions, line_end
-
-
-def _inert_regions(command):
-    """{start: end} for each span this walk must not read as shell text.
-
-    A `#` comment runs to the newline. A heredoc body runs from the line after
-    its opener to its terminator. Both are data the shell never parses for
-    quoting, and reading them desynchronizes a quote-tracking scan.
-    """
-    regions = {}
-    quote = None
-    index = 0
-    # How far the current opener line's heredocs have already been collected,
-    # so a second `<<` on that line does not recompute the first body.
-    heredocs_done = 0
-    while index < len(command):
-        char = command[index]
-        if char == BACKSLASH and quote in (None, '"'):
-            index += 2
-            continue
-        if quote is None and char in ("'", '"'):
-            quote = char
-        elif quote == char:
-            quote = None
-        elif quote is None and char == "#" and (
-                index == 0 or command[index - 1] in " \t\n;&|()"):
-            newline = command.find("\n", index)
-            end = len(command) if newline == -1 else newline
-            regions[index] = end
-            index = end
-            continue
-        elif quote is None and command.startswith("<<", index):
-            match = RX_HEREDOC_OPEN.match(command, index)
-            if match:
-                # Collect this line's bodies ONCE, then keep scanning the
-                # rest of the opener line normally. Jumping to the line end
-                # instead skipped a trailing `#` comment there, and an
-                # apostrophe in it desynchronized the caller's quote walk.
-                if index >= heredocs_done:
-                    bodies, line_end = _heredoc_bodies(command, match)
-                    regions.update(bodies)
-                    heredocs_done = line_end
-                index = match.end()
-                continue
-        index += 1
-    return regions
-
-
 def neutralize_quoted_expansions(command):
     """`command` with every QUOTED expansion trigger made inert.
 
@@ -718,20 +629,9 @@ def neutralize_quoted_expansions(command):
     out = list(command)
     quote = None
     index = 0
-    skip_to = _inert_regions(command)
+    delimiters = []
     while index < len(command):
-        # A comment body and a heredoc body are DATA, and an apostrophe in one
-        # is not a quote. Scanning them flipped this walk's quote state, so the
-        # real opening quote of a later operand read as a close and its trigger
-        # survived un-neutralized: a false discharge from the word "it's".
-        if index in skip_to:
-            # max(): a region that did not advance would spin forever, and
-            # this walk runs on every earlier Bash command in the transcript.
-            index = max(skip_to[index], index + 1)
-            continue
         char = command[index]
-        # A backslash escapes at top level and inside double quotes, where a
-        # backslash-quote is a literal quote rather than the span's close.
         if char == BACKSLASH and quote in (None, '"'):
             index += 2
             continue
@@ -743,8 +643,32 @@ def neutralize_quoted_expansions(command):
             quote = None
             index += 1
             continue
+        if quote is None and char == "#" and (
+                index == 0 or command[index - 1] in " \t\n;&|()"):
+            newline = command.find("\n", index)
+            index = len(command) if newline == -1 else newline
+            continue
+        if quote is None and command.startswith("<<", index):
+            match = RX_HEREDOC_OPEN.match(command, index)
+            if match:
+                delimiters.append((match.group(1), match.group(3)))
+                index = match.end()
+                continue
         if quote is not None and _trigger_at(command, index, quote):
             out[index] = INERT
+        if quote is None and char == "\n" and delimiters:
+            cursor = index + 1
+            for dash, delimiter in delimiters:
+                indent = r"[\t]*" if dash else ""
+                term = re.compile(r"^" + indent + re.escape(delimiter) + r"$", re.M)
+                found = term.search(command, cursor)
+                stop = len(command) if found is None else found.end()
+                cursor = stop
+                if found is None:
+                    break
+            index = cursor
+            delimiters = []
+            continue
         index += 1
     return "".join(out)
 

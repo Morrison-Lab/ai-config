@@ -684,6 +684,57 @@ that round is not redundant, since it found two false discharges the worker's ro
 - **Don't:** brief a worker to push and ARDI its own PR;
   the guard refuses it by construction, and the retry burns the worker's whole budget.
 
+## A syntax check does not catch a delegated edit whose quoting was dropped
+
+[`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md) already says to run a parser over a scripted edit *and* run the relevant tests before trusting it.
+What this case adds is which of those two halves decides, for delegated shell, and that the cheap half carries no partial credit.
+A dropped quote can leave a *different valid program* rather than an invalid one, and did here, so the parser passes and the artifact is still wrong.
+
+Measured 2026-09-10 on [ai-config#3435](https://github.com/Morrison-Lab/ai-config/pull/3435).
+An `agy` worker asked to guard a call in `bootstrap.sh` emitted a line of this shape:
+
+```sh
+cmd || printf warn  render-agy-hooks.py exited %d
+ "$?"
+```
+
+The format string lost its quotes and gained a real newline, so `"$?"` became its own command.
+Under that script's `set -euo pipefail` it expands to `0`, runs `0`, and aborts the bootstrap before the symlink creation that follows it and, much later, the dotfiles installer loop.
+
+`bash -n` exits 0 on that file.
+Verified on the reduced case: `bash -n` reports nothing, and running it dies with `0: command not found` and status 127.
+Nothing about the text is ungrammatical --- `printf` simply took different arguments than the author meant.
+That is what happened here;
+whether a lost quote usually lands that way rather than producing a syntax error is not measured, and running the edited script is worth doing either way.
+
+**Executing the artifact is the check that works, and this repo already had it.**
+`scripts/test_agy_hook_adapter.py` runs `bash bootstrap.sh` and asserts a zero exit, and `validate.yml` gates it, so CI would have failed on the mangled line.
+It could not run on the Windows machine that wrote it, for an unrelated path-quoting bug in the test itself ([ai-config#3551](https://github.com/Morrison-Lab/ai-config/issues/3551)) --- so the local loop was blind and the adversarial reviewer was the only detector before push.
+
+The transferable part is which check answers which question.
+A parser answers whether the file is *well-formed*.
+Only running it can expose a failure that lives in the *behaviour* rather than in the grammar, which is the class this defect belongs to.
+It is not proof the change is right: an execution test asserts what it happens to assert, so a semantically wrong edit passes wherever the relevant behaviour is untested.
+What it rules out is the case here, where a delegated edit's own account of itself is accurate and the text it wrote is not.
+Nothing here settles whether the worker authored the malformed line or a transport mangled one it wrote correctly, and the check is the same either way.
+
+- **Do:** run the suite that executes an edited script, not only a parser over it, before trusting a delegated commit that touched shell.
+- **Do:** run the script yourself against a throwaway fixture when no suite executes it, and file an issue for the missing coverage rather than skipping the check.
+  Derive the candidates rather than recalling them, and say the output is a candidate list rather than the set of uncovered scripts.
+  It finds a literal filename mention and nothing else, so a script covered only by a glob would print.
+  None does today: the one `hooks/*.sh`, which `scripts/test_hooks.py` pairs by glob, is also named literally in its own test.
+  The gap is in what the query can decide, not in what it currently reports:
+
+  ```bash
+  for s in $(git ls-files '*.sh'); do
+    grep -rqlF "$(basename "$s")" scripts/test_*.py hooks/test-*.py || echo "$s"
+  done
+  ```
+- **Do:** say in the report that a test you could not run locally is unchecked, rather than counting a passing parser toward it.
+- **Don't:** read `bash -n` (or `py_compile`) passing as evidence that a delegated edit is correct --- it reports grammar, and dropped quoting is grammatical.
+- **Don't:** rely on the commit message agreeing with the diff here;
+  the message was accurate and the code was not.
+
 ## opencode free tier: a full authoring task, validated mechanically
 
 Measured 2026-08-28 on opencode CLI 1.18.15 (macOS),

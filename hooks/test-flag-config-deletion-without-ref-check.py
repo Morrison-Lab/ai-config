@@ -565,6 +565,16 @@ _ATTRIBUTION_CASES = [
     # earlier boundary set included them and swallowed the rest of the line.
     ("echo ${#x} $(cat ~/.claude/settings.json)", {"claude"},
      "a parameter length is not a comment"),
+    # An apostrophe in a comment or a heredoc body is not a quote. Reading one
+    # flipped the neutralizing walk's quote state, so the real opening quote of
+    # a later operand read as a close and its tilde survived un-neutralized --
+    # a false discharge produced by the word "it's".
+    ("echo ok # it's fine\ncat '~/.claude/settings.json'", set(),
+     "an apostrophe in a comment does not desynchronize the quote walk"),
+    ("cat <<EOF\nit's fine\nEOF\ncat '~/.claude/settings.json'", set(),
+     "an apostrophe in a heredoc body does not either"),
+    ("echo ok # it's fine\ncat ~/.claude/settings.json", {"claude"},
+     "and a real unquoted read after such a comment still credits"),
     # An unquoted `#` starts a comment, and bash expands nothing after it.
     ("echo ok # $(cat ~/.claude/settings.json)", set(),
      "a substitution inside a comment is never run"),

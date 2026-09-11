@@ -106,13 +106,14 @@ try:
         "scripts", "lib")
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
-    from shellcmd import (_heredoc_free, resolve_cd_target,
+    from shellcmd import (RX_HEREDOC_OPEN, _heredoc_free, resolve_cd_target,
                           simple_commands_with_scope, strip_env)
 except Exception as _exc:  # broken install; fall back to the lexical path
     print("flag-config-deletion-without-ref-check: cannot load "
           "scripts/lib/shellcmd.py ({0}); using the lexical fallback"
           .format(_exc), file=sys.stderr)
     resolve_cd_target = simple_commands_with_scope = strip_env = None
+    RX_HEREDOC_OPEN = None
     _heredoc_free = None
 
 # Configuration roots whose files are typically referenced by a manifest rather
@@ -606,6 +607,47 @@ BACKSLASH = chr(92)
 INERT = chr(2)
 
 
+def _inert_regions(command):
+    """{start: end} for each span this walk must not read as shell text.
+
+    A `#` comment runs to the newline. A heredoc body runs from the line after
+    its opener to its terminator. Both are data the shell never parses for
+    quoting, and reading them desynchronizes a quote-tracking scan.
+    """
+    regions = {}
+    quote = None
+    index = 0
+    while index < len(command):
+        char = command[index]
+        if char == BACKSLASH and quote in (None, '"'):
+            index += 2
+            continue
+        if quote is None and char in ("'", '"'):
+            quote = char
+        elif quote == char:
+            quote = None
+        elif quote is None and char == "#" and (
+                index == 0 or command[index - 1] in " \t\n;&|()"):
+            newline = command.find("\n", index)
+            end = len(command) if newline == -1 else newline
+            regions[index] = end
+            index = end
+            continue
+        elif quote is None and command.startswith("<<", index):
+            match = RX_HEREDOC_OPEN.match(command, index)
+            if match:
+                body = command.find("\n", match.end())
+                if body != -1:
+                    terminator = command.find(
+                        "\n" + match.group(3), body)
+                    end = len(command) if terminator == -1 else terminator + 1
+                    regions[body + 1] = end
+                index = match.end()
+                continue
+        index += 1
+    return regions
+
+
 def neutralize_quoted_expansions(command):
     """`command` with every QUOTED expansion trigger made inert.
 
@@ -628,7 +670,15 @@ def neutralize_quoted_expansions(command):
     out = list(command)
     quote = None
     index = 0
+    skip_to = _inert_regions(command)
     while index < len(command):
+        # A comment body and a heredoc body are DATA, and an apostrophe in one
+        # is not a quote. Scanning them flipped this walk's quote state, so the
+        # real opening quote of a later operand read as a close and its trigger
+        # survived un-neutralized: a false discharge from the word "it's".
+        if index in skip_to:
+            index = skip_to[index]
+            continue
         char = command[index]
         # A backslash escapes at top level and inside double quotes, where a
         # backslash-quote is a literal quote rather than the span's close.

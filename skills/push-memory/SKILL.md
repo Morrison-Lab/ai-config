@@ -142,9 +142,15 @@ These are exactly
    Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
 
    ```bash
-   acfg="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/push-memory rev-parse --show-toplevel 2>/dev/null)}"   # re-derived: a separate Bash call inherits neither variable
+   # Re-derived, since a separate Bash call inherits neither variable.
+   # The SAME derivation as the block above, fallback included: a session
+   # that needed the fallback there needs it here too.
+   acfg="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/push-memory rev-parse --show-toplevel 2>/dev/null)}"
+   [ -n "$acfg" ] || for d in ~/ai-config ~/Documents/GitHub/ai-config ../ai-config; do
+     [ -d "$d/.git" ] && acfg="$(git -C "$d" rev-parse --show-toplevel)" && break
+   done
    wt="$(git -C "$acfg" worktree list --porcelain | awk '/^worktree /{w=$2} /^branch refs\/heads\/memory\/<slug>$/{print w}')"   # $wt was an mktemp -d in that call too
-   [ -n "$wt" ] || { echo "no worktree on memory/<slug>; re-run the previous block"; exit 1; }
+   [ -n "$wt" ] || { echo "no worktree on memory/<slug> under ${acfg:-<no ai-config checkout found>}"; exit 1; }
    git -C "$wt" push -u origin memory/<slug>
    ```
 

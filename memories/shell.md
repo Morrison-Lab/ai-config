@@ -171,10 +171,13 @@ git add -A && git commit -F msg.txt && rm -f msg.txt
 
 `git add -A` stages `msg.txt` before `git commit` reads it, so the file enters the tree, and the `rm` afterwards removes only the working copy.
 Nothing turns red.
-The checks pass, the push succeeds, and the working tree is clean afterwards, so the only surviving evidence is in the commit itself.
+The checks pass and the push succeeds.
+The `rm` does leave a trace, and it is a weak one: an unstaged deletion (` D msg.txt`) that reads as ordinary scratch cleanup, and that a later `git add -A` silently records.
+So the durable evidence is in the commit rather than in the status.
 
 That silence is what makes it worth stating separately from the collision case.
-A wrong commit *message* is visible the moment anyone reads the commit; a stray file in the repo root is visible only to someone looking for it, and it ships.
+A wrong commit *message* is visible the moment anyone reads the commit;
+a stray file in the repo root is visible only to someone looking for it, and it ships.
 Deleting the file afterwards feels like the cleanup that makes the pattern safe, which is why the shape survives review --- the delete is real, and it runs one step too late.
 
 A path outside the worktree is immune by construction rather than by discipline: `git add` cannot reach it, whatever flags it is given.
@@ -183,10 +186,12 @@ So the same substitution the bullets above prescribe fixes both hazards at once,
 - **Do:** pass `git commit -F` an absolute path under the session scratchpad, so no `git add` invocation can stage it.
 - **Do:** run `git ls-files | grep -x <name>` in every worktree a round touched, when a round used a scratch name, rather than only the one a reviewer flagged.
 - **Don't:** write the message file into the worktree and rely on deleting it --- the delete runs after the staging that captured it.
-- **Don't:** read "the path is private to me" as sufficient; that answers the collision hazard and not this one.
+- **Don't:** read "the path is private to me" as sufficient;
+  that answers the collision hazard and not this one.
 
 (Measured 2026-09-10 on `Lacaedemon/sparta`: the shape above shipped a stray `msg.txt` to three PRs in one turn, because the same command was reused for each.
-A reviewer caught it on one; the other two were found only by grepping `git ls-files` afterwards.
+A reviewer caught it on one;
+the other two were found only by grepping `git ls-files` afterwards.
 Tracked as [ai-config#3558](https://github.com/Morrison-Lab/ai-config/issues/3558), which also proposes the guard: refuse a commit whose staged set contains the file passed to `-F`.)
 
 ## Writing robust bash scripts (recurring review findings)

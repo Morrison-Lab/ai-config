@@ -205,11 +205,10 @@ confirmed it fixed.)
 Never chain a `git commit` into a `git push` in one shell invocation:
 
 ```
-git add -A && git commit -F <scratchpad>/msg.txt && git push -u origin my-branch
+git add -A && git commit -F /path/to/session-scratchpad/msg.txt && git push -u origin my-branch
 ```
 
-The message file sits outside the worktree in that example for a separate reason, not as a stylistic choice:
-`git add -A` stages a message file written inside the worktree before `git commit` reads it, so the file ships.
+The message file sits outside the worktree in that example for a separate reason, not as a stylistic choice: `git add -A` stages a message file written inside the worktree before `git commit` reads it, so the file ships.
 [`memories/shell.md`](../../memories/shell.md)'s heredoc section carries that case.
 
 A `PreToolUse` guard denies the **whole invocation**, before any part of it runs.

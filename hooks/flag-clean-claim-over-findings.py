@@ -479,36 +479,51 @@ def _blocks(m):
     return blocks
 
 
-def _result_text(block):
-    """Flatten a tool_result's content to text, whatever transport shape it uses.
+def _flatten_content(raw, depth=0):
+    """Recursively flatten a tool_result content value to text.
 
-    `content` is a plain string in some transports and a list of content blocks
-    in others -- `no-push-without-self-review.py::_result_text` documents the
-    same split. `str()` on the list form yields a Python repr in which every
-    real newline becomes the two characters backslash-n, and the imported
-    `classify_verdict`/`_unresolved_finding_pattern` both need real newlines to
-    see a heading or a marked line. So the list form scored as no verdict and no
-    finding, and the hook went silent on the exact shape it was written for
-    (round 8, finding 1).
+    A tool result's `content` is a plain string in some transports and a list of
+    content blocks in others -- `no-push-without-self-review.py::_result_text`
+    documents the same split. It is also, in some, a single block that was never
+    wrapped in a list.
+
+    Every non-string shape must be walked rather than `str()`-ed. `str()` on a
+    container yields a Python repr in which each real newline becomes the two
+    characters backslash-n, and the imported `classify_verdict` and
+    `_unresolved_finding_pattern` both need real newlines to see a heading or a
+    marked line. So a `str()`-ed container scores as no verdict and no finding,
+    and the hook goes silent on the exact shape it exists for. Round 8 found
+    that for the list form; round 9 found the same bug surviving in the
+    fallback, for a bare dict and for a doubly-nested sub-block.
+
+    `depth` bounds the recursion so a self-referential structure cannot hang the
+    hook. Past the bound the value is dropped rather than `str()`-ed, because a
+    dropped value merely misses while a repr can be scanned and misread.
     """
-    raw = block.get("content")
-    if raw is None:
-        raw = block.get("output")
+    if depth > 4:
+        return ""
     if isinstance(raw, str):
         return raw
     if isinstance(raw, list):
-        parts = []
-        for sub in raw:
-            if isinstance(sub, str):
-                parts.append(sub)
-            elif isinstance(sub, dict):
-                val = sub.get("text")
-                if val is None:
-                    val = sub.get("content")
-                if isinstance(val, str):
-                    parts.append(val)
-        return "\n".join(parts)
+        parts = [_flatten_content(sub, depth + 1) for sub in raw]
+        return "\n".join(p for p in parts if p)
+    if isinstance(raw, dict):
+        for key in ("text", "content"):
+            if key in raw:
+                return _flatten_content(raw[key], depth + 1)
+        return ""
     return "" if raw is None else str(raw)
+
+
+def _result_text(block):
+    """Return a tool_result block's body as text, whatever shape it arrived in."""
+    raw = block.get("content")
+    if raw is None:
+        raw = block.get("output")
+    try:
+        return _flatten_content(raw)
+    except Exception:
+        return ""
 
 
 def scan(path):

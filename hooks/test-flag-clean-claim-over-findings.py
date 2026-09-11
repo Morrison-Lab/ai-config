@@ -73,6 +73,25 @@ def result_blocks(tool_id, content):
          "content": [{"type": "text", "text": content}]}]}}
 
 
+def result_bare_dict(tool_id, content):
+    """A tool_result whose `content` is a single block, never wrapped in a list.
+
+    Round 9: the round-8 flattener handled the list form and fell through to
+    `str()` for this one, reproducing the same escaped-newline blindness it was
+    written to remove.
+    """
+    return {"type": "user", "message": {"content": [
+        {"type": "tool_result", "tool_use_id": tool_id,
+         "content": {"type": "text", "text": content}}]}}
+
+
+def result_nested(tool_id, content):
+    """A tool_result whose sub-block's own `text` is itself a list."""
+    return {"type": "user", "message": {"content": [
+        {"type": "tool_result", "tool_use_id": tool_id,
+         "content": [{"type": "text", "text": [{"type": "text", "text": content}]}]}]}}
+
+
 def checker(pr):
     return {"type": "assistant", "message": {"content": [
         {"type": "tool_use", "name": "Bash",
@@ -87,6 +106,16 @@ HAZARD_42_BLOCKS = [
 CLEAN_REFETCH_42 = [
     fetch("gh api repos/o/r/pulls/42/reviews", "t9"),
     result("t9", CLEAN_BODY),
+]
+
+HAZARD_42_BARE_DICT = [
+    fetch("gh api repos/o/r/pulls/42/reviews", "td1"),
+    result_bare_dict("td1", HAZARD_BODY),
+]
+
+HAZARD_42_NESTED = [
+    fetch("gh api repos/o/r/pulls/42/reviews", "tn1"),
+    result_nested("tn1", HAZARD_BODY),
 ]
 
 HAZARD_42 = [
@@ -421,6 +450,16 @@ CASES = [
                   result("t12", NOT_CLEAN_BODY)]
      + [say("Ready for merge.")],
      True, "a not-clean re-read of the same PR does not supersede the hazard"),
+
+    # Round 9: the flattener must walk every container shape, not just a list.
+    # A bare dict fell through to str() and reproduced the escaped-newline
+    # blindness round 8 removed for the list form.
+    (HAZARD_42_BARE_DICT + [say("Reported to the user: Ready for merge.")],
+     True, "a bare-dict tool result is still scanned for the hazard"),
+
+    # And a sub-block whose own text is itself a list was silently dropped.
+    (HAZARD_42_NESTED + [say("Reported to the user: Ready for merge.")],
+     True, "a nested sub-block is still scanned for the hazard"),
 
 ]
 

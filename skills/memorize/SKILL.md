@@ -137,6 +137,7 @@ those forms — this skill is what it hands off to once memory is the answer.
    Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
 
    ```bash
+   repo="$(git -C ~/.claude/memories rev-parse --show-toplevel)"   # re-derived: a separate Bash call does not inherit the variable
    git -C "$repo" push origin HEAD   # current branch; not HEAD:main — that would push a feature branch's commits onto main
    ```
 

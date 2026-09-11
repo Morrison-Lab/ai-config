@@ -63,6 +63,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 from collections import Counter
 import json
@@ -79,6 +80,14 @@ SHELL_LANGUAGES = {
     "", "sh", "bash", "shell", "zsh", "console", "shell-session", "sh-session",
 }
 
+# The session languages record a terminal transcript: each command carries a
+# prompt, and the lines between are output. Parsed as-is the body begins with
+# `$`, so the predicate sees no git command and the block scans clean however
+# it is written. Their prompts are stripped and their output dropped before
+# evaluation.
+SESSION_LANGUAGES = {"console", "shell-session", "sh-session"}
+PROMPT_RE = re.compile(r"^\s*(?:\$|#|>|\S+[$#>])\s+(?P<command>.*)$")
+
 # A fence opener, tolerating leading indentation.  ai-config#3002's sweep is
 # believed to have anchored at column 0, which misses every block nested in a
 # list item --- `skills/st/SKILL.md`'s is indented two spaces, several others
@@ -91,11 +100,20 @@ FENCE_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<ticks>```+|~~~+)(?P<info>.*)$")
 # and each match is reported rather than hidden.  Only Markdown is scanned, so
 # a path here is a Markdown path: the guard's own docstring quotes the shape it
 # refuses, and needs no entry because a `.py` file is never examined.
+# Keyed by (path, body fingerprint) rather than by path and a count. A count
+# alone cannot tell a replacement from the original: delete the anti-example,
+# add one prescriptive chained block elsewhere in the same file, and the count
+# is still one, so the sweep exits clean over a block nobody exempted. The
+# fingerprint is the first 16 hex of the body's SHA-256.
 ALLOWED = {
-    "shared/workflow/check-before-pushing.md": (
-        1, "the deliberate anti-example the fragment is about (ai-config#3199)"
-    ),
+    ("shared/workflow/check-before-pushing.md", "2b80d0a06da1c499"):
+        "the deliberate anti-example the fragment is about (ai-config#3199)",
 }
+
+
+def body_fingerprint(body):
+    """The short digest an ALLOWED entry is keyed by."""
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]
 
 
 def load_predicate(root: Path):
@@ -106,6 +124,15 @@ def load_predicate(root: Path):
     spec = importlib.util.spec_from_file_location("_nccp", hook)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    # The hook fails OPEN when scripts/lib/shellcmd.py cannot be imported: it
+    # sets its own parser to None and evaluate() then returns None for every
+    # body. That is right for a guard and wrong for a sweep, which would scan
+    # the whole corpus, deny nothing, and exit 0 having checked nothing.
+    if getattr(module, "simple_commands", "missing") is None:
+        raise SystemExit(
+            f"{hook} loaded with its parser disabled, so evaluate() would "
+            "return None for every block. Fix scripts/lib/shellcmd.py's "
+            "import before trusting this sweep.")
     return module.evaluate
 
 
@@ -141,6 +168,13 @@ def fenced_blocks(text: str):
         indent = opener.group("indent")
         ticks = opener.group("ticks")
         info = opener.group("info").strip()
+        # CommonMark: a backtick opener's info string may not contain a
+        # backtick. Treating one as an opener lets it swallow a later real
+        # block up to the next closer, so a denial inside that block is
+        # missed. scripts/lib/fences.py draws the same line.
+        if ticks[0] == "`" and "`" in info:
+            i += 1
+            continue
         marker = ticks[0]
         start = i
         i += 1
@@ -159,6 +193,22 @@ def fenced_blocks(text: str):
             body.append(line)
             i += 1
         yield start + 1, info, "\n".join(body)
+
+
+def commands_from_session(body: str) -> str:
+    """The commands out of a terminal transcript, without prompts or output.
+
+    A `console` block interleaves prompted commands with their output, so the
+    body as written begins with a prompt character and parses with `$` as
+    argv[0]. The predicate then sees no git command, and the block scans
+    clean however it is written.
+    """
+    commands = []
+    for line in body.splitlines():
+        match = PROMPT_RE.match(line)
+        if match:
+            commands.append(match.group("command"))
+    return "\n".join(commands)
 
 
 def language_of(info: str) -> str:
@@ -192,8 +242,11 @@ def scan(root: Path):
             continue
         for line_no, info, body in fenced_blocks(text):
             blocks_all_languages += 1
-            if language_of(info) not in SHELL_LANGUAGES:
+            language = language_of(info)
+            if language not in SHELL_LANGUAGES:
                 continue
+            if language in SESSION_LANGUAGES:
+                body = commands_from_session(body)
             if not body.strip():
                 continue
             # Counted after the empty-body guard, so the denominator names the
@@ -211,9 +264,11 @@ def scan(root: Path):
                 continue
             if reason is None:
                 continue
-            hit = {"path": name, "line": line_no, "language": language_of(info)}
-            if name in ALLOWED:
-                hit["reason"] = ALLOWED[name][1]
+            key = (name, body_fingerprint(body))
+            hit = {"path": name, "line": line_no, "language": language_of(info),
+                   "fingerprint": key[1]}
+            if key in ALLOWED:
+                hit["reason"] = ALLOWED[key]
                 allowed_hits.append(hit)
             else:
                 findings.append(hit)
@@ -270,17 +325,15 @@ def main(argv=None) -> int:
     # entry is stale documentation pointing at an example that is gone --
     # invisible otherwise, since a zero count trips no threshold.
     allowed_mismatch = False
-    allowed_counts = Counter(hit["path"] for hit in result["allowed"])
-    for path, (allowed_count, _) in ALLOWED.items():
-        found = allowed_counts[path]
-        if found == allowed_count:
+    seen = {(hit["path"], hit["fingerprint"]) for hit in result["allowed"]}
+    for key in ALLOWED:
+        if key in seen:
             continue
-        direction = "more than" if found > allowed_count else "fewer than"
-        print(f"ERROR: {path} has {found} allowed hit(s), {direction} the "
-              f"{allowed_count} the allowlist records", file=sys.stderr)
-        if found < allowed_count:
-            print("       the exemption looks stale: either the passage no "
-                  "longer carries the anti-example, or it moved", file=sys.stderr)
+        print(f"ERROR: {key[0]} no longer carries the exempted block "
+              f"{key[1]}", file=sys.stderr)
+        print("       the exemption looks stale: the passage was reworded, "
+              "moved, or removed. Re-derive its fingerprint or drop the "
+              "entry.", file=sys.stderr)
         allowed_mismatch = True
 
     if result["blocks_examined"] == 0:
@@ -288,8 +341,13 @@ def main(argv=None) -> int:
               "check, which is a defect in the sweep rather than a clean "
               "corpus", file=sys.stderr)
         return 1
-    if result["blocks_examined"] > 0 and result["blocks_skipped"] == result["blocks_examined"]:
-        print("all examined blocks were skipped because the predicate raised", file=sys.stderr)
+    # ANY skipped block is fatal, not only the all-skipped case. A corpus where
+    # one block never reached the predicate is a corpus this sweep did not
+    # check, and the unchecked block is exactly where a denial could hide.
+    if result["blocks_skipped"]:
+        print(f"{result['blocks_skipped']} block(s) were skipped because the "
+              "predicate raised, so the corpus was not fully examined",
+              file=sys.stderr)
         return 1
     if allowed_mismatch:
         return 1

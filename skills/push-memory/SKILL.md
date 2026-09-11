@@ -142,6 +142,7 @@ These are exactly
    Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
 
    ```bash
+   wt="$(git -C "$acfg" worktree list --porcelain | awk '/^worktree /{w=$2} /^branch refs\/heads\/memory\/<slug>$/{print w}')"   # re-derived: $wt was an mktemp -d in a separate Bash call
    git -C "$wt" push -u origin memory/<slug>
    ```
 

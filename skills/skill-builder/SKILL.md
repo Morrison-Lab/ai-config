@@ -354,6 +354,7 @@ git commit -m "skills: add <name> — <summary>"   # COMMIT
 Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
 
 ```bash
+cd "${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/skill-builder rev-parse --show-toplevel 2>/dev/null || pwd)}"   # re-established: a separate Bash call starts in the caller's directory
 git push -u origin HEAD && gh pr create --fill   # PUSH, CREATE_PR
 ```
 

@@ -178,6 +178,14 @@ result = scan_fixture({"skills/demo/SKILL.md": SPLIT})
 check("the split form the fix applies is NOT reported",
       result["findings"] == [] and result["blocks_examined"] == 2)
 
+# The allowlist is keyed by (path, body fingerprint), so a fixture standing
+# in for the real anti-example registers its own body. A per-path count
+# could not tell a REPLACEMENT from the original; a fingerprint can.
+FIXTURE_KEY = ("shared/workflow/check-before-pushing.md", 'c95b628e8b482c91')
+_REAL_ALLOWED = dict(cccp.ALLOWED)
+cccp.ALLOWED.clear()
+cccp.ALLOWED[FIXTURE_KEY] = "the deliberate anti-example the fragment is about"
+
 result = scan_fixture({
     "shared/workflow/check-before-pushing.md": CHAINED_INDENTED,
 })
@@ -187,10 +195,21 @@ check("an allowed hit still states its reason, so no exemption is silent",
       result["allowed"] and "anti-example" in result["allowed"][0]["reason"])
 
 result = scan_fixture({
-    "shared/workflow/check-before-pushing.md": CHAINED_INDENTED + "\n" + CHAINED_INDENTED,
+    "shared/workflow/check-before-pushing.md":
+        CHAINED_INDENTED + "\n" + CHAINED_INDENTED,
 })
-check("a second chained block in the same file exceeds the allowed count",
-      len(result["allowed"]) == 2)
+check("a second copy of the exempted block is allowed by fingerprint",
+      len(result["allowed"]) == 2 and result["findings"] == [])
+
+result = scan_fixture({
+    "shared/workflow/check-before-pushing.md":
+        CHAINED_INDENTED.replace("my-branch", "other-branch"),
+})
+check("a DIFFERENT chained block in an allowlisted file is a finding",
+      len(result["findings"]) == 1 and result["allowed"] == [])
+
+cccp.ALLOWED.clear()
+cccp.ALLOWED.update(_REAL_ALLOWED)
 
 result = scan_fixture({
     "skills/demo/SKILL.md":
@@ -305,6 +324,37 @@ QMD_CHAINED = "Some prose.\n\n```{bash}\ngit commit -m x && git push origin HEAD
 result = scan_fixture({"notes/demo.qmd": QMD_CHAINED})
 check("a {bash} fence in a .qmd is examined", result["blocks_examined"] == 1)
 check("a {bash} fence in a .qmd is denied when chained", len(result["findings"]) == 1)
+
+# A console transcript carries a prompt on every command, so the body parsed
+# with `$` as argv[0] and the predicate saw no git command at all: the block
+# scanned clean however it was written.
+SESSION = (
+    "Transcript:\n"
+    "\n"
+    "```console\n"
+    "$ git commit -m x && git push -u origin b\n"
+    "Everything up-to-date\n"
+    "```\n"
+)
+
+result = scan_fixture({"skills/demo/SKILL.md": SESSION})
+check("a chained command inside a console transcript is denied",
+      len(result["findings"]) == 1)
+
+# CommonMark: a backtick opener's info string may not contain a backtick.
+# Treating one as an opener let it swallow the real block that followed.
+BACKTICK_INFO = (
+    "````not-an-info-string`\n"
+    "```\n"
+    "\n"
+    "```bash\n"
+    "git commit -m x && git push -u origin b\n"
+    "```\n"
+)
+
+result = scan_fixture({"skills/demo/SKILL.md": BACKTICK_INFO})
+check("a backticked info string does not swallow the next real block",
+      len(result["findings"]) == 1)
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

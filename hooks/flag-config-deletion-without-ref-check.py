@@ -618,7 +618,11 @@ def quoted_literals(command):
     index = 0
     while index < len(command):
         char = command[index]
-        if quote is None and char == BACKSLASH:
+        # A backslash escapes at top level and inside double quotes, where a
+        # backslash-quote is a literal quote rather than the span's close.
+        # Missing that desynchronized the scan for the rest of the command, so
+        # a correctly quoted operand further along read as unquoted.
+        if char == BACKSLASH and quote in (None, '"'):
             index += 2
             continue
         if quote is None and char in ("'", '"'):
@@ -631,11 +635,30 @@ def quoted_literals(command):
 
 
 def expansion_is_quoted(operand, single, double):
-    """True when the shell would NOT have expanded `operand`'s leading name."""
-    if operand.startswith("~"):
-        return operand in single or operand in double
-    if operand.startswith("$HOME") or operand.startswith("${HOME}"):
-        return operand in single
+    """True when the shell would NOT have expanded `operand`'s leading name.
+
+    Asks whether the TRIGGER appears quoted, not whether the whole operand
+    does. A split-quoted prefix quotes only the tilde and the shell expands
+    nothing, so matching the joined operand missed it.
+
+    A span counts only when the operand STARTS with it, which is what keeps a
+    quoted tilde in one argument from refusing an unquoted one in another:
+    `grep -rn '<tilde>/.claude' <tilde>/.codex/config.toml` quotes its pattern,
+    and the file operand still expands.
+
+    Approximate, and in the safe direction: an operand assembled from several
+    quoted pieces is not reconstructed, so at worst a span goes unrecognised
+    and the operand expands. That would credit a file nothing opened, which is
+    why the span test is `startswith` rather than equality --- equality missed
+    the split-quoted prefix entirely.
+    """
+    for prefix, blocked_by in (("~", single | double),
+                               ("${HOME}", single),
+                               ("$HOME", single)):
+        if not operand.startswith(prefix):
+            continue
+        return any(text and operand.startswith(text) and prefix in text
+                   for text in blocked_by)
     return False
 
 
@@ -815,7 +838,7 @@ def substitution_spans(command):
         # `cat`, so following that substitution credited a read that never
         # happens.
         if (quote is None and char == "#"
-                and (index == 0 or command[index - 1] in " \t\n;&|(")):
+                and (index == 0 or command[index - 1] in " \t\n;&|(){}")):
             newline = command.find("\n", index)
             if newline == -1:
                 break

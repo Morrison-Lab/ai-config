@@ -538,6 +538,24 @@ _ATTRIBUTION_CASES = [
      "a single-quoted $HOME is literal text"),
     ('cat "$HOME/.claude/settings.json"', {"claude"},
      "a double-quoted $HOME DOES expand"),
+    # Quoting the TRIGGER alone is enough, so matching the whole joined
+    # operand missed it. Verified against bash: echo '<tilde>'/x prints the
+    # tilde literally.
+    ("cat '~'/.claude/settings.json", set(),
+     "a split-quoted tilde expands no more than a fully quoted one"),
+    ("cat '$HOME'/.claude/settings.json", set(),
+     "a split-quoted $HOME is literal too"),
+    # ...but a quoted trigger in ANOTHER argument must not refuse this one.
+    ("grep -rn '~/.claude' ~/.codex/config.toml", {"codex"},
+     "a quoted tilde in the pattern leaves the file operand expanding"),
+    # A backslash-quote inside a double-quoted span is a literal quote, not the
+    # span's close; missing that desynchronized the scan for the rest of the
+    # command and made a later quoted operand read as unquoted.
+    ('echo "a\\"" ; cat "~/.claude/settings.json"', set(),
+     "an escaped quote does not desynchronize the quote scan"),
+    # `)` ends a word, so a `#` after one starts a comment.
+    ("(:)# $(cat ~/.claude/settings.json)", set(),
+     "a comment after a closing paren is still a comment"),
     # An unquoted `#` starts a comment, and bash expands nothing after it.
     ("echo ok # $(cat ~/.claude/settings.json)", set(),
      "a substitution inside a comment is never run"),

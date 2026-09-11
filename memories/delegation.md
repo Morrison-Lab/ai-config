@@ -719,16 +719,18 @@ What it rules out is the case here, where a delegated edit's own account of itse
 Nothing here settles whether the worker authored the malformed line or a transport mangled one it wrote correctly, and the check is the same either way.
 
 - **Do:** run the suite that executes an edited script, not only a parser over it, before trusting a delegated commit that touched shell.
-- **Do:** run the script yourself against a throwaway fixture when no suite executes it, and treat that gap as worth a filed issue rather than a reason to skip the check.
-  Derive the CANDIDATES rather than recalling them, and read the output as a candidate list rather than as the set of uncovered scripts.
-  It finds a literal filename mention and nothing else, while `scripts/test_hooks.py` pairs every `hooks/*.sh` to a `test-<stem>.py` by glob, so a covered script still prints:
+- **Do:** run the script yourself against a throwaway fixture when no suite executes it, and file an issue for the missing coverage rather than skipping the check.
+  Derive the candidates rather than recalling them, and say the output is a candidate list rather than the set of uncovered scripts.
+  It finds a literal filename mention and nothing else, so a script covered only by a glob would print.
+  None does today: the one `hooks/*.sh`, which `scripts/test_hooks.py` pairs by glob, is also named literally in its own test.
+  The gap is in what the query can decide, not in what it currently reports:
 
   ```bash
   for s in $(git ls-files '*.sh'); do
     grep -rqlF "$(basename "$s")" scripts/test_*.py hooks/test-*.py || echo "$s"
   done
   ```
-- **Do:** treat a test you cannot run locally as an unchecked artifact, and say so, rather than reading the parser's silence as coverage.
+- **Do:** say in the report that a test you could not run locally is unchecked, rather than counting a passing parser toward it.
 - **Don't:** read `bash -n` (or `py_compile`) passing as evidence that a delegated edit is correct --- it reports grammar, and dropped quoting is grammatical.
 - **Don't:** rely on the commit message agreeing with the diff here;
   the message was accurate and the code was not.

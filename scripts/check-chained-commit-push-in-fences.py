@@ -7,8 +7,8 @@ include a `git commit` followed by a `git push` is exactly the shape
 `hooks/no-commit-chained-to-push.py` denies.  So the corpus can prescribe, in
 its own skills, a call its own guard refuses.
 
-That is the defect ai-config#3199 records.  It also records why a hand-run
-sweep is the wrong remedy: ai-config#3002 ran one, concluded its single
+That is the defect [#3199](https://github.com/Morrison-Lab/ai-config/issues/3199) records.  It also records why a hand-run
+sweep is the wrong remedy: [#3002](https://github.com/Morrison-Lab/ai-config/issues/3002) ran one, concluded its single
 `tool-mappings.yml` finding was "the only residual prescriptive denial in the
 repository", and was wrong by fourteen sites.  The likeliest cause was fence
 extraction anchored at column 0, which cannot see a block indented inside a
@@ -88,7 +88,7 @@ SHELL_LANGUAGES = {
 SESSION_LANGUAGES = {"console", "shell-session", "sh-session"}
 PROMPT_RE = re.compile(r"^\s*(?:\$|#|>|\S+[$#>])\s+(?P<command>.*)$")
 
-# A fence opener, tolerating leading indentation.  ai-config#3002's sweep is
+# A fence opener, tolerating leading indentation.  [#3002](https://github.com/Morrison-Lab/ai-config/issues/3002)'s sweep is
 # believed to have anchored at column 0, which misses every block nested in a
 # list item --- `skills/st/SKILL.md`'s is indented two spaces, several others
 # three.  The opener's indentation is captured so it can be stripped from the
@@ -107,7 +107,7 @@ FENCE_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<ticks>```+|~~~+)(?P<info>.*)$")
 # fingerprint is the first 16 hex of the body's SHA-256.
 ALLOWED = {
     ("shared/workflow/check-before-pushing.md", "66b0ad73970161ca"):
-        "the deliberate anti-example the fragment is about (ai-config#3199)",
+        "the deliberate anti-example the fragment is about ([#3199](https://github.com/Morrison-Lab/ai-config/issues/3199))",
 }
 
 

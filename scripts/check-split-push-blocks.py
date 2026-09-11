@@ -20,7 +20,7 @@ under persistence: `cd ../sibling` run from inside that sibling does not
 resolve. So this check accepts either spelling rather than demanding a `cd`,
 which would demand the worse one.
 
-Successive review rounds on ai-config#3199 each found another recipe with that
+Successive review rounds on [#3199](https://github.com/Morrison-Lab/ai-config/issues/3199) each found another recipe with that
 gap, after the previous round had fixed the ones it was shown. The property is
 mechanical, so this checks it instead: a `Push as a separate Bash call` block
 must carry its own `cd` whenever the block above it has one, and must set every

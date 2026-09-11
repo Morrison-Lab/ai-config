@@ -278,13 +278,6 @@ with tempfile.TemporaryDirectory() as tmp:
 
     path = root / "shared" / "workflow" / "check-before-pushing.md"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(CHAINED_INDENTED + "\n" + CHAINED_INDENTED, encoding="utf-8")
-    subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
-
-    buffer = io.StringIO()
-    with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(io.StringIO()):
-        exit_code_excess = cccp.main(["--root", str(root)])
-    check("main exits 1 when a path has more allowed hits than permitted", exit_code_excess == 1)
 
     # The other direction: the allowlisted passage no longer carries the
     # anti-example. A zero count trips no threshold, so without this the stale

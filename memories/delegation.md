@@ -720,7 +720,8 @@ Nothing here settles whether the worker authored the malformed line or a transpo
 
 - **Do:** run the suite that executes an edited script, not only a parser over it, before trusting a delegated commit that touched shell.
 - **Do:** run the script yourself against a throwaway fixture when no suite executes it, and treat that gap as worth a filed issue rather than a reason to skip the check.
-  Derive which scripts those are rather than recalling them, and note that a direct reference is not the only way a script is covered --- `scripts/test_hooks.py` pairs every `hooks/*.sh` to a `test-<stem>.py` by glob, so a name grep alone understates coverage:
+  Derive the CANDIDATES rather than recalling them, and read the output as a candidate list rather than as the set of uncovered scripts.
+  It finds a literal filename mention and nothing else, while `scripts/test_hooks.py` pairs every `hooks/*.sh` to a `test-<stem>.py` by glob, so a covered script still prints:
 
   ```bash
   for s in $(git ls-files '*.sh'); do

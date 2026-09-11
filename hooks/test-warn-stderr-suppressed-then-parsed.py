@@ -237,6 +237,20 @@ check(
 check("a bare close still fires", fires("cmd 2>&- > out.json"), True)
 check("fd 12 is not fd 2", fires("cmd 12>/dev/null > out.json"), False)
 
+# The append form. `2>>?` let its optional second `>` backtrack away, so this
+# matched as a stderr-to-FILE redirect at the discard's own offset, read as
+# reclaiming it, and never fired -- while the catalog said it was covered.
+check(
+    "an appended discard fires like a truncating one",
+    fires("cmd 2>>/dev/null > out.json"),
+    True,
+)
+check(
+    "an append to a real file is still a reclaim, not a discard",
+    fires("cmd 2>>err.log > out.json"),
+    False,
+)
+
 # `|&` is `2>&1 |`, and bash applies that merge after the command has applied
 # its own redirections, so stderr reaches the pipe and nothing stays
 # suppressed. A plain pipe beside it keeps the contrast visible.
@@ -397,6 +411,13 @@ check(
     reported("cmd 2>/dev/null >|$(mktemp)")[1],
     "redirected to `$(mktemp)`",
 )
+
+
+# Regression tests for fd-2 lookbehinds and escape handling
+check("word ending in 2 is not an fd-2 redirect", fires("echo x2>/dev/null > out.json"), False)
+check("genuine fd-2 redirect still fires", fires("echo 2>/dev/null > out.json"), True)
+check("escaped redirect is not parsed", fires(r"cmd 2>/dev/null echo \>out.json"), False)
+check("escaped pipe is not parsed", fires(r"printf '%s\n' foo 2>/dev/null \| bar"), False)
 
 if failures:
     print("FAILED:")

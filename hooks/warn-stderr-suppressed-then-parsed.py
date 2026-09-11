@@ -139,25 +139,29 @@ RX_MERGE_NULL = re.compile(r"(?:&>>?|>&)\s*/dev/null(?![^\s;|&<>()])")
 
 # stderr alone to /dev/null. The lookbehind keeps `12>/dev/null` (fd 12) from
 # being read as the `2>` form.
-RX_STDERR_NULL = re.compile(r"(?<![0-9<>&])2>>?\s*/dev/null(?![^\s;|&<>()])")
+RX_STDERR_NULL = re.compile(r"(?<![^\s|&;()<>])2>>?\s*/dev/null(?![^\s;|&<>()])")
 
 # stderr closed outright.
-RX_STDERR_CLOSED = re.compile(r"(?<![0-9<>&])2>&-")
+RX_STDERR_CLOSED = re.compile(r"(?<![^\s|&;()<>])2>&-")
 
 # stderr reclaimed by a LATER redirect. The shell applies redirects left to
 # right, so `cmd 2>/dev/null 2>err.log` captures stderr to the file and
 # suppresses nothing -- warning there is the over-warning this hook rules out.
 # `2>&-` is excluded from the file form since closing is itself a suppression.
 RX_STDERR_TO_FILE = re.compile(
-    r"(?<![0-9<>&])2>>?\s*(?!/dev/null(?![^\s;|&<>()]))(?![&-])\S")
-RX_STDERR_MERGED = re.compile(r"(?<![0-9<>&])2>&[0-9]+")
+    # `(?!>)` forces the operator to be maximal. Without it the optional
+    # second `>` backtracks away, so `2>>/dev/null` matches as `2>` plus a
+    # `>` operand -- a stderr-to-FILE redirect at the same offset as the
+    # discard, which then reads as reclaiming it and the discard never fires.
+    r"(?<![^\s|&;()<>])2>>?(?!>)\s*(?!/dev/null(?![^\s;|&<>()]))(?![&-])\S")
+RX_STDERR_MERGED = re.compile(r"(?<![^\s|&;()<>])2>&[0-9]+")
 
 # `&>file` / `>&file` with a NON-null target. Both streams go to the file, so
 # this is a stdout file target and an stderr reclaim at once. Only the
 # /dev/null spelling was recognised before, which let a later `&>file.log`
 # fail to reclaim an earlier `2>/dev/null` and produced a false positive.
 RX_MERGE_FILE = re.compile(
-    r"(?<![0-9<>&])(?:&>>?|>&)\s*(?!/dev/null(?![^\s;|&<>()]))"
+    r"(?:&>>?|>&)\s*(?!/dev/null(?![^\s;|&<>()]))"
     r"(?![&-])(?![0-9]+-?(?![^\s;|&<>()]))([^\s;|&<>()]+)")
 
 # Every stdout redirect operator, including `>|`, which overrides noclobber and
@@ -302,6 +306,7 @@ def _mask(command):
         # A backslash escapes inside a backtick substitution as it does at top
         # level and inside double quotes; only single quotes take it literally.
         if char == "\\" and index + 1 < size and quote in (None, '"', "`"):
+            _blank(out, index, index + 2)
             index += 2
             continue
         if char == "$" and index + 1 < size and text[index + 1] == "(":

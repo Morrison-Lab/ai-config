@@ -58,9 +58,11 @@ to fire:
 
 DISCHARGE
 ---------
-Three outs. The first two are checked in `main()` before the reply is ever
-inspected; the third is applied earlier still, during `scan()`, by removing
-the hazard from consideration altogether:
+Three outs. The first two are checked in `main()`, before the reply is asked
+whether it ASSERTS a clean claim -- the first of them does read the reply, for
+acknowledgment vocabulary, so "before the reply is inspected" would be wrong.
+The third is applied earlier still, during `scan()`, by removing the hazard
+from consideration altogether:
 
   * The reply itself ACKNOWLEDGES findings vocabulary (`finding(s)`, `nit(s)`,
     `unresolved`, `unaddressed`, `non-blocking`, `outstanding`, a Findings-

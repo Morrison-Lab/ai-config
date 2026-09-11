@@ -158,7 +158,11 @@ there is no standard environment variable that already holds it.
 
 (Measured 2026-09-04: `git commit --amend -F /tmp/msg.txt` picked up a different concurrent session's message from the same shared path, silently replacing the intended PR's subject and body.)
 
-**The scratchpad is also the answer to a second, independent hazard, and the collision argument above cannot reach it: a message file written inside the worktree is staged by `git add -A` and committed.**
+**The scratchpad is also the answer to a second, independent hazard, and the collision argument above cannot reach it: an unignored message file written inside the worktree is staged by a blanket `git add -A` and committed.**
+(`git add -A` skips ignored paths, so a scratch name covered by `.gitignore` or `.git/info/exclude` escapes this;
+do not rely on that, since a per-PR scratch name is ad hoc and no repository ignores it by default.)
+Note what the blanket staging means: [`preferences.md`](preferences.md) already forbids `git add -A` outright, because it sweeps unrelated in-flight edits into the commit.
+So this hazard is a second consequence of a command the corpus had already ruled out, and staging explicit paths prevents it independently of where the file lives.
 Note what the reasoning above would permit.
 It rejects `/tmp/msg.txt` because `/tmp` is shared, so a path nobody else can write --- a file in the worktree you alone are driving --- satisfies every word of it.
 That path is the dangerous one.
@@ -169,7 +173,8 @@ The failing shape is one command:
 git add -A && git commit -F msg.txt && rm -f msg.txt
 ```
 
-`git add -A` stages `msg.txt` before `git commit` reads it, so the file enters the tree, and the `rm` afterwards removes only the working copy.
+`git add -A` stages `msg.txt` before `git commit` reads it, so the file enters the tree.
+The `rm` afterwards removes only the working copy.
 Nothing turns red.
 On the occasion measured below, the checks passed and the push succeeded;
 the staging is invisible to both by construction, since neither inspects the committed file set for scratch.
@@ -185,8 +190,9 @@ A path outside the worktree is immune by construction rather than by discipline:
 So the same substitution the bullets above prescribe fixes both hazards at once, and no second rule is needed.
 
 - **Do:** pass `git commit -F` an absolute path under the session scratchpad, so no `git add` invocation can stage it.
-- **Do:** run `git ls-files | grep -qxF -- "$name"` in every worktree a round touched, when a round used a scratch name, rather than only the one a reviewer flagged.
-  The `F` and the `--` are load-bearing: an unquoted pattern is a regex, so a scratch name carrying a metacharacter can match the wrong path or miss the tracked one, and a leading `-` is read as an option.
+- **Do:** audit the round's own commits, not the index, with `git diff --name-only --diff-filter=A origin/<default-branch>...HEAD | grep -qxF -- "$name"`, in every worktree the round touched.
+  `git ls-files` answers about the current index only, so a later cleanup commit that removes the file makes the audit pass over a branch whose history still carries it.
+  The `F` and the `--` are load-bearing either way: an unquoted pattern is a regex, so a scratch name carrying a metacharacter can match the wrong path or miss the tracked one, and a leading `-` is read as an option.
 - **Don't:** write the message file into the worktree and rely on deleting it --- the delete runs after the staging that captured it.
 - **Don't:** read "the path is private to me" as sufficient;
   that answers the collision hazard and not this one.

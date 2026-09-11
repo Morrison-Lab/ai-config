@@ -205,7 +205,7 @@ confirmed it fixed.)
 Never chain a `git commit` into a `git push` in one shell invocation:
 
 ```
-git add -A && git commit -F /path/to/session-scratchpad/msg.txt && git push -u origin my-branch
+git add src/thing.py && git commit -F /path/to/session-scratchpad/msg.txt && git push -u origin my-branch
 ```
 
 The message file sits in the session scratchpad in that example for a separate reason,

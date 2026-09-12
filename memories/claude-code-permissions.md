@@ -213,7 +213,6 @@ re-verify before relying on these internal pipeline stages:
   - **Do:** use `gh api` endpoints directly when higher-level `gh` CLI subcommands trip the auto-mode denial circuit breaker.
   - **Don't:** attempt to poll or wait via shell loops (`sleep`, `until`, `while`) in a headless `@claude` bot session --- headless runs cannot answer approval prompts.
 
-
 ## OS sandbox filesystem invariants & customization lockdown paths
 
 Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236) and managed policy behavior:

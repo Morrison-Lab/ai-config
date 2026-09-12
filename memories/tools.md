@@ -470,13 +470,12 @@ The same shape was still present on `scripts/check-hook-output-shape.py` as of 2
 The per-script fix is ASCII on that line (`OK: ...`), matching [`ascii-punctuation-in-source.md`](../shared/coding/ascii-punctuation-in-source.md).
 Reconfiguring streams at script startup (`sys.stdout.reconfigure(encoding="utf-8", errors="replace")`) is a second option used in scripts that deliberately print status glyphs or diff formatting (`validate-skills.py`, `check-links.py` since #2169):
 ```python
-for stream in (sys.stdout, sys.stderr):
-    if hasattr(stream, "reconfigure"):
-        stream.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 ```
 It depends on the stream supporting `reconfigure`.
 ASCII cannot fail the encoding.
-(Note: `Morrison-Lab/gha#860` scripts wrap the call in `try/except Exception: pass`, but ai-config precedent avoids swallowing exceptions and uses the bare `hasattr` guard directly.)
+(Note: `Morrison-Lab/gha#860` scripts wrap dual-stream reconfigure in `try/except Exception: pass`, but ai-config precedent avoids swallowing exceptions and uses the bare `hasattr` guard on `sys.stdout` directly.)
 Issue [#2080](https://github.com/Morrison-Lab/ai-config/issues/2080) tracks the remaining `check-links.py` glyph (ballot-X on the failure path, check mark on success).
 
 In composite actions or multi-check wrappers (`check-diff-scoped.sh` in Morrison-Lab/gha#860), passing `PYTHONIOENCODING=utf-8` in the wrapper invocation (`env PYTHONIOENCODING=utf-8 python3 "$script"`) shields child checks from non-UTF-8 ambient console environments as an added layer of defense.

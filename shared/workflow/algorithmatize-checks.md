@@ -2297,3 +2297,28 @@ A newly failing artifact that predates the change is evidence about the predicat
 (Measured 2026-09-11 on ai-config#3440.
 A first attempt refused every derived path, which immediately failed five established recipes in `skills/ums`, `skills/agent-builder` and `skills/skill-builder` that build an absolute path from `CLAUDE_PLUGIN_ROOT` with a fallback.
 The predicate was rewritten to refuse only what a reader can tell is relative, and the five recipes were left alone.)
+
+## A check resting on the data's shape must say so where it is defined
+
+Some checks are sound because of what the language means.
+Others are sound because of what this particular corpus happens to contain, and the two are indistinguishable from the code.
+
+That matters more than it sounds, because the second kind reads as a bug to the next person who sees it.
+They apply the check to an input the corpus does not contain, watch it give the wrong answer, and remove it as unsound, which is exactly the reasoning the author would have used had the property not held.
+The check then has to be rediscovered by the review round that asked for it in the first place.
+
+The remedy is one paragraph rather than a cleverer test.
+Name the property the check rests on, say where that property is established, and say what would invalidate it.
+A reader who then finds a counterexample knows whether they have found a bug or a corpus that changed.
+
+- **Do:** state the data property a corpus-dependent check rests on, in the docstring of the check itself.
+- **Do:** say what would invalidate it, so a future reader can tell a defect from a changed input.
+- **Don't:** ship a check whose soundness depends on the data while its docstring argues from the language.
+- **Don't:** delete such a check as unsound before reading its docstring for a stated data property, and checking whether that property still holds.
+
+(Measured 2026-09-11 on [ai-config#3435](https://github.com/Morrison-Lab/ai-config/pull/3435).
+An agent added a check flagging any hook command with more than two whitespace-separated tokens as carrying a space inside a path.
+The orchestrator removed it as unsound, since a command carrying a flag has three tokens and no space in any path.
+The next review round asked for the check again, and the underlying gap was real: a manifest staged by something other than this repo can carry a path with a space, and nothing on the reading side caught it.
+What made the restored version defensible was not a different test but a stated reason, namely that the canonical form in `plugins/ai-config/hooks.json` is an interpreter and a script with no arguments and that all eleven of that manifest's commands have exactly two tokens, so a third means whitespace inside a path.
+The docstring says that, and says it would not survive a manifest whose commands take arguments.)

@@ -1223,3 +1223,31 @@ the dangerous direction.
 This serves the Reliable goal in the
 [principles catalog](README.md): a loud failure is easier to catch than
 a silent one.
+
+## Fix a pattern's siblings in the same pass, or the next round finds them
+
+A reviewer who reports a wrong regex reports the instances it looked at.
+Patterns travel in families, though: the same idiom gets copied to the neighbouring case the day it is written, so the set the reviewer names is almost never the set that shares the defect.
+
+Fixing only what was named therefore produces a round that looks like progress and guarantees another one.
+The next reviewer finds the sibling, reports it with equal correctness, and the loop continues until somebody derives the family instead of reading the list.
+
+Deriving it is one search.
+Grep for the idiom rather than the pattern name, fix every hit in the same commit, and write a case per distinguishable shape before calling the class closed.
+See also [`memories/preferences.md`](../../memories/preferences.md)'s standing sibling-sweep rule (grep the whole repo for sibling instances and fix them all in one pass).
+
+**A corrected pattern is not one edit, so verify each candidate separately.**
+Successive attempts at a boundary test can each fix the reported shape while breaking a different one, and a suite that passed before the change will keep passing if none of its cases covers the shape just broken.
+Probe the shapes directly, in both directions, before committing.
+
+- **Do:** grep for the idiom and fix every pattern carrying it in one commit.
+- **Do:** write a case per shape the corrected pattern must tell apart, and probe each one directly rather than trusting an unchanged suite.
+- **Don't:** stop at the patterns the reviewer named without running the idiom search;
+  that list is a sample of the family.
+- **Don't:** claim the class is closed while any sibling still carries the old idiom.
+
+(Measured 2026-09-11 on [ai-config#3439](https://github.com/Morrison-Lab/ai-config/pull/3439).
+A reviewer named six patterns sharing a lookbehind that rejected a preceding digit where it meant a token boundary.
+Fixing those six left four more in the same file, `hooks/warn-stderr-suppressed-then-parsed.py`, on the other redirect direction, which the next round found.
+Three further attempts at the corrected form each broke a case that had worked: one inverted the polarity of the boundary test, one dropped the exclusion of a preceding redirect operator so an append operator's second character matched as a redirect of its own, and one misread a word ending in two digits.
+The version that survived carries five lookbehinds and five cases.)

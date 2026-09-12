@@ -26,6 +26,10 @@ Worked-example case records for the rules below live in
   R's `try()`, `suppressWarnings()`, and `suppressMessages()` belong in
   the same category: each mutes a whole class of condition rather than
   the one you know about.
+- Do not suppress stderr --- `2>/dev/null`, `2>>/dev/null`, or `2>&-` --- on a command whose output is then consumed, unless the suppression is deliberate noise reduction that you will re-run without the moment an empty or unexpected result appears.
+  This shape is a member of the silent fallback family.
+  Silencing the one channel carrying the failure turns a diagnosable error into an empty result.
+  An empty result is indistinguishable from a legitimately empty one.
 - When a fallback is genuinely wanted --- graceful degradation at a
   system boundary, a retry for a known-transient failure --- make it
   explicit and observable: message the degradation, bound the retries,

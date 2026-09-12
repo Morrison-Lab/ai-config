@@ -464,6 +464,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-stderr-suppressed-then-parsed.py\"'",
+            "timeout": 10,
+            "script": "warn-stderr-suppressed-then-parsed.py",
+            "why": "shared/principles/fail-fast.md, silent-fallback family. A command that suppresses stderr (2>/dev/null, 2>>/dev/null, 2>&-) while its stdout is consumed (redirected to a file, piped, or captured with $(...)) turns a diagnosable failure into an empty result indistinguishable from a legitimately empty one. Measured 2026-09-02 mirroring ucdavis/hac.sap to GitLab: a glab api call with 2>/dev/null wrote an empty file, the emptiness was diagnosed as a sandbox redirect problem, and the suppressed stderr held the real cause (DNS: no such host, the VPN had dropped). WARNS, never blocks: the suppression is sometimes deliberate. Does not fire when stdout is discarded too, which is what &>/dev/null and >/dev/null 2>&1 both do, when stderr is merged (2>&1), or when nothing is suppressed. Tracked as #2998."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-verdict-line-filter.py\"'",
             "timeout": 10,
             "script": "warn-verdict-line-filter.py",

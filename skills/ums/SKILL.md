@@ -393,7 +393,7 @@ committed pass.
    # previous one's directory is unsettled between sessions, so a
    # relative `cd` breaks in whichever half it did not assume.
    repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
-   git -C "$repo/../ai-config-worktrees/ums-<topic>" push -u origin HEAD   # PUSH — PR creation is handled by the post-push verification step below
+   git -C "$repo/../ai-config-worktrees/ums-<topic>" push -u origin HEAD   # PUSH -- PR creation is handled by the post-push verification step below
    ```
 
    *Cross-fork case* (this checkout's `origin` is your own fork, not the
@@ -424,7 +424,7 @@ committed pass.
    git -C "$repo/../ai-config-worktrees/ums-<topic>" push -u origin HEAD   # PUSH -- to your fork; PR creation is handled by the post-push verification step below
    ```
    **CAUTION:** keeping the push in its own call is what makes the commit durable before anything can refuse the push.
-   If you do chain them and the call is **denied**, *nothing* was committed — verify with `git status` / `git log` before any `git reset --hard`, or you'll silently discard the still-uncommitted edits.
+   If you do chain them and the call is **denied**, *nothing* was committed -- verify with `git status` / `git log` before any `git reset --hard`, or you'll silently discard the still-uncommitted edits.
 
    **After the PR merges**, remove the worktree so it doesn't accumulate:
    `git -C "$repo" worktree remove "../ai-config-worktrees/<branch>"` (the

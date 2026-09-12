@@ -321,11 +321,10 @@ def main(argv=None) -> int:
                   "calls: two fenced blocks, or a prose line between them. "
                   "Nothing about either command needs to change.")
 
-    # The allowlist is checked in BOTH directions. More hits than permitted
-    # means a second, unrelated chained block is riding on the exemption. Fewer
-    # means the passage the exemption was written for no longer chains, so the
-    # entry is stale documentation pointing at an example that is gone --
-    # invisible otherwise, since a zero count trips no threshold.
+    # The allowlist is checked for stale entries: if an entry in ALLOWED
+    # has no matching hit in result["allowed"], the passage the exemption
+    # was written for no longer chains or was reworded/moved/removed, so the
+    # entry is stale documentation pointing at an example that is gone.
     allowed_mismatch = False
     seen = {(hit["path"], hit["fingerprint"]) for hit in result["allowed"]}
     for key in ALLOWED:

@@ -3,8 +3,9 @@
 
 The load-bearing case is the negative control.  Until the sweep has been seen
 to produce a non-zero on a KNOWN chained block, a zero from it against the real
-corpus is not evidence of anything --- which is the failure ai-config#3199
-records against the hand-run sweep it replaces, and the general argument in
+corpus is not evidence of anything --- which is the failure
+[#3199](https://github.com/Morrison-Lab/ai-config/issues/3199) records against
+the hand-run sweep it replaces, and the general argument in
 `shared/workflow/batch-merge-and-resolve.md` about a sweep with no negative
 control.
 

@@ -210,5 +210,16 @@ class TestRendererCli(unittest.TestCase):
             self.assertEqual(rc, 1)
             self.assertFalse(out.exists())
 
+    def test_output_write_oserror_reports_cleanly(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out_dir = Path(tmp) / "is_dir"
+            out_dir.mkdir()
+            sink = io.StringIO()
+            with contextlib.redirect_stderr(sink), contextlib.redirect_stdout(io.StringIO()):
+                rc = RENDERER.main(["--platform", "posix", "--output", str(out_dir)])
+            self.assertEqual(rc, 1)
+            self.assertTrue(sink.getvalue().startswith("error: "))
+
+
 if __name__ == "__main__":
     unittest.main()

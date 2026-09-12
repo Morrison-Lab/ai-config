@@ -337,15 +337,8 @@ A clean automated review from every available provider evaluating the current HE
   override-drops-token test and #2419's veto tests, both caught in
   unposted local pre-push review rounds rather than on those PRs'
   records.)
-- **2nd occurrence of the class, 2026-08-28** (ai-config#2449 / PR #2515, after #2419 above), and the near-miss this entry did not previously name: the base-parity proof WAS built, and was constructed over the wrong quantity.
-  It compared what the two revisions *blanked* --- asking whether every extra-blanked character lay inside a code span the change exists to blank --- which cannot return non-zero for any implementation of that shape, because the extra-blanked set is the span set.
-  It reported 0 while two real fail-opens were live, and was silent by construction about the passes running downstream of the blanking, where both lived.
-  A parity proof is over ACCEPTANCE SETS --- which bodies each revision calls clean --- never over the transformation.
-  The replacement instrument, `scripts/check-verdict-scan-parity.py`, demonstrates its own discrimination rather than asserting it --- but only half of that demonstration is reproducible from `main`.
-  The `0` for the shipped design re-runs from any clone.
-  The 3,924 / 108 / 270 / non-zero off-axis figures were taken against the four designs rejected on the PR branch, which the squash merge as `07847b9` left off `main`;
-  recover them with `git fetch origin 'refs/pull/2515/head:refs/remotes/pr/2515'` (`c7ff646`, `4f9d3fc`, `68a14b9`, `a3251bf`) rather than treating them as lost.
-  Canonical rule for the general shape: [`verify-the-right-artifact.md`](../shared/workflow/verify-the-right-artifact.md)'s "what a change TRANSFORMS, standing in for what it CONCLUDES".
+- **Occurrence ledger**: the 2nd occurrence, with its measurements, is in
+  [`mistake-patterns.cases.md`](mistake-patterns.cases.md).
 
 ## Pattern 16: Same-Vendor Subagent Fallback When a Reachable CLI Would Give True Independence
 - **Mistake**: When the `adversarial-reviewer` subagent type is unregistered
@@ -376,10 +369,8 @@ A clean automated review from every available provider evaluating the current HE
   route to whichever resolves, per `delegate-to-codex`/`delegate-to-opencode`.
   Only fall back to a same-vendor subagent, stating so explicitly in the
   push reply, when none of those three CLIs are reachable at all.
-- **2nd occurrence, 2026-08-29** ([ucdavis/hac.it#9](https://github.com/ucdavis/hac.it/pull/9), a docs PR): same shape, one step later.
-  `adversarial-reviewer` was unregistered in this Claude Code CLI session (as opposed to Cursor Cloud, where it is registered), so a same-vendor `general-purpose` subagent was dispatched as the substitute reviewer and the PR was pushed on that verdict alone --- with `self-review-fallback.md`'s cross-vendor section already loaded in context and not applied.
-  The user corrected it directly: "you should have run adv without me having to ask."
-  A subsequent `adv --engine cursor` pass produced a genuinely independent verdict (Ready for merge, several non-blocking nits the same-vendor pass had not surfaced) --- concrete evidence the cross-vendor pass adds real signal rather than ceremony, and a second data point toward this pattern's third-occurrence bar for a hook.
+- **Occurrence ledger**: the 2nd occurrence, with its measurements, is in
+  [`mistake-patterns.cases.md`](mistake-patterns.cases.md).
 
 ## Pattern 17: Theorizing a Cause for a Guard Refusal Instead of Running Its Own Reader
 - **Mistake**: When `hooks/no-push-without-self-review.py` refuses a push citing "The latest adversarial self-review returned a blocking verdict" despite believing the most recent dispatch was clean, attributing the refusal to session/harness mechanics (the transcript lagging the current turn) instead of executing the guard's own `read_latest_review`/`parse_report` against the live transcript and reading what it actually parsed.
@@ -411,35 +402,11 @@ A clean automated review from every available provider evaluating the current HE
 - **Fix**: After the second refutation of the same classification problem, stop proposing new discriminators.
   Execute the classifier (or the equivalent instrument) over the actual failing input's constituent parts and read which feature produces the output, before writing a third design.
   Consider whether the fix belongs at the author's end (a convention change) rather than in the instrument at all --- the instrument's own vocabulary can already handle a correctly-written input.
-- **2nd occurrence, 2026-08-28** (ai-config#2449 / PR #2515, after #2409 above), on the same module and with a second resolution direction worth adding: where each refuted design breaks a *different* consumer, the measurement to run is over the REPRESENTATION rather than over the failing input.
-  Four designs widened what `strip_cited_finding_vocab` blanked, and no two of them failed the same way;
-  between them they broke six distinct downstream passes --- anchored negation windows, a markedness check, a sentence-boundary gate, a findings-item tag, a bare-marker guard, and reviewer-identity extraction --- producing nine fail-opens on a fail-closed instrument across five adversarial rounds.
-  The three counts are not a one-to-one mapping and should not be read as one: the fourth design alone broke several passes, and one broken pass can fail open on more than one shape.
-  What matters is that the failures were *unrelated*, which makes them one fact restated four times rather than four bugs --- namely that many character-and-offset-sensitive consumers read the buffer being edited.
-  The design that shipped leaves the scan byte-identical and carries a parallel citation mask, making the class unreachable rather than patched member by member, and giving parity by identity rather than by proof.
-  Canonical rule: [`fail-fast.md`](../shared/principles/fail-fast.md)'s "Where many consumers key on a shared buffer, filter the matches rather than editing the buffer".
-- **3rd occurrence, 2026-08-28** (ai-config#2538 / PR #2539, after #2409 and #2449 above), which is the same pattern run to its conclusion and worth recording for what finally stopped it.
-  **Twelve** designs, **twelve** certification fail-opens on a fail-closed instrument, **none** caught by a green suite --- every one found by an adversarial round.
-  The arc: classification on exclusions alone, then on the harness's `origin.kind` label, then per record, then per block, then per non-envelope region, then against a four-name tag list, then against a structural opener test.
-  Each fix was refuted by a shape the previous design had not considered, and by round 9 the sequence had a second, subtler stage worth naming --- the parse was not removed, only moved from **grammar** (where do the delimiters balance) to **vocabulary** (is this name in my list), while the code claimed *"nothing is parsed"*.
-  Two of the last three failures were regressions introduced by the fix for the one before, which is Pattern 18's own signal arriving at a higher rate.
-  What ended it was abandoning the claim rather than narrowing it: the tool now reports every matching record with its provenance and decides nothing, so the class is unreachable rather than guarded --- the same resolution shape as the 2nd occurrence's parallel mask, one level up.
-  A twelfth round then found the mirror failure the eleven had all missed, because every round had been hunting false positives: the tool was *under-reading* the corpus, and reported "no record contains it" over text the user had typed.
-  Canonical rule: [`deterministic-tools.md`](../shared/principles/deterministic-tools.md)'s "An enumeration is still a parse", and the recurrence test one level up again --- when refutation recurs past the second design, ask whether the CLAIM is achievable rather than which discriminator to try next.
-- **4th occurrence, 2026-08-30** (ai-config#2668, on the same module and citation-stripping machinery as the 2nd/3rd occurrences above;
-  open, with the driving session still pushing commits, at time of writing), the occurrence that names the axis the first three resolved by trial rather than by rule.
-  As the driving session reported it, two separate discriminators in the same file failed open across a review series it logged at roughly sixteen adversarial rounds, and in both cases the fix it settled on was a change of KIND rather than a further narrowing of the same kind. (a) A guard deciding whether a negator scopes over a resolution went through four lexical designs in sequence --- a fixed glue whitelist, a bounded word run, a grammatical-role (preposition-governed) test, then a governed-and-clause-detached test --- and each admitted a fresh false-clean the next round found.
-  The design the session settled on abandons the lexical proxy entirely: any negator earlier in the same sentence defeats the exemption, trading a fifth refinement for a documented, bounded over-flag --- the same trade [`learn-from-review-findings.md`](../shared/workflow/learn-from-review-findings.md) already names ("a bounded, nameable false positive beats a silent bypass, and both beat a heuristic nobody can characterize"). (b) A citation strip deciding whether a `(posted <timestamp>, verdict **X**)` aside was narration or a live statement used a positive attribution gate plus a closed vocabulary veto, and each round's re-raise arrived in a phrasing the vocabulary had not enumerated.
-  The design the session settled on is a discriminator on a different axis: a structural gate that strips the citation only when the comment body states a verdict of its own, because a cited verdict overriding the reviewer's OWN stated verdict is the only thing the strip ever needed to protect against, and that test is blind to how the citation happens to be phrased. (As of this entry, `origin/fix/check-pr-fully-clean-posted-verdict-citation` --- distinct from `origin/main`, which has neither fix yet --- carries `_POSTED_VERDICT_CITATION`, a general "posted TS, verdict `**X**`" pattern rather than an enumerated word list;
-  whether that pushed form is the closed-vocabulary design this entry describes being refuted, an intermediate step, or already the structural gate is not independently reconstructable from the two commits on the remote branch alone, so the round-by-round narrative above is the driving session's own account, not a re-derivation from this checkout.)
-  The module carries a directly relevant caution already, in the docstring of `strip_cited_finding_vocab_with_mask` --- verified on both `origin/main` and the PR branch of `scripts/check-pr-fully-clean.py`, about 115 lines above where the PR branch's new citation regex lives in that same function: "the true discriminator...cannot be determined from text alone" (lines 761-763) and, of four earlier attempts at a sibling citation-scan, "every one of those was fail-open on a fail-closed instrument" (line 802).
-  Per the driving session's account, that lesson did not travel to the vocabulary veto being written later in the same function.
-  A principle stated in one part of a file and contradicted by practice in another part of the same file is itself a signal worth reading, independent of the round count.
-  Canonical rule: not a wider or narrower version of the failing test, but a test on a different axis --- structural or positional (does the body carry its own verdict heading at all) rather than lexical (which words appear).
-  See also [`learn-from-review-findings.md`](../shared/workflow/learn-from-review-findings.md)'s "A finding class that RECURS is evidence about your instrument, not about its threshold" section, which this occurrence specializes: the replacement axis, not just the recurrence signal.
+- **Occurrence ledger**: occurrences 2 through 4, with their measurements, are in
+  [`mistake-patterns.cases.md`](mistake-patterns.cases.md).
 - **Do:** after a second narrowing of one discriminator fails review, ask what KIND of test would decide the question, and prefer a structural or positional test over a vocabulary list wherever the property being tested is actually structural.
 - **Don't:** write a fourth or fifth lexical refinement --- a longer word list, a tighter adjacency window, a new grammatical exception --- once three have already failed on the same axis;
-  every occurrence above did that at least once before finding the axis change.
+  every occurrence in [`mistake-patterns.cases.md`](mistake-patterns.cases.md) did that at least once before finding the axis change.
 
 ## Pattern 19: A "Needs More Work" Loop Can Have Two Independent Mechanisms, and Fixing One Leaves the Other
 - **Mistake**: Treating a stuck "Needs more work" verdict as one bug --- a review conditioning its verdict on its own run's in-flight sibling checks --- and re-dispatching review rounds expecting one of them to converge, when a second, independent mechanism also reproduces the block: a review deferring to `scripts/check-pr-fully-clean.py`'s exit status, which itself only reports the PREVIOUS round's status-conditioned verdict, so each new round inherits the prior round's hedge.

@@ -1686,3 +1686,20 @@ What it needed was a check against `pgrep`'s own documented behaviour: `pgrep --
 (Measured 2026-09-09 in this sandbox: `pgrep --help` lists `-A, --ignore-ancestors` as a documented flag, confirming `pgrep -f <pattern>` excludes only its own PID by default and matches an ancestor shell whose command line contains the pattern.
 The corrected belief and its displacing fact are the same pair [`memories/shell.md`](../../memories/shell.md) (ai-config#3428) records for the underlying `pkill -f` hazard;
 this entry is the general verification-method lesson the specific fix does not itself state --- that verifying the passage prescribing a remedy is not verifying the remedy holds.)
+
+## An unresolved review thread is evidence about the review conversation, not about the code
+
+The shapes above all substitute one artifact for another.
+This one substitutes the state of a review conversation for the state of the codebase.
+On 2026-09-12, six review threads were still unresolved when Morrison-Lab/ai-config pull requests [ai-config#3440](https://github.com/Morrison-Lab/ai-config/pull/3440) and [ai-config#3469](https://github.com/Morrison-Lab/ai-config/pull/3469) merged.
+The natural reading was six open defects needing tracking issues.
+Checking each against `origin/main` showed none of the six was an untracked open defect.
+Four were fixed by the maintainer's final commits before merge.
+One was addressed by a documenting note.
+One was already recorded as a known gap in the approximation section of `hooks/flag-config-deletion-without-ref-check.py`.
+Filing on thread state would have produced six issues, none of which named an untracked problem.
+
+The remedy is to read the file an unresolved thread names on the default branch before concluding that thread represents a current defect.
+
+- **Do:** read the file an unresolved thread names on the default branch (e.g., with `git show origin/main:<path>`), and file only what is still true there.
+- **Don't:** treat an unresolved review thread on a merged pull request as evidence of an open defect in the code.

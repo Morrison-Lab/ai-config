@@ -225,6 +225,21 @@ check(
     False,
 )
 check(
+    "2>&2 self-duplication does not supersede earlier discard",
+    fires("cmd 2>/dev/null 2>&2 > out.json"),
+    True,
+)
+check(
+    "2>| noclobber override discard fires",
+    fires("cmd 2>|/dev/null > out.json"),
+    True,
+)
+check(
+    "2>| noclobber override to file supersedes earlier discard",
+    fires("cmd 2>/dev/null 2>|err.log > out.json"),
+    False,
+)
+check(
     "a later stderr file redirect supersedes an earlier close",
     fires("cmd 2>&- 2>err.log > out.json"),
     False,
@@ -293,6 +308,16 @@ check(
 check(
     "a three-digit fd before /dev/null reads as stdout discard and under-warns (known gap)",
     fires("cmd 2>/dev/null 123>/dev/null | jq ."),
+    False,
+)
+check(
+    "a quoted /dev/null target is blanked during quote masking and under-warns (known gap)",
+    fires('cmd 2>"/dev/null" > out.json'),
+    False,
+)
+check(
+    "an arithmetic expansion preceding command substitution under-warns (known gap)",
+    fires("result=$(echo $((1)); cmd 2>/dev/null)"),
     False,
 )
 

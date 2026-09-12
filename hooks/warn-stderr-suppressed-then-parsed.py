@@ -92,6 +92,12 @@ Known gaps, not exhaustive:
   tolerated.
 
 - A `case` nested inside a command substitution does not fire. Under-warn.
+- An arithmetic expansion `$(( ... ))` preceding a command substitution or
+  inside one can prematurely close the command substitution's depth tracker.
+  Under-warn.
+- A quoted `/dev/null` target, e.g. `2>"/dev/null"`, is blanked during quote
+  masking before redirect patterns run and reads as a non-suppressed redirect.
+  Under-warn.
 - `exec` redirects apply to the rest of the shell rather than to one command,
   and are not modelled at all.
 - `/dev/stdout`, `/dev/stderr` and `/proc/self/fd/N` are treated as ordinary
@@ -151,8 +157,9 @@ MAXLEN = 90
 RX_MERGE_NULL = re.compile(r"(?:&>>?|>&)\s*/dev/null(?![^\s;|&<>()])")
 
 # stderr alone to /dev/null. The lookbehind keeps `12>/dev/null` (fd 12) from
-# being read as the `2>` form.
-RX_STDERR_NULL = re.compile(r"(?<![^\s|&;()<>])2>>?\s*/dev/null(?![^\s;|&<>()])")
+# being read as the `2>` form. Includes `2>|` which overrides noclobber.
+_ERR_OP = r"(?:>>?\||>>?)"
+RX_STDERR_NULL = re.compile(r"(?<![^\s|&;()<>])2" + _ERR_OP + r"\s*/dev/null(?![^\s;|&<>()])")
 
 # stderr closed outright.
 RX_STDERR_CLOSED = re.compile(r"(?<![^\s|&;()<>])2>&-")
@@ -162,12 +169,11 @@ RX_STDERR_CLOSED = re.compile(r"(?<![^\s|&;()<>])2>&-")
 # suppresses nothing -- warning there is the over-warning this hook rules out.
 # `2>&-` is excluded from the file form since closing is itself a suppression.
 RX_STDERR_TO_FILE = re.compile(
-    # `(?!>)` forces the operator to be maximal. Without it the optional
-    # second `>` backtracks away, so `2>>/dev/null` matches as `2>` plus a
-    # `>` operand -- a stderr-to-FILE redirect at the same offset as the
-    # discard, which then reads as reclaiming it and the discard never fires.
-    r"(?<![^\s|&;()<>])2>>?(?!>)\s*(?!/dev/null(?![^\s;|&<>()]))(?![&-])\S")
-RX_STDERR_MERGED = re.compile(r"(?<![^\s|&;()<>])2>&[0-9]+")
+    # `(?![>|])` forces the operator to be maximal so neither `2>>` nor `2>|`
+    # backtracks away into `2>` plus a `>` or `|` operand.
+    r"(?<![^\s|&;()<>])2" + _ERR_OP + r"(?![>|])\s*(?!/dev/null(?![^\s;|&<>()]))(?![&-])\S")
+# `2>&2` is a self-duplication no-op in bash that does not reclaim stderr.
+RX_STDERR_MERGED = re.compile(r"(?<![^\s|&;()<>])2>&(?!2(?![0-9]))[0-9]+")
 
 # `&>file` / `>&file` with a NON-null target. Both streams go to the file, so
 # this is a stdout file target and an stderr reclaim at once. Only the

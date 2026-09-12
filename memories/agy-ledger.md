@@ -41,3 +41,5 @@ Each numbered rule is a past mistake on a real dispatch, stated as the action th
 - Name the exact files an agent should read, so the shell route is the obvious one.
 - Send an agent's mistake back to it with the finding, the input that broke the agent's output, and the standard.
   Do not commit the fix yourself.
+- Give your own files, such as a job's log, a name the agent's deletion rule cannot match.
+  An agent told it may delete files with a given prefix will delete an orchestrator log carrying that prefix, because it is following the rule it was given.

@@ -267,8 +267,9 @@ check(
 )
 
 # A three-digit fd is out of reach at fixed width, and the hook says so in
-# its own Known gaps list. These two pin what it does instead, so the gap
-# is recorded rather than merely tolerated.
+# its own Known gaps list. These pin what it does instead (both file-target
+# misreporting and discard silent-miss), so the gap is recorded rather than
+# merely tolerated.
 check(
     "a three-digit fd reads as a stdout redirect (known gap)",
     reported("cmd 2>/dev/null 123>realfile.txt")[1],
@@ -278,6 +279,21 @@ check(
     "and it hides the pipe behind it (known gap)",
     reported("cmd 2>/dev/null 123>realfile.txt | jq .")[1],
     "redirected to `realfile.txt`",
+)
+check(
+    "a three-digit fd before >&2 reads as stdout discard and under-warns (known gap)",
+    fires("cmd 2>/dev/null 123>&2 | jq ."),
+    False,
+)
+check(
+    "a three-digit fd before >&- reads as stdout discard and under-warns (known gap)",
+    fires("cmd 2>/dev/null 123>&- | jq ."),
+    False,
+)
+check(
+    "a three-digit fd before /dev/null reads as stdout discard and under-warns (known gap)",
+    fires("cmd 2>/dev/null 123>/dev/null | jq ."),
+    False,
 )
 
 # The append form. `2>>?` let its optional second `>` backtrack away, so this

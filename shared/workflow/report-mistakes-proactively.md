@@ -437,6 +437,15 @@ the API actually returned.
 - **Don't:** announce "filed as #N" while the dupe-check is still outstanding
   --- that asserts the new-issue outcome before anything has decided it.
 
+**The artifact the invented number lands in need not be a chat reply or a PR link-back --- it survives just as easily in a durable file, and there it outlives the conversation that invented it.**
+Every example above is something said to a reader in the moment: a PR body, a merge message, a reply.
+A predicted number written into a memory entry or a corpus fragment is the same invented claim, aimed at a file this session is about to commit rather than at a person reading the current thread --- and it is worse in one respect, since a chat claim dies with the conversation while a committed one persists until someone happens to notice the mismatch.
+
+(Measured 2026-09-09: `ai-config#3439` was written into a memory entry before the filing call ran;
+the issue that call actually created was `#3449`.
+Caught and corrected before the entry was committed, but nothing in the repo would have caught it afterward --- a wrong issue reference passes every existing check, since nothing resolves an `ai-config#NNNN` citation against the tracker to confirm it names what the text claims it names.
+Whether that gap is worth a dedicated checker, rather than only this rule, is its own open question, tracked separately rather than decided here.)
+
 ## A dupe-check chained into the same call as the create gates nothing
 
 The section above rules out announcing step 2's outcome before step 2 has

@@ -826,6 +826,16 @@ refutation of it.**
   the reviewer's finding --- it is a fresh claim, and overturning something
   feels like having verified it.
 
+**Second occurrence, 2026-09-09: the reviewer's own note carried an explanation, and the explanation was the part that went unchecked.**
+The first occurrence above is a note with no explanation attached --- the reviewer names a discrepancy and moves on, and the discipline is to verify the discrepancy itself before acting or writing off.
+Here the reviewer went further and offered a specific account of why the discrepancy was benign, then declined to raise it as a finding on the strength of that account: an arithmetic mismatch (18 minus 14 equals 4) against three authored equations, explained away and flagged only "for the author's awareness."
+A supplied explanation reads as the check already having happened, which is exactly what makes it easier to wave through than a bare unexplained note --- so the same verification the rule already prescribes has to reach the explanation, not stop at agreeing the discrepancy exists.
+Re-running the instrument against the actual files showed the explanation was wrong: the figure was a single document's count, presented as though it summed three documents'.
+Four prior review rounds had passed over the same discrepancy with no explanation attached at all, so the fifth round's incorrect explanation was, perversely, the first thing to make it look resolved.
+
+- **Do:** re-derive a reviewer-explained discrepancy against the actual artifacts, not just confirm the discrepancy is real --- an explanation is a claim, not a measurement.
+- **Don't:** read "the reviewer accounted for it" as a stronger clearance than "the reviewer noted it and moved on" --- both are unverified until you run the check.
+
 **Refuting the mechanism a finding proposes is not refuting its claim, and the
 quality of the refutation is what hides the difference.**
 The rule above governs a refutation nobody checked.

@@ -83,9 +83,10 @@ PERMISSION_RULE = (
 )
 HOOK_REFUSAL = (
     "git push blocked by the pre-push self-review policy:\n"
-    "No `adversarial-reviewer` subagent was dispatched in this session.\n"
-    "Dispatch it against your committed diff and address its findings before "
-    "pushing."
+    "No `adversarial-reviewer` subagent or recognized external reviewer (`agy --print`) "
+    "was dispatched in this session.\n"
+    "Dispatch the subagent or run an `agy --print '<prompt>'` review against your "
+    "committed diff and address its findings before pushing."
 )
 AUTOMODE_UNAVAILABLE = (
     "claude-sonnet-5[1m] is temporarily unavailable, so auto mode cannot "

@@ -159,4 +159,11 @@ The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-anti
 - Command adapters must execute matched hook scripts concurrently (e.g. via `concurrent.futures.ThreadPoolExecutor`) to keep execution latency under ~1-2s and prevent timeouts.
 - Concurrency worker pool size defaults to 16 and is configurable via `AGY_ADAPTER_MAX_WORKERS` (clamped to at least 1).
 
+## Antigravity MWC merge gate and self-approval boundary (`enforce-mwc-review-gate.py`)
 
+- `plugins/ai-config/enforce-mwc-review-gate.py` gates `gh pr merge` tool calls in Antigravity.
+- When a repository lacks external review bots (`github-actions[bot]`, `claude[bot]`, Copilot) or operates under `no-ai-review`, review verdicts posted by local subagents are submitted under the authenticated user/agent account (e.g. `d-morrison`).
+- The gate classifies review comments under non-bot logins as `untrusted-clean`, strictly preventing an agent posting under the user's login from authorizing its own PR merge without human approval.
+- Neither active `/mwc` session grant nor `ALLOW_MERGE=1` overrides this review-gate requirement in `enforce-mwc-review-gate.py` (which evaluates review and CI status directly rather than delegating review vetting to a command-line wrapper).
+- In repositories without automated bot review workflows, merges must be executed either via an affirmative human review from another repository member or directly by the human from their terminal outside the Antigravity agent hook harness.
+  (Observed in live Antigravity sessions 2026-09-11.)

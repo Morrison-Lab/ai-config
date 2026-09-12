@@ -1197,3 +1197,28 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
   says to distrust.
 - **Don't:** let a brief-scoped grep stand in for a corpus-wide one because it
   returned zero hits.
+
+## Pattern 55: A Baseline/Floor Abstraction's "Covers Everything" Claim Needs Domain Verification, Not Just the Motivating Test Case
+
+- **Mistake**: fixing an over-strict (false-positive) permission comparison by introducing a baseline/floor abstraction --- treating a shorthand value as implicitly granting its own rank on every key in a set --- without checking that claim against each key's own domain.
+  When the floor's rank equals the comparison's maximum, every key ranked at or under it becomes permanently unreachable by the escalation check: not merely covered for the cases that motivated the fix, but silently dead for every case past them.
+- **Direction of failure**: the repair for a false-positive DENY opened a false-negative ALLOW, the more dangerous direction for a security guard.
+  This is Pattern 15's inversion produced by a different mechanism: not a widened text exemption, but a numeric floor pinned at the max rank.
+- **Example**: 2026-09-08, `Morrison-Lab/ai-config#3304`, `hooks/guard-slide-major-tag.py` (commit `26b154478`).
+  A reviewer finding: shorthand permissions (`read-all`/`write-all`) were compared with a plain inequality while dict-form permissions used a rank ordering, so a strict downgrade (`write-all` -> `read-all`) was flagged as an escalation --- a false-positive deny.
+  Ranking the shorthand-vs-shorthand comparison left the *same false-positive class* alive one branch over: a shorthand baseline compared against an explicit dict still coerced the baseline to `{}`, so every dict key looked newly added --- `write-all -> {contents: read}`, itself a downgrade, was still denied.
+  That sibling case is not one the review comment named;
+  it turned up only from testing the shorthand-vs-dict boundary directly, not from re-reading the fix.
+  Fixing it introduced the floor: a shorthand baseline was treated as granting its own rank on every dict key it was compared against, so a key was flagged only if it outranked the floor.
+  `write-all`'s floor equalled the rank scale's maximum, so after a `write-all` baseline no dict key could ever be flagged --- including `id-token: write`, which GitHub's workflow-syntax reference documents as accepting only `write` or `none` (never `read`), so `read-all` provably cannot grant it, and whether `write-all` covers it is documented nowhere.
+  `write-all -> {id-token: write}` is a real escalation that the pre-floor code denied correctly and the floor silently allowed, caught by asking what the floor newly permitted rather than by re-running the false positive it was built to fix.
+- **Canonical Rule**: `shared/workflow/metacognitive-monitoring.md`'s "an unexamined default gets named and decided" and Pattern 15 in [`mistake-patterns.cases.md`](mistake-patterns.cases.md) (widening a fail-closed exemption needs a base-parity proof).
+  This pattern is the case where the widening is a numeric floor rather than a text exemption, so the check that catches it is a reachability comparison over the rank domain, not only a corpus diff --- a corpus-parity sweep can miss it entirely if the corpus never happens to combine that specific key with that specific baseline.
+- **Fix**: before shipping a baseline/floor/ceiling abstraction, enumerate what it newly allows, not only what false positive it removes.
+  Name every key the floor's rank reaches or exceeds, and check each one against its own documented domain rather than assuming the general ranking scale applies uniformly to every member.
+
+- **Do:** when a fix introduces a baseline meant to cover a set of keys, ask which of those keys the baseline newly allows to escalate undetected, and enumerate them by name.
+- **Do:** check a floor's rank against each covered key's own documented valid range, not against the general scale the rest of the comparison uses.
+- **Don't:** trust that a fix which resolves the reported false positive is safe merely because it does;
+  test what it newly permits, separately from what it correctly stopped denying.
+- **Don't:** stop at the review's own named finding --- the fix for a comparison bug in one branch can leave the identical bug shape live in a sibling branch nobody pointed at.

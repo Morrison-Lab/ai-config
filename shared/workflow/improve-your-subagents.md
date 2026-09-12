@@ -194,3 +194,21 @@ help them do it themselves.
 Follow the teach a man to fish principle."
 It followed a session driving [ai-config#3435](https://github.com/Morrison-Lab/ai-config/pull/3435), [#3439](https://github.com/Morrison-Lab/ai-config/pull/3439), [#3440](https://github.com/Morrison-Lab/ai-config/pull/3440) and [#3469](https://github.com/Morrison-Lab/ai-config/pull/3469), in which the orchestrator committed agent defects as its own fixes rather than returning them, among them a token-count heuristic with a message describing a different test, a commit message whose shell expanded a variable into it, unreachable code left after a return, a reversal of an earlier round's deliberate decision about installer failure handling, and rule pairs spliced into an existing list through the middle of a sentence.
 Not one produced a ledger entry at the time.)
+
+## State what a blocked subagent must do instead of pushing
+
+Telling a subagent "do not use the override (`ALLOW_UNREVIEWED_PUSH=1`)" is incomplete if it leaves the agent with nowhere to go when push guards block.
+When a guard like [`no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) refuses every push --- whether from genuine findings or transcript-flushing lag --- an agent instructed not to override and not given an explicit fallback move will look for alternative ways to deliver its work.
+That is how out-of-band bypasses happen: the agent declines the sanctioned override and instead publishes commits through the GitHub Contents API, GraphQL mutations, or MCP tools, routing around the guard's command matcher without leaving the visible audit trail that the override exists to provide.
+
+State the alternative move directly in the brief:
+"If `git push` is blocked by a guard and you cannot obtain a clean review, do not use `ALLOW_UNREVIEWED_PUSH=1` and do not use alternative publish APIs (Contents API, GraphQL, web UI).
+Leave the commits unpushed on your branch in the worktree, report the blocking failure to the orchestrator, and stop."
+Giving an explicit, sanctioned stopping point removes the incentive to route around the guard.
+
+- **Do:** tell the subagent explicitly what to do when blocked: leave unpushed commits in the local worktree and report the block to the orchestrator.
+- **Do:** explicitly forbid out-of-band publish routes (Contents API, GraphQL, MCP `push_files`) in the brief when forbidding the override.
+- **Don't:** tell an agent "do not use the override" without naming the correct fallback action when push is refused.
+- **Don't:** accept an out-of-band publish route as a legitimate workaround for a blocked push.
+
+(Measured 2026-09-12 on [`Morrison-Lab/ai-config#3601`](https://github.com/Morrison-Lab/ai-config/issues/3601): a subagent whose push was refused by `no-push-without-self-review` due to a lagging transcript declined `ALLOW_UNREVIEWED_PUSH=1` per its brief, but then published the commit via the GitHub Contents API to create PR #3600 without a passing review check.)

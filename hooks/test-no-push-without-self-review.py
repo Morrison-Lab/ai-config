@@ -801,7 +801,7 @@ CASES = [
         {"type": "user", "message": {"content": [
             {"type": "tool_result", "tool_use_id": "x1", "content": body()}]}}], True,
      "a non-Agent tool carrying subagent_type is not a dispatch",
-     "No `adversarial-reviewer` subagent was dispatched"),
+     "No `adversarial-reviewer` subagent or recognized external reviewer"),
 ]
 
 

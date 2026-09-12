@@ -1728,8 +1728,10 @@ def verify_review(transcript_path: str, directory: str | None,
 
     if not saw_reviewer_call:
         return False, (
-            "No `adversarial-reviewer` subagent was dispatched in this session.\n"
-            "Dispatch it against your committed diff and address its findings before pushing."
+            "No `adversarial-reviewer` subagent or recognized external reviewer (`agy --print`) "
+            "was dispatched in this session.\n"
+            "Dispatch the subagent or run an `agy --print '<prompt>'` review against your "
+            "committed diff and address its findings before pushing."
         )
 
     if verdict is None:

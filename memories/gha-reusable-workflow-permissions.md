@@ -248,3 +248,8 @@ It permits:
 - Dropped permission keys.
 - Brand-new reusable workflows (no existing callers pinned to the base tag).
 - Comment edits and key reorderings (parsed YAML per-job set comparison).
+
+Bypass mechanisms for emergency slides:
+- `slide-major-tag.yml` input `force: true`.
+- Environment/repo variable `ALLOW_BREAKING_SLIDE=1`.
+

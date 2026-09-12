@@ -501,7 +501,7 @@ Exit code 0 means at least one match, 1 means none, anything else is a real erro
 - **Do:** read `git grep`'s exit code as three-valued (0 / 1 / error), the same as any other grep-family tool.
 - **Don't:** assume every `grep` flag that isn't obviously working-tree-only survived into `git grep` -- check `git grep -h` rather than porting a command by analogy.
 
-## Commit a fix before mutation-testing it -- `git checkout -- <file>` restores to HEAD, not to your fix
+## Commit a fix before mutation-testing it --- `git checkout -- <file>` restores from the index, not to your fix
 
 The diff-scoped no-op section above says to commit before running a diff-scoped check, because the check reads the wrong population otherwise.
 This is the same commit-first discipline for a different, more destructive reason: the restore step after a mutation test discards whatever is uncommitted, fix included.

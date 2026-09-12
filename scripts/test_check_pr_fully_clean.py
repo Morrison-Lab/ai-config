@@ -624,6 +624,73 @@ def main() -> int:
         and any("Claude" in i for i in xr_issues),
     )
 
+    # ai-config#3587: a reviewer that reports it CANNOT review this head is
+    # unavailable, not pending, so its stale not-clean must stop blocking --
+    # waiting on it cannot end. The notice is not a clean verdict, so the
+    # release is reported as a NOTE that still demands ARD of its findings.
+    QUOTA_NOTICE = (
+        "Copilot was unable to review this pull request because the user who "
+        "requested the review has reached their quota limit."
+    )
+    COPILOT_BLOCKS = (
+        "### Changes recommended\n\nTwo findings remain.\n\n"
+        "### Verdict\n\n**Needs more work**"
+    )
+    CLAUDE_CLEAR = (
+        "**Claude finished** review\n\n### Verdict\n\n**Ready for merge**"
+    )
+
+    def _review(when, body, author):
+        return ("review", when, body, "", "", author)
+
+    items_outage_cross = [
+        _review("2026-09-11T05:00:00Z", COPILOT_BLOCKS, "copilot-pull-request-reviewer"),
+        _review("2026-09-11T06:00:00Z", QUOTA_NOTICE, "copilot-pull-request-reviewer"),
+        _review("2026-09-11T07:00:00Z", CLAUDE_CLEAR, "github-actions"),
+    ]
+    oc_ok, oc_issues = checker.check_latest_verdict(items_outage_cross)
+    check(
+        "check_latest_verdict: an outage newer than a reviewer's stale not-clean "
+        "releases the per-reviewer block (#3587)",
+        oc_ok and any(i.startswith("NOTE: ") and "UNAVAILABLE" in i for i in oc_issues),
+    )
+
+    # The same release has to reach the global-latest branch, which is the case
+    # a PR hits when the unavailable reviewer is the ONLY one that ever posted.
+    items_outage_sole = [
+        _review("2026-09-11T05:00:00Z", COPILOT_BLOCKS, "copilot-pull-request-reviewer"),
+        _review("2026-09-11T06:00:00Z", QUOTA_NOTICE, "copilot-pull-request-reviewer"),
+    ]
+    os_ok, os_issues = checker.check_latest_verdict(items_outage_sole)
+    check(
+        "check_latest_verdict: an outage releases the global-latest branch too, "
+        "for a sole unavailable reviewer (#3587)",
+        os_ok and any(i.startswith("NOTE: ") and "UNAVAILABLE" in i for i in os_issues),
+    )
+
+    # The negative control, and the one that decides whether the release is
+    # sound: an outage that PRECEDES the finding says nothing about the
+    # reviewer's ability to have produced it, so the finding still blocks.
+    items_outage_stale = [
+        _review("2026-09-11T04:00:00Z", QUOTA_NOTICE, "copilot-pull-request-reviewer"),
+        _review("2026-09-11T05:00:00Z", COPILOT_BLOCKS, "copilot-pull-request-reviewer"),
+        _review("2026-09-11T07:00:00Z", CLAUDE_CLEAR, "github-actions"),
+    ]
+    ost_ok, ost_issues = checker.check_latest_verdict(items_outage_stale)
+    check(
+        "check_latest_verdict: an outage OLDER than the not-clean still blocks (#3587)",
+        (not ost_ok) and any("NOT clean" in i for i in ost_issues),
+    )
+
+    check(
+        "is_reviewer_unavailable_notice: a review quoting the outage it stands "
+        "in for is still a review (#3587)",
+        checker.is_reviewer_unavailable_notice(QUOTA_NOTICE)
+        and not checker.is_reviewer_unavailable_notice(
+            "**Claude finished** review\n\n" + QUOTA_NOTICE + "\n\n### Verdict\n\nClean"
+        ),
+    )
+
     items_same_reviewer = [
         (
             "comment",
@@ -833,7 +900,11 @@ def main() -> int:
     check(
         "check_latest_verdict: Copilot CHANGES_REQUESTED is not cleared by a "
         "later Claude all-clear (#2274)",
-        (not cr_ok) and any("copilot-pull-request-reviewer[bot]" in i for i in cr_issues),
+        # The blocker names the reviewer IDENTITY, which for every Copilot
+        # login spelling is now "Copilot" (ai-config#3066). The assertion is
+        # unchanged in substance: Copilot's own standing not-clean is still
+        # what has to survive Claude's later all-clear.
+        (not cr_ok) and any("Copilot" in i for i in cr_issues),
     )
     cr_approved_ok, cr_approved_issues = checker.check_latest_verdict(
         [copilot_cr, claude_ready],
@@ -1364,6 +1435,10 @@ def main() -> int:
         "Nothing here needs any further work.",
         "No changes requested.",
         "There are no changes requested on this round.",
+        # ai-config#3487: the guard's prefix test required a space between
+        # "no" and what follows, so a hyphenated negation slipped through
+        # even though it says the identical thing.
+        "No-changes requested.",
     ):
         check(
             f"classify_verdict: a NEGATED not-clean phrase is not a verdict -- {phrase!r}",
@@ -1401,6 +1476,18 @@ def main() -> int:
         "classify_verdict: Anthropic code-review plugin clean comment with AGENTS.md is clean",
         checker.classify_verdict(
             "## Code review\n\nNo issues found. Checked for bugs and AGENTS.md compliance."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: Anthropic code-review plugin clean comment with bold prefix is clean",
+        checker.classify_verdict(
+            "## Review Summary\n\n**No issues found.** Checked for bugs and CLAUDE.md compliance."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: Anthropic code-review plugin clean comment with bold prefix and AGENTS.md is clean",
+        checker.classify_verdict(
+            "## Review Summary\n\n**No issues found.** Checked for bugs and AGENTS.md compliance."
         ) == "clean",
     )
     check(
@@ -1854,6 +1941,147 @@ def main() -> int:
           checker.classify_verdict(
               "### Verdict\nNits below, plus the previously blocking crash which is NOT fixed.\n", "")
           == "not-clean")
+
+    # ai-config#3487: the #2369 fix above only exempted the "non-"/"non "
+    # compounds from the bare `_BARE_REJECTION` pattern itself. "not
+    # blocking" and "no blocking findings remain" say the exact same thing
+    # with a different negator immediately in front of the word, and the
+    # bare pattern matched both with no guard at all -- confirmed by
+    # reverting the `(?<!not\s)(?<!no\s)` lookbehinds and re-running these
+    # two checks, which then fail (match found instead of none).
+    #
+    # These two are asserted at the bare-pattern level, not through
+    # classify_verdict/`_unresolved_finding_pattern`: both of those already
+    # route every `_BARE_REJECTION` match through `NOT_CLEAN_NEGATION_PREFIX`
+    # (below), whose word list already includes "no"/"not" with a plain
+    # space -- so a classify_verdict-level check of the same two phrases
+    # passes identically with or without this fix and would not actually
+    # exercise it. The bare pattern is still worth guarding directly: other
+    # code (and this test file's own #2369 checks) matches `_BARE_REJECTION`
+    # standalone, with no downstream negation guard at all.
+    check("_BARE_REJECTION no longer matches inside 'not blocking'",
+          not _re.search(checker._BARE_REJECTION,
+                         "this is not blocking the merge", _re.I))
+    check("_BARE_REJECTION no longer matches inside 'no blocking findings remain'",
+          not _re.search(checker._BARE_REJECTION,
+                         "no blocking findings remain", _re.I))
+
+    # #3497 review: the hyphen branch of NOT_CLEAN_NEGATION_PREFIX was first
+    # written as `(?:no|not|nothing|none|never)(?:-|\s+...)`, which exempted
+    # `not-blocking` / `no-blocking` / `not-rejected` through the FULL
+    # pipeline -- undoing one layer up the narrowness the lookbehinds above
+    # preserve, in the dangerous direction. `non-X` is a negating compound;
+    # `not-X` is two words someone hyphenated.
+    #
+    # These are asserted through classify_verdict on purpose. The comment
+    # above explains why the bare level is the right place for the SPACE
+    # forms; it does not carry to the hyphen forms, whose whole failure mode
+    # lived in the generic guard rather than in the bare pattern. That gap is
+    # why the first version of this fix passed 797 tests with the regression
+    # in it.
+    # All five negators, including `no`. An earlier round exempted `no-`
+    # in the generic prefix guard to keep `no-changes requested` clean, and
+    # that swallowed `no-blocking` with it. The hyphen now lives on the
+    # `Changes\s+requested` alternative itself, so the generic guard stays
+    # space-only and every hyphenated negator before a not-clean phrase
+    # stays flagged.
+    for _neg in ("not", "no", "never", "nothing", "none"):
+        check(f"classify_verdict: '{_neg}-blocking' stays not-clean",
+              checker.classify_verdict(
+                  f"### Verdict\nReady for merge. {_neg}-blocking nit noted.\n",
+                  "") == "not-clean")
+    check("classify_verdict: 'not-rejected' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\nReady for merge. not-rejected nit noted.\n", "")
+          == "not-clean")
+    check("_unresolved_finding_pattern: 'not-blocking' still reports a finding",
+          checker._unresolved_finding_pattern(
+              "### Verdict\nReady for merge. not-blocking nit noted.\n")
+          is not None)
+    # The case the fix exists for must still pass, through the same pipeline.
+    # The five phrases the generic hyphen exemption silently swallowed
+    # before it was withdrawn (#3497 review): every alternative of
+    # `_BARE_REJECTION`, not just the one the fix was written for.
+    for _phrase in ("rejected", "unapproved", "impasse", "deadlock"):
+        check(f"classify_verdict: 'non-{_phrase}' stays not-clean",
+              checker.classify_verdict(
+                  f"### Verdict\nReady for merge. non-{_phrase} nit noted.\n",
+                  "") == "not-clean")
+    check("classify_verdict: 'no-rejected' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\nReady for merge. no-rejected nit noted.\n", "")
+          == "not-clean")
+    # #3497 review round 4: the lookbehinds had no word boundary, so any
+    # longer word ending in "no"/"not" swallowed the phrase after it.
+    for _word in ("volcano", "casino", "domino"):
+        check(f"classify_verdict: '{_word}-changes requested' stays not-clean",
+              checker.classify_verdict(
+                  f"### Verdict\n{_word.capitalize()}-changes requested.\n",
+                  "") == "not-clean")
+        check(f"classify_verdict: '{_word} blocking' stays not-clean",
+              checker.classify_verdict(
+                  f"### Verdict\nReady for merge. {_word} blocking issue "
+                  "remains.\n", "") == "not-clean")
+    check("classify_verdict: 'no-changes requested' stays exempt (#2369)",
+          checker.classify_verdict(
+              "### Verdict\nNo-changes requested.\n", "") != "not-clean")
+    check("classify_verdict: 'non-blocking' is still exempt",
+          checker.classify_verdict(
+              "### Verdict\nReady for merge. non-blocking nit noted.\n", "")
+          == "clean")
+    # The dangerous direction stays covered: a negator that is NOT
+    # immediately adjacent to "blocking" must still read as a live finding,
+    # because the fixed-width lookbehind only ever looks at the three or
+    # four characters right before the word. "it is not a nit -- it is
+    # blocking" and "there is no doubt this is blocking" both put other
+    # words between the negator and "blocking", so neither is swallowed --
+    # this is the guard against the "blanket negation window" anti-pattern
+    # the issue explicitly warns against. Checked at both the bare-pattern
+    # level and through the full classify_verdict pipeline.
+    check("_BARE_REJECTION still matches 'not a nit -- it is blocking' (negator not adjacent)",
+          bool(_re.search(checker._BARE_REJECTION,
+                          "this is not a nit -- it is blocking", _re.I)))
+    check("_BARE_REJECTION still matches 'no doubt this is blocking' (negator not adjacent)",
+          bool(_re.search(checker._BARE_REJECTION,
+                          "there is no doubt this is blocking", _re.I)))
+    check("classify_verdict: 'not a nit -- it is blocking' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\nThis is not a nit -- it is blocking.\n", "")
+          == "not-clean")
+    check("classify_verdict: 'no doubt this is blocking' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\nThere is no doubt this is blocking merge.\n", "")
+          == "not-clean")
+
+    # ai-config#3487: NOT_CLEAN_NEGATION_PREFIX's negator-to-phrase gap used
+    # a bare `\s`, so a hyphenated negation ("No-changes requested.") was
+    # NOT exempted even though the word-spaced form ("No changes
+    # requested.") already was -- the same hyphen-vs-space gap "non-blocking"
+    # hit, one guard over. Mutation check: reverting the hyphen branch back
+    # to a bare `\s` in NOT_CLEAN_NEGATION_PREFIX makes this fail (returns
+    # "not-clean" instead of "").
+    check("classify_verdict: 'No-changes requested.' (hyphenated) is not a verdict",
+          checker.classify_verdict("### Verdict\nNo-changes requested.\n", "") == "")
+    # Round-2 adversarial review of #3487: the FIRST attempt at the check
+    # above widened `\s` to `[\s-]` everywhere in NOT_CLEAN_NEGATION_PREFIX,
+    # including inside the `\w+\s+` filler -- which let a hyphen stand in
+    # for a space between the negator and an intervening word, not just
+    # between the negator and the phrase itself. That swallowed any
+    # hyphenated compound ADJECTIVE that happens to open with a negator
+    # word, which has nothing to do with negating what follows: reverting
+    # to that blanket `[\s-]` version makes every check below fail (each
+    # returns "" or None instead of "not-clean"/a real finding).
+    for phrase in (
+        "Not-negligible changes requested.",
+        "No-nonsense changes requested here.",
+        "Not-yet-addressed changes requested below.",
+        "Never-resolved changes requested.",
+    ):
+        check(
+            f"classify_verdict: hyphenated compound adjective before a real "
+            f"not-clean phrase still reads not-clean -- {phrase!r}",
+            checker.classify_verdict(f"### Verdict\n{phrase}\n", "") == "not-clean",
+        )
     check("a previously blocking failure explicitly fixed is not an active finding",
           checker._unresolved_finding_pattern(
               "### Verdict\n**Ready for merge.** The previously blocking "
@@ -2113,6 +2341,7 @@ def main() -> int:
         checker.classify_verdict(
             "### Verdict\nNeeds more work: non-blocking issue, please rename variable x.\n",
             "",
+            "copilot"
         )
         == "not-clean",
     )
@@ -5702,6 +5931,225 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check(
         "_blank_fences_and_spans on max-length body of double backticks scales linearly (< 1s)",
         _db_secs < 1.0,
+    )
+
+    # ai-config#3066: a current-head Copilot formal review is the authentic
+    # clean external verdict, and its heading vocabulary was unreadable to
+    # every scan in this file, so it counted neither way.
+    #
+    # Fixture provenance, per shared/workflow/fixtures-are-not-evidence.md: a
+    # fixture is not evidence about the system it imitates, so these bodies are
+    # transcribed from real Copilot reviews rather than invented. The issue
+    # cites ucdavis/rampp#161 review 5096969112, which is not readable from
+    # this repo; the wording below is taken from Copilot's reviews on
+    # Morrison-Lab/ai-config#3166, fetched on 2026-09-09 -- review 5108199716
+    # for the affirmative shape and 5108139399 / 5108171770 / 5108621306 for
+    # the three negative ones.
+    copilot_details = (
+        "<details>\n<summary>Review details</summary>\n\n"
+        "- **Files reviewed:** 4/4 changed files\n"
+        "- **Comments generated:** 0 new\n"
+        "- **Review effort level:** Lite\n"
+        "</details>"
+    )
+    copilot_clean_body = (
+        "### \U0001f7e2 Approval recommended\n\n"
+        "The changes are documentation-only, internally consistent within the "
+        "updated sections, and appear to correctly scope and qualify the "
+        "measured claims.\n\n" + copilot_details
+    )
+    copilot_changes_body = (
+        "### \U0001f7e1 Changes recommended\n\n"
+        "The new section title currently omits the required remote argument.\n\n"
+        "<details>\n<summary>Review details</summary>\n\n"
+        "- **Files reviewed:** 4/4 changed files\n"
+        "- **Comments generated:** 2\n"
+        "- **Review effort level:** Lite\n"
+        "</details>"
+    )
+    copilot_closer_look_body = (
+        "### \U0001f535 Needs a closer look\n\n"
+        "The new section uses a command that will not emit patches.\n\n"
+        "<details>\n<summary>Review details</summary>\n\n"
+        "### Suppressed comments (1)\n\n"
+        "**Previously missed (1)** in code that hasn't changed since the last "
+        "review.\n\n"
+        "**memories/git-diffing.md:179**\n"
+        "* Without the patch flag the output is just commit messages.\n\n"
+        "- **Files reviewed:** 4/4 changed files\n"
+        "- **Comments generated:** 0 new\n"
+        "- **Review effort level:** Lite\n"
+        "</details>"
+    )
+    copilot_suppressed_body = copilot_clean_body.replace(
+        "- **Files reviewed:** 4/4 changed files",
+        "### Suppressed comments (1)\n\n"
+        "**memories/git.md:152**\n"
+        "* This file still contains non-ASCII em dashes.\n\n"
+        "- **Files reviewed:** 4/4 changed files",
+    )
+    copilot_nonzero_body = copilot_clean_body.replace(
+        "Comments generated:** 0 new", "Comments generated:** 2"
+    )
+    copilot_countless_body = copilot_clean_body.split("<details>")[0].rstrip()
+
+    check(
+        "copilot_verdict: affirmative heading with zero comments and no "
+        "suppression block is clean",
+        checker.copilot_verdict(copilot_clean_body) == "clean",
+    )
+    check(
+        "copilot_verdict: 'Changes recommended' heading is not clean",
+        checker.copilot_verdict(copilot_changes_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: 'Needs a closer look' heading is not clean",
+        checker.copilot_verdict(copilot_closer_look_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: affirmative heading over a suppression block is "
+        "not clean",
+        checker.copilot_verdict(copilot_suppressed_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: affirmative heading with a nonzero comment count is "
+        "not clean",
+        checker.copilot_verdict(copilot_nonzero_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: affirmative heading with no comment count states no "
+        "verdict rather than a clean one",
+        checker.copilot_verdict(copilot_countless_body) == "",
+    )
+    check(
+        "copilot_verdict: a body carrying no Copilot heading states no verdict",
+        checker.copilot_verdict("### Verdict\n\n**Ready for merge**") == "",
+    )
+    check(
+        "copilot_verdict: 'Approval recommended' in prose is not a heading "
+        "verdict",
+        checker.copilot_verdict(
+            "The reviewer wrote that Approval recommended was its earlier "
+            "verdict.\n\n- **Comments generated:** 0\n"
+        )
+        == "",
+    )
+
+    check(
+        "classify_verdict: Copilot affirmative review classifies clean",
+        checker.classify_verdict(copilot_clean_body, "COMMENTED", "copilot") == "clean",
+    )
+    for _label, _body in (
+        ("changes recommended", copilot_changes_body),
+        ("needs a closer look", copilot_closer_look_body),
+        ("suppressed findings", copilot_suppressed_body),
+        ("nonzero comment count", copilot_nonzero_body),
+    ):
+        check(
+            f"classify_verdict: Copilot {_label} review classifies not-clean",
+            checker.classify_verdict(_body, "COMMENTED", "copilot") == "not-clean",
+        )
+    check(
+        "classify_verdict: a finding stated in a Copilot body's prose beats "
+        "its affirmative heading",
+        checker.classify_verdict(
+            copilot_clean_body.replace(
+                "The changes are documentation-only",
+                "### Verdict\n\n**Needs work**\n\nThe changes are "
+                "documentation-only",
+            ),
+            "COMMENTED",
+            "copilot"
+        )
+        == "not-clean",
+    )
+
+    check(
+        "classify_verdict: a non-Copilot body with that heading and an explicit clean verdict stays clean",
+        checker.classify_verdict("### \U0001f7e2 Approval recommended\n\n### Verdict\n\n**Ready for merge**", "COMMENTED", "someone-else") == "clean",
+    )
+    check(
+        "copilot_verdict: fenced example of Copilot heading is ignored",
+        checker.copilot_verdict('```\n### \U0001f7e1 Changes recommended\n```\n### \U0001f7e2 Approval recommended\n\n- **Comments generated:** 0') == "clean",
+    )
+    check(
+        "copilot_verdict: negated heading is not affirmative",
+        checker.copilot_verdict("### Not Approval recommended\n\n- **Comments generated:** 0") == "",
+    )
+    check(
+        "copilot_verdict: quoted heading is not affirmative",
+        checker.copilot_verdict("## \"Approval recommended\"? No.\n\n- **Comments generated:** 0") == "",
+    )
+    check(
+        "_is_bot_author admits Copilot's bare login as well as the [bot] form",
+        checker._is_bot_author("copilot-pull-request-reviewer")
+        and checker._is_bot_author("copilot-pull-request-reviewer[bot]"),
+    )
+    check(
+        "_reviewer_identity maps every Copilot login spelling to one identity",
+        len(
+            {
+                checker._reviewer_identity(copilot_clean_body, login)
+                for login in (
+                    "Copilot",
+                    "copilot-pull-request-reviewer",
+                    "copilot-pull-request-reviewer[bot]",
+                )
+            }
+        )
+        == 1,
+    )
+
+    # End to end through check_review_comments: the clean shape satisfies a
+    # single-provider quorum, and each negative shape blocks.
+    copilot_review = {
+        "submittedAt": "2026-09-09T18:14:14Z",
+        "state": "COMMENTED",
+        "author": {"login": "copilot-pull-request-reviewer"},
+        "commit": {"oid": "sha123"},
+        "body": copilot_clean_body,
+    }
+    mock_copilot_clean = json.dumps({"comments": [], "reviews": [copilot_review]})
+    with patch.object(checker, "run_cmd", return_value=mock_copilot_clean):
+        cop_ok, cop_issues = checker.check_review_comments("3066", "sha123", TEST_REPO)
+    check(
+        "check_review_comments: a current-head Copilot approval counts toward "
+        "quorum (ai-config#3066)",
+        cop_ok and cop_issues == [],
+    )
+
+    for _label, _body in (
+        ("changes recommended", copilot_changes_body),
+        ("needs a closer look", copilot_closer_look_body),
+        ("suppressed findings", copilot_suppressed_body),
+        ("nonzero comment count", copilot_nonzero_body),
+    ):
+        _review = dict(copilot_review, body=_body)
+        _mock = json.dumps({"comments": [], "reviews": [_review]})
+        with patch.object(checker, "run_cmd", return_value=_mock):
+            _ok, _issues = checker.check_review_comments("3066", "sha123", TEST_REPO)
+        check(
+            f"check_review_comments: Copilot {_label} review blocks",
+            (not _ok) and any(not i.startswith("NOTE: ") for i in _issues),
+        )
+
+    # Quorum: two Copilot login spellings are one provider, not two.
+    _copilot_bot_spelling = dict(
+        copilot_review,
+        submittedAt="2026-09-09T18:20:00Z",
+        author={"login": "copilot-pull-request-reviewer[bot]"},
+    )
+    mock_two_spellings = json.dumps(
+        {"comments": [], "reviews": [copilot_review, _copilot_bot_spelling]}
+    )
+    with patch.object(checker, "run_cmd", return_value=mock_two_spellings):
+        two_ok, two_issues = checker.check_review_comments(
+            "3066", "sha123", TEST_REPO, quorum=2
+        )
+    check(
+        "check_review_comments: two Copilot login spellings do not satisfy a "
+        "two-provider quorum on their own",
+        (not two_ok) and any("quorum" in i.lower() for i in two_issues),
     )
 
     print(f"\n{passes} passed, {failures} failed")

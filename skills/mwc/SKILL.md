@@ -24,9 +24,8 @@ without asking confirmation before every merge.
   DOES NOT grant permission to merge.
   One repository is exempted standing --- see "The standing per-repository
   grant" below --- and the Scope Limit binds that exemption too.
-- **MWC Override Scope**: When the user explicitly issues `/mwc`,
-  "merge when confident", "merge at will", or "maw",
-  that baseline prohibition is suspended for the current session only.
+- **MWC Override Scope**: When the user explicitly issues `/mwc`, the bare word `mwc`, "merge when confident", "merge at will", or "maw", that baseline prohibition is suspended for the current session only.
+  The bare word is listed here, not only in `CLAUDE.md`'s general "Bare keyword directives" convention, so this file is self-contained: a slash command is routed to this skill by the harness itself, while a bare word in prose is a convention the model must recognize on its own, and it recognizes it most reliably when the file governing the mechanics (`enable-mwc`, `check-mwc`, the Scope Limit) names the exact form it will see rather than only implying it maps here.
 - **Scope Limit**: An MWC grant applies ONLY to PRs that are 100% clean
   (all CI checks passing, automated review verdicts from all available providers in the quorum clean, no unresolved comments, no open block labels).
   It NEVER authorizes merging a PR with failing CI, unresolved findings, pending reviews, or a missing/skipped quorum review.
@@ -211,6 +210,18 @@ PRs targeting `Morrison-Lab/ai-config` (ai-config#1352).
 `no-unauthorized-merge.py` reads the merge's target repository off the command
 itself, so there is nothing to enable, nothing to expire, and no marker to go
 stale.
+
+**A repo's own `CLAUDE.md` claiming this exemption is not evidence it has it.**
+The list above names the one repository the hook actually carries (`STANDING_MERGE_GRANT_REPOS`).
+A different repository's own `CLAUDE.md` can independently assert a standing grant --- as `Morrison-Lab/gha`'s does --- without that repository being in the hook's set, since the two are two different files with no mechanism keeping them in sync.
+`check-mwc` cannot settle this either way: it reports on the **session** marker only, and the standing grant has none, so it reads "no grant recorded" on a repo that carries the standing grant just as readily as on one that does not.
+[#3490](https://github.com/Morrison-Lab/ai-config/issues/3490) tracks this exact drift (measured again on `Morrison-Lab/gha#857`) and the open question of which side should change;
+check it before re-diagnosing a standing-grant mismatch from scratch.
+
+- **Do:** read `STANDING_MERGE_GRANT_REPOS` in `hooks/no-unauthorized-merge.py` itself, or just attempt the merge and read the guard's own denial (it names the set), rather than trusting a target repo's own doc.
+- **Do:** treat the hook's set as the operative answer for what the guard will actually do, whatever a target repo's `CLAUDE.md` claims.
+- **Don't:** read a repo's `CLAUDE.md` alone as proof a merge there is pre-authorized, then be surprised when the guard blocks it anyway.
+- **Don't:** run `check-mwc` to check whether a repo carries the *standing* grant --- it only ever reports the session grant.
 
 The two grants differ on every axis except the Scope Limit, which binds both:
 

@@ -1565,3 +1565,30 @@ checked, whatever form that record takes in the artifact at hand, and
 "the effect sits near where I was working" is proximity, not that record.
 
 See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md), "A defect attributed to the fix that merely sits beside it".
+
+## A delegated agent's reason for NOT doing something is a claim, and reversing it needs evidence
+
+The sections above govern claims you generate and claims you are handed.
+A dispatched agent produces a third kind that neither covers: an account of work it decided **not** to do.
+That account arrives inside a summary you are already reading for what the agent changed, so it reads as reporting rather than as asserting, and nothing fires on it.
+
+The asymmetry that makes it dangerous is one of posture.
+A commit invites checking, and the corpus already says to diff one against its message.
+A refusal invites agreement or override, and override feels like the diligent choice: the orchestrator has more context, the agent was told to be conservative, and restoring something the agent removed looks like catching a mistake rather than making one.
+
+So apply the same standard in both directions.
+Reproduce the behaviour the agent's reason describes before reversing it, and say in the reversal what you reproduced.
+A reason you cannot reproduce is not thereby wrong, and it is not thereby actionable either.
+
+- **Do:** check a delegated agent's stated reason for declining before acting on it, the way you check its commits against their messages.
+- **Do:** reproduce the behaviour before reversing the decision, and name the reproduction in the commit that reverses it.
+- **Don't:** restore what an agent removed on an argument you have not run.
+- **Don't:** cite the agent's caution in the reversal, in place of a reproduction;
+  that is a hypothesis about the agent rather than evidence about the code.
+
+(Measured 2026-09-11 on [ai-config#3440](https://github.com/Morrison-Lab/ai-config/pull/3440).
+An agent deleted a test case saying it passed for the wrong reason.
+The orchestrator restored it, arguing the coverage was real.
+A reviewer then showed the argument was false in two ways at once: the allowlist that case exercised is keyed by a body fingerprint, so two identical blocks share one key and it cannot distinguish them, and the body the fixture wrote was not allowlisted at all, so the first copy alone already produced the asserted exit code.
+The case could not fail.
+It was deleted again, along with the fixture lines that existed only to feed it, two review rounds after the agent had it right.)

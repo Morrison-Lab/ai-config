@@ -226,7 +226,24 @@ python3 scripts/check-vendored-drift.py
 npx --yes markdownlint-cli2@0.22.1   # markdown style on the updated skill's SKILL.md
 git add .claude/agents/<name>.md skills/<calling-skill>/SKILL.md   # stage only what you touched
 git commit -m "agents: add <name> — <summary>"   # COMMIT
-git push -u origin HEAD && gh pr create --fill   # PUSH, CREATE_PR
+```
+
+Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+```bash
+# Re-derived rather than inherited: a separate Bash call never keeps the
+# previous one's variables, and whether it keeps the directory is
+# unsettled. Target the active branch's worktree, falling back to the checkout root:
+repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/agent-builder rev-parse --show-toplevel 2>/dev/null || pwd)}"
+wt="$(git -C "$repo" worktree list --porcelain | awk '/^worktree /{w=$2} /^branch refs\/heads\/add-<name>-agent$/{print w}')"
+target="${wt:-$repo}"
+git -C "$target" push -u origin HEAD   # PUSH
+```
+
+Open the PR in a separate Bash call:
+
+```bash
+gh pr create --fill   # CREATE_PR
 ```
 
 Then, as explicit steps:

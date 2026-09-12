@@ -361,7 +361,16 @@ committed pass.
    cd "$wt"
    git add "skills/<name>/SKILL.md" "memories/<file>.md"   # the files you touched
    git commit -m "ums: <brief summary>"   # COMMIT
-   git push origin HEAD                   # PUSH
+   ```
+
+   Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+   ```bash
+   # `git -C`, not `cd`: whether a separate Bash call keeps the
+   # previous one's directory is unsettled between sessions, so a
+   # relative `cd` breaks in whichever half it did not assume.
+   repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
+   git -C "$repo/../ai-config-worktrees/<branch>" push origin HEAD   # PUSH
    ```
 
    *No PR yet:* branch off main first — a direct-to-main push is denied by
@@ -375,7 +384,16 @@ committed pass.
    cd "../ai-config-worktrees/ums-<topic>"
    git add "skills/<name>/SKILL.md" "memories/<file>.md"   # the files you touched
    git commit -m "ums: <brief summary>"   # COMMIT
-   git push -u origin HEAD   # PUSH — PR creation is handled by the post-push verification step below
+   ```
+
+   Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+   ```bash
+   # `git -C`, not `cd`: whether a separate Bash call keeps the
+   # previous one's directory is unsettled between sessions, so a
+   # relative `cd` breaks in whichever half it did not assume.
+   repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
+   git -C "$repo/../ai-config-worktrees/ums-<topic>" push -u origin HEAD   # PUSH -- PR creation is handled by the post-push verification step below
    ```
 
    *Cross-fork case* (this checkout's `origin` is your own fork, not the
@@ -394,11 +412,19 @@ committed pass.
    cd "../ai-config-worktrees/ums-<topic>"
    git add "skills/<name>/SKILL.md" "memories/<file>.md"   # the files you touched
    git commit -m "ums: <brief summary>"   # COMMIT
-   git push -u origin HEAD   # PUSH -- to your fork; PR creation is handled by the post-push verification step below
    ```
-   **CAUTION:** if a compound `add && commit && push` is **denied**, *nothing*
-   was committed — verify with `git status` / `git log` before any `git reset
-   --hard`, or you'll silently discard the still-uncommitted edits.
+
+   Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+   ```bash
+   # `git -C`, not `cd`: whether a separate Bash call keeps the
+   # previous one's directory is unsettled between sessions, so a
+   # relative `cd` breaks in whichever half it did not assume.
+   repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/ums rev-parse --show-toplevel 2>/dev/null || pwd)}"
+   git -C "$repo/../ai-config-worktrees/ums-<topic>" push -u origin HEAD   # PUSH -- to your fork; PR creation is handled by the post-push verification step below
+   ```
+   **CAUTION:** keeping the push in its own call is what makes the commit durable before anything can refuse the push.
+   If you do chain them and the call is **denied**, *nothing* was committed -- verify with `git status` / `git log` before any `git reset --hard`, or you'll silently discard the still-uncommitted edits.
 
    **After the PR merges**, remove the worktree so it doesn't accumulate:
    `git -C "$repo" worktree remove "../ai-config-worktrees/<branch>"` (the

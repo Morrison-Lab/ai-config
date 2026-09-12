@@ -100,6 +100,42 @@ is the reason the scope goes unquestioned.**
 See [`address-every-comment.cases.md`](address-every-comment.cases.md),
 "A finding's site list spans every branch in the stack".
 
+**A review names instances, never the class: call sites across a codebase or control-flow branches within a function.**
+A reviewer samples a class and cites what it found,
+so its list is evidence that the defect exists rather than a census of where.
+Treating it as a census is the error,
+and it is easy to make because the list arrives looking authoritative:
+specific files, specific line numbers, quoted code.
+Here, the *next review round* reports the missed instance,
+so the same defect comes back with a new instance attached and the round reads as progress.
+Three rounds of that is three pushes,
+three review cycles,
+and a defect still present.
+This is [`derive-dont-enumerate`](derive-dont-enumerate.md) on the fixing side:
+derive the set rather than accept it.
+
+- **Do:** treat a reviewer's cited instances as a sample,
+  and derive the full set before fixing --
+  `git grep -n '<symbol>'` for a call site,
+  an enumeration of every branch for a control-flow fix.
+- **Do:** paste the deriving command and its output in the reply,
+  so the reviewer can check the set rather than re-finding members of it.
+- **Do:** make that enumeration the deliverable when a defect has already recurred once;
+  the one-line fix is the cheap half.
+- **Don't:** count a round that fixed exactly what was cited as having addressed the finding,
+  when the finding was about a class.
+
+Measured 2026-09-10/11 on `Lacaedemon/sparta`, three times in one session:
+
+- A fix threaded a new argument through the two call sites a reviewer named.
+  A third call site existed, and the next round found it.
+- A function got a guard for a partial tick,
+  then a second round for zero speed,
+  then a third for zero distance --
+  each the branch the previous fix had not visited.
+- An all-or-nothing validation pass was added,
+  and its one early `continue` kept the very non-atomicity it was written to prevent.
+
 **Deriving the class is necessary and not sufficient, because you can derive the
 wrong one --- and the growth rate across rounds is what says so.**
 
@@ -789,6 +825,16 @@ refutation of it.**
 - **Don't:** let your own refutation past the check you would have applied to
   the reviewer's finding --- it is a fresh claim, and overturning something
   feels like having verified it.
+
+**Second occurrence, 2026-09-09: the reviewer's own note carried an explanation, and the explanation was the part that went unchecked.**
+The first occurrence above is a note with no explanation attached --- the reviewer names a discrepancy and moves on, and the discipline is to verify the discrepancy itself before acting or writing off.
+Here the reviewer went further and offered a specific account of why the discrepancy was benign, then declined to raise it as a finding on the strength of that account: an arithmetic mismatch (18 minus 14 equals 4) against three authored equations, explained away and flagged only "for the author's awareness."
+A supplied explanation reads as the check already having happened, which is exactly what makes it easier to wave through than a bare unexplained note --- so the same verification the rule already prescribes has to reach the explanation, not stop at agreeing the discrepancy exists.
+Re-running the instrument against the actual files showed the explanation was wrong: the figure was a single document's count, presented as though it summed three documents'.
+Four prior review rounds had passed over the same discrepancy with no explanation attached at all, so the fifth round's incorrect explanation was, perversely, the first thing to make it look resolved.
+
+- **Do:** re-derive a reviewer-explained discrepancy against the actual artifacts, not just confirm the discrepancy is real --- an explanation is a claim, not a measurement.
+- **Don't:** read "the reviewer accounted for it" as a stronger clearance than "the reviewer noted it and moved on" --- both are unverified until you run the check.
 
 **Refuting the mechanism a finding proposes is not refuting its claim, and the
 quality of the refutation is what hides the difference.**

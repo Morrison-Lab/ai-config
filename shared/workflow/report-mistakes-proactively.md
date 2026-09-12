@@ -80,6 +80,59 @@ the new evidence onto an open one --- not **whether** to make it.
 Those are different questions, and only the first has a discretionary
 answer.
 
+## How many you have already filed is not an input
+
+The section above at least asks about the finding.
+This one does not: it accepts the finding as valid, then withholds it on a
+budget the session invented.
+
+It reads as restraint rather than avoidance, which is why it survives
+self-review.
+It sounds like consideration for the tracker, for the reader's attention, for
+a maintainer who will have to triage.
+But a valid finding does not become less true because it is the ninth.
+
+**Volume is a real problem, and it is decided somewhere else.**
+[`triage-backlog`](triage-backlog.md) exists precisely as the counterweight to
+this rule, and it does not claim the cost of filing is small --- it measures
+the opposite, an open count going from 15 to 410 in six weeks with 67% of
+those issues never commented on.
+So the answer to volume is a weekly pass that assigns `P1`/`P2`/`P3` or
+closes, run by someone with the standing to decide.
+It is not a session silently raising its own bar partway through a sweep,
+which produces no triage decision and no record of the thing it declined to
+file.
+
+A high count is evidence the sweep is working, not evidence to stop.
+A session that surfaces nine defects and files eight of them has not been
+disciplined;
+it has produced an eight-item record and one thing nobody can find.
+
+- **Do:** file the ninth exactly as you filed the first, and let the count
+  land where it lands.
+- **Do:** say what the volume suggests, if it suggests something --- a
+  cluster of guard findings in one session is itself worth a filed
+  observation, which is filing more rather than less.
+- **Don't:** withhold a finding you have already judged valid because you
+  judge you have filed enough --- the count is not a criterion, and deciding
+  it is not the filer's job.
+- **Don't:** read a long list of issues from one session as a reason to
+  raise the bar partway through; the bar is whether the finding is valid.
+
+(Directive from the user, 2026-09-10 --- "it doesn't matter how many issues
+you've already filed" --- after a session that filed eight issues and then
+handed the ninth back rather than filing it.
+The withheld finding was filed as ai-config#3519 once the correction landed,
+which is the measure of what the deferral was protecting: nothing.
+Neither [`no-offer-to-file.py`](../../hooks/no-offer-to-file.py) nor
+[`no-unfiled-finding.py`](../../hooks/no-unfiled-finding.py) fired on it:
+the first wants an interrogative or a `let me know if you'd like` shape, and
+the sentence was a declarative preference;
+the second matches the artifact by name, and the sentence referred to it by
+count.
+ai-config#3520 carries the sentence verbatim and two candidate pattern
+families.)
+
 ## The issue and "land it in this PR instead" are not alternatives
 
 A specific offer shape earns its own section because the false choice inside
@@ -384,6 +437,15 @@ the API actually returned.
 - **Don't:** announce "filed as #N" while the dupe-check is still outstanding
   --- that asserts the new-issue outcome before anything has decided it.
 
+**The artifact the invented number lands in need not be a chat reply or a PR link-back --- it survives just as easily in a durable file, and there it outlives the conversation that invented it.**
+Every example above is something said to a reader in the moment: a PR body, a merge message, a reply.
+A predicted number written into a memory entry or a corpus fragment is the same invented claim, aimed at a file this session is about to commit rather than at a person reading the current thread --- and it is worse in one respect, since a chat claim dies with the conversation while a committed one persists until someone happens to notice the mismatch.
+
+(Measured 2026-09-09: `ai-config#3439` was written into a memory entry before the filing call ran;
+the issue that call actually created was `#3449`.
+Caught and corrected before the entry was committed, but nothing in the repo would have caught it afterward --- a wrong issue reference passes every existing check, since nothing resolves an `ai-config#NNNN` citation against the tracker to confirm it names what the text claims it names.
+Whether that gap is worth a dedicated checker, rather than only this rule, is its own open question, tracked separately rather than decided here.)
+
 ## A dupe-check chained into the same call as the create gates nothing
 
 The section above rules out announcing step 2's outcome before step 2 has
@@ -465,6 +527,56 @@ See
   GitHub scope, no network path), file in the current working repo, state
   plainly which repo it really belongs to, and ask the user to transfer it
   — the same fallback the `config-ai` skill's step 3 uses.
+
+## A defect that resolved itself on a retry is still a defect
+
+The rules above all govern a finding you can still see.
+This one governs the finding that stops reproducing while you are deciding
+what to do about it, which is the shape most likely to go unfiled --- not
+because anyone judged it unimportant, but because the reason to file it
+disappeared before the filing did.
+
+The reasoning that dismisses it sounds like proportion rather than avoidance:
+the thing recovered, nothing is broken now, and filing an issue for a state
+that no longer exists looks like noise.
+Every clause there is true and the conclusion is still wrong, because a
+defect that fires intermittently is *harder* to diagnose than one that fires
+every time, not easier.
+Self-resolution is evidence about this attempt.
+It is no evidence at all about recurrence, and it destroys the artifact a
+later investigator would have started from.
+
+The transient case also carries diagnostic information the reproducible one
+does not, and only a filed record preserves it: how often it fired, what the
+population was, and what made it stop.
+"Two of twelve, and re-dispatching fixed both" tells a maintainer that the
+cause is intermittent rather than a formatting bug, and hands them a
+workaround.
+"It happened and then it did not" tells them nothing.
+
+So file it, or add the measurement to the issue that already covers it, on
+the same terms as any other finding.
+The rate and the recovery step belong in the report, since those are the
+parts that expire.
+
+- **Do:** file a defect that stopped reproducing, and state the rate
+  (how many of how many) and what made it stop.
+- **Do:** dupe-check first --- a transient defect is disproportionately
+  likely to be already known, precisely because it recurs.
+- **Don't:** treat a successful retry as closing the finding; it closes the
+  incident.
+- **Don't:** reach for "it resolved itself" as a reason to skip the filing
+  step --- that phrase describes the evidence, not the defect.
+
+(Morrison-Lab/wai, 2026-09-10.
+Two of twelve PR reviews emitted a `Reviewed commit` fingerprint naming a
+commit absent from the repository, disqualifying both from an otherwise
+authorized merge.
+Re-dispatching the review produced correct fingerprints and the session
+moved on, calling it "transient rather than a defect worth filing".
+`hooks/no-unfiled-finding.py` caught the sentence, and the finding turned
+out to be already tracked as ai-config#3508, where the rate and the
+re-dispatch workaround were genuinely new information.)
 
 ## Scope discipline
 

@@ -99,6 +99,37 @@ one concrete answer to "keep going, but change what you are asking for."
   back clean having checked your list and nothing else --- which is
   indistinguishable from a round that found nothing.
 
+**Brief every identifier-reporting subagent to derive it, never recall it --- and don't accept an identifier back that could have been recalled instead.**
+[`ardi`](ardi.md)'s "A SHA you put in a PR body or a reply must be read, never recalled" section already governs the orchestrating session's own citations.
+The same failure recurs one level down, in a *dispatched* subagent's own report, and it is worse there because the orchestrator cannot watch it happen --- it only ever sees the finished string.
+
+An `adversarial-reviewer` persona already instructs exactly this ("Read that sha yourself rather than taking it from the brief", present since [#1911](https://github.com/Morrison-Lab/ai-config/pull/1911), well before either measured case below), and the instruction alone did not hold both times it was tested.
+[ai-config#3295](https://github.com/Morrison-Lab/ai-config/issues/3295): dispatched with the head as an abbreviated SHA, the reviewer's `Reviewed-Commit:` line echoed the correct 8-character prefix it was handed and invented the remaining 32.
+A second, independent instance (d-morrison/rme, measured 2026-09-09): dispatched against a committed diff with no abbreviation in the brief, the reviewer's fingerprint again got the first 9 hex characters right and fabricated the remaining 31 --- consistent with having seen an abbreviated form somewhere in its own tool output (a `git log --oneline`, a commit's own echo) and confabulating a full-length SHA to fill the required field, rather than running `git rev-parse HEAD` as instructed and copying the result.
+
+The near-miss is what makes this hard to catch by reading the report: a fabricated SHA with a correct prefix passes every eyeball check, because a 40-character hex string looks exactly as authoritative whether it was read or invented.
+`hooks/no-push-without-self-review.py` only surfaced the second case because it independently resolves what the push would ship and compares SHAs --- and even there, the resulting refusal message ("the clean verdict is for commit X, but this push would ship Y") reads like an ordinary stale-verdict complaint (a later commit, a rebase), not like "the reviewer invented data", so the natural response is to re-review rather than to suspect fabrication.
+
+Two fixes, and both were warranted rather than either alone:
+
+- **In the brief.**
+  State the exact command (`git rev-parse HEAD`) and require the output be copied verbatim --- "do not reconstruct or abbreviate it."
+  A re-dispatch with that explicit instruction produced a correct SHA on both subsequent tries in the second measured case.
+- **In the consumer.**
+  Don't trust that the brief-side instruction held.
+  `no-push-without-self-review.py` now resolves the reported fingerprint (`git rev-parse <sha>^{commit}`, the same pattern the file already used for resolving push targets) before comparing it to the shipped commits, and refuses with a distinct message ("does not resolve to any commit... fabricated or corrupted, not a stale verdict") when it does not resolve at all --- rather than folding that case into the generic "unreviewed" message, which sends the reader looking for the wrong problem.
+
+Since a persona-level instruction already existed and still failed twice, treat "the brief says to derive it" as necessary but not sufficient: any guard or script that keys off a subagent-reported identifier should resolve or verify it, the same way this one now does, rather than trusting that the identifier is what it claims to be.
+
+- **Do:** name the exact derivation command in the brief when a subagent must report an identifier (a SHA, a run id, a PR number), and require the raw output copied verbatim.
+- **Do:** resolve or verify a subagent-reported identifier in the consuming code before trusting it --- a value that *could* have been recalled from context rather than derived gets no benefit of the doubt.
+- **Do:** give a fabricated/unresolvable identifier its own error message, distinct from "this is stale" or "this points elsewhere" --- the reader needs to know which defect to suspect.
+- **Don't:** treat a persona-level "derive this, don't recall it" instruction as having discharged the risk --- it is necessary, and this class of mistake recurred with it already in place.
+- **Don't:** let a correct-looking prefix substitute for verifying the whole value;
+  a fabricated tail is exactly what a prefix-only glance misses.
+
+See [`ardi`](ardi.md)'s read-never-recall section for the orchestrator's own-citation analog, and [ai-config#3295](https://github.com/Morrison-Lab/ai-config/issues/3295) for the full first-instance writeup and the guard-side fix this section describes.
+
 **Measure the agent.**
 Rounds to clean per PR, and mistakes per dispatch, by class.
 Compare briefs and models against those numbers rather than against an impression of the last run.
@@ -128,3 +159,38 @@ the delegation-skill half is tracked as [ai-config#3080](https://github.com/Morr
 (Measured 2026-09-05 on [Morrison-Lab/ai-config#3175](https://github.com/Morrison-Lab/ai-config/pull/3175): four consecutive review rounds each returned exactly one finding, and the last two were single-line label-consistency nits (`# M4` versus `# M4b` in a comment, then the same stale label in a mutation-table key).
 Each round cost a full CI cycle.
 The brief change described above --- one exhaustive pass, nothing held back, an explicit materiality bar including a request to name a dropped candidate --- produced a clean round on the very next dispatch, which named a nit it had considered and dropped rather than reporting nothing.)
+
+## Send the correction back to the agent; never absorb it yourself
+
+The rule above already routes a re-dispatch to the same agent.
+This section exists because that rule was loaded, read, and broken repeatedly in one session anyway, so the instruction alone is evidently not enough.
+
+The near-miss is small fixes.
+A dispatched agent returns work that is mostly right, and what is wrong is one line: a heuristic with a misleading message, a comment that reverses a decision an earlier round made deliberately, a commit message the shell expanded a variable into, a rule pair appended into the middle of somebody else's list.
+Each of those costs the orchestrator a minute and costs a re-dispatch twenty.
+So the orchestrator fixes it, the work moves, and nothing about the next brief changes.
+
+That arithmetic is wrong in a way that is invisible at the moment of choosing, because the minute is real and the saving is not.
+The agent will make the same class of mistake on the next dispatch, and the one after that, and the orchestrator will pay the minute again each time while believing it saved one.
+The cost of absorbing a fix is not the fix.
+It is every future instance of the class, plus the ledger entry that never got written because nothing forced the orchestrator to name what went wrong.
+
+Send it back.
+Say what was wrong, say what the agent should have checked, and let the agent make the change.
+Where the schedule genuinely cannot take another round, the fix and the ledger entry are one unit: write the rule into the agent's standing brief in the same commit that carries the fix, so the next dispatch is different even though this one was not.
+
+**A correction the agent cannot act on is not a correction.**
+"Do not add unsound heuristics" names nothing.
+"Your check fired on any command with more than two tokens, which is also true of a command carrying a flag;
+state the property of the data that makes a token count sound, or test the thing you mean" names the mistake, the counterexample, and the standard.
+
+- **Do:** re-dispatch with the finding, the counterexample, and the standard, and let the agent make the edit.
+- **Do:** write the class into the agent's standing brief in the same commit, on the rare occasion you must apply the fix yourself.
+- **Don't:** commit a one-line fix yourself because re-dispatching costs more than fixing --- that comparison omits every later instance of the class.
+- **Don't:** send back an adjective; send the input that broke it.
+
+(Directive from the user, 2026-09-11: "don't fix subagents mistakes yourself;
+help them do it themselves.
+Follow the teach a man to fish principle."
+It followed a session driving [ai-config#3435](https://github.com/Morrison-Lab/ai-config/pull/3435), [#3439](https://github.com/Morrison-Lab/ai-config/pull/3439), [#3440](https://github.com/Morrison-Lab/ai-config/pull/3440) and [#3469](https://github.com/Morrison-Lab/ai-config/pull/3469), in which the orchestrator committed agent defects as its own fixes rather than returning them, among them a token-count heuristic with a message describing a different test, a commit message whose shell expanded a variable into it, unreachable code left after a return, a reversal of an earlier round's deliberate decision about installer failure handling, and rule pairs spliced into an existing list through the middle of a sentence.
+Not one produced a ledger entry at the time.)

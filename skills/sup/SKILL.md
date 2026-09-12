@@ -139,9 +139,17 @@ git checkout -b fix/<slug> upstream/main  # CREATE_BRANCH — or upstream/master
 # ... make edits ...
 
 git add -A && git commit -m "<conventional commit message>"   # COMMIT
-git push upstream fix/<slug>                                   # PUSH
+```
 
-# Open PR
+Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+```bash
+git push upstream fix/<slug>   # PUSH
+```
+
+Open the PR in its own call:
+
+```bash
 gh pr create --repo <owner>/<repo> \
   --base main \
   --head fix/<slug> \
@@ -163,9 +171,17 @@ cd /tmp/upstream-fix
 git checkout -b fix/<slug>   # CREATE_BRANCH
 # ... make edits ...
 git add -A && git commit -m "<conventional commit message>"   # COMMIT
-git push origin fix/<slug>                                     # PUSH
+```
 
-# Open PR from your fork to upstream
+Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+```bash
+git -C /tmp/upstream-fix push origin fix/<slug>   # PUSH -- absolute, so it does not depend on the caller's directory
+```
+
+Open the PR in its own call:
+
+```bash
 gh pr create --repo <owner>/<repo> \
   --base main \
   --head <your-username>:fix/<slug> \

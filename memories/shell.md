@@ -158,6 +158,68 @@ there is no standard environment variable that already holds it.
 
 (Measured 2026-09-04: `git commit --amend -F /tmp/msg.txt` picked up a different concurrent session's message from the same shared path, silently replacing the intended PR's subject and body.)
 
+**The scratchpad is also the answer to a second, independent hazard, and the collision argument above cannot reach it: an unignored message file written inside the worktree is staged by a blanket `git add -A` and committed.**
+(`git add -A` skips ignored paths, so a newly created, untracked scratch name covered by `.gitignore` or `.git/info/exclude` escapes this.
+An ignore rule does nothing for a path already tracked, which is what a file shipped by an earlier round has become.
+Do not rely on either way: a per-PR scratch name is ad hoc and no repository ignores it by default.)
+Note what the blanket staging means: [`preferences.md`](preferences.md) already forbids `git add -A` outright, because it sweeps unrelated in-flight edits into the commit.
+So this hazard is a second consequence of a command the corpus had already ruled out.
+Staging only the source paths you edited prevents it independently of where the file lives.
+Note the limit of that.
+Explicitness alone is not the safeguard, since `git add msg.txt` names an explicit path and stages the message file.
+The safeguard is naming only the files the change itself touches.
+A destination `git add` cannot reach is the stronger half, because it makes the mistake unavailable rather than merely avoidable.
+Note what the reasoning above would permit.
+It rejects `/tmp/msg.txt` because `/tmp` is shared, so a path nobody else can write --- a file in the worktree you alone are driving --- satisfies every word of it.
+That path is the dangerous one.
+
+The failing shape is one command:
+
+```sh
+git add -A && git commit -F msg.txt && rm -f msg.txt
+```
+
+`git add -A` stages `msg.txt` before `git commit` reads it, so the file enters the tree.
+The `rm` afterwards removes only the working copy.
+Nothing turns red.
+On the occasion measured below, the checks passed and the push succeeded;
+the staging is invisible to both by construction, since neither inspects the committed file set for scratch.
+The `rm` does leave a trace, and it is a weak one: an unstaged deletion (` D msg.txt`) that reads as ordinary scratch cleanup, and that a later `git add -A` silently records.
+So the durable evidence is in the commit rather than in the status.
+
+That silence is what makes it worth stating separately from the collision case.
+A wrong commit *message* is visible the moment anyone reads the commit;
+a stray file in the repo root is visible only to someone looking for it, and it ships.
+Deleting the file afterwards feels like the cleanup that makes the pattern safe, which is why the shape survives review --- the delete is real, and it runs one step too late.
+
+A path outside the worktree is immune by construction rather than by discipline: `git add` cannot reach it, whatever flags it is given.
+So the same substitution the bullets above prescribe fixes both hazards at once, and no second rule is needed.
+
+- **Do:** pass `git commit -F` an absolute path under the session scratchpad, so no `git add` invocation can stage it.
+- **Do:** audit the round's commits one by one, in every worktree the round touched:
+
+  ```sh
+  name=msg.txt   # the repository-relative path, bound before the pipeline
+  git log --diff-filter=A --name-only --format= origin/<default-branch>..HEAD | grep -qxF -- "$name"
+  ```
+
+  Bind `name` rather than inheriting it.
+  `--format=` emits blank separator lines, and an unset variable expands to an empty pattern, so `grep -qxF` matches one of those blanks and the audit reports success without having found anything.
+  Two nearer answers both miss the case that matters, which is a file added in one commit and removed by a later cleanup commit.
+  `git ls-files` reads the current index.
+  A three-dot `git diff` compares the merge base against the final tree, so an add and a later delete cancel.
+  Only walking the commits sees a path that was ever added.
+  `-F` is what makes `grep` match the name literally rather than as a regex, so a scratch name carrying a metacharacter cannot match the wrong path or miss the tracked one;
+  quoting the pattern does not do that, and `--` is separately needed so a leading `-` is not read as an option.
+- **Don't:** write the message file into the worktree and rely on deleting it --- the delete runs after the staging that captured it.
+- **Don't:** read "the path is private to me" as sufficient;
+  that answers the collision hazard and not this one.
+
+(Measured 2026-09-10 on `Lacaedemon/sparta`: the shape above shipped a stray `msg.txt` to three PRs in one turn --- [#1555](https://github.com/Lacaedemon/sparta/pull/1555), [#1556](https://github.com/Lacaedemon/sparta/pull/1556) and [#1560](https://github.com/Lacaedemon/sparta/pull/1560) --- because the same command was reused for each.
+A reviewer caught it on one;
+the other two were found only by grepping `git ls-files` afterwards.
+Tracked as [ai-config#3558](https://github.com/Morrison-Lab/ai-config/issues/3558), which also proposes the guard: refuse a commit whose staged set contains the file passed to `-F`.)
+
 ## Writing robust bash scripts (recurring review findings)
 
 Lessons the reviewer flagged across the `session-lock` PR (Morrison-Lab/ai-config#38) ---
@@ -177,6 +239,14 @@ pre-empt these when authoring shell, especially under `set -euo pipefail`:
   Separately, the `-name` glob must match the `mktemp` prefix you chose,
   or it silently misses every orphan (`.tmp.XXXXXX` -> `'.tmp.*'`;
   mktemp's bare `tmp.XXXXXX` default -> `'tmp.*'`).
+- **`grep -qxF "$var" file` silently fails to match when `$var` starts with `-` --- unlike `find` above, `--` DOES fix it here.**
+  A value beginning with `-` (a Claude session-project directory name, which encodes a filesystem path with every `/`, `.` and `_` mapped to `-`, e.g. `-Users-ezramorrison-...`) is parsed as an option by `grep`, so the match silently fails even though the file provably contains that exact line (verified: `grep -qxF "$var" file` returned no match;
+  `grep -qxF -- "$var" file` matched).
+  This is the opposite of the `find` case just above --- there `--` does NOT help because `find`'s own expression parser still reads a dash-prefixed argument as an expression after it;
+  for `grep`, `--` is the ordinary POSIX end-of-options marker and works as documented.
+  Don't generalize either finding to the other command: always pass `--` before a variable operand to `grep`, and separately verify the target of `<dir>` itself for `find`, per the bullet above.
+
+  (Self-hit during a `clean-git` session, 2026-09-10: a safety filter meant to skip live sessions' worktrees under-matched silently because of this, reading a genuinely live session's registration as absent.)
 - **Bounds-check value-taking flags before `shift 2`.**
   In a `set -e` arg parser, `--flag` as the last arg makes `${2:-}` expand to "" but the following `shift 2` fail (count out of range) -> script aborts with a cryptic error.
   Guard with the `set -u`-safe presence test:
@@ -190,3 +260,18 @@ pre-empt these when authoring shell, especially under `set -euo pipefail`:
 - **bash 3.2 (macOS default) compatibility:** indexed arrays, C-style `for ((...))`, and `${2+set}` all work;
   **associative arrays do NOT** (4.0+).
   Parse key=value records with `while IFS='=' read -r k v; do case "$k" in ...`.
+
+## Git Bash process substitution fails for a native-Windows consumer
+
+In Git Bash on Windows, `<(...)` works for msys-native consumers and fails only when the consumer is a **native Windows binary** that has to reopen the msys `/proc/NNNN/fd/N` path.
+Measured 2026-09-10 on Git Bash 2.37.2.windows.2: `cat <(cat f)`, `wc -l <(printf ...)` and `grep -c a <(printf ...)` all exit 0, while `git hash-object <(printf 'x\n')` exits 128 with `fatal: could not open '/proc/20068/fd/63' for reading`.
+`git commit -F <(...)` fails the same way, reporting `could not read log file` --- so the error text comes from the consuming tool rather than from the shell, and grepping for a remembered message finds nothing.
+Write the content to a real file and pass the path.
+
+[`zsh.md`](zsh.md) records a different failure of the same construct, under zsh on Linux, with an explicit non-reproduction on macOS;
+[`claude-code.md`](claude-code.md) points at that entry rather than adding a third measurement.
+Two unrelated platform failures of one construct is the argument for suspecting it early rather than diagnosing it again.
+
+- **Do:** write the content to a file when the consumer is a native Windows binary (`git`, and anything else not built against msys).
+- **Do:** grep for the construct rather than for an error string, since the message belongs to the consumer.
+- **Don't:** conclude process substitution is unavailable in Git Bash --- test it with `cat` and it works.

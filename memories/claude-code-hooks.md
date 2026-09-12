@@ -527,3 +527,45 @@ that never mentioned that repo.
 (Measured 2026-09-04 in a `ucdavis/hac.sap` session: invoking `/daytb` armed
 the guard on `Morrison-Lab/gha#240`, cited only in that skill's own case
 record, which then fired on the next unrelated memory-file edit.)
+
+## A hook defect you observe may be a stale installed copy, not a bug
+
+Four of the five guards installed under `~/.claude/hooks/` on this machine were far behind the repo on 2026-09-11: `no-unshipped-commit.py` at 196 lines against 1002, `no-clobbering-push.py` at 615 against 1240, `no-unreviewed-pr.py` at 1747 against 2602, and `no-stale-pr-status.py` at 328 against 619.
+Only the one refreshed by hand earlier that night matched.
+
+Two apparent defects came from that gap, and both looked exactly like live bugs.
+A session driving several pull requests pushes branches checked out in other worktrees, with `git -C <path> push`.
+The installed `no-unshipped-commit.py` matched only `git\s+push`, so such a push did not count and its Stop guard blocked a fully-pushed session three times running.
+The installed `no-clobbering-push.py` compared the remote tip against the session's own HEAD rather than the ref being pushed, so an exact no-op push was reported as dozens of commits about to be discarded, listing the session's own commits back to it as another agent's work.
+
+The repo had fixed both.
+`hooks/no-unshipped-commit.py` gained a `_GIT_FLAGS` run that admits `-C` before the verb on 2026-09-04, and `hooks/no-clobbering-push.py` reads each `-C` value back out precisely so that `git -C <other-worktree> push origin HEAD` is not resolved against the session's own HEAD.
+An issue was filed against both before either file was read, and had to be corrected.
+
+The trap is that a hook's behaviour is the strongest possible evidence about a hook, and it is evidence about the **installed** copy while the issue you file is against the **repo** copy.
+Nothing in the output says which one ran.
+This is the adjacent-artifact substitution [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md) names, in the one place where the wrong artifact is the one actually executing.
+
+- **Do:** diff the installed copy against the repo's before filing a hook defect, and quote the repo's line in the issue.
+- **Do:** read a guard that fires wrongly and repeatedly as a freshness question first, since the corpus's own freshness check covers exactly this.
+- **Don't:** infer a repo hook's matcher from what a guard did to you.
+- **Don't:** file against the repo on behaviour alone --- an installed copy can be hundreds of lines and several fixes behind.
+
+(Measured 2026-09-11.
+[ai-config#3577](https://github.com/Morrison-Lab/ai-config/issues/3577) was filed on the behaviour and corrected once the repo files were read.)
+
+## Mutation-testing a hook that uses `_sibling()` cross-imports needs the mutant copy IN `hooks/`, not `/tmp`
+
+Every hook that imports another hook's helpers uses the `_sibling()` pattern (`flag-unmeasured-timestamp.py`, `flag-unread-commit-citation.py`, ...), which resolves the sibling's path off `HERE = os.path.dirname(os.path.abspath(__file__))` --- the mutant's OWN directory, not the original hook's.
+Copying a mutated hook file to `/tmp` for mutation-testing (`cp hook.py /tmp/mut.py`, or writing the mutant there directly) silently breaks every `_sibling()` import, because `/tmp/flag-unmeasured-timestamp.py` does not exist.
+`_sibling()` fails open (returns `None` on any exception), so the mutant does not crash --- it just runs with every imported regex/function replaced by `None` or a narrow local fallback, which changes its behaviour for reasons that have nothing to do with the mutation under test.
+
+The failure is invisible from the test runner's output alone: the suite still reports a pass/fail count, and a coincidentally-similar count to the unmutated baseline reads as "the mutation had no effect" rather than "the mutant never really ran the code being mutated."
+The tell, if you look for it, is that DIFFERENT mutations (say, inverting a patch-flag check vs. widening a SHA regex) produce an IDENTICAL failing-test list --- both are actually failing for the same reason (broken sibling imports), not for their own distinct reasons.
+
+- **Do:** place a mutated copy in the hook's own directory (`hooks/_mutX-<name>.py`, deleted after the run) so `_sibling()` resolves normally, and verify the mutation was actually applied (`grep` the mutant file for the changed line) before trusting a "no additional failures" result.
+- **Do:** treat two structurally different mutations producing the exact same failure list as a signal to check for a shared infrastructure failure (a broken import, a missing fixture) rather than a coincidence.
+- **Don't:** copy a hook file to `/tmp` (or any directory other than `hooks/`) for mutation testing without first checking whether it imports siblings via `_sibling()`.
+- **Don't:** trust a mutation-test run's pass/fail count without spot-checking that the mutation itself is present in the file actually being tested.
+
+(Measured 2026-09-09 authoring `hooks/flag-unread-commit-citation.py` (ai-config#3471): a `/tmp`-copied mutant produced `body=None` from `_post_from_payload` for a completely unrelated reason --- its `_sibling()` call for `flag-unmeasured-timestamp.py` returned `None` because `/tmp/flag-unmeasured-timestamp.py` does not exist --- and a later `hooks/`-placed rerun of the identical mutation correctly failed the suite.)

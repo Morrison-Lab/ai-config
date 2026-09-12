@@ -21,6 +21,31 @@ For example, `ai-config` uses
 `~/.gemini/config/plugins/ai-config/claude-hook-adapter.py`
 backed by a staging directory created in `bootstrap.sh`.
 
+### A Windows hook command must carry no quotes, and `python3` and `~` do not resolve there
+
+Measured 2026-09-09 on Windows 11 ([ai-config#3091](https://github.com/Morrison-Lab/ai-config/issues/3091)).
+`cmd.exe` resolves neither `python3` nor `~`, so the portable POSIX command form cannot be staged verbatim onto a Windows machine.
+The obvious repair, an absolute interpreter path in quotes, does not work either: the launcher hands the whole command to `cmd.exe` as a **single argument**, which re-escapes every embedded quote on the way, so a correctly quoted path arrives with a backslash in front of it and `cmd.exe` reports it as not recognized.
+The same two paths **unquoted** launch and return `{"decision": "allow"}`.
+
+That leaves one correct form, an unquoted absolute interpreter path followed by an unquoted absolute script path, which has no rendering at all when either path contains a space.
+`scripts/render-agy-hooks.py` writes that form (and fails fast on a space, naming `AGY_HOOK_PYTHON` as the override);
+`bootstrap.sh` calls it in place of the `cp` it used to run;
+`scripts/check-agy-hook-commands.py` refuses both the escaped form and any quote, and `scripts/doctor.py` runs it over the installed copy.
+
+- **Do:** render the staged manifest per platform, and leave `plugins/ai-config/hooks.json` in the portable POSIX form.
+- **Do:** re-run `bootstrap.sh` rather than hand-editing the staged `hooks.json`, since a hand repair is what introduced the quoting.
+- **Don't:** quote a path in a Windows hook command, however correctly the JSON escapes it.
+
+### A hooked-tool failure leaves headless `agy` reporting success
+
+Same measurement ([ai-config#3091](https://github.com/Morrison-Lab/ai-config/issues/3091)), and it is why the quoting bug survived a full dispatch unnoticed.
+A `run_command` hook that fails to launch is skipped (see this file's fail-open section), the agent then cannot run any shell command, and the headless run still exits 0 and prints a "Completed Work Summary" naming files it never wrote.
+Nothing in the exit code, the stdout, or the summary distinguishes that from a successful dispatch.
+
+- **Do:** verify a dispatched `agy` run's claimed edits against `git status` or `git diff` before believing its summary.
+- **Don't:** read exit 0 plus a work summary as evidence that any file changed.
+
 ### Lifecycle events & payload mapping
 - **`PreToolUse`**: Passed `{"toolCall": {"name": "<tool_name>", "args": { ... }}}`.
   Returns `{"decision": "allow" | "deny" | "ask", "reason": "..."}`.
@@ -61,7 +86,8 @@ backed by a staging directory created in `bootstrap.sh`.
   - Context injection in Antigravity uses `{"injectSteps": [{"ephemeralMessage": "..."}]}`.
   - Claude `UserPromptSubmit` hooks may output raw text, or JSON carrying a `systemMessage`/`additionalContext` field, to stdout.
     The adapter parses JSON when present (falling back to the raw text otherwise), reading `systemMessage`, top-level `additionalContext`, or the nested `hookSpecificOutput.additionalContext` form, and emits one `ephemeralMessage` `injectSteps` entry per hook --- it does not join multiple hooks' output into a single joined string.
-    The caps default to 10KB per message, 30KB total, and 20 messages, and are overridable via `AGY_ADAPTER_MSG_BYTE_CAP`, `AGY_ADAPTER_TOTAL_BYTE_CAP`, and `AGY_ADAPTER_MSG_CAP` (the subagent fanout cap is `AGY_ADAPTER_FANOUT_CAP`, default 50).
+    The caps default to 10KB per message, 30KB total, and 20 messages, and are overridable via `AGY_ADAPTER_MSG_BYTE_CAP`, `AGY_ADAPTER_TOTAL_BYTE_CAP`, and `AGY_ADAPTER_MSG_CAP` (the subagent fanout cap is `AGY_ADAPTER_FANOUT_CAP`, default 50;
+    max hook execution worker threads is `AGY_ADAPTER_MAX_WORKERS`, default 16, clamped to at least 1).
 
 ### Fail-open on a hook subprocess timeout or crash is intentional, not a gap
 
@@ -110,9 +136,14 @@ Three layers had to fail together, and each is worth checking separately when au
 - Two path layers decide which hook code agy actually runs:
   `~/.gemini/config/plugins.json` registers the plugin in a **staging runtime directory** (`~/.gemini/config/plugins/ai-config`),
   where `hooks.json` and `plugin.json` are copied so Antigravity runtime rewrites do not dirty the git checkout.
-  Executable scripts and repository directories (`hooks/`, `scripts/`, `skills/`, `shared/`) are symlinked from the checkout into the staging directory,
+  Executable scripts and repository directories (`hooks/`, `scripts/`, `skills/`, `shared/`, `rules/`) are symlinked from the checkout into the staging directory,
   so adapter and gate updates take effect live while canonical source remains pristine.
   (Updated 2026-08-31 for Issue #2673).
+
+## Antigravity plugin rules discovery
+
+- Antigravity plugins discover ambient and conditional rules from `<plugin_dir>/rules/*.md` containing YAML frontmatter with `trigger:` and `description:`.
+- Packaging rules under `plugins/ai-config/rules/` (and staging them into `~/.gemini/config/plugins/ai-config/rules`) delivers universal instructions and Antigravity operating guidelines across all host workspaces without requiring manual submodule or local repo configuration.
 
 ## Reactive wakeup vs background task polling
 
@@ -138,7 +169,26 @@ The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-anti
 - In Antigravity / Gemini CLI, `invoke_subagent` dispatches subagents asynchronously in the background, returning `{conversationId, ...}` immediately.
 - The subagent's completed report arrives as an incoming reactive message from the subagent's conversation ID, rather than as the synchronous tool step result of `invoke_subagent`.
 - Consequently, client-side pre-tool hooks (such as `no-push-without-self-review.py`) that parse the direct tool-result output of the subagent tool call will not find the verdict embedded in the initial dispatch step result.
-- Once the asynchronous subagent has finished and returned its verified clean review report and fingerprint, use the authorized prefix `ALLOW_UNREVIEWED_PUSH=1` for the `git push` invocation (the guard's `AGENT_TOOLS` set intentionally rejects `Bash`/`run_command` outputs to prevent unauthenticated reviews).
+- Once the asynchronous subagent has finished and returned its verified clean review report and fingerprint, use the authorized prefix `ALLOW_UNREVIEWED_PUSH=1` for the `git push` invocation.
   (Observed in live Antigravity sessions 2026-09-01.)
+- That advice was written when the guard admitted a verdict only from an `Agent`-tool result, and its original parenthetical said the `AGENT_TOOLS` set rejects `Bash`/`run_command` output outright.
+  That is no longer true: since #3327 (merged 2026-09-07, six days after the observation above) the guard also admits a `Bash` call in the shape `agy --print '<prompt>'`.
+  So where `agy` is available, dispatching the review that way discharges the guard directly and needs no override at all.
+  The override above is for the case where it is not.
+  No other delegation CLI is recognized, so `codex`, `opencode` and `adv` still need the override.
 
+## Antigravity hook runner 30s timeout and adapter parallelism
 
+- Antigravity enforces an ambient ~30-second timeout on command hooks declared in `hooks.json`.
+- When an adapter (such as `claude-hook-adapter.py`) runs multiple matching hooks sequentially (e.g. 25+ Python scripts on `run_command` matching `Bash`), cumulative process startup and I/O latency can exceed 30 seconds, causing Antigravity to kill the hook with `signal: killed` (`JSON hook ... failed: command failed: signal: killed`).
+- Command adapters must execute matched hook scripts concurrently (e.g. via `concurrent.futures.ThreadPoolExecutor`) to keep execution latency under ~1-2s and prevent timeouts.
+- Concurrency worker pool size defaults to 16 and is configurable via `AGY_ADAPTER_MAX_WORKERS` (clamped to at least 1).
+
+## Antigravity MWC merge gate and self-approval boundary (`enforce-mwc-review-gate.py`)
+
+- `plugins/ai-config/enforce-mwc-review-gate.py` gates `gh pr merge` tool calls in Antigravity.
+- When a repository lacks external review bots (`github-actions[bot]`, `claude[bot]`, Copilot) or operates under `no-ai-review`, review verdicts posted by local subagents are submitted under the authenticated user/agent account (e.g. `d-morrison`).
+- The gate classifies review comments under non-bot logins as `untrusted-clean`, strictly preventing an agent posting under the user's login from authorizing its own PR merge without human approval.
+- Neither active `/mwc` session grant nor `ALLOW_MERGE=1` overrides this review-gate requirement in `enforce-mwc-review-gate.py` (which evaluates review and CI status directly rather than delegating review vetting to a command-line wrapper).
+- In repositories without automated bot review workflows, merges must be executed either via an affirmative human review from another repository member or directly by the human from their terminal outside the Antigravity agent hook harness.
+  (Observed in live Antigravity sessions 2026-09-11.)

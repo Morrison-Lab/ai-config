@@ -334,6 +334,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-paginate-without-slurp.py\"",
+            "timeout": 10,
+            "script": "warn-paginate-without-slurp.py",
+            "why": "mwc's \"Another session's PR\" section states that the -s and the double flatten are load-bearing, and that their absence is invisible on any resource small enough to test on: gh api --paginate emits one array PER PAGE, so an aggregating jq filter (last, first, length, max_by, add, sort_by, ...) runs once per page and returns one answer per page. The rule is read at load time and broken at composition time. Measured 2026-09-10 on Morrison-Lab/wai: a session that had read that rule ran `gh api ... --paginate --jq '[...] | last'` across twelve PRs to check which reviews named a real commit, got an empty result for every one, and reported a false conclusion (that the defect was systemic when it affected two of twelve). WARNS rather than denies: a non-aggregating --jq filter streams correctly across pages and is common, and the aggregator list cannot be exhaustive, so a refusal would block correct commands. Fails open."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-handrolled-verdict-parse.py\"",
             "timeout": 10,
             "script": "no-handrolled-verdict-parse.py",
@@ -352,6 +359,13 @@
             "timeout": 10,
             "script": "warn-unlabelled-agent-issue.py",
             "why": "shared/workflow/issue-first.md, 'Label an agent-filed issue with its authorship and its model'. disclose-agent-authorship.md scopes its marker line to comment BODIES and excludes an issue body, so an agent-filed issue is the one artifact that discloses nothing -- it goes out under the account holder's login as type: User. The labels close that, and the rule is consulted at read time while the omission happens at composition time. WARNS, never blocks: an unlabelled issue is fixed by one `gh issue edit --add-label` while a blocked create loses the act that makes work visible (report-mistakes-proactively.md, 'filing is not gated on approval'), the rule is scoped to repos we administrate and this hook cannot tell which repo is ours (sup files upstream with neither label), and a repo whose labels cannot be created still gets the issue. Anchored on a command position with heredoc bodies stripped, for the reason warn-pr-create-without-dupe-check.py records: this corpus quotes `gh issue create` constantly. Fails open. Tracked as #3111."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-deferred-closing-keyword.py\"",
+            "timeout": 10,
+            "script": "warn-deferred-closing-keyword.py",
+            "why": "shared/workflow/issue-first.md, 'A closing keyword plus #N closes #N even when the sentence negates it'. GitHub's parser is purely lexical, so a body saying a LATER PR will close #N, or that #N is NOT being closed, closes it on merge. Scoped to a PR/issue DESCRIPTION and a commit message, since GitHub never scans a plain comment. Warns when a closing keyword sits next to an issue reference mid-line AND its sentence carries a deferral or negation cue; a bare `Closes #N` line never fires. Three measured occurrences: ai-config#1718/#1717, Morrison-Lab/gha#460/#322, ucdavis/bcs#982/#923. Warns rather than blocks -- the guard cannot read intent and the remedy costs one word. Fails open. Tracked as #3512."
           },
           {
             "type": "command",
@@ -397,6 +411,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-blanket-worktree-force-remove.py\"",
+            "timeout": 20,
+            "script": "warn-blanket-worktree-force-remove.py",
+            "why": "skills/clean-worktrees/SKILL.md step 5: a `git worktree remove` refusal is a safety net -- do NOT blindly --force it; the refusal means the worktree was likely misclassified (dirty tree, unpushed work), so the prescribed response is to re-inspect, not retry forced. Self-hit during a clean-git session on 2026-09-10: a blanket `git worktree remove \"$p\" || git worktree remove --force \"$p\"` fallback was written, contradicting the skill's own explicit warning read earlier the same session -- flagged by hooks/no-mistake-without-a-hook.py as a mistake worth mechanizing, and the auto-mode permission classifier's denial of the command is the only reason nothing was lost. WARNS, never blocks: the skill documents one legitimate single-shot --force (a genuinely clean worktree that merely contains a submodule, refused with a DIFFERENT error -- 'fatal: working trees containing submodules cannot be moved or removed' -- not the dirty-tree refusal), and that exact case occurred later in the same session and was correct, so this hook can never safely deny; it only ever adds context naming the fallback/loop shape and the submodule exception. Fires on the tokenized argv (via scripts/lib/shellcmd.py's git_subcommand, plus its own bespoke operator/segment tokenizer -- not simple_commands, which drops the operator tokens this hook needs), not raw text, so a command merely quoting or documenting the pattern (a commit message, a heredoc writing this file) does not trip it."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-commit-chained-to-push.py\"",
             "timeout": 10,
             "script": "no-commit-chained-to-push.py",
@@ -408,6 +429,13 @@
             "timeout": 10,
             "script": "flag-chained-push.py",
             "why": "Lacaedemon/sparta, 2026-09-05: three refusals in one session, each a `git push` either chained after another command with `&&`/`;`/`||` or suffixed by a pipe/redirect. no-clobbering-push.py and the plugin's own no-push-without-self-review.py push policy both parse the WHOLE command text for a push rather than the isolated push segment, so a trailing `2>&1` hands either parser a bare `2` sitting where a commit-ish token would sit in other shapes, and a chained prefix reads as part of the same invocation. A PreToolUse deny rejects the whole Bash call, so a refused chain runs NOTHING -- not the commands before the push either -- and the refusal naming only the push invites the misreading that the prefix succeeded. WARNS, never blocks: neither shape is wrong on its own (an ordinary `git fetch && git push`, a push piped to `tee` for a log), so the message asks the author to run the push alone and, after any refusal, re-check state rather than assume the prefix ran."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-generated-file-stale.py\"",
+            "timeout": 45,
+            "script": "warn-generated-file-stale.py",
+            "why": "algorithmatize-checks -- warns when a push changes a generated file's SOURCE (hooks/hooks.json) while the repo's own generator reports its output stale. Consumes scripts/gen-hooks-plugin.py --check rather than re-deriving; the gap it closes is timing, since validate.yml runs the same check minutes later and costs a red round. Warn-only: the condition is a path in the diff plus a generator exit code, so it is decidable, but a mid-stack push can legitimately be stale. Added after ai-config#3524 went red on exactly this."
           },
           {
             "type": "command",
@@ -460,7 +488,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-push-without-self-review.py\"",
             "timeout": 10,
             "script": "no-push-without-self-review.py",
-            "why": "cai: don't push until you run self-review locally and get a clean verdict, and use an adversarial subagent for the local self-review -- blocks git push in PreToolUse unless an `adversarial-reviewer` subagent returned a clean verdict as its own call result AND that report's `Reviewed-Commit:` fingerprint matches the commits the push would ship, or the push itself is prefixed with ALLOW_UNREVIEWED_PUSH=1."
+            "why": "cai: don't push until you run self-review locally and get a clean verdict, and use an adversarial subagent for the local self-review -- blocks git push in PreToolUse unless a clean verdict whose `Reviewed-Commit:` fingerprint matches the commits the push would ship came either from an `adversarial-reviewer` subagent's own call result or from a Bash call matching the guard's external-reviewer pattern, which today recognizes `agy --print` and no other delegation CLI, or unless the push itself is prefixed with ALLOW_UNREVIEWED_PUSH=1."
           },
           {
             "type": "command",
@@ -660,6 +688,13 @@
             "if": "Bash(git commit *)",
             "script": "flag-unchanged-test-sibling.py",
             "why": "Warns when a commit stages a file whose conventionally-named test sibling is left unstaged, so the suite gets opened rather than reasoned about (ai-config#3419)."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-indirect-gnu-grep-flag.py\"",
+            "timeout": 10,
+            "script": "flag-indirect-gnu-grep-flag.py",
+            "why": "Measured 2026-09-10 on Morrison-Lab/qwt: `git ls-files -z | xargs -0 grep -lP ...` hit BSD grep in the xargs child (the session's ugrep is a shell function and does not cross a child-process boundary), printed a usage error to stderr, and exited 1 -- the same status as an honest no-match -- so the empty stdout was reported as 'no tracked file contains an em dash' and the false claim reached a commit message. Warns only; which grep resolves in the child is not decidable from the command text."
           }
         ]
       },
@@ -802,6 +837,13 @@
             "timeout": 10,
             "script": "warn-unlabelled-agent-issue.py",
             "why": "shared/workflow/issue-first.md, 'Label an agent-filed issue with its authorship and its model'. disclose-agent-authorship.md scopes its marker line to comment BODIES and excludes an issue body, so an agent-filed issue is the one artifact that discloses nothing -- it goes out under the account holder's login as type: User. The labels close that, and the rule is consulted at read time while the omission happens at composition time. WARNS, never blocks: an unlabelled issue is fixed by one `gh issue edit --add-label` while a blocked create loses the act that makes work visible (report-mistakes-proactively.md, 'filing is not gated on approval'), the rule is scoped to repos we administrate and this hook cannot tell which repo is ours (sup files upstream with neither label), and a repo whose labels cannot be created still gets the issue. Anchored on a command position with heredoc bodies stripped, for the reason warn-pr-create-without-dupe-check.py records: this corpus quotes `gh issue create` constantly. Fails open. Tracked as #3111."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-deferred-closing-keyword.py\"",
+            "timeout": 10,
+            "script": "warn-deferred-closing-keyword.py",
+            "why": "shared/workflow/issue-first.md, 'A closing keyword plus #N closes #N even when the sentence negates it'. GitHub's parser is purely lexical, so a body saying a LATER PR will close #N, or that #N is NOT being closed, closes it on merge. Scoped to a PR/issue DESCRIPTION and a commit message, since GitHub never scans a plain comment. Warns when a closing keyword sits next to an issue reference mid-line AND its sentence carries a deferral or negation cue; a bare `Closes #N` line never fires. Three measured occurrences: ai-config#1718/#1717, Morrison-Lab/gha#460/#322, ucdavis/bcs#982/#923. Warns rather than blocks -- the guard cannot read intent and the remedy costs one word. Fails open. Tracked as #3512."
           },
           {
             "type": "command",
@@ -1035,6 +1077,18 @@
             "why": "Warns when a write-capable Agent launch targets a worktree holding uncommitted work, since the agent cannot tell your changes from its own scratch edits and may discard them."
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-move-without-inbound-sweep.py\"",
+            "timeout": 15,
+            "script": "no-move-without-inbound-sweep.py",
+            "why": "Warns when a `git commit` stages a cross-file content move and no repo-wide search for the source file's basename ran this session, so the files citing the source for moved content get enumerated rather than assumed clean (ai-config#3501)."
+          }
+        ]
       }
     ],
     "Stop": [
@@ -1073,7 +1127,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unfiled-finding.py\"",
             "timeout": 10,
             "script": "no-unfiled-finding.py",
-            "why": "report-mistakes-proactively 'Filing is not gated on approval' -- no-offer-to-file.py catches the OFFER (needs a `?`); this catches the DECLARATIVE form, which asks nothing and so slips past it."
+            "why": "report-mistakes-proactively 'Filing is not gated on approval' -- no-offer-to-file.py catches the OFFER, interrogative or not (`want me to file` and `say the word and I will file` both match with no `?`); this catches the DECLARATIVE ASSERTION that a finding is worth an issue, which asks nothing and so slips past it. Neither covers the deferral shape ('I would rather you tell me whether it is worth a ninth'); ai-config#3520 records why a lexical guard for that was attempted and abandoned."
           },
           {
             "type": "command",
@@ -1172,6 +1226,13 @@
             "timeout": 10,
             "script": "flag-unfiled-issue.py",
             "why": "shared/workflow/report-mistakes-proactively.md, CLAUDE.md's 'Status requests do not make issues report-only' -- user directive 2026-09-09, verbatim: 'always file issues immediately; is still unfiled. should be a hook trigger?'. Measured across roughly six consecutive replies in one session: a stopping-point line stated a known defect (stale equation-number comments in a C source file) was 'still unfiled', repeated turn after turn, until the user asked for it filed directly (UCD-SERG/serocalculator#694). Warns, never blocks, when a reply reports a known gap with a RETROSPECTIVE status phrase (`is/was still unfiled`, `hasn't been filed`, `needs an issue`, `should be filed`, a copula-bound `is/remains untracked`, `still needs a tracking issue`, `I owe ... an issue`) and no issue-create or issue-comment call follows it in the transcript. Distinct from `no-unfiled-finding.py`, which blocks the FORWARD assertion that something is worth an issue and does not match this backward-looking phrasing at all -- the two share no trigger vocabulary except `needs an issue` / `should be filed`, which fire both hooks on purpose rather than being de-duplicated away. Warns rather than blocks because whether an item should have been filed is not lexically decidable (it may already be filed, or belong to a repo this session cannot file into), and blocking a truthful status report would be worse than the report. Reuses the sibling's `visible_prose`/`scan`/`RX_ALREADY` via a dynamic import (degrading to silence if unavailable) so fenced code, blockquotes, and inline code spans are stripped before matching, the same self-implicating-example mitigation the sibling uses -- partial by design, since plain prose about the phrase with no backticks still matches."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-clean-claim-over-findings.py\"",
+            "timeout": 10,
+            "script": "flag-clean-claim-over-findings.py",
+            "why": "Morrison-Lab/ai-config#3578: a session read a review body stating `Ready for merge` under `### Verdict` that ALSO carried a `### Findings` section with two entries, and reported the round clean -- backwards per fully-clean.md, whose test is the ABSENCE of findings, not the presence of a clean verdict line. Warns, never blocks, when (1) a review body fetched by something REVIEW_FETCH/SAVED_BODY-shaped (reused from remind-ums-on-scrutiny.py / no-handrolled-verdict-parse.py) and carrying the corpus's own paste marker, is scored -- via check-pr-fully-clean.py's OWN `classify_verdict()`/`_unresolved_finding_pattern()`, not a re-derived heuristic -- as stating a clean verdict while still carrying an unresolved finding, AND (2) the reply states a clean-claim phrase (the same `VERDICT_CLEAN_PATTERNS` list the checker itself uses) outside any fenced/backtick code span, with no findings-acknowledgment vocabulary, AND (3) `check-pr-fully-clean.py` has not been run for that PR since (reused from `no-handrolled-verdict-parse.py`'s own `checked_prs()` discharge). Only the MOST RECENT hazard is consulted. Deliberately narrow so a message merely quoting `Ready for merge`/`### Verdict` while discussing this very rule cannot self-trigger: no hazard is ever recorded from a local file read (only an actual GitHub review fetch or a saved-and-reread body qualifies), and a backtick-quoted mention of the phrase is stripped before matching. Three things discharge a hazard, not two: the reply acknowledging findings vocabulary, check-pr-fully-clean.py having been run for that PR since, and a later review fetch of that same PR coming back genuinely clean -- the last of these is what stops the hook nagging through the ordinary fetch, fix, re-fetch, report loop. A not-clean re-read does not discharge, and neither does one whose PR cannot be recovered from the command."
           }
         ]
       }

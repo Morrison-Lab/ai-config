@@ -84,6 +84,46 @@ class TestDoctor(unittest.TestCase):
         self.assertEqual(res["status"], "OK")
 
     @patch("doctor.run_cmd")
+    def test_check_agy_hook_commands(self, mock_run_cmd):
+        clean = {"ok": True, "reports": [{"path": "hooks.json", "present": True, "findings": []}]}
+        mock_run_cmd.return_value = (0, json.dumps(clean), "")
+        res = doctor.check_agy_hook_commands()
+        self.assertTrue(res["ok"])
+        self.assertEqual(res["status"], "OK")
+
+    @patch("doctor.run_cmd")
+    def test_check_agy_hook_commands_reports_findings(self, mock_run_cmd):
+        broken = {
+            "ok": False,
+            "reports": [
+                {"path": "hooks.json", "present": True, "findings": ["contains a double quote"]}
+            ],
+        }
+        mock_run_cmd.return_value = (1, json.dumps(broken), "")
+        res = doctor.check_agy_hook_commands()
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["status"], "FAIL")
+        self.assertIn("contains a double quote", res["details"])
+
+    @patch("doctor.run_cmd")
+    def test_check_agy_hook_commands_over_zero_manifests_fails(self, mock_run_cmd):
+        """A report covering no manifest cannot say the hooks are launchable."""
+        empty = {"ok": True, "reports": [{"path": "hooks.json", "present": False, "findings": []}]}
+        mock_run_cmd.return_value = (0, json.dumps(empty), "")
+        res = doctor.check_agy_hook_commands()
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["status"], "FAIL")
+        self.assertIn("zero manifests", res["details"])
+
+    @patch("doctor.run_cmd")
+    def test_check_agy_hook_commands_without_a_report_fails(self, mock_run_cmd):
+        """No parseable report means the check did not run, which is not a pass."""
+        mock_run_cmd.return_value = (1, "", "Traceback")
+        res = doctor.check_agy_hook_commands()
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["status"], "FAIL")
+
+    @patch("doctor.run_cmd")
     def test_check_context_closure(self, mock_run_cmd):
         mock_run_cmd.return_value = (0, "budget ok", "")
         res = doctor.check_context_closure()
@@ -172,15 +212,19 @@ class TestDoctor(unittest.TestCase):
     @patch("doctor.check_submodules")
     @patch("doctor.check_codex_wrappers")
     @patch("doctor.check_hook_catalog")
+    @patch("doctor.check_agy_hook_commands")
     @patch("doctor.check_context_closure")
     @patch("doctor.check_jsonc_configs")
     @patch("doctor.check_ai_clis")
     @patch("doctor.check_consumer_leftovers")
-    def test_run_doctor_healthy(self, m_leftovers, m_ai, m_jsonc, m_closure, m_hooks, m_wrappers, m_subm, m_git):
+    def test_run_doctor_healthy(
+        self, m_leftovers, m_ai, m_jsonc, m_closure, m_agy, m_hooks, m_wrappers, m_subm, m_git
+    ):
         m_git.return_value = {"name": "git_status", "ok": True, "status": "OK", "details": "ok"}
         m_subm.return_value = {"name": "submodules", "ok": True, "status": "OK", "details": "ok"}
         m_wrappers.return_value = {"name": "codex_wrappers", "ok": True, "status": "OK", "details": "ok"}
         m_hooks.return_value = {"name": "hook_catalog", "ok": True, "status": "OK", "details": "ok"}
+        m_agy.return_value = {"name": "agy_hook_commands", "ok": True, "status": "OK", "details": "ok"}
         m_closure.return_value = {"name": "context_budget", "ok": True, "status": "OK", "details": "ok"}
         m_jsonc.return_value = {"name": "jsonc_configs", "ok": True, "status": "OK", "details": "ok"}
         m_ai.return_value = {"name": "ai_clis", "ok": True, "status": "OK", "details": "ok"}

@@ -468,24 +468,33 @@ Measured 2026-08-06: `check-links.py` printed `Checked 1114 relative links acros
 The same shape was still present on `scripts/check-hook-output-shape.py` as of 2026-08-26 (ai-config#2038): an all-green run under `PYTHONIOENCODING=cp1252` exited 1 on the success line.
 
 The per-script fix is ASCII on that line (`OK: ...`), matching [`ascii-punctuation-in-source.md`](../shared/coding/ascii-punctuation-in-source.md).
-`sys.stdout.reconfigure(encoding="utf-8", errors="replace")` is a second option some scripts already use (`validate-skills.py`, `check-links.py` since #2169);
-it still depends on the stream supporting `reconfigure`.
+Reconfiguring streams at script startup (`sys.stdout.reconfigure(encoding="utf-8", errors="replace")`) is a second option used in scripts that deliberately print status glyphs or diff formatting (`validate-skills.py`, `check-links.py` since #2169):
+```python
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+```
+It depends on the stream supporting `reconfigure`.
 ASCII cannot fail the encoding.
+(Note: `Morrison-Lab/gha#860` scripts wrap dual-stream reconfigure in `try/except Exception: pass`, but ai-config precedent avoids swallowing exceptions and uses the bare `hasattr` guard on `sys.stdout` directly.)
 Issue [#2080](https://github.com/Morrison-Lab/ai-config/issues/2080) tracks the remaining `check-links.py` glyph (ballot-X on the failure path, check mark on success).
+
+In composite actions or multi-check wrappers (`check-diff-scoped.sh` in Morrison-Lab/gha#860), passing `PYTHONIOENCODING=utf-8` in the wrapper invocation (`env PYTHONIOENCODING=utf-8 python3 "$script"`) shields child checks from non-UTF-8 ambient console environments as an added layer of defense.
 
 Distinct from the `LC_ALL=C.UTF-8` material in [`fail-fast`](../shared/principles/fail-fast.md) and `memories/debugging.md`, which is an **input**-side problem --- `grep -P` failing to *match* a non-ASCII pattern under a non-UTF-8 locale.
 This one is **output**-side, in the interpreter, on a string the script already holds.
 Different layer, different fix; do not reach for one when you have the other.
 
 - **Do:** print ASCII on a script's own success or failure line, so a cp1252 stdout cannot turn a green run into exit 1 (ai-config#2038).
-- **Do:** set `PYTHONIOENCODING=utf-8` when running a remaining glyph-printing check from a Windows shell.
+- **Do:** reconfigure `sys.stdout` and `sys.stderr` with `errors="replace"` or `encoding="utf-8"` via `hasattr(stream, "reconfigure")` in Python CLI tools that format output or emit status glyphs.
+- **Do:** pass `PYTHONIOENCODING=utf-8` in shell wrappers running Python linters and scanners locally (Morrison-Lab/gha#860).
 - **Do:** read the traceback's last line before believing a red check --- a `UnicodeEncodeError` on a `print` says nothing about what the check found.
 - **Don't:** treat a nonzero exit from these scripts as a finding, or start hunting for the broken link or the drifted vendored file it never reported.
 - **Don't:** leave a Unicode check mark on a success `print` and rely on the caller to set `PYTHONIOENCODING` --- that is a workaround, not a fix.
 
 (2026-08-06, verified both ways while running the pre-push checks for `Morrison-Lab/ai-config#1224`.
 ASCII-on-the-success-line adopted 2026-08-26 for #2038;
-the 2026-08-06 wording had treated deleting the glyph as the wrong fix.)
+the 2026-08-06 wording had treated deleting the glyph as the wrong fix.
+Multi-stream reconfigure and diff-scoped wrapper shielding recorded 2026-09-09 for Morrison-Lab/gha#860.)
 
 opencode's Bash tool on this box has its own failure mode and workaround;
 see [`opencode-bash-windows.md`](opencode-bash-windows.md).
@@ -524,6 +533,11 @@ The contrast that motivated the fix: its CI counterpart,
 [`Morrison-Lab/gha`](https://github.com/Morrison-Lab/gha), was diff-scoped by
 design from the start, so a corpus's pre-existing drift is never reflagged.
 The checker got that treatment years before the formatter did.
+
+**It treats every file as prose, regardless of extension --- never point `--write` at a `.py` file.**
+Dry-run against a `.py` file (2026-09-10) showed it merging an `if`/`elif` chain onto one line, syntactically-plausible-looking and semantically broken.
+- **Do:** preview (the default) before ever passing `--write`, `.md` or not.
+- **Don't:** assume the extension gates it --- nothing in the tool checks.
 
 ## macOS disk cleanup: where the space actually goes
 

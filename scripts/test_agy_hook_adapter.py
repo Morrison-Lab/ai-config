@@ -290,6 +290,56 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertEqual(out.get("reason"), "Unauthorized command")
 
     @patch('os.path.exists', return_value=True)
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_run_command_parallel_multiple_hooks_and_order(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_exists):
+        multi_hooks_def = {
+            "hooks": {
+                "PreToolUse": [
+                    {
+                        "matcher": "Bash",
+                        "hooks": [
+                            {"type": "command", "command": "python3 /fake/hook1.py", "timeout": 10},
+                            {"type": "command", "command": "python3 /fake/hook2.py", "timeout": 10},
+                            {"type": "command", "command": "python3 /fake/hook3.py", "timeout": 10}
+                        ]
+                    }
+                ]
+            }
+        }
+
+        def fake_run(cmd, *args, **kwargs):
+            if "hook1.py" in cmd:
+                return MagicMock(returncode=0, stdout=json.dumps({"systemMessage": "Notice 1", "hookSpecificOutput": {}}), stderr="")
+            elif "hook2.py" in cmd:
+                return MagicMock(returncode=0, stdout=json.dumps({"systemMessage": "Notice 2", "hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": "Blocked by hook2"}}), stderr="")
+            elif "hook3.py" in cmd:
+                return MagicMock(returncode=0, stdout=json.dumps({"systemMessage": "Notice 3", "hookSpecificOutput": {}}), stderr="")
+            return MagicMock(returncode=0, stdout=json.dumps({}), stderr="")
+
+        mock_run.side_effect = fake_run
+
+        with patch('builtins.open', new_callable=mock_open, read_data=json.dumps(multi_hooks_def)):
+            payload = {
+                "toolCall": {
+                    "name": "run_command",
+                    "args": {"CommandLine": "git push origin main"}
+                }
+            }
+            mock_stdin.write(json.dumps(payload))
+            mock_stdin.seek(0)
+            self.adapter.main()
+
+            out = json.loads(mock_stdout.getvalue())
+            self.assertEqual(out.get("decision"), "deny")
+            self.assertIn("Blocked by hook2", out.get("reason"))
+            self.assertIn("Notice 1", out.get("reason"))
+            self.assertIn("Notice 2", out.get("reason"))
+            self.assertEqual(mock_run.call_count, 3)
+
+    @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
     @patch('sys.stdin', new_callable=io.StringIO)
     @patch('sys.stdout', new_callable=io.StringIO)
@@ -1155,10 +1205,14 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
     def test_multi_subagent_fanout_and_deny(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
-        res1 = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
-        res2 = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
-        res3 = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": "Agent 2 not permitted"}}), stderr="")
-        mock_run.side_effect = [res1, res2, res3, MagicMock()]
+        def fake_run(cmd, *args, **kwargs):
+            payload_str = kwargs.get("input", "{}")
+            payload = json.loads(payload_str)
+            if payload.get("tool_input", {}).get("subagent_type") == "agent2":
+                return MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": "Agent 2 not permitted"}}), stderr="")
+            return MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
+
+        mock_run.side_effect = fake_run
         
         payload = {
             "toolCall": {
@@ -1930,6 +1984,15 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertEqual(adapter.PRE_INVOCATION_TOTAL_BYTE_CAP, 30000)
         self.assertEqual(buf.getvalue(), "")
 
+    def test_max_workers_non_positive_clamped_to_one(self):
+        with patch.dict(os.environ, {"AGY_ADAPTER_MAX_WORKERS": "0"}):
+            adapter = load_adapter()
+            self.assertEqual(adapter.MAX_WORKERS, 1)
+
+        with patch.dict(os.environ, {"AGY_ADAPTER_MAX_WORKERS": "-5"}):
+            adapter = load_adapter()
+            self.assertEqual(adapter.MAX_WORKERS, 1)
+
     # -- Symlink invocation & repo_root resolution (Issue #2681) ---------
 
     def test_symlink_invocation_resolves_repo_root_to_find_hooks_json(self):
@@ -2326,6 +2389,7 @@ class TestAgyHookAdapter(unittest.TestCase):
             self.assertTrue(os.path.islink(os.path.join(staging_dir, "scripts")))
             self.assertTrue(os.path.islink(os.path.join(staging_dir, "skills")))
             self.assertTrue(os.path.islink(os.path.join(staging_dir, "shared")))
+            self.assertTrue(os.path.islink(os.path.join(staging_dir, "rules")))
 
             plugins_json_path = os.path.join(config_dir, "plugins.json")
             self.assertTrue(os.path.isfile(plugins_json_path))

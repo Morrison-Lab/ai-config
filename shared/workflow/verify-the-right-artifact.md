@@ -411,6 +411,57 @@ the fix here is a stricter version of the same falsifying-question test, aimed a
 The Pandoc-bypass and the empty-submodule-baseline are also written up in that PR's own thread and in d-morrison/rme#1154's "Two instrument traps" section;
 the bypass produced a wrong "fix" and two issues filed on the false "math does not compile" premise, one of them d-morrison/macros#85, closed not-planned once the Pandoc-expansion mistake was found.)
 
+## A reviewer's counter-measurement needs the same check the claim it rebuts would have needed
+
+The section above is about the same artifact measured at a narrower scope than the claim names.
+This one is a plain substitution, the kind the four shapes above describe --- a different document standing in for the one the claim is about --- and it is worth its own entry only because of *who* commits it: a **reviewer** refuting someone else's claim rather than an author supporting their own.
+That is easy to miss, because a rebuttal reads as skepticism rather than as an assertion --- "I tested this and it isn't true" sounds like diligence applied, not like a new claim that itself owes [`dont-take-my-word-for-it`](../principles/dont-take-my-word-for-it.md).
+A finding backed by a real command is not thereby a finding backed by the *right* command, and nothing about the reviewer's own confidence distinguishes the two.
+
+A commit fixing a broken macro (`\def\v0`/`\def\v1` silently overriding `\renewcommand{\v}`) said only that it was "verified through `pandoc -t latex`" --- true, and unfalsifiable-looking to a reader with no further detail.
+An `adversarial-reviewer` subagent, dispatched to check the fix, ran its own counter-test: appended `\v0` `\v1` `\v{x}` to a document containing **no macro definitions**, ran it through `quarto pandoc -t latex`, and observed every token pass through unexpanded.
+From that it concluded pandoc does not expand TeX macros in math mode at all, so the stated verification could not possibly have discriminated a working macro file from a broken one --- and filed the fix's claim as unsubstantiated.
+
+The reasoning was valid.
+The measurement was real.
+Both were about the wrong case: pandoc's `latex_macros` extension expands a macro only when it is **defined in the same document**, which the reviewer's test document was not.
+Testing an empty document to ask "does pandoc expand macros" is the null case, indistinguishable in outcome whether the extension works or the extension is entirely absent --- [`fail-fast`](../principles/fail-fast.md)'s denominator move again: a test whose passing and failing readings look identical has not tested anything.
+Re-running with the precondition restored (a document that actually defines `\v`) produces the discriminator the claim needed:
+
+| | `\v0` | `\v1` | `\v{x}` |
+| --- | --- | --- | --- |
+| no definitions present | `\v0` | `\v1` | `\v{x}` |
+| `macros.qmd` before the fix | `\v0` | `\tilde{1}` | `\v{x}` |
+| `macros.qmd` after the fix | `\tilde{0}` | `\tilde{1}` | `\tilde{x}` |
+
+The reviewer had measured the top row and read it as the whole truth table.
+The middle row is the bug's actual signature --- only `\v1` expands, because a delimited `\def\v1` survived as the last definition of `\v` --- and the bottom row is the fix.
+Nothing in the reviewer's transcript was fabricated;
+the precondition the original claim depended on was simply never in the reviewer's own test.
+
+**Two things follow, and both are needed --- one about re-measuring a finding, one about where the fix belongs.**
+
+First: a rebuttal is a claim like any other, so the *rebutter* re-measures before publishing it, not only the party being rebutted.
+[`address-every-comment`](address-every-comment.md)'s Rebut disposition already lets an author push back on a reviewer's finding;
+the mirror obligation belongs to the reviewer before the finding is filed --- confirm the counter-test actually carries the precondition the original claim relied on, not merely a test that superficially exercises the same mechanism.
+
+Second: the fix is not to win the rebuttal in a PR comment where it dies with the thread.
+The original message's vagueness --- "verified through `pandoc -t latex`", true and giving the reader nothing to check --- is what invited a plausible wrong finding in the first place.
+Amending the commit message to carry the three-row table above did both jobs at once: it rebutted the finding, and it left the next reader (human or reviewer) unable to repeat the reviewer's mistake, because the null row sits right next to the two rows that discriminate.
+A durable artifact that states its own discriminator is [`quotable-findings`](quotable-findings.md)'s standard turned around --- a claim that names the exact measurement that would falsify it is the one nobody can plausibly misread.
+
+- **Do:** treat a reviewer's own counter-test as a claim requiring the same re-derivation any other claim does, whichever side of the finding you are on.
+- **Don't:** read "the reviewer ran a command" as equivalent to "the reviewer ran the command that could have shown the claim false" --- a command that cannot exhibit the failure mode has not tested the claim, however real its output is.
+- **Do:** when rebutting a finding, name the precondition the original claim relied on and confirm the counter-test carried it.
+- **Don't:** rebut by re-asserting the original claim against the counter-test's bare output;
+  that answers confidence with confidence and settles nothing --- name the specific precondition the counter-test dropped.
+- **Do:** write the discriminating measurement --- including the null case that shows what a non-discriminating test looks like --- into the durable artifact (commit message, PR body) rather than only into a comment thread.
+- **Don't:** leave a verification claim as a bare tool invocation ("verified through X") with no stated discriminator;
+  that vagueness is what makes a plausible-but-wrong counter-finding possible in the first place.
+
+(Measured 2026-09-09 on d-morrison/macros#87: the reviewer's counter-test and its null-case conclusion are the measured half;
+the general rule that a rebuttal is itself a claim requiring re-derivation, and that the fix belongs in the durable artifact rather than a comment, is the inferred half, extending [`address-every-comment`](address-every-comment.md)'s Rebut disposition to the reviewer's own side of it.)
+
 ## A summary is another shape, and the auto-loaded copy is the one you read
 
 [`fact-check-prose`](../writing/fact-check-prose.md)'s "any condensation
@@ -1456,3 +1507,182 @@ reread, which is the same discovery path
 sure about that?" case record already names as invisible to a hook keyed on
 a first-person admission: the wrongness surfaced as an answer to a question,
 with no admission attached.)
+
+## Naming a reference is not verifying it
+
+Repairing a stale reference by making it durable and repairing it by making
+it true are two different edits, and only the first one feels urgent when
+the passage under repair is about references.
+
+A positional cross-reference ("the 2nd occurrence above") breaks the moment
+a record moves, which is exactly the failure this corpus's own
+[`mistake-patterns.cases.md`](../../memories/mistake-patterns.cases.md)
+header rules out by writing every cross-reference by name.
+Swapping the position for a name is the correct fix for durability, and it
+supplies none of the fix for accuracy: a named target is checkable, not
+checked, and the check is a separate step that a reference-repair pass has
+no built-in reason to take, since references are already the subject.
+The named artifact still has to be opened and read against the specific
+claim the reference is standing in for, the same substitution
+[`The four shapes`](#the-four-shapes) already names for every other
+adjacent-artifact case.
+
+- **Do:** open the named target and confirm it contains the specific claim
+  the reference stands in for, as a step separate from naming it.
+- **Do:** treat "the reference is now durable" and "the reference is now
+  true" as two claims needing two checks, even in a pass whose subject is
+  references.
+- **Don't:** replace a positional pointer with a named one and read the
+  improvement in form as evidence of the content underneath.
+- **Don't:** assume a reference-repair pass is exempt from this file's own
+  rule merely because references, not facts, are what is being edited.
+
+(Measured 2026-09-09, ai-config#3484: a stale positional reference reading
+"the 2nd occurrence above" was replaced with a named pointer to "the
+2026-09-03 occurrence recorded in this file" without opening that occurrence
+to confirm it carried the claim being cited.
+It did not.
+The named occurrence was
+[`mistake-patterns.cases.md`](../../memories/mistake-patterns.cases.md)'s
+misidentified-hook-copy record, which carries no restart measurement at
+all; the actual measurement lived in Pattern 43's own Fix step, in
+[`mistake-patterns.md`](../../memories/mistake-patterns.md), a different
+file entirely.
+The repair converted an arguable pointer into a confidently false one, and
+the confidence was new: a vague positional reference invites a reader to
+check it, while a specific named one reads as already checked.)
+
+## A diagnostic returning clean is evidence about the diagnostic, not the fault
+
+A clean result from a targeted check answers "does this specific thing show
+the problem", not "is the problem absent" --- and the gap between those two
+questions is invisible exactly when every individual check was reasonable to
+run.
+
+The tell is a fault that keeps firing after every registration path a
+diagnosis names comes back clean.
+Each clean read gets spent arguing the fault must be elsewhere, when it is
+equally consistent with the diagnosis having examined the wrong population:
+a check that is sound on the artifact it reads says nothing about whether
+that artifact is the one actually responsible.
+Ruling out three registration paths in turn is real work and reads as
+progress, but a fault that persists through all three is telling you about
+the paths checked, not about the fault --- the same shape
+[`fail-fast`](../principles/fail-fast.md) names for a pass path that isn't
+provably disjoint from the failure path, applied here to a diagnostic
+instead of to a guard.
+
+The fix is not a sharper check on the same candidate set; it is capturing
+the fault directly while it fires (a process sample, a live trace) rather
+than continuing to deduce the culprit from registration files that have
+already all read clean.
+
+- **Do:** treat a clean result from every registration path checked so far
+  as evidence about which paths were examined, not as evidence the fault
+  sits elsewhere.
+- **Do:** capture the fault live (a process sample taken while deliberately
+  triggering it) once the obvious registration paths have all read clean,
+  rather than adding a fourth path to the same deduction.
+- **Don't:** read "every check I ran came back clean" as narrowing the
+  search space --- it narrows the set of *checked* paths, not the set of
+  *possible* ones.
+- **Don't:** keep refining the diagnostic technique against a candidate set
+  established by guesswork, when a direct capture would name the actual
+  path without needing the set enumerated at all.
+
+(ai-config#3141 is the worked incident, and it turned on the diagnostic twice
+over.
+Chasing which copy of `hooks/no-unreviewed-pr.py` was firing an expired
+moratorium, a first pass reported the copy registered in
+`~/.claude/settings.json` as current, all three `installed_plugins.json` pins as
+containing no hook file, and `enabledPlugins` as `false` --- every registration
+clean while the guard misbehaved.
+That reading was itself an instrument artifact.
+The probe initialised each pin's result to the string `(no hook file)` and
+overwrote it only when a `MORATORIUM_END` line was found, so a pin whose hook
+file exists but carries no moratorium constant printed as though the file were
+missing.
+Re-derived with the two conditions separated, one pin does hold the hook ---
+user-scope, with no `MORATORIUM_END` at all, which is a copy predating the
+moratorium and therefore one that demands the review unconditionally.
+A registration did explain it.
+So the incident supplies the rule twice: once for the diagnostic that returned
+clean while the fault stood, and once for the probe whose defaulted variable
+described a condition it never tested.
+The record and its measurements live in
+[`mistake-patterns.cases.md`](../../memories/mistake-patterns.cases.md)'s
+Pattern 43 entry; this section states the transferable rule the incident
+does not itself generalize.)
+
+## A negative lookup cannot tell "never existed" from "no longer reachable"
+
+The shapes above all substitute one artifact for another.
+This one substitutes a *result* for a claim: an absence lookup returns nothing, and nothing is read as proof the thing was never there.
+
+`git cat-file -t <sha>` answering `Not a valid object name` is the worked case.
+It means only that the object is not in **this** clone **now**.
+It does not distinguish an invented SHA from a real commit that has since become unreachable, and the difference is the whole finding: one is a fabrication to chase, the other a stale reference to re-point.
+
+The trap is that the lookup feels like a *measurement* rather than an inference, so it escapes the claim-checking a stated fact would get.
+It also arrives with the grammar of proof --- a command, a definite answer, no hedging --- which is exactly `grep-is-not-coverage`'s error one level down: there a search's silence is read as corpus coverage, here a lookup's silence is read as an artifact's nonexistence.
+
+**GitHub's pull refs are the common generator.**
+A `pull_request`-triggered workflow checks out `refs/pull/N/merge`, an ephemeral merge of the head into the base whose SHA is neither:
+
+```console
+$ git fetch origin 'refs/pull/N/merge:refs/remotes/origin/pr-merge'
+$ git log -1 --format='%h parents: %p' origin/pr-merge
+356e7cb5 parents: f3611051 4edc93a2
+          ^ base    ^ PR head
+```
+
+That ref is replaced on every push, so a previous run's merge SHA is unreachable within minutes.
+Anything a CI job reports about "the commit it ran on" is therefore unverifiable from an ordinary clone shortly afterwards --- and comes back looking fabricated.
+
+The same shape covers a force-pushed commit, a deleted branch's tip, a dangling object past `gc`, and a rev in a shallow clone --- which is the sharpest, because the object exists on the remote and the local answer is still nothing.
+
+The remedy is not a better lookup but a different question: ask what else would produce this exact silence, and whether the artifact you queried could hold the answer at all.
+Where the reference is ephemeral, capture it **while it is current** rather than testing afterwards.
+Where it is not, fetch the namespace that would carry it before concluding anything --- a clone that has never fetched `refs/pull/*` cannot see a pull ref, so its silence about one is a fact about the clone.
+
+- **Do:** name what else explains the empty result, before reporting it as absence.
+- **Do:** fetch the namespace or deepen the clone that would hold the object, and say which you did.
+- **Do:** capture an ephemeral reference at the moment it is live.
+- **Don't:** read `Not a valid object name`, a 404, or an empty query as evidence the thing never existed.
+- **Don't:** treat a lookup as exempt from claim-checking because it ran a command --- the command measured this clone, and the claim was about the world.
+
+(Measured 2026-09-10, ai-config#3508.
+Three CI reviews on ai-config#3548 emitted a `commit_sha` that did not resolve locally, and I reported them on the tracking issue as SHAs that "do not exist" and abbreviate "nothing real".
+The third carried a full 40-character value and prose saying "the merge commit introduces no further diff", which identified the mechanism: the job runs on the pull merge ref, so the JSON names a real commit that the next push made unreachable.
+The clone I tested in had never fetched a pull ref, so it would have answered identically for every candidate explanation.
+The defect is real and is a stale-reference one;
+the fabrication reading was mine, and it pointed at the wrong fix.)
+
+## The invoking process is itself a member of the population a filter scopes, and reading the filter's prose does not check that
+
+Every shape above substitutes one artifact for another.
+This one substitutes a **claim about a passage** for a claim about the **mechanism the passage describes** --- distinct from ["A mechanism's prose is not the mechanism's definition"](#a-mechanisms-prose-is-not-the-mechanisms-definition) above, which is about a comment's motivating example being narrower than the mechanism it explains.
+Here the passage is not narrow or ambiguous;
+it states its remedy plainly and correctly as prose.
+The gap is between reading that prose carefully and confirming it, and checking whether following the remedy actually produces the exclusion it is read as promising --- which needs the tool's own documented behaviour, not a second reading of the sentence describing it.
+
+A companion memory entry, tracking the underlying `pkill -f` hazard as [ai-config#3427](https://github.com/Morrison-Lab/ai-config/issues/3427) and merged into [`memories/shell.md`](../../memories/shell.md) via [ai-config#3428](https://github.com/Morrison-Lab/ai-config/pull/3428), recommends: for a `pkill -f` scoped only by a shared script path, resolve candidates with `pgrep -f <pattern>`, then filter each one on its own working directory (`readlink /proc/<pid>/cwd`) against your own worktree, killing only a match.
+Reading that passage and confirming it says what it says is not the same claim as "this filter cannot re-admit the shell that is running it."
+The wrong belief was exactly that stronger claim: that a cwd filter, applied to `pgrep -f`'s candidate list, cannot reach the invoking session, because a non-matching session sits in a different working directory.
+That reasons about *other* worktrees' processes and never asks whether the invoking shell itself belongs to the population the filter admits.
+
+It does.
+`pgrep -f <pattern>` matches by regex against every process's full command line, and excludes only its own PID --- not its ancestors.
+The shell that typed the `pgrep`/`pkill` command has that pattern text in its own command line (you just typed it) and sits in your own worktree by construction, which is exactly the condition a cwd filter is built to accept.
+So the shell running the search is a candidate the filter admits, not one it excludes, and nothing about re-reading the passage's prose --- however carefully --- would surface that, because the prose is a true description of the filter it proposes.
+What it needed was a check against `pgrep`'s own documented behaviour: `pgrep --help` lists `-A, --ignore-ancestors` for precisely this case, which means the tool's own authors anticipated it and named the flag the passage's remedy omits.
+
+- **Do:** before trusting a filter's stated coverage, ask whether the process performing the filtering is itself a member of the population being filtered --- not only whether the passage describing the filter is read correctly.
+- **Do:** check a claim about what a filter excludes against the tool's own documented behaviour (a `--help` flag, a manpage clause), not against a second reading of the prose recommending it.
+- **Don't:** treat "the filter's cwd check would not match a *different* worktree's process" as having shown it cannot match the *invoking* one --- those are different claims, and only the second is the one that matters for self-exclusion.
+- **Don't:** read a remedy's prose as verified once it has been read carefully;
+  a coherent, correctly-stated remedy can still fail to achieve what it is read as promising.
+
+(Measured 2026-09-09 in this sandbox: `pgrep --help` lists `-A, --ignore-ancestors` as a documented flag, confirming `pgrep -f <pattern>` excludes only its own PID by default and matches an ancestor shell whose command line contains the pattern.
+The corrected belief and its displacing fact are the same pair [`memories/shell.md`](../../memories/shell.md) (ai-config#3428) records for the underlying `pkill -f` hazard;
+this entry is the general verification-method lesson the specific fix does not itself state --- that verifying the passage prescribing a remedy is not verifying the remedy holds.)

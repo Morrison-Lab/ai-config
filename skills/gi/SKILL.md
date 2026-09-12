@@ -228,8 +228,23 @@ branch a diff with an empty commit, push, and open a **draft** PR:
 
 ```bash
 git commit --allow-empty -m "start: <issue title> (closes #<N>)"   # COMMIT
-git push -u origin fix/<slug>                                      # PUSH
+```
 
+Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+```bash
+# An ABSOLUTE `cd` (or `git -C`), because whether a separate Bash call keeps
+# the previous one's directory is unsettled between sessions. Substitute the
+# absolute path step 6b created the worktree at, or this checkout's own path
+# when step 7's fallback was taken.
+cd /abs/path/to/<repo>-<slug>
+git push -u origin fix/<slug>   # PUSH
+```
+
+Open the draft PR/MR in its own Bash call:
+
+```bash
+cd /abs/path/to/<repo>-<slug>
 # GitHub — draft PR
 gh pr create --draft --title "<title>" --body "Closes #<N>
 

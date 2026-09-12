@@ -336,6 +336,15 @@ with environment variables read from the running IDE process: `ANTIGRAVITY_LS_AD
 The reply lands as a `PLANNER_RESPONSE` step in `~/.gemini/antigravity/brain/<conversationId>/.system_generated/logs/transcript.jsonl`, not on stdout, so a caller has to poll or tail that file rather than capturing a return value.
 This route did real tool work and two edit-only doc fixes on 2026-09-02, so it is a working fallback, not merely a documented one --- but it depends on the IDE process already running, which the direct CLI install above does not.
 
+**A headless `agy` run reports success over a hook that failed to launch.**
+Measured 2026-09-09 ([ai-config#3091](https://github.com/Morrison-Lab/ai-config/issues/3091)): the staged Windows `hooks.json` carried quoted absolute paths, every `run_command` hook failed to start, the agent could run no shell command at all, and the dispatch still exited 0 and printed a "Completed Work Summary" naming files it never wrote.
+A clean `git status` was the only tell.
+`memories/antigravity.md` carries the quoting rule and the fix;
+what matters to a dispatcher is that the run's own report cannot be taken as evidence.
+
+- **Do:** check a dispatched `agy` run's claimed edits against `git status` or `git diff` before acting on its summary.
+- **Don't:** treat exit 0 and a work summary as proof that anything was written.
+
 - **Do:** install from the official `antigravity-cli` GitHub release when setting up `agy` fresh on Windows, and confirm with `agy --version` and `agy models` before trusting the install.
 - **Do:** read `agy models`' own output for the current roster rather than reusing a pasted list, since a vendor roster is exactly the kind of claim this corpus times.
 - **Do:** reach for the `agentapi` fallback only when the IDE is already open --- it reads the IDE's own ports and token, so it cannot start a fresh Antigravity session on its own.
@@ -684,6 +693,57 @@ that round is not redundant, since it found two false discharges the worker's ro
 - **Don't:** brief a worker to push and ARDI its own PR;
   the guard refuses it by construction, and the retry burns the worker's whole budget.
 
+## A syntax check does not catch a delegated edit whose quoting was dropped
+
+[`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md) already says to run a parser over a scripted edit *and* run the relevant tests before trusting it.
+What this case adds is which of those two halves decides, for delegated shell, and that the cheap half carries no partial credit.
+A dropped quote can leave a *different valid program* rather than an invalid one, and did here, so the parser passes and the artifact is still wrong.
+
+Measured 2026-09-10 on [ai-config#3435](https://github.com/Morrison-Lab/ai-config/pull/3435).
+An `agy` worker asked to guard a call in `bootstrap.sh` emitted a line of this shape:
+
+```sh
+cmd || printf warn  render-agy-hooks.py exited %d
+ "$?"
+```
+
+The format string lost its quotes and gained a real newline, so `"$?"` became its own command.
+Under that script's `set -euo pipefail` it expands to `0`, runs `0`, and aborts the bootstrap before the symlink creation that follows it and, much later, the dotfiles installer loop.
+
+`bash -n` exits 0 on that file.
+Verified on the reduced case: `bash -n` reports nothing, and running it dies with `0: command not found` and status 127.
+Nothing about the text is ungrammatical --- `printf` simply took different arguments than the author meant.
+That is what happened here;
+whether a lost quote usually lands that way rather than producing a syntax error is not measured, and running the edited script is worth doing either way.
+
+**Executing the artifact is the check that works, and this repo already had it.**
+`scripts/test_agy_hook_adapter.py` runs `bash bootstrap.sh` and asserts a zero exit, and `validate.yml` gates it, so CI would have failed on the mangled line.
+It could not run on the Windows machine that wrote it, for an unrelated path-quoting bug in the test itself ([ai-config#3551](https://github.com/Morrison-Lab/ai-config/issues/3551)) --- so the local loop was blind and the adversarial reviewer was the only detector before push.
+
+The transferable part is which check answers which question.
+A parser answers whether the file is *well-formed*.
+Only running it can expose a failure that lives in the *behaviour* rather than in the grammar, which is the class this defect belongs to.
+It is not proof the change is right: an execution test asserts what it happens to assert, so a semantically wrong edit passes wherever the relevant behaviour is untested.
+What it rules out is the case here, where a delegated edit's own account of itself is accurate and the text it wrote is not.
+Nothing here settles whether the worker authored the malformed line or a transport mangled one it wrote correctly, and the check is the same either way.
+
+- **Do:** run the suite that executes an edited script, not only a parser over it, before trusting a delegated commit that touched shell.
+- **Do:** run the script yourself against a throwaway fixture when no suite executes it, and file an issue for the missing coverage rather than skipping the check.
+  Derive the candidates rather than recalling them, and say the output is a candidate list rather than the set of uncovered scripts.
+  It finds a literal filename mention and nothing else, so a script covered only by a glob would print.
+  None does today: the one `hooks/*.sh`, which `scripts/test_hooks.py` pairs by glob, is also named literally in its own test.
+  The gap is in what the query can decide, not in what it currently reports:
+
+  ```bash
+  for s in $(git ls-files '*.sh'); do
+    grep -rqlF "$(basename "$s")" scripts/test_*.py hooks/test-*.py || echo "$s"
+  done
+  ```
+- **Do:** say in the report that a test you could not run locally is unchecked, rather than counting a passing parser toward it.
+- **Don't:** read `bash -n` (or `py_compile`) passing as evidence that a delegated edit is correct --- it reports grammar, and dropped quoting is grammatical.
+- **Don't:** rely on the commit message agreeing with the diff here;
+  the message was accurate and the code was not.
+
 ## opencode free tier: a full authoring task, validated mechanically
 
 Measured 2026-08-28 on opencode CLI 1.18.15 (macOS),
@@ -755,5 +815,46 @@ The canonical trade-off analysis, context-budget rationale, and Do/Don't directi
 - **Don't:** duplicate the full trade-off rationale across multiple files ---
   keep the normative guidance in [`use-subagents`](../shared/workflow/use-subagents.md).
 
+## The push guard's accepted agy shape forbids every flag, which caps a review at five minutes
 
+`hooks/no-push-without-self-review.py` accepts a cross-family review only as a recognized reviewer, a print-mode flag, and one single-quoted prompt, matched against the whole raw command.
+Its own docstring explains why the shape is compared rather than parsed, and names the costs it accepts: a double-quoted prompt, a leading `cd`, a prompt containing an apostrophe, and **any extra flag**, `--model` included.
 
+One consequence of that last item is not stated there and is worth knowing before briefing a reviewer.
+`--print-timeout` is a flag, so it cannot be passed either, and the review runs at the CLI's five-minute default.
+A run that exceeds it returns `print timeout after 5m0s with turn in progress; returning partial output`, which carries no verdict and so discharges nothing.
+
+The budget can be spent on the reviewer's own reading rather than on the diff.
+The same commit was reviewed twice on 2026-09-11, so its size was constant across both runs.
+The first brief named the `git show` command and asked five questions, and the reviewer opened further files and timed out.
+The second told it to run that one command, to open no other file, and asked three questions, and it returned a verdict in under two minutes.
+Two things changed at once, the reading instruction and the question count, so which of them mattered is not established.
+What the pair does establish is that a brief can bring the same diff in under budget, which is the actionable half.
+
+So write the brief to bound the reading: name the one command, forbid opening anything else, and keep the question list short.
+
+- **Do:** name the exact command a guard-discharging agy review should run, and tell it to open no other file.
+- **Do:** re-issue a timed-out review with a shorter question list and a narrower reading instruction, rather than reaching for a timeout flag the guard will refuse.
+- **Don't:** push on a partial-output timeout --- it is the absence of a verdict, not a lenient one.
+- **Don't:** assume a small diff is enough to fit the budget;
+  an unbounded brief spends it on reading around the diff.
+
+## agy dies with no output when it reaches for its own file tools
+
+A brief can forbid the native file tools in its first line, in capital letters, and agy will still reach for one.
+Headless mode cannot prompt for the permission, so the call is auto-denied and the whole run ends having produced nothing:
+
+```
+jetski: no output produced -- a tool required the "read_file" permission that
+headless mode cannot prompt for, so it was auto-denied.
+```
+
+The failure is total rather than partial, and it costs the whole dispatch.
+It is likeliest on a job whose first act is exploratory reading --- a corpus search, a "find the right file" pass --- and least likely on a job handed one file and one change.
+
+- **Do:** hand a job the exact paths it should read, so the shell route is the obvious one.
+- **Do:** check a finished job's log for that line before reading its silence as no findings.
+- **Don't:** rely on a brief's prohibition alone for a job that has to go looking for files.
+
+(Measured 2026-09-11: an exploratory memories pass died this way while a single-file fix job briefed identically succeeded.
+The standing remedy is an allow-rule under `permissions.allow` in the Antigravity settings, which is the user's call to make.)

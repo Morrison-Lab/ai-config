@@ -62,14 +62,16 @@ If there is no fingerprint
 (including a stale-registered persona),
 obtain a CLI review, write that reviewer's report to a file
 under `/tmp`, and call `parse_report()` on that file.
-On Claude Code the guard admits a verdict only from that subagent's own call result, only when the verdict is a verdict *line* rather than a sentence quoting one, and only when the report names the commit it read (`Reviewed-Commit: <sha>`, after the verdict) and that commit is what the push would actually ship --- refspec resolved, so `push origin some-other-branch` is not covered by a verdict for `HEAD`.
+On Claude Code the guard admits a verdict from that subagent's own call result, or from a Bash call matching its external-reviewer pattern, which today recognizes `agy --print` and no other delegation CLI.
+Either way it admits the verdict only when it is a verdict *line* rather than a sentence quoting one, and only when the report names the commit it read (`Reviewed-Commit: <sha>`, after the verdict) and that commit is what the push would actually ship --- refspec resolved, so `push origin some-other-branch` is not covered by a verdict for `HEAD`.
 So an inline pass under a reviewer framing, a verdict quoted out of a file, the guard's own denial message, and a verdict for an earlier commit all fail to satisfy it.
 Review after committing, therefore, not before.
 
 Override by prefixing the push itself with `ALLOW_UNREVIEWED_PUSH=1` when no verdict can exist for the guard to check --- and say in your reply that you used it and why:
 
 - the initial empty PR branch under [`pr-on-claim`](../../shared/workflow/pr-on-claim.md), which carries nothing to review;
-- a review delivered by a separate CLI rather than a subagent, whose verdict never becomes an `Agent` call's result;
+- a review delivered by a CLI the guard does NOT recognize, whose verdict never becomes an `Agent` call's result
+  (an `agy --print` review is not this case: the guard admits it directly, so overriding for one is both unnecessary and a worse record than the real thing);
 - a session where the reviewer agent is unregistered ([ai-config#1921](https://github.com/Morrison-Lab/ai-config/issues/1921)) or registered from a stale definition, which is the case on any rollout of a change to the persona itself;
 - an emergency.
 
@@ -286,8 +288,9 @@ Actively query current-head CI/pipeline status (`gh pr checks` / `glab ci list` 
 
 ## Proactive hook compliance
 
-- **`no-push-without-self-review.py`**: Blocks `git push` unless an adversarial self-review subagent
-  produced a clean verdict for the exact commit being pushed (`Reviewed-Commit: <HEAD_SHA>`).
+- **`no-push-without-self-review.py`**: Blocks `git push` unless a clean verdict for the exact commit
+  being pushed (`Reviewed-Commit: <HEAD_SHA>`) came from an adversarial self-review subagent, or from
+  a review by a CLI the guard recognizes, which today means `agy --print` and no other.
   Dispatch the reviewer in the foreground and resolve all findings before pushing.
   Use `ALLOW_UNREVIEWED_PUSH=1` only for the empty `pr-on-claim` commit or documented exceptions.
 - **`no-clobbering-push.py`**: Denies bare `git push -f`/`--force` and warns if remote tip has diverged.

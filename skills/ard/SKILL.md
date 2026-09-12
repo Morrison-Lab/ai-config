@@ -114,7 +114,12 @@ Apply the decision order above. For Address items, make the edits now.
 ```bash
 git add -p                                           # stage deliberately
 git commit -m "fix: address round <k> review findings"   # COMMIT
-git push                                                  # PUSH
+```
+
+Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+```bash
+git push   # PUSH
 ```
 
 - **One commit per round**, not one per finding — reference its SHA in every Address row.

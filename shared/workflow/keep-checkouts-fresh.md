@@ -11,8 +11,48 @@ In every session --- at session start, and again periodically during long sessio
    Still flag it rather than force if the tree is dirty, or if a path on local `main` is genuinely missing from `origin/main`.
    **If `main` isn't the currently checked-out branch** (the session is already working on a feature branch), skip the checkout dance entirely --- `git branch -f main origin/main` realigns the ref in place without touching the working tree or switching away from the branch you're actively on.
 2. **The `~/.claude` consumer install.**
-   Claude Code and Cursor no longer read this repo's `skills/`/`commands/` as a symlinked copy under `~/.claude` at all --- they install this repo as a native plugin, which auto-updates at session start (see README's *Verify the install*), so the served copy needs no freshness check.
+   Claude Code and Cursor no longer read this repo's `skills/` and `commands/` as a symlinked copy under `~/.claude` at all.
+   They install this repo as a native plugin, which auto-updates at session start (see README's *Verify the install*),
+   so the freshness question moves from a symlinked copy to the pinned snapshot the plugin serves.
    That is a claim about what is **served**, and not about what is **left over**.
+
+   **The auto-update claim is narrower than it reads: it is a claim about the update *mechanism*, and says nothing about whether this session's already-cached snapshot is current.**
+   `installed_plugins.json`'s `lastUpdated` field records when the pin was last written, not how far behind the pin currently sits, so confirming the plugin is enabled and not doubled tells you nothing about whether the cached snapshot it points at is stale.
+
+   Measured on this Windows machine, 2026-09-09.
+   The pinned commit's `lastUpdated` read 2026-08-27T18:33:12Z, 13 days before the session that read it,
+   and `git rev-list --count <pinned-commit>..origin/main` in a freshly fetched ai-config checkout counted 459 commits ahead of that pin.
+   The gap included a targeted hook fix (`hooks/no-placeholder-reply.py`, [#2964](https://github.com/Morrison-Lab/ai-config/pull/2964)) whose absence let a placeholder reply through unblocked --- see [ai-config#3437](https://github.com/Morrison-Lab/ai-config/issues/3437).
+
+   Check it from the pin the active scope actually serves, not from the newest directory under the cache: the cache can hold a newer snapshot while this scope's entry still points at an older one.
+   Read the `gitCommitSha` of the entry whose `scope` and `projectPath` match the session, then count how far `main` has moved past it:
+
+   ```bash
+   python3 - <<'EOF'
+   import json, os
+   pins = json.load(open(os.path.expanduser("~/.claude/plugins/installed_plugins.json")))
+   entries = pins.get("plugins", {}).get("ai-config@Morrison-Lab") or []
+   if not entries:
+       print("no ai-config@Morrison-Lab entry in installed_plugins.json")
+   for entry in entries:
+       print(entry.get("scope"), entry.get("projectPath", "-"), entry.get("gitCommitSha", "?"))
+   EOF
+   git -C <ai-config checkout> fetch -q origin && git -C <ai-config checkout> rev-list --count <gitCommitSha>..origin/main
+   ```
+
+   Any non-zero count means the served snapshot is behind `origin/main`, whatever `installed_plugins.json`'s own `lastUpdated` claims and however new the other cache directories are;
+   the larger the count, the more fixes the session is running without.
+
+   `claude plugin update <plugin>` (verified present in `claude plugin --help` output on this machine) is the remedy once staleness is confirmed --- run it per scope (`claude plugin update ai-config@Morrison-Lab`, and `claude plugin update --scope project ai-config@Morrison-Lab` from each affected project/worktree), then restart the session to pick up the refreshed cache path.
+   [ai-config#2439](https://github.com/Morrison-Lab/ai-config/issues/2439) tracks making this check itself part of the session-start sweep rather than something a session discovers by symptom.
+
+   - **Do:** count commits from the active scope's pinned `gitCommitSha` to `origin/main`, rather than trusting the auto-update mechanism to have already run.
+   - **Do:** run `claude plugin update` (per scope) once staleness is confirmed, then restart to apply it.
+   - **Do:** confirm a CLI remedy exists (`claude plugin --help`) on the machine in question before writing that none does.
+   - **Don't:** read "auto-updates at session start" as meaning the currently-running session's cache is already current --- that is exactly the claim this check tests.
+   - **Don't:** read `installed_plugins.json`'s `lastUpdated` field as a freshness measure.
+     It says when the pin was last written, and nothing about how many commits `origin/main` has gained since the pinned SHA.
+
    `shared/`, `hooks/`, and `memories/` have no plugin-equivalent replacement yet ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), so anyone relying on `~/.claude/shared`, `~/.claude/hooks`, or `~/.claude/memories` today is on a symlink or copy placed by an install predating that change, or by a manual step --- `bootstrap.sh` no longer places any of them.
    **`skills/` belongs in that sweep too, and the plugin serving them is not a reason to skip it.**
    A leftover `~/.claude/skills` from a pre-plugin install loads alongside the plugin, listing every skill twice --- bare `ums` beside `ai-config:ums` --- which crowds the skill listing and can cost entries their descriptions, the text routing selects on.
@@ -81,7 +121,15 @@ In every session --- at session start, and again periodically during long sessio
    ```bash
    python3 <ai-config-checkout>/scripts/install-hooks.py          # report
    python3 <ai-config-checkout>/scripts/install-hooks.py --fix     # register the missing ones
+   python3 <ai-config-checkout>/scripts/install-hooks.py --check   # do the registered paths resolve?
    ```
+   **Run `--check` too, because the report above and `--check` answer different questions and only the second one can see the outage.**
+   The report is keyed on `hooks/hooks.json`, so it speaks only about hooks this repo ships, at the path this script would itself write.
+   `--check` reads the settings files instead and asks, of every binding they carry, whether the path inside the command resolves.
+   That matters because an unresolvable path is not an inert guard: `python3` exits 2 on a file it cannot open, and exit 2 is the `PreToolUse` deny signal, so one stale absolute path denies every tool call its matcher names --- and from inside the session that is indistinguishable from the guard legitimately firing.
+   A path this process cannot expand (`${CLAUDE_PLUGIN_ROOT}` is set by the plugin loader, not by the shell) is reported as `skipped` rather than `missing`, since not checkable here is a different finding from not present.
+   `--check` exits 1 when any registered path is missing, and also when there is no settings file at all --- the zero case arms nothing, so reporting it as clean would be the pass-path-equals-failure-path shape.
+   See [ai-config#2392](https://github.com/Morrison-Lab/ai-config/issues/2392) for the two measured occurrences, the second of which lost `Bash` and `Write`/`Edit` together and so had no self-repair path left.
    Four caveats before running `--fix`.
    Check `enabledPlugins` in `settings.json` first: if the ai-config **plugin** is enabled it already loads every hook in `hooks/hooks.json`, and `--fix` then registers each one a second time under a different command string, so every hook fires twice --- the two paths are mutually exclusive, per README.
    And hooks connect at **session start**, so a mid-session `--fix` arms nothing until a restart.
@@ -100,10 +148,10 @@ In every session --- at session start, and again periodically during long sessio
    (Measured 2026-09-01: the cache hook at rev `a3e0fdb` predated [ai-config#2820](https://github.com/Morrison-Lab/ai-config/pull/2820)'s fallback while the marketplace clone had pulled past it;
    tracked as [ai-config#2899](https://github.com/Morrison-Lab/ai-config/issues/2899);
    see [`mistake-patterns.md`](../../memories/mistake-patterns.md) Pattern 43 for the full deadlock.)
-   `install-hooks.py --fix` covers the non-plugin path only, and its own docstring is explicit about what it does not do: it never places a file, and it does not check that the script it is registering exists.
+   `install-hooks.py --fix` covers the non-plugin path only, and its own docstring is explicit about what it does not do: it never places a file.
    `bootstrap.sh` no longer places `hooks/` under `~/.claude` (see its header comment), so this path currently only helps on a machine whose `~/.claude/hooks` already holds the scripts some other way.
    Registering a hook whose file is absent is worse than leaving it unregistered: an unregistered guard is inert, while a registered-but-absent `PreToolUse` `Bash` hook makes `python3` exit 2 on **every** Bash call and takes the shell down.
-   `--fix` prints a note naming this only when run *without* `--fix`, so the run that causes the damage is the one that stays silent about it.
+   `--fix` therefore refuses to register a hook whose script is not on disk, prints `REFUSED` naming it, and keeps the exit code non-zero (ai-config#2392) --- so the machine that lacks the scripts ends a `--fix` run with nothing registered rather than with a session-wide deny.
    **Point 1 governs this instrument too, and its stale run is dangerous.**
    A stale `install-hooks.py` run reads an old `hooks/hooks.json`, finds every hook it knows about already bound, and prints `All hooks registered.` --- a positive all-clear over hooks it cannot see.
    Pull first, then measure, and treat the examined count as the thing to read: it is the manifest's size, so a number below the current hook count means the checkout is behind rather than the machine being clean.

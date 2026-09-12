@@ -768,6 +768,12 @@
   That is the mechanism working, not failing --- a date that re-arms is the whole reason the switch is a date and not an env flag --- but it does show the cost of a short window, since the re-arm lands mid-session with no announcement.
   So the new window is three months rather than a fortnight, far enough from the day-to-day that its expiry is unlikely to surprise an active session.
 
+  **Reconfirmed 2026-09-10.**
+  The directive, verbatim: "copilot is unavailable until october;
+  remember this and stop trying to use it".
+  Logged for the date and the wording, as each prior directive is.
+  `MORATORIUM_END` is deliberately unchanged: December already covers October, so the constant remains the operative window and editing it down to the stated month would shorten the guard rather than extend it.
+
   `MORATORIUM_END` in [`hooks/no-unreviewed-pr.py`](../hooks/no-unreviewed-pr.py) is the live value and this paragraph is its prose pair;
   the constant's own comment requires editing both together, and an extension that moves one is a silent divergence.
 

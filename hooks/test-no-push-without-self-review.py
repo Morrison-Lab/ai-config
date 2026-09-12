@@ -1874,6 +1874,73 @@ def fallback_cases() -> tuple[int, int]:
     return failures, ran
 
 
+def fingerprint_resolution_cases() -> tuple[int, int]:
+    """A reported fingerprint must resolve to a real commit (ai-config#3295).
+
+    A reviewer that recalls or reconstructs a SHA instead of reading it
+    verbatim from `git rev-parse HEAD` can get a prefix right (echoed from an
+    abbreviation it was handed, or from its own earlier `git log --oneline`)
+    and invent the rest -- a fabrication that a bare `startswith` comparison
+    cannot distinguish from a stale verdict for a genuinely different commit,
+    because both simply fail to match. The two are different defects and want
+    different messages: one says re-dispatch against what changed, the other
+    says the reviewer invented data.
+    """
+    failures = 0
+    ran = 0
+
+    def check(label, ok, detail=""):
+        nonlocal failures, ran
+        ran += 1
+        if ok:
+            print(f"PASS: {label}")
+        else:
+            print(f"FAIL: {label}{' - ' + detail if detail else ''}")
+            failures += 1
+
+    # A syntactically full-length SHA that shares HEAD's real prefix (as a
+    # confabulated tail would) but does not resolve to any object.
+    fabricated = HEAD[:9] + "e" * (40 - 9)
+    events = [agent_call(call_id="fpr1"),
+              agent_result("fpr1", body(commit=fabricated))]
+    rc, out = run_hook(PUSH, events)
+    spec = out.get("hookSpecificOutput") or {}
+    blocked = spec.get("permissionDecision") == "deny"
+    reason = spec.get("permissionDecisionReason", "")
+    check("a fingerprint that resolves to no commit is refused",
+          rc == 0 and blocked, reason[:160])
+    check("the refusal names it fabricated or corrupted, not stale",
+          "fabricated or corrupted" in reason, reason[:200])
+    check("the refusal tells the reviewer to copy `git rev-parse HEAD` verbatim",
+          "git rev-parse HEAD" in reason and "verbatim" in reason, reason[:200])
+
+    # A genuinely short but resolvable prefix (what `git log --oneline` would
+    # show) still authorizes the push it names -- the guard must not start
+    # requiring 40 characters as a side effect of resolving the fingerprint.
+    events = [agent_call(call_id="fpr2"),
+              agent_result("fpr2", body(commit=HEAD[:10]))]
+    rc, out = run_hook(PUSH, events)
+    blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+    check("a genuinely-read short prefix that resolves still authorizes the push",
+          rc == 0 and not blocked)
+
+    # A resolvable fingerprint for a real but wrong commit is the pre-existing
+    # stale-verdict case and must keep its own message, not the fabrication one.
+    events = [agent_call(call_id="fpr3"),
+              agent_result("fpr3", body(commit=PREV))]
+    rc, out = run_hook(PUSH, events)
+    spec = out.get("hookSpecificOutput") or {}
+    blocked = spec.get("permissionDecision") == "deny"
+    reason = spec.get("permissionDecisionReason", "")
+    check("a resolvable verdict for a different real commit still blocks",
+          rc == 0 and blocked, reason[:160])
+    check("that refusal keeps the stale-verdict wording, not the fabrication one",
+          "but this push would ship" in reason and "fabricated" not in reason,
+          reason[:200])
+
+    return failures, ran
+
+
 def fingerprint_guidance_cases() -> tuple[int, int]:
     """The refusal that asks for a fingerprint must not contradict the settled
     tail contract (ai-config#3050).
@@ -2127,8 +2194,8 @@ def main():
                    fixture_branch_cases, windows_path_cases,
                    structured_payload_cases, transcript_scoping_cases,
                    cd_tracking_cases, fallback_cases,
-                   fingerprint_guidance_cases, omo_cases,
-                   external_reviewer_cases):
+                   fingerprint_guidance_cases, fingerprint_resolution_cases,
+                   omo_cases, external_reviewer_cases):
             f, r = fn()
             failed += f
             extra += r

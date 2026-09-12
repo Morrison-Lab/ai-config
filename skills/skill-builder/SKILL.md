@@ -349,7 +349,24 @@ git add skills/<name>/SKILL.md codex-skills/<name> \
                                                             # one) — NOT `-A`, which
                                                             # sweeps in unrelated edits
 git commit -m "skills: add <name> — <summary>"   # COMMIT
-git push -u origin HEAD && gh pr create --fill   # PUSH, CREATE_PR
+```
+
+Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
+
+```bash
+# Re-derived rather than inherited: a separate Bash call never keeps the
+# previous one's variables, and whether it keeps the directory is
+# unsettled. Target the active branch's worktree, falling back to the checkout root:
+repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/skill-builder rev-parse --show-toplevel 2>/dev/null || pwd)}"
+wt="$(git -C "$repo" worktree list --porcelain | awk '/^worktree /{w=$2} /^branch refs\/heads\/add-<name>-skill$/{print w}')"
+target="${wt:-$repo}"
+git -C "$target" push -u origin HEAD   # PUSH
+```
+
+Open the PR in a separate Bash call:
+
+```bash
+gh pr create --fill   # CREATE_PR
 ```
 
 **Regenerate the Codex wrappers — every new or renamed skill needs them.**

@@ -159,3 +159,38 @@ the delegation-skill half is tracked as [ai-config#3080](https://github.com/Morr
 (Measured 2026-09-05 on [Morrison-Lab/ai-config#3175](https://github.com/Morrison-Lab/ai-config/pull/3175): four consecutive review rounds each returned exactly one finding, and the last two were single-line label-consistency nits (`# M4` versus `# M4b` in a comment, then the same stale label in a mutation-table key).
 Each round cost a full CI cycle.
 The brief change described above --- one exhaustive pass, nothing held back, an explicit materiality bar including a request to name a dropped candidate --- produced a clean round on the very next dispatch, which named a nit it had considered and dropped rather than reporting nothing.)
+
+## Send the correction back to the agent; never absorb it yourself
+
+The rule above already routes a re-dispatch to the same agent.
+This section exists because that rule was loaded, read, and broken repeatedly in one session anyway, so the instruction alone is evidently not enough.
+
+The near-miss is small fixes.
+A dispatched agent returns work that is mostly right, and what is wrong is one line: a heuristic with a misleading message, a comment that reverses a decision an earlier round made deliberately, a commit message the shell expanded a variable into, a rule pair appended into the middle of somebody else's list.
+Each of those costs the orchestrator a minute and costs a re-dispatch twenty.
+So the orchestrator fixes it, the work moves, and nothing about the next brief changes.
+
+That arithmetic is wrong in a way that is invisible at the moment of choosing, because the minute is real and the saving is not.
+The agent will make the same class of mistake on the next dispatch, and the one after that, and the orchestrator will pay the minute again each time while believing it saved one.
+The cost of absorbing a fix is not the fix.
+It is every future instance of the class, plus the ledger entry that never got written because nothing forced the orchestrator to name what went wrong.
+
+Send it back.
+Say what was wrong, say what the agent should have checked, and let the agent make the change.
+Where the schedule genuinely cannot take another round, the fix and the ledger entry are one unit: write the rule into the agent's standing brief in the same commit that carries the fix, so the next dispatch is different even though this one was not.
+
+**A correction the agent cannot act on is not a correction.**
+"Do not add unsound heuristics" names nothing.
+"Your check fired on any command with more than two tokens, which is also true of a command carrying a flag;
+state the property of the data that makes a token count sound, or test the thing you mean" names the mistake, the counterexample, and the standard.
+
+- **Do:** re-dispatch with the finding, the counterexample, and the standard, and let the agent make the edit.
+- **Do:** write the class into the agent's standing brief in the same commit, on the rare occasion you must apply the fix yourself.
+- **Don't:** commit a one-line fix yourself because re-dispatching costs more than fixing --- that comparison omits every later instance of the class.
+- **Don't:** send back an adjective; send the input that broke it.
+
+(Directive from the user, 2026-09-11: "don't fix subagents mistakes yourself;
+help them do it themselves.
+Follow the teach a man to fish principle."
+It followed a session driving [ai-config#3435](https://github.com/Morrison-Lab/ai-config/pull/3435), [#3439](https://github.com/Morrison-Lab/ai-config/pull/3439), [#3440](https://github.com/Morrison-Lab/ai-config/pull/3440) and [#3469](https://github.com/Morrison-Lab/ai-config/pull/3469), in which the orchestrator committed agent defects as its own fixes rather than returning them, among them a token-count heuristic with a message describing a different test, a commit message whose shell expanded a variable into it, unreachable code left after a return, a reversal of an earlier round's deliberate decision about installer failure handling, and rule pairs spliced into an existing list through the middle of a sentence.
+Not one produced a ledger entry at the time.)

@@ -284,3 +284,26 @@ There is no changelog-fragment exemption in either job's globs or paths-ignore.
   - **Do:** write the fragment at clause boundaries like its siblings, and run gha's own checker from the worktree before pushing: `NLB_GLOBS='*.md *.qmd' NLB_BASE_REF=origin/main python3 check-new-line-breaks/check-new-line-breaks.py`.
   - **Don't:** write a changelog bullet as one unbroken line on the reasoning that it is "just a changelog" and outside the line-break convention's scope.
   (Measured 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826).)
+
+- **A `changelog.d/<slug>.<category>.md` fragment is also linted by markdownlint-cli2 and fails on multiple trailing blanks (MD012).**
+  In Morrison-Lab/gha, `selftest` runs `lint-markdown` over all tracked markdown files using `.markdownlint.default.jsonc`.
+  Leaving extra blank lines at the end of a changelog fragment triggers `MD012/no-multiple-blanks Multiple consecutive blank lines [Expected: 1; Actual: 2]`.
+  Verify new or modified changelog fragments before pushing with:
+  `npx markdownlint-cli2 --config lint-markdown/.markdownlint.default.jsonc 'changelog.d/*.md'`.
+  - **Do:** ensure changelog fragments end with exactly one terminal newline and no trailing blank lines.
+  - **Don't:** assume changelog fragments are exempt from repo-wide markdownlint passes.
+  (Measured 2026-09-12 on [Morrison-Lab/gha#873](https://github.com/Morrison-Lab/gha/pull/873).)
+
+- **Qualify safety and trade-off claims in verdict classifiers to their precise conditions.**
+  When documenting "Accepted trade-offs" in regex- or string-blanking routines (e.g. `strip_code_spans` in `classify-review-verdict.sh`),
+  never assert blanket fail-closed guarantees (`clean=false verdict=no-verdict`)
+  without checking whether earlier surviving text or headings could be exposed by swallowing a subsequent retraction.
+  In last-match-wins scanners, if an earlier clean verdict exists,
+  swallowing a later rejection's heading and polarity keyword leaves that earlier verdict active as the last match,
+  reverting to `clean=true`.
+  Safety claims must be strictly qualified with the exact preconditions required for fail-closed behavior
+  (e.g. when no other verdict-bearing text survives elsewhere in the body).
+  - **Do:** state the exact structural condition required for fail-closed behavior rather than claiming universal safety.
+  - **Do:** test multi-heading interactions in the same block when blanking rules operate per paragraph.
+  - **Don't:** assert that losing a rejection heading always defaults to fail-closed when preceding blocks in the same body can state an approving verdict.
+  (Measured 2026-09-12 on [Morrison-Lab/gha#873](https://github.com/Morrison-Lab/gha/pull/873).)

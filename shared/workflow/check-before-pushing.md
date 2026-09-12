@@ -255,16 +255,35 @@ Immediately maintain an active polling loop or scheduled wake mechanism.
 Actively query current-head CI/pipeline status (`gh pr checks` / `glab ci list` or `glab mr view`) and review verdicts (`gh pr view` / `glab mr view`) until that round reaches a terminal state.
 Re-arm the poll while work remains.
 
+## Out-of-band publish channels must not bypass push guards
+
+Client-side pre-tool guards such as [`no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) and [`no-clobbering-push.py`](../../hooks/no-clobbering-push.py) pattern-match command text in Bash calls (`git push ...`).
+They cannot intercept out-of-band publish channels: the GitHub Contents API (`gh api repos/.../contents/...`), GraphQL commit mutations, MCP tools like `push_files`, or web UI file creations.
+(Widening the guard's reach to intercept MCP and API publish mechanisms is an open technical issue tracked in [`Morrison-Lab/ai-config#1929`](https://github.com/Morrison-Lab/ai-config/issues/1929).)
+
+When a guard blocks a push, finding an unsanctioned out-of-band route to publish the commit is a violation of the review invariant.
+The sanctioned override (`ALLOW_UNREVIEWED_PUSH=1`) exists precisely so that an exceptional push is **auditable** --- it appears in the command invocation, the reason must be stated, and any reader or reviewer sees it on the record.
+Publishing through the Contents API or GraphQL bypasses the guard silently without that audit trail.
+Declining the sanctioned override and then reaching for an out-of-band publish mechanism is the same bypass with worse visibility.
+
+When an agent cannot push and cannot override (or is instructed not to use the override), the only sanctioned action is to **stop, report the block, and leave the unpushed commits in place on the local branch in the worktree**.
+The orchestrator can then inspect the worktree, verify the review verdict, and decide whether to handle the push or address the underlying blocker.
+An agent must never route around a push block by publishing through an alternative API.
+
 - **Do:** take a fresh `git ls-remote` reading immediately before every push, including on a branch you created and believe you alone are driving.
 - **Do:** push with `--force-with-lease --force-if-includes` whenever a force is genuinely wanted, and state a reason whenever you reach for `ALLOW_FORCE_PUSH=1`.
 - **Do:** add a new commit rather than amending once a commit has been pushed to the remote.
 - **Do:** immediately start or re-arm active CI and review polling after pushing to a PR/MR, driving the round until it reaches a terminal state.
+- **Do:** stop and report when a push is refused and no override is authorized, leaving unpushed commits in the local worktree for the orchestrator.
+- **Do:** use the sanctioned override (`ALLOW_UNREVIEWED_PUSH=1`) only when authorized, stating the exact reason on the record so the bypass is auditable.
 - **Do:** reconcile a divergence by fetching and reading it, and treat an object you cannot resolve locally as the stronger signal rather than the weaker.
 - **Don't:** treat an earlier fetch, sync, or green CI run as the check --- each was a reading of a moment that has passed.
 - **Don't:** read "I opened this branch and its PR" as evidence you are its only driver.
   That belief is what the check exists to test.
 - **Don't:** run `git commit --amend` on a commit that has already been pushed and reviewed, orphaning the SHA cited in review verdicts.
 - **Don't:** abandon monitoring after pushing, or assume automated pipelines and reviewer runs will complete without active polling.
+- **Don't:** use out-of-band publish APIs (GitHub Contents API, GraphQL mutations, MCP `push_files`) to route around a blocked `git push`.
+- **Don't:** treat declining a sanctioned override as entitling you to find an unsanctioned publication route.
 - **Don't:** reach for bare `git push --force`, and don't read `--force-with-lease` alone as safe --- a background fetch defeats it silently.
 - **Don't:** pair `--force` *with* the lease and expect protection.
   Git's documentation for `-f, --force` says the flag "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`" --- so the two together are a plain force push.
@@ -282,6 +301,8 @@ Re-arm the poll while work remains.
   reset has happened since your last read of it.
 - **Don't:** claim a fix in changelog or prose text that the pushed patch
   itself cannot show.
+
+(Measured 2026-09-12 on [`Morrison-Lab/ai-config#3601`](https://github.com/Morrison-Lab/ai-config/issues/3601): a subagent whose push was refused by `no-push-without-self-review` due to a lagging transcript declined `ALLOW_UNREVIEWED_PUSH=1` per instructions, but then published the commit via the GitHub Contents API to create PR #3600 without a passing review check.)
 
 (Directive from the user, 2026-08-21:
 "cai: add protections against clobbering commits from other agents on a branch

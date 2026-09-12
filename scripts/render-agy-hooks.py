@@ -66,7 +66,21 @@ def main(argv: list[str]) -> int:
         return 0
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(text, encoding="utf-8")
+    # Write beside the target and move it into place, so a run that dies
+    # part way leaves the previous manifest rather than a truncated one.
+    # `os.replace` is atomic on POSIX. On Windows it can fail outright
+    # while another process holds the target open, so the guarantee to
+    # rely on there is only that half-written bytes never reach `out`.
+    # The name is built by appending rather than by `with_suffix`, which
+    # would return the target itself for an output already named `.tmp`
+    # and make the cleanup below delete it.
+    tmp = out.parent / (out.name + ".tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        tmp.replace(out)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
     print(f"rendered {out} for {'windows' if windows else 'posix'}")
     return 0
 

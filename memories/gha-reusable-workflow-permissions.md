@@ -230,3 +230,21 @@ current base; a bare reopen does not.
   making the PR mergeable, or that a `pull_request` event's merge-ref
   semantics substitute for an actual push -- both were asserted here
   without being measured first, and both were wrong.
+
+## Slide-tag callee permissions gate (gha#836)
+
+`slide-major-tag.yml` gates sliding major tags on `audit_callee_permissions.py`.
+Before advancing a floating tag (e.g. `v2`), the script compares all reusable workflows
+(`on: workflow_call`) between the base tag and the head commit.
+
+It rejects:
+- Added permission keys on any job or workflow level.
+- Widened permission values (`read` -> `write`, or dict -> `write-all`).
+- Jobs gaining a `permissions:` block where none existed.
+- Jobs dropping a `permissions:` block (reverting to unconstrained inheritance).
+
+It permits:
+- Narrowed values (`write` -> `read`, `read` -> `none`).
+- Dropped permission keys.
+- Brand-new reusable workflows (no existing callers pinned to the base tag).
+- Comment edits and key reorderings (parsed YAML per-job set comparison).

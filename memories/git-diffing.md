@@ -507,22 +507,31 @@ The diff-scoped no-op section above says to commit before running a diff-scoped 
 This is the same commit-first discipline for a different, more destructive reason: the restore step after a mutation test discards whatever is uncommitted, fix included.
 
 The mutation-testing workflow this corpus already documents in [`algorithmatize-checks.md`](../shared/workflow/algorithmatize-checks.md) is edit the checker to inject a fault, confirm it is caught, then undo the edit and confirm a clean run passes.
-That last "undo the edit" step is usually a `git checkout -- <file>`, and `git checkout -- <path>` restores the path from the index/HEAD, not from "however it looked a minute ago" -- it does not know or care that the pre-mutation state was itself uncommitted work rather than a committed baseline.
+That last "undo the edit" step is usually a `git checkout -- <file>`, and `git checkout -- <path>` restores the path **from the index**, not from `HEAD` and not from "however it looked a minute ago" --- when the index and HEAD match (the clean-index case), it restores HEAD's content;
+when changes are staged in the index, it restores those staged changes over the working tree.
+It does not know or care that the pre-mutation state was itself uncommitted work rather than a committed baseline.
 
-So mutation-testing an uncommitted fix and then running `git checkout -- <file>` to remove the mutation reverts straight past the fix to whatever HEAD held before it existed.
+So mutation-testing an uncommitted fix and then running `git checkout -- <file>` to remove the mutation reverts straight past the fix to whatever the index held before it existed.
 The fix is gone, not stashed, not reachable through the reflog (a working-tree edit that was never staged or committed leaves no object at all).
 
-The safe order is: commit the fix first, apply the mutation on top, confirm it is caught, then `git checkout -- <file>` (or `git restore <file>`) to drop the mutation -- which now restores to the commit carrying the fix, because that is what HEAD points at.
+The safe order is: commit the fix first, apply the mutation on top, confirm it is caught, then `git checkout -- <file>` (or `git restore <file>`) to drop the mutation --- which now restores to the commit carrying the fix, provided the index has not staged anything on top of it.
+When a commit is undone via `git reset --soft HEAD~1`, the changes remain staged in the index;
+running `git checkout -- <file>` afterwards restores from that staged index, keeping the staged changes intact and silently reporting "byte-identical" when comparing the working tree against the index.
+To discard staged changes and restore to HEAD, use `git restore --source=HEAD --staged --worktree -- <path>` (or `git reset --hard HEAD` when the entire working tree and index belong to you).
+Always verify undos against `HEAD` (`git diff HEAD -- <path>`) rather than against the index (`git diff -- <path>`).
 
 - **Do:** commit the fix, then mutate, then restore with `git checkout --` (or `git restore`) -- in that order, every time.
 - **Do:** treat any uncommitted state as gone the moment a restore command runs against its path, regardless of how recently it was written.
+- **Do:** verify an undo against `HEAD` (`git diff HEAD -- <path>`), not against the index (`git diff -- <path>`), especially after `reset --soft`.
 - **Don't:** mutation-test a fix before committing it -- the restore step cannot distinguish "revert my mutation" from "revert my fix" once both are uncommitted.
+- **Don't:** use `git checkout -- <file>` to revert a staged change or an undone commit after `reset --soft` --- it restores from the index and leaves staged modifications untouched.
 - **Don't:** assume `git checkout -- <file>` is reversible for uncommitted content;
   there is no object to recover it from.
 
 (Measured 2026-08-27 in `Morrison-Lab/gha`: a working `check-new-line-breaks` implementation was mutation-tested before being committed, and the restore step's `git checkout -- <file>` reverted to pre-fix HEAD, wiping the implementation.
 It had to be re-applied from the session transcript rather than recovered from git.
-This exact failure recurred while drafting this entry: the drafting session ran `git checkout -- <file>` to test the semantic-line-breaks reformatter's default scope, wiping its own uncommitted additions described here and requiring a redo.)
+This exact failure recurred while drafting this entry: the drafting session ran `git checkout -- <file>` to test the semantic-line-breaks reformatter's default scope, wiping its own uncommitted additions described here and requiring a redo.
+Measured again 2026-09-12 on `Morrison-Lab/ai-config#3602`: an accidental commit undone with `git reset --soft HEAD~1` was followed by `git checkout -- <file>` intended to revert the path to clean state, but restored from the staged index instead, leaving the staged modification behind while falsely verifying "byte-identical" against the index.)
 
 **A third recurrence added a step this entry did not yet name: the loss can be sealed in, not just left uncommitted, by a broad-add commit that runs before the suite is re-run.**
 Both measured cases above were caught relatively fast, because the wiped file stayed uncommitted and a subsequent look at the working tree (or a failing test) surfaced the gap.

@@ -553,3 +553,19 @@ This is the adjacent-artifact substitution [`verify-the-right-artifact`](../shar
 
 (Measured 2026-09-11.
 [ai-config#3577](https://github.com/Morrison-Lab/ai-config/issues/3577) was filed on the behaviour and corrected once the repo files were read.)
+
+## Mutation-testing a hook that uses `_sibling()` cross-imports needs the mutant copy IN `hooks/`, not `/tmp`
+
+Every hook that imports another hook's helpers uses the `_sibling()` pattern (`flag-unmeasured-timestamp.py`, `flag-unread-commit-citation.py`, ...), which resolves the sibling's path off `HERE = os.path.dirname(os.path.abspath(__file__))` --- the mutant's OWN directory, not the original hook's.
+Copying a mutated hook file to `/tmp` for mutation-testing (`cp hook.py /tmp/mut.py`, or writing the mutant there directly) silently breaks every `_sibling()` import, because `/tmp/flag-unmeasured-timestamp.py` does not exist.
+`_sibling()` fails open (returns `None` on any exception), so the mutant does not crash --- it just runs with every imported regex/function replaced by `None` or a narrow local fallback, which changes its behaviour for reasons that have nothing to do with the mutation under test.
+
+The failure is invisible from the test runner's output alone: the suite still reports a pass/fail count, and a coincidentally-similar count to the unmutated baseline reads as "the mutation had no effect" rather than "the mutant never really ran the code being mutated."
+The tell, if you look for it, is that DIFFERENT mutations (say, inverting a patch-flag check vs. widening a SHA regex) produce an IDENTICAL failing-test list --- both are actually failing for the same reason (broken sibling imports), not for their own distinct reasons.
+
+- **Do:** place a mutated copy in the hook's own directory (`hooks/_mutX-<name>.py`, deleted after the run) so `_sibling()` resolves normally, and verify the mutation was actually applied (`grep` the mutant file for the changed line) before trusting a "no additional failures" result.
+- **Do:** treat two structurally different mutations producing the exact same failure list as a signal to check for a shared infrastructure failure (a broken import, a missing fixture) rather than a coincidence.
+- **Don't:** copy a hook file to `/tmp` (or any directory other than `hooks/`) for mutation testing without first checking whether it imports siblings via `_sibling()`.
+- **Don't:** trust a mutation-test run's pass/fail count without spot-checking that the mutation itself is present in the file actually being tested.
+
+(Measured 2026-09-09 authoring `hooks/flag-unread-commit-citation.py` (ai-config#3471): a `/tmp`-copied mutant produced `body=None` from `_post_from_payload` for a completely unrelated reason --- its `_sibling()` call for `flag-unmeasured-timestamp.py` returned `None` because `/tmp/flag-unmeasured-timestamp.py` does not exist --- and a later `hooks/`-placed rerun of the identical mutation correctly failed the suite.)

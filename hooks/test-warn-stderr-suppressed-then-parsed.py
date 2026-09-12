@@ -266,6 +266,20 @@ check(
     "piped into the next command",
 )
 
+# A three-digit fd is out of reach at fixed width, and the hook says so in
+# its own Known gaps list. These two pin what it does instead, so the gap
+# is recorded rather than merely tolerated.
+check(
+    "a three-digit fd reads as a stdout redirect (known gap)",
+    reported("cmd 2>/dev/null 123>realfile.txt")[1],
+    "redirected to `realfile.txt`",
+)
+check(
+    "and it hides the pipe behind it (known gap)",
+    reported("cmd 2>/dev/null 123>realfile.txt | jq .")[1],
+    "redirected to `realfile.txt`",
+)
+
 # The append form. `2>>?` let its optional second `>` backtrack away, so this
 # matched as a stderr-to-FILE redirect at the discard's own offset, read as
 # reclaiming it, and never fired -- while the catalog said it was covered.

@@ -78,6 +78,16 @@ ignorable nag and a missed one leaves the reader exactly where they were.
 
 Known gaps, not exhaustive:
 
+* An fd of three or more digits reads as a stdout redirect. The stdout
+  patterns tell an fd prefix from a word ending in digits with fixed-width
+  lookbehinds, and those cover one and two digits, so `cmd 2>/dev/null
+  123>realfile.txt` warns although bash leaves stdout alone, and the same
+  command before a pipe reports the file rather than the pipe.
+  A variable-width lookbehind would settle it and Python has none; a
+  third pair would move the line to four digits rather than remove it.
+  Both directions are pinned by tests, so the behaviour is recorded
+  rather than merely tolerated.
+
 - A `case` nested inside a command substitution does not fire. Under-warn.
 - `exec` redirects apply to the rest of the shell rather than to one command,
   and are not modelled at all.

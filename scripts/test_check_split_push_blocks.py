@@ -129,6 +129,33 @@ class TestProblemsIn(unittest.TestCase):
         problems = CHECKER.problems_in(recipe("git push", earlier_body="ls"))
         self.assertEqual(problems, [])
 
+    def test_push_chained_with_pr_create_fails(self):
+        body = "git push origin feat && gh pr create"
+        problems = CHECKER.problems_in(recipe(body))
+        self.assertTrue(any("chains other commands" in p for p in problems))
+
+    def test_push_followed_by_subsequent_commands_fails(self):
+        body = NL.join(["git push origin feat", "gh pr create --title t"])
+        problems = CHECKER.problems_in(recipe(body))
+        self.assertTrue(any("subsequent commands" in p for p in problems))
+
+    def test_indented_earlier_cd_is_detected(self):
+        # Even inside a markdown list item or blockquote, an earlier cd is noticed
+        text = NL.join([
+            "- Step 1:",
+            "  ```bash",
+            "  cd ../other-repo",
+            "  ```",
+            "",
+            MARKER + ":",
+            "",
+            "```bash",
+            "git push",
+            "```",
+        ])
+        problems = CHECKER.problems_in(text)
+        self.assertTrue(any("neither cds nor passes" in p for p in problems))
+
 
 class TestSweep(unittest.TestCase):
     def test_an_empty_corpus_fails_rather_than_reporting_clean(self):

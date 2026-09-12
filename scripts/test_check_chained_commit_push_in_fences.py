@@ -83,6 +83,13 @@ nested = list(cccp.fenced_blocks(
 check("a longer opener is not closed by a shorter inner fence",
       len(nested) == 1 and "git status" in nested[0][2])
 
+unclosed_raised = False
+try:
+    list(cccp.fenced_blocks("```bash\ngit status\n"))
+except ValueError:
+    unclosed_raised = True
+check("an unclosed fence raises ValueError", unclosed_raised)
+
 
 # ---------------------------------------------------------------------------
 # The predicate is the hook's own
@@ -185,7 +192,7 @@ check("the split form the fix applies is NOT reported",
 FIXTURE_KEY = ("shared/workflow/check-before-pushing.md", 'c95b628e8b482c91')
 _REAL_ALLOWED = dict(cccp.ALLOWED)
 cccp.ALLOWED.clear()
-cccp.ALLOWED[FIXTURE_KEY] = "the deliberate anti-example the fragment is about"
+cccp.ALLOWED[FIXTURE_KEY] = ("the deliberate anti-example the fragment is about", 1)
 
 result = scan_fixture({
     "shared/workflow/check-before-pushing.md": CHAINED_INDENTED,
@@ -300,6 +307,15 @@ with tempfile.TemporaryDirectory() as tmp:
           exit_code_stale == 1)
     check("the stale-allowlist error says the exemption looks stale",
           "looks stale" in errors.getvalue())
+
+    # A duplicate of the allowlisted block causes count mismatch:
+    path.write_text("# Fragment\n\n" + CHAINED_INDENTED + "\n\n" + CHAINED_INDENTED, encoding="utf-8")
+    subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
+    errors_dup = io.StringIO()
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(errors_dup):
+        exit_code_dup = cccp.main(["--root", str(root)])
+    check("main exits 1 when an allowlisted block occurs more times than expected",
+          exit_code_dup == 1 and "expected 1 occurrence(s)" in errors_dup.getvalue())
 
 buffer = io.StringIO()
 with contextlib.redirect_stdout(buffer):

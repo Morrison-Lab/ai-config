@@ -145,8 +145,11 @@ Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow
 
 ```bash
 git push upstream fix/<slug>   # PUSH
+```
 
-# Open PR
+Open the PR in its own call:
+
+```bash
 gh pr create --repo <owner>/<repo> \
   --base main \
   --head fix/<slug> \
@@ -174,8 +177,11 @@ Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow
 
 ```bash
 git -C /tmp/upstream-fix push origin fix/<slug>   # PUSH -- absolute, so it does not depend on the caller's directory
+```
 
-# Open PR from your fork to upstream
+Open the PR in its own call:
+
+```bash
 gh pr create --repo <owner>/<repo> \
   --base main \
   --head <your-username>:fix/<slug> \

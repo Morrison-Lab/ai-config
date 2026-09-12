@@ -378,11 +378,11 @@ We'd like to thank everyone who contributed to this release:
 
 Or just reference the generator in code:
 
-```markdown
+````markdown
 ```{r}
 #| echo: false #| eval: false usethis::use_tidy_thanks("rstudio/bslib", from = "v0.6.1")
 ```
-```
+````
 
 ## CSS Customization
 
@@ -451,7 +451,7 @@ Unlike Tidyverse posts which are language-specific, Shiny posts should show exam
 
 Every code example should include both R and Python variants using Quarto tabsets:
 
-```markdown
+````markdown
 ::: {.panel-tabset group="language"}
 ## R
 
@@ -465,7 +465,7 @@ Every code example should include both R and Python variants using Quarto tabset
 # Python code here
 ```
 :::
-```
+````
 
 **Guidelines:**
 - Use `group="language"` to sync all language tabsets on the page
@@ -477,7 +477,7 @@ Every code example should include both R and Python variants using Quarto tabset
 
 Always show installation for both languages at the start of the post:
 
-```markdown
+````markdown
 ::: {.panel-tabset group="language"}
 ## R
 
@@ -491,13 +491,13 @@ install.packages("packagename")
 pip install packagename
 ```
 :::
-```
+````
 
 ### Language-Specific Features
 
 When features differ between languages, be explicit about the differences:
 
-```markdown
+````markdown
 ::: {.panel-tabset group="language"}
 ## R
 
@@ -515,7 +515,7 @@ In Python, use the `._display` attribute:
 my_tool._display = {"title": "My Tool", "icon": "star"}
 ```
 :::
-```
+````
 
 ### Version Information
 

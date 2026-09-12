@@ -100,14 +100,16 @@ FENCE_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<ticks>```+|~~~+)(?P<info>.*)$")
 # and each match is reported rather than hidden.  Only Markdown and Quarto are scanned, so
 # a path here is a Markdown or Quarto path: the guard's own docstring quotes the shape it
 # refuses, and needs no entry because a `.py` file is never examined.
-# Keyed by (path, body fingerprint) rather than by path and a count. A count
+# Keyed by (path, body fingerprint) mapping to (reason, expected_count). A count
 # alone cannot tell a replacement from the original: delete the anti-example,
 # add one prescriptive chained block elsewhere in the same file, and the count
 # is still one, so the sweep exits clean over a block nobody exempted. The
 # fingerprint is the first 16 hex of the body's SHA-256.
 ALLOWED = {
-    ("shared/workflow/check-before-pushing.md", "66b0ad73970161ca"):
+    ("shared/workflow/check-before-pushing.md", "66b0ad73970161ca"): (
         "the deliberate anti-example the fragment is about ([#3199](https://github.com/Morrison-Lab/ai-config/issues/3199))",
+        1,
+    ),
 }
 
 
@@ -179,12 +181,14 @@ def fenced_blocks(text: str):
         start = i
         i += 1
         body = []
+        closed = False
         while i < len(lines):
             closer = FENCE_RE.match(lines[i])
             if (closer is not None
                     and closer.group("ticks")[0] == marker
                     and len(closer.group("ticks")) >= len(ticks)
                     and closer.group("info").strip() == ""):
+                closed = True
                 i += 1
                 break
             line = lines[i]
@@ -192,6 +196,8 @@ def fenced_blocks(text: str):
                 line = line[len(indent):]
             body.append(line)
             i += 1
+        if not closed:
+            raise ValueError(f"unclosed fenced code block opened at line {start + 1}")
         yield start + 1, info, "\n".join(body)
 
 
@@ -231,6 +237,7 @@ def scan(root: Path):
     files = tracked_files(root, {".md", ".qmd"})
     findings = []
     allowed_hits = []
+    files_skipped = []
     blocks_examined = 0
     blocks_all_languages = 0
     blocks_skipped = 0
@@ -239,10 +246,29 @@ def scan(root: Path):
     for name in files:
         try:
             text = (root / name).read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
+        except (OSError, UnicodeDecodeError) as err:
+            files_skipped.append({"path": name, "error": str(err)})
+            findings.append({
+                "path": name,
+                "line": 1,
+                "language": "file",
+                "fingerprint": "unreadable",
+                "reason": f"unreadable tracked file: {err}",
+            })
             continue
         files_scanned += 1
-        for line_no, info, body in fenced_blocks(text):
+        try:
+            blocks = list(fenced_blocks(text))
+        except ValueError as err:
+            findings.append({
+                "path": name,
+                "line": 1,
+                "language": "fence",
+                "fingerprint": "unclosed-fence",
+                "reason": str(err),
+            })
+            continue
+        for line_no, info, body in blocks:
             blocks_all_languages += 1
             language = language_of(info)
             if language not in SHELL_LANGUAGES:
@@ -270,13 +296,14 @@ def scan(root: Path):
             hit = {"path": name, "line": line_no, "language": language_of(info),
                    "fingerprint": key[1]}
             if key in ALLOWED:
-                hit["reason"] = ALLOWED[key]
+                hit["reason"] = ALLOWED[key][0]
                 allowed_hits.append(hit)
             else:
                 findings.append(hit)
 
     return {
         "files_scanned": files_scanned,
+        "files_skipped": files_skipped,
         "blocks_examined": blocks_examined,
         "blocks_all_languages": blocks_all_languages,
         "blocks_skipped": blocks_skipped,
@@ -321,21 +348,20 @@ def main(argv=None) -> int:
                   "calls: two fenced blocks, or a prose line between them. "
                   "Nothing about either command needs to change.")
 
-    # The allowlist is checked for stale entries: if an entry in ALLOWED
-    # has no matching hit in result["allowed"], the passage the exemption
-    # was written for no longer chains or was reworded/moved/removed, so the
-    # entry is stale documentation pointing at an example that is gone.
+    # The allowlist is checked for stale entries and count mismatches:
+    # storing an expected count prevents duplicates from passing silently.
     allowed_mismatch = False
-    seen = {(hit["path"], hit["fingerprint"]) for hit in result["allowed"]}
-    for key in ALLOWED:
-        if key in seen:
-            continue
-        print(f"ERROR: {key[0]} no longer carries the exempted block "
-              f"{key[1]}", file=sys.stderr)
-        print("       the exemption looks stale: the passage was reworded, "
-              "moved, or removed. Re-derive its fingerprint or drop the "
-              "entry.", file=sys.stderr)
-        allowed_mismatch = True
+    counts = Counter((hit["path"], hit["fingerprint"]) for hit in result["allowed"])
+    for key, (reason, expected_count) in ALLOWED.items():
+        actual_count = counts[key]
+        if actual_count != expected_count:
+            print(f"ERROR: {key[0]} expected {expected_count} occurrence(s) of exempted block "
+                  f"{key[1]}, found {actual_count}", file=sys.stderr)
+            if actual_count == 0:
+                print("       the exemption looks stale: the passage was reworded, "
+                      "moved, or removed. Re-derive its fingerprint or drop the "
+                      "entry.", file=sys.stderr)
+            allowed_mismatch = True
 
     if result["blocks_examined"] == 0:
         print("no fenced shell blocks examined; the sweep found nothing to "

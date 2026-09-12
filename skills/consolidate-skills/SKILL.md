@@ -167,7 +167,14 @@ git commit -m "skills: consolidate <a>/<b> into <canonical> (+ alias stubs)"   #
 Push as a separate Bash call, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "Keep the commit in its own Bash call":
 
 ```bash
-git push -u origin HEAD && gh pr create --fill   # PUSH, CREATE_PR
+repo="${CLAUDE_PLUGIN_ROOT:-$(git -C ~/.claude/skills/consolidate-skills rev-parse --show-toplevel 2>/dev/null || pwd)}"
+git -C "$repo" push -u origin HEAD   # PUSH
+```
+
+Open the PR in a separate Bash call:
+
+```bash
+gh pr create --fill   # CREATE_PR
 ```
 
 ## Relationship to other skills

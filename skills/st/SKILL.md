@@ -131,6 +131,11 @@ git checkout -b <type>/<slug> origin/main   # CREATE_BRANCH — fix/ feat/ docs/
 
   ```bash
   git push -u origin <type>/<slug>   # PUSH
+  ```
+
+  Open the draft PR in a separate Bash call:
+
+  ```bash
   gh pr create --draft --title "<title>" --body "Closes #<N>
 
   WIP — opened up front to claim the issue; implementing now."   # CREATE_PR

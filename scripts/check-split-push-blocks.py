@@ -71,7 +71,7 @@ REPO = Path(__file__).resolve().parent.parent
 MARKER = "Push as a separate Bash call"
 PUSH_BLOCK = re.compile(
     MARKER + r"[^\n]*\n\n[ \t]*```bash\n(?P<body>.*?)```", re.S)
-ANY_BLOCK = re.compile(r"```bash\n(.*?)```", re.S)
+ANY_BLOCK = re.compile(r"^[ \t]*```bash\n(.*?)^\s*```", re.S | re.M)
 CD = re.compile(r"^[ \t]*cd[ \t]+(?P<target>\S+)", re.M)
 COMMENT = re.compile(r"#[^\n]*")
 # Every operator that ends one command and may begin another, so a segment
@@ -83,6 +83,27 @@ SEGMENT = re.compile(r"[$][(]|[)]|`|&&|\|\||\||;")
 # path is accepted: the recipes that use one anchor it on an absolute root
 # and the value is not in the block to inspect.
 RELATIVE = re.compile(r"\A(?:[.]|[A-Za-z0-9_-]+(?:/|\Z))")
+
+
+def push_runs_alone(body: str) -> tuple[bool, str]:
+    """True when git push is not chained with other commands and runs alone."""
+    text = COMMENT.sub("", body)
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    push_line_idx = -1
+    for idx, line in enumerate(lines):
+        segments = SEGMENT.split(line)
+        for seg_idx, segment in enumerate(segments):
+            tokens = segment.split()
+            if len(tokens) >= 2 and tokens[0] == "git" and "push" in tokens[1:]:
+                if seg_idx < len(segments) - 1 and any(s.strip() for s in segments[seg_idx + 1:]):
+                    return False, "it chains other commands with `git push`"
+                if idx < len(lines) - 1:
+                    return False, "it contains subsequent commands after `git push`; the push must run alone"
+                push_line_idx = idx
+                break
+    if push_line_idx == -1:
+        return False, "no `git push` command found in push block"
+    return True, ""
 USES = re.compile(r"[$]{?([A-Za-z_][A-Za-z0-9_]*)")
 ASSIGNS = re.compile(r"^[ \t]*([A-Za-z_][A-Za-z0-9_]*)=", re.M)
 FOR_VAR = re.compile(r"\bfor\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\b")
@@ -160,6 +181,9 @@ def problems_in(text):
     found = []
     for match in PUSH_BLOCK.finditer(text):
         body = match.group("body")
+        alone_ok, alone_err = push_runs_alone(body)
+        if not alone_ok:
+            found.append(alone_err)
         # EVERY preceding block, not just the one immediately above. The
         # directory a recipe works in is often established several steps
         # earlier -- `gi` cds in step 6b and pushes in step 8 -- and checking

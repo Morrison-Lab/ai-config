@@ -138,7 +138,7 @@ those forms — this skill is what it hands off to once memory is the answer.
 
    ```bash
    repo="$(git -C ~/.claude/memories rev-parse --show-toplevel)"   # re-derived: a separate Bash call does not inherit the variable
-   git -C "$repo" push origin HEAD   # current branch; not HEAD:main — that would push a feature branch's commits onto main
+   git -C "$repo" push origin HEAD   # current branch; not HEAD:main -- that would push a feature branch's commits onto main
    ```
 
    The push targets the ai-config repo's **current branch**, so run memorize

@@ -84,10 +84,10 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
     Request a review on the MR by posting `@claude review` (e.g. `glab mr note <MR_IID> -m "@claude review"`), which triggers the webhook `claude-respond` pipeline on `main`.
   - Blocking discussions: both automated review comments and `glab mr note create` create resolvable discussion threads.
     If the repository enables "All discussions must be resolved before merge", the MR cannot be merged until all threads are resolved.
-    Query unresolved discussions via `glab api "/projects/:id/merge_requests/:iid/discussions?per_page=100" | jq '.[] | select(.notes[0].resolved == false) | .id'`
-    and resolve each with `glab api --method PUT "/projects/:id/merge_requests/:iid/discussions/:discussion_id" -f "resolved=true"`.
+    Sweep unresolved items using the paginated notes endpoint above (`.resolvable == true and .resolved == false`), then resolve the corresponding discussion thread with `glab api --method PUT "/projects/:id/merge_requests/:iid/discussions/:discussion_id" -f "resolved=true"`.
+    To inspect non-inline or general discussion threads that also block merge, query `glab api "/projects/:id/merge_requests/:iid/discussions?per_page=100" | jq '.[] | select(.notes[0].resolved == false) | .id'`.
   - Shared runner capacity and pipeline queuing: pushing squash-merges to `main` triggers automated pipelines on `main` that can monopolize shared runners (e.g. `check-package`, `test_coverage`, `linting`, `docs_check`).
-    Cancel redundant/queued pipelines on `main` with `glab ci cancel pipeline <ID>...` so feature branch pipelines run without waiting in queue.
+    Cancel redundant/queued pipelines on `main` with `glab ci cancel pipeline <ID>...` (or use the `cancel-superseded` skill for branch-scoped pipelines) so feature branch pipelines run without waiting in queue.
 - GitLab CI job token allowlist:
   - When repo A's CI job needs API access to repo B, repo B must add A to its allowlist
   - `glab api --method POST "/projects/<TARGET_ID>/job_token_scope/allowlist" -f "target_project_id=<SOURCE_ID>"`

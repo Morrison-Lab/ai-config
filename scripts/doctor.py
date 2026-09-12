@@ -152,6 +152,60 @@ def check_hook_catalog() -> Dict[str, Any]:
     }
 
 
+def check_agy_hook_commands() -> Dict[str, Any]:
+    """Check that Antigravity hook commands can launch, here and in the repo.
+
+    A hook command that fails to launch leaves every guard inert while
+    Antigravity skips it silently and a headless `agy` run still reports
+    success (https://github.com/Morrison-Lab/ai-config/issues/3091), so this reports FAIL rather than WARN: the
+    machine has no client-side enforcement at all until it is fixed.
+
+    Deviation from https://github.com/Morrison-Lab/ai-config/issues/3091: The static check catches the quoting
+    regression the issue measured. A dynamic cmd /c probe would need a
+    synthetic stdin payload to avoid firing on a hook's own business logic,
+    and a resolvable-but-broken interpreter is therefore out of its reach.
+    That probe is tracked separately as https://github.com/Morrison-Lab/ai-config/issues/3556.
+    """
+    script = REPO_ROOT / "scripts" / "check-agy-hook-commands.py"
+    code, out, err = run_cmd([sys.executable, str(script), "--installed", "--json"])
+    try:
+        report = json.loads(out)
+    except Exception:
+        return {
+            "name": "agy_hook_commands",
+            "ok": False,
+            "status": "FAIL",
+            "details": f"check-agy-hook-commands.py produced no report: {err or out}",
+        }
+
+    findings = [f"{r['path']}: {f}" for r in report["reports"] for f in r["findings"]]
+    checked = [r for r in report["reports"] if r["present"]]
+    if code == 0 and not findings and not checked:
+        return {
+            "name": "agy_hook_commands",
+            "ok": False,
+            "status": "FAIL",
+            "details": (
+                "no Antigravity hook manifest was checked at all; a report "
+                "covering zero manifests cannot say the hooks are launchable."
+            ),
+        }
+    if code == 0 and not findings:
+        return {
+            "name": "agy_hook_commands",
+            "ok": True,
+            "status": "OK",
+            "details": f"Antigravity hook commands launchable in {len(checked)} manifest(s).",
+        }
+    return {
+        "name": "agy_hook_commands",
+        "ok": False,
+        "status": "FAIL",
+        "findings": findings,
+        "details": f"{len(findings)} unlaunchable Antigravity hook command(s): {'; '.join(findings)}",
+    }
+
+
 def check_context_closure() -> Dict[str, Any]:
     """Check if CLAUDE.md context closure budget passes."""
     code, out, err = run_cmd([sys.executable, str(REPO_ROOT / "scripts" / "check-context-closure.py")])
@@ -630,6 +684,7 @@ def run_doctor() -> Dict[str, Any]:
         check_submodules(),
         check_codex_wrappers(),
         check_hook_catalog(),
+        check_agy_hook_commands(),
         check_context_closure(),
         check_jsonc_configs(),
         check_ai_clis(),

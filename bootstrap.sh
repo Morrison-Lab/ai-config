@@ -68,9 +68,25 @@ if [ -d "$SCRIPT_DIR/plugins/ai-config" ]; then
   fi
   mkdir -p "$PLUGIN_STAGING_DIR"
 
-  # Copy canonical plugin manifest and hooks.json to staging runtime directory
+  # Copy the canonical plugin manifest to the staging runtime directory.
   cp -f "$SCRIPT_DIR/plugins/ai-config/plugin.json" "$PLUGIN_STAGING_DIR/plugin.json"
-  cp -f "$SCRIPT_DIR/plugins/ai-config/hooks.json" "$PLUGIN_STAGING_DIR/hooks.json"
+
+  # hooks.json is RENDERED rather than copied. The canonical file stays in the
+  # portable POSIX form (`python3 ~/.gemini/...`), which Antigravity resolves
+  # on macOS and Linux and cmd.exe resolves on neither count. Copying it
+  # verbatim left the Windows install needing a hand repair, and that repair
+  # introduced the quoting that broke every run_command hook (https://github.com/Morrison-Lab/ai-config/issues/3091).
+  # The renderer refuses to emit a command carrying the quoting or the
+  # unresolved prefix that broke the install; it does not check that the
+  # interpreter it names exists, which check-agy-hook-commands.py does.
+  # A failure here leaves hooks.json missing on a first install, or leaves
+  # whatever the last successful render wrote on a re-run. It is warned
+  # about and not fatal, so the installer loop and the symlinks below still
+  # run. The checker and doctor.py report the missing case; neither
+  # compares a present manifest against the canonical one, so a stale but
+  # valid manifest is caught only by this warning.
+  python3 "$SCRIPT_DIR/scripts/render-agy-hooks.py" --output "$PLUGIN_STAGING_DIR/hooks.json" ||
+    printf 'warn  %s exited %d\n' "scripts/render-agy-hooks.py" "$?"
 
   # Symlink executable scripts and repository directories
   ln -sfn "$SCRIPT_DIR/plugins/ai-config/claude-hook-adapter.py" "$PLUGIN_STAGING_DIR/claude-hook-adapter.py"

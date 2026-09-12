@@ -259,6 +259,7 @@ Re-arm the poll while work remains.
 
 Client-side pre-tool guards such as [`no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) and [`no-clobbering-push.py`](../../hooks/no-clobbering-push.py) pattern-match command text in Bash calls (`git push ...`).
 They cannot intercept out-of-band publish channels: the GitHub Contents API (`gh api repos/.../contents/...`), GraphQL commit mutations, MCP tools like `push_files`, or web UI file creations.
+(Widening the guard's reach to intercept MCP and API publish mechanisms is an open technical issue tracked in [`Morrison-Lab/ai-config#1929`](https://github.com/Morrison-Lab/ai-config/issues/1929).)
 
 When a guard blocks a push, finding an unsanctioned out-of-band route to publish the commit is a violation of the review invariant.
 The sanctioned override (`ALLOW_UNREVIEWED_PUSH=1`) exists precisely so that an exceptional push is **auditable** --- it appears in the command invocation, the reason must be stated, and any reader or reviewer sees it on the record.

@@ -14,6 +14,7 @@ repo is bootstrapped.
 Several skills fan a task out across many independent targets — one competitor
 community per research pass, one dependency pin per audit, one claim per
 fact-check — and want each target checked in parallel without risking a stray
+worker writing a file, filing an issue, or running a destructive command.
 Every scout, auditor, and reviewer agent in this repo omits `Edit` and `Write`
 from its Claude Code `tools` list.
 Claude Code honors that allowlist (the `tools:` field, documented at

@@ -10,12 +10,12 @@ Writing "queued", "next up", "after this", or "I will do that next" into a statu
 Treat the urge to write the word as the trigger to launch, not as an acceptable way to describe the plan.
 
 **Sidecar delegation is pre-authorized, so it is never worth asking about.**
-Independent investigation, verification, a disjoint implementation slice, an owed UMS pass, a routed `cai` --- all of these are standing grants.
+Independent investigation, verification, a disjoint implementation slice, an owed UMS pass, a routed `cai`, or an editing pass by an editor agent ([`prose-editor`](../../.claude/agents/prose-editor.md) or [`code-editor`](../../.claude/agents/code-editor.md)) --- all of these are standing grants.
 This section is the user instruction that settles it, so a harness default of the form "do not call the Agent tool unless the user requested it" is already satisfied: the request is here, standing, and does not need restating each session.
 Asking anyway costs a round trip and returns the answer already written down.
 
 - **Do:** launch the subagent at the moment you would otherwise have typed "queued", and say in the recap what it is working on.
-- **Do:** treat an owed UMS pass or a routed `cai` as delegable sidecar work rather than as a wrap-up step to reach later.
+- **Do:** treat an owed UMS pass, a routed `cai`, or an editor agent style revision pass as delegable sidecar work rather than as a wrap-up step to reach later.
 - **Don't:** report an item as queued, next up, or deferred to later in the session when nothing actually blocks it.
 - **Don't:** wait for a per-session request before delegating, or ask whether to use a subagent.
 - **Don't:** hand off the blocking edit itself --- the critical-path change stays local, so progress never waits on a round trip.

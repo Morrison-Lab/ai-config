@@ -44,9 +44,13 @@ The read-only constraint matters for the same reason and one more:
 a reviewer that could edit would turn a finding into a silent fix, losing the
 finding and its disposition together.
 
-The **editor agents** ([`prose-editor`](https://github.com/Morrison-Lab/ai-config/blob/main/.claude/agents/prose-editor.md) and [`code-editor`](https://github.com/Morrison-Lab/ai-config/blob/main/.claude/agents/code-editor.md)) are bounded implementation workers granted `Edit` and `Write` access to revise drafts in-place.
+The **editor agents** (`prose-editor` and `code-editor`, in the table below)
+are bounded implementation workers granted `Edit` and `Write` access
+to revise drafts in-place.
 Writing agents do not need to enforce all style guidelines on their first draft;
-they work iteratively, producing substantively-correct but stylistically loose first drafts and then handing off to editor agents for revisions.
+they work iteratively,
+producing substantively-correct but stylistically loose first drafts
+and then handing off to editor agents for revisions.
 
 ## Agents in this repo
 
@@ -63,12 +67,14 @@ they work iteratively, producing substantively-correct but stylistically loose f
 | [`reproducibility-auditor`](https://github.com/Morrison-Lab/ai-config/blob/main/.claude/agents/reproducibility-auditor.md) | `Bash`, `Read`, `Grep`, `Glob`, `WebFetch` | [`reproducibility-audit`](skills/reproducibility-audit/SKILL.md) | Surveys a project for hidden dependencies, hardcoded absolute paths, undocumented prerequisites, environment assumptions, and output traceability, scoped per project type |
 | [`skill-usage-auditor`](https://github.com/Morrison-Lab/ai-config/blob/main/.claude/agents/skill-usage-auditor.md) | `Bash`, `Read`, `Grep`, `Glob` | [`skill-audit`](skills/skill-audit/SKILL.md) | Enumerates skills, greps local session transcripts for their invocations, rolls alias counts into their canonical skill, and buckets every skill into actively-used / dormant / dead |
 
-Every scout, auditor, and reviewer agent except `community-demand-scout` keeps `Bash` for read-only checks
+Every scout, auditor, and reviewer agent except `community-demand-scout`
+keeps `Bash` for read-only checks
 (`grep`, `gh api`, `git submodule status`, `test -e`) --- avoiding a
 write-capable shell command (`renv::update()` without `check = TRUE`,
 `pre-commit autoupdate`) is instruction-level discipline for those.
-The editor agents (`prose-editor` and `code-editor`) use `Bash` to run linters, formatters,
-and test suites alongside their direct `Edit` and `Write` tools.
+The editor agents (`prose-editor` and `code-editor`)
+use `Bash` to run linters, formatters, and test suites
+alongside their direct `Edit` and `Write` tools.
 Each read-only agent's file under `.claude/agents/` says so in as many words,
 so the Bash discipline is instructed where it is relied on rather than
 only asserted here.

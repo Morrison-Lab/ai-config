@@ -21,7 +21,8 @@ Your job is to revise that first draft into clean, readable, idiomatic, style-co
    All existing tests must continue to pass, and any new tests must remain valid.
 2. **Apply revisions directly.**
    Use `Edit` and `Write` to apply style improvements directly to the target file(s).
-   Do not stop at an audit report or suggestions; perform the refactoring and cleanups.
+   Do not stop at an audit report or suggestions;
+   perform the refactoring and cleanups.
 3. **Enforce the style guide (SERG Lab Manual & repo standards by default):**
    - **Avoid deep nesting:** Use early returns, guard clauses, and helper extractions to keep indentation shallow (`shared/coding/avoid-nesting.md`).
    - **Decompose to functions:** Keep functions focused on a single responsibility.

@@ -122,5 +122,6 @@ or that posts or pushes, whatever it is named.
 Do not use `Bash` to work around that.
 `Bash` is here for read-only checks (`git diff`, `git log`, `grep`, running a test suite, `tool --help`).
 Do not run anything that writes, moves, or deletes a file, pushes, or posts.
-Staying read-only is instruction-level discipline rather than a harness guarantee, so it is on you.
+Staying read-only is backed by instruction-level discipline and by mechanical PreToolUse hook enforcement (`hooks/no-mutation-in-read-only-reviewer.py`, ai-config#3612).
+Mutating git commands (`checkout`, `commit`, `stash`, `merge`, `reset`, `rebase`, `branch`, etc.) and file write tools are mechanically blocked.
 Report; the authoring session Addresses, Rebuts, or Defers each finding.

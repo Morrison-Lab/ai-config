@@ -477,6 +477,28 @@ try:
     payload_p14 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p14}
     hit = hook.offending("Bash", payload_p14["tool_input"], payload_p14)
     check("must NOT block git commit when prompt uses 'Do not edit any files outside' with commit directive", hit, None)
+
+    # 12o. Scoped with 'Make no changes to unrelated files' and affirmative commit (Claude review round 4)
+    p15 = os.path.join(prohibitive_dir, "subagents", "agent-make-no-changes-scope.jsonl")
+    with open(p15, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Make no changes to unrelated files, but fix the reported bug and commit your change."},
+        }) + "\n")
+    payload_p15 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p15}
+    hit = hook.offending("Bash", payload_p15["tool_input"], payload_p15)
+    check("must NOT block git commit when prompt scopes edits with 'Make no changes to unrelated files' and directs commit", hit, None)
+
+    # 12p. Total 'Make no changes' prohibition (Claude review round 4)
+    p16 = os.path.join(prohibitive_dir, "subagents", "agent-make-no-changes-total.jsonl")
+    with open(p16, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Make no changes. Only inspect the code and report findings."},
+        }) + "\n")
+    payload_p16 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'oops'"}, "transcript_path": p16}
+    hit = hook.offending("Bash", payload_p16["tool_input"], payload_p16)
+    check("must block git commit when prompt issues total 'Make no changes' prohibition", hit is not None, True)
 finally:
     try:
         import shutil

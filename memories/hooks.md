@@ -383,6 +383,6 @@ Adversarial review (ai-config#3623) established two key boundary requirements fo
 3. **Distinguish scoping prohibitions from total read-only lockdown:**
    Subagent instructions often scope write boundaries (e.g. "Never edit files outside your worktree.
    Fix the failing tests and commit.")
-   or scope staging (e.g. "Refactor functions without committing").
-   Prohibition regexes (`never`, `do not`, `without`) must require trailing totality indicators (`any`, `anything`, `any files`) rather than matching bare scoped directives,
+   or scope staging (e.g. "Make no changes to unrelated files, but fix the reported bug and commit your change").
+   Prohibition regexes (`never`, `do not`, `without`, `make no changes`) must require trailing totality indicators (`any`, `anything`, `any files`) or negative lookahead for scoping prepositions (`to unrelated/other files`, `outside`, `except`),
    and affirmative write directives (`RX_AFFIRMATIVE_WRITE`, e.g. `and then fix`, `write reproduction tests`, `fix defects and commit as you go`) must prevent read-only lockdown.

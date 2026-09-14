@@ -36,7 +36,7 @@ import sys
 import tempfile
 
 SUBJECT = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "flag-stale-adjacent-comment.py")
+    os.path.dirname(os.path.realpath(__file__)), "flag-stale-adjacent-comment.py")
 
 
 def load(path):

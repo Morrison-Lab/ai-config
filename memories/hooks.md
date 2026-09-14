@@ -386,7 +386,7 @@ sibling via abspath exists : False
 sibling via realpath exists: True
 ```
 
-The blast radius is the whole `hooks/` tree, not one guard: 19 sites across 18 non-test hooks resolved their directory this way.
+The blast radius is the whole `hooks/` tree, not one guard: 19 sites across 18 non-test hooks computed a path from `__file__` this way --- 17 of them resolving the hook's own directory to reach a sibling or a data file, and 2 (`monitor-open-prs.py`, `no-unmonitored-pr.py`) resolving the hook's own file to re-exec it. 16 test suites carried the same idiom and were swept with them, because a suite that resolves its subject lexically cannot be run through the registration path at all --- which is the natural way to reproduce this by hand.
 `no-push-without-self-review.py` was the visible one only because it fails closed --- with its detector unreachable it fell into degraded mode and denied any push-shaped command, including a heredoc whose body merely *quoted* a push line while writing an issue body, leaving `ALLOW_UNREVIEWED_PUSH=1` as the only way to run anything.
 The hooks that load a sibling for context fail the other way, silently: `no-empty-promise.py`'s `_sibling()` catches a bare `Exception` -- the error actually raised is a `FileNotFoundError` out of `spec.loader.exec_module` -- and returns `None`, so it simply runs without its sibling's code-region stripping.
 Measured the same day in the layout above --- `sibling loaded: False` under `abspath`, `True` under `realpath` --- for that hook;
@@ -396,6 +396,8 @@ the remaining sites were fixed by inspection rather than each measured.
 It was already the idiom in the newer hooks (`no-commit-chained-to-push.py`, `warn-heredoc-doubled-backslash.py`).
 Read that as an incomplete sweep rather than as a style that had not reached them yet: this exact symlink-resolution failure was diagnosed and fixed under [#2681](https://github.com/Morrison-Lab/ai-config/issues/2681) in `plugins/ai-config/claude-hook-adapter.py`, whose comment says "resolving any symlinks via realpath" and whose test is named `test_symlink_invocation_resolves_repo_root_to_find_hooks_json`.
 The corpus had already paid for the lesson in an adjacent file and did not carry it into `hooks/`, which is the transferable part: a path fix belongs to every site that computes a path, not to the file where the symptom appeared.
+
+`scripts/check-hook-file-resolution.py` is the instrument, hard-gating in `validate.yml`: the condition is one AST walk over `hooks/*.py`, the remedy is one word, and the corpus had already paid for the lesson twice without sweeping.
 
 - **Do:** write `os.path.realpath(__file__)` in any hook that resolves its own directory to reach a sibling or a data file.
 - **Do:** test such a hook through a symlinked path, not only from the checkout --- a suite that runs it from `hooks/` cannot see this at all, which is why the 308 cases this guard had before the two added here all passed over a live session-wide lockout.

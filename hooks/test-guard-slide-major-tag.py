@@ -45,7 +45,7 @@ import tempfile
 if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
     HOOK = os.path.abspath(sys.argv[1])
 else:
-    HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "guard-slide-major-tag.py")
+    HOOK = os.path.join(os.path.dirname(os.path.realpath(__file__)), "guard-slide-major-tag.py")
 
 _TMPDIRS: list[str] = []
 

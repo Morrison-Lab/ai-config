@@ -719,7 +719,7 @@ SM_EXTRA += 1
 # Resolved from THIS FILE, not from HOOK: a mutation run passes a temp copy as
 # HOOK, and pathing off it crashed the suite for a reason unrelated to the
 # mutant -- which reads as the mutant being caught when it is not.
-_hj = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+_hj = json.load(open(os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                   "hooks.json"), encoding="utf-8"))
 _matchers = [e.get("matcher", "") for e in _hj["hooks"].get("PreToolUse", [])
              if any("remind-brief-premises" in json.dumps(h)

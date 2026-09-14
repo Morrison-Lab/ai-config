@@ -18,7 +18,7 @@ import sys
 import tempfile
 import unittest
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.realpath(__file__))
 HOOK = os.path.join(HERE, "warn-deferred-closing-keyword.py")
 
 spec = importlib.util.spec_from_file_location("wdck", HOOK)

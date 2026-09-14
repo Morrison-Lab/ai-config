@@ -16,7 +16,7 @@ import sys
 import tempfile
 
 HOOK = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else os.path.abspath("hooks/warn-new-line-breaks-on-push.py")
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 REAL_CHECKER = os.path.join(ROOT, "scripts", "vendor", "gha-check-new-line-breaks.py")
 REAL_SEMBR = os.path.join(ROOT, "scripts", "semantic-line-breaks.py")
 

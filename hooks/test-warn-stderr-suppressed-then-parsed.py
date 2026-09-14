@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.realpath(__file__))
 HOOK = os.path.join(HERE, "warn-stderr-suppressed-then-parsed.py")
 
 spec = importlib.util.spec_from_file_location("hook", HOOK)

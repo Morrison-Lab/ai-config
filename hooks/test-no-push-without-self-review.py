@@ -31,9 +31,13 @@ import time
 # the same reason the subject itself uses it (ai-config#2981): invoking this
 # suite against the hook's real registration path --
 # `.claude/skills/ai-config-hooks/../../hooks/<name>.py`, the natural way to
-# reproduce that issue by hand -- collapses to `<checkout>/.claude/hooks`
-# under `abspath`, and the sibling copy below then raises FileNotFoundError
-# before a single case runs.
+# reproduce that issue by hand -- collapses under `abspath` to
+# `<checkout>/.claude/hooks`, where no hook lives. Measured on the pre-fix
+# spelling: 181 case lines print first, 177 of them `FAIL (exit 2)` because
+# every case runs a subject that does not exist, and the run then aborts in
+# `orphan_cases()` where `shutil.copy(HOOK, orphan)` raises FileNotFoundError
+# on the hook itself. So the failure is loud but misattributed -- it reads as
+# 177 broken cases rather than as one wrong path.
 HOOK = os.path.realpath(sys.argv[1])
 
 _next_id = [0]

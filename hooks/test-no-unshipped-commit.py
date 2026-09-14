@@ -509,7 +509,7 @@ commit_and_push = transcript(["git commit -m hook", "git push origin main"])
 
 # main() end-to-end harness: a private TMPDIR, so the sentinel the hook
 # writes lands inside a directory this suite removes afterwards.
-hook = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+hook = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                     "no-unshipped-commit.py")
 hook_tmp = tempfile.mkdtemp()
 hook_env = dict(os.environ, TMPDIR=hook_tmp,

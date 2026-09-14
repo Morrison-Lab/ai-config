@@ -623,7 +623,7 @@ the same condition, which this narrowing does not touch.
 
 A second hard gate covers how a hook finds its own files.
 `scripts/check-hook-file-resolution.py` refuses `os.path.abspath(__file__)` and
-the other lexical spelling (`normpath`) across
+the other lexical spellings (`normpath`, `relpath`) across
 `hooks/*.py` and `plugins/ai-config/*.py`, including a test suite resolving its
 `sys.argv` subject.
 

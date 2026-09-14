@@ -350,7 +350,15 @@ def lexical_set_is_derived(mod) -> tuple[int, int]:
             out = fn(probe)
         except Exception:
             continue  # wrong arity or wrong type for this probe: not a candidate
-        if isinstance(out, str) and ".." not in out and out.replace(os.sep, "/").endswith("a/c/d.py"):
+        # `endswith` alone establishes the collapse: an uncollapsed
+        # `a/b/../c/d.py` does not end with `a/c/d.py`. An earlier revision
+        # also tested `".." not in out`, which discriminated nothing and made
+        # this hard-gated assertion depend on the CHECKOUT PATH -- `abspath`
+        # and `realpath` prepend the cwd, so a checkout under a directory
+        # whose name contains `..` dropped both and the suite went red
+        # blaming `_LEXICAL` for the working directory. Measured at 54/55
+        # from a path containing `we..ird`.
+        if isinstance(out, str) and out.replace(os.sep, "/").endswith("a/c/d.py"):
             collapsing.add(name)
 
     expected = collapsing - mod._RESOLVERS

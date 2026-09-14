@@ -490,7 +490,8 @@ The corpus had already paid for the lesson in an adjacent file and did not carry
 
 That phrasing is the scope, and it is narrower than "every site that computes a path" on purpose.
 `scripts/` still holds lexical `abspath(__file__)` sites and they are deliberately left alone.
-The reason is not that hooks never reach into `scripts/`. 15 non-test hooks do, counting by AST over `hooks/*.py` any `"scripts"`/`"scripts/..."` path literal or `from scripts.* import`, on this branch's merged tree on 2026-09-14 -- most of them adding `scripts/lib` to `sys.path`, plus `flag-clean-claim-over-findings.py` importing `check-pr-fully-clean.py` and `warn-new-line-breaks-on-push.py` running the vendored line-break checker.
+The reason is not that hooks never reach into `scripts/`.
+15 non-test hooks do, counting by AST over `hooks/*.py` any `"scripts"`/`"scripts/..."` path literal or `from scripts.* import`, on this branch's merged tree on 2026-09-14 -- most of them adding `scripts/lib` to `sys.path`, plus `flag-clean-claim-over-findings.py` importing `check-pr-fully-clean.py` and `warn-new-line-breaks-on-push.py` running the vendored line-break checker.
 
 That number took three attempts and then went stale on a merge, which is the more useful thing to record.
 A first pass grepped for a hand-listed set of call shapes and found none, and asserted the exclusion on it.

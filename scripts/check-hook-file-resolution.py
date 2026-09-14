@@ -57,10 +57,13 @@ and two argument shapes:
     fine when it is not collapsed lexically.
 
 Two collapsing spellings are matched, because `abspath` is not the only one:
-`os.path.abspath` and `os.path.normpath` (25 call sites across 7 files in
-`hooks/`, 12 of them in 5 non-test hooks, counted at `e388e906` on 2026-09-14
--- a moving population, so the ref and the date are attached rather than only
-the criterion -- and so a live idiom here rather than a hypothetical).
+`os.path.abspath` and `os.path.normpath`. `normpath` alone accounts for 25
+call sites across 7 files in `hooks/`, 12 of them in 5 non-test hooks, counted
+at `e388e906` on 2026-09-14 -- a moving population, so the ref and the date
+are attached rather than only the criterion. That figure is `normpath`'s, not
+the pair's: both spellings together are 91 calls across 56 files at the same
+ref. It is quoted to show `normpath` is a live idiom here rather than a
+hypothetical.
 
 `Path(...).absolute()` is deliberately NOT among them, and an earlier revision
 had it there on a belief nobody measured. CPython documents it as performing
@@ -73,9 +76,8 @@ ai-config#2981, under a message telling its author to do what they had already
 done. It is not a resolver either, so a lexical call wrapped around it is still
 caught.
 
-The two spellings it matches,
-pathlib's non-symlink-resolving form. `Path(...).resolve()` is
-realpath-equivalent and deliberately clean.
+`Path(...).resolve()` is realpath-equivalent and deliberately clean, as is
+`os.path.realpath`.
 
 One hop of name binding is followed, because both live escapes are that shape
 and both are deliberate: `flag-config-deletion-without-ref-check.py` writes
@@ -102,6 +104,13 @@ stated loosely is one nobody can check:
   - A function parameter (`def f(p): os.path.abspath(p)` called with
     `__file__`), and a container built by a method call
     (`paths.append(__file__)`).
+  - A call named `resolve` or `realpath` that is NOT a path resolver.
+    `_RESOLVERS` matches by function name and ignores the receiver, so
+    `os.path.abspath(corpus.resolve(__file__))` is skipped. The collision is
+    live in the scanned tree -- `no-misattributed-quote.py` calls
+    `corpus.resolve(cited)` -- though no site combines it with a lexical call
+    today. Narrowing it needs type information, which a syntax match does not
+    have.
 
 A container built by a LITERAL or a store is NOT unseen, and is listed here
 because the natural reading of "a container" covers both: `d = {"f":
@@ -157,9 +166,11 @@ def _is_lexical_call(node: ast.AST) -> bool:
     if not isinstance(node, ast.Call):
         return False
     func = node.func
-    # `os.path.abspath(x)`, `path.normpath(x)`, `Path(x).absolute()`; a bare
-    # `abspath(x)` from `from os.path import abspath` counts too, since the
-    # hazard is the function rather than the spelling used to reach it.
+    # `os.path.abspath(x)` and `path.normpath(x)`; a bare `abspath(x)` from
+    # `from os.path import abspath` counts too, since the hazard is the
+    # function rather than the spelling used to reach it. `Path(x).absolute()`
+    # is deliberately NOT here -- see the module docstring; it preserves `..`
+    # and so behaves like `realpath`.
     if isinstance(func, ast.Attribute) and func.attr in _LEXICAL:
         return True
     return isinstance(func, ast.Name) and func.id in _LEXICAL
@@ -358,7 +369,7 @@ def main() -> int:
               "(use os.path.realpath / Path.resolve):\n", file=sys.stderr)
         for line in failures:
             print(f"  {line}", file=sys.stderr)
-        print("\nabspath/normpath/Path.absolute collapse `..` as text, so a hook reached "
+        print("\nabspath and normpath collapse `..` as text, so a hook reached "
               "through the .claude/skills symlink resolves its own directory "
               "to <checkout>/.claude/hooks, which holds none of the hooks a "
               "sibling import looks for. "

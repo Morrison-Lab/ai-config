@@ -168,8 +168,14 @@ CASES = [
     ("normpath over an already-realpath'd prefix",
      "import os\nROOT = os.path.normpath(os.path.join("
      "os.path.dirname(os.path.realpath(__file__)), '..'))\n", 0),
-    ("absolute() over an already-resolved prefix",
-     "from pathlib import Path\nR = Path(__file__).resolve().parent.absolute()\n", 0),
+    # Repointed from `.absolute()` to `normpath`: once `absolute` left
+    # _LEXICAL, `_is_lexical_call` returned False and `_mentions` was never
+    # consulted, so the case survived emptying _RESOLVERS entirely and
+    # credited the resolver skip with coverage it did not have. Measured: the
+    # form below flips 0 -> 1 under that mutation; the old one did not.
+    ("normpath over an already-resolved Path.resolve() prefix",
+     "import os\nfrom pathlib import Path\n"
+     "R = os.path.normpath(str(Path(__file__).resolve().parent))\n", 0),
     ("normpath over an already-absolute() prefix is still caught",
      "import os\nfrom pathlib import Path\n"
      "R = os.path.normpath(str(Path(__file__).absolute()))\n", 1),

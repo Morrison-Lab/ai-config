@@ -116,11 +116,11 @@ RX_SCOPED_READ_ONLY = re.compile(
 )
 
 RX_PROHIBITION = re.compile(
-    r"\bdo(?:es)? not\s+(?:(?:edit|modify|write|change|fix|commit|mutate|add|stage|delete|remove|update|touch)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|mutate|add|stage|delete|remove|update|touch)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
-    r"|\bdon't\s+(?:(?:edit|modify|write|change|fix|commit|mutate|add|stage|delete|remove|update|touch)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|mutate|add|stage|delete|remove|update|touch)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
-    r"|\bnever\s+(?:(?:edit|modify|write|change|fix|commit|mutate|add|stage|delete|remove|update|touch)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|mutate|add|stage|delete|remove|update|touch)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
+    r"\bdo(?:es)? not\s+(?:(?:edit|modify|write|change|fix|commit|mutate|add|stage|delete|remove|update|touch|apply|push|rebuild)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|fix|commit|mutate|add|stage|delete|remove|update|touch|apply|push|rebuild)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
+    r"|\bdon't\s+(?:(?:edit|modify|write|change|fix|commit|mutate|add|stage|delete|remove|update|touch|apply|push|rebuild)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|fix|commit|mutate|add|stage|delete|remove|update|touch|apply|push|rebuild)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
+    r"|\bnever\s+(?:(?:edit|modify|write|change|fix|commit|mutate|add|stage|delete|remove|update|touch|apply|push|rebuild)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|fix|commit|mutate|add|stage|delete|remove|update|touch|apply|push|rebuild)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
     r"|\bmake no changes\b(?!\s+(?:to\s+(?:any\s+files\s+(?:outside|other than|except)|(?:unrelated|other|existing|arbitrary)\s+files?)|outside|other than|except)\b)"
-    r"|\bwithout\s+(?:(?:editing|modifying|writing|changing|fixing|committing|adding|staging|deleting|removing|updating|touching)[,\s]+(?:and\s+|or\s+)?)*(?:editing|modifying|writing|changing|adding|staging|deleting|removing|updating|touching)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)",
+    r"|\bwithout\s+(?:(?:editing|modifying|writing|changing|fixing|committing|adding|staging|deleting|removing|updating|touching|applying|pushing|rebuilding)[,\s]+(?:and\s+|or\s+)?)*(?:editing|modifying|writing|changing|fixing|committing|adding|staging|deleting|removing|updating|touching|applying|pushing|rebuilding)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)",
     re.I,
 )
 
@@ -133,12 +133,12 @@ RX_NOT_READ_ONLY = re.compile(r"\bnot\s+read[- ]only\b", re.I)
 
 RX_AFFIRMATIVE_WRITE = re.compile(
     r"\band\s+then\s+(?:fix|commit|patch|repair|edit|modify|write|create)\b"
-    r"|\band\s+(?:fix|commit|patch|repair|edit|modify|write|create)\s+(?:(?:the|a|an|any|all|every|each|new|this|that|these|those|your|our|my|their|its)\s+|(?:issues?|bugs?|errors?|defects?|tests?|files?|patches?|scripts?|changes?|work|updates?|it|them)\b)"
-    r"|\b(?:fix|patch|repair|address)\s+(?:every|all|any|the|each|your|our|my|this|that|these|those|issues?|bugs?|errors?|defects?|findings?|it|them)\b"
-    r"|\bcommitt?(?:ing|ed)?\s+(?:as\s+you\s+go|(?:the\s+|your\s+|this\s+|our\s+|my\s+)?changes?)\b"
-    r"|\bcommit\s+(?:the\s+|your\s+|this\s+|these\s+|our\s+|my\s+)?changes?\b"
-    r"|\b(?:make|apply)\s+(?:the\s+|a\s+|your\s+|our\s+|my\s+|this\s+|these\s+)?(?:fixes?|changes?|edits?|patches?|modifications?)\b"
-    r"|\b(?:write|create)\s+(?:the\s+|a\s+|an\s+|new\s+|your\s+|our\s+|my\s+|this\s+|these\s+)?(?:fixes?|tests?|files?|code|patches?|scripts?)\b",
+    r"|\band\s+(?:fix|commit|patch|repair|edit|modify|write|create)\s+(?:(?:the|a|an|any|all|every|each|new|this|that|these|those|your|our|my|their|its)\s+|(?:issues?|bugs?|errors?|defects?|tests?|files?|patches?|scripts?|changes?|work|updates?|it|them|this|that)\b)"
+    r"|\b(?:fix|patch|repair|address)\s+(?:every|all|any|the|each|your|our|my|this|that|these|those|issues?|bugs?|errors?|defects?|findings?|it|them|this|that)\b"
+    r"|\bcommitt?(?:ing|ed)?\s+(?:as\s+you\s+go|(?:the\s+|your\s+|this\s+|that\s+|these\s+|those\s+|our\s+|my\s+)?changes?)\b"
+    r"|\bcommit\s+(?:the\s+|your\s+|this\s+|that\s+|these\s+|those\s+|our\s+|my\s+)?changes?\b"
+    r"|\b(?:make|apply)\s+(?:the\s+|a\s+|an\s+|your\s+|our\s+|my\s+|this\s+|that\s+|these\s+|those\s+)?(?:fix(?:es)?|changes?|edits?|patches?|modifications?)\b"
+    r"|\b(?:write|create)\s+(?:the\s+|a\s+|an\s+|new\s+|your\s+|our\s+|my\s+|this\s+|that\s+|these\s+|those\s+)?(?:fix(?:es)?|tests?|files?|code|patches?|scripts?)\b",
     re.I,
 )
 
@@ -171,23 +171,28 @@ def has_affirmative_write(content: str) -> bool:
     """Check if content commands affirmative write actions (excluding advisory or negated verbs)."""
     for m in RX_AFFIRMATIVE_WRITE.finditer(content):
         start = m.start()
-        is_coordinated_and = bool(re.match(r"^and\s+", m.group(), re.I))
         preceding = content[:start].rstrip()
+        is_coord_prefix = bool(re.match(r"^and\s+", m.group(), re.I)) and preceding.endswith(",")
+        m_prec_and = re.search(r",\s*and$", preceding, re.I)
+        is_coord_prec = bool(m_prec_and)
 
         # If coordinated with 'and' after a comma:
         # Check if the preceding clause has an active negated write action.
         # If so, 'and <write_verb>' is part of a prohibited action list (e.g. 'Do not write, edit, and commit')
+        # if it is a serial list or has negative totality ('any files'),
         # unless an explicit affirmative directive marker ('make sure', 'ensure', 'please', 'then') intervenes.
-        if is_coordinated_and and preceding.endswith(","):
-            separators = list(RX_BOUNDARY_SPLIT.finditer(content[:start]))
+        if is_coord_prefix or is_coord_prec:
+            cutoff = m_prec_and.start() if is_coord_prec else start
+            separators = list(RX_BOUNDARY_SPLIT.finditer(content[:cutoff]))
             clause_start = separators[-1].end() if separators else 0
-            prior_clause = content[clause_start:start]
+            prior_clause = content[clause_start:cutoff]
             has_marker = bool(
                 RX_AFFIRMATIVE_MARKER.search(prior_clause)
                 or RX_AFFIRMATIVE_MARKER.match(content[start:])
                 or re.match(r"^and\s+then\b", m.group(), re.I)
             )
-            if RX_NEGATED_WRITE_ACTION.search(prior_clause) and not has_marker:
+            is_serial_list = prior_clause.strip().rstrip(",").count(",") >= 1 or bool(re.search(r"\bany\s+files?\b", m.group(), re.I))
+            if RX_NEGATED_WRITE_ACTION.search(prior_clause) and is_serial_list and not has_marker:
                 continue
             clause_prefix = ""
         else:

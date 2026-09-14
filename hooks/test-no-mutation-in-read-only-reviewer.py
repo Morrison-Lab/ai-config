@@ -642,6 +642,72 @@ try:
     payload_p29 = {"tool_name": "Edit", "tool_input": {"file_path": "main.py"}, "transcript_path": p29}
     hit = hook.offending("Edit", payload_p29["tool_input"], payload_p29)
     check("must NOT block Edit with pronoun target 'and fix it'", hit, None)
+
+    # 12z5. Standalone 'Do not commit any files.' without review prompt words
+    p30 = os.path.join(prohibitive_dir, "subagents", "agent-do-not-commit.jsonl")
+    with open(p30, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Do not commit any files."},
+        }) + "\n")
+    payload_p30 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p30}
+    hit = hook.offending("Bash", payload_p30["tool_input"], payload_p30)
+    check("must block git commit when prompt states 'Do not commit any files.'", hit is not None, True)
+
+    # 12z6. 'without committing any files'
+    p31 = os.path.join(prohibitive_dir, "subagents", "agent-without-committing.jsonl")
+    with open(p31, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Inspect the logs without committing any files."},
+        }) + "\n")
+    payload_p31 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p31}
+    hit = hook.offending("Bash", payload_p31["tool_input"], payload_p31)
+    check("must block git commit when prompt states 'without committing any files'", hit is not None, True)
+
+    # 12z7. Demonstratives 'make that change' and 'apply those fixes'
+    p32 = os.path.join(prohibitive_dir, "subagents", "agent-make-that-change.jsonl")
+    with open(p32, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "This is an adversarial review. Don't skip tests, and make that change."},
+        }) + "\n")
+    payload_p32 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p32}
+    hit = hook.offending("Bash", payload_p32["tool_input"], payload_p32)
+    check("must NOT block git commit when prompt directs 'make that change'", hit, None)
+
+    # 12z8. Pronouns 'this' / 'that' in 'and commit this'
+    p33 = os.path.join(prohibitive_dir, "subagents", "agent-commit-this.jsonl")
+    with open(p33, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Don't change config, and commit this."},
+        }) + "\n")
+    payload_p33 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p33}
+    hit = hook.offending("Bash", payload_p33["tool_input"], payload_p33)
+    check("must NOT block git commit when prompt directs 'and commit this'", hit, None)
+
+    # 12z9. 'apply that fix' and pronoun 'and modify that'
+    p34 = os.path.join(prohibitive_dir, "subagents", "agent-apply-that-fix.jsonl")
+    with open(p34, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Review the code. Don't skip tests, and modify that."},
+        }) + "\n")
+    payload_p34 = {"tool_name": "Edit", "tool_input": {"file_path": "main.py"}, "transcript_path": p34}
+    hit = hook.offending("Edit", payload_p34["tool_input"], payload_p34)
+    check("must NOT block Edit when prompt directs 'and modify that'", hit, None)
+
+    # 12z10. 'without fixing any files'
+    p35 = os.path.join(prohibitive_dir, "subagents", "agent-without-fixing.jsonl")
+    with open(p35, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Inspect the logs without fixing any files."},
+        }) + "\n")
+    payload_p35 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p35}
+    hit = hook.offending("Bash", payload_p35["tool_input"], payload_p35)
+    check("must block git commit when prompt states 'without fixing any files'", hit is not None, True)
 finally:
     try:
         import shutil

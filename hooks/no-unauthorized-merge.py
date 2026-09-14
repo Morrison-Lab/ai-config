@@ -147,7 +147,7 @@ EXEC_WRAP = (
 EXEC_AT_CMD_POS = re.compile(
     PERMISSIVE_LEAD + ENV_WRAP + r"(?:[/\w.-]+/)?(?:" + EXEC_PROGS + r")\b"
 )
-HEREDOC_EXECUTOR = EXEC_AT_CMD_POS
+# HEREDOC_EXECUTOR is bound below, once DOT_SOURCE_AT_CMD_POS exists.
 # The quote-masking counterpart. A quoted span is inert only when nothing
 # before it in the same simple command can run it; `bash -c "<merge>"`,
 # `eval "<merge>"` and `ssh host "<merge>"` are the executor's own operand and
@@ -182,21 +182,38 @@ EXEC_BEFORE_QUOTE = EXEC_AT_CMD_POS
 DOT_SOURCE_AT_CMD_POS = re.compile(
     PERMISSIVE_LEAD + ENV_WRAP + r"(?:source|\.)(?=[ \t])"
 )
-# "This construct's CONTENTS are executed": the union both the heredoc masker
-# and the process-substitution scanner want. One compiled object rather than
-# two call-site alternations, because every place in this file that rolled a
-# second command-position anchor has since had to be fixed.
-EXECUTES_ITS_INPUT = re.compile(
+# "This construct's CONTENTS are executed", for a caller that only asks WHETHER
+# one is present. `mask_heredocs` is that caller: it decides whether the line's
+# consumer RUNS the body, and `source`/`.` do (ai-config#1308 review, finding
+# 3) -- `source /dev/stdin <<'EOF'` executes what it reads.
+#
+# An alternation is sound for `search`, and NOT for `finditer`. A single
+# pattern consumes text non-overlappingly, so one branch's match can swallow a
+# position the other branch would have reported: over 60,000 random token
+# strings its match-end set differed from the true union in 2,027 of them, and
+# `')$FOO )`bash` . '` reports only the `.` while dropping the `` `bash` ``.
+# For a guard a dropped executor position is the fail-open direction, so the
+# scanner that enumerates POSITIONS uses `executes_its_input_ends` below
+# instead. Calling this one "the union" was wrong (same review, finding 6).
+HEREDOC_EXECUTOR = re.compile(
     "(?:" + EXEC_AT_CMD_POS.pattern + ")|(?:" + DOT_SOURCE_AT_CMD_POS.pattern + ")"
 )
+
+
+def executes_its_input_ends(text: str) -> list:
+    """Sorted end offsets of everything in `text` that RUNS what it is given.
+
+    The real union of the two anchors, taken by running each and merging the
+    results, because one alternation cannot report a position another branch
+    consumed. See HEREDOC_EXECUTOR's note.
+    """
+    return sorted({m.end() for m in EXEC_AT_CMD_POS.finditer(text)}
+                  | {m.end() for m in DOT_SOURCE_AT_CMD_POS.finditer(text)})
+
+
 # Where the current simple command begins. An operand cannot be separated from
 # its executor by a command separator, so scanning back only this far keeps
 # `bash -c "x"; echo "prose"` from treating the second quote as live.
-# Rebound now that EXECUTES_ITS_INPUT exists. `mask_heredocs` asks whether the
-# line's consumer RUNS the body, and `source`/`.` do (ai-config#1308 review,
-# finding 3): `source /dev/stdin <<'EOF'` executes what it reads.
-HEREDOC_EXECUTOR = EXECUTES_ITS_INPUT
-
 COMMAND_SEPARATOR = re.compile(r"[;&|\n`()]")
 OPT_VAL = r"""(?:="[^"]*"|='[^']*'|=[^\s;&|`()]+|\s+"[^"]*"|\s+'[^']*'|\s+[^\s;&|`()]+|\$\{IFS\}[^\s;&|`()]+)"""
 OPT_FLAGS = rf"(?:\s+-[A-Za-z0-9_-]+(?:{OPT_VAL})?)*"
@@ -386,6 +403,17 @@ def _paren_matches(text: str):
     closes = {}
     starts = []
     stack = []
+    # A `case` pattern is terminated by a `)` that opened nothing, so pairing
+    # it with the nearest open paren truncates that paren's body. Measured
+    # (ai-config#1308 review, finding 2): `bash <(case x in x) echo "<merge>";;
+    # esac)` recorded its body as `case x in x`, left the merge outside every
+    # live span, and ran the merge. `main` allows it too.
+    #
+    # The discriminator is the stack DEPTH the `case` was opened at. A `)`
+    # while the stack has grown no deeper than that cannot be closing anything
+    # this `case` contains, so it is a pattern terminator and is skipped.
+    case_depths = []
+    word = ""
     in_single = in_double = escaped = False
     i = 0
     n = len(text)
@@ -400,16 +428,30 @@ def _paren_matches(text: str):
         elif c == '"' and not in_single:
             in_double = not in_double
         elif not in_single and not in_double:
+            # Word tracking runs only outside quotes, so a quoted "esac" in
+            # prose closes nothing.
+            if c.isalpha():
+                word += c
+            else:
+                if word == "case":
+                    case_depths.append(len(stack))
+                elif word == "esac" and case_depths:
+                    case_depths.pop()
+                word = ""
             if c == "(":
                 stack.append(i)
             elif c == ")":
-                if stack:
+                if case_depths and len(stack) <= case_depths[-1]:
+                    pass  # a `case` pattern terminator, not a closer
+                elif stack:
                     closes[stack.pop()] = i
             elif c == "<" and i + 1 < n and text[i + 1] == "(":
                 starts.append((i, i + 1))
                 stack.append(i + 1)
                 i += 2
                 continue
+        else:
+            word = ""
         i += 1
     return closes, starts
 
@@ -453,21 +495,33 @@ def _proc_subst_regions(text: str) -> list:
 # lead is `[;&`()\n\s]\s*` followed by two bounded repetitions that each end in
 # `\s*`/`\s+`, so every position in the run re-tries the same partitions.
 # Measured on `main`: `echo x` plus 1200 trailing spaces takes 1502ms inside
-# `offending`, and 2400 takes 5886ms. That is pre-existing and tracked
-# separately -- but filling a view with spaces would hand that regex its worst
-# input SEVEN times over, so a 400-deep nest cost 1288ms here before this
-# character changed. NUL is in no character class this file matches, so a
-# filled run is inert and linear.
+# `offending`, and 2400 takes 5886ms. That is pre-existing (ai-config#3640) --
+# but filling a view with spaces would hand that regex its worst input once per
+# nesting level, so a 400-deep nest cost 1288ms here before this character
+# changed.
+#
+# What makes NUL work is narrow, and an earlier version of this note overstated
+# it as "NUL is in no character class this file matches" -- false, since `\S`,
+# ENV_WRAP and VAR_PREFIX all match it. What is true is the only part that
+# matters: NUL is not in PERMISSIVE_LEAD's `[;&`()\n\s]`, so no command
+# position opens inside a filled run and the whitespace partitioning above
+# cannot start (ai-config#1308 review, finding 5).
 _FILL = "\x00"
 
 
 def _blank(view: list, start: int, stop: int) -> None:
     """Fill `view[start:stop]` with `_FILL`, keeping one space at each end.
 
-    The end spaces matter. PERMISSIVE_LEAD needs a command position before a
-    command word, and a real token adjacent to a filled run would otherwise sit
-    against a NUL and fail to anchor -- so `< <(...) bash` would blank the
-    substitution correctly and then lose the `bash` it exists to find.
+    The end spaces replace the `<` and the `)` themselves, so they supply the
+    command position PERMISSIVE_LEAD needs on either side of a filled run.
+
+    They are NOT what saves `< <(...) bash`: the space before that `bash` sits
+    outside the blanked range and is never touched, and deleting both
+    assignments still blocks it and fails no suite case. An earlier version of
+    this docstring claimed otherwise (ai-config#1308 review, finding 4). What
+    they do change is degenerate input -- a fuzz over 120,000 random token
+    strings found 103 verdict differences with them removed -- so they stay,
+    with the reason stated as what it is.
     """
     if stop <= start:
         return
@@ -553,12 +607,18 @@ def live_proc_subst_spans(text: str) -> list:
     covers it.
 
     `cat <(echo "<merge>")` is deliberately NOT a span, because `cat` does not
-    run its input. That is a claim about `cat`, NOT about the command line:
-    `cat <(echo "<merge>") | bash` does merge, and this guard allows it, on
-    this branch and on `main` alike. What defeats it is the pipe, which
-    SPLIT makes a segment boundary -- a pre-existing hole tracked separately,
-    and the reason the sentence above is scoped to the consumer rather than to
-    the outcome.
+    run its input. That is a claim about `cat`, NOT about the command line, and
+    two shapes make the difference concrete. `cat <(echo "<merge>") | bash`
+    merges, because SPLIT makes the pipe a segment boundary. And
+    `echo "<merge>" > >(bash)` merges with no pipe at all, because only `<(` is
+    collected here -- an OUTPUT substitution fed by the enclosing command's
+    stdout is a script this scanner never looks at.
+
+    Both are allowed on this branch and on `main` alike, and both are
+    ai-config#3639. Naming only the pipe was wrong (ai-config#1308 review,
+    finding 3): the diff's own `echo x > >(bash -c "<merge>")` BLOCK case
+    catches the merge INSIDE the substitution and says nothing about the merge
+    FEEDING it, which is the shape that is open.
     """
     text = mask_trailing_comments(text)
     regions = _proc_subst_regions(text)
@@ -573,16 +633,39 @@ def live_proc_subst_spans(text: str) -> list:
     live = [False] * len(regions)
     covered = [False] * len(regions)
     spans = []
-    deepest = max(region[3] for region in regions)
-    for depth in range(min(deepest, MAX_PROC_SUBST_DEPTH) + 1):
-        at_depth = [i for i, region in enumerate(regions) if region[3] == depth]
+    by_depth = {}
+    for index, region in enumerate(regions):
+        by_depth.setdefault(region[3], []).append(index)
+    deepest = max(by_depth)
+    for depth in range(deepest + 1):
+        at_depth = by_depth.get(depth)
         if not at_depth:
+            continue
+        if depth > MAX_PROC_SUBST_DEPTH:
+            # Past the cap, stop asking and assume the body runs.
+            #
+            # `covered` is set on EVERY region here, not only the ones that
+            # record a span. Marking only the recorders left the first region
+            # past the cap uncovered -- its parent was covered, so it was
+            # skipped without being marked -- and its own child then read an
+            # uncovered parent and appended a span INSIDE the recorded
+            # ancestor. That breaks the disjointness `mask_inert_quotes`
+            # bisects on, and the bisect then lands on the inner span and
+            # reports the quote as dead: a nest one level past the cap ran a
+            # real merge and was allowed (ai-config#1308 review, finding 1).
+            # The loop that did this was written as a separate tail pass, which
+            # is how it came to disagree with the main loop about `covered`.
+            for index in at_depth:
+                parent = regions[index][4]
+                if parent < 0 or not covered[parent]:
+                    spans.append((regions[index][1], regions[index][2]))
+                covered[index] = True
             continue
         view = _depth_view(text, regions, depth)
         separators = list(COMMAND_SEPARATOR.finditer(view))
         sep_ends = [m.end() for m in separators]
         sep_starts = [m.start() for m in separators]
-        exec_ends = sorted(m.end() for m in EXECUTES_ITS_INPUT.finditer(view))
+        exec_ends = executes_its_input_ends(view)
         for index in at_depth:
             lt_idx, body_start, body_end, _depth, parent = regions[index]
             if parent >= 0 and covered[parent]:
@@ -600,13 +683,6 @@ def live_proc_subst_spans(text: str) -> list:
                     exec_ends, seg_start):
                 live[index] = covered[index] = True
                 spans.append((body_start, body_end))
-    # Past the cap, stop asking and assume the body runs.
-    for index, region in enumerate(regions):
-        if region[3] > MAX_PROC_SUBST_DEPTH:
-            parent = region[4]
-            if parent < 0 or not covered[parent]:
-                covered[index] = True
-                spans.append((region[1], region[2]))
     spans.sort()
     return spans
 

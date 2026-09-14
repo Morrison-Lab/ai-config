@@ -338,6 +338,27 @@ BLOCK = [
     # accepted over-block it is, rather than asserted away in an ALLOW case
     # whose stated reason the code contradicts.
     ('rsync -a . <(echo "gh pr merge 411")', "ACCEPTED OVER-BLOCK: a bare dot pathspec reads as the source builtin"),
+    # Round 3 of ai-config#1308's review. The first two are fail-opens that
+    # really executed a merge under bash; the last three cover clauses that
+    # reverted to ZERO failing cases, which is this file's own definition of
+    # an untested clause.
+    #
+    # A `case` pattern's `)` opened nothing, so pairing it with the nearest
+    # open paren truncated the recorded body and left the merge outside every
+    # live span. One character defeated the whole scanner.
+    ('bash <(case x in x) echo "gh pr merge 411";; esac)', "a case pattern's `)` is not a paren closer"),
+    ('< <(case x in x) echo "gh pr merge 411";; esac) bash', "the same with the executor written after"),
+    # One level past MAX_PROC_SUBST_DEPTH: the region at the cap was skipped
+    # without being marked covered, so its child re-recorded a span INSIDE an
+    # already-recorded one and the bisect then read the quote as dead.
+    ('cat <(cat <(cat <(cat <(cat <(cat <(bash <(cat <(cat <(echo hi)) ; echo "gh pr merge 411")))))))',
+     "a nest one level past the depth cap still fails closed"),
+    # Covers `_depth_view`'s boundary spaces: the executor is at depth 1 and
+    # the outer command is not one.
+    ('cat <(bash <(echo "gh pr merge 411"))', "an executor nested inside a non-executor's substitution"),
+    # Covers the `covered` array specifically: the merge is a sibling of an
+    # inner substitution, inside an outer body that does run.
+    ('bash <(cat <(bash <(echo hi)); echo "gh pr merge 411")', "a grandchild region does not escape its covered ancestor"),
 ]
 
 ALLOW = [
@@ -454,6 +475,10 @@ ALLOW = [
     # ending at the `<(` rather than past it.
     ('bash -c y;<(echo "gh pr merge 411")', "an executor before the separator does not introduce this substitution"),
     ('cat f;<(echo "gh pr merge 411")', "the same with no executor anywhere"),
+    # `case` handling must not turn a non-executor into one.
+    ('cat <(case x in x) echo "gh pr merge 411";; esac)', "a case pattern inside a substitution cat merely reads"),
+    # A quoted `esac` is prose and closes no case construct.
+    ('echo "case x in x) gh pr merge 411;; esac"', "a whole case construct quoted as prose"),
 ]
 
 

@@ -27,8 +27,11 @@ The two failure directions are both bad and only one is visible:
 
 The corpus has paid for this twice: once in `plugins/ai-config/
 claude-hook-adapter.py` under ai-config#2681, and again across 19 sites in
-18 non-test hooks (plus the `__file__` and subject resolution of 31 test
-suites: 16 carried one on `__file__`, 23 on their subject, 8 on both) in
+18 non-test hooks (plus the `__file__` and subject resolution of 34 test
+suites: 16 carried one on `__file__`, 26 on their subject, 8 on both,
+re-derived at `e388e906` after this instrument gained its `sys.argv` binding
+arm -- the figure before that arm was 31/16/23/8, undercounted by exactly the
+three suites the arm surfaced) in
 `hooks/` under ai-config#2981, because the first fix was not swept. That is the
 recurrence bar in `shared/principles/deterministic-tools.md`, and this file is
 the instrument it asks for.
@@ -53,12 +56,24 @@ and two argument shapes:
     `<checkout>/.claude/hooks/guard-slide-major-tag.py`, a path that opens
     fine when it is not collapsed lexically.
 
-Three collapsing spellings are matched, because `abspath` is not the only one:
-`os.path.abspath`, `os.path.normpath` (25 call sites across 7 files in
+Two collapsing spellings are matched, because `abspath` is not the only one:
+`os.path.abspath` and `os.path.normpath` (25 call sites across 7 files in
 `hooks/`, 12 of them in 5 non-test hooks, counted at `e388e906` on 2026-09-14
 -- a moving population, so the ref and the date are attached rather than only
-the criterion -- and so a live idiom here rather than a hypothetical), and
-`Path(...).absolute()`,
+the criterion -- and so a live idiom here rather than a hypothetical).
+
+`Path(...).absolute()` is deliberately NOT among them, and an earlier revision
+had it there on a belief nobody measured. CPython documents it as performing
+"no normalization or symlink resolution", and measured against this corpus's
+own registration path it PRESERVES the `..` for the OS to walk, landing on a
+path that exists -- grouping it with `realpath`, not with `abspath`. Matching
+it made a hard gate with no suppression path reject
+`ROOT = Path(__file__).absolute().parent`, correct code that cannot cause
+ai-config#2981, under a message telling its author to do what they had already
+done. It is not a resolver either, so a lexical call wrapped around it is still
+caught.
+
+The two spellings it matches,
 pathlib's non-symlink-resolving form. `Path(...).resolve()` is
 realpath-equivalent and deliberately clean.
 
@@ -76,7 +91,7 @@ One hop covers four binding forms -- an ordinary assignment, an annotated
 one, a walrus, and a tuple target -- and applies to BOTH argument shapes: a
 name bound from `__file__`, and, inside a suite, a name bound from
 `sys.argv`. The second arm was missing at first, and the gate read clean over
-two live suites that resolve a name-bound subject lexically.
+three live suites that resolve a name-bound subject lexically.
 
 What remains unseen, enumerated rather than gestured at, because a boundary
 stated loosely is one nobody can check:
@@ -134,7 +149,7 @@ FAILURE_EXIT = 1
 # Every spelling that collapses `..` without consulting the filesystem.
 # `realpath` and `Path.resolve()` are the symlink-resolving counterparts and
 # are deliberately absent.
-_LEXICAL = frozenset({"abspath", "normpath", "absolute"})
+_LEXICAL = frozenset({"abspath", "normpath"})
 
 
 def _is_lexical_call(node: ast.AST) -> bool:
@@ -266,12 +281,16 @@ def _self_bound_names(tree: ast.AST, subject_path: bool = False) -> frozenset[st
                 # The SUBJECT half needs the same one hop, and an earlier
                 # revision gave it only the direct form. `HOOK = sys.argv[1]`
                 # followed by `os.path.abspath(HOOK)` is the identical shape
-                # the `__file__` arm already special-cases, and two live
-                # suites carried it while the gate read clean
-                # (test-flag-positional-figure-in-commit-message.py,
-                # test-remind-deserialize-before-binary-claim.py). The
-                # asymmetry also silently undercounted the census this
-                # instrument was used to derive.
+                # the `__file__` arm already special-cases, and THREE live
+                # suites carried it while the gate read clean:
+                # test-flag-positional-figure-in-commit-message.py,
+                # test-remind-deserialize-before-binary-claim.py, and
+                # test-warn-stale-review-diff-base.py. An external review
+                # found the first two; fixing the arm surfaced the third,
+                # which is why an exhaustive-looking list of two was worse
+                # than no list at all. The asymmetry also silently
+                # undercounted the census this instrument was used to derive,
+                # by exactly those three.
                 or (subject_path and (
                     (isinstance(n, ast.Attribute) and n.attr == "argv")
                     or (isinstance(n, ast.Name) and n.id == "argv")))

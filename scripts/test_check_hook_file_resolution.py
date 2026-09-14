@@ -147,8 +147,15 @@ CASES = [
     # with nothing to say which of the two is current.
     ("normpath joining __file__ with a parent segment",
      "import os\nROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))\n", 1),
-    ("Path(__file__).absolute(), pathlib's non-resolving form",
-     "from pathlib import Path\nROOT = Path(__file__).absolute().parent\n", 1),
+    # `Path.absolute()` is CLEAN, and an earlier revision had it as an
+    # offender on a belief nobody measured. CPython documents it as doing "no
+    # normalization or symlink resolution", and measured against this corpus's
+    # own registration path it PRESERVES the `..` for the OS to walk, landing
+    # on a path that exists -- so it groups with `realpath`, not `abspath`.
+    # Two constructs with the same behaviour had been classified oppositely,
+    # and these two cases were pinning the wrong one.
+    ("Path(__file__).absolute() preserves `..`, so it is not an offender",
+     "from pathlib import Path\nROOT = Path(__file__).absolute().parent\n", 0),
     ("normpath on a path that is not __file__",
      "import os\nX = os.path.normpath(os.path.join(a, b))\n", 0),
     # Already-resolved prefixes. These were false positives before `_mentions`
@@ -163,12 +170,19 @@ CASES = [
      "os.path.dirname(os.path.realpath(__file__)), '..'))\n", 0),
     ("absolute() over an already-resolved prefix",
      "from pathlib import Path\nR = Path(__file__).resolve().parent.absolute()\n", 0),
+    ("normpath over an already-absolute() prefix is still caught",
+     "import os\nfrom pathlib import Path\n"
+     "R = os.path.normpath(str(Path(__file__).absolute()))\n", 1),
     # The exemption must not swallow the real cases: the same two spellings
     # over an UNresolved __file__ are still offenders.
     ("normpath over an unresolved __file__ is still caught",
      "import os\nR = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))\n", 1),
-    ("Path(__file__).absolute() with no resolve is still caught",
-     "from pathlib import Path\nR = Path(__file__).absolute().parent\n", 1),
+    # ...but a genuinely lexical call WRAPPED around it is still caught,
+    # because `absolute` is not a resolver either -- it neither collapses nor
+    # protects.
+    ("an abspath wrapped around Path(__file__).absolute() is still caught",
+     "import os\nfrom pathlib import Path\n"
+     "R = os.path.abspath(str(Path(__file__).absolute()))\n", 1),
     # One hop of name binding. Both live escapes are this shape, and both are
     # written deliberately so the file survives being exec'd into a namespace
     # with no `__file__` -- so neither is going away and the checker has to

@@ -149,18 +149,22 @@ class TestEvaluate(unittest.TestCase):
 
     def test_copilot_suppressed_comments_denies(self):
         """Copilot approval with suppressed comments blocks merge."""
-        state = pr(
-            reviews=[review(
-                "copilot-pull-request-reviewer",
-                "COMMENTED",
-                body="### Approval recommended\n\nSuppressed comments: 2 of 2\n\n- nit 1\n- nit 2",
-                commit=HEAD,
-            )],
-            comments=[CLEAN_VERDICT],
-        )
-        decision = gate.evaluate(MERGE_CMD, state)
-        self.assertEqual(decision["decision"], "deny")
-        self.assertIn("not clean", decision["reason"])
+        for suppressed_block in (
+            "### Suppressed comments (2)\n\n- nit 1\n- nit 2",
+            "<summary>Comments suppressed due to low confidence (1)</summary>",
+        ):
+            state = pr(
+                reviews=[review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body=f"### Approval recommended\n\n{suppressed_block}",
+                    commit=HEAD,
+                )],
+                comments=[CLEAN_VERDICT],
+            )
+            decision = gate.evaluate(MERGE_CMD, state)
+            self.assertEqual(decision["decision"], "deny", suppressed_block)
+            self.assertIn("not clean", decision["reason"])
 
     def test_bot_changes_requested_superseded_by_approved(self):
         """A bot CHANGES_REQUESTED review superseded by APPROVED allows merge."""

@@ -105,7 +105,8 @@ COPILOT_NEGATIVE_HEADER = re.compile(
     re.IGNORECASE,
 )
 COPILOT_SUPPRESSED_BLOCK = re.compile(
-    r"\bSuppressed\s+comments\s*:\s*\d+\s+of\s+\d+\b", re.IGNORECASE
+    r"\b(?:Suppressed\s+comments|Comments\s+suppressed\s+due\s+to\s+low\s+confidence)\b",
+    re.IGNORECASE,
 )
 # Shortest sha abbreviation a head-binding prefix test will accept.
 ABBREV_SHA_LEN = 7

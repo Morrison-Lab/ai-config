@@ -48,6 +48,7 @@ class TestPullRequest(unittest.TestCase):
         self.assertEqual(pr.review_decision, "CHANGES_REQUESTED")
         self.assertEqual(pr.commit_date, "2023-10-01T12:00:00Z")
         self.assertEqual(pr.review_requests, [{"login": "copilot-pull-request-reviewer"}])
+        self.assertEqual(pr.pending_review_requests, ["copilot-pull-request-reviewer"])
         
         reviews = pr.get_reviews()
         self.assertEqual(len(reviews), 1)

@@ -53,8 +53,10 @@ and two argument shapes:
 
 Three collapsing spellings are matched, because `abspath` is not the only one:
 `os.path.abspath`, `os.path.normpath` (25 call sites across 7 files in
-`hooks/`, 12 of them in 5 non-test hooks, so a live idiom here rather than a
-hypothetical), and `Path(...).absolute()`,
+`hooks/`, 12 of them in 5 non-test hooks, counted at `e388e906` on 2026-09-14
+-- a moving population, so the ref and the date are attached rather than only
+the criterion -- and so a live idiom here rather than a hypothetical), and
+`Path(...).absolute()`,
 pathlib's non-symlink-resolving form. `Path(...).resolve()` is
 realpath-equivalent and deliberately clean.
 
@@ -77,13 +79,25 @@ stated loosely is one nobody can check:
   - TWO hops (`A = __file__; B = A; os.path.abspath(B)`).
   - Four further ONE-hop forms that are not assignments -- a `for` target, a
     `with ... as` target, a comprehension target, and an `AugAssign`.
-  - A binding through a container element or a function parameter.
+  - A function parameter (`def f(p): os.path.abspath(p)` called with
+    `__file__`), and a container built by a method call
+    (`paths.append(__file__)`).
 
-Each was measured at zero offenders against this checker, and each was then
-swept for in `hooks/` and `plugins/ai-config/`: none occurs. Closing them
-needs real dataflow, so the instrument enforces the common members of the
-class stated in `memories/hooks.md` rather than the whole class -- and says
-which members those are.
+A container built by a LITERAL or a store is NOT unseen, and is listed here
+because the natural reading of "a container" covers both: `d = {"f":
+__file__}`, `d = [__file__]`, `d["f"] = __file__` and `c.f = __file__` are all
+flagged, because the target walk binds the container's own name. That is the
+same over-reach the tuple arm has, with the same remedy.
+
+Each unseen shape above was measured at zero offenders against this checker,
+and each was then swept for in `hooks/` and `plugins/ai-config/`: none occurs.
+Closing them needs real dataflow, so the instrument enforces the common
+members of the class stated in `memories/hooks.md` rather than the whole
+class -- and says which members those are.
+
+Measuring rather than reasoning is the point of that paragraph: an earlier
+revision asserted the container case was unseen, and four of its five shapes
+turned out to be caught.
 
 Run: python3 scripts/check-hook-file-resolution.py
 """
@@ -302,10 +316,11 @@ def main() -> int:
               "through the .claude/skills symlink resolves its own directory "
               "to <checkout>/.claude/hooks, which holds none of the hooks a "
               "sibling import looks for. "
-              "If the flagged value is NOT a self-path -- a tuple assignment "
-              "binds every name in its target, so a name beside `__file__` is "
-              "reported too -- split that assignment rather than changing the "
-              "call. "
+              "If the flagged value is NOT a self-path, the binding was "
+              "over-matched: a tuple target binds every name in it, and a "
+              "container literal or store binds the container, so a name "
+              "beside `__file__` is reported too. Split that assignment "
+              "rather than changing the call. "
               "See memories/hooks.md and ai-config#2981.", file=sys.stderr)
         return FAILURE_EXIT
 

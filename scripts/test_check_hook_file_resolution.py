@@ -214,6 +214,18 @@ CASES = [
      "import os\na, b = __file__, 1\nD = os.path.abspath(a)\n", 1),
     ("a bare annotation binds nothing",
      "import os\np: str\nD = os.path.abspath(p)\n", 0),
+    # Container shapes. The docstring asserted these were unseen; four of the
+    # five turned out to be caught, because the target walk binds the
+    # container's own name. Pinned in whichever direction they measured, so
+    # the corrected claim cannot drift back.
+    ("a dict literal holding __file__ binds the container",
+     "import os\nd = {'f': __file__}\nD = os.path.abspath(d['f'])\n", 1),
+    ("a subscript store of __file__ binds the container",
+     "import os\nd = {}\nd['f'] = __file__\nD = os.path.abspath(d['f'])\n", 1),
+    ("a container built by a method call is genuinely unseen",
+     "import os\nd = []\nd.append(__file__)\nD = os.path.abspath(d[0])\n", 0),
+    ("a function parameter is genuinely unseen",
+     "import os\ndef f(p):\n    return os.path.abspath(p)\nf(__file__)\n", 0),
 ]
 
 # The subject-path half, which applies only inside a `hooks/test-*.py` suite:

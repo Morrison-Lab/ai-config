@@ -291,8 +291,12 @@ When authoring a new hook:
    ```bash
    python3 scripts/check-hook-catalog.py
    python3 scripts/check-hook-output-shape.py
+   python3 scripts/check-hook-file-resolution.py
    python3 scripts/test_hooks.py
    ```
+   The third is the gate a new hook trips most easily: resolve the hook's own
+   path with `os.path.realpath(__file__)`, never `abspath`.
+   See "Resolve a hook's own directory with `realpath`" below.
 
 ## 5.5 A hook test that invokes the real hook is not hermetic against live git state
 

@@ -359,6 +359,25 @@ BLOCK = [
     # Covers the `covered` array specifically: the merge is a sibling of an
     # inner substitution, inside an outer body that does run.
     ('bash <(cat <(bash <(echo hi)); echo "gh pr merge 411")', "a grandchild region does not escape its covered ancestor"),
+    # Round 4. A candidate this scanner cannot balance now FAILS CLOSED rather
+    # than being dropped. It was an ALLOW case, justified as "bash would reject
+    # it anyway" -- true of a genuinely unbalanced command, and the condition
+    # is a claim about the SCANNER, so dropping made every paren-model bug an
+    # allow. Over-blocking a command bash rejects costs nothing.
+    ("bash <(echo 'gh pr merge 411'", "an opener this scanner cannot balance fails closed"),
+    # A word ENDS at a shell metacharacter. Matching `case` on letters alone
+    # gave it no left boundary, so `use_case` pushed a spurious case depth, the
+    # substitution's own `)` was skipped as a pattern terminator, and the merge
+    # escaped. One appended token was the whole bypass.
+    ('bash <(use_case=1; echo "gh pr merge 411")', "a word merely ENDING in case is not a case construct"),
+    ('source <(test_case=1; echo "gh pr merge 411")', "the same through source"),
+    ('< <(echo "gh pr merge 411"; lower-case=1) bash', "the same with the executor written after"),
+    # An odd quote in an EXECUTING heredoc body reaches the paren scan
+    # unmasked, because mask_heredocs deliberately leaves such a body live.
+    ("bash <<EOF\ndon't\nEOF\nbash <(echo \"gh pr merge 411\")",
+     "an apostrophe in an executing heredoc body does not suppress a later substitution"),
+    ("ssh h <<EOF\ndon't\nEOF\nsource <(echo \"gh pr merge 411\")",
+     "the same through ssh and source"),
 ]
 
 ALLOW = [
@@ -466,19 +485,15 @@ ALLOW = [
     ('gh pr comment 1 --body "repro: bash <(echo \'gh pr merge 411\')"', "the construct inside a comment body"),
     ('ALLOW_MERGE=1 bash <(echo "gh pr merge 411")', "an explicit override on the substitution form"),
     ("bash <(echo hello)", "a process substitution with no merge in it"),
-    # Load-bearing: the body carries a REAL merge, so this passes only because
-    # the opener is unbalanced. With `gh pr view` it passed with the balance
-    # requirement deleted outright, which is a case that cannot fail.
-    ("bash <(echo 'gh pr merge 411'", "an unbalanced opener bash would reject anyway"),
     # The executor is in the PREVIOUS segment, which a `bisect_left` on
     # separator ends reached into by returning the index OF the separator
     # ending at the `<(` rather than past it.
     ('bash -c y;<(echo "gh pr merge 411")', "an executor before the separator does not introduce this substitution"),
     ('cat f;<(echo "gh pr merge 411")', "the same with no executor anywhere"),
-    # `case` handling must not turn a non-executor into one.
+    # The `case` tracking must not turn a non-executor into one. Load-bearing
+    # in the ALLOW direction: `cat` reads its input, and no paren-model change
+    # may make it execute.
     ('cat <(case x in x) echo "gh pr merge 411";; esac)', "a case pattern inside a substitution cat merely reads"),
-    # A quoted `esac` is prose and closes no case construct.
-    ('echo "case x in x) gh pr merge 411;; esac"', "a whole case construct quoted as prose"),
 ]
 
 
@@ -955,6 +970,48 @@ for tool_name, tool_input, desc in MCP_ALLOW:
     v = verdict_mcp(tool_name, tool_input)
     check(v == "allow")
     print(f"  {v:<6} {desc}")
+
+# ------------------------------------------------ scanner-level assertions
+#
+# Two round-4 clauses are load-bearing but NOT reachable through a verdict,
+# because the fail-closed default catches the same commands for a different
+# reason. A verdict case for either would pass with the clause deleted, which
+# this file calls a case that cannot fail -- so assert the SPAN instead, which
+# is what the clause actually changes.
+import importlib.util as _ilu
+
+_spec = _ilu.spec_from_file_location("_guard", HOOK)
+_guard = _ilu.module_from_spec(_spec)
+_spec.loader.exec_module(_guard)
+
+print("\nscanner-level:")
+
+
+def _span_check(label, command, want):
+    global checks, wrong
+    checks += 1
+    got = _guard.live_proc_subst_spans(command)
+    ok = got == want
+    if not ok:
+        wrong += 1
+    print(f"  {'ok' if ok else 'WRONG':<6} {label}")
+    if not ok:
+        print(f"         got {got}, want {want}")
+
+
+# `use_case` must not be read as a `case`, so the `)` closes the `<(` and the
+# body is the real one. With the letters-only word match the region vanished.
+_span_check("a word ending in case leaves the closer intact",
+            'bash <(use_case=1; echo hi)', [(7, 26)])
+# The `case` pattern's `)` is skipped, so the body runs to the real closer.
+_span_check("a case pattern's `)` is not the closer",
+            'bash <(case x in x) echo hi;; esac)',
+            [(7, 34)])
+# An odd quote makes the quote-aware read unreliable by its own account, so
+# the scan is redone ignoring quotes -- which finds the region rather than
+# silently seeing nothing.
+_span_check("an unbalanced quote falls back to a quote-blind scan",
+            "don't\nbash <(echo hi)", [(13, 20)])
 
 total = checks
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))

@@ -201,11 +201,21 @@ HEREDOC_EXECUTOR = re.compile(
 
 
 def executes_its_input_ends(text: str) -> list:
-    """Sorted end offsets of everything in `text` that RUNS what it is given.
+    """Sorted end offsets where `text` invokes something that RUNS its input.
 
-    The real union of the two anchors, taken by running each and merging the
-    results, because one alternation cannot report a position another branch
-    consumed. See HEREDOC_EXECUTOR's note.
+    Each anchor is run separately and the results merged, because ONE
+    alternation cannot report a position another branch consumed: its
+    match-end set differed from the merged one in 2,027 of 60,000 random
+    strings.
+
+    NOT every such position, which this docstring claimed until round 3
+    finding 6. `finditer` is non-overlapping WITHIN each anchor too, so
+    `EXEC_AT_CMD_POS` alone still drops an executor consumed by an earlier
+    match of itself -- 14 of 20,000 random strings disagree with a
+    match-at-every-offset scan. That residue changed 0 of 40,000 fuzzed
+    verdicts, and reverting this function to the alternation fails 0 suite
+    cases, so it narrows a known fail-open direction rather than fixing a
+    reachable defect. Stated here rather than left looking complete.
     """
     return sorted({m.end() for m in EXEC_AT_CMD_POS.finditer(text)}
                   | {m.end() for m in DOT_SOURCE_AT_CMD_POS.finditer(text)})
@@ -400,6 +410,33 @@ def _paren_matches(text: str):
     that runs before every Bash call. The same trap `live_operand_test` and
     VAR_PREFIX each carry a note about, reached a third way.
     """
+    closes, starts, balanced = _paren_scan(text, quote_aware=True)
+    if not balanced:
+        # An odd quote leaves every later character reading as quoted, so the
+        # scan silently stops seeing `<(` at all. Masking comments closes one
+        # source of that (round 2, finding 2); it is not the only one, because
+        # `mask_heredocs` deliberately leaves an EXECUTING heredoc's body live,
+        # and an apostrophe there reaches this scan unmasked -- 12 of 12 such
+        # shapes ran a real merge (round 3, finding 2).
+        #
+        # Enumerating the sources is the failure mode this file keeps
+        # recording, so do not enumerate them. When the quote state does not
+        # balance, the quote-aware reading is unreliable BY ITS OWN ACCOUNT, so
+        # take the reading that cannot under-detect: rescan ignoring quotes
+        # entirely. That finds more regions, never fewer, which is the
+        # fail-closed direction -- and it costs one extra linear pass on input
+        # that is already malformed.
+        closes, starts, _ = _paren_scan(text, quote_aware=False)
+    return closes, starts
+
+
+# Where a shell word ends. Anything not in here is part of the word, so
+# `use_case` is one word and not a `case`.
+_WORD_BREAK = set(" \t\n;&|()<>\"'`$\\")
+
+
+def _paren_scan(text: str, quote_aware: bool):
+    """`(closes, starts, quotes_balanced)` for one pass over `text`."""
     closes = {}
     starts = []
     stack = []
@@ -421,16 +458,26 @@ def _paren_matches(text: str):
         c = text[i]
         if escaped:
             escaped = False
-        elif c == "\\" and not in_single:
+        elif quote_aware and c == "\\" and not in_single:
             escaped = True
-        elif c == "'" and not in_double:
+        elif quote_aware and c == "'" and not in_double:
             in_single = not in_single
-        elif c == '"' and not in_single:
+        elif quote_aware and c == '"' and not in_single:
             in_double = not in_double
         elif not in_single and not in_double:
             # Word tracking runs only outside quotes, so a quoted "esac" in
             # prose closes nothing.
-            if c.isalpha():
+            #
+            # A word ends at a shell METACHARACTER, not at any non-letter. An
+            # earlier version accumulated `c.isalpha()` only, which gave the
+            # word no LEFT boundary: `use_case`, `test_case`, `x=case` and
+            # `$case` each flushed as the bare word `case` and pushed a
+            # spurious depth, after which the substitution's own `)` was
+            # skipped as a pattern terminator and the region vanished. A
+            # 660-command fuzz found 36 fail-opens and every one was that
+            # class, so `bash <(use_case=1; echo "<merge>")` ran the merge
+            # (ai-config#1308 review, round 3 finding 1).
+            if c not in _WORD_BREAK:
                 word += c
             else:
                 if word == "case":
@@ -453,7 +500,7 @@ def _paren_matches(text: str):
         else:
             word = ""
         i += 1
-    return closes, starts
+    return closes, starts, not (in_single or in_double)
 
 
 # Past this many nested process substitutions, stop analysing and treat the
@@ -472,15 +519,22 @@ def _proc_subst_regions(text: str) -> list:
     always follows its parent. `parent` indexes back into this same list, or is
     `-1` at the top level.
 
-    An UNBALANCED candidate is dropped rather than recorded: bash rejects the
-    command outright, so there is nothing in it to hide a merge in.
+    A candidate with no matching `)` FAILS CLOSED: its body is taken to run to
+    the end of the text.
+
+    The earlier version dropped it, justified as "bash rejects the command
+    outright". That is a claim about bash, and the condition is a claim about
+    THIS SCANNER -- `bash <(use_case=1; echo "<merge>")` is balanced, bash
+    accepts it, bash runs the merge, and a modelling bug here read it as
+    unbalanced (ai-config#1308 review, round 3 findings 1 and 3). Dropping made
+    every present and future error in the paren model an ALLOW, which is the
+    one direction this file never takes. A genuinely unbalanced command is
+    rejected by bash before anything runs, so over-blocking one costs nothing.
     """
     closes, candidates = _paren_matches(text)
     regions, stack = [], []
     for lt_idx, open_idx in candidates:
-        close_idx = closes.get(open_idx)
-        if close_idx is None:
-            continue
+        close_idx = closes.get(open_idx, len(text))
         while stack and lt_idx > regions[stack[-1]][2]:
             stack.pop()
         regions.append((lt_idx, open_idx + 1, close_idx,
@@ -523,6 +577,10 @@ def _blank(view: list, start: int, stop: int) -> None:
     strings found 103 verdict differences with them removed -- so they stay,
     with the reason stated as what it is.
     """
+    # `stop` may run one past the end: a candidate with no matching `)` fails
+    # closed with its body taken to the end of the text, and the caller then
+    # asks to blank through `body_end + 1`.
+    stop = min(stop, len(view))
     if stop <= start:
         return
     for i in range(start, stop):
@@ -625,12 +683,15 @@ def live_proc_subst_spans(text: str) -> list:
     if not regions:
         return []
 
-    # `covered` is live-OR-inside-something-live, and it is not the same array.
-    # Skipping a child because its parent runs must mark the CHILD covered too,
-    # or a grandchild sees a parent that is merely `live == False` and gets
-    # evaluated on its own -- re-recording a span already inside a recorded one
-    # and breaking the disjointness `mask_inert_quotes` bisects on.
-    live = [False] * len(regions)
+    # `covered` means live OR inside something live, and the OR is the point:
+    # skipping a child because its parent runs must mark the CHILD too, or a
+    # grandchild reads an unmarked parent, evaluates itself, and records a span
+    # already inside a recorded one -- breaking the disjointness
+    # `mask_inert_quotes` bisects on.
+    #
+    # There was a second array, `live`, kept for that contrast. It was written
+    # and never read, so it explained a distinction the code did not make
+    # (ai-config#1308 review, round 3 finding 5).
     covered = [False] * len(regions)
     spans = []
     by_depth = {}
@@ -681,7 +742,7 @@ def live_proc_subst_spans(text: str) -> list:
             seg_end = sep_starts[j] if j < len(sep_starts) else len(view)
             if bisect.bisect_right(exec_ends, seg_end) > bisect.bisect_left(
                     exec_ends, seg_start):
-                live[index] = covered[index] = True
+                covered[index] = True
                 spans.append((body_start, body_end))
     spans.sort()
     return spans

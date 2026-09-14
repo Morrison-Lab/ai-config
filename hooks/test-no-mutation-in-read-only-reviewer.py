@@ -763,6 +763,28 @@ try:
     payload_p40 = {"tool_name": "Edit", "tool_input": {"file_path": "main.py"}, "transcript_path": p40}
     hit = hook.offending("Edit", payload_p40["tool_input"], payload_p40)
     check("must block Edit when prompt states 'You will not edit or commit any files.'", hit is not None, True)
+
+    # 12z16. Subordinate conjunction 'until' with unrelated preceding modal negator allows write
+    p41 = os.path.join(prohibitive_dir, "subagents", "agent-wont-stop-until.jsonl")
+    with open(p41, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "This is an adversarial review, and you won't stop until you fix the bugs and commit the changes."},
+        }) + "\n")
+    payload_p41 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p41}
+    hit = hook.offending("Bash", payload_p41["tool_input"], payload_p41)
+    check("must allow git commit when prompt contains affirmative write after subordinate conjunction 'until'", hit, None)
+
+    # 12z17. Prohibition with subordinate clause 'until' blocks mutating commands
+    p42 = os.path.join(prohibitive_dir, "subagents", "agent-do-not-commit-until.jsonl")
+    with open(p42, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Do not commit any files until you are told to do so."},
+        }) + "\n")
+    payload_p42 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p42}
+    hit = hook.offending("Bash", payload_p42["tool_input"], payload_p42)
+    check("must block git commit when prompt states 'Do not commit any files until you are told to do so.'", hit is not None, True)
 finally:
     try:
         import shutil

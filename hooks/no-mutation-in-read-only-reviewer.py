@@ -167,7 +167,7 @@ RX_AFFIRMATIVE_MARKER = re.compile(
 
 RX_BOUNDARY_SPLIT = re.compile(
     r"[;:.!?\n]"
-    r"|\b(?:but|however|yet|nevertheless|nonetheless)\b"
+    r"|\b(?:but|however|yet|nevertheless|nonetheless|until|till|unless|before|after|so\s+that|in\s+order\s+to|because|since|as\s+soon\s+as|once)\b"
     r"|\b(?:and\s+then|make\s+sure(?:\s+you)?|ensure(?:\s+you)?|be\s+sure\s+to|please)\b",
     re.I,
 )

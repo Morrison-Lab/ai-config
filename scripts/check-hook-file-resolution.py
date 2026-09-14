@@ -161,7 +161,18 @@ def _mentions(node: ast.AST, subject_path: bool,
 
 
 def _walk_unresolved(node: ast.AST):
-    """`ast.walk`, but not descending into a `realpath()`/`resolve()` call."""
+    """`ast.walk`, but not descending into a `realpath()`/`resolve()` call.
+
+    The ROOT is skipped too, which is the whole node rather than a child and
+    is easy to miss: `HERE = os.path.realpath(__file__)` binds a value whose
+    root IS the resolver, so yielding the root unconditionally walked straight
+    into it and tainted `HERE`. The wrapped spelling
+    (`dirname(realpath(__file__))`) hid that, because there the resolver is a
+    child and the skip applied -- so the common idiom passed while the plainer
+    one did not.
+    """
+    if _resolved_call(node):
+        return
     queue = [node]
     while queue:
         current = queue.pop()

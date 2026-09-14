@@ -38,7 +38,8 @@ def _offenders_of(mod, source: str, name: str = "sample.py") -> list[tuple[int, 
         shutil.rmtree(d, ignore_errors=True)
 
 
-def _run_main(mod, hooks_contents: dict | None) -> int:
+def _run_main(mod, hooks_contents: dict | None,
+              plugin_files: list | None = None) -> int:
     """Run main() against a temp tree and return its exit code.
 
     `hooks_contents` of None means no hooks directory at all. An empty dict
@@ -55,7 +56,8 @@ def _run_main(mod, hooks_contents: dict | None) -> int:
         # case could pass for the wrong reason.
         plugin_dir = d / "plugins" / "ai-config"
         plugin_dir.mkdir(parents=True)
-        (plugin_dir / "adapter.py").write_text("X = 1\n", encoding="utf-8")
+        for name in (["adapter.py"] if plugin_files is None else plugin_files):
+            (plugin_dir / name).write_text("X = 1\n", encoding="utf-8")
         mod.PLUGIN_DIR = plugin_dir
         mod.SCANNED_DIRS = (mod.HOOKS_DIR, plugin_dir)
         if hooks_contents is not None:
@@ -101,6 +103,16 @@ MAIN_CASES = [
     # a root-running CI container would not honour.
     ("an undecodable hook exits nonzero rather than being skipped",
      {"h.py": b"\xff\xfe not utf-8"}, 1),
+]
+
+# The loop in `main()` runs over both scanned directories, and every case
+# above varies only `hooks/`. A loop narrowed to `hooks/` alone would leave
+# all of them green, so the plugin arm needs its own case -- otherwise the
+# per-directory guarantee is proven for one of the two directories and
+# asserted for the other.
+PLUGIN_DIR_CASES = [
+    ("an empty plugin directory exits nonzero rather than reporting clean", [], 1),
+    ("a populated plugin directory is fine", ["adapter.py"], 0),
 ]
 
 
@@ -171,6 +183,21 @@ CASES = [
     ("a name bound from an already-resolved __file__ does not taint it",
      "import os\nHERE = os.path.dirname(os.path.realpath(__file__))\n"
      "ROOT = os.path.abspath(HERE)\n", 0),
+    # The UNWRAPPED spellings, where the resolver is the value's ROOT rather
+    # than a child. The wrapped case above passed while these failed, because
+    # the walk applied its resolver skip to children and yielded the root
+    # unconditionally -- so the common idiom was clean and the plainer one was
+    # a false positive on a gate with no suppression path.
+    ("an unwrapped realpath binding does not taint it",
+     "import os\nHERE = os.path.realpath(__file__)\n"
+     "ROOT = os.path.abspath(os.path.join(HERE, '..'))\n", 0),
+    ("an unwrapped Path.resolve() binding does not taint it",
+     "import os\nfrom pathlib import Path\nHERE = Path(__file__).resolve()\n"
+     "R = os.path.normpath(str(HERE) + '/..')\n", 0),
+    # The exemption must not reach an inner collapse: here the outer call is a
+    # resolver, but abspath has already flattened the path underneath it.
+    ("realpath wrapping an abspath is still caught",
+     "import os\nH = os.path.realpath(os.path.abspath(__file__))\n", 1),
 ]
 
 # The subject-path half, which applies only inside a `hooks/test-*.py` suite:
@@ -217,6 +244,15 @@ def main() -> int:
         else:
             print(f"PASS: {label}")
 
+    clean_hook = {"h.py": "import os\nH = os.path.dirname(os.path.realpath(__file__))\n"}
+    for label, plugin_files, expected in PLUGIN_DIR_CASES:
+        code = _run_main(mod, clean_hook, plugin_files=plugin_files)
+        if bool(code) != bool(expected):
+            print(f"FAIL (exit {code}, wanted {'nonzero' if expected else '0'}): {label}")
+            failures += 1
+        else:
+            print(f"PASS: {label}")
+
     # The checker must also be green on the repo it ships in -- and that
     # assertion is only worth anything because the planted cases above prove
     # the detector fires.
@@ -231,7 +267,8 @@ def main() -> int:
         print(f"PASS: hooks/ and plugins/ai-config/ are clean "
               f"({len(scanned)} files)")
 
-    total = len(CASES) + len(SUBJECT_CASES) + len(MAIN_CASES) + 1
+    total = (len(CASES) + len(SUBJECT_CASES) + len(MAIN_CASES)
+             + len(PLUGIN_DIR_CASES) + 1)
     print(f"\n{total - failures}/{total} cases passed")
     return 1 if failures else 0
 

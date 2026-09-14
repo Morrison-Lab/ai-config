@@ -427,11 +427,12 @@ That is [`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md) twi
 
 The exclusion survives anyway, for a reason that does not depend on the count:
 every path by which a hook reaches `scripts/` is already fully resolved.
-Twelve root theirs at `realpath(__file__)` (or `realpath(_SELF)`) after this sweep, `warn-new-line-breaks-on-push.py` takes its root from `git rev-parse --show-toplevel`, and `warn-generated-file-stale.py` runs with `cwd` set from the same `rev-parse`.
+Twelve of them compute that root as `realpath(__file__)` (or `realpath(_SELF)`) after this sweep;
+`warn-new-line-breaks-on-push.py` takes its root from `git rev-parse --show-toplevel`, and `warn-generated-file-stale.py` runs with `cwd` set from the same `rev-parse`.
 A `scripts/` file opened through an already-resolved path has no `..` left to collapse, so `abspath` and `realpath` agree inside it.
 Widen the checker the day something under `scripts/` is reached through a path that is *not* already resolved, and not before.
 Sweeping them would be churn dressed as thoroughness.
-`scripts/check-hook-file-resolution.py` is the instrument, hard-gating in `validate.yml`: the condition is one AST walk over `hooks/*.py`, the remedy is one word, and the corpus had already paid for the lesson twice without sweeping.
+`scripts/check-hook-file-resolution.py` is the instrument, hard-gating in `validate.yml`: the condition is one AST walk over `hooks/*.py` and `plugins/ai-config/*.py`, the remedy is one word, and the corpus had already paid for the lesson twice without sweeping.
 
 - **Do:** write `os.path.realpath(__file__)` in any hook that resolves its own directory to reach a sibling or a data file.
 - **Do:** test such a hook through a symlinked path, not only from the checkout --- a suite that runs it from `hooks/` cannot see this at all, which is why the 308 cases this guard had before the two added here all passed over a live session-wide lockout.

@@ -601,23 +601,6 @@ hook itself broke rather than that it denied a tool call.
 And it reads literal statuses only, since `sys.exit(main())` passes a computed
 one.
 
-A second hard gate covers how a hook finds its own files.
-`scripts/check-hook-file-resolution.py` refuses `os.path.abspath(__file__)` and
-the other lexical spellings (`normpath`, `Path(...).absolute()`) across
-`hooks/*.py` and `plugins/ai-config/*.py`, including a test suite resolving its
-`sys.argv` subject.
-
-So when adding a hook, resolve its own path with `os.path.realpath(__file__)`
-(or `Path(__file__).resolve()`), never `abspath`.
-`abspath` collapses `..` as text without consulting the filesystem, and this
-repo's `.claude/skills` is a symlink to its own `skills/`, so a hook reached
-through the skills-directory plugin registration computes its directory as
-`<checkout>/.claude/hooks` --- a directory that exists and holds only
-`session-start.sh`, none of the Python hooks a sibling import would look for.
-A fail-closed guard then denies every command it can no longer classify, and a
-fail-open one silently runs without its sibling's helpers.
-See `memories/hooks.md` and ai-config#2981.
-
 The `except`-handler narrowing keys on the handler and nothing wider, so an
 error-path `return 2` written outside one still reads as a block and exempts
 the hook.
@@ -636,6 +619,24 @@ the same condition, which this narrowing does not touch.
   printed payload.
 - **Don't:** treat an error-path `return 1` as a blocking channel --- the
   checker reads status 2 alone.
+
+A second hard gate covers how a hook finds its own files.
+`scripts/check-hook-file-resolution.py` refuses `os.path.abspath(__file__)` and
+the other lexical spellings (`normpath`, `Path(...).absolute()`) across
+`hooks/*.py` and `plugins/ai-config/*.py`, including a test suite resolving its
+`sys.argv` subject.
+
+So when adding a hook, resolve its own path with `os.path.realpath(__file__)`
+(or `Path(__file__).resolve()`), never `abspath`.
+`abspath` collapses `..` as text without consulting the filesystem, and this
+repo's `.claude/skills` is a symlink to its own `skills/`, so a hook reached
+through the skills-directory plugin registration computes its directory as
+`<checkout>/.claude/hooks` --- a directory that exists and holds only
+`session-start.sh`, none of the Python hooks a sibling import would look for.
+A fail-closed guard then denies every command it can no longer classify, and a
+fail-open one silently runs without its sibling's helpers.
+See `memories/hooks.md` and ai-config#2981.
+
 
 A **`PreToolUse`** hook that emits **both** channels should gate its
 `systemMessage` on `ANTIGRAVITY_AGENT` being unset.

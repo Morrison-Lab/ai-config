@@ -394,4 +394,7 @@ Adversarial review (ai-config#3623) established three key boundary requirements 
 
 4. **Distinguish Oxford-comma prohibited lists from coordinated write directives:**
    In prohibitive prompts, comma-separated lists of prohibited verbs (e.g. "Do not write code, edit, and commit any files") share the initial negation clause.
-   Do not treat an `and <verb>` following a comma as starting an affirmative directive unless the preceding clause does not carry an active negated write action or an affirmative directive marker (`make sure`, `ensure`, `please`, `and then`) is present.
+   An Oxford serial list carries an internal serial comma (`prior_clause.strip().rstrip(",").count(",") >= 1`) or negative totality phrasing (`any files`).
+   In contrast, compound sentences joining two independent clauses with `, and` (e.g. "Don't change config, and commit this") carry affirmative directives in the coordinated clause unless explicitly negated.
+   Ensure verb lists in `RX_PROHIBITION` and `RX_NEGATED_WRITE_ACTION` remain symmetrical across prefix and terminal groups (`commit`, `fix`, `apply`, `push`, `rebuild`).
+

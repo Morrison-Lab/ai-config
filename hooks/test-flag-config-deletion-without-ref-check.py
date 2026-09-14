@@ -14,7 +14,7 @@ import tempfile
 
 if len(sys.argv) < 2:
     sys.exit("Usage: python3 %s <path-to-hook>" % sys.argv[0])
-HOOK = os.path.abspath(sys.argv[1])
+HOOK = os.path.realpath(sys.argv[1])
 
 # Every mkdtemp here is recorded and removed at exit, via atexit rather than a
 # line at the end of the module: `run()` calls `sys.exit` on a FATAL hook exit

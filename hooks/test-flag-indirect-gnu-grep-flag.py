@@ -40,7 +40,7 @@ import tempfile
 # CLAUDE.md's "Tool transport collapses doubled backslashes".
 B = chr(92)
 
-HOOK = os.path.abspath(sys.argv[1])
+HOOK = os.path.realpath(sys.argv[1])
 
 
 def verdict(command, hook=None, tool="Bash"):

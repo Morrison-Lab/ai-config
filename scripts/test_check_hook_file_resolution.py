@@ -28,14 +28,56 @@ def _load():
     return mod
 
 
-def _offenders_of(mod, source: str) -> list[tuple[int, str]]:
+def _offenders_of(mod, source: str, name: str = "sample.py") -> list[tuple[int, str]]:
     d = Path(tempfile.mkdtemp(prefix="chfr-"))
     try:
-        p = d / "sample.py"
+        p = d / name
         p.write_text(source, encoding="utf-8")
         return mod.offenders(p)
     finally:
         shutil.rmtree(d, ignore_errors=True)
+
+
+def _run_main(mod, hooks_contents: dict | None) -> tuple[int, bool]:
+    """Run main() against a temp tree; return (exit code, printed anything).
+
+    `hooks_contents` of None means no hooks directory at all. An empty dict
+    means the directory exists and is empty -- the case whose whole point is
+    that a sweep of zero files must not read as a clean sweep.
+    """
+    d = Path(tempfile.mkdtemp(prefix="chfr-main-"))
+    saved_root, saved_dir = mod.ROOT, mod.HOOKS_DIR
+    try:
+        mod.ROOT = d
+        mod.HOOKS_DIR = d / "hooks"
+        if hooks_contents is not None:
+            mod.HOOKS_DIR.mkdir()
+            for fname, text in hooks_contents.items():
+                (mod.HOOKS_DIR / fname).write_text(text, encoding="utf-8")
+        try:
+            return mod.main(), True
+        except SystemExit as exc:
+            # offenders() raises SystemExit on an unreadable or unparseable
+            # file; a string payload is a failure, not a clean exit.
+            return (1 if exc.code else 0), True
+    finally:
+        mod.ROOT, mod.HOOKS_DIR = saved_root, saved_dir
+        shutil.rmtree(d, ignore_errors=True)
+
+
+MAIN_CASES = [
+    # (label, hooks dir contents or None, expected exit code)
+    ("a clean hooks directory exits 0",
+     {"h.py": "import os\nHERE = os.path.dirname(os.path.realpath(__file__))\n"}, 0),
+    ("one offender exits nonzero",
+     {"h.py": "import os\nHERE = os.path.dirname(os.path.abspath(__file__))\n"}, 1),
+    # The three fail-closed branches. Each is the shape where a checker that
+    # examined nothing would otherwise print a reassuring result.
+    ("a missing hooks directory exits nonzero rather than reporting clean", None, 1),
+    ("an empty hooks directory exits nonzero rather than reporting clean", {}, 1),
+    ("an unparseable hook exits nonzero rather than being skipped",
+     {"h.py": "def broken(:\n"}, 1),
+]
 
 
 CASES = [
@@ -61,6 +103,29 @@ CASES = [
      "from pathlib import Path\nROOT = Path(__file__).resolve().parent\n", 0),
     ("the word abspath inside a string or comment only",
      "# do not use os.path.abspath(__file__) here\nX = 'os.path.abspath(__file__)'\n", 0),
+    # normpath collapses `..` exactly as abspath does, and is already used at
+    # 7 sites in hooks/, so it is a live reintroduction route rather than a
+    # hypothetical one.
+    ("normpath joining __file__ with a parent segment",
+     "import os\nROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))\n", 1),
+    ("Path(__file__).absolute(), pathlib's non-resolving form",
+     "from pathlib import Path\nROOT = Path(__file__).absolute().parent\n", 1),
+    ("normpath on a path that is not __file__",
+     "import os\nX = os.path.normpath(os.path.join(a, b))\n", 0),
+]
+
+# The subject-path half, which applies only inside a `hooks/test-*.py` suite:
+# there `sys.argv[1]` is the hook under test, and resolving it lexically makes
+# the suite unrunnable against the real registration path. The same line in a
+# non-test file is out of scope, so each case is asserted BOTH ways -- a
+# matcher ignoring the filename would fail the second column.
+SUBJECT_CASES = [
+    ("a suite resolving its subject lexically",
+     "import os, sys\nHOOK = os.path.abspath(sys.argv[1])\n", 1, 0),
+    ("a suite resolving its subject with realpath",
+     "import os, sys\nHOOK = os.path.realpath(sys.argv[1])\n", 0, 0),
+    ("the `from sys import argv` spelling",
+     "from sys import argv\nfrom os.path import abspath\nHOOK = abspath(argv[1])\n", 1, 0),
 ]
 
 
@@ -71,6 +136,24 @@ def main() -> int:
         got = len(_offenders_of(mod, source))
         if got != expected:
             print(f"FAIL (got {got}, wanted {expected}): {label}")
+            failures += 1
+        else:
+            print(f"PASS: {label}")
+
+    for label, source, in_suite, in_hook in SUBJECT_CASES:
+        got_suite = len(_offenders_of(mod, source, "test-sample.py"))
+        got_hook = len(_offenders_of(mod, source, "sample.py"))
+        if (got_suite, got_hook) != (in_suite, in_hook):
+            print(f"FAIL (suite={got_suite}/{in_suite}, "
+                  f"hook={got_hook}/{in_hook}): {label}")
+            failures += 1
+        else:
+            print(f"PASS: {label}")
+
+    for label, contents, expected in MAIN_CASES:
+        code, _ = _run_main(mod, contents)
+        if bool(code) != bool(expected):
+            print(f"FAIL (exit {code}, wanted {'nonzero' if expected else '0'}): {label}")
             failures += 1
         else:
             print(f"PASS: {label}")
@@ -86,7 +169,7 @@ def main() -> int:
     else:
         print("PASS: hooks/ is clean")
 
-    total = len(CASES) + 1
+    total = len(CASES) + len(SUBJECT_CASES) + len(MAIN_CASES) + 1
     print(f"\n{total - failures}/{total} cases passed")
     return 1 if failures else 0
 

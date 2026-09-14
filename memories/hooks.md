@@ -386,9 +386,14 @@ sibling via abspath exists : False
 sibling via realpath exists: True
 ```
 
-The blast radius is the whole `hooks/` tree, not one guard: 19 sites across 18 non-test hooks computed a path from `__file__` this way --- 17 of them resolving the hook's own directory to reach a sibling or a data file, and 2 (`monitor-open-prs.py`, `no-unmonitored-pr.py`) resolving the hook's own file to re-exec it. 16 test suites carried the same idiom and were swept with them, because a suite that resolves its subject lexically cannot be run through the registration path at all --- which is the natural way to reproduce this by hand.
+The blast radius is the whole `hooks/` tree, not one guard. 19 sites across 18 non-test hooks computed a path from `__file__` this way: 17 resolving the hook's own directory to reach a sibling or a data file, and 2 (`monitor-open-prs.py`, `no-unmonitored-pr.py`) resolving the hook's own file to re-exec it.
+
+The test suites carry a second, separate half, and the first sweep missed it. 15 suites used the same `abspath(__file__)` spelling.
+A further 22 resolved their *subject* with `abspath(sys.argv[1])`, which breaks the same way for the same reason --- measured on `test-guard-slide-major-tag.py` before the sweep, invoking it through the registration path raised `FileNotFoundError` on `<checkout>/.claude/hooks/guard-slide-major-tag.py`, a path that opens fine when it is not collapsed lexically.
+That matters because running a suite against the real registration path is the natural way to reproduce this by hand, and under the lexical spelling the suite cannot run at all.
+Both halves are swept, and the checker below covers both.
 `no-push-without-self-review.py` was the visible one only because it fails closed --- with its detector unreachable it fell into degraded mode and denied any push-shaped command, including a heredoc whose body merely *quoted* a push line while writing an issue body, leaving `ALLOW_UNREVIEWED_PUSH=1` as the only way to run anything.
-The hooks that load a sibling for context fail the other way, silently: `no-empty-promise.py`'s `_sibling()` catches a bare `Exception` -- the error actually raised is a `FileNotFoundError` out of `spec.loader.exec_module` -- and returns `None`, so it simply runs without its sibling's code-region stripping.
+The hooks that load a sibling for context fail the other way, silently: `no-empty-promise.py`'s `_sibling()` catches a bare `Exception` --- the error actually raised is a `FileNotFoundError` out of `spec.loader.exec_module` --- and returns `None`, so it simply runs without its sibling's code-region stripping.
 Measured the same day in the layout above --- `sibling loaded: False` under `abspath`, `True` under `realpath` --- for that hook;
 the remaining sites were fixed by inspection rather than each measured.
 

@@ -1180,7 +1180,7 @@ assert hook_git_flags == git_cmd_flags, f"fallback _GIT_FLAGS drifted: {hook_git
 
 # Test fallback exception branch logs warning to stderr on import failure
 import subprocess  # noqa: E402
-hook_abs = os.path.abspath(sys.argv[1])
+hook_abs = os.path.realpath(sys.argv[1])
 proc = subprocess.run(
     [sys.executable, "-c",
      f"import sys; sys.modules['git_cmd'] = None; "

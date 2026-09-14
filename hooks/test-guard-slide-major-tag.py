@@ -43,7 +43,7 @@ import sys
 import tempfile
 
 if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
-    HOOK = os.path.abspath(sys.argv[1])
+    HOOK = os.path.realpath(sys.argv[1])
 else:
     HOOK = os.path.join(os.path.dirname(os.path.realpath(__file__)), "guard-slide-major-tag.py")
 

@@ -33,9 +33,30 @@ the instrument it asks for.
 Hard-gating rather than advisory: the condition is lexically decidable, the
 remedy is one word, and a false positive costs nothing.
 
-Scope is `hooks/*.py`, test suites included. A test suite resolving its subject
-lexically cannot be run through the registration path at all, which is the
-natural way to reproduce ai-config#2981 by hand.
+Scope is `hooks/*.py`, test suites included, and two argument shapes:
+
+  - `__file__`, which is how a hook finds its own directory.
+  - `sys.argv[...]` inside a `hooks/test-*.py` suite, which is how a suite
+    finds the SUBJECT it was handed. That half matters for the same reason:
+    running a suite against the hook's real registration path is the natural
+    way to reproduce ai-config#2981 by hand, and under the lexical spelling
+    the suite cannot run at all. Measured on `test-guard-slide-major-tag.py`
+    before the sweep: `FileNotFoundError` on
+    `<checkout>/.claude/hooks/guard-slide-major-tag.py`, a path that opens
+    fine when it is not collapsed lexically.
+
+Three collapsing spellings are matched, because `abspath` is not the only one:
+`os.path.abspath`, `os.path.normpath` (already used at 7 sites in `hooks/`, so
+a live idiom here rather than a hypothetical), and `Path(...).absolute()`,
+pathlib's non-symlink-resolving form. `Path(...).resolve()` is
+realpath-equivalent and deliberately clean.
+
+What this cannot see, stated rather than implied: the argument has to mention
+`__file__` or `sys.argv` syntactically inside the call. Binding it to a name
+first (`p = __file__; os.path.abspath(p)`) escapes the walk. Closing that
+needs dataflow rather than a syntax match, and no such shape exists in the
+tree today -- so the instrument enforces the common members of the class in
+`memories/hooks.md`, not the whole class.
 
 Run: python3 scripts/check-hook-file-resolution.py
 """
@@ -52,26 +73,47 @@ SUCCESS_EXIT = 0
 FAILURE_EXIT = 1
 
 
-def _is_abspath_call(node: ast.AST) -> bool:
-    """True for `os.path.abspath(...)`, however `os.path` was spelled."""
+# Every spelling that collapses `..` without consulting the filesystem.
+# `realpath` and `Path.resolve()` are the symlink-resolving counterparts and
+# are deliberately absent.
+_LEXICAL = frozenset({"abspath", "normpath", "absolute"})
+
+
+def _is_lexical_call(node: ast.AST) -> bool:
+    """True for a call to a path function that collapses `..` as text."""
     if not isinstance(node, ast.Call):
         return False
     func = node.func
-    # `os.path.abspath(x)` and `path.abspath(x)`; a bare `abspath(x)` from
-    # `from os.path import abspath` counts too, since the hazard is the
-    # function rather than the spelling used to reach it.
-    if isinstance(func, ast.Attribute) and func.attr == "abspath":
+    # `os.path.abspath(x)`, `path.normpath(x)`, `Path(x).absolute()`; a bare
+    # `abspath(x)` from `from os.path import abspath` counts too, since the
+    # hazard is the function rather than the spelling used to reach it.
+    if isinstance(func, ast.Attribute) and func.attr in _LEXICAL:
         return True
-    return isinstance(func, ast.Name) and func.id == "abspath"
+    return isinstance(func, ast.Name) and func.id in _LEXICAL
 
 
-def _mentions_dunder_file(node: ast.AST) -> bool:
-    return any(isinstance(n, ast.Name) and n.id == "__file__"
-               for n in ast.walk(node))
+def _mentions(node: ast.AST, subject_path: bool) -> bool:
+    """True when NODE syntactically reads `__file__`, or an argv subject.
+
+    `subject_path` widens this to `sys.argv[...]`, which is meaningful only in
+    a test suite: there the argv is the hook under test, and resolving it
+    lexically breaks the registration-path invocation.
+    """
+    for n in ast.walk(node):
+        if isinstance(n, ast.Name) and n.id == "__file__":
+            return True
+        if not subject_path:
+            continue
+        # `sys.argv[1]` and a bare `argv[1]` from `from sys import argv`.
+        if isinstance(n, ast.Attribute) and n.attr == "argv":
+            return True
+        if isinstance(n, ast.Name) and n.id == "argv":
+            return True
+    return False
 
 
 def offenders(path: Path) -> list[tuple[int, str]]:
-    """(lineno, source line) for every `abspath(...__file__...)` in PATH."""
+    """(lineno, source line) for every lexical self-path resolution in PATH."""
     try:
         source = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
@@ -84,9 +126,10 @@ def offenders(path: Path) -> list[tuple[int, str]]:
         raise SystemExit(f"{path}: cannot parse ({exc})")
 
     lines = source.splitlines()
+    subject_path = path.name.startswith("test-")
     found = []
     for node in ast.walk(tree):
-        if _is_abspath_call(node) and _mentions_dunder_file(node):
+        if _is_lexical_call(node) and _mentions(node, subject_path):
             found.append((node.lineno, lines[node.lineno - 1].strip()))
     return sorted(set(found))
 
@@ -111,18 +154,18 @@ def main() -> int:
             failures.append(f"{path.relative_to(ROOT)}:{lineno}: {text}")
 
     if failures:
-        print("Hooks resolving their own path lexically "
-              "(use os.path.realpath, not os.path.abspath):\n", file=sys.stderr)
+        print("Hooks resolving a path lexically "
+              "(use os.path.realpath / Path.resolve):\n", file=sys.stderr)
         for line in failures:
             print(f"  {line}", file=sys.stderr)
-        print("\nos.path.abspath() collapses `..` as text, so a hook reached "
+        print("\nabspath/normpath/Path.absolute collapse `..` as text, so a hook reached "
               "through the .claude/skills symlink resolves its own directory "
               "to <checkout>/.claude/hooks, where no hook lives. "
               "See memories/hooks.md and ai-config#2981.", file=sys.stderr)
         return FAILURE_EXIT
 
     print(f"checked {len(paths)} hook files; "
-          f"none resolves its own path with lexical abspath")
+          f"none resolves its own path or its subject lexically")
     return SUCCESS_EXIT
 
 

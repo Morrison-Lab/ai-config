@@ -53,7 +53,11 @@ def _run_main(mod, hooks_contents: dict | None) -> tuple[int, bool]:
         if hooks_contents is not None:
             mod.HOOKS_DIR.mkdir()
             for fname, text in hooks_contents.items():
-                (mod.HOOKS_DIR / fname).write_text(text, encoding="utf-8")
+                target = mod.HOOKS_DIR / fname
+                if isinstance(text, bytes):
+                    target.write_bytes(text)
+                else:
+                    target.write_text(text, encoding="utf-8")
         try:
             return mod.main(), True
         except SystemExit as exc:
@@ -77,6 +81,13 @@ MAIN_CASES = [
     ("an empty hooks directory exits nonzero rather than reporting clean", {}, 1),
     ("an unparseable hook exits nonzero rather than being skipped",
      {"h.py": "def broken(:\n"}, 1),
+    # The unreadable branch, pinned separately from the unparseable one: they
+    # are different `except` arms, and mutating this one's `raise SystemExit`
+    # to `return []` left the suite green before this case existed. A file of
+    # invalid UTF-8 exercises it without depending on file permissions, which
+    # a root-running CI container would not honour.
+    ("an undecodable hook exits nonzero rather than being skipped",
+     {"h.py": b"\xff\xfe not utf-8"}, 1),
 ]
 
 

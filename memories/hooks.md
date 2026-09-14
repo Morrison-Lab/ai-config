@@ -386,11 +386,21 @@ sibling via abspath exists : False
 sibling via realpath exists: True
 ```
 
-The blast radius is the whole `hooks/` tree, not one guard. 19 sites across 18 non-test hooks computed a path from `__file__` this way: 17 resolving the hook's own directory to reach a sibling or a data file, and 2 (`monitor-open-prs.py`, `no-unmonitored-pr.py`) resolving the hook's own file to re-exec it.
+The blast radius is the whole `hooks/` tree, not one guard.
+Across the 18 non-test hooks that carried it, 19 sites computed a path from `__file__` this way:
+17 resolving the hook's own directory to reach a sibling or a data file,
+and 2 (`monitor-open-prs.py`, `no-unmonitored-pr.py`) resolving the hook's own file to re-exec it.
 
-The test suites carry a second, separate half, and the first sweep missed it. 15 suites used the same `abspath(__file__)` spelling.
-A further 22 resolved their *subject* with `abspath(sys.argv[1])`, which breaks the same way for the same reason --- measured on `test-guard-slide-major-tag.py` before the sweep, invoking it through the registration path raised `FileNotFoundError` on `<checkout>/.claude/hooks/guard-slide-major-tag.py`, a path that opens fine when it is not collapsed lexically.
-That matters because running a suite against the real registration path is the natural way to reproduce this by hand, and under the lexical spelling the suite cannot run at all.
+The test suites carry a second, separate half, and the first sweep missed it.
+Counted against `main` with the checker's own AST semantics, 30 suites were affected:
+15 carried a lexical call on `__file__`, 23 carried one on their `sys.argv` *subject*, and 8 carried both.
+The first sweep converted only the `__file__` half, which is why the subject count is the larger one.
+
+The subject half breaks for the same reason, and matters for a specific one.
+Measured on `test-guard-slide-major-tag.py` before the sweep, invoking it through the registration path raised `FileNotFoundError` on `<checkout>/.claude/hooks/guard-slide-major-tag.py`,
+a path that opens fine when it is not collapsed lexically.
+Running a suite against the real registration path is the natural way to reproduce this by hand,
+and under the lexical spelling the suite cannot run at all.
 Both halves are swept, and the checker below covers both.
 `no-push-without-self-review.py` was the visible one only because it fails closed --- with its detector unreachable it fell into degraded mode and denied any push-shaped command, including a heredoc whose body merely *quoted* a push line while writing an issue body, leaving `ALLOW_UNREVIEWED_PUSH=1` as the only way to run anything.
 The hooks that load a sibling for context fail the other way, silently: `no-empty-promise.py`'s `_sibling()` catches a bare `Exception` --- the error actually raised is a `FileNotFoundError` out of `spec.loader.exec_module` --- and returns `None`, so it simply runs without its sibling's code-region stripping.
@@ -400,7 +410,21 @@ the remaining sites were fixed by inspection rather than each measured.
 `realpath` resolves symlinks before collapsing `..`, and is identical to `abspath` wherever no symlink is involved, so it strictly widens the set of layouts that work.
 It was already the idiom in the newer hooks (`no-commit-chained-to-push.py`, `warn-heredoc-doubled-backslash.py`).
 Read that as an incomplete sweep rather than as a style that had not reached them yet: this exact symlink-resolution failure was diagnosed and fixed under [#2681](https://github.com/Morrison-Lab/ai-config/issues/2681) in `plugins/ai-config/claude-hook-adapter.py`, whose comment says "resolving any symlinks via realpath" and whose test is named `test_symlink_invocation_resolves_repo_root_to_find_hooks_json`.
-The corpus had already paid for the lesson in an adjacent file and did not carry it into `hooks/`, which is the transferable part: a path fix belongs to every site that computes a path, not to the file where the symptom appeared.
+The corpus had already paid for the lesson in an adjacent file and did not carry it into `hooks/`, which is the transferable part:
+a path fix belongs to every site that is *reached* the way the broken one was, not to the file where the symptom appeared.
+
+That phrasing is the scope, and it is narrower than "every site that computes a path" on purpose.
+`scripts/` still holds lexical `abspath(__file__)` sites and they are deliberately left alone:
+nothing under `scripts/` is registered through the `.claude/skills` symlink, and no hook invokes one
+(derived: no `join`/`Popen`/`subprocess`/`spec_from_file_location` reference to a `scripts/` path in any non-test hook),
+so those sites are always reached by an ordinary path and `abspath` and `realpath` agree there.
+Sweeping them would be churn dressed as thoroughness.
+Widen the checker the day something under `scripts/` becomes reachable through a symlinked registration, and not before.
+
+One caveat about checking this entry's own line breaks, found while writing it:
+the repo's `new-line-breaks` gate does not see a sentence that opens with a digit, because its lookahead class is `[A-Z"'`*\[]`.
+This corpus opens sentences with derived counts constantly, so that blind spot lands exactly where its prose does ---
+two two-sentence lines in this very section passed the gate green ([gha#878](https://github.com/Morrison-Lab/gha/issues/878)).
 
 `scripts/check-hook-file-resolution.py` is the instrument, hard-gating in `validate.yml`: the condition is one AST walk over `hooks/*.py`, the remedy is one word, and the corpus had already paid for the lesson twice without sweeping.
 

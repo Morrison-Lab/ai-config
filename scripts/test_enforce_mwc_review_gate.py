@@ -121,6 +121,105 @@ class TestEvaluate(unittest.TestCase):
         )
         self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
 
+    def test_pending_review_requests_teams_and_strings(self):
+        """Pending review requests with team slugs or string representations block merge."""
+        state = pr(
+            comments=[CLEAN_VERDICT],
+            review_requests=[{"slug": "frontend-team"}, "external-reviewer"],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("frontend-team", decision["reason"])
+        self.assertIn("external-reviewer", decision["reason"])
+
+    def test_copilot_needs_a_closer_look_denies(self):
+        """Copilot 'Needs a closer look' header blocks merge."""
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body="## Needs a closer look\n\nPotential performance bottleneck.",
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_suppressed_comments_denies(self):
+        """Copilot approval with suppressed comments blocks merge."""
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body="### Approval recommended\n\nSuppressed comments: 2 of 2\n\n- nit 1\n- nit 2",
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_bot_changes_requested_superseded_by_approved(self):
+        """A bot CHANGES_REQUESTED review superseded by APPROVED allows merge."""
+        state = pr(
+            reviews=[
+                review("coderabbitai[bot]", "CHANGES_REQUESTED", commit=HEAD),
+                review("coderabbitai[bot]", "APPROVED", commit=HEAD),
+            ],
+            comments=[CLEAN_VERDICT],
+        )
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
+
+    def test_bot_dismissed_review_allows(self):
+        """A bot CHANGES_REQUESTED review dismissed by maintainer allows merge."""
+        state = pr(
+            reviews=[
+                review("coderabbitai[bot]", "CHANGES_REQUESTED", commit=HEAD),
+                review("coderabbitai[bot]", "DISMISSED", commit=HEAD),
+            ],
+            comments=[CLEAN_VERDICT],
+        )
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
+
+    def test_standing_bot_not_clean_on_older_commit_blocks_new_head(self):
+        """A bot not-clean review on an older commit stands across commits until cleared."""
+        older_sha = "1111111111111111111111111111111111111111"
+        state = pr(
+            reviews=[
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body="### Changes recommended\n\nFound a race condition.",
+                    commit=older_sha,
+                ),
+            ],
+            comments=[CLEAN_VERDICT],  # comments says clean for HEAD, but Copilot hasn't cleared older_sha
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("copilot-pull-request-reviewer", decision["reason"])
+
+    def test_bot_short_oid_does_not_clear_or_match_head(self):
+        """A 1-character commit oid in a bot review is not head-bound."""
+        short_sha = HEAD[0]
+        state = pr(
+            reviews=[
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body="### Approval recommended\n\nAll good.",
+                    commit=short_sha,
+                ),
+            ],
+            comments=[NEEDS_WORK_VERDICT],
+        )
+        # Should not approve or allow
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+
     def test_sparta_1427_regression_denied(self):
         """Zero reviews + Needs-more-work verdict + later demo-diff comment."""
         state = pr(comments=[NEEDS_WORK_VERDICT, DEMO_DIFF])

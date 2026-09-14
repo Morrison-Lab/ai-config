@@ -2966,7 +2966,10 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
     if review_requests:
         pending_reviewers = []
         for req in review_requests:
-            login = req.get("login") or req.get("name") or req.get("slug") or str(req)
+            if isinstance(req, dict):
+                login = req.get("login") or req.get("name") or req.get("slug") or ""
+            else:
+                login = str(req).strip()
             if login:
                 pending_reviewers.append(login)
         if pending_reviewers:

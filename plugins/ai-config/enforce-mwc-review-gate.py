@@ -95,11 +95,17 @@ NOT_CLEAN_VERDICT_RE = re.compile(
 REVIEWED_COMMIT_RE = re.compile(
     r"Reviewed[-\s]commit[:\s]+`?([0-9a-f]{7,40})`?", re.IGNORECASE
 )
-COPILOT_NEGATIVE_HEADER = re.compile(
-    r"^\s*###\s+🟡\s+Changes recommended", re.MULTILINE
-)
+_COPILOT_HEADING_PREFIX = r"(?:^|\n)[ \t]*#{1,6}[ \t]*(?:[^\w\n\'\"]+[ \t]*)?"
 COPILOT_AFFIRMATIVE_HEADER = re.compile(
-    r"^\s*###\s+🟢\s+Approval recommended", re.MULTILINE
+    _COPILOT_HEADING_PREFIX + r"\bApproval\s+recommended\b", re.IGNORECASE
+)
+COPILOT_NEGATIVE_HEADER = re.compile(
+    _COPILOT_HEADING_PREFIX
+    + r"\b(?:Changes\s+recommended|Needs\s+a\s+closer\s+look)\b",
+    re.IGNORECASE,
+)
+COPILOT_SUPPRESSED_BLOCK = re.compile(
+    r"\bSuppressed\s+comments\s*:\s*\d+\s+of\s+\d+\b", re.IGNORECASE
 )
 # Shortest sha abbreviation a head-binding prefix test will accept.
 ABBREV_SHA_LEN = 7
@@ -317,13 +323,27 @@ def latest_human_review_states(reviews, head_oid="", pr_author=""):
     return states
 
 
+def extract_request_names(review_requests):
+    """Extract reviewer logins or team slugs from reviewRequests."""
+    names = []
+    for r in review_requests:
+        if isinstance(r, dict):
+            name = r.get("login") or r.get("name") or r.get("slug") or ""
+        else:
+            name = str(r).strip()
+        if name:
+            names.append(name)
+    return names
+
+
 def latest_bot_review_states(reviews, head_oid=""):
-    """Latest standing per bot author evaluating head_oid.
+    """Latest standing per bot author.
 
     Tracks whether any bot review (e.g. Copilot, Coderabbit) submitted a formal
     CHANGES_REQUESTED review or has a negative verdict header (such as
-    '### 🟡 Changes recommended') evaluating the current PR head.
-    A later clean review on the current head supersedes an earlier not-clean.
+    'Changes recommended' or 'Needs a closer look').
+    A formal CHANGES_REQUESTED or an admissible negative verdict stands across commits
+    until superseded by a clean review on the current head or dismissed.
     """
     states = {}
     for r in reviews:
@@ -331,16 +351,35 @@ def latest_bot_review_states(reviews, head_oid=""):
         if not login or not is_bot_login(login):
             continue
         state = (r.get("state") or "").upper()
+        if state == "DISMISSED":
+            states.pop(login, None)
+            continue
         if state in ("CHANGES_REQUESTED", "REJECTED"):
             states[login] = state
             continue
+        if state == "APPROVED":
+            states[login] = "APPROVED"
+            continue
+        raw_body = r.get("body", "") or ""
         oid = ((r.get("commit") or {}).get("oid") or "")
-        if head_oid and oid and head_oid.startswith(oid):
-            raw_body = r.get("body", "") or ""
-            if COPILOT_NEGATIVE_HEADER.search(raw_body) or NOT_CLEAN_VERDICT_RE.search(raw_body):
-                states[login] = "NOT_CLEAN"
-            elif COPILOT_AFFIRMATIVE_HEADER.search(raw_body) or CLEAN_VERDICT_RE.search(raw_body):
+        is_negative = bool(
+            COPILOT_NEGATIVE_HEADER.search(raw_body)
+            or NOT_CLEAN_VERDICT_RE.search(raw_body)
+            or (COPILOT_SUPPRESSED_BLOCK.search(raw_body) if COPILOT_AFFIRMATIVE_HEADER.search(raw_body) else False)
+        )
+        if is_negative:
+            states[login] = "NOT_CLEAN"
+            continue
+
+        is_affirmative = bool(
+            (COPILOT_AFFIRMATIVE_HEADER.search(raw_body) and not COPILOT_SUPPRESSED_BLOCK.search(raw_body))
+            or CLEAN_VERDICT_RE.search(raw_body)
+        )
+        if is_affirmative:
+            if head_oid and oid and len(oid) >= ABBREV_SHA_LEN and head_oid.startswith(oid):
                 states[login] = "CLEAN"
+            elif states.get(login) == "CLEAN":
+                states.pop(login, None)
     return states
 
 
@@ -452,11 +491,7 @@ def evaluate(cmd, pr_data):
     # Reviews in flight check: never merge while reviews are still running/requested (ai-config#3570).
     review_requests = pr_data.get("reviewRequests") or []
     if review_requests:
-        req_names = [
-            r.get("login") or r.get("name") or r.get("slug") or str(r)
-            for r in review_requests
-            if (r.get("login") or r.get("name") or r.get("slug") or str(r))
-        ]
+        req_names = extract_request_names(review_requests)
         if req_names:
             return deny(
                 "Strict Merge Control Policy: Cannot merge while reviews are still "
@@ -486,7 +521,7 @@ def evaluate(cmd, pr_data):
     if bot_blockers:
         return deny(
             "Strict Merge Control Policy: automated review from "
-            f"{', '.join(sorted(bot_blockers))} states this PR is not clean on the current head. "
+            f"{', '.join(sorted(bot_blockers))} states this PR is not clean. "
             "Consensus clean verdicts across all reviewers are required to merge; address "
             "it and get an approving review on the current head."
         )

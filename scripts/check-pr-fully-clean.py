@@ -6,6 +6,7 @@ Verifies that:
 2. An automated review comment evaluating the exact HEAD commit SHA has been posted.
 3. All review comments evaluating the HEAD commit SHA contain zero findings, and no active CHANGES_REQUESTED or REJECTED state exists on the PR.
 4. Every reviewer's latest verdict-bearing statement is clean.
+5. All inline review threads are resolved.
 
 Criterion 4 is deliberately scoped wider than criteria 2 and 3, which look only
 at items evaluating the current HEAD SHA. An explicit "Needs more work" posted
@@ -22,15 +23,14 @@ NOT COVERED. A `FULLY CLEAN` line here is not the whole of that fragment's
 "Findings hide on several surfaces" check, and the difference is mechanical
 rather than a matter of thoroughness. Both halves of the mechanism say so.
 scripts/lib/payload_fetcher.py, which governs the `--from-json` path, maps
-`gh pr view`, `gh repo view`, and two `gh api` reads; the default path's own
-call sites are `gh pr view --json` and the `/check-runs` read in
-scripts/lib/pull_request.py, `gh repo view` for repo resolution, and the two
-`/actions/runs/` reads below. `pulls/<N>/comments` is in neither, so inline
-review comments are invisible here, resolved or not (ai-config#3079). No
-`<summary>`-scoped match on `suppressed` exists in this file either, so a
-Copilot finding inside a collapsed `<details>` block is invisible too
-(ai-config#3170): it creates no inline comment and states no verdict, so no
-count performed here can see it. The one exception is a Copilot review
+`gh pr view`, `gh repo view`, and three `gh api` reads (`/check-runs`,
+`/actions/runs/`, and `graphql`); the default path's own call sites are
+`gh pr view --json`, `gh api graphql` for review threads, the `/check-runs`
+read in scripts/lib/pull_request.py, `gh repo view` for repo resolution, and the
+two `/actions/runs/` reads below. No `<summary>`-scoped match on `suppressed`
+exists in this file either, so a Copilot finding inside a collapsed `<details>`
+block is invisible too (ai-config#3170): it creates no inline comment and
+states no verdict, so no count performed here can see it. The one exception is a Copilot review
 carrying its own heading verdict (ai-config#3066): `copilot_verdict` matches
 `Suppressed comments` anywhere in that body, so a collapsed block there
 reads as not-clean; every other path is still blind to it.
@@ -411,12 +411,8 @@ NOTICE_PREFIX_WINDOW = 200
 # or Deferred -- that is the ARD loop's job, not this script's.
 #
 # Read that limit precisely, because it decides how much this release costs.
-# The CI and HEAD criteria are checked here and still apply. Unresolved review
-# THREADS are not checked by this script at all (ai-config#3586), so before this
-# change a stale not-clean verdict was the only thing that happened to hold a PR
-# carrying open inline findings. Releasing it removes that accident. Check the
-# threads yourself -- `reviewThreads(...) { isResolved }` over GraphQL -- until
-# #3586 lands.
+# The CI, review thread, and HEAD criteria are checked here and still apply.
+# Unresolved review threads are checked via GraphQL (ai-config#3586).
 #
 # Matched against a prefix window for the same reason the notice markers above
 # are: this corpus quotes the wording, and a real review discussing an outage
@@ -737,6 +733,39 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
                 f"'{conclusion}'")
 
     return len(issues) == 0, issues
+
+
+def check_review_threads(pr) -> Tuple[bool, List[str]]:
+    """Verify that all inline review threads are resolved.
+
+    Unresolved threads on current lines block clean status (ai-config#3586).
+    Unresolved threads that are outdated (the line was modified or deleted
+    in a later commit) are reported as informational notes so they are not
+    silently ignored, but do not block clean status because the push may have
+    addressed them without an explicit resolution.
+    """
+    threads = pr.get_review_threads()
+    issues: List[str] = []
+
+    for t in threads:
+        if not t.is_resolved:
+            loc = f"{t.path}:{t.line}" if t.line is not None else t.path
+            ident = f" ({t.id})" if t.id else ""
+            if t.is_outdated:
+                issues.append(f"NOTE: Unresolved outdated review thread at {loc}{ident}")
+            else:
+                issues.append(f"Unresolved review thread at {loc}{ident}")
+
+    blocking = [i for i in issues if not i.startswith("NOTE: ")]
+    if not blocking:
+        count = len(threads)
+        if count > 0:
+            print(f"\u2713 All {count} review thread(s) are resolved.")
+        else:
+            print("\u2713 No review threads found.")
+
+    return len(blocking) == 0, issues
+
 
 
 # origin/main's own inline-span pattern, reused verbatim. The scan text this
@@ -3231,9 +3260,10 @@ def main():
     print(f"PR #{pr_num} ({branch}): state={state}, HEAD={sha[:8]} (committed {commit_date})")
 
     ci_ok, ci_issues = check_ci_runs(pr)
+    threads_ok, thread_issues = check_review_threads(pr)
     review_ok, review_issues = check_review_comments(pr, args.quorum)
 
-    all_issues = ci_issues + review_issues
+    all_issues = ci_issues + thread_issues + review_issues
 
     # NOTE-prefixed issues are informational (unreadable-format warnings) and
     # do not block -- only real findings or missing reviews cause a failure.

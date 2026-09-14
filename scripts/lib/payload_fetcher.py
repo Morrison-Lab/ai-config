@@ -117,8 +117,9 @@ class PayloadFetcher:
 
         raise PayloadError(
             f"no payload mapping for command: {' '.join(cmd)}.\n"
-            "This fetcher covers `gh pr view`, `gh repo view`, and the two "
-            "`gh api` reads. A new call site needs a new payload key."
+            "This fetcher covers `gh pr view`, `gh repo view`, and the three "
+            "`gh api` reads (`/check-runs`, `/actions/runs/`, and `graphql`). "
+            "A new call site needs a new payload key."
         )
 
     def _pr(self) -> Dict[str, Any]:
@@ -200,5 +201,37 @@ class PayloadFetcher:
                 # payload unbuildable without knowing the answer first.
                 return json.dumps({})
             return json.dumps(runs[run_id])
+
+        if path == "graphql":
+            threads = self.payload.get("review_threads")
+            if threads is None and isinstance(self.payload.get("pr"), dict):
+                threads = self.payload["pr"].get("review_threads")
+            if threads is None:
+                threads = _require(self.payload, "review_threads", "review-thread status")
+            if isinstance(threads, list):
+                threads = {"nodes": threads}
+            if not isinstance(threads, dict) or "nodes" not in threads:
+                raise PayloadError(
+                    "'review_threads' must be a list, or an object with a 'nodes' key."
+                )
+            for i, item in enumerate(threads.get("nodes") or []):
+                if not isinstance(item, dict):
+                    raise PayloadError(
+                        f"payload 'review_threads[{i}]' must be an object, got "
+                        f"{type(item).__name__}."
+                    )
+            page_info = threads.get("pageInfo") or {"hasNextPage": False, "endCursor": None}
+            return json.dumps({
+                "data": {
+                    "repository": {
+                        "pullRequest": {
+                            "reviewThreads": {
+                                "pageInfo": page_info,
+                                "nodes": threads.get("nodes") or [],
+                            }
+                        }
+                    }
+                }
+            })
 
         raise PayloadError(f"no payload mapping for gh api path: {path}")

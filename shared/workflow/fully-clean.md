@@ -951,7 +951,7 @@ Those still need Address, Rebut or Defer like any others --- what lapses is the 
 Two things decide whether a release is sound, and both are checkable.
 The unavailability must be **newer** than the verdict it releases: an outage that predates a finding says nothing about the reviewer's ability to have produced it.
 And the other axes must be checked on their own, because this one was quietly carrying them --- unresolved review threads especially, which
-[`check-pr-fully-clean.py`](../../scripts/check-pr-fully-clean.py) does not examine at all
+[`check-pr-fully-clean.py`](../../scripts/check-pr-fully-clean.py) verifies via GraphQL
 ([ai-config#3586](https://github.com/Morrison-Lab/ai-config/issues/3586)).
 
 The instrument implements this
@@ -961,7 +961,7 @@ it recognises the outage notice, releases that reviewer's block only when the no
 - **Do:** ask what would end the wait before waiting.
   If nothing would, the reviewer is unavailable rather than pending.
 - **Do:** disposition every finding the unavailable reviewer already raised, and say so when you merge.
-- **Do:** check the unresolved threads yourself, since the instrument does not.
+- **Do:** confirm every unresolved review thread is resolved before merge.
 - **Don't:** re-request a reviewer that has reported itself out of quota --- the request returns the same notice and costs an attempt.
 - **Don't:** read an outage as a clean verdict, or let one that predates a finding release it.
 

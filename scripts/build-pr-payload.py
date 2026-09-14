@@ -184,6 +184,7 @@ def build_payload(
     commits_raw: List[Dict[str, Any]],
     check_runs_raw: List[Dict[str, Any]],
     actions_runs: Optional[Dict[str, Dict[str, Any]]] = None,
+    review_threads_raw: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Map REST JSON to the shape scripts/lib/payload_fetcher.py expects.
 
@@ -250,7 +251,12 @@ def build_payload(
         }
         for c in check_runs_raw
     ]
-    payload = {"repo": owner_repo, "pr": pr, "check_runs": check_runs}
+    payload = {
+        "repo": owner_repo,
+        "pr": pr,
+        "check_runs": check_runs,
+        "review_threads": review_threads_raw if review_threads_raw is not None else [],
+    }
     if actions_runs is not None:
         payload["actions_runs"] = actions_runs
     return payload
@@ -311,7 +317,8 @@ def main() -> int:
         f"{pr['mergeStateStatus']} decision={pr['reviewDecision'] or '-'} "
         f"reviews={len(pr['reviews'])} comments={len(pr['comments'])} "
         f"commits={len(pr['commits'])} checks={len(payload['check_runs'])} "
-        f"actions_runs={len(payload.get('actions_runs') or {})}"
+        f"actions_runs={len(payload.get('actions_runs') or {})} "
+        f"threads={len(payload.get('review_threads') or [])}"
     )
     return 0
 

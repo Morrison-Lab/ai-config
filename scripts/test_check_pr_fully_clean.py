@@ -6152,6 +6152,66 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         (not two_ok) and any("quorum" in i.lower() for i in two_issues),
     )
 
+    # --- check_review_threads tests (ai-config#3586) ---
+    class FakeThread:
+        def __init__(self, id, is_resolved, is_outdated, path, line):
+            self.id = id
+            self.is_resolved = is_resolved
+            self.is_outdated = is_outdated
+            self.path = path
+            self.line = line
+
+    class FakePR:
+        def __init__(self, threads):
+            self._threads = threads
+
+        def get_review_threads(self):
+            return self._threads
+
+    # 1. No threads
+    ok, issues = checker.check_review_threads(FakePR([]))
+    check("check_review_threads: empty thread list is clean", ok and len(issues) == 0)
+
+    # 2. All threads resolved
+    t_resolved = [
+        FakeThread("t1", True, False, "scripts/test.py", 10),
+        FakeThread("t2", True, True, "scripts/old.py", None),
+    ]
+    ok, issues = checker.check_review_threads(FakePR(t_resolved))
+    check("check_review_threads: all resolved threads is clean", ok and len(issues) == 0)
+
+    # 3. Live unresolved thread blocks
+    t_live_unresolved = [
+        FakeThread("PRRT_123", False, False, "scripts/Battle.gd", 2608),
+    ]
+    ok, issues = checker.check_review_threads(FakePR(t_live_unresolved))
+    check("check_review_threads: unresolved live thread blocks", not ok and len(issues) == 1)
+    check("check_review_threads: unresolved live thread names path and line", len(issues) == 1 and "scripts/Battle.gd:2608" in issues[0])
+    check("check_review_threads: unresolved live thread names thread id", len(issues) == 1 and "PRRT_123" in issues[0])
+
+    # 4. Outdated unresolved thread does not block (emits NOTE)
+    t_outdated_unresolved = [
+        FakeThread("PRRT_456", False, True, "scripts/Unit.gd", None),
+    ]
+    ok, issues = checker.check_review_threads(FakePR(t_outdated_unresolved))
+    check("check_review_threads: unresolved outdated thread does not block", ok)
+    check("check_review_threads: unresolved outdated thread reports NOTE", any(i.startswith("NOTE: ") for i in issues))
+    check("check_review_threads: unresolved outdated thread names path", len(issues) == 1 and "scripts/Unit.gd" in issues[0])
+
+    # 5. Mixed live and outdated unresolved threads
+    t_mixed = [
+        FakeThread("PRRT_1", False, False, "main.py", 5),
+        FakeThread("PRRT_2", False, True, "old.py", 10),
+        FakeThread("PRRT_3", True, False, "ok.py", 15),
+    ]
+    ok, issues = checker.check_review_threads(FakePR(t_mixed))
+    blocking = [i for i in issues if not i.startswith("NOTE: ")]
+    notes = [i for i in issues if i.startswith("NOTE: ")]
+    check("check_review_threads: mixed threads blocks overall", not ok)
+    check("check_review_threads: mixed threads has exactly one blocking issue", len(blocking) == 1 and "main.py:5" in blocking[0])
+    check("check_review_threads: mixed threads has exactly one note", len(notes) == 1 and "old.py:10" in notes[0])
+
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

@@ -222,6 +222,15 @@ CASES = [
      "import os\nd = {'f': __file__}\nD = os.path.abspath(d['f'])\n", 1),
     ("a subscript store of __file__ binds the container",
      "import os\nd = {}\nd['f'] = __file__\nD = os.path.abspath(d['f'])\n", 1),
+    # An ATTRIBUTE store and a LIST literal, pinned separately. The dict-literal
+    # case above cannot discriminate the target walk: its target is a plain
+    # Name, so it survives a Name-only mutation. These two do not -- measured,
+    # a mutant skipping ast.Attribute targets leaves every other case green
+    # while the docstring's `c.f = __file__` claim goes false.
+    ("an attribute store of __file__ binds the base name",
+     "import os\nc.f = __file__\nD = os.path.abspath(c.f)\n", 1),
+    ("a list literal holding __file__ binds the container",
+     "import os\nd = [__file__]\nD = os.path.abspath(d[0])\n", 1),
     ("a container built by a method call is genuinely unseen",
      "import os\nd = []\nd.append(__file__)\nD = os.path.abspath(d[0])\n", 0),
     ("a function parameter is genuinely unseen",

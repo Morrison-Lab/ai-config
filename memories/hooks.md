@@ -296,7 +296,7 @@ When authoring a new hook:
    ```
    The third is the gate a new hook trips most easily: resolve the hook's own
    path with `os.path.realpath(__file__)`, never `abspath`.
-   See "Resolve a hook's own directory with `realpath`" below.
+   See [Resolve a hook's own directory with `realpath`, never lexical `abspath`](#resolve-a-hooks-own-directory-with-realpath-never-lexical-abspath).
 
 ## 5.5 A hook test that invokes the real hook is not hermetic against live git state
 

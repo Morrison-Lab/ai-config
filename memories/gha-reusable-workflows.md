@@ -286,7 +286,7 @@ There is no changelog-fragment exemption in either job's globs or paths-ignore.
   (Measured 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826).)
 
 - **`check-new-line-breaks` does not see a sentence that opens with a digit, so a two-sentence line passes silently whenever the second sentence starts with a number.**
-  Its `_SENT_BREAK_RE` lookahead class is `[A-Z"'`*\[]`, which admits an uppercase letter or a markup character and no digit.
+  Its `_SENT_BREAK_RE` lookahead class is `` [A-Z"'`*\[] ``, which admits an uppercase letter or a markup character and no digit.
   This corpus opens sentences with derived counts constantly, because `CLAUDE.md` asks for numbers derived rather than recalled --- "19 sites across ...", "308 cases passed ..." --- so the blind spot sits exactly where the prose most often lands.
   It is a false negative, so nothing reports it: the check goes green and the author reads that as the line being fine.
   - **Do:** scan added prose lines yourself for a second sentence when the gate passes a long line, particularly one whose next sentence is a count.

@@ -12,7 +12,8 @@ skills-directory plugin registers every hook as
 `${CLAUDE_PLUGIN_ROOT}/../../hooks/<name>.py`. The interpreter walks that
 `../../` THROUGH the symlink and opens the real file, so the hook runs and
 nothing looks wrong; `abspath` collapses the same `..` against the symlink's
-own path and reports `<checkout>/.claude/hooks`, which holds no hooks. Every
+own path and reports `<checkout>/.claude/hooks`, which holds only
+`session-start.sh` and none of the Python hooks a sibling import looks for. Every
 sibling import and data file resolved from there is then missing.
 
 The two failure directions are both bad and only one is visible:
@@ -57,20 +58,21 @@ hypothetical), and `Path(...).absolute()`,
 pathlib's non-symlink-resolving form. `Path(...).resolve()` is
 realpath-equivalent and deliberately clean.
 
-What this cannot see, stated rather than implied: the argument has to mention
-`__file__` or `sys.argv` syntactically inside the call. Binding it to a name
-first escapes the walk, and that shape IS live here --
-`flag-config-deletion-without-ref-check.py` writes
-`_SELF = globals().get("__file__") or sys.argv[0]` and resolves `_SELF`,
-deliberately, so the file works when exec'd into a namespace with no
-`__file__`. It uses `realpath` today, but swapping that one word to `abspath`
-yields zero offenders: measured, a one-word reintroduction of ai-config#2981
-at an existing site passes this gate silently.
+One hop of name binding is followed, because both live escapes are that shape
+and both are deliberate: `flag-config-deletion-without-ref-check.py` writes
+`_SELF = globals().get("__file__") or sys.argv[0]`, and
+`plugins/ai-config/claude-hook-adapter.py` writes
+`target_file = start_file or __file__`, each so the file still works when
+exec'd into a namespace with no `__file__`. Before `_self_bound_names`
+existed, swapping either site's `realpath` to `abspath` yielded zero
+offenders -- a one-word reintroduction of ai-config#2981 passing the gate in
+silence, at the very file where the corpus first fixed it.
 
-Closing it needs dataflow rather than a syntax match. Until then the
+What remains unseen, stated rather than implied: TWO hops
+(`A = __file__; B = A; os.path.abspath(B)`) still escape. Closing that needs
+real dataflow, and no such shape exists in the scanned tree -- so the
 instrument enforces the common members of the class stated in
-`memories/hooks.md`, not the whole class, and that one site is the known
-hole rather than a hypothetical one.
+`memories/hooks.md` rather than the whole class.
 
 Run: python3 scripts/check-hook-file-resolution.py
 """
@@ -134,8 +136,9 @@ def _resolved_call(node: ast.AST) -> bool:
     return name in _RESOLVERS
 
 
-def _mentions(node: ast.AST, subject_path: bool) -> bool:
-    """True when NODE syntactically reads an UNRESOLVED `__file__` or subject.
+def _mentions(node: ast.AST, subject_path: bool,
+              bound: frozenset[str] = frozenset()) -> bool:
+    """True when NODE reads an UNRESOLVED `__file__`, subject, or alias.
 
     `subject_path` widens this to `sys.argv[...]`, which is meaningful only in
     a test suite: there the argv is the hook under test, and resolving it
@@ -145,7 +148,7 @@ def _mentions(node: ast.AST, subject_path: bool) -> bool:
     count: the collapse it would cause has already been prevented.
     """
     for n in _walk_unresolved(node):
-        if isinstance(n, ast.Name) and n.id == "__file__":
+        if isinstance(n, ast.Name) and (n.id == "__file__" or n.id in bound):
             return True
         if not subject_path:
             continue
@@ -169,6 +172,46 @@ def _walk_unresolved(node: ast.AST):
             queue.append(child)
 
 
+def _self_bound_names(tree: ast.AST) -> frozenset[str]:
+    """Names assigned directly from an UNRESOLVED `__file__` expression.
+
+    Both known escapes from the syntactic match are this one hop, and both are
+    written deliberately rather than by accident:
+
+        _SELF = globals().get("__file__") or sys.argv[0]   # a hook
+        target_file = start_file or __file__               # the adapter
+
+    Each exists so the file still works when exec'd into a namespace with no
+    `__file__`, so neither is going away. Resolving one hop covers them without
+    reaching for dataflow: a binding whose value already passes through
+    `realpath()`/`resolve()` is NOT collected, because the collapse it would
+    cause has already been prevented -- which is what keeps the ordinary
+    `HERE = os.path.dirname(os.path.realpath(__file__))` from tainting `HERE`.
+
+    Two hops (`A = __file__; B = A; abspath(B)`) are still invisible. No such
+    shape exists in the scanned tree, and saying so is cheaper than the
+    dataflow that would close it.
+    """
+    bound = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        # `__file__` reaches a binding two ways, and only the first is a Name.
+        # `globals().get("__file__")` -- the spelling the hook uses, precisely
+        # because a bare reference would raise there -- carries it as a STRING
+        # constant, so matching Name alone misses the site this check exists
+        # for. Measured: it did.
+        if not any(
+                (isinstance(n, ast.Name) and n.id == "__file__")
+                or (isinstance(n, ast.Constant) and n.value == "__file__")
+                for n in _walk_unresolved(node.value)):
+            continue
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                bound.add(target.id)
+    return frozenset(bound)
+
+
 def offenders(path: Path) -> list[tuple[int, str]]:
     """(lineno, source line) for every lexical self-path resolution in PATH."""
     try:
@@ -184,9 +227,10 @@ def offenders(path: Path) -> list[tuple[int, str]]:
 
     lines = source.splitlines()
     subject_path = path.name.startswith("test-")
+    bound = _self_bound_names(tree)
     found = []
     for node in ast.walk(tree):
-        if _is_lexical_call(node) and _mentions(node, subject_path):
+        if _is_lexical_call(node) and _mentions(node, subject_path, bound):
             found.append((node.lineno, lines[node.lineno - 1].strip()))
     return sorted(set(found))
 
@@ -206,15 +250,6 @@ def main() -> int:
             print(f"error: no python files under {directory}", file=sys.stderr)
             return FAILURE_EXIT
         paths.extend(found)
-    if not paths:
-        # A glob that matches nothing would otherwise report a clean sweep of
-        # zero files, which is the shape `shared/workflow/` warns about: a
-        # detector that never ran is indistinguishable from one that found
-        # nothing.
-        print("error: no python files found under "
-              + ", ".join(str(d) for d in SCANNED_DIRS), file=sys.stderr)
-        return FAILURE_EXIT
-
     failures = []
     for path in paths:
         for lineno, text in offenders(path):
@@ -227,7 +262,8 @@ def main() -> int:
             print(f"  {line}", file=sys.stderr)
         print("\nabspath/normpath/Path.absolute collapse `..` as text, so a hook reached "
               "through the .claude/skills symlink resolves its own directory "
-              "to <checkout>/.claude/hooks, where no hook lives. "
+              "to <checkout>/.claude/hooks, which holds none of the hooks a "
+              "sibling import looks for. "
               "See memories/hooks.md and ai-config#2981.", file=sys.stderr)
         return FAILURE_EXIT
 

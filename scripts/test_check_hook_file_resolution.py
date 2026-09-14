@@ -86,6 +86,11 @@ MAIN_CASES = [
     # The three fail-closed branches. Each is the shape where a checker that
     # examined nothing would otherwise print a reassuring result.
     ("a missing hooks directory exits nonzero rather than reporting clean", None, 1),
+    # This is also the masking case: `_run_main` always populates the plugin
+    # directory, so an empty hooks/ only fails if the emptiness check runs per
+    # directory rather than over the union of the scanned ones. A separately
+    # labelled masking case was added and then removed -- same input, same
+    # helper, same expectation, so it could not fail independently of this one.
     ("an empty hooks directory exits nonzero rather than reporting clean", {}, 1),
     ("an unparseable hook exits nonzero rather than being skipped",
      {"h.py": "def broken(:\n"}, 1),
@@ -94,11 +99,6 @@ MAIN_CASES = [
     # to `return []` left the suite green before this case existed. A file of
     # invalid UTF-8 exercises it without depending on file permissions, which
     # a root-running CI container would not honour.
-    # An empty hooks/ must fail even though the plugin directory the helper
-    # always populates is non-empty. Checking the UNION instead of each
-    # directory let that sibling mask it -- measured while widening the scope:
-    # the empty-directory case silently started passing for the wrong reason.
-    ("an empty hooks/ is not masked by a populated plugin directory", {}, 1),
     ("an undecodable hook exits nonzero rather than being skipped",
      {"h.py": b"\xff\xfe not utf-8"}, 1),
 ]
@@ -154,6 +154,23 @@ CASES = [
      "import os\nR = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))\n", 1),
     ("Path(__file__).absolute() with no resolve is still caught",
      "from pathlib import Path\nR = Path(__file__).absolute().parent\n", 1),
+    # One hop of name binding. Both live escapes are this shape, and both are
+    # written deliberately so the file survives being exec'd into a namespace
+    # with no `__file__` -- so neither is going away and the checker has to
+    # follow them. The second spelling carries `__file__` as a STRING, which a
+    # Name-only match misses; it did, until measured.
+    ("a name bound from __file__ and then resolved lexically",
+     "import os\ntarget = start or __file__\nD = os.path.dirname(os.path.abspath(target))\n", 1),
+    ("a name bound via globals().get(\"__file__\") and resolved lexically",
+     "import os, sys\n_SELF = globals().get(\"__file__\") or sys.argv[0]\n"
+     "D = os.path.dirname(os.path.abspath(_SELF))\n", 1),
+    ("the same binding resolved with realpath is clean",
+     "import os\ntarget = start or __file__\nD = os.path.dirname(os.path.realpath(target))\n", 0),
+    # A binding whose value is ALREADY resolved must not taint the name, or
+    # the commonest correct idiom in the tree becomes a false positive.
+    ("a name bound from an already-resolved __file__ does not taint it",
+     "import os\nHERE = os.path.dirname(os.path.realpath(__file__))\n"
+     "ROOT = os.path.abspath(HERE)\n", 0),
 ]
 
 # The subject-path half, which applies only inside a `hooks/test-*.py` suite:

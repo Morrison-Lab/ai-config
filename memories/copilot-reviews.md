@@ -171,3 +171,11 @@ ai-config#2969 (ai-config#694 pattern) to keep both files well under the
     answer it again by citing that disposition when nothing has changed.
   - **Don't:** treat repeated comment text as proof that an earlier fix did
     not land, or as a new finding, without checking the thread.
+- **A PR does not count as clean for MWC while Copilot (or any review) is still running, even if another reviewer reported clean.**
+  In [#3469](https://github.com/Morrison-Lab/ai-config/pull/3469#pullrequestreview-5175527714), Claude review finished clean at `06:09:39Z`,
+  while Copilot was still running until `06:19:33Z` when it submitted `### 🟡 Changes recommended`.
+  An in-flight review blocks clean status;
+  consensus clean verdicts across all active reviewers are required before merging under MWC (ai-config#3570).
+  - **Do:** wait for all running reviews (check runs in progress or pending review requests) to complete before evaluating whether the PR is fully clean.
+  - **Don't:** declare clean or merge under MWC when one reviewer has finished clean while another review is still in flight.
+

@@ -178,4 +178,13 @@ ai-config#2969 (ai-config#694 pattern) to keep both files well under the
   consensus clean verdicts across all active reviewers are required before merging under MWC (ai-config#3570).
   - **Do:** wait for all running reviews (check runs in progress or pending review requests) to complete before evaluating whether the PR is fully clean.
   - **Don't:** declare clean or merge under MWC when one reviewer has finished clean while another review is still in flight.
+- **Automated bot review tracking must account for formal states, header variations, and commit boundaries.**
+  In `plugins/ai-config/enforce-mwc-review-gate.py`, bot reviews (like Copilot and CodeRabbit) require:
+  1. Recognizing both formal states (`CHANGES_REQUESTED`, `APPROVED`, `DISMISSED`) and header verdicts (`Changes recommended`, `Needs a closer look`, `Approval recommended`).
+  2. Preserving earlier `NOT_CLEAN` verdicts across commit pushes until the same reviewer evaluates the new HEAD commit or is dismissed/approved.
+  3. Verifying `Suppressed comments` blocks even when the header states `Approval recommended`.
+  4. Guarding against short commit abbreviations (`len(oid) >= 7`) before matching head OIDs.
+  - **Do:** ensure bot review gates require a later clean review from the same bot or formal dismissal before clearing standing negative reviews across pushes.
+  - **Don't:** drop standing bot findings simply because a new commit moved `HEAD`.
+
 

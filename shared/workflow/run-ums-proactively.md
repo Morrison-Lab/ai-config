@@ -55,6 +55,11 @@ When a request arrives at a checkpoint, either run UMS first and then start the 
 
 The same skip has a second route worth checking, since several skills end in a UMS step ([`post-merge`](../../skills/post-merge/SKILL.md), [`ardi`](ardi.md), [`wrap-up`](../../skills/wrap-up/SKILL.md)).
 Reporting one of those skills complete asserts that its final step ran, so before calling a merge wrapped up, confirm the UMS pass actually happened rather than only the steps before it.
+Loading the skill is not that confirmation.
+A valid no-change pass still scans the context and, for every candidate, categorizes it and greps the destination's full `memories/` directory plus the relevant skill and shared-workflow files;
+its report names the candidates and searches rather than asserting a conclusion with no pass behind it.
+A 2026-09-14 post-merge session recurred here: it loaded UMS and ran one narrow grep, then reported "UMS review found no additional durable memory update needed";
+the user's "what about ums?" exposed that the actual pass had never run.
 
 **A merge you discover rather than perform is still a checkpoint, and it is the one that never feels like a moment.**
 Every bullet above describes a checkpoint that *happens* while you are watching: you push, the verdict lands, the PR merges, you report back.

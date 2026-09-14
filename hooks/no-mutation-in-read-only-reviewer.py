@@ -118,7 +118,7 @@ RX_SCOPED_READ_ONLY = re.compile(
 RX_INTERJECTION = r"(?:\s*,\s*[^,;:.!?\n]+,\s*|\s+(?:under any circumstances|for any reason|under any condition|at any time|at all|ever)\s+|\s+)"
 
 RX_PROHIBITION = re.compile(
-    rf"\b(?:do(?:es)?\s+not|don't|never|must(?:n't|\s+not)|cannot|can't|should(?:n't|\s+not)){RX_INTERJECTION}"
+    rf"\b(?:do(?:es)?\s+not|don't|did(?:n't|\s+not)|won't|will\s+not|would(?:n't|\s+not)|never|must(?:n't|\s+not)|cannot|can't|should(?:n't|\s+not)|shall\s+not|shan't){RX_INTERJECTION}"
     r"(?:(?:edit|modify|write|change|fix|commit|mutate|add|stage|delete|remove|update|touch|apply|push|rebuild)[,\s]+(?:and\s+|or\s+)?)*"
     r"(?:edit|modify|write|change|fix|commit|mutate|add|stage|delete|remove|update|touch|apply|push|rebuild)\b"
     r".*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
@@ -149,13 +149,13 @@ RX_AFFIRMATIVE_WRITE = re.compile(
 )
 
 RX_NEGATED_OR_ADVISORY = re.compile(
-    r"\b(?:do(?:es)?\s+not|don't|did(?:n't|\s+not)|never|without|not|avoid|refrain\s+from|no\s+need\s+to|should(?:n't|\s+not)|must(?:n't|\s+not)|cannot|can't)\b"
+    r"\b(?:do(?:es)?\s+not|don't|did(?:n't|\s+not)|won't|will\s+not|would(?:n't|\s+not)|never|without|not|avoid|refrain\s+from|no\s+need\s+to|should(?:n't|\s+not)|must(?:n't|\s+not)|cannot|can't|shall\s+not|shan't)\b"
     r"|\b(?:how\s+to|propose|suggest|explain|recommend|tell\s+(?:us|me)\s+how\s+to)\b",
     re.I,
 )
 
 RX_NEGATED_WRITE_ACTION = re.compile(
-    r"\b(?:do(?:es)?\s+not|don't|did(?:n't|\s+not)|never|without|not|avoid|refrain\s+from|no\s+need\s+to|should(?:n't|\s+not)|must(?:n't|\s+not)|cannot|can't)\s+"
+    r"\b(?:do(?:es)?\s+not|don't|did(?:n't|\s+not)|won't|will\s+not|would(?:n't|\s+not)|never|without|not|avoid|refrain\s+from|no\s+need\s+to|should(?:n't|\s+not)|must(?:n't|\s+not)|cannot|can't|shall\s+not|shan't)\s+"
     r"(?:[^\n.;:!?]*\b)?(?:fix|patch|repair|edit|modify|write|create|commit|mutate|change|add|stage|delete|remove|update|touch|apply|push|rebuild)\b",
     re.I,
 )

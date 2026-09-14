@@ -408,3 +408,11 @@ Adversarial review (ai-config#3623) established three key boundary requirements 
    and common adverbial phrases
    (`under any circumstances|for any reason|under any condition|at any time|at all|ever`)
    between the negator and the verb list.
+
+6. **Include future and modal contractions across negator regexes:**
+   Review prompts and instructions routinely express prohibitions using future modal contractions
+   (such as "You won't commit your changes;
+   only report findings"
+   or "You will not edit or commit any files").
+   Negator alternations (`RX_PROHIBITION`, `RX_NEGATED_OR_ADVISORY`, `RX_NEGATED_WRITE_ACTION`) must explicitly include
+   `won't`, `will\s+not`, `would(?:n't|\s+not)`, and `shall\s+not|shan't` alongside `do not`, `don't`, `never`, `must not`, and `cannot`.

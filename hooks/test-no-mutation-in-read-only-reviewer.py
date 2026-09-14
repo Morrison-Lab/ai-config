@@ -741,6 +741,28 @@ try:
     payload_p38 = {"tool_name": "Edit", "tool_input": {"file_path": "main.py"}, "transcript_path": p38}
     hit = hook.offending("Edit", payload_p38["tool_input"], payload_p38)
     check("must block Edit with interjection 'Never, under any circumstances, edit any files'", hit is not None, True)
+
+    # 12z14. Won't negation in review brief
+    p39 = os.path.join(prohibitive_dir, "subagents", "agent-wont-commit.jsonl")
+    with open(p39, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "This is an adversarial review. You won't commit your changes; only report findings."},
+        }) + "\n")
+    payload_p39 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p39}
+    hit = hook.offending("Bash", payload_p39["tool_input"], payload_p39)
+    check("must block git commit when review brief states 'You won't commit your changes'", hit is not None, True)
+
+    # 12z15. Will not negation prohibition
+    p40 = os.path.join(prohibitive_dir, "subagents", "agent-will-not-edit.jsonl")
+    with open(p40, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "You will not edit or commit any files."},
+        }) + "\n")
+    payload_p40 = {"tool_name": "Edit", "tool_input": {"file_path": "main.py"}, "transcript_path": p40}
+    hit = hook.offending("Edit", payload_p40["tool_input"], payload_p40)
+    check("must block Edit when prompt states 'You will not edit or commit any files.'", hit is not None, True)
 finally:
     try:
         import shutil

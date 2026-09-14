@@ -77,6 +77,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 | [`flag-unmeasured-timestamp.py`](../hooks/flag-unmeasured-timestamp.py) | Warn | Warns when a `gh` comment or review body states a Pacific clock time (`HH:MM`, optional seconds, optional AM/PM, then `PDT`, `PST`, or `PT`) with no clock read in the current turn, or when the body cannot be read (a `--body-file` not yet on disk). | Run `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"` immediately before typing a time into a claim or status comment, and restate the stamp from its output. | None. |
 | [`flag-cd-into-main-checkout.py`](../hooks/flag-cd-into-main-checkout.py) | Warn | Warns when a worktree-rooted session `cd`s into the primary/main checkout of the repository. | Keep all file edits and command executions rooted within the dedicated worktree directory. | None. |
 | [`warn-unlabelled-agent-issue.py`](../hooks/warn-unlabelled-agent-issue.py) | Warn | Warns when `gh issue create` / `glab issue create` runs with no `ai-authored` label in the command. | Pass `--label ai-authored --label "model:<model-id>"` (both CLIs also accept the comma-separated `--label "ai-authored,model:<model-id>"`) in the creating command, per `shared/workflow/issue-first.md`. | None. |
+| [`no-mutation-in-read-only-reviewer.py`](../hooks/no-mutation-in-read-only-reviewer.py) | **Block** | Blocks mutating git commands (`commit`, `checkout`, `switch`, `restore`, `stash`, `merge`, `reset`, `rebase`, `branch`, `tag`, `add`, `stage`, `pull`, `push`) and write tools when executing in read-only personas (`adversarial-reviewer`, `Explore`, `Plan`). | Reviewer personas must stay strictly read-only and report findings to the authoring session rather than mutating working tree or branch state. | Set `ALLOW_READ_ONLY_MUTATION=1 <cmd>` if mutation is explicitly intended. |
 
 ### 2.2 Agent, Task & SendMessage Interceptors
 
@@ -366,6 +367,73 @@ That is what makes repeating a demand costly rather than merely tedious, and it 
 (Tracked as [#3141](https://github.com/Morrison-Lab/ai-config/issues/3141), the original defect report;
 [#3156](https://github.com/Morrison-Lab/ai-config/issues/3156) is its corpus record and [#3185](https://github.com/Morrison-Lab/ai-config/issues/3185) a later recurrence.)
 
+## Read-Only Reviewer Guard Design Principles
+
+`hooks/no-mutation-in-read-only-reviewer.py` enforces read-only discipline across reviewer personas (`adversarial-reviewer`, `Explore`, `Plan`, etc.) to protect shared working trees and indices from accidental contamination (ai-config#3612, #3602, #3584).
+Adversarial review (ai-config#3623) established three key boundary requirements for deny-by-default persona guards:
+
+1. **Never conflate review-instruction mentions with read-only roles, but prioritize explicit read-only instructions over prohibited action verbs:**
+   A subagent brief saying "Review the diff and then fix every issue you find, committing as you go" is a write-capable fix-and-commit dispatch, not a read-only reviewer.
+   However, a guard must not short-circuit on bare action verbs (`fix`, `edit`, `write`, `commit`) without negation awareness.
+   Prohibitive briefs (e.g. "Do not edit, fix, or commit anything") or agent definitions stating "Its declared allowlist omits Edit and Write" mention those verbs specifically to prohibit them.
+   Explicit read-only instructions (`read-only`, `do not edit/commit`, `make no changes`) must take priority: affirmative write directives qualify review-instruction briefs (`REVIEW_PROMPT_RE`), rather than overriding explicit read-only prohibitions (`RX_READ_ONLY`).
+   Asking a read-only reviewer to suggest how to fix or address defects must not unlock write tools or git mutations.
+2. **Isolate subagent transcripts from orchestrator transcripts:**
+   Parent orchestrator transcripts often record historical subagent dispatches (with `attributionAgent` or `isSidechain: True`).
+   A guard scanning transcript records must restrict attribution reads to dedicated subagent transcripts (`subagents/agent-*.jsonl`), preventing an earlier review dispatch from poisoning subsequent orchestrator commands (`git push`, `git commit`).
+3. **Distinguish scoping prohibitions from total read-only lockdown:**
+   Subagent instructions often scope write boundaries (e.g. "Never edit files outside your worktree.
+   Fix the failing tests and commit.")
+   or scope staging (e.g. "Make no changes to unrelated files, but fix the reported bug and commit your change").
+   Prohibition regexes (`never`, `do not`, `without`, `make no changes`) must require trailing totality indicators (`any`, `anything`, `any files`) or negative lookahead for scoping prepositions (`to any files outside/except`, `to unrelated/other files`, `outside`, `except`),
+   preventing scoped tasks from matching `RX_READ_ONLY` so that affirmative write directives (`RX_AFFIRMATIVE_WRITE`, e.g. `and then fix`, `write reproduction tests`, `fix defects and commit as you go`) keep the task write-capable under `REVIEW_PROMPT_RE`.
+   Conversely, blanket prohibitions without scoping
+   (such as "Make no changes to files")
+   must not be excluded by overly broad lookaheads (such as bare `files\b` in lookaheads)
+   and must strictly match `RX_READ_ONLY`.
+
+4. **Distinguish Oxford-comma prohibited lists from coordinated write directives:**
+   In prohibitive prompts, comma-separated lists of prohibited verbs (e.g. "Do not write code, edit, and commit any files") share the initial negation clause.
+   An Oxford serial list carries an internal serial comma (`prior_clause.strip().rstrip(",").count(",") >= 1`) or negative totality phrasing (`any files`).
+   In contrast, compound sentences joining two independent clauses with `, and` (e.g. "Don't change config, and commit this") carry affirmative directives in the coordinated clause unless explicitly negated.
+   Ensure verb lists in `RX_PROHIBITION` and `RX_NEGATED_WRITE_ACTION` remain symmetrical across prefix and terminal groups (`commit`, `fix`, `apply`, `push`, `rebuild`).
+
+5. **Support interjections between negators and prohibited verbs:**
+   Prohibitive instructions frequently insert parenthetical or adverbial interjections directly after negators
+   (e.g. "Do not, under any circumstances, edit or fix any files",
+   "Do not, for any reason, commit any files",
+   "Never, under any circumstances, edit any files").
+   Prohibition regexes must allow comma-separated parenthetical clauses
+   (`,\s*[^,;:.!?\n]+,\s*`)
+   and common adverbial phrases
+   (`under any circumstances|for any reason|under any condition|at any time|at all|ever`)
+   between the negator and the verb list.
+
+6. **Include future and modal contractions across negator regexes:**
+   Review prompts and instructions routinely express prohibitions using future modal contractions
+   (such as "You won't commit your changes;
+   only report findings"
+   or "You will not edit or commit any files").
+   Negator alternations (`RX_PROHIBITION`, `RX_NEGATED_OR_ADVISORY`, `RX_NEGATED_WRITE_ACTION`) must explicitly include
+   `won't`, `will\s+not`, `would(?:n't|\s+not)`, and `shall\s+not|shan't` alongside `do not`, `don't`, `never`, `must not`, and `cannot`.
+
+7. **Recognize negative persistence idioms rather than broad subordinate boundary splitting:**
+   Broadly adding subordinate or temporal conjunctions
+   (such as `before`, `after`, `since`, `until`, `because`)
+   to `RX_BOUNDARY_SPLIT` causes a fail-open regression on prohibition clauses containing multiple write actions
+   (e.g. "Do not fix bugs before committing changes"
+   or "Never edit any files before you have finished committing your changes"),
+   because the temporal conjunction severs the governing prohibition from the subsequent write verbs.
+   Instead, keep `RX_BOUNDARY_SPLIT` restricted to sentence boundaries, contrasting conjunctions (`but`, `however`),
+   and affirmative markers (`and then`, `make sure`, `ensure`, `please`).
+   To isolate intended affirmative write actions under persistence phrasing
+   (e.g. "This is an adversarial review, and you won't stop until you fix the bugs and commit the changes"),
+   recognize the specific negative persistence idiom
+   (`RX_PERSISTENCE_UNTIL`, matching negators like `won't`, `will not`, `must not`, `don't`
+   governing persistence verbs `stop`, `rest`, `pause`, `quit`, `cease`, `hesitate`, `wait` followed by `until|till`),
+   and strip that persistence idiom from `clause_prefix` when checking `RX_NEGATED_OR_ADVISORY`.
+   This allows affirmative directives in persistence contexts while keeping prohibitions strictly intact across temporal connectives.
+
 ## Resolve a hook's own directory with `realpath`, never lexical `abspath`
 
 A hook that reaches a sibling script or a data file computes its own directory from `__file__`.
@@ -392,8 +460,10 @@ Across the 18 non-test hooks that carried it, 19 sites computed a path from `__f
 and 2 (`monitor-open-prs.py`, `no-unmonitored-pr.py`) resolving the hook's own file to re-exec it.
 
 The test suites carry a second, separate half, and the first sweep missed it.
-Counted against `main` with the checker's own AST semantics, 30 suites were affected:
-15 carried a lexical call on `__file__`, 23 carried one on their `sys.argv` *subject*, and 8 carried both.
+Counted by the checker's own AST semantics against `main` at `e388e906` on 2026-09-14, 31 suites were affected:
+16 carried a lexical call on `__file__`, 23 carried one on their `sys.argv` *subject*, and 8 carried both.
+The ref is pinned and dated because `main` moved during this branch's review and took the count with it ---
+the 31st suite arrived with `no-mutation-in-read-only-reviewer.py`, and is swept here too.
 The first sweep converted only the `__file__` half, which is why the subject count is the larger one.
 
 The subject half breaks for the same reason, and matters for a specific one.

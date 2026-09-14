@@ -198,6 +198,17 @@ CASES = [
     # resolver, but abspath has already flattened the path underneath it.
     ("realpath wrapping an abspath is still caught",
      "import os\nH = os.path.realpath(os.path.abspath(__file__))\n", 1),
+    # The other one-hop binding forms. None occurs in the scanned tree; they
+    # are covered because a boundary drawn at the shapes that happen to be
+    # present is not a boundary, and the docstring claims this one.
+    ("an annotated binding from __file__",
+     "import os\np: str = __file__\nD = os.path.abspath(p)\n", 1),
+    ("a walrus binding from __file__",
+     "import os\nD = os.path.abspath((p := __file__))\n", 1),
+    ("a tuple-target binding from __file__",
+     "import os\na, b = __file__, 1\nD = os.path.abspath(a)\n", 1),
+    ("a bare annotation binds nothing",
+     "import os\np: str\nD = os.path.abspath(p)\n", 0),
 ]
 
 # The subject-path half, which applies only inside a `hooks/test-*.py` suite:

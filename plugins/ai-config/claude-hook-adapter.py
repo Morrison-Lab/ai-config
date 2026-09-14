@@ -241,11 +241,17 @@ def find_repo_root(start_file=None):
             if os.path.isfile(os.path.join(repo_candidate, "hooks", "hooks.json")):
                 return repo_candidate
 
-    # 4. Environment override
+    # 4. Environment override.
+    # realpath, not abspath, for the same reason branches 1-3 use it: the
+    # value here is CLAUDE_PLUGIN_ROOT, which is exactly the symlinked path
+    # this function exists to resolve. The isfile check above passes against
+    # the unresolved value because the filesystem walks the symlink, so a
+    # lexically collapsed return would be a root that does not contain the
+    # hooks/hooks.json just verified to be there (ai-config#2981).
     for env_var in ("AI_CONFIG_ROOT", "CLAUDE_PLUGIN_ROOT"):
         val = os.environ.get(env_var)
         if val and os.path.isfile(os.path.join(val, "hooks", "hooks.json")):
-            return os.path.abspath(val)
+            return os.path.realpath(val)
 
     return candidate
 

@@ -68,11 +68,13 @@ existed, swapping either site's `realpath` to `abspath` yielded zero
 offenders -- a one-word reintroduction of ai-config#2981 passing the gate in
 silence, at the very file where the corpus first fixed it.
 
-What remains unseen, stated rather than implied: TWO hops
-(`A = __file__; B = A; os.path.abspath(B)`) still escape. Closing that needs
-real dataflow, and no such shape exists in the scanned tree -- so the
-instrument enforces the common members of the class stated in
-`memories/hooks.md` rather than the whole class.
+One hop covers an ordinary assignment, an annotated one, a walrus, and a
+tuple target. What remains unseen, stated rather than implied: TWO hops
+(`A = __file__; B = A; os.path.abspath(B)`), and a binding through a
+container or a function parameter. Closing those needs real dataflow, and no
+such shape exists in the scanned tree -- so the instrument enforces the
+common members of the class stated in `memories/hooks.md` rather than the
+whole class.
 
 Run: python3 scripts/check-hook-file-resolution.py
 """
@@ -205,21 +207,37 @@ def _self_bound_names(tree: ast.AST) -> frozenset[str]:
     """
     bound = set()
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Assign):
+        # `ast.Assign` alone misses an annotated binding (`p: str = __file__`)
+        # and a walrus (`f := __file__`), both of which bind exactly as an
+        # ordinary assignment does. Neither occurs in the scanned tree today;
+        # they are covered because the docstring's job is to state the real
+        # boundary, and a boundary drawn at the shape that happens to be in
+        # front of you is not one.
+        if not isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr)):
             continue
         # `__file__` reaches a binding two ways, and only the first is a Name.
         # `globals().get("__file__")` -- the spelling the hook uses, precisely
         # because a bare reference would raise there -- carries it as a STRING
         # constant, so matching Name alone misses the site this check exists
         # for. Measured: it did.
+        if node.value is None:
+            continue  # a bare annotation (`p: str`) binds nothing
         if not any(
                 (isinstance(n, ast.Name) and n.id == "__file__")
                 or (isinstance(n, ast.Constant) and n.value == "__file__")
                 for n in _walk_unresolved(node.value)):
             continue
-        for target in node.targets:
-            if isinstance(target, ast.Name):
-                bound.add(target.id)
+        targets = (node.targets if isinstance(node, ast.Assign)
+                   else [node.target])
+        for target in targets:
+            # A tuple/list target (`a, b = __file__, 1`) binds every name in
+            # it. Which element carries `__file__` is not decidable here, so
+            # all of them are taken -- over-inclusive by design, and only
+            # within an assignment already known to mention an unresolved
+            # `__file__`.
+            for name in ast.walk(target):
+                if isinstance(name, ast.Name):
+                    bound.add(name.id)
     return frozenset(bound)
 
 

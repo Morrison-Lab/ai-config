@@ -1038,11 +1038,12 @@ class TestMain(unittest.TestCase):
             state = view if view is not None else pr()
             view_payload = {k: state[k] for k in
                             ("url", "author", "reviews",
-                             "statusCheckRollup", "headRefOid")}
+                             "statusCheckRollup", "headRefOid", "reviewRequests") if k in state}
             side_effect = [
                 gh_result(stdout=json.dumps(view_payload)),
                 gh_result(stdout=json.dumps(comments if comments is not None
                                             else state["comments"])),
+                gh_result(stdout=json.dumps([])),
             ]
         with patch.object(sys, "stdin", io.StringIO(json.dumps(payload))), \
              patch.object(sys, "stdout", stdout), \
@@ -1228,9 +1229,47 @@ class TestMain(unittest.TestCase):
         decision, _ = self.run_main(
             self.payload(MERGE_CMD),
             side_effect=[gh_result(stdout=json.dumps(view_payload)),
-                         gh_result(stdout=pages)],
+                         gh_result(stdout=pages),
+                         gh_result(stdout=json.dumps([]))],
         )
         self.assertEqual(decision["decision"], "allow")
+
+    def test_check_runs_fetched_via_rest(self):
+        _, run_mock = self.run_main(
+            self.payload(MERGE_CMD), view=pr(comments=[CLEAN_VERDICT]))
+        api_cmd = run_mock.call_args_list[2][0][0]
+        self.assertIn("api", api_cmd)
+        self.assertIn("--paginate", api_cmd)
+        self.assertIn(f"repos/Lacaedemon/sparta/commits/{HEAD}/check-runs", api_cmd)
+
+    def test_check_runs_fetch_failure_denies(self):
+        state = pr(comments=[CLEAN_VERDICT])
+        view_payload = {k: state[k] for k in
+                        ("url", "author", "reviews", "statusCheckRollup",
+                         "headRefOid", "reviewRequests") if k in state}
+        decision, _ = self.run_main(
+            self.payload(MERGE_CMD),
+            side_effect=[gh_result(stdout=json.dumps(view_payload)),
+                         gh_result(stdout=json.dumps(state["comments"])),
+                         gh_result(rc=1, stderr="check-runs fetch failed")],
+        )
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("commit check-runs", decision["reason"])
+
+    def test_in_flight_copilot_check_run_denies(self):
+        state = pr(comments=[CLEAN_VERDICT])
+        view_payload = {k: state[k] for k in
+                        ("url", "author", "reviews", "statusCheckRollup",
+                         "headRefOid", "reviewRequests") if k in state}
+        check_runs = [{"name": "copilot-pull-request-reviewer", "status": "in_progress", "conclusion": ""}]
+        decision, _ = self.run_main(
+            self.payload(MERGE_CMD),
+            side_effect=[gh_result(stdout=json.dumps(view_payload)),
+                         gh_result(stdout=json.dumps(state["comments"])),
+                         gh_result(stdout=json.dumps(check_runs))],
+        )
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("copilot-pull-request-reviewer", decision["reason"])
 
     def test_repo_flag_forwarded(self):
         _, run_mock = self.run_main(

@@ -325,7 +325,12 @@ def latest_human_review_states(reviews, head_oid="", pr_author=""):
 
 
 def extract_request_names(review_requests):
-    """Extract reviewer logins or team slugs from reviewRequests."""
+    """Extract reviewer logins or team slugs from reviewRequests.
+
+    Defined self-contained here so the enforcement hook has no external
+    library or module import dependencies when run across standalone or
+    minimal plugin environments.
+    """
     names = []
     for r in review_requests:
         if isinstance(r, dict):
@@ -478,10 +483,11 @@ def evaluate(cmd, pr_data):
     # entries carry only state (FAILURE/ERROR/PENDING/EXPECTED/SUCCESS).
     failures = [
         check.get("name") or check.get("context") for check in status_rollup
-        if check.get("conclusion") in BLOCKED_CI_CONCLUSIONS
-        or check.get("status") in PENDING_CI_STATUSES
-        or check.get("state") in BLOCKED_STATUS_STATES
+        if (check.get("conclusion") or "").upper() in BLOCKED_CI_CONCLUSIONS
+        or (check.get("status") or "").upper() in PENDING_CI_STATUSES
+        or (check.get("state") or "").upper() in BLOCKED_STATUS_STATES
     ]
+    failures = list(dict.fromkeys(failures))
     if failures:
         return deny(
             "Strict Merge Control Policy: Cannot merge with failing or "
@@ -695,6 +701,38 @@ def fetch_pr_data(cmd, cwd):
         while pos < len(text) and text[pos] in " \r\n":
             pos += 1
     pr_data["comments"] = comments
+
+    # GraphQL statusCheckRollup drops copilot-pull-request-reviewer
+    # (ai-config#3570, fully-clean.cases.md:79). Query commit check-runs via REST
+    # and merge them into statusCheckRollup so active or failed reviewer runs block merge.
+    head_oid = pr_data.get("headRefOid", "") or ""
+    if head_oid:
+        check_runs_result = run_gh(
+            ["api", f"repos/{url_match.group(1)}/commits/{head_oid}/check-runs",
+             "--paginate", "--jq", "[.check_runs[]? | {name: .name, status: (.status // \"\"), conclusion: (.conclusion // \"\")}]"],
+            cwd,
+        )
+        if check_runs_result.returncode != 0:
+            return None, (
+                "Hook failed to fetch the PR's commit check-runs (gh api returned "
+                "non-zero). Output: " + check_runs_result.stderr
+            )
+        check_runs = []
+        text = check_runs_result.stdout.strip()
+        pos = 0
+        while pos < len(text):
+            page, end = decoder.raw_decode(text, pos)
+            check_runs.extend(page)
+            pos = end
+            while pos < len(text) and text[pos] in " \r\n":
+                pos += 1
+        existing_rollup = pr_data.setdefault("statusCheckRollup", [])
+        for cr in check_runs:
+            existing_rollup.append({
+                "name": cr.get("name") or "",
+                "status": (cr.get("status") or "").upper(),
+                "conclusion": (cr.get("conclusion") or "").upper(),
+            })
     return pr_data, None
 
 

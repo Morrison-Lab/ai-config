@@ -191,10 +191,10 @@ ai-config#2969 (ai-config#694 pattern) to keep both files well under the
   As measured in `memories/gh-cli.md`, `gh pr view --json reviewRequests` and REST `requested_reviewers`
   clear within moments of a request landing, even while Copilot is actively running or queued to review (as occurred in #3469).
   While `reviewRequests` catches pending requests when present (e.g. human reviewers), detecting Copilot in flight requires:
-  1. Checking for queued or in-progress check runs (e.g. `copilot-pull-request-reviewer`).
+  1. Checking for queued or in-progress check runs (e.g. `copilot-pull-request-reviewer`)
+     via the commit check-runs REST endpoint (`commits/<sha>/check-runs`),
+     since GitHub GraphQL `statusCheckRollup` drops `copilot-pull-request-reviewer`
+     (ai-config#3570, `fully-clean.cases.md:79`).
   2. Preserving prior `NOT_CLEAN` verdicts across pushes until a new clean review is posted on HEAD.
-  - **Do:** check check-run status and poll `reviews[]` rather than relying on `reviewRequests` to know if Copilot is in flight.
+  - **Do:** check check-run status via the commit check-runs REST endpoint and poll `reviews[]` rather than relying on `reviewRequests` to know if Copilot is in flight.
   - **Don't:** treat an empty `reviewRequests` response as proof that Copilot has completed its review.
-
-
-

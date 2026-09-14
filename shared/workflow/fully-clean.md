@@ -22,7 +22,8 @@ A single clean verdict while another review is running does not authorize merge 
 Note that while `reviewRequests` catches pending requests when present,
 `memories/gh-cli.md` documents that Copilot review requests frequently clear from `reviewRequests` upon worker pickup before review completion.
 Therefore, in-flight review detection for automated reviewers like Copilot must not rely on `reviewRequests` alone;
-it additionally relies on active check runs in `statusCheckRollup` (e.g. `copilot-pull-request-reviewer`),
+it additionally relies on active check runs from the commit check-runs REST endpoint
+(`commits/<sha>/check-runs`, since GraphQL `statusCheckRollup` drops `copilot-pull-request-reviewer` per `fully-clean.cases.md:79`),
 persisting standing `NOT_CLEAN` review states from prior rounds across commits,
 and requiring consensus clean verdicts at the current HEAD.
 

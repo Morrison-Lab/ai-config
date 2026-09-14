@@ -499,6 +499,28 @@ try:
     payload_p16 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'oops'"}, "transcript_path": p16}
     hit = hook.offending("Bash", payload_p16["tool_input"], payload_p16)
     check("must block git commit when prompt issues total 'Make no changes' prohibition", hit is not None, True)
+
+    # 12q. Explicit read-only reviewer with remediation advice (adversarial review round 5)
+    p17 = os.path.join(prohibitive_dir, "subagents", "agent-ro-remediation-advice.jsonl")
+    with open(p17, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "You are a read-only reviewer. Do not edit, change, or modify any files. Suggest how to fix the issues."},
+        }) + "\n")
+    payload_p17 = {"tool_name": "Write", "tool_input": {"TargetFile": "fix.py"}, "transcript_path": p17}
+    hit = hook.offending("Write", payload_p17["tool_input"], payload_p17)
+    check("must block write tools when explicit read-only prompt includes remediation advice", hit is not None, True)
+
+    # 12r. Scoped with 'Make no changes to any files outside' and affirmative commit (adversarial review round 5)
+    p18 = os.path.join(prohibitive_dir, "subagents", "agent-make-no-changes-any-files-outside.jsonl")
+    with open(p18, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Make no changes to any files outside your worktree. Fix the failing tests and commit."},
+        }) + "\n")
+    payload_p18 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p18}
+    hit = hook.offending("Bash", payload_p18["tool_input"], payload_p18)
+    check("must NOT block git commit when prompt uses 'Make no changes to any files outside' with commit directive", hit, None)
 finally:
     try:
         import shutil

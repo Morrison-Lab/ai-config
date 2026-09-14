@@ -370,13 +370,14 @@ That is what makes repeating a demand costly rather than merely tedious, and it 
 ## Read-Only Reviewer Guard Design Principles
 
 `hooks/no-mutation-in-read-only-reviewer.py` enforces read-only discipline across reviewer personas (`adversarial-reviewer`, `Explore`, `Plan`, etc.) to protect shared working trees and indices from accidental contamination (ai-config#3612, #3602, #3584).
-Adversarial review (ai-config#3623) established two key boundary requirements for deny-by-default persona guards:
+Adversarial review (ai-config#3623) established three key boundary requirements for deny-by-default persona guards:
 
 1. **Never conflate review-instruction mentions with read-only roles, but prioritize explicit read-only instructions over prohibited action verbs:**
    A subagent brief saying "Review the diff and then fix every issue you find, committing as you go" is a write-capable fix-and-commit dispatch, not a read-only reviewer.
    However, a guard must not short-circuit on bare action verbs (`fix`, `edit`, `write`, `commit`) without negation awareness.
    Prohibitive briefs (e.g. "Do not edit, fix, or commit anything") or agent definitions stating "Its declared allowlist omits Edit and Write" mention those verbs specifically to prohibit them.
-   Explicit read-only instructions (`read-only`, `do not edit/commit`, `make no changes`) must take priority, with affirmative write checks targeting directive phrasing (`and then fix`, `committing as you go`, `make the fixes`) rather than bare verb occurrences.
+   Explicit read-only instructions (`read-only`, `do not edit/commit`, `make no changes`) must take priority: affirmative write directives qualify review-instruction briefs (`REVIEW_PROMPT_RE`), rather than overriding explicit read-only prohibitions (`RX_READ_ONLY`).
+   Asking a read-only reviewer to suggest how to fix or address defects must not unlock write tools or git mutations.
 2. **Isolate subagent transcripts from orchestrator transcripts:**
    Parent orchestrator transcripts often record historical subagent dispatches (with `attributionAgent` or `isSidechain: True`).
    A guard scanning transcript records must restrict attribution reads to dedicated subagent transcripts (`subagents/agent-*.jsonl`), preventing an earlier review dispatch from poisoning subsequent orchestrator commands (`git push`, `git commit`).
@@ -384,5 +385,5 @@ Adversarial review (ai-config#3623) established two key boundary requirements fo
    Subagent instructions often scope write boundaries (e.g. "Never edit files outside your worktree.
    Fix the failing tests and commit.")
    or scope staging (e.g. "Make no changes to unrelated files, but fix the reported bug and commit your change").
-   Prohibition regexes (`never`, `do not`, `without`, `make no changes`) must require trailing totality indicators (`any`, `anything`, `any files`) or negative lookahead for scoping prepositions (`to unrelated/other files`, `outside`, `except`),
-   and affirmative write directives (`RX_AFFIRMATIVE_WRITE`, e.g. `and then fix`, `write reproduction tests`, `fix defects and commit as you go`) must prevent read-only lockdown.
+   Prohibition regexes (`never`, `do not`, `without`, `make no changes`) must require trailing totality indicators (`any`, `anything`, `any files`) or negative lookahead for scoping prepositions (`to any files outside/except`, `to unrelated/other files`, `outside`, `except`),
+   preventing scoped tasks from matching `RX_READ_ONLY` so that affirmative write directives (`RX_AFFIRMATIVE_WRITE`, e.g. `and then fix`, `write reproduction tests`, `fix defects and commit as you go`) keep the task write-capable under `REVIEW_PROMPT_RE`.

@@ -554,6 +554,17 @@ try:
     payload_p21 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p21}
     hit = hook.offending("Bash", payload_p21["tool_input"], payload_p21)
     check("must block git commit when review prompt has negator separated from verb ('Do not try to fix')", hit is not None, True)
+
+    # 12v. Negator with comma-delimited parenthetical interjection (Claude review round 9)
+    p22 = os.path.join(prohibitive_dir, "subagents", "agent-comma-interjection.jsonl")
+    with open(p22, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "This is an adversarial review. You must not, regardless of what you find, fix the bug or commit the change."},
+        }) + "\n")
+    payload_p22 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p22}
+    hit = hook.offending("Bash", payload_p22["tool_input"], payload_p22)
+    check("must block git commit when review prompt has comma-bounded interjection between negator and verb", hit is not None, True)
 finally:
     try:
         import shutil

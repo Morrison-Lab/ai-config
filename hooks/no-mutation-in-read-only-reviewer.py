@@ -147,7 +147,7 @@ RX_NEGATED_OR_ADVISORY = re.compile(
     re.I,
 )
 
-RX_CLAUSE_SPLIT = re.compile(r"[,;:.!?\n]|\bbut\b|\bhowever\b|\byet\b", re.I)
+RX_BOUNDARY_SPLIT = re.compile(r"[;:.!?\n]|\bbut\b|\bhowever\b|\byet\b|\bnevertheless\b|\bnonetheless\b", re.I)
 
 
 def has_affirmative_write(content: str) -> bool:
@@ -155,7 +155,7 @@ def has_affirmative_write(content: str) -> bool:
     for m in RX_AFFIRMATIVE_WRITE.finditer(content):
         start = m.start()
         preceding = content[:start]
-        separators = list(RX_CLAUSE_SPLIT.finditer(preceding))
+        separators = list(RX_BOUNDARY_SPLIT.finditer(preceding))
         clause_start = separators[-1].end() if separators else 0
         clause_prefix = content[clause_start:start]
         if RX_NEGATED_OR_ADVISORY.search(clause_prefix):

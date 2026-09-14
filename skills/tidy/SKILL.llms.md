@@ -77,5 +77,6 @@ Ask the user which items (if any) they’d like you to implement. Offer to: - Im
 - **`shared/workflow/challenge-unnecessary-complexity.md`** — the standing review-time counterpart to this skill’s axis 4 (“Simplify”). That fragment folds an unnecessary-complexity check into every normal review pass (including prose and math, not just code) and runs automatically, not on demand; run `/tidy` when you want a full prioritized audit across all 5 axes on demand, not just complexity.
 - **`prune-dead-code`** (`pdc`) — the dedicated dead-code and orphaned-asset removal procedure for axis 1, systematically eliminating dead symbols, orphaned configs, and stale docs.
 - **`simplify`** — the narrow dead-code-removal counterpart, triggered after a refactor narrows invocation context, not an on-demand audit.
+- **`code-editor` agent** ([`.claude/agents/code-editor.md`](../../.claude/agents/code-editor.md)) — the dedicated code editor subagent. Coding workflows work iteratively: implement functionally-correct code first, then hand off to `code-editor` to enforce style guide compliance and refactor cleanly. While `/tidy` audits complexity and produces prioritized recommendations, `code-editor` can be dispatched to implement approved simplification and cleanup. See [`shared/workflow/iterative-editing.md`](../../shared/workflow/iterative-editing.md).
 
 Back to top

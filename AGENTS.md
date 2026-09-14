@@ -527,6 +527,15 @@ Name the model on every dispatch, a cheaper tier for bounded or mechanical work,
 On Claude Code, `hooks/no-fable-subagent.py` denies the launch that violates this.
 Other harnesses carry the rule as instruction (ai-config#2927).
 
+## Work iteratively with editor agents on drafting
+
+Writing agents do not need to enforce all style guidelines on first draft.
+Work iteratively: write a substantively-correct but stylistically loose first draft,
+and then hand off to editor agents for revisions:
+- A prose editor agent ([`prose-editor`](.claude/agents/prose-editor.md)) that improves prose style and enforces compliance with a style guide ([Principles of Scientific Writing](https://github.com/Morrison-Lab/psw/) by default).
+- A code editor agent ([`code-editor`](.claude/agents/code-editor.md)) that improves code style and enforces compliance with a style guide ([SERG Lab Manual](https://github.com/UCD-SERG/lab-manual) by default).
+See [`shared/workflow/iterative-editing.md`](shared/workflow/iterative-editing.md).
+
 ## Every self-review is an adversarial review by a separate subagent
 
 Never push code to a remote branch blind, and never review your own diff in the context that wrote it.

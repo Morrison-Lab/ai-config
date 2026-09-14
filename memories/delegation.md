@@ -858,3 +858,16 @@ It is likeliest on a job whose first act is exploratory reading --- a corpus sea
 
 (Measured 2026-09-11: an exploratory memories pass died this way while a single-file fix job briefed identically succeeded.
 The standing remedy is an allow-rule under `permissions.allow` in the Antigravity settings, which is the user's call to make.)
+
+## Reciprocal cross-referencing between agent catalog and skill definitions
+
+When introducing a new agent to the catalog in `agents.qmd`, the "Used by" column lists the skills or workflows that dispatch it.
+Every skill named in that column must reciprocally reference the agent in its own `skills/<name>/SKILL.md` (typically under a `## Relationship to other skills` section).
+Listing a skill as a consumer in `agents.qmd` when the skill does not mention or wire the agent creates a dangling documentation assertion that automated CI reviews flag as inaccurate.
+When adding or updating a skill definition, remember to re-run `python3 scripts/sync-codex-skill-wrappers.py` to keep generated `codex-skills/` wrappers and `tool-mappings.md` in sync.
+
+- **Do:** add a reciprocal cross-reference under `Relationship to other skills` in each skill named in `agents.qmd`'s "Used by" column.
+- **Do:** run `python3 scripts/sync-codex-skill-wrappers.py` after editing any `SKILL.md`.
+- **Don't:** assert that a skill consumes or uses an agent in `agents.qmd` without wiring that relationship into the skill itself.
+(Morrison-Lab/ai-config#3619, 2026-09-12.)
+

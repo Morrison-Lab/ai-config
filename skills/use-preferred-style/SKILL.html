@@ -501,6 +501,7 @@ ul.task-list li input[type="checkbox"] {
 <section id="relationship-to-other-skills" class="level2">
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
 <ul>
+<li><strong><code>prose-editor</code> agent</strong> (<a href="../../.claude/agents/prose-editor.md"><code>.claude/agents/prose-editor.md</code></a>) — the dedicated editor subagent. Writing agents work iteratively: draft substantively-correct content first, then hand off to <code>prose-editor</code> to tighten prose style and enforce PSW compliance. See <a href="../../shared/workflow/iterative-editing.md"><code>shared/workflow/iterative-editing.md</code></a>.</li>
 <li><strong><code>find-ai-tells</code></strong> — the detector counterpart. It <em>scans</em> finished text for AI-authorship tells. This skill <em>prescribes</em> how to write up front. Run <code>find-ai-tells</code> after; run <code>use-preferred-style</code> during.</li>
 <li><strong><code>simplify</code> / <code>tidy</code></strong> — the same “cut what adds no value” instinct, applied to code instead of prose.</li>
 <li><strong><code>memorize</code> / <code>remember</code></strong> — for a one-off wording preference, write a memory instead of editing this skill.</li>

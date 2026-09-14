@@ -576,6 +576,28 @@ try:
     payload_p23 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p23}
     hit = hook.offending("Bash", payload_p23["tool_input"], payload_p23)
     check("must NOT block git commit when prompt has unrelated negation before coordinated affirmative write directive", hit, None)
+
+    # 12x. Oxford-comma list of prohibited actions (Adversarial review Finding 1)
+    p24 = os.path.join(prohibitive_dir, "subagents", "agent-oxford-comma-prohibited.jsonl")
+    with open(p24, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Review the code. Do not write code, edit, and commit any files."},
+        }) + "\n")
+    payload_p24 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p24}
+    hit = hook.offending("Bash", payload_p24["tool_input"], payload_p24)
+    check("must block git commit when prompt has Oxford-comma list of prohibited actions", hit is not None, True)
+
+    # 12y. Motivating directive 'and commit your changes' after unrelated negation (Adversarial review Finding 2)
+    p25 = os.path.join(prohibitive_dir, "subagents", "agent-commit-your-changes.jsonl")
+    with open(p25, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "This is an adversarial review. Don't skip any tests, and commit your changes."},
+        }) + "\n")
+    payload_p25 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p25}
+    hit = hook.offending("Bash", payload_p25["tool_input"], payload_p25)
+    check("must NOT block git commit when prompt directs 'and commit your changes' after unrelated negation", hit, None)
 finally:
     try:
         import shutil

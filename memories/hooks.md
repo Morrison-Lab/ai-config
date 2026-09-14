@@ -391,3 +391,7 @@ Adversarial review (ai-config#3623) established three key boundary requirements 
    (such as "Make no changes to files")
    must not be excluded by overly broad lookaheads (such as bare `files\b` in lookaheads)
    and must strictly match `RX_READ_ONLY`.
+
+4. **Distinguish Oxford-comma prohibited lists from coordinated write directives:**
+   In prohibitive prompts, comma-separated lists of prohibited verbs (e.g. "Do not write code, edit, and commit any files") share the initial negation clause.
+   Do not treat an `and <verb>` following a comma as starting an affirmative directive unless the preceding clause does not carry an active negated write action or an affirmative directive marker (`make sure`, `ensure`, `please`, `and then`) is present.

@@ -133,11 +133,12 @@ RX_NOT_READ_ONLY = re.compile(r"\bnot\s+read[- ]only\b", re.I)
 
 RX_AFFIRMATIVE_WRITE = re.compile(
     r"\band\s+then\s+(?:fix|commit|patch|repair|edit|modify|write|create)\b"
-    r"|\band\s+(?:fix|commit|patch|repair|edit|modify|write|create)\s+(?:(?:the|a|an|any|all|every|each|new|these|those)\s+|(?:issues?|bugs?|errors?|defects?|tests?|files?|patches?|scripts?)\b)"
-    r"|\b(?:fix|patch|repair|address)\s+(?:every|all|any|the|each|issues?|bugs?|errors?|defects?|findings?)\b"
-    r"|\bcommitt?(?:ing|ed)?\s+as\s+you\s+go\b"
-    r"|\b(?:make|apply)\s+(?:the\s+|a\s+)?(?:fixes?|changes?|edits?|patches?|modifications?)\b"
-    r"|\b(?:write|create)\s+(?:the\s+|a\s+|an\s+|new\s+)?(?:fixes?|tests?|files?|code|patches?|scripts?)\b",
+    r"|\band\s+(?:fix|commit|patch|repair|edit|modify|write|create)\s+(?:(?:the|a|an|any|all|every|each|new|these|those|your|their|its)\s+|(?:issues?|bugs?|errors?|defects?|tests?|files?|patches?|scripts?|changes?|work|updates?)\b)"
+    r"|\b(?:fix|patch|repair|address)\s+(?:every|all|any|the|each|your|these|those|issues?|bugs?|errors?|defects?|findings?)\b"
+    r"|\bcommitt?(?:ing|ed)?\s+(?:as\s+you\s+go|(?:the\s+|your\s+)?changes?)\b"
+    r"|\bcommit\s+(?:the\s+|your\s+|these\s+)?changes?\b"
+    r"|\b(?:make|apply)\s+(?:the\s+|a\s+|your\s+)?(?:fixes?|changes?|edits?|patches?|modifications?)\b"
+    r"|\b(?:write|create)\s+(?:the\s+|a\s+|an\s+|new\s+|your\s+)?(?:fixes?|tests?|files?|code|patches?|scripts?)\b",
     re.I,
 )
 
@@ -147,10 +148,20 @@ RX_NEGATED_OR_ADVISORY = re.compile(
     re.I,
 )
 
+RX_NEGATED_WRITE_ACTION = re.compile(
+    r"\b(?:do(?:es)?\s+not|don't|did(?:n't|\s+not)|never|without|not|avoid|refrain\s+from|no\s+need\s+to|should(?:n't|\s+not)|must(?:n't|\s+not)|cannot|can't)\s+"
+    r"(?:[^\n.;:!?]*\b)?(?:fix|patch|repair|edit|modify|write|create|commit|mutate|change)\b",
+    re.I,
+)
+
+RX_AFFIRMATIVE_MARKER = re.compile(
+    r"\b(?:and\s+then|make\s+sure(?:\s+you)?|ensure(?:\s+you)?|be\s+sure\s+to|please)\b",
+    re.I,
+)
+
 RX_BOUNDARY_SPLIT = re.compile(
     r"[;:.!?\n]"
     r"|\b(?:but|however|yet|nevertheless|nonetheless)\b"
-    r"|,\s*and\b"
     r"|\b(?:and\s+then|make\s+sure(?:\s+you)?|ensure(?:\s+you)?|be\s+sure\s+to|please)\b",
     re.I,
 )
@@ -162,7 +173,17 @@ def has_affirmative_write(content: str) -> bool:
         start = m.start()
         is_coordinated_and = bool(re.match(r"^and\s+", m.group(), re.I))
         preceding = content[:start].rstrip()
+
+        # If coordinated with 'and' after a comma:
+        # Check if the preceding clause has an active negated write action.
+        # If so, 'and <write_verb>' is part of a prohibited action list (e.g. 'Do not write, edit, and commit')
+        # unless an explicit affirmative directive marker ('make sure', 'ensure', 'please', 'then') intervenes.
         if is_coordinated_and and preceding.endswith(","):
+            separators = list(RX_BOUNDARY_SPLIT.finditer(content[:start]))
+            clause_start = separators[-1].end() if separators else 0
+            prior_clause = content[clause_start:start]
+            if RX_NEGATED_WRITE_ACTION.search(prior_clause) and not RX_AFFIRMATIVE_MARKER.search(prior_clause):
+                continue
             clause_prefix = ""
         else:
             separators = list(RX_BOUNDARY_SPLIT.finditer(content[:start]))

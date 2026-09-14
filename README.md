@@ -576,6 +576,22 @@ warn-only hooks never emit `reason` alone, that warn-only `Stop` hooks emit
 `systemMessage`, and that their test suites inspect the payload shape rather than
 checking non-empty output.
 
+A second hard gate covers how a hook finds its own files.
+`scripts/check-hook-file-resolution.py` refuses `os.path.abspath(__file__)` and
+the other lexical spellings (`normpath`, `Path(...).absolute()`) across
+`hooks/*.py` and `plugins/ai-config/*.py`, including a test suite resolving its
+`sys.argv` subject.
+
+So when adding a hook, resolve its own path with `os.path.realpath(__file__)`
+(or `Path(__file__).resolve()`), never `abspath`.
+`abspath` collapses `..` as text without consulting the filesystem, and this
+repo's `.claude/skills` is a symlink to its own `skills/`, so a hook reached
+through the skills-directory plugin registration computes its directory as
+`<checkout>/.claude/hooks` --- a directory that exists and holds no hooks.
+A fail-closed guard then denies every command it can no longer classify, and a
+fail-open one silently runs without its sibling's helpers.
+See `memories/hooks.md` and ai-config#2981.
+
 The `PreToolUse` half was added after `flag-cd-into-main-checkout.py` shipped
 printing its warning to stderr and exiting 0
 ([#3068](https://github.com/Morrison-Lab/ai-config/issues/3068)).

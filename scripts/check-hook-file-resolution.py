@@ -37,7 +37,8 @@ them to do what their code already does -- which is why `_mentions` refuses to
 descend through a `realpath()`/`resolve()` call rather than matching the
 outer spelling alone.
 
-Scope is `hooks/*.py`, test suites included, and two argument shapes:
+Scope is `hooks/*.py` and `plugins/ai-config/*.py`, test suites included,
+and two argument shapes:
 
   - `__file__`, which is how a hook finds its own directory.
   - `sys.argv[...]` inside a `hooks/test-*.py` suite, which is how a suite
@@ -81,6 +82,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 HOOKS_DIR = ROOT / "hooks"
+# `plugins/ai-config/` is in scope for the same reason `hooks/` is, and for a
+# sharper one: `claude-hook-adapter.py` is the file where this corpus FIRST
+# fixed this bug, under ai-config#2681, and it is reached through a symlinked
+# plugin root by construction. It kept a lexical `abspath` in its second
+# layout branch while its first used `realpath`, so the fix had not been
+# carried across two branches of one function -- which is the same
+# fix-where-the-symptom-appeared failure at its smallest possible scale.
+PLUGIN_DIR = ROOT / "plugins" / "ai-config"
+SCANNED_DIRS = (HOOKS_DIR, PLUGIN_DIR)
 
 SUCCESS_EXIT = 0
 FAILURE_EXIT = 1
@@ -182,17 +192,27 @@ def offenders(path: Path) -> list[tuple[int, str]]:
 
 
 def main() -> int:
-    if not HOOKS_DIR.is_dir():
-        print(f"error: no hooks directory at {HOOKS_DIR}", file=sys.stderr)
-        return FAILURE_EXIT
-
-    paths = sorted(HOOKS_DIR.glob("*.py"))
+    paths = []
+    for directory in SCANNED_DIRS:
+        if not directory.is_dir():
+            print(f"error: no directory at {directory}", file=sys.stderr)
+            return FAILURE_EXIT
+        found = sorted(directory.glob("*.py"))
+        if not found:
+            # Per directory, not over the union. Checking the union instead
+            # would let a populated sibling mask an empty one, which is the
+            # same vacuous-zero the emptiness check exists to refuse -- just
+            # harder to see.
+            print(f"error: no python files under {directory}", file=sys.stderr)
+            return FAILURE_EXIT
+        paths.extend(found)
     if not paths:
         # A glob that matches nothing would otherwise report a clean sweep of
         # zero files, which is the shape `shared/workflow/` warns about: a
         # detector that never ran is indistinguishable from one that found
         # nothing.
-        print(f"error: no hooks found under {HOOKS_DIR}", file=sys.stderr)
+        print("error: no python files found under "
+              + ", ".join(str(d) for d in SCANNED_DIRS), file=sys.stderr)
         return FAILURE_EXIT
 
     failures = []
@@ -211,7 +231,7 @@ def main() -> int:
               "See memories/hooks.md and ai-config#2981.", file=sys.stderr)
         return FAILURE_EXIT
 
-    print(f"checked {len(paths)} hook files; "
+    print(f"checked {len(paths)} hook and adapter files; "
           f"none resolves its own path or its subject lexically")
     return SUCCESS_EXIT
 

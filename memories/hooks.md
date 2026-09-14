@@ -431,12 +431,6 @@ Twelve root theirs at `realpath(__file__)` (or `realpath(_SELF)`) after this swe
 A `scripts/` file opened through an already-resolved path has no `..` left to collapse, so `abspath` and `realpath` agree inside it.
 Widen the checker the day something under `scripts/` is reached through a path that is *not* already resolved, and not before.
 Sweeping them would be churn dressed as thoroughness.
-
-One caveat about checking this entry's own line breaks, found while writing it:
-the repo's `new-line-breaks` gate does not see a sentence that opens with a digit, because its lookahead class is `[A-Z"'`*\[]`.
-This corpus opens sentences with derived counts constantly, so that blind spot lands exactly where its prose does ---
-two two-sentence lines in this section passed the gate green until a later commit reflowed them ([gha#878](https://github.com/Morrison-Lab/gha/issues/878)).
-
 `scripts/check-hook-file-resolution.py` is the instrument, hard-gating in `validate.yml`: the condition is one AST walk over `hooks/*.py`, the remedy is one word, and the corpus had already paid for the lesson twice without sweeping.
 
 - **Do:** write `os.path.realpath(__file__)` in any hook that resolves its own directory to reach a sibling or a data file.

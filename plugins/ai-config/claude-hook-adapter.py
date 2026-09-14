@@ -225,7 +225,7 @@ def find_repo_root(start_file=None):
         return candidate
 
     # 2. Staged layout: `hooks/` directory next to the adapter
-    adapter_dir = os.path.dirname(os.path.abspath(target_file))
+    adapter_dir = os.path.dirname(os.path.realpath(target_file))
     staged_hooks = os.path.join(adapter_dir, "hooks")
     if os.path.isdir(staged_hooks) and os.path.isfile(os.path.join(staged_hooks, "hooks.json")):
         real_hooks = os.path.realpath(staged_hooks)

@@ -46,10 +46,18 @@ def _run_main(mod, hooks_contents: dict | None) -> int:
     that a sweep of zero files must not read as a clean sweep.
     """
     d = Path(tempfile.mkdtemp(prefix="chfr-main-"))
-    saved_root, saved_dir = mod.ROOT, mod.HOOKS_DIR
+    saved = (mod.ROOT, mod.HOOKS_DIR, mod.PLUGIN_DIR, mod.SCANNED_DIRS)
     try:
         mod.ROOT = d
         mod.HOOKS_DIR = d / "hooks"
+        # The plugin directory is held constant and always present, so each
+        # case varies exactly one directory -- otherwise a "missing directory"
+        # case could pass for the wrong reason.
+        plugin_dir = d / "plugins" / "ai-config"
+        plugin_dir.mkdir(parents=True)
+        (plugin_dir / "adapter.py").write_text("X = 1\n", encoding="utf-8")
+        mod.PLUGIN_DIR = plugin_dir
+        mod.SCANNED_DIRS = (mod.HOOKS_DIR, plugin_dir)
         if hooks_contents is not None:
             mod.HOOKS_DIR.mkdir()
             for fname, text in hooks_contents.items():
@@ -65,7 +73,7 @@ def _run_main(mod, hooks_contents: dict | None) -> int:
             # file; a string payload is a failure, not a clean exit.
             return 1 if exc.code else 0
     finally:
-        mod.ROOT, mod.HOOKS_DIR = saved_root, saved_dir
+        mod.ROOT, mod.HOOKS_DIR, mod.PLUGIN_DIR, mod.SCANNED_DIRS = saved
         shutil.rmtree(d, ignore_errors=True)
 
 
@@ -86,6 +94,11 @@ MAIN_CASES = [
     # to `return []` left the suite green before this case existed. A file of
     # invalid UTF-8 exercises it without depending on file permissions, which
     # a root-running CI container would not honour.
+    # An empty hooks/ must fail even though the plugin directory the helper
+    # always populates is non-empty. Checking the UNION instead of each
+    # directory let that sibling mask it -- measured while widening the scope:
+    # the empty-directory case silently started passing for the wrong reason.
+    ("an empty hooks/ is not masked by a populated plugin directory", {}, 1),
     ("an undecodable hook exits nonzero rather than being skipped",
      {"h.py": b"\xff\xfe not utf-8"}, 1),
 ]
@@ -115,8 +128,8 @@ CASES = [
     ("the word abspath inside a string or comment only",
      "# do not use os.path.abspath(__file__) here\nX = 'os.path.abspath(__file__)'\n", 0),
     # normpath collapses `..` exactly as abspath does, and is already used at
-    # 7 sites in hooks/, so it is a live reintroduction route rather than a
-    # hypothetical one.
+    # 25 call sites across 7 files in hooks/ (12 of them in 5 non-test hooks),
+    # so it is a live reintroduction route rather than a hypothetical one.
     ("normpath joining __file__ with a parent segment",
      "import os\nROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))\n", 1),
     ("Path(__file__).absolute(), pathlib's non-resolving form",
@@ -190,13 +203,16 @@ def main() -> int:
     # The checker must also be green on the repo it ships in -- and that
     # assertion is only worth anything because the planted cases above prove
     # the detector fires.
-    repo_offenders = sum(len(mod.offenders(p))
-                         for p in sorted((ROOT / "hooks").glob("*.py")))
+    scanned = [p for d in (ROOT / "hooks", ROOT / "plugins" / "ai-config")
+               for p in sorted(d.glob("*.py"))]
+    repo_offenders = sum(len(mod.offenders(p)) for p in scanned)
     if repo_offenders:
-        print(f"FAIL (repo has {repo_offenders} offenders): hooks/ is clean")
+        print(f"FAIL (repo has {repo_offenders} offenders): "
+              f"hooks/ and plugins/ai-config/ are clean")
         failures += 1
     else:
-        print("PASS: hooks/ is clean")
+        print(f"PASS: hooks/ and plugins/ai-config/ are clean "
+              f"({len(scanned)} files)")
 
     total = len(CASES) + len(SUBJECT_CASES) + len(MAIN_CASES) + 1
     print(f"\n{total - failures}/{total} cases passed")

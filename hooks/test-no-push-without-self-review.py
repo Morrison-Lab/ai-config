@@ -27,8 +27,14 @@ import tempfile
 import time
 
 # Absolute, because every case runs the hook with `cwd` set to a throwaway
-# repository rather than the repo root.
-HOOK = os.path.abspath(sys.argv[1])
+# repository rather than the repo root. `realpath` rather than `abspath` for
+# the same reason the subject itself uses it (ai-config#2981): invoking this
+# suite against the hook's real registration path --
+# `.claude/skills/ai-config-hooks/../../hooks/<name>.py`, the natural way to
+# reproduce that issue by hand -- collapses to `<checkout>/.claude/hooks`
+# under `abspath`, and the sibling copy below then raises FileNotFoundError
+# before a single case runs.
+HOOK = os.path.realpath(sys.argv[1])
 
 _next_id = [0]
 

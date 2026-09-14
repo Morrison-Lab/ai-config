@@ -556,9 +556,12 @@ This is the adjacent-artifact substitution [`verify-the-right-artifact`](../shar
 
 ## Mutation-testing a hook that uses `_sibling()` cross-imports needs the mutant copy IN `hooks/`, not `/tmp`
 
-Every hook that imports another hook's helpers uses the `_sibling()` pattern (`flag-unmeasured-timestamp.py`, `flag-unread-commit-citation.py`, ...), which resolves the sibling's path off `HERE = os.path.dirname(os.path.abspath(__file__))` --- the mutant's OWN directory, not the original hook's.
+Every hook that imports another hook's helpers uses the `_sibling()` pattern (`flag-unmeasured-timestamp.py`, `flag-unread-commit-citation.py`, ...), which resolves the sibling's path off `HERE = os.path.dirname(os.path.realpath(__file__))` --- the mutant's OWN directory, not the original hook's.
 Copying a mutated hook file to `/tmp` for mutation-testing (`cp hook.py /tmp/mut.py`, or writing the mutant there directly) silently breaks every `_sibling()` import, because `/tmp/flag-unmeasured-timestamp.py` does not exist.
 `_sibling()` fails open (returns `None` on any exception), so the mutant does not crash --- it just runs with every imported regex/function replaced by `None` or a narrow local fallback, which changes its behaviour for reasons that have nothing to do with the mutation under test.
+
+That `HERE` spelling was `os.path.abspath(__file__)` until [#2981](https://github.com/Morrison-Lab/ai-config/issues/2981) changed every non-test hook to `realpath`.
+Nothing in this section changes: the two agree for a mutant copied into a real directory, and the `/tmp` trap above is about the directory, not about how it is spelled.
 
 The failure is invisible from the test runner's output alone: the suite still reports a pass/fail count, and a coincidentally-similar count to the unmutated baseline reads as "the mutation had no effect" rather than "the mutant never really ran the code being mutated."
 The tell, if you look for it, is that DIFFERENT mutations (say, inverting a patch-flag check vs. widening a SHA regex) produce an IDENTICAL failing-test list --- both are actually failing for the same reason (broken sibling imports), not for their own distinct reasons.

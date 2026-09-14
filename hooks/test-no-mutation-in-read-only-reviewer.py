@@ -565,6 +565,17 @@ try:
     payload_p22 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p22}
     hit = hook.offending("Bash", payload_p22["tool_input"], payload_p22)
     check("must block git commit when review prompt has comma-bounded interjection between negator and verb", hit is not None, True)
+
+    # 12w. Unrelated negation in preceding clause separated by comma-coordinated conjunction (Claude review round 10)
+    p23 = os.path.join(prohibitive_dir, "subagents", "agent-unrelated-clause-negation.jsonl")
+    with open(p23, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "This is an adversarial review. Don't skip any tests, and make sure you fix every failing test and commit your changes."},
+        }) + "\n")
+    payload_p23 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p23}
+    hit = hook.offending("Bash", payload_p23["tool_input"], payload_p23)
+    check("must NOT block git commit when prompt has unrelated negation before coordinated affirmative write directive", hit, None)
 finally:
     try:
         import shutil

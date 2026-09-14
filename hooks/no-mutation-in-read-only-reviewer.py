@@ -147,17 +147,28 @@ RX_NEGATED_OR_ADVISORY = re.compile(
     re.I,
 )
 
-RX_BOUNDARY_SPLIT = re.compile(r"[;:.!?\n]|\bbut\b|\bhowever\b|\byet\b|\bnevertheless\b|\bnonetheless\b", re.I)
+RX_BOUNDARY_SPLIT = re.compile(
+    r"[;:.!?\n]"
+    r"|\b(?:but|however|yet|nevertheless|nonetheless)\b"
+    r"|,\s*and\b"
+    r"|\b(?:and\s+then|make\s+sure(?:\s+you)?|ensure(?:\s+you)?|be\s+sure\s+to|please)\b",
+    re.I,
+)
 
 
 def has_affirmative_write(content: str) -> bool:
     """Check if content commands affirmative write actions (excluding advisory or negated verbs)."""
     for m in RX_AFFIRMATIVE_WRITE.finditer(content):
         start = m.start()
-        preceding = content[:start]
-        separators = list(RX_BOUNDARY_SPLIT.finditer(preceding))
-        clause_start = separators[-1].end() if separators else 0
-        clause_prefix = content[clause_start:start]
+        is_coordinated_and = bool(re.match(r"^and\s+", m.group(), re.I))
+        preceding = content[:start].rstrip()
+        if is_coordinated_and and preceding.endswith(","):
+            clause_prefix = ""
+        else:
+            separators = list(RX_BOUNDARY_SPLIT.finditer(content[:start]))
+            clause_start = separators[-1].end() if separators else 0
+            clause_prefix = content[clause_start:start]
+
         if RX_NEGATED_OR_ADVISORY.search(clause_prefix):
             continue
         return True

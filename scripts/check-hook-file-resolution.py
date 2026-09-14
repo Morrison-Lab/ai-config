@@ -46,17 +46,26 @@ Scope is `hooks/*.py`, test suites included, and two argument shapes:
     fine when it is not collapsed lexically.
 
 Three collapsing spellings are matched, because `abspath` is not the only one:
-`os.path.abspath`, `os.path.normpath` (already used at 7 sites in `hooks/`, so
-a live idiom here rather than a hypothetical), and `Path(...).absolute()`,
+`os.path.abspath`, `os.path.normpath` (25 call sites across 7 files in
+`hooks/`, 12 of them in 5 non-test hooks, so a live idiom here rather than a
+hypothetical), and `Path(...).absolute()`,
 pathlib's non-symlink-resolving form. `Path(...).resolve()` is
 realpath-equivalent and deliberately clean.
 
 What this cannot see, stated rather than implied: the argument has to mention
 `__file__` or `sys.argv` syntactically inside the call. Binding it to a name
-first (`p = __file__; os.path.abspath(p)`) escapes the walk. Closing that
-needs dataflow rather than a syntax match, and no such shape exists in the
-tree today -- so the instrument enforces the common members of the class in
-`memories/hooks.md`, not the whole class.
+first escapes the walk, and that shape IS live here --
+`flag-config-deletion-without-ref-check.py` writes
+`_SELF = globals().get("__file__") or sys.argv[0]` and resolves `_SELF`,
+deliberately, so the file works when exec'd into a namespace with no
+`__file__`. It uses `realpath` today, but swapping that one word to `abspath`
+yields zero offenders: measured, a one-word reintroduction of ai-config#2981
+at an existing site passes this gate silently.
+
+Closing it needs dataflow rather than a syntax match. Until then the
+instrument enforces the common members of the class stated in
+`memories/hooks.md`, not the whole class, and that one site is the known
+hole rather than a hypothetical one.
 
 Run: python3 scripts/check-hook-file-resolution.py
 """

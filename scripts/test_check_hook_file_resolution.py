@@ -38,8 +38,8 @@ def _offenders_of(mod, source: str, name: str = "sample.py") -> list[tuple[int, 
         shutil.rmtree(d, ignore_errors=True)
 
 
-def _run_main(mod, hooks_contents: dict | None) -> tuple[int, bool]:
-    """Run main() against a temp tree; return (exit code, printed anything).
+def _run_main(mod, hooks_contents: dict | None) -> int:
+    """Run main() against a temp tree and return its exit code.
 
     `hooks_contents` of None means no hooks directory at all. An empty dict
     means the directory exists and is empty -- the case whose whole point is
@@ -59,11 +59,11 @@ def _run_main(mod, hooks_contents: dict | None) -> tuple[int, bool]:
                 else:
                     target.write_text(text, encoding="utf-8")
         try:
-            return mod.main(), True
+            return mod.main()
         except SystemExit as exc:
             # offenders() raises SystemExit on an unreadable or unparseable
             # file; a string payload is a failure, not a clean exit.
-            return (1 if exc.code else 0), True
+            return 1 if exc.code else 0
     finally:
         mod.ROOT, mod.HOOKS_DIR = saved_root, saved_dir
         shutil.rmtree(d, ignore_errors=True)
@@ -162,7 +162,7 @@ def main() -> int:
             print(f"PASS: {label}")
 
     for label, contents, expected in MAIN_CASES:
-        code, _ = _run_main(mod, contents)
+        code = _run_main(mod, contents)
         if bool(code) != bool(expected):
             print(f"FAIL (exit {code}, wanted {'nonzero' if expected else '0'}): {label}")
             failures += 1

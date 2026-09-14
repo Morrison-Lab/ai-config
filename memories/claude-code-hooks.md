@@ -561,7 +561,7 @@ Copying a mutated hook file to `/tmp` for mutation-testing (`cp hook.py /tmp/mut
 `_sibling()` fails open (returns `None` on any exception), so the mutant does not crash --- it just runs with every imported regex/function replaced by `None` or a narrow local fallback, which changes its behaviour for reasons that have nothing to do with the mutation under test.
 
 That `HERE` spelling was `os.path.abspath(__file__)` until [#2981](https://github.com/Morrison-Lab/ai-config/issues/2981) changed every non-test hook that used it to `realpath`.
-(Some already resolved correctly by another spelling --- `flag-unattributable-reviewer-request.py` and `no-misattributed-quote.py` use `Path(__file__).resolve()` --- and were not touched.)
+(Some already resolved correctly by another spelling --- the three non-test hooks `flag-unattributable-reviewer-request.py`, `no-misattributed-quote.py` and `no-unauthorized-merge.py` use `Path(__file__).resolve()` --- and were not touched.)
 Nothing in this section changes: the two agree for a mutant copied into a real directory, and the `/tmp` trap above is about the directory, not about how it is spelled.
 
 The failure is invisible from the test runner's output alone: the suite still reports a pass/fail count, and a coincidentally-similar count to the unmutated baseline reads as "the mutation had no effect" rather than "the mutant never really ran the code being mutated."

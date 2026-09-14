@@ -414,17 +414,20 @@ The corpus had already paid for the lesson in an adjacent file and did not carry
 a path fix belongs to every site that is *reached* the way the broken one was, not to the file where the symptom appeared.
 
 That phrasing is the scope, and it is narrower than "every site that computes a path" on purpose.
-`scripts/` still holds lexical `abspath(__file__)` sites and they are deliberately left alone:
-nothing under `scripts/` is registered through the `.claude/skills` symlink, and no hook invokes one
-(derived: no `join`/`Popen`/`subprocess`/`spec_from_file_location` reference to a `scripts/` path in any non-test hook),
-so those sites are always reached by an ordinary path and `abspath` and `realpath` agree there.
+`scripts/` still holds lexical `abspath(__file__)` sites and they are deliberately left alone.
+The reason is not that hooks never reach into `scripts/` --- three non-test hooks do
+(`flag-clean-claim-over-findings.py` imports `check-pr-fully-clean.py`, `no-push-without-self-review.py` adds `scripts/lib` to `sys.path`, and `warn-new-line-breaks-on-push.py` runs the vendored line-break checker),
+and a first pass asserted the opposite from a grep too narrow to see them.
+It is that every path by which a hook reaches `scripts/` is already fully resolved:
+the first two root theirs at `realpath(__file__)` after this sweep, and the third takes its root from `git rev-parse --show-toplevel`.
+A `scripts/` file opened through an already-resolved path has no `..` left to collapse, so `abspath` and `realpath` agree inside it.
+Widen the checker the day something under `scripts/` is reached through a path that is *not* already resolved, and not before.
 Sweeping them would be churn dressed as thoroughness.
-Widen the checker the day something under `scripts/` becomes reachable through a symlinked registration, and not before.
 
 One caveat about checking this entry's own line breaks, found while writing it:
 the repo's `new-line-breaks` gate does not see a sentence that opens with a digit, because its lookahead class is `[A-Z"'`*\[]`.
 This corpus opens sentences with derived counts constantly, so that blind spot lands exactly where its prose does ---
-two two-sentence lines in this very section passed the gate green ([gha#878](https://github.com/Morrison-Lab/gha/issues/878)).
+two two-sentence lines in this section passed the gate green until a later commit reflowed them ([gha#878](https://github.com/Morrison-Lab/gha/issues/878)).
 
 `scripts/check-hook-file-resolution.py` is the instrument, hard-gating in `validate.yml`: the condition is one AST walk over `hooks/*.py`, the remedy is one word, and the corpus had already paid for the lesson twice without sweeping.
 

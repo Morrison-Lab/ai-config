@@ -344,7 +344,7 @@ CONFIG_LIKE_INDETERMINATE_FLAGS = (
 # whose text looks like a push (ai-config#2981).
 
 def _load_sibling():
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "no-unreviewed-pr.py")
+    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "no-unreviewed-pr.py")
     spec = importlib.util.spec_from_file_location("no_unreviewed_pr", path)
     if spec is None or spec.loader is None:
         raise ImportError(f"cannot load {path}")
@@ -385,7 +385,7 @@ def _load_review_payload():
         return extract_review_payload, payload_is_blocking
     except ImportError:
         pass
-    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    repo_root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     lib_dir = os.path.join(repo_root, "scripts", "lib")
     path = os.path.join(lib_dir, "review_payload.py")
     if os.path.isfile(path):

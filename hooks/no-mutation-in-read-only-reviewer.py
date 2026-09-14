@@ -102,20 +102,25 @@ REVIEW_PROMPT_RE = re.compile(
     re.I,
 )
 
-RX_WRITE_INTENT = re.compile(
-    r"\b(?:fix|fixes|fixing|commit|commits|committing|write|writes|writing|"
-    r"edit|edits|editing|modify|modifies|modifying|repair|repairs|repairing|"
-    r"patch|patching|implement|implementing|refactor|refactoring)\b",
-    re.I,
-)
-
 RX_READ_ONLY = re.compile(
     r"\bread-only\b"
     r"|\bread only\b"
-    r"|\bdo(?:es)? not (?:edit|modify|write|change) any(?:thing| files?)?\b"
-    r"|\bdon't (?:edit|modify|write|change) any(?:thing| files?)?\b"
+    r"|\bdo(?:es)? not (?:edit|modify|write|change|fix|commit|mutate) any(?:thing| files?)?\b"
+    r"|\bdon't (?:edit|modify|write|change|fix|commit|mutate) any(?:thing| files?)?\b"
+    r"|\bnever (?:edit|modify|write|change|fix|commit|mutate)\b"
     r"|\bmake no changes\b"
-    r"|\bwithout editing any\b",
+    r"|\bwithout (?:editing|modifying|changing|fixing|committing)\b",
+    re.I,
+)
+
+RX_NOT_READ_ONLY = re.compile(r"\bnot\s+read[- ]only\b", re.I)
+
+RX_AFFIRMATIVE_WRITE = re.compile(
+    r"\b(?:and|then)\s+(?:fix|commit|patch|repair|edit|modify)\b"
+    r"|\b(?:fix|patch|repair|address)\s+(?:every|all|any|the|each|issues?|bugs?|errors?|defects?|findings?)\b"
+    r"|\bcommitt?(?:ing|ed)?\s+as\s+you\s+go\b"
+    r"|\b(?:make|apply)\s+(?:the\s+)?(?:fixes|changes|edits|patches|modifications)\b"
+    r"|\b(?:write|create)\s+(?:the\s+)?(?:fixes|tests|files|code|patches)\b",
     re.I,
 )
 
@@ -330,10 +335,9 @@ def is_read_only_persona(payload: dict) -> tuple[bool, str]:
                                 elif isinstance(record.get("content"), str):
                                     content = record["content"]
                             if content:
-                                # A brief with write intent (fix, commit, edit, modify, etc.) is NEVER read-only
-                                if RX_WRITE_INTENT.search(content):
-                                    continue
-                                if RX_READ_ONLY.search(content) or REVIEW_PROMPT_RE.search(content):
+                                if RX_READ_ONLY.search(content) and not RX_NOT_READ_ONLY.search(content):
+                                    return True, "read-only reviewer subagent"
+                                if REVIEW_PROMPT_RE.search(content) and not RX_AFFIRMATIVE_WRITE.search(content):
                                     return True, "read-only reviewer subagent"
             except Exception:
                 pass

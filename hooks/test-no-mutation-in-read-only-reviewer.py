@@ -320,7 +320,61 @@ finally:
     except Exception:
         pass
 
-# 12. Process execution & output shape verification
+# 12. Subagent prompt nuance: prohibitive briefs vs affirmative write briefs
+prohibitive_dir = tempfile.mkdtemp()
+try:
+    # 12a. Prohibitive brief that mentions forbidden write words
+    p1 = os.path.join(prohibitive_dir, "subagents", "agent-prohibit.jsonl")
+    os.makedirs(os.path.dirname(p1), exist_ok=True)
+    with open(p1, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Do not edit, fix, or commit anything. This is a read-only review; only inspect and report findings."},
+        }) + "\n")
+    payload_p1 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'oops'"}, "transcript_path": p1}
+    hit = hook.offending("Bash", payload_p1["tool_input"], payload_p1)
+    check("must detect read-only persona even when prohibitive brief mentions forbidden write words", hit is not None, True)
+
+    # 12b. Verbatim agent prompt containing 'Edit and Write' in its read-only description
+    p2 = os.path.join(prohibitive_dir, "subagents", "agent-adv-prompt.jsonl")
+    with open(p2, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Read-only adversarial reviewer... Its declared allowlist omits Edit and Write. You are an adversarial reviewer."},
+        }) + "\n")
+    payload_p2 = {"tool_name": "Bash", "tool_input": {"command": "git checkout -b sneak"}, "transcript_path": p2}
+    hit = hook.offending("Bash", payload_p2["tool_input"], payload_p2)
+    check("must detect read-only persona when agent prompt mentions 'omits Edit and Write'", hit is not None, True)
+
+    # 12c. Affirmative write instruction in review context
+    p3 = os.path.join(prohibitive_dir, "subagents", "agent-affirm-write.jsonl")
+    with open(p3, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Perform an adversarial review and then fix every issue you find, committing as you go."},
+        }) + "\n")
+    payload_p3 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p3}
+    hit = hook.offending("Bash", payload_p3["tool_input"], payload_p3)
+    check("must NOT block when review brief has affirmative write directive ('and then fix...')", hit, None)
+
+    # 12d. Explicit 'not read-only' instruction
+    p4 = os.path.join(prohibitive_dir, "subagents", "agent-not-ro.jsonl")
+    with open(p4, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "This task is not read-only; perform review and repair any defects."},
+        }) + "\n")
+    payload_p4 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p4}
+    hit = hook.offending("Bash", payload_p4["tool_input"], payload_p4)
+    check("must NOT block when brief explicitly specifies 'not read-only'", hit, None)
+finally:
+    try:
+        import shutil
+        shutil.rmtree(prohibitive_dir, ignore_errors=True)
+    except Exception:
+        pass
+
+# 13. Process execution & output shape verification
 payload_deny = {
     "tool_name": "Bash",
     "tool_input": {"command": "git commit -m 'attempt fix'"},

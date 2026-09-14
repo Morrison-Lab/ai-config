@@ -102,9 +102,21 @@ REVIEW_PROMPT_RE = re.compile(
     re.I,
 )
 
-RX_READ_ONLY = re.compile(
-    r"\bread[- ]only\b"
-    r"|\bdo(?:es)? not\s+(?:(?:edit|modify|write|change|fix|commit|mutate)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|mutate)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
+RX_EXPLICIT_READ_ONLY = re.compile(
+    r"\b(?:you are\s+(?:a\s+)?|act as\s+(?:a\s+)?|this is\s+(?:a\s+)?|operate in\s+|run in\s+)?read[- ]only\s+(?:reviewer|subagent|agent|mode|task|review|audit|inspection|role|persona|pass)\b"
+    r"|\b(?:you are|act as|this is|operate in|run in)\s+(?:a\s+)?read[- ]only\b"
+    r"|\b(?:strictly|purely|entirely)\s+read[- ]only\b",
+    re.I,
+)
+
+RX_SCOPED_READ_ONLY = re.compile(
+    r"\b(?:directory|dir|folder|file|path|repo|repository|submodule|dependency|database|db|volume|mount|table|cache|disk|partition|branch|package|module)[^\n.?!;]*\bread[- ]only\b"
+    r"|\bread[- ]only\s+(?:directory|dir|folder|file|path|repo|repository|submodule|dependency|database|db|volume|mount|table|cache|disk|partition|branch|package|module)\b",
+    re.I,
+)
+
+RX_PROHIBITION = re.compile(
+    r"\bdo(?:es)? not\s+(?:(?:edit|modify|write|change|fix|commit|mutate)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|mutate)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
     r"|\bdon't\s+(?:(?:edit|modify|write|change|fix|commit|mutate)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|mutate)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
     r"|\bnever\s+(?:(?:edit|modify|write|change|fix|commit|mutate)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|mutate)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
     r"|\bmake no changes\b(?!\s+(?:to\s+(?:any\s+files\s+(?:outside|other than|except)|(?:unrelated|other|existing|arbitrary)\s+files?)|outside|other than|except)\b)"
@@ -112,8 +124,14 @@ RX_READ_ONLY = re.compile(
     re.I,
 )
 
+RX_READ_ONLY = re.compile(
+    RX_EXPLICIT_READ_ONLY.pattern + r"|" + RX_PROHIBITION.pattern,
+    re.I,
+)
+
 RX_NOT_READ_ONLY = re.compile(r"\bnot\s+read[- ]only\b", re.I)
 
+ADVISORY_PREFIX = re.compile(r"\b(?:how to|propose|suggest|explain|recommend)\s+", re.I)
 NEGATION_LOOKBEHINDS = r"(?<!\bdo not\s)(?<!\bdon't\s)(?<!\bnever\s)(?<!\bwithout\s)(?<!\bnot\s)"
 
 RX_AFFIRMATIVE_WRITE = re.compile(
@@ -125,6 +143,16 @@ RX_AFFIRMATIVE_WRITE = re.compile(
     r"|" + NEGATION_LOOKBEHINDS + r"\b(?:write|create)\s+(?:the\s+|a\s+|an\s+|new\s+)?(?:fixes?|tests?|files?|code|patches?|scripts?)\b",
     re.I,
 )
+
+
+def has_affirmative_write(content: str) -> bool:
+    """Check if content commands affirmative write actions (excluding advisory requests)."""
+    for m in RX_AFFIRMATIVE_WRITE.finditer(content):
+        start = m.start()
+        prefix = content[max(0, start - 25):start]
+        if not ADVISORY_PREFIX.search(prefix):
+            return True
+    return False
 
 ALWAYS_MUTATING_GIT_SUBCMDS = frozenset({
     "commit",
@@ -337,9 +365,14 @@ def is_read_only_persona(payload: dict) -> tuple[bool, str]:
                                 elif isinstance(record.get("content"), str):
                                     content = record["content"]
                             if content and not RX_NOT_READ_ONLY.search(content):
-                                if RX_READ_ONLY.search(content):
+                                if RX_EXPLICIT_READ_ONLY.search(content):
                                     return True, "read-only reviewer subagent"
-                                if REVIEW_PROMPT_RE.search(content) and not RX_AFFIRMATIVE_WRITE.search(content):
+                                if RX_PROHIBITION.search(content) and not has_affirmative_write(content):
+                                    return True, "read-only reviewer subagent"
+                                if re.search(r"\bread[- ]only\b", content, re.I):
+                                    if not RX_SCOPED_READ_ONLY.search(content) and not has_affirmative_write(content):
+                                        return True, "read-only reviewer subagent"
+                                if REVIEW_PROMPT_RE.search(content) and not has_affirmative_write(content):
                                     return True, "read-only reviewer subagent"
             except Exception:
                 pass

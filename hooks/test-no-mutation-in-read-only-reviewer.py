@@ -532,6 +532,17 @@ try:
     payload_p19 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'oops'"}, "transcript_path": p19}
     hit = hook.offending("Bash", payload_p19["tool_input"], payload_p19)
     check("must block git commit when prompt issues blanket 'Make no changes to files' prohibition", hit is not None, True)
+
+    # 12t. Resource-scoped 'read-only' with affirmative write directive (Claude review round 7)
+    p20 = os.path.join(prohibitive_dir, "subagents", "agent-resource-scoped-ro.jsonl")
+    with open(p20, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "The vendored/ directory is read-only; don't touch it. Fix the bug in mutable.py and commit your change."},
+        }) + "\n")
+    payload_p20 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p20}
+    hit = hook.offending("Bash", payload_p20["tool_input"], payload_p20)
+    check("must NOT block git commit when prompt scopes read-only to a resource and directs commit", hit, None)
 finally:
     try:
         import shutil

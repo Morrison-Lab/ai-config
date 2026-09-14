@@ -530,15 +530,19 @@ Round 5's suggested direction is this rule's remedy stated as a design change:
 "invert the default the way pass 2 already did --- treat a heredoc as executing
 unless its introducing line is provably fed to a non-executing consumer".
 
-**Third occurrence, measured 2026-09-14 while working ai-config#1308**, in a process-substitution scanner for the same file.
-A `<(` candidate with no matching `)` was dropped rather than treated as live, justified as "bash rejects the command outright" --- a claim about bash's own parser, standing in for the actual condition, which is whether THIS SCANNER'S paren model can be trusted whenever it cannot find a match.
-`bash <(use_case=1; echo "<merge>")` is balanced and bash runs it.
-The scanner had simply misread it, and the drop-on-unbalanced default turned that misread, and every other present or future misread of the same shape, into a silent ALLOW.
-Inverting the default --- an unmatched paren failing closed, its body taken to the end of the text --- caught that case and, by the same route, a second one the round had not yet found.
+**The general form, and why the two occurrences above are enough to state it.**
+Both are the same shape: a branch the code could not resolve, whose DEFAULT
+decided the guard's safety, defended by a claim about something other than the
+condition being tested.
+Round 5's `LEAD` case defended a drop with a claim about what `LEAD` was for;
+round 6's defended one with a claim about a heredoc's consumer.
 
-**That scanner is not on `main` as of this date.**
-Issue #1308 is open and the work is in flight, so a reader checking `main` will find no process-substitution scanner in that file at all.
-The occurrence is recorded because the LESSON is the file's own, repeated: a "cannot resolve, so allow" default doing more damage than any point-fix it was meant to guard against, for the third time in this file's review history, and the first two are on `main` and checkable today.)
+The test that catches both, before any third case is needed: for every
+"cannot tell" branch, say what the default does, and check that the sentence
+justifying it is about the CONDITION the branch tests rather than about
+something adjacent to it.
+A justification that names bash's parser, or the caller's intent, or the
+reference implementation, is not about whether THIS code can tell.)
 
 ## Repointing a configured path at a different artifact is reuse, and the accessor's own docs say what it is for
 
@@ -642,22 +646,23 @@ second question.
   that produces it does; the direction a give-up branch takes is fixed, and
   what that direction *costs* is decided anew by every caller.
 
-(Measured 2026-09-14 while working `Morrison-Lab/ai-config#1973`.
-The extraction was of `hooks/no-empty-promise.py`'s `_poller_executed` --- a
-function whose own docstring names itself the reference implementation and
-records four review rounds spent on this class --- into a shared helper wired
-into two guards.
-The review round that followed (14 findings) named the inversion directly:
-the descent was copied out of a place where every give-up point fails CLOSED
-into two guards where the identical give-up point fails OPEN.
-Six concrete `-c`-shaped bypasses were verified executing under real `bash`,
-and the new docstring's own "unchanged from the reference implementation"
-sentence was the artifact that let the mismatch ship.
+(The case that prompts this rule is `hooks/no-empty-promise.py`'s
+`_poller_executed`, which is on `main` and readable today.
+Its own docstring names it the reference implementation, records four review
+rounds spent on its class, and states the direction its give-up branches take:
+"a missed arming is visible to its author and one plainer command from
+clearing, whereas a false discharge defeats the guard silently".
 
-**Only the reference implementation is on `main` as of this date.**
-Issue #1973 is open and the extraction is in flight, so a reader can check
-`_poller_executed` and its four rounds today and cannot check the helper or
-the wiring.
-The rule above stands on the reference alone: the give-up branches are
-visible there, and the question it asks --- what does THIS caller pay for
-them --- is answerable against any consumer, present or future.)
+That sentence is what makes it the case.
+It is correct for a discharge check, where the worst outcome of giving up is a
+promise that does not clear.
+Read it in a GUARD and the same branch has the opposite worst outcome, because
+what gives up there is the thing deciding whether a destructive command is
+allowed.
+Nothing in the function changes; the cost of its limits does.
+
+Morrison-Lab/ai-config#1973 proposes extracting exactly this descent into a
+shared helper for two `PreToolUse` guards, which is what makes the question
+live rather than hypothetical.
+Read the issue for the proposal; the rule here needs only the reference, since
+the give-up branches and their stated direction are both in front of you.)

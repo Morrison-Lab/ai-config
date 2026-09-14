@@ -595,7 +595,9 @@ A hook that instead does a path-relative import of `scripts/lib/<module>.py` (re
 
 This is worse than the ad-hoc `/tmp cp` case above in one respect: it turns up inside the repo's own COMMITTED mutation harnesses, which read as already correct, so nothing prompts re-checking them.
 The bug then ships with the harness rather than being introduced by someone copying a hook elsewhere by hand.
-`hooks/test-no-clobbering-push.py` and `hooks/test-flag-reset-hard-uncommitted-work.py` are the two that hit it, on a branch that wires both hooks to `scripts/lib/shellcmd.py`.
+
+The population to check is derivable rather than memorable: any harness that writes the hook under test to a temp directory, paired with any hook importing something that is not a sibling hook.
+`grep -ln "tempfile\|mktemp" hooks/test-*.py` gives the first half and `grep -ln "scripts.*lib" hooks/*.py` the second; the intersection is the exposure.
 
 The remedy differs from `_sibling()`'s "relocate the mutant": there is no fixed sibling basename to sit next to, since the import is a package path rather than another hook's filename.
 Put the real `scripts/lib` directory on the mutant subprocess's own `PYTHONPATH` instead of trying to make the temp directory look like `hooks/`:
@@ -613,10 +615,9 @@ proc = subprocess.run([sys.executable, hook_path], ..., env=env, ...)
 - **Don't:** apply the `_sibling()` remedy ("keep the mutant in `hooks/`") here.
   It fixes a same-directory basename lookup and does nothing for a package import resolved off a different relative path.
 
-(Measured 2026-09-14 while working `Morrison-Lab/ai-config#1973`.
-Both harnesses copy the hook under test to a temp directory, and the fix under that issue makes both hooks import `scripts/lib/shellcmd.py`.
-Every new case then read as "flipped" under EVERY mutation, because the import landed as `None` in each mutant rather than because the reverted clause did anything.
+(The SYMPTOM is what makes this findable, and it is worth recognising on sight: every new case reads as "flipped" under EVERY mutation clause, including clauses that have nothing to do with it.
+That pattern means the mutant is not running the code under test at all -- the import landed as `None` and the hook degraded -- rather than that the reverted clause did anything.
+A single clause flipping unexpected cases is a test problem.
+ALL of them flipping the same new cases is an import problem.
 
-**The import wiring this describes is not on `main` as of that date** --- Issue #1973 is open and its fix is in flight, so a reader checking `main` will find neither the import nor the `PYTHONPATH` lines.
-The general rule above does not depend on that work landing: it is about any hook whose mutation harness copies one file while the hook imports a package path, and this repo will keep producing those.
-Stated this way deliberately, after a reviewer checked the first draft of this entry against `main`, found nothing, and reasonably read it as invented --- which is what a memory entry citing unpushed state looks like from outside.)
+Twelve non-test hooks already import `scripts/lib` on `main` today, so the exposure is live and growing whether or not any particular wiring lands.)

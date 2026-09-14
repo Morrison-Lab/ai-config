@@ -102,11 +102,8 @@ A POST whose payload contains `$(...)` command substitution is the concrete case
 Reusing the Stop hook's own parser for a block would therefore inherit a bias calibrated for a safe, low-cost consequence and apply it to an unsafe, high-cost one.
 
 [`hooks/no-unauthorized-merge.py`](../../hooks/no-unauthorized-merge.py) is the concrete evidence for how much engineering a *correctly calibrated* PreToolUse block over arbitrary shell-command structure costs in this repo: six review rounds (ai-config#1279, #1287) closing false-negative gaps in what counts as a command position, with its own comments stating the enumeration "cannot be finished."
-That cost recurs per construct rather than per file.
-Work on a process-substitution scanner for the same guard (ai-config#1308, open and in flight as of 2026-09-14) ran to four finding-bearing rounds of 9, 9, 7 and 10 without closing.
-One of those findings traced to the same shape as #1287's --- a default choice on a case the scanner could not resolve deciding the guard's safety, this time for process substitution rather than for a command-position anchor.
-Those round counts are this session's own measurements of work not yet on `main`.
-The #1287 counts above are in the merged history and checkable.
+That cost is per CONSTRUCT rather than per file, which is the part worth carrying forward: closing one class of bypass in a guard does not shorten the next class's review, because each new construct brings its own shell syntax the scanner does not yet model.
+ai-config#1308 is an open instance for the same guard, on a different construct.
 That investment is proportionate there because the thing being prevented is an unauthorized merge.
 It is not proportionate here, because the thing this new hook would prevent is a single wasted Bash call with a working safety net already in place -- the Stop hook already protects the actual invariant (no PR ships without a review request) and gives a one-round, self-explanatory fix.
 

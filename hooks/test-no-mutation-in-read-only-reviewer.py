@@ -708,6 +708,39 @@ try:
     payload_p35 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p35}
     hit = hook.offending("Bash", payload_p35["tool_input"], payload_p35)
     check("must block git commit when prompt states 'without fixing any files'", hit is not None, True)
+
+    # 12z11. Interjection 'Do not, under any circumstances, edit or fix any files.'
+    p36 = os.path.join(prohibitive_dir, "subagents", "agent-interjection-circumstances.jsonl")
+    with open(p36, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Do not, under any circumstances, edit or fix any files. Only inspect and report."},
+        }) + "\n")
+    payload_p36 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p36}
+    hit = hook.offending("Bash", payload_p36["tool_input"], payload_p36)
+    check("must block git commit with interjection 'Do not, under any circumstances, edit or fix any files'", hit is not None, True)
+
+    # 12z12. Interjection 'Do not, for any reason, commit any files.'
+    p37 = os.path.join(prohibitive_dir, "subagents", "agent-interjection-for-any-reason.jsonl")
+    with open(p37, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Do not, for any reason, commit any files."},
+        }) + "\n")
+    payload_p37 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p37}
+    hit = hook.offending("Bash", payload_p37["tool_input"], payload_p37)
+    check("must block git commit with interjection 'Do not, for any reason, commit any files'", hit is not None, True)
+
+    # 12z13. Interjection 'Never, under any circumstances, edit any files.'
+    p38 = os.path.join(prohibitive_dir, "subagents", "agent-never-interjection.jsonl")
+    with open(p38, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Never, under any circumstances, edit any files."},
+        }) + "\n")
+    payload_p38 = {"tool_name": "Edit", "tool_input": {"file_path": "main.py"}, "transcript_path": p38}
+    hit = hook.offending("Edit", payload_p38["tool_input"], payload_p38)
+    check("must block Edit with interjection 'Never, under any circumstances, edit any files'", hit is not None, True)
 finally:
     try:
         import shutil

@@ -115,12 +115,18 @@ RX_SCOPED_READ_ONLY = re.compile(
     re.I,
 )
 
+RX_INTERJECTION = r"(?:\s*,\s*[^,;:.!?\n]+,\s*|\s+(?:under any circumstances|for any reason|under any condition|at any time|at all|ever)\s+|\s+)"
+
 RX_PROHIBITION = re.compile(
-    r"\bdo(?:es)? not\s+(?:(?:edit|modify|write|change|fix|commit|mutate|add|stage|delete|remove|update|touch|apply|push|rebuild)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|fix|commit|mutate|add|stage|delete|remove|update|touch|apply|push|rebuild)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
-    r"|\bdon't\s+(?:(?:edit|modify|write|change|fix|commit|mutate|add|stage|delete|remove|update|touch|apply|push|rebuild)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|fix|commit|mutate|add|stage|delete|remove|update|touch|apply|push|rebuild)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
-    r"|\bnever\s+(?:(?:edit|modify|write|change|fix|commit|mutate|add|stage|delete|remove|update|touch|apply|push|rebuild)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|fix|commit|mutate|add|stage|delete|remove|update|touch|apply|push|rebuild)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
+    rf"\b(?:do(?:es)?\s+not|don't|never|must(?:n't|\s+not)|cannot|can't|should(?:n't|\s+not)){RX_INTERJECTION}"
+    r"(?:(?:edit|modify|write|change|fix|commit|mutate|add|stage|delete|remove|update|touch|apply|push|rebuild)[,\s]+(?:and\s+|or\s+)?)*"
+    r"(?:edit|modify|write|change|fix|commit|mutate|add|stage|delete|remove|update|touch|apply|push|rebuild)\b"
+    r".*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
     r"|\bmake no changes\b(?!\s+(?:to\s+(?:any\s+files\s+(?:outside|other than|except)|(?:unrelated|other|existing|arbitrary)\s+files?)|outside|other than|except)\b)"
-    r"|\bwithout\s+(?:(?:editing|modifying|writing|changing|fixing|committing|adding|staging|deleting|removing|updating|touching|applying|pushing|rebuilding)[,\s]+(?:and\s+|or\s+)?)*(?:editing|modifying|writing|changing|fixing|committing|adding|staging|deleting|removing|updating|touching|applying|pushing|rebuilding)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)",
+    rf"|\bwithout{RX_INTERJECTION}"
+    r"(?:(?:editing|modifying|writing|changing|fixing|committing|adding|staging|deleting|removing|updating|touching|applying|pushing|rebuilding)[,\s]+(?:and\s+|or\s+)?)*"
+    r"(?:editing|modifying|writing|changing|fixing|committing|adding|staging|deleting|removing|updating|touching|applying|pushing|rebuilding)\b"
+    r".*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)",
     re.I,
 )
 

@@ -398,3 +398,13 @@ Adversarial review (ai-config#3623) established three key boundary requirements 
    In contrast, compound sentences joining two independent clauses with `, and` (e.g. "Don't change config, and commit this") carry affirmative directives in the coordinated clause unless explicitly negated.
    Ensure verb lists in `RX_PROHIBITION` and `RX_NEGATED_WRITE_ACTION` remain symmetrical across prefix and terminal groups (`commit`, `fix`, `apply`, `push`, `rebuild`).
 
+5. **Support interjections between negators and prohibited verbs:**
+   Prohibitive instructions frequently insert parenthetical or adverbial interjections directly after negators
+   (e.g. "Do not, under any circumstances, edit or fix any files",
+   "Do not, for any reason, commit any files",
+   "Never, under any circumstances, edit any files").
+   Prohibition regexes must allow comma-separated parenthetical clauses
+   (`,\s*[^,;:.!?\n]+,\s*`)
+   and common adverbial phrases
+   (`under any circumstances|for any reason|under any condition|at any time|at all|ever`)
+   between the negator and the verb list.

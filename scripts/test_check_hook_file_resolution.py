@@ -139,9 +139,12 @@ CASES = [
      "from pathlib import Path\nROOT = Path(__file__).resolve().parent\n", 0),
     ("the word abspath inside a string or comment only",
      "# do not use os.path.abspath(__file__) here\nX = 'os.path.abspath(__file__)'\n", 0),
-    # normpath collapses `..` exactly as abspath does, and is already used at
-    # 25 call sites across 7 files in hooks/ (12 of them in 5 non-test hooks),
-    # so it is a live reintroduction route rather than a hypothetical one.
+    # normpath collapses `..` exactly as abspath does, and is already a live
+    # idiom in hooks/ rather than a hypothetical one. The call-site census is
+    # stated once, pinned to a ref and a date, in
+    # check-hook-file-resolution.py's own docstring -- restating it here would
+    # be the copy that goes stale on the next merge adding a normpath call,
+    # with nothing to say which of the two is current.
     ("normpath joining __file__ with a parent segment",
      "import os\nROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))\n", 1),
     ("Path(__file__).absolute(), pathlib's non-resolving form",

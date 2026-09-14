@@ -496,7 +496,9 @@ most of them adding `scripts/lib` to `sys.path`, plus `flag-clean-claim-over-fin
 That number took three attempts and then went stale on a merge, which is the more useful thing to record.
 A first pass grepped for a hand-listed set of call shapes and found none, and asserted the exclusion on it.
 A second corrected it to three by grepping for a path literal on the same line as a call.
-Only counting by AST, with the criterion stated, gave a number that reproduces --- and the criterion has to be stated, because counting `scripts.*` imports as well as path literals is what separates 14 from 13.
+Only counting by AST, with the criterion stated, gave a number that reproduces --- and the criterion has to be stated, because counting `scripts.*` imports as well as path literals is what separates the union from the path-literal-only count.
+That gap was 14 against 13 at the third attempt and is 15 against 14 on this branch's merged tree;
+the gap is the durable part, and the two numbers are not, which is why they carry the ref and the date above.
 That is [`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md) twice in one paragraph, in the sentence whose whole job was correcting the first instance.
 A fourth attempt was needed after the merge: it was 14 until `main` added `no-mutation-in-read-only-reviewer.py`, which reaches `scripts/lib`.
 So a derived count over a moving population needs its ref and its date attached, not only its criterion --- the neighbouring suite count was pinned that way and survived the merge, and this one was not and did not.

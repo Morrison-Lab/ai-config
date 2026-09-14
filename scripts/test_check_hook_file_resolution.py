@@ -203,8 +203,13 @@ CASES = [
     # present is not a boundary, and the docstring claims this one.
     ("an annotated binding from __file__",
      "import os\np: str = __file__\nD = os.path.abspath(p)\n", 1),
-    ("a walrus binding from __file__",
-     "import os\nD = os.path.abspath((p := __file__))\n", 1),
+    # The walrus case must separate the BINDING from the USE. Written as
+    # `abspath((p := __file__))` the reference sits lexically inside the call,
+    # so `_mentions` finds it by direct walk and never consults the collector
+    # -- the case passed identically with NamedExpr removed, which is a case
+    # named for a feature it could not test.
+    ("a walrus binding used on a later line",
+     "import os\nif (p := __file__):\n    D = os.path.abspath(p)\n", 1),
     ("a tuple-target binding from __file__",
      "import os\na, b = __file__, 1\nD = os.path.abspath(a)\n", 1),
     ("a bare annotation binds nothing",

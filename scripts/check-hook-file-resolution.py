@@ -68,13 +68,22 @@ existed, swapping either site's `realpath` to `abspath` yielded zero
 offenders -- a one-word reintroduction of ai-config#2981 passing the gate in
 silence, at the very file where the corpus first fixed it.
 
-One hop covers an ordinary assignment, an annotated one, a walrus, and a
-tuple target. What remains unseen, stated rather than implied: TWO hops
-(`A = __file__; B = A; os.path.abspath(B)`), and a binding through a
-container or a function parameter. Closing those needs real dataflow, and no
-such shape exists in the scanned tree -- so the instrument enforces the
-common members of the class stated in `memories/hooks.md` rather than the
-whole class.
+One hop covers four binding forms: an ordinary assignment, an annotated one,
+a walrus, and a tuple target.
+
+What remains unseen, enumerated rather than gestured at, because a boundary
+stated loosely is one nobody can check:
+
+  - TWO hops (`A = __file__; B = A; os.path.abspath(B)`).
+  - Four further ONE-hop forms that are not assignments -- a `for` target, a
+    `with ... as` target, a comprehension target, and an `AugAssign`.
+  - A binding through a container element or a function parameter.
+
+Each was measured at zero offenders against this checker, and each was then
+swept for in `hooks/` and `plugins/ai-config/`: none occurs. Closing them
+needs real dataflow, so the instrument enforces the common members of the
+class stated in `memories/hooks.md` rather than the whole class -- and says
+which members those are.
 
 Run: python3 scripts/check-hook-file-resolution.py
 """
@@ -293,6 +302,10 @@ def main() -> int:
               "through the .claude/skills symlink resolves its own directory "
               "to <checkout>/.claude/hooks, which holds none of the hooks a "
               "sibling import looks for. "
+              "If the flagged value is NOT a self-path -- a tuple assignment "
+              "binds every name in its target, so a name beside `__file__` is "
+              "reported too -- split that assignment rather than changing the "
+              "call. "
               "See memories/hooks.md and ai-config#2981.", file=sys.stderr)
         return FAILURE_EXIT
 

@@ -486,19 +486,21 @@ a path fix belongs to every site that is *reached* the way the broken one was, n
 That phrasing is the scope, and it is narrower than "every site that computes a path" on purpose.
 `scripts/` still holds lexical `abspath(__file__)` sites and they are deliberately left alone.
 The reason is not that hooks never reach into `scripts/`.
-14 non-test hooks do, counting by AST over `hooks/*.py` any `"scripts"`/`"scripts/..."` path literal or `from scripts.* import` --
+15 non-test hooks do, counting by AST over `hooks/*.py` any `"scripts"`/`"scripts/..."` path literal or `from scripts.* import`, on this branch's merged tree on 2026-09-14 --
 most of them adding `scripts/lib` to `sys.path`, plus `flag-clean-claim-over-findings.py` importing `check-pr-fully-clean.py` and `warn-new-line-breaks-on-push.py` running the vendored line-break checker.
 
-That number took three attempts, which is the more useful thing to record.
+That number took three attempts and then went stale on a merge, which is the more useful thing to record.
 A first pass grepped for a hand-listed set of call shapes and found none, and asserted the exclusion on it.
 A second corrected it to three by grepping for a path literal on the same line as a call.
 Only counting by AST, with the criterion stated, gave a number that reproduces --- and the criterion has to be stated, because counting `scripts.*` imports as well as path literals is what separates 14 from 13.
 That is [`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md) twice in one paragraph, in the sentence whose whole job was correcting the first instance.
+A fourth attempt was needed after the merge: it was 14 until `main` added `no-mutation-in-read-only-reviewer.py`, which reaches `scripts/lib`.
+So a derived count over a moving population needs its ref and its date attached, not only its criterion --- the neighbouring suite count was pinned that way and survived the merge, and this one was not and did not.
 
 The exclusion survives anyway, for a reason that does not depend on the count:
 every path by which a hook reaches `scripts/` is already fully resolved.
-Twelve of them compute that root as `realpath(__file__)` (or `realpath(_SELF)`) after this sweep;
-`warn-new-line-breaks-on-push.py` takes its root from `git rev-parse --show-toplevel`, and `warn-generated-file-stale.py` runs with `cwd` set from the same `rev-parse`.
+Thirteen of them compute that root as `realpath(__file__)` (or `realpath(_SELF)`) after this sweep;
+the other two take it from git --- `warn-new-line-breaks-on-push.py` from `git rev-parse --show-toplevel`, and `warn-generated-file-stale.py` by running with `cwd` set from the same `rev-parse`.
 A `scripts/` file opened through an already-resolved path has no `..` left to collapse, so `abspath` and `realpath` agree inside it.
 Widen the checker the day something under `scripts/` is reached through a path that is *not* already resolved, and not before.
 Sweeping them would be churn dressed as thoroughness.

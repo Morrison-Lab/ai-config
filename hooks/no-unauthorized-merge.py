@@ -396,40 +396,6 @@ def mask_subexpressions(val: str) -> str:
     return "".join(result)
 
 
-def _paren_matches(text: str):
-    """One quote-aware left-to-right pass returning two things at once.
-
-    `(open_index -> close_index)` for every balanced paren, and the ordered
-    list of `(lt_index, open_index)` for each `<(` that bash would actually
-    expand -- one inside quotes is literal, so it is not one.
-
-    Built as a single stack pass rather than a scan-forward-per-`<(` helper.
-    Scanning forward is quadratic when the parens do not balance: each `<(`
-    then reads to end of string. Measured on `bash <(` repeated with no closer:
-    130ms at 500 repetitions, 438ms at 1000, 1712ms at 2000, against a guard
-    that runs before every Bash call. The same trap `live_operand_test` and
-    VAR_PREFIX each carry a note about, reached a third way.
-    """
-    closes, starts, balanced = _paren_scan(text, quote_aware=True)
-    if not balanced:
-        # An odd quote leaves every later character reading as quoted, so the
-        # scan silently stops seeing `<(` at all. Masking comments closes one
-        # source of that (round 2, finding 2); it is not the only one, because
-        # `mask_heredocs` deliberately leaves an EXECUTING heredoc's body live,
-        # and an apostrophe there reaches this scan unmasked -- 12 of 12 such
-        # shapes ran a real merge (round 3, finding 2).
-        #
-        # Enumerating the sources is the failure mode this file keeps
-        # recording, so do not enumerate them. When the quote state does not
-        # balance, the quote-aware reading is unreliable BY ITS OWN ACCOUNT, so
-        # take the reading that cannot under-detect: rescan ignoring quotes
-        # entirely. That finds more regions, never fewer, which is the
-        # fail-closed direction -- and it costs one extra linear pass on input
-        # that is already malformed.
-        closes, starts, _ = _paren_scan(text, quote_aware=False)
-    return closes, starts
-
-
 # Where a shell word ends. Anything not in here is part of the word, so
 # `use_case` is one word and not a `case`.
 _WORD_BREAK = set(" \t\n;&|()<>\"'`$\\")
@@ -465,7 +431,9 @@ def _paren_scan(text: str, quote_aware: bool):
     starts = []
     stack = []            # (kind, index); kind is proc, paren, subst or brace
     case_depths = []      # stack depth at each `case`, once its `in` is seen
-    pending_case = []     # a `case` seen, waiting for its `in`
+    pending_case = []     # stack depth at each `case` awaiting its `in`
+    separated = False     # a command separator seen since the pending `case`
+    prev_word = ""        # the last complete unquoted word
     word = ""
     in_single = in_double = in_backtick = escaped = ansi_c = False
     i = 0
@@ -515,16 +483,31 @@ def _paren_scan(text: str, quote_aware: bool):
             if c not in _WORD_BREAK:
                 word += c
             else:
-                if word == "case":
-                    pending_case.append(True)
+                # The `in` must belong to the `case`, which means no command
+                # separator between them: `for case in a b` and
+                # `grep -c case f; grep -c in f` both armed pattern mode
+                # otherwise, ran the body to end of text, and blocked a later
+                # prose mention (round 5 finding 9).
+                # `for case in a b` and `select case in ...` name a VARIABLE
+                # `case`, and its `in` follows immediately with no separator,
+                # so the separator test above cannot tell them apart. The
+                # preceding word can (round 5 finding 9).
+                if word == "case" and prev_word not in ("for", "select"):
+                    pending_case.append(len(stack))
                 elif word == "in" and pending_case:
-                    pending_case.pop()
-                    case_depths.append(len(stack))
+                    if pending_case.pop() == len(stack) and not separated:
+                        case_depths.append(len(stack))
                 elif word == "esac":
                     if case_depths:
                         case_depths.pop()
                     elif pending_case:
                         pending_case.pop()
+                if c in ";&|\n":
+                    separated = True
+                elif word == "" and c not in " \t":
+                    separated = False
+                if word:
+                    prev_word = word
                 word = ""
             if c == "$" and i + 1 < n and text[i + 1] == "(":
                 stack.append(("subst", i + 1))
@@ -540,10 +523,15 @@ def _paren_scan(text: str, quote_aware: bool):
                 if stack and stack[-1][0] == "brace":
                     stack.pop()
             elif c == ")":
-                if stack and stack[-1][0] == "subst":
-                    stack.pop()          # closes the command substitution
-                elif case_depths and len(stack) <= case_depths[-1]:
+                # The case-pattern test comes FIRST. Popping a `subst`
+                # unconditionally consumed the pattern terminator of a `case`
+                # opened inside `$( )`, after which the substitution's real `)`
+                # popped the enclosing region and truncated the body
+                # (round 5 finding 2).
+                if case_depths and len(stack) <= case_depths[-1]:
                     pass                 # a `case` pattern terminator
+                elif stack and stack[-1][0] == "subst":
+                    stack.pop()          # closes the command substitution
                 elif stack and stack[-1][0] in ("paren", "proc"):
                     closes[stack.pop()[1]] = i
             elif c == "<" and i + 1 < n and text[i + 1] == "(":
@@ -570,12 +558,16 @@ def _paren_matches(text: str):
 
     The two readings are MERGED, never substituted. A quote-blind pass finds
     more region STARTS and can find strictly SHORTER bodies, because a `)`
-    inside quotes closes a region it should not: 213 executing fail-opens in a
-    4,000-case fuzz, every one on the substituted path, which is what the
-    previous version did (round 4). So a start is kept if either pass saw it,
-    and a body runs to the FURTHER of the two closers -- or to the end of the
-    text when only one pass saw the region at all, since the other cannot
-    vouch for a closer it never found.
+    inside quotes closes a region it should not, which is what the substituted
+    version did (round 4). So a start is kept if either pass saw it, and a body
+    runs to the FURTHER of the two closers.
+
+    A body whose CLOSER only one pass found runs to the end of the text. That
+    is about the closer, not about the region: both passes routinely see the
+    same start while only one finds a closer, and the earlier wording here --
+    "when only one pass saw the region at all" -- described a narrower
+    condition than the code applies (round 5 finding 10). The implemented rule
+    is the more fail-closed of the two, and it is the one stated now.
 
     `starts` from the fallback may include a `<(` inside quotes, which bash
     would not expand. That is an over-detection and it is deliberate: the pass
@@ -613,6 +605,53 @@ def _paren_matches(text: str):
 MAX_PROC_SUBST_DEPTH = 6
 
 
+# Constructs this scanner models APPROXIMATELY. A body containing any of them
+# is not one whose closing `)` can be trusted.
+#
+# WHY A WHITELIST, after five rounds of the other thing. The design rested on
+# "a modelling error fails closed", and that held only when the error also
+# unbalanced the QUOTE state, because the fail-closed path is keyed on quote
+# balance alone. Every fail-open found since has been a `)` misread while
+# quotes stayed balanced, so the net never fired: a `)` in a shell comment, a
+# `case` pattern inside `$( )` whose terminator pops the substitution first, a
+# `$( )` or `${ }` or backtick nested inside DOUBLE QUOTES where bash restarts
+# quoting and this scanner does not, and a `)` inside an executing heredoc body
+# that `mask_heredocs` deliberately leaves live.
+#
+# Each was found by a reviewer executing a real merge. The docstring below used
+# to enumerate "THREE THINGS" that make a `)` not a closer; there were at least
+# five, and this file records the same enumeration failing five separate times
+# for command-position anchors. An enumeration of what BREAKS the model cannot
+# be finished. An enumeration of what the model provably HANDLES can.
+#
+# So the matched `)` is trusted only for a body with none of these in it, and
+# any other body runs to the end of the text. The cost is an over-block on a
+# command that both contains one of these constructs AND carries a merge-shaped
+# string later on the same line; the benefit is that the next unmodelled
+# construct is a blocked command rather than a silent merge.
+_APPROXIMATED = ("#", "`", "$(", "${", "$'", "<<")
+
+
+def _body_is_simple(text: str, body_start: int, body_end: int) -> bool:
+    """True when nothing in this body defeats the paren model.
+
+    Deliberately conservative and deliberately cheap: a substring scan over one
+    region, with no attempt to decide whether a given occurrence is really the
+    construct it looks like. A `#` inside a word is not a comment, and paying
+    an over-block for it is the whole design.
+
+    `case` is deliberately NOT listed, because this scanner does model it --
+    tracking the keyword, requiring its `in`, and skipping a pattern `)` by
+    stack depth. Listing it extended every body merely MENTIONING the word to
+    end of text, which re-created the exact over-block the `in` requirement was
+    added to remove: `bash <(grep -c case f); echo "<prose>"` blocking a prose
+    mention. A `case` nested inside `$( )`, which the model does not handle, is
+    covered by `$(` being listed.
+    """
+    body = text[body_start:body_end]
+    return not any(token in body for token in _APPROXIMATED)
+
+
 def _proc_subst_regions(text: str) -> list:
     """`(lt_idx, body_start, body_end, depth, parent)` for each expandable `<(`.
 
@@ -636,6 +675,8 @@ def _proc_subst_regions(text: str) -> list:
     regions, stack = [], []
     for lt_idx, open_idx in candidates:
         close_idx = closes.get(open_idx, len(text))
+        if not _body_is_simple(text, open_idx + 1, close_idx):
+            close_idx = len(text)
         while stack and lt_idx > regions[stack[-1]][2]:
             stack.pop()
         regions.append((lt_idx, open_idx + 1, close_idx,
@@ -661,6 +702,14 @@ def _proc_subst_regions(text: str) -> list:
 # matters: NUL is not in PERMISSIVE_LEAD's `[;&`()\n\s]`, so no command
 # position opens inside a filled run and the whitespace partitioning above
 # cannot start (ai-config#1308 review, finding 5).
+#
+# `_FILL` fixes the WHITESPACE shape and not the others. A run of `$(` is still
+# quadratic in EXEC_AT_CMD_POS itself, and running that scan once per depth
+# view multiplies it: measured at 6 KB of `$( ` repetitions, 380ms on `main`
+# against 923ms here (round 5 finding 12). `MAX_PROC_SUBST_DEPTH` bounds the
+# multiplier at 7 rather than at the nesting depth, so this is a constant
+# factor on a pre-existing quadratic rather than a new order. The quadratic
+# itself is ai-config#3640.
 _FILL = "\x00"
 
 
@@ -753,13 +802,14 @@ def live_proc_subst_spans(text: str) -> list:
     `< <(...) bash` are the same command and both run the body's output. See
     `_depth_view`.
 
-    Comments are NOT masked here any more. That call was added when a lone
-    apostrophe in one -- `# don't` -- set `in_single` for the rest of the
-    string and silently suppressed every later `<(`. `_paren_matches`'s
-    quote-blind merge covers that case and every sibling of it, so the call
-    reverted with zero failing suite cases and its stated reason had become
-    untrue (round 4 findings 9 and 10). A guard keeping a clause whose
-    rationale no longer holds is how the next reader learns the wrong model.
+    Comments are masked first, and removing that call was a fail-open. It
+    reverted with zero failing suite cases, which is what made it look dead --
+    and a `)` inside a shell comment is literal to bash, structural to this
+    scanner, and leaves the quote state BALANCED, so the quote-blind merge
+    never runs and the body is truncated. `sh <(#)\necho "<merge>")` ran a real
+    merge with the call removed (round 5 finding 1). Zero failing cases meant
+    the suite did not cover it; the claim that the merge "covers that case and
+    every sibling of it" was the error.
 
     Returns maximal `(body_start, body_end)` pairs, disjoint and sorted by
     start. Disjoint because a substitution inside an already-live body is
@@ -781,6 +831,7 @@ def live_proc_subst_spans(text: str) -> list:
     catches the merge INSIDE the substitution and says nothing about the merge
     FEEDING it, which is the shape that is open.
     """
+    text = mask_trailing_comments(text)
     regions = _proc_subst_regions(text)
     if not regions:
         return []

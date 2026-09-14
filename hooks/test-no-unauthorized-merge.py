@@ -378,6 +378,22 @@ BLOCK = [
      "an apostrophe in an executing heredoc body does not suppress a later substitution"),
     ("ssh h <<EOF\ndon't\nEOF\nsource <(echo \"gh pr merge 411\")",
      "the same through ssh and source"),
+    # Round 5. Six more `)`-misread fail-opens, each verified executing a real
+    # merge under bash. Every one left the QUOTE state balanced, so the
+    # quote-blind merge -- the whole fail-closed mechanism at the time -- never
+    # fired. That is what moved the design from enumerating what BREAKS the
+    # paren model to enumerating what it provably HANDLES.
+    ('sh <(#)\necho "gh pr merge 411")', "a `)` inside a shell comment"),
+    ('source <(v=$(case $k in a) echo 1;; esac); echo "gh pr merge 411")',
+     "a case pattern inside $( ), whose terminator popped the substitution"),
+    ('bash <(: $(case x in x) :;; esac); echo "gh pr merge 411")',
+     "the same shape without an assignment"),
+    ('bash <(: "$(: "a)")"; echo "gh pr merge 411")',
+     "$( ) nested inside double quotes, where bash restarts quoting"),
+    ('bash <(: "${x:-"a)"}"; echo "gh pr merge 411")', "${ } nested inside double quotes"),
+    ('bash <(: "`: "a)"`"; echo "gh pr merge 411")', "a backtick nested inside double quotes"),
+    ('bash <(bash <<EOF\n)\nEOF\necho "gh pr merge 411")',
+     "a `)` inside an executing heredoc body, which mask_heredocs leaves live"),
 ]
 
 ALLOW = [
@@ -510,6 +526,13 @@ ALLOW = [
     # cites as its own bar (round 4 finding 7).
     ('bash <(grep -c case f) ; echo "you cannot gh pr merge 411 here"', "a bare word case is an argument, not a construct"),
     ('source <(grep -v case ~/.bashrc) ; echo "gh pr merge 411"', "the same through source"),
+    # Round 5. `case` armed pattern mode from any later unquoted `in`, which
+    # need not belong to it -- so a loop variable named `case`, or two
+    # unrelated greps, ran the body to end of text and blocked a prose mention.
+    ('bash <(for case in a b; do :; done); echo "never gh pr merge 411"',
+     "a loop variable named case is not a case construct"),
+    ('bash <(grep -c case f; grep -c in f); echo "never gh pr merge 411"',
+     "an `in` in a later simple command does not belong to an earlier case"),
 ]
 
 
@@ -993,10 +1016,16 @@ for tool_name, tool_input, desc in MCP_ALLOW:
 # clause changes and a verdict can be reached by a different route.
 #
 # An earlier version of this comment said the clauses were "NOT reachable
-# through a verdict". That was false and this file's own cases refute it:
-# deleting the quote-blind merge flips 2 verdict cases, the word break 1, and
-# the `case` skipping 2 (round 4 finding 5). The span checks are a sharper
-# instrument, not the only one -- which is the honest reason to have both.
+# through a verdict", and then a later one gave per-clause counts that were
+# wrong for the code shipped beside them (round 5 finding 7). Both errors have
+# the same cause: a mutation count measured against one revision and copied
+# forward into the next.
+#
+# So no counts are quoted here. Re-measure them -- revert the clause, run this
+# file, read the number -- rather than trusting a figure written down when the
+# surrounding code was different. The span checks below are a sharper
+# instrument than a verdict case for these clauses, which is the reason to have
+# both, and is true independently of any count.
 import importlib.util as _ilu
 
 _spec = _ilu.spec_from_file_location("_guard", HOOK)
@@ -1033,6 +1062,7 @@ _span_check("a case pattern's `)` is not the closer",
 # passes saw the region at all and the other cannot vouch for a closer it never
 # found. Substituting the blind reading instead of merging it produced strictly
 # SHORTER bodies and 213 executing fail-opens in a 4,000-case fuzz.
+
 # The depth cap was described in a commit message as "a performance bound with
 # no reachable behavioural test". That was wrong: past the cap the analysis
 # stops and the body is assumed executed, so a nest one level past it blocks
@@ -1045,6 +1075,9 @@ if not _guard.offending(_DEEP):
 print(("  ok    " if _guard.offending(_DEEP) else "  WRONG ")
       + " a nest past the depth cap fails closed")
 
+# An odd quote makes the quote-aware read unreliable by its own account, so a
+# quote-blind pass is merged in. The body then runs to the end of the text
+# rather than to the `)`, because the two passes do not agree on a closer.
 _span_check("an unbalanced quote merges a quote-blind scan, failing closed",
             "don't\nbash <(echo hi)", [(13, 21)])
 

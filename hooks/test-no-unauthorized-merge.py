@@ -292,9 +292,14 @@ BLOCK = [
      "a PR merge that also matches the GraphQL pattern is ambiguous"),
     # ai-config#1308: `<(...)` runs its body and hands the caller a /dev/fd path
     # whose contents are that body's OUTPUT. When the caller runs what it is
-    # given, the output is a script -- and the merge text never appears at a
-    # command position anywhere in the command line, so neither a wider
-    # command-position anchor nor the live-operand rule reaches it.
+    # given, the output is a script.
+    #
+    # In MOST of these the merge text never reaches a command position at all,
+    # which is why neither a wider command-position anchor nor the live-operand
+    # rule reached them. Two are different and are marked: the merge sits at a
+    # command position inside the body, so they already blocked before this
+    # scanner existed. They are kept as regression guards for the masking, not
+    # as evidence of what it fixed.
     ('bash <(echo "gh pr merge 411")', "a process substitution fed to bash"),
     ("sh <(printf %s 'gh pr merge 411')", "printf building the script body"),
     ('zsh <(echo "gh pr merge 411")', "a non-bash shell reading the substitution"),
@@ -306,8 +311,33 @@ BLOCK = [
     ('FOO=1 bash <(echo "gh pr merge 411")', "an env assignment before the executor"),
     ('bash <(echo a; echo "gh pr merge 411")', "a separator inside the body does not reset the command position"),
     ('bash <(cat <(echo "gh pr merge 411"))', "a nested substitution inside an executed body"),
-    ("bash <(gh pr merge 411)", "the merge at a command position inside the body"),
-    ('echo x > >(bash -c "gh pr merge 411")', "an output process substitution running an executor"),
+    ("bash <(gh pr merge 411)", "REGRESSION GUARD (blocked before this scanner): the merge at a command position inside the body"),
+    ('echo x > >(bash -c "gh pr merge 411")', "REGRESSION GUARD (blocked before this scanner): an output process substitution running an executor"),
+    # Round 2 of ai-config#1308's adversarial review. Each of the four below
+    # really executed the merge under bash against a `gh` stub, and each was
+    # ALLOWED by round 1's own fix.
+    #
+    # A redirection may be written BEFORE the command name, so the test is
+    # co-occurrence rather than order. This file already recorded that lesson
+    # for heredocs and the first draft of the substitution scanner reproduced
+    # it anyway -- a backwards-only scan never saw the trailing `bash`.
+    ('< <(echo "gh pr merge 411") bash', "an executor written after the substitution"),
+    ('0< <(echo "gh pr merge 411") bash', "the same with an explicit fd"),
+    # `_paren_matches` is quote-STATEFUL, unlike every other scanner here, so
+    # one apostrophe in a comment used to set `in_single` for the rest of the
+    # string and silently suppress every later `<(`.
+    ("echo hi # don't\nbash <(echo \"gh pr merge 411\")", "an apostrophe in a comment does not desync the paren scan"),
+    ('echo hi # ok\nbash <(echo "gh pr merge 411")', "the same line with no apostrophe"),
+    # `source`/`.` execute their input, so a heredoc fed to one is a script.
+    # Round 1 taught that to the substitution scanner and not to the heredoc
+    # masker, which is the enumerate-one-consumer-and-stop failure.
+    ("source /dev/stdin <<'EOF'\ngh pr merge 411\nEOF", "a heredoc fed to source"),
+    (". /dev/stdin <<EOF\ngh pr merge 411\nEOF", "a heredoc fed to the dot form"),
+    # A bare `.` pathspec DOES read as the source builtin, because
+    # PERMISSIVE_LEAD makes any whitespace a command position. Recorded as the
+    # accepted over-block it is, rather than asserted away in an ALLOW case
+    # whose stated reason the code contradicts.
+    ('rsync -a . <(echo "gh pr merge 411")', "ACCEPTED OVER-BLOCK: a bare dot pathspec reads as the source builtin"),
 ]
 
 ALLOW = [
@@ -415,8 +445,15 @@ ALLOW = [
     ('gh pr comment 1 --body "repro: bash <(echo \'gh pr merge 411\')"', "the construct inside a comment body"),
     ('ALLOW_MERGE=1 bash <(echo "gh pr merge 411")', "an explicit override on the substitution form"),
     ("bash <(echo hello)", "a process substitution with no merge in it"),
-    ("ls . <(echo hello)", "a bare dot pathspec is not the source builtin"),
-    ("bash <(echo 'gh pr view 411'", "an unbalanced opener bash would reject anyway"),
+    # Load-bearing: the body carries a REAL merge, so this passes only because
+    # the opener is unbalanced. With `gh pr view` it passed with the balance
+    # requirement deleted outright, which is a case that cannot fail.
+    ("bash <(echo 'gh pr merge 411'", "an unbalanced opener bash would reject anyway"),
+    # The executor is in the PREVIOUS segment, which a `bisect_left` on
+    # separator ends reached into by returning the index OF the separator
+    # ending at the `<(` rather than past it.
+    ('bash -c y;<(echo "gh pr merge 411")', "an executor before the separator does not introduce this substitution"),
+    ('cat f;<(echo "gh pr merge 411")', "the same with no executor anywhere"),
 ]
 
 

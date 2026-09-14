@@ -155,20 +155,48 @@ HEREDOC_EXECUTOR = EXEC_AT_CMD_POS
 # declining to mask, which costs a scan, while under-detecting hides a merge.
 EXEC_BEFORE_QUOTE = EXEC_AT_CMD_POS
 # `source` and `.` run the CONTENTS of what they are handed, so a process
-# substitution given to either is a script exactly as `bash <(...)` is.
+# substitution or a heredoc given to either is a script exactly as
+# `bash <(...)` and `bash <<EOF` are.
 #
-# Deliberately NOT folded into EXEC_PROGS. That list's other two consumers read
-# an operand as a COMMAND, while `source`'s operand is a FILENAME -- adding it
-# there would keep `source "gh pr merge"` live for no gain. And `.` cannot take
-# the `\b` those consumers append: `\b` after a non-word character requires a
-# word character next, which `. <(` does not have. The lookahead is what keeps
-# `./script.sh` and a bare `.` pathspec from matching.
+# Deliberately NOT folded into EXEC_PROGS, which has THREE consumers where only
+# two want this. EXEC_BEFORE_QUOTE reads an operand as a COMMAND, while
+# `source`'s operand is a FILENAME, so adding it there would keep
+# `source "gh pr merge"` live for no gain. And `.` cannot take the `\b` that
+# consumer appends: `\b` after a non-word character requires a word character
+# next, which `. <(` does not have.
+#
+# Getting that split wrong once already cost a hole. The first version of this
+# comment reasoned about the quoted-operand consumer, concluded "not in
+# EXEC_PROGS", and never asked what the OTHER consumers needed -- so
+# `source /dev/stdin <<'EOF' ... EOF` had its body masked as inert prose while
+# bash ran the merge inside it. Enumerating one consumer and stopping is the
+# same shape as enumerating what may precede a command word.
+#
+# The lookahead keeps `./script.sh` from matching, since `.` is followed by
+# `/`. It does NOT keep a bare `.` pathspec from matching: PERMISSIVE_LEAD
+# makes any whitespace a command position, so the ` . ` in `rsync -a . <(...)`
+# matches and that substitution is read as executed. The over-block is
+# accepted rather than narrowed -- this anchor decides whether to SCAN, where
+# a false positive costs a scan and a false negative hides a merge -- but it
+# is stated here because the claim, not the behaviour, was wrong before.
 DOT_SOURCE_AT_CMD_POS = re.compile(
     PERMISSIVE_LEAD + ENV_WRAP + r"(?:source|\.)(?=[ \t])"
+)
+# "This construct's CONTENTS are executed": the union both the heredoc masker
+# and the process-substitution scanner want. One compiled object rather than
+# two call-site alternations, because every place in this file that rolled a
+# second command-position anchor has since had to be fixed.
+EXECUTES_ITS_INPUT = re.compile(
+    "(?:" + EXEC_AT_CMD_POS.pattern + ")|(?:" + DOT_SOURCE_AT_CMD_POS.pattern + ")"
 )
 # Where the current simple command begins. An operand cannot be separated from
 # its executor by a command separator, so scanning back only this far keeps
 # `bash -c "x"; echo "prose"` from treating the second quote as live.
+# Rebound now that EXECUTES_ITS_INPUT exists. `mask_heredocs` asks whether the
+# line's consumer RUNS the body, and `source`/`.` do (ai-config#1308 review,
+# finding 3): `source /dev/stdin <<'EOF'` executes what it reads.
+HEREDOC_EXECUTOR = EXECUTES_ITS_INPUT
+
 COMMAND_SEPARATOR = re.compile(r"[;&|\n`()]")
 OPT_VAL = r"""(?:="[^"]*"|='[^']*'|=[^\s;&|`()]+|\s+"[^"]*"|\s+'[^']*'|\s+[^\s;&|`()]+|\$\{IFS\}[^\s;&|`()]+)"""
 OPT_FLAGS = rf"(?:\s+-[A-Za-z0-9_-]+(?:{OPT_VAL})?)*"
@@ -386,14 +414,118 @@ def _paren_matches(text: str):
     return closes, starts
 
 
+# Past this many nested process substitutions, stop analysing and treat the
+# body as executed. The analysis costs one linear pass per nesting LEVEL, so an
+# unbounded depth is unbounded work on a guard that runs before every Bash
+# call; a cap turns that into a constant. Failing CLOSED at the cap is the
+# direction this whole file takes -- an over-block clears with ALLOW_MERGE=1,
+# and nothing anyone writes by hand nests six deep.
+MAX_PROC_SUBST_DEPTH = 6
+
+
+def _proc_subst_regions(text: str) -> list:
+    """`(lt_idx, body_start, body_end, depth, parent)` for each expandable `<(`.
+
+    Ordered by position, so siblings at one depth are disjoint and a child
+    always follows its parent. `parent` indexes back into this same list, or is
+    `-1` at the top level.
+
+    An UNBALANCED candidate is dropped rather than recorded: bash rejects the
+    command outright, so there is nothing in it to hide a merge in.
+    """
+    closes, candidates = _paren_matches(text)
+    regions, stack = [], []
+    for lt_idx, open_idx in candidates:
+        close_idx = closes.get(open_idx)
+        if close_idx is None:
+            continue
+        while stack and lt_idx > regions[stack[-1]][2]:
+            stack.pop()
+        regions.append((lt_idx, open_idx + 1, close_idx,
+                        len(stack), stack[-1] if stack else -1))
+        stack.append(len(regions) - 1)
+    return regions
+
+
+# What a blanked region is filled with, and it is deliberately NOT a space.
+#
+# EXEC_AT_CMD_POS is quadratic on a long WHITESPACE run -- its command-position
+# lead is `[;&`()\n\s]\s*` followed by two bounded repetitions that each end in
+# `\s*`/`\s+`, so every position in the run re-tries the same partitions.
+# Measured on `main`: `echo x` plus 1200 trailing spaces takes 1502ms inside
+# `offending`, and 2400 takes 5886ms. That is pre-existing and tracked
+# separately -- but filling a view with spaces would hand that regex its worst
+# input SEVEN times over, so a 400-deep nest cost 1288ms here before this
+# character changed. NUL is in no character class this file matches, so a
+# filled run is inert and linear.
+_FILL = "\x00"
+
+
+def _blank(view: list, start: int, stop: int) -> None:
+    """Fill `view[start:stop]` with `_FILL`, keeping one space at each end.
+
+    The end spaces matter. PERMISSIVE_LEAD needs a command position before a
+    command word, and a real token adjacent to a filled run would otherwise sit
+    against a NUL and fail to anchor -- so `< <(...) bash` would blank the
+    substitution correctly and then lose the `bash` it exists to find.
+    """
+    if stop <= start:
+        return
+    for i in range(start, stop):
+        view[i] = _FILL
+    view[start] = " "
+    view[stop - 1] = " "
+
+
+def _depth_view(text: str, regions: list, depth: int) -> str:
+    """`text` with only the simple commands at nesting `depth` legible.
+
+    Length-preserving, so one set of offsets indexes this and `text` alike.
+
+    Two blankings, and the second is the whole point. Everything outside a
+    depth-`depth` body is blanked, so a separator in an enclosing shell cannot
+    bound a command in this one. Then every depth-`depth` substitution is
+    blanked WHOLE -- its `<(`, its body, and its `)` -- so the enclosing simple
+    command reads as one contiguous run.
+
+    Blanking the DELIMITERS is what finding 1 of ai-config#1308's review
+    turned on. `(` and `)` are COMMAND_SEPARATORs, so leaving them in place
+    cuts the enclosing simple command in two, and an executor written on the
+    far side of the substitution lands in a different segment:
+    `< <(echo "<merge>") bash` really runs the merge, and a scan that only
+    looked BEFORE the `<(` never saw the `bash`. This file already recorded
+    that lesson for heredocs -- "A redirection may appear anywhere in a simple
+    command ... Order was never part of the question" -- and the first draft of
+    this scanner reproduced it anyway.
+    """
+    if depth == 0:
+        view = list(text)
+    else:
+        view = [_FILL] * len(text)
+        for _lt, body_start, body_end, region_depth, _parent in regions:
+            if region_depth == depth - 1:
+                view[body_start:body_end] = list(text[body_start:body_end])
+                # The `(` and `)` just outside the body become the command
+                # positions its first and last simple commands anchor on.
+                if body_start:
+                    view[body_start - 1] = " "
+                if body_end < len(view):
+                    view[body_end] = " "
+    for lt_idx, _body_start, body_end, region_depth, _parent in regions:
+        if region_depth == depth:
+            _blank(view, lt_idx, body_end + 1)
+    return "".join(view)
+
+
 def live_proc_subst_spans(text: str) -> list:
     """Body spans of `<(...)` process substitutions whose output is EXECUTED.
 
     `<(...)` runs the body and hands the caller a `/dev/fd/N` path whose
-    contents are the body's OUTPUT. When the caller is an executor, that output
-    is a script -- so `bash <(echo "<merge>")`, `sh <(printf "%s" "<merge>")`,
-    `source <(...)` and `. <(...)` all run the merge, while the merge text never
-    appears at a command position anywhere in the command line.
+    contents are the body's OUTPUT. When the caller runs what it is given, that
+    output is a script -- so `bash <(echo "<merge>")`, `sh <(printf "%s"
+    "<merge>")`, `source <(...)` and `. <(...)` all run the merge, while the
+    merge text never appears at a command position anywhere in the command
+    line.
 
     `mask_inert_quotes` could not see it. `(` is a COMMAND_SEPARATOR, so
     scanning back from a quote inside the body stops at the `(` and never
@@ -402,51 +534,80 @@ def live_proc_subst_spans(text: str) -> list:
     anchor does not reach this, and neither does the live-operand rule -- the
     executor is plainly visible and it is the OPERAND that is unreachable.
 
-    Returns maximal `(body_start, body_end)` pairs, disjoint and sorted by
-    start. Disjoint because a `<(` found INSIDE an already-live body is skipped
-    rather than recorded: its own enclosing command may well not be an executor
-    (`bash <(cat <(echo "<merge>"))`), and the outer span already covers it.
-    That is the fail-CLOSED direction, matching every other masking decision in
-    this file -- over-detecting an executor costs a scan, under-detecting hides
-    a merge.
+    The test is CO-OCCURRENCE, not order: does the simple command owning this
+    `<(` invoke something that executes its input, anywhere on it? A
+    redirection may be written before the command name, so `bash <(...)` and
+    `< <(...) bash` are the same command and both run the body's output. See
+    `_depth_view`.
 
-    `cat <(echo "<merge>")` is deliberately NOT a span: `cat` does not run its
-    input, so nothing merges and the text is prose. An UNBALANCED `<(` is not
-    one either -- bash rejects the command outright, so there is nothing to
-    hide a merge in.
+    Comments are masked first. `_paren_matches` is quote-STATEFUL, so a lone
+    apostrophe anywhere -- `# don't` -- would otherwise set `in_single` for the
+    rest of the string and silently suppress every later `<(`. The sibling
+    scanners in this file are quote-naive regexes and never had that exposure,
+    which is why the round-1 draft read a subject nothing else needed masked.
+
+    Returns maximal `(body_start, body_end)` pairs, disjoint and sorted by
+    start. Disjoint because a substitution inside an already-live body is
+    skipped rather than recorded: its own enclosing command may well not be an
+    executor (`bash <(cat <(echo "<merge>"))`), and the outer span already
+    covers it.
+
+    `cat <(echo "<merge>")` is deliberately NOT a span, because `cat` does not
+    run its input. That is a claim about `cat`, NOT about the command line:
+    `cat <(echo "<merge>") | bash` does merge, and this guard allows it, on
+    this branch and on `main` alike. What defeats it is the pipe, which
+    SPLIT makes a segment boundary -- a pre-existing hole tracked separately,
+    and the reason the sentence above is scoped to the consumer rather than to
+    the outcome.
     """
-    closes, candidates = _paren_matches(text)
-    if not candidates:
+    text = mask_trailing_comments(text)
+    regions = _proc_subst_regions(text)
+    if not regions:
         return []
 
-    sep_ends = [m.end() for m in COMMAND_SEPARATOR.finditer(text)]
-    exec_ends = sorted(
-        [m.end() for m in EXEC_AT_CMD_POS.finditer(text)]
-        + [m.end() for m in DOT_SOURCE_AT_CMD_POS.finditer(text)]
-    )
-
-    def executor_precedes(lt_idx: int) -> bool:
-        """Does an executor occupy this `<(`'s own simple command?
-
-        Precomputed offsets plus binary search, not a per-`<(` rescan, for the
-        same reason `live_operand_test` precomputes its own.
-        """
-        j = bisect.bisect_right(exec_ends, lt_idx)
-        if j == 0:
-            return False
-        i = bisect.bisect_left(sep_ends, lt_idx)
-        seg_start = sep_ends[i - 1] if i else 0
-        return exec_ends[j - 1] >= seg_start
-
+    # `covered` is live-OR-inside-something-live, and it is not the same array.
+    # Skipping a child because its parent runs must mark the CHILD covered too,
+    # or a grandchild sees a parent that is merely `live == False` and gets
+    # evaluated on its own -- re-recording a span already inside a recorded one
+    # and breaking the disjointness `mask_inert_quotes` bisects on.
+    live = [False] * len(regions)
+    covered = [False] * len(regions)
     spans = []
-    for lt_idx, open_idx in candidates:
-        if spans and spans[-1][0] <= lt_idx < spans[-1][1]:
-            continue  # already covered by an enclosing executed body
-        close_idx = closes.get(open_idx)
-        if close_idx is None:
+    deepest = max(region[3] for region in regions)
+    for depth in range(min(deepest, MAX_PROC_SUBST_DEPTH) + 1):
+        at_depth = [i for i, region in enumerate(regions) if region[3] == depth]
+        if not at_depth:
             continue
-        if executor_precedes(lt_idx):
-            spans.append((open_idx + 1, close_idx))
+        view = _depth_view(text, regions, depth)
+        separators = list(COMMAND_SEPARATOR.finditer(view))
+        sep_ends = [m.end() for m in separators]
+        sep_starts = [m.start() for m in separators]
+        exec_ends = sorted(m.end() for m in EXECUTES_ITS_INPUT.finditer(view))
+        for index in at_depth:
+            lt_idx, body_start, body_end, _depth, parent = regions[index]
+            if parent >= 0 and covered[parent]:
+                covered[index] = True
+                continue  # already covered by an enclosing executed body
+            # bisect_RIGHT: a separator ENDING exactly at `lt_idx` bounds this
+            # segment, and bisect_left would return its own index and hand back
+            # the separator before it -- reaching into the previous segment for
+            # an executor that never introduced this command.
+            i = bisect.bisect_right(sep_ends, lt_idx)
+            seg_start = sep_ends[i - 1] if i else 0
+            j = bisect.bisect_left(sep_starts, body_end)
+            seg_end = sep_starts[j] if j < len(sep_starts) else len(view)
+            if bisect.bisect_right(exec_ends, seg_end) > bisect.bisect_left(
+                    exec_ends, seg_start):
+                live[index] = covered[index] = True
+                spans.append((body_start, body_end))
+    # Past the cap, stop asking and assume the body runs.
+    for index, region in enumerate(regions):
+        if region[3] > MAX_PROC_SUBST_DEPTH:
+            parent = region[4]
+            if parent < 0 or not covered[parent]:
+                covered[index] = True
+                spans.append((region[1], region[2]))
+    spans.sort()
     return spans
 
 

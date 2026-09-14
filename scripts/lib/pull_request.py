@@ -29,6 +29,14 @@ class CheckRun:
         self.conclusion: Optional[str] = data.get("conclusion")
         self.html_url: str = (data.get("html_url") or "")
 
+class ReviewThread:
+    def __init__(self, data: Dict[str, Any]):
+        self.id: str = data.get("id") or ""
+        self.is_resolved: bool = bool(data.get("isResolved", False))
+        self.is_outdated: bool = bool(data.get("isOutdated", False))
+        self.path: str = data.get("path") or ""
+        self.line: Optional[int] = data.get("line")
+
 class PullRequest:
     def __init__(self, pr_num: str, repo: str, fetcher: Callable[[List[str]], str] = default_fetcher):
         self.pr_num = str(pr_num)
@@ -36,6 +44,7 @@ class PullRequest:
         self._fetcher = fetcher
         self._data = self._fetch_pr_data()
         self._check_runs = None
+        self._review_threads = None
         
     def _fetch_pr_data(self) -> Dict[str, Any]:
         fields = [
@@ -82,3 +91,44 @@ class PullRequest:
             self._check_runs = [CheckRun(cr) for cr in (json.loads(stdout).get("check_runs") or [])]
         return self._check_runs
 
+    def get_review_threads(self) -> List[ReviewThread]:
+        if self._review_threads is None:
+            owner, name = self.repo.split("/", 1)
+            query = (
+                "query($owner:String!,$name:String!,$n:Int!,$cursor:String){"
+                "repository(owner:$owner,name:$name){"
+                "pullRequest(number:$n){"
+                "reviewThreads(first:100,after:$cursor){"
+                "pageInfo{hasNextPage endCursor}"
+                "nodes{id isResolved isOutdated path line}"
+                "}}}}"
+            )
+            nodes = []
+            cursor = None
+            while True:
+                cmd = [
+                    "gh", "api", "graphql",
+                    "-f", f"query={query}",
+                    "-F", f"owner={owner}",
+                    "-F", f"name={name}",
+                    "-F", f"n={self.pr_num}",
+                ]
+                if cursor:
+                    cmd.extend(["-F", f"cursor={cursor}"])
+                stdout = self._fetcher(cmd)
+                data = json.loads(stdout)
+                threads_data = (
+                    data.get("data", {})
+                    .get("repository", {})
+                    .get("pullRequest", {})
+                    .get("reviewThreads", {})
+                )
+                nodes.extend(threads_data.get("nodes") or [])
+                page_info = threads_data.get("pageInfo") or {}
+                if not page_info.get("hasNextPage"):
+                    break
+                cursor = page_info.get("endCursor")
+                if not cursor:
+                    break
+            self._review_threads = [ReviewThread(node) for node in nodes]
+        return self._review_threads

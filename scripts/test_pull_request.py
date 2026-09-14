@@ -1,9 +1,10 @@
+import json
 import unittest
 from unittest.mock import patch, MagicMock
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from scripts.lib.pull_request import PullRequest, Review, IssueComment, CheckRun
+from scripts.lib.pull_request import PullRequest, Review, IssueComment, CheckRun, ReviewThread
 
 class TestPullRequest(unittest.TestCase):
     def setUp(self):
@@ -66,6 +67,96 @@ class TestPullRequest(unittest.TestCase):
         self.assertEqual(runs[0].status, "completed")
         self.assertEqual(runs[0].conclusion, "success")
         mock_run.assert_called_once()
+
+    @patch('subprocess.run')
+    @patch.object(PullRequest, '_fetch_pr_data')
+    def test_get_review_threads(self, mock_fetch, mock_run):
+        mock_fetch.return_value = self.mock_data
+        graphql_resp = json.dumps({
+            "data": {
+                "repository": {
+                    "pullRequest": {
+                        "reviewThreads": {
+                            "pageInfo": {"hasNextPage": False, "endCursor": None},
+                            "nodes": [
+                                {
+                                    "id": "thread_1",
+                                    "isResolved": False,
+                                    "isOutdated": False,
+                                    "path": "src/main.py",
+                                    "line": 42
+                                },
+                                {
+                                    "id": "thread_2",
+                                    "isResolved": True,
+                                    "isOutdated": True,
+                                    "path": "src/utils.py",
+                                    "line": None
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        })
+        mock_run.return_value.stdout = graphql_resp
+
+        pr = PullRequest("123", "owner/repo")
+        threads = pr.get_review_threads()
+        self.assertEqual(len(threads), 2)
+        self.assertEqual(threads[0].id, "thread_1")
+        self.assertFalse(threads[0].is_resolved)
+        self.assertFalse(threads[0].is_outdated)
+        self.assertEqual(threads[0].path, "src/main.py")
+        self.assertEqual(threads[0].line, 42)
+
+        self.assertEqual(threads[1].id, "thread_2")
+        self.assertTrue(threads[1].is_resolved)
+        self.assertTrue(threads[1].is_outdated)
+        self.assertEqual(threads[1].path, "src/utils.py")
+        self.assertIsNone(threads[1].line)
+
+    @patch('subprocess.run')
+    @patch.object(PullRequest, '_fetch_pr_data')
+    def test_get_review_threads_pagination(self, mock_fetch, mock_run):
+        mock_fetch.return_value = self.mock_data
+        page1 = json.dumps({
+            "data": {
+                "repository": {
+                    "pullRequest": {
+                        "reviewThreads": {
+                            "pageInfo": {"hasNextPage": True, "endCursor": "cur1"},
+                            "nodes": [{"id": "t1", "isResolved": True, "isOutdated": False, "path": "a.py", "line": 1}]
+                        }
+                    }
+                }
+            }
+        })
+        page2 = json.dumps({
+            "data": {
+                "repository": {
+                    "pullRequest": {
+                        "reviewThreads": {
+                            "pageInfo": {"hasNextPage": False, "endCursor": None},
+                            "nodes": [{"id": "t2", "isResolved": False, "isOutdated": True, "path": "b.py", "line": 2}]
+                        }
+                    }
+                }
+            }
+        })
+        mock_run.side_effect = [MagicMock(stdout=page1), MagicMock(stdout=page2)]
+
+        pr = PullRequest("123", "owner/repo")
+        threads = pr.get_review_threads()
+        self.assertEqual(len(threads), 2)
+        self.assertEqual(threads[0].id, "t1")
+        self.assertEqual(threads[1].id, "t2")
+        self.assertEqual(mock_run.call_count, 2)
+        # Verify second call included cursor
+        second_cmd = mock_run.call_args_list[1][0][0]
+        self.assertIn("-F", second_cmd)
+        self.assertIn("cursor=cur1", second_cmd)
+
 
 if __name__ == '__main__':
     unittest.main()

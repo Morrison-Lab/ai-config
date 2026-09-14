@@ -184,6 +184,7 @@ def build_payload(
     commits_raw: List[Dict[str, Any]],
     check_runs_raw: List[Dict[str, Any]],
     actions_runs: Optional[Dict[str, Dict[str, Any]]] = None,
+    review_threads_raw: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Map REST JSON to the shape scripts/lib/payload_fetcher.py expects.
 
@@ -250,10 +251,96 @@ def build_payload(
         }
         for c in check_runs_raw
     ]
-    payload = {"repo": owner_repo, "pr": pr, "check_runs": check_runs}
+    payload = {
+        "repo": owner_repo,
+        "pr": pr,
+        "check_runs": check_runs,
+    }
     if actions_runs is not None:
         payload["actions_runs"] = actions_runs
+    if review_threads_raw is not None:
+        payload["review_threads"] = review_threads_raw
     return payload
+
+
+def fetch_review_threads(owner_repo: str, pr_number: int, token: str) -> Optional[List[Dict[str, Any]]]:
+    """Fetch review threads via GraphQL if reachable.
+
+    Returns None if GraphQL is unreachable (e.g. pinned-proxy environment
+    or token without GraphQL scope), warning on stderr so the omission is
+    visible. The payload will then omit 'review_threads', causing
+    check-pr-fully-clean.py --from-json to fail fast (exit 2) rather than
+    silently assuming zero unresolved threads.
+    """
+    owner, name = owner_repo.split("/", 1)
+    query = (
+        "query($owner:String!,$name:String!,$n:Int!,$cursor:String){"
+        "repository(owner:$owner,name:$name){"
+        "pullRequest(number:$n){"
+        "reviewThreads(first:100,after:$cursor){"
+        "pageInfo{hasNextPage endCursor}"
+        "nodes{id isResolved isOutdated path line}"
+        "}}}}"
+    )
+    nodes: List[Dict[str, Any]] = []
+    cursor: Optional[str] = None
+    url = "https://api.github.com/graphql"
+    while True:
+        body = json.dumps({
+            "query": query,
+            "variables": {"owner": owner, "name": name, "n": pr_number, "cursor": cursor},
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=body,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "User-Agent": USER_AGENT,
+                "Content-Type": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req) as resp:
+                data = json.load(resp)
+        except urllib.error.HTTPError as exc:
+            err_body = exc.read().decode("utf-8", "replace")
+            print(
+                f"warning: GraphQL reviewThreads query failed ({exc.code} {err_body}); "
+                "review_threads will be omitted from payload",
+                file=sys.stderr,
+            )
+            return None
+        except Exception as exc:  # noqa: BLE001
+            print(
+                f"warning: GraphQL reviewThreads query failed ({exc}); "
+                "review_threads will be omitted from payload",
+                file=sys.stderr,
+            )
+            return None
+
+        if "errors" in data:
+            print(
+                f"warning: GraphQL reviewThreads returned errors ({data['errors']}); "
+                "review_threads will be omitted from payload",
+                file=sys.stderr,
+            )
+            return None
+
+        threads_data = (
+            data.get("data", {})
+            .get("repository", {})
+            .get("pullRequest", {})
+            .get("reviewThreads", {})
+        )
+        nodes.extend(threads_data.get("nodes") or [])
+        page_info = threads_data.get("pageInfo") or {}
+        if not page_info.get("hasNextPage"):
+            break
+        cursor = page_info.get("endCursor")
+        if not cursor:
+            break
+    return nodes
 
 
 def fetch_payload(owner_repo: str, pr_number: int, token: str) -> Dict[str, Any]:
@@ -266,8 +353,16 @@ def fetch_payload(owner_repo: str, pr_number: int, token: str) -> Dict[str, Any]
         f"{base}/commits/{pr_raw['head']['sha']}/check-runs", token, envelope="check_runs"
     )
     actions_runs = fetch_actions_runs(owner_repo, run_ids_from_check_runs(check_runs_raw), token)
+    review_threads = fetch_review_threads(owner_repo, pr_number, token)
     return build_payload(
-        owner_repo, pr_raw, reviews_raw, comments_raw, commits_raw, check_runs_raw, actions_runs
+        owner_repo,
+        pr_raw,
+        reviews_raw,
+        comments_raw,
+        commits_raw,
+        check_runs_raw,
+        actions_runs,
+        review_threads,
     )
 
 
@@ -311,7 +406,8 @@ def main() -> int:
         f"{pr['mergeStateStatus']} decision={pr['reviewDecision'] or '-'} "
         f"reviews={len(pr['reviews'])} comments={len(pr['comments'])} "
         f"commits={len(pr['commits'])} checks={len(payload['check_runs'])} "
-        f"actions_runs={len(payload.get('actions_runs') or {})}"
+        f"actions_runs={len(payload.get('actions_runs') or {})} "
+        f"threads={len(payload['review_threads']) if 'review_threads' in payload else '-'}"
     )
     return 0
 

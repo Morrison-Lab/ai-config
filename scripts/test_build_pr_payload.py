@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 SCRIPT = Path(__file__).parent / "build-pr-payload.py"
 spec = importlib.util.spec_from_file_location("build_pr_payload", SCRIPT)
@@ -352,6 +353,52 @@ def test_cancelled_run_superseded_end_to_end():
           not ok_other and any("cancelled" in i for i in issues_other))
 
 
+def test_review_threads_handling():
+    # 1. review_threads is absent when review_threads_raw is None
+    payload_none = build_pr_payload.build_payload(
+        "example-org/example-repo", PR_RAW, [], [], [], []
+    )
+    check("review_threads is absent when not gathered", "review_threads" not in payload_none)
+
+    # 2. review_threads carried through when provided
+    sample_threads = [{"id": "t1", "isResolved": True, "isOutdated": False, "path": "x.py", "line": 1}]
+    payload_threads = build_pr_payload.build_payload(
+        "example-org/example-repo", PR_RAW, [], [], [], [], review_threads_raw=sample_threads
+    )
+    check("review_threads carried through when provided", payload_threads.get("review_threads") == sample_threads)
+
+    # 3. fetch_review_threads returns nodes on successful GraphQL
+    graphql_data = {
+        "data": {
+            "repository": {
+                "pullRequest": {
+                    "reviewThreads": {
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "nodes": sample_threads,
+                    }
+                }
+            }
+        }
+    }
+    class FakeResp:
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+        def read(self):
+            return json.dumps(graphql_data).encode("utf-8")
+
+    with patch("urllib.request.urlopen", return_value=FakeResp()):
+        with patch("json.load", return_value=graphql_data):
+            threads = build_pr_payload.fetch_review_threads("example-org/example-repo", 123, "tok")
+            check("fetch_review_threads extracts nodes", threads == sample_threads)
+
+    # 4. fetch_review_threads returns None on error
+    with patch("urllib.request.urlopen", side_effect=Exception("network down")):
+        threads = build_pr_payload.fetch_review_threads("example-org/example-repo", 123, "tok")
+        check("fetch_review_threads returns None on error", threads is None)
+
+
 def main():
     test_run_ids_from_check_runs()
     test_build_payload_carries_actions_runs()
@@ -366,6 +413,7 @@ def main():
     test_check_runs_bare_list_accepted_by_payload_fetcher()
     test_rest_get_paginates_enveloped_check_runs()
     test_main_fails_fast_with_no_token()
+    test_review_threads_handling()
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

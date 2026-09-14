@@ -68,6 +68,7 @@ def base_payload():
             {"name": "validate", "status": "completed",
              "conclusion": "success", "html_url": "https://example.invalid/1"},
         ],
+        "review_threads": [],
     }
 
 
@@ -218,7 +219,48 @@ def main():
     f(["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"])
     f(["gh", "api", "repos/o/r/commits/x/check-runs?per_page=100"])
     f(["gh", "api", "repos/o/r/actions/runs/900"])
-    check("routing: all four command shapes recorded", len(f.seen) == 4)
+    f(["gh", "api", "graphql", "-f", "query=...", "-F", "owner=o", "-F", "name=r", "-F", "n=1"])
+    check("routing: all five command shapes recorded", len(f.seen) == 5)
+
+    # --- review_threads payload validation and verdicts ---
+    p = base_payload()
+    del p["review_threads"]
+    code, _ = run_script(p)
+    check("missing review_threads exits 2, NOT 1", code == 2)
+
+    p = base_payload()
+    p["review_threads"] = "invalid"
+    code, _ = run_script(p)
+    check("review_threads as string exits 2, NOT 1", code == 2)
+
+    p = base_payload()
+    p["review_threads"] = ["invalid"]
+    code, _ = run_script(p)
+    check("review_threads with non-dict item exits 2, NOT 1", code == 2)
+
+    p = base_payload()
+    p["review_threads"] = [
+        {"id": "t1", "isResolved": False, "isOutdated": False, "path": "src/main.py", "line": 42}
+    ]
+    code, out = run_script(p)
+    check("unresolved live review thread exits 1 (not clean)", code == 1)
+    check("...and names path and line", "src/main.py:42" in out)
+
+    p = base_payload()
+    p["review_threads"] = [
+        {"id": "t2", "isResolved": False, "isOutdated": True, "path": "src/old.py", "line": 10}
+    ]
+    code, out = run_script(p)
+    check("unresolved outdated review thread exits 0 (clean)", code == 0)
+    check("...and notes outdated thread", "Unresolved outdated review thread at src/old.py:10" in out)
+
+    p = base_payload()
+    p["review_threads"] = [
+        {"id": "t3", "is_resolved": False, "is_outdated": False, "path": "src/snake.py", "line": 7}
+    ]
+    code, out = run_script(p)
+    check("snake_case is_resolved False blocks clean status", code == 1)
+    check("...and names snake_case path and line", "src/snake.py:7" in out)
 
     # An end-to-end run WITHOUT -R must exercise resolve_repo through the
     # payload rather than shelling out; a run WITH a realistic Actions URL

@@ -425,6 +425,21 @@ Operationalized by:
 the diagnostic requirements in `AGENTS.md`
 and log-inspection mechanisms.
 
+## Teach a man to fish --- don't fix subagents' mistakes yourself
+
+When an agent, subagent, or assistant produces defective, incomplete, or misaligned work,
+do not absorb the defect by quietly fixing it yourself.
+Help the agent fix it itself:
+send the correction back with the concrete finding,
+the counterexample that broke it,
+and the standard to meet,
+and have the agent execute the repair and record the learning.
+
+Full statement: [`teach-a-man-to-fish`](teach-a-man-to-fish.md).
+Operationalized by:
+[`improve-your-subagents`](../workflow/improve-your-subagents.md#send-the-correction-back-to-the-agent-never-absorb-it-yourself)
+and delegation workflows.
+
 ## The 3Rs lens — reduce, reuse, recycle
 
 The environmental mnemonic maps cleanly onto the catalog, and makes a
@@ -539,6 +554,13 @@ and fail-fast: where fail-fast ensures failure is loud and deterministic-tools
 ensures mechanisms are inspectable, get-under-the-hood demands that investigators
 actually open and read those inspectable mechanics and un-truncated logs rather than
 attempting black-box speculation from surface symptoms or summary error codes.
+
+Teach-a-man-to-fish governs the delegation and orchestration boundary:
+where don't-incur-technical-debt demands fixing diagnosed debt now rather than deferring it,
+teach-a-man-to-fish ensures that debt is not quietly absorbed by the orchestrator.
+Absorbing an agent's error is taking on unrecorded, compounding maintenance debt;
+teaching the agent forces the investment in durable self-correction, prompt refinement,
+and automated checks.
 
 The remaining principles serve the goals directly: least astonishment
 and self-documenting code serve readability the way modularity serves

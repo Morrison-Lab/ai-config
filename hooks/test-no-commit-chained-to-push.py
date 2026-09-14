@@ -20,7 +20,7 @@ import subprocess
 import sys
 import types
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.realpath(__file__))
 HOOK = os.path.join(HERE, "no-commit-chained-to-push.py")
 
 # Bytecode caching is disabled for this suite. The mutation section below

@@ -46,7 +46,7 @@ import subprocess
 import sys
 import tempfile
 
-HOOK = os.path.abspath(sys.argv[1])
+HOOK = os.path.realpath(sys.argv[1])
 
 
 def _run(cwd, *args, check=True):

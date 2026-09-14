@@ -28,7 +28,7 @@ import subprocess
 import sys
 import tempfile
 
-HOOK = os.path.abspath(sys.argv[1])
+HOOK = os.path.realpath(sys.argv[1])
 
 B = chr(92)  # a single literal backslash, built rather than typed doubled --
              # the remedy this hook itself recommends, applied to its own test.

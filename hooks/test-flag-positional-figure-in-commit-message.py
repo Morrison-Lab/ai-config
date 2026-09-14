@@ -29,7 +29,7 @@ import subprocess
 import sys
 import tempfile
 
-HOOK = sys.argv[1]
+HOOK = os.path.realpath(sys.argv[1])
 
 # Payloads a fire produced that the harness would discard; see fired().
 SHAPE_ERRORS = []

@@ -32,7 +32,7 @@ import subprocess
 import sys
 import tempfile
 
-HOOK = os.path.abspath(sys.argv[1])
+HOOK = os.path.realpath(sys.argv[1])
 
 GWR = "g" + "it worktree remove"  # see module docstring
 

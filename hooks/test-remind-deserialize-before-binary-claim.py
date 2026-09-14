@@ -31,7 +31,7 @@ import tempfile
 
 if len(sys.argv) < 2:
     sys.exit(f"Usage: python3 {sys.argv[0]} <path-to-hook>")
-HOOK = sys.argv[1]
+HOOK = os.path.realpath(sys.argv[1])
 
 if not os.path.isfile(HOOK):
     sys.exit(

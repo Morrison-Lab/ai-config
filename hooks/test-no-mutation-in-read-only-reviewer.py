@@ -18,7 +18,7 @@ import subprocess
 import sys
 import tempfile
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.realpath(__file__))
 HOOK = os.path.join(HERE, "no-mutation-in-read-only-reviewer.py")
 
 sys.dont_write_bytecode = True

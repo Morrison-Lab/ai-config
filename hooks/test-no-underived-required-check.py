@@ -27,7 +27,7 @@ import subprocess
 import sys
 import types
 
-HOOK = os.path.abspath(sys.argv[1])
+HOOK = os.path.realpath(sys.argv[1])
 SOURCE = open(HOOK, encoding="utf-8").read()
 
 RULESET_PUT = (

@@ -24,8 +24,8 @@ import subprocess
 import sys
 import tempfile
 
-SUBJECT = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "flag-uncounted-comment-claims.py")
+SUBJECT = os.path.realpath(sys.argv[1]) if len(sys.argv) > 1 else os.path.join(
+    os.path.dirname(os.path.realpath(__file__)), "flag-uncounted-comment-claims.py")
 
 
 def load(path):

@@ -123,6 +123,24 @@ CASES = [
      "from pathlib import Path\nROOT = Path(__file__).absolute().parent\n", 1),
     ("normpath on a path that is not __file__",
      "import os\nX = os.path.normpath(os.path.join(a, b))\n", 0),
+    # Already-resolved prefixes. These were false positives before `_mentions`
+    # stopped descending through a resolver, and a hard gate has no
+    # suppression path -- so flagging them would have handed their author a
+    # red required check whose remedy says to do what the code already does.
+    # Joining ".." onto a realpath-rooted directory is the ordinary way to
+    # reach the repo root, so this is a common shape rather than a contrived
+    # one.
+    ("normpath over an already-realpath'd prefix",
+     "import os\nROOT = os.path.normpath(os.path.join("
+     "os.path.dirname(os.path.realpath(__file__)), '..'))\n", 0),
+    ("absolute() over an already-resolved prefix",
+     "from pathlib import Path\nR = Path(__file__).resolve().parent.absolute()\n", 0),
+    # The exemption must not swallow the real cases: the same two spellings
+    # over an UNresolved __file__ are still offenders.
+    ("normpath over an unresolved __file__ is still caught",
+     "import os\nR = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))\n", 1),
+    ("Path(__file__).absolute() with no resolve is still caught",
+     "from pathlib import Path\nR = Path(__file__).absolute().parent\n", 1),
 ]
 
 # The subject-path half, which applies only inside a `hooks/test-*.py` suite:

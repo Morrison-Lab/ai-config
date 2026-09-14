@@ -30,8 +30,12 @@ claude-hook-adapter.py` under ai-config#2681, and again across 19 sites in
 recurrence bar in `shared/principles/deterministic-tools.md`, and this file is
 the instrument it asks for.
 
-Hard-gating rather than advisory: the condition is lexically decidable, the
-remedy is one word, and a false positive costs nothing.
+Hard-gating rather than advisory: the condition is lexically decidable and
+the remedy is one word. A hard gate has no suppression path, though, so a
+false positive would cost its author a red required check whose message tells
+them to do what their code already does -- which is why `_mentions` refuses to
+descend through a `realpath()`/`resolve()` call rather than matching the
+outer spelling alone.
 
 Scope is `hooks/*.py`, test suites included, and two argument shapes:
 
@@ -101,14 +105,36 @@ def _is_lexical_call(node: ast.AST) -> bool:
     return isinstance(func, ast.Name) and func.id in _LEXICAL
 
 
+# The symlink-resolving calls. A `__file__` that reaches a lexical call
+# THROUGH one of these has already been resolved, so there is no `..` left for
+# the lexical call to collapse against a symlink -- `normpath(join(
+# dirname(realpath(__file__)), ".."))` is correct code, and flagging it would
+# hand its author a red required check whose remedy message tells them to do
+# what they already did. Walking past such a subtree is a one-node check, not
+# dataflow: it only skips a resolver that is syntactically in the path from
+# the lexical call down to `__file__`.
+_RESOLVERS = frozenset({"realpath", "resolve"})
+
+
+def _resolved_call(node: ast.AST) -> bool:
+    if not isinstance(node, ast.Call):
+        return False
+    func = node.func
+    name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", None)
+    return name in _RESOLVERS
+
+
 def _mentions(node: ast.AST, subject_path: bool) -> bool:
-    """True when NODE syntactically reads `__file__`, or an argv subject.
+    """True when NODE syntactically reads an UNRESOLVED `__file__` or subject.
 
     `subject_path` widens this to `sys.argv[...]`, which is meaningful only in
     a test suite: there the argv is the hook under test, and resolving it
     lexically breaks the registration-path invocation.
+
+    A reference sitting underneath a `realpath()`/`resolve()` call does not
+    count: the collapse it would cause has already been prevented.
     """
-    for n in ast.walk(node):
+    for n in _walk_unresolved(node):
         if isinstance(n, ast.Name) and n.id == "__file__":
             return True
         if not subject_path:
@@ -119,6 +145,18 @@ def _mentions(node: ast.AST, subject_path: bool) -> bool:
         if isinstance(n, ast.Name) and n.id == "argv":
             return True
     return False
+
+
+def _walk_unresolved(node: ast.AST):
+    """`ast.walk`, but not descending into a `realpath()`/`resolve()` call."""
+    queue = [node]
+    while queue:
+        current = queue.pop()
+        yield current
+        for child in ast.iter_child_nodes(current):
+            if _resolved_call(child):
+                continue
+            queue.append(child)
 
 
 def offenders(path: Path) -> list[tuple[int, str]]:

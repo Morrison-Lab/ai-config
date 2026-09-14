@@ -72,8 +72,11 @@ existed, swapping either site's `realpath` to `abspath` yielded zero
 offenders -- a one-word reintroduction of ai-config#2981 passing the gate in
 silence, at the very file where the corpus first fixed it.
 
-One hop covers four binding forms: an ordinary assignment, an annotated one,
-a walrus, and a tuple target.
+One hop covers four binding forms -- an ordinary assignment, an annotated
+one, a walrus, and a tuple target -- and applies to BOTH argument shapes: a
+name bound from `__file__`, and, inside a suite, a name bound from
+`sys.argv`. The second arm was missing at first, and the gate read clean over
+two live suites that resolve a name-bound subject lexically.
 
 What remains unseen, enumerated rather than gestured at, because a boundary
 stated loosely is one nobody can check:
@@ -88,7 +91,10 @@ stated loosely is one nobody can check:
 A container built by a LITERAL or a store is NOT unseen, and is listed here
 because the natural reading of "a container" covers both: `d = {"f":
 __file__}`, `d = [__file__]`, `d["f"] = __file__` and `c.f = __file__` are all
-flagged, because the target walk binds the container's own name. That is the
+flagged, because the target walk binds the container's own name. The same
+holds for a `sys.argv` subject in a suite, since both arms share one
+collector -- an earlier revision had the `__file__` arm only, and every
+binding row above was asymmetric as a result. That is the
 same over-reach the tuple arm has, with the same remedy.
 
 Each unseen shape above was measured at zero offenders against this checker,
@@ -177,6 +183,13 @@ def _mentions(node: ast.AST, subject_path: bool,
     for n in _walk_unresolved(node):
         if isinstance(n, ast.Name) and (n.id == "__file__" or n.id in bound):
             return True
+        # The STRING spelling, which `_self_bound_names` already matched and
+        # this walk did not -- so `globals()["__file__"]` passed straight into
+        # a lexical call was missed while the same value bound to a name first
+        # was caught. The direct form being weaker than the indirect one
+        # inverts the usual relationship, which is why it went unnoticed.
+        if isinstance(n, ast.Constant) and n.value == "__file__":
+            return True
         if not subject_path:
             continue
         # `sys.argv[1]` and a bare `argv[1]` from `from sys import argv`.
@@ -210,7 +223,7 @@ def _walk_unresolved(node: ast.AST):
             queue.append(child)
 
 
-def _self_bound_names(tree: ast.AST) -> frozenset[str]:
+def _self_bound_names(tree: ast.AST, subject_path: bool = False) -> frozenset[str]:
     """Names assigned directly from an UNRESOLVED `__file__` expression.
 
     Both known escapes from the syntactic match are this one hop, and both are
@@ -250,6 +263,18 @@ def _self_bound_names(tree: ast.AST) -> frozenset[str]:
         if not any(
                 (isinstance(n, ast.Name) and n.id == "__file__")
                 or (isinstance(n, ast.Constant) and n.value == "__file__")
+                # The SUBJECT half needs the same one hop, and an earlier
+                # revision gave it only the direct form. `HOOK = sys.argv[1]`
+                # followed by `os.path.abspath(HOOK)` is the identical shape
+                # the `__file__` arm already special-cases, and two live
+                # suites carried it while the gate read clean
+                # (test-flag-positional-figure-in-commit-message.py,
+                # test-remind-deserialize-before-binary-claim.py). The
+                # asymmetry also silently undercounted the census this
+                # instrument was used to derive.
+                or (subject_path and (
+                    (isinstance(n, ast.Attribute) and n.attr == "argv")
+                    or (isinstance(n, ast.Name) and n.id == "argv")))
                 for n in _walk_unresolved(node.value)):
             continue
         targets = (node.targets if isinstance(node, ast.Assign)
@@ -281,7 +306,7 @@ def offenders(path: Path) -> list[tuple[int, str]]:
 
     lines = source.splitlines()
     subject_path = path.name.startswith("test-")
-    bound = _self_bound_names(tree)
+    bound = _self_bound_names(tree, subject_path)
     found = []
     for node in ast.walk(tree):
         if _is_lexical_call(node) and _mentions(node, subject_path, bound):

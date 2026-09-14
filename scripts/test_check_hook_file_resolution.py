@@ -215,6 +215,14 @@ CASES = [
      "import os\nif (p := __file__):\n    D = os.path.abspath(p)\n", 1),
     ("a tuple-target binding from __file__",
      "import os\na, b = __file__, 1\nD = os.path.abspath(a)\n", 1),
+    # The STRING spelling passed DIRECTLY into a lexical call. _self_bound_names
+    # matched it and _mentions did not, so the direct form was weaker than the
+    # indirect one -- an inversion of the usual relationship, which is why it
+    # survived until an adversarial round probed both arms against each other.
+    ("globals()['__file__'] passed directly into a lexical call",
+     "import os\nD = os.path.abspath(globals()['__file__'])\n", 1),
+    ("a '__file__' string that is not a path is not an offender",
+     "import os\nprint('__file__')\nD = os.path.abspath(other)\n", 0),
     ("a bare annotation binds nothing",
      "import os\np: str\nD = os.path.abspath(p)\n", 0),
     # Container shapes. The docstring asserted these were unseen; four of the
@@ -259,6 +267,16 @@ SUBJECT_CASES = [
      "import os, sys\nHOOK = os.path.realpath(sys.argv[1])\n", 0, 0),
     ("the `from sys import argv` spelling",
      "from sys import argv\nfrom os.path import abspath\nHOOK = abspath(argv[1])\n", 1, 0),
+    # The subject half needs the SAME one hop of name binding the __file__ arm
+    # gets, and it had none at first: three live suites wrote `HOOK =
+    # sys.argv[1]` and resolved HOOK lexically later, and the gate read clean
+    # over all three. An external reviewer found two; fixing the arm surfaced
+    # the third. The census this instrument derived was undercounted by
+    # exactly those three.
+    ("a subject bound to a name and resolved lexically later",
+     "import os, sys\nHOOK = sys.argv[1]\nD = os.path.abspath(HOOK)\n", 1, 0),
+    ("the same binding resolved with realpath is clean",
+     "import os, sys\nHOOK = os.path.realpath(sys.argv[1])\nD = os.path.abspath(HOOK)\n", 0, 0),
 ]
 
 

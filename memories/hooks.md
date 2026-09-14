@@ -464,11 +464,18 @@ Across the 18 non-test hooks that carried it, 19 sites computed a path from `__f
 and 2 (`monitor-open-prs.py`, `no-unmonitored-pr.py`) resolving the hook's own file to re-exec it.
 
 The test suites carry a second, separate half, and the first sweep missed it.
-Counted by the checker's own AST semantics against `main` at `e388e906` on 2026-09-14, 31 suites were affected:
-16 carried a lexical call on `__file__`, 23 carried one on their `sys.argv` *subject*, and 8 carried both.
+Counted by the checker's own AST semantics against `main` at `e388e906` on 2026-09-14, 34 suites were affected:
+16 carried a lexical call on `__file__`, 26 carried one on their `sys.argv` *subject*, and 8 carried both.
+
+That census was first reported as 31 / 16 / 23 / 8, and the three missing suites are the sharpest instance in this whole record of the class the rest of it is about.
+The instrument used to derive the number had a blind spot in exactly the half being counted: `_self_bound_names` followed one hop of name binding from `__file__` and had no equivalent arm for `sys.argv`, so `HOOK = sys.argv[1]` followed by `os.path.abspath(HOOK)` was invisible to it.
+Three live suites carried that shape while the gate read clean, and the count inherited the gap silently ---
+a number derived by an instrument is only as scoped as the instrument, and stating the instrument does not make the number trustworthy if the instrument is what is wrong.
+An external reviewer found two of the three; fixing the arm surfaced the third.
 The ref is pinned and dated because `main` moved during this branch's review and took the count with it ---
 the 31st suite arrived with `no-mutation-in-read-only-reviewer.py`, and is swept here too.
 The subject count is the larger one because more suites resolve a subject at all, which is a property of the pre-existing population rather than of any sweep --- at that same ref, counting every call the checker recognizes as either lexical or resolving, 25 suites resolved a subject against 23 resolving `__file__`.
+(Those two figures predate the `sys.argv` binding arm and are therefore lower bounds, like the census above was.)
 The first sweep did convert only the `__file__` half, but of the *hooks*: it converted no suite's resolution spelling (it did edit one suite, to add the regression cases).
 
 A first attempt at that measurement counted the literal `realpath` spelling and reported 0 and 1, which is wrong under this branch's own `_RESOLVERS = {"realpath", "resolve"}` --- the true figures for symlink-safe resolution at that ref are 2 and 8, since `Path(x).resolve()` is realpath-equivalent and seven suites already used it.

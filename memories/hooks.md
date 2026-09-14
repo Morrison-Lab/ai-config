@@ -366,3 +366,15 @@ That is what makes repeating a demand costly rather than merely tedious, and it 
 
 (Tracked as [#3141](https://github.com/Morrison-Lab/ai-config/issues/3141), the original defect report;
 [#3156](https://github.com/Morrison-Lab/ai-config/issues/3156) is its corpus record and [#3185](https://github.com/Morrison-Lab/ai-config/issues/3185) a later recurrence.)
+
+## Read-Only Reviewer Guard Design Principles
+
+`hooks/no-mutation-in-read-only-reviewer.py` enforces read-only discipline across reviewer personas (`adversarial-reviewer`, `Explore`, `Plan`, etc.) to protect shared working trees and indices from accidental contamination (ai-config#3612, #3602, #3584).
+Adversarial review (ai-config#3623) established two key boundary requirements for deny-by-default persona guards:
+
+1. **Never conflate review-instruction mentions with read-only roles:**
+   A subagent brief saying "Review the diff and then fix every issue you find, committing as you go" is a write-capable fix-and-commit dispatch, not a read-only reviewer.
+   Prompt-sniffing heuristics must check for write intent (`fix`, `commit`, `write`, `edit`, `patch`, `repair`) and stay inert when write actions are requested.
+2. **Isolate subagent transcripts from orchestrator transcripts:**
+   Parent orchestrator transcripts often record historical subagent dispatches (with `attributionAgent` or `isSidechain: True`).
+   A guard scanning transcript records must restrict attribution reads to dedicated subagent transcripts (`subagents/agent-*.jsonl`), preventing an earlier review dispatch from poisoning subsequent orchestrator commands (`git push`, `git commit`).

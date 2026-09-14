@@ -28,9 +28,12 @@ hook = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(hook)
 
 failures: list[str] = []
+checks_run: int = 0
 
 
 def check(label: str, got: object, want: object) -> None:
+    global checks_run
+    checks_run += 1
     if got != want:
         failures.append(f"{label}: got {got!r}, want {want!r}")
 
@@ -207,7 +210,7 @@ for cmd in OVERRIDE_CASES:
     check(f"must respect inline override: {cmd}", hit, None)
 
 # 8. Transcript-based detection (Claude Code subagent transcript)
-with tempfile.NamedTemporaryFile("w", delete=False, suffix=".jsonl") as tf:
+with tempfile.NamedTemporaryFile("w", delete=False, suffix=".jsonl", prefix="agent-") as tf:
     # Emulate Claude Code subagent transcript
     tf.write(json.dumps({"type": "user", "message": {"content": "Review the diff at HEAD"}}) + "\n")
     tf.write(json.dumps({
@@ -261,7 +264,63 @@ finally:
     except Exception:
         pass
 
-# 10. Process execution & output shape verification
+# 10. Negative test: Write-capable subagent whose brief contains review words
+write_subagent_dir = tempfile.mkdtemp()
+write_subagent_transcript = os.path.join(write_subagent_dir, "subagents", "agent-write123.jsonl")
+os.makedirs(os.path.dirname(write_subagent_transcript), exist_ok=True)
+with open(write_subagent_transcript, "w", encoding="utf-8") as tf:
+    tf.write(json.dumps({
+        "type": "user",
+        "message": {"content": "Review the diff and then fix every issue you find, committing as you go"},
+    }) + "\n")
+
+try:
+    payload_write_sub = {
+        "tool_name": "Bash",
+        "tool_input": {"command": "git commit -m 'fix: resolved issue'"},
+        "transcript_path": write_subagent_transcript,
+    }
+    hit = hook.offending("Bash", payload_write_sub["tool_input"], payload_write_sub)
+    check("must NOT block write-capable subagent briefed to review and fix/commit", hit, None)
+finally:
+    try:
+        os.unlink(write_subagent_transcript)
+        os.rmdir(os.path.dirname(write_subagent_transcript))
+        os.rmdir(write_subagent_dir)
+    except Exception:
+        pass
+
+# 11. Negative test: Orchestrator session transcript with historical subagent records
+orch_transcript_dir = tempfile.mkdtemp()
+orch_transcript = os.path.join(orch_transcript_dir, "session-orch-main.jsonl")
+with open(orch_transcript, "w", encoding="utf-8") as tf:
+    tf.write(json.dumps({
+        "type": "assistant",
+        "isSidechain": True,
+        "attributionAgent": "adversarial-reviewer",
+        "message": {"content": "Historical subagent review output"},
+    }) + "\n")
+    tf.write(json.dumps({
+        "type": "user",
+        "message": {"content": "Great, please push the branch now"},
+    }) + "\n")
+
+try:
+    payload_orch = {
+        "tool_name": "Bash",
+        "tool_input": {"command": "git push origin main"},
+        "transcript_path": orch_transcript,
+    }
+    hit = hook.offending("Bash", payload_orch["tool_input"], payload_orch)
+    check("must NOT block orchestrator session whose transcript carries historical subagent records", hit, None)
+finally:
+    try:
+        os.unlink(orch_transcript)
+        os.rmdir(orch_transcript_dir)
+    except Exception:
+        pass
+
+# 12. Process execution & output shape verification
 payload_deny = {
     "tool_name": "Bash",
     "tool_input": {"command": "git commit -m 'attempt fix'"},
@@ -296,6 +355,5 @@ if failures:
         print("  -", f)
     sys.exit(1)
 
-total_checks = len(MUTATING_COMMANDS) + len(READ_ONLY_COMMANDS) + 25
-print(f"PASS: hooks/test-no-mutation-in-read-only-reviewer.py -- all {total_checks} assertions passed")
+print(f"PASS: hooks/test-no-mutation-in-read-only-reviewer.py -- all {checks_run} assertions passed")
 sys.exit(0)

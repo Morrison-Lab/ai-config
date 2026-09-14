@@ -98,7 +98,14 @@ READ_ONLY_NAME_RE = re.compile(
 )
 
 REVIEW_PROMPT_RE = re.compile(
-    r"\b(?:adversarial(?:[- ]code)?[- ]review|self-review|review the (?:committed )?diff)\b",
+    r"\b(?:adversarial(?:[- ]code)?[- ]review|self-review)\b",
+    re.I,
+)
+
+RX_WRITE_INTENT = re.compile(
+    r"\b(?:fix|fixes|fixing|commit|commits|committing|write|writes|writing|"
+    r"edit|edits|editing|modify|modifies|modifying|repair|repairs|repairing|"
+    r"patch|patching|implement|implementing|refactor|refactoring)\b",
     re.I,
 )
 
@@ -226,7 +233,12 @@ def is_mutating_tag(rest: list[str]) -> bool:
 def is_subagent_transcript_path(path: str) -> bool:
     """True if path looks like a dedicated subagent transcript file."""
     norm = path.replace("\\", "/")
-    return "/subagents/" in norm or norm.startswith("subagents/")
+    return (
+        "/subagents/" in norm
+        or norm.startswith("subagents/")
+        or "/agent-" in norm
+        or os.path.basename(norm).startswith("agent-")
+    )
 
 
 def is_read_only_persona(payload: dict) -> tuple[bool, str]:
@@ -264,6 +276,9 @@ def is_read_only_persona(payload: dict) -> tuple[bool, str]:
                 return True, msg_v
 
     # 4. Transcript inspection
+    # Main orchestrator transcripts may carry historical subagent dispatches or isSidechain
+    # records that must not contaminate the orchestrator's own authoring capabilities.
+    # Only dedicated subagent transcripts should be scanned for subagent persona attribution.
     transcript_path = (
         payload.get("transcript_path")
         or payload.get("transcriptPath")
@@ -272,51 +287,56 @@ def is_read_only_persona(payload: dict) -> tuple[bool, str]:
         or ""
     )
     if transcript_path and os.path.exists(transcript_path):
-        try:
-            with open(transcript_path, "r", encoding="utf-8", errors="replace") as f:
-                is_sub = is_subagent_transcript_path(transcript_path)
-                for idx, line in enumerate(f):
-                    line_str = line.strip()
-                    if not line_str:
-                        continue
-                    try:
-                        record = json.loads(line_str)
-                    except Exception:
-                        continue
+        is_sub = is_subagent_transcript_path(transcript_path)
+        if is_sub:
+            try:
+                with open(transcript_path, "r", encoding="utf-8", errors="replace") as f:
+                    for idx, line in enumerate(f):
+                        line_str = line.strip()
+                        if not line_str:
+                            continue
+                        try:
+                            record = json.loads(line_str)
+                        except Exception:
+                            continue
 
-                    # Scan for attributionAgent or persona
-                    attr = (
-                        record.get("attributionAgent")
-                        or record.get("subagent_type")
-                        or record.get("agent_type")
-                        or record.get("persona")
-                    )
-                    if isinstance(attr, str) and (attr in READ_ONLY_PERSONA_NAMES or READ_ONLY_NAME_RE.match(attr)):
-                        return True, attr
-
-                    msg = record.get("message")
-                    if isinstance(msg, dict):
-                        msg_attr = (
-                            msg.get("attributionAgent")
-                            or msg.get("subagent_type")
-                            or msg.get("agent_type")
-                            or msg.get("persona")
+                        # Scan for attributionAgent or persona in subagent transcript
+                        attr = (
+                            record.get("attributionAgent")
+                            or record.get("subagent_type")
+                            or record.get("agent_type")
+                            or record.get("persona")
                         )
-                        if isinstance(msg_attr, str) and (msg_attr in READ_ONLY_PERSONA_NAMES or READ_ONLY_NAME_RE.match(msg_attr)):
-                            return True, msg_attr
+                        if isinstance(attr, str) and (attr.lower().strip() in READ_ONLY_PERSONA_NAMES or READ_ONLY_NAME_RE.match(attr.strip())):
+                            return True, attr
 
-                    # Initial prompt / instruction inspection for subagent transcripts
-                    if idx in (0, 1):
-                        content = ""
-                        if record.get("type") in ("user", "USER_INPUT"):
-                            if isinstance(msg, dict) and isinstance(msg.get("content"), str):
-                                content = msg["content"]
-                            elif isinstance(record.get("content"), str):
-                                content = record["content"]
-                        if content and is_sub and (REVIEW_PROMPT_RE.search(content) or RX_READ_ONLY.search(content)):
-                            return True, "read-only reviewer subagent"
-        except Exception:
-            pass
+                        msg = record.get("message")
+                        if isinstance(msg, dict):
+                            msg_attr = (
+                                msg.get("attributionAgent")
+                                or msg.get("subagent_type")
+                                or msg.get("agent_type")
+                                or msg.get("persona")
+                            )
+                            if isinstance(msg_attr, str) and (msg_attr.lower().strip() in READ_ONLY_PERSONA_NAMES or READ_ONLY_NAME_RE.match(msg_attr.strip())):
+                                return True, msg_attr
+
+                        # Initial prompt / instruction inspection for subagent transcripts
+                        if idx in (0, 1):
+                            content = ""
+                            if record.get("type") in ("user", "USER_INPUT"):
+                                if isinstance(msg, dict) and isinstance(msg.get("content"), str):
+                                    content = msg["content"]
+                                elif isinstance(record.get("content"), str):
+                                    content = record["content"]
+                            if content:
+                                # A brief with write intent (fix, commit, edit, modify, etc.) is NEVER read-only
+                                if RX_WRITE_INTENT.search(content):
+                                    continue
+                                if RX_READ_ONLY.search(content) or REVIEW_PROMPT_RE.search(content):
+                                    return True, "read-only reviewer subagent"
+            except Exception:
+                pass
 
     return False, ""
 

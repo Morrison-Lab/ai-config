@@ -23,7 +23,7 @@ The operational mechanics and incident history are detailed in
 
 At the principle level,
 absorbing mistakes trades sustainable capability for temporary convenience.
-Teaching the agent to fish is building durable competence across three commitments:
+Teaching the agent to fish is building durable competence across four commitments:
 
 1. **Re-dispatch with actionable feedback.**
    Provide the concrete counterexample or failing input,

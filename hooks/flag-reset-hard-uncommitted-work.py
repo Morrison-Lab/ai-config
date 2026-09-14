@@ -398,6 +398,11 @@ def offending(command):
                   f"shells ({exc}); checking the outer command only",
                   file=sys.stderr)
             pieces = [command]
+    # Unlike its sibling, this hook needs no per-piece caveat: `offending_here`
+    # reads the command TEXT and resolves nothing against a directory, so a
+    # nested piece is answerable on exactly the terms a flat one is. The
+    # directory only enters later, in `_tracked_changes`, which runs once on
+    # the hook's own cwd whatever piece matched.
     for piece in pieces:
         match = offending_here(piece)
         if match is not None:

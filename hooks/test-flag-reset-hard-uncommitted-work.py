@@ -598,7 +598,10 @@ SHOULD_STAY_SILENT += [
 # every mutant, the interpreter-wrapper cases go silent under EVERY clause, and
 # they read as "flipped" for reasons that have nothing to do with the clause
 # being reverted (ai-config#1973). The mutant is a reverted clause, not a
-# broken install; the degraded path is exercised on its own terms instead.
+# broken install. The degraded path -- `shell_c_expansions` left as `None`
+# because the import failed -- is NOT covered by any test here or elsewhere; an
+# earlier version of this comment claimed it was (ai-config#1973 review). It is
+# stated as a known gap rather than left reading as covered.
 _REAL_LIB = os.path.join(
     os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
     "scripts", "lib")

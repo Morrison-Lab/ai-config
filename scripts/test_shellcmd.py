@@ -402,8 +402,64 @@ check("a -c with no operand yields nothing extra",
 check("an unbalanced quote does not lose the outer command",
       shellcmd.shell_c_expansions("git commit -m 'unclosed"),
       ["git commit -m 'unclosed"])
-check("depth is capped",
-      len(shellcmd.shell_c_expansions("git push", max_depth=0)), 1)
+# The cap must BITE for the check to mean anything. The first version used
+# `"git push"`, which has no nested shell at all, so it returned one piece for
+# every max_depth and passed with the bound deleted outright -- a case that
+# cannot fail, which is the standard this repo applies to its own tests.
+_BS = chr(92)
+_Q = chr(34)
+_THREE_DEEP = ('bash -c ' + _Q + 'bash -c ' + _BS + _Q + 'bash -c '
+               + _BS + _BS + _BS + _Q + 'git push' + _BS + _BS + _BS + _Q
+               + _BS + _Q + _Q)
+check("depth 1 stops after the first nested command line",
+      len(shellcmd.shell_c_expansions(_THREE_DEEP, max_depth=1)), 2)
+check("depth 2 reaches the second",
+      len(shellcmd.shell_c_expansions(_THREE_DEEP, max_depth=2)), 3)
+check("depth 3 reaches all of them",
+      len(shellcmd.shell_c_expansions(_THREE_DEEP, max_depth=3)), 4)
+
+# ai-config#1973 review. After `-c`, bash keeps parsing options and takes the
+# first non-option OPERAND, so the command string is not necessarily adjacent.
+# Each of these really runs the command -- verified directly under bash.
+for _flags, _label in (("-c -x", "a flag after -c"),
+                       ("-c --", "an end-of-options marker after -c"),
+                       ("-o pipefail -c", "an option VALUE before -c"),
+                       ("--rcfile /dev/null -c", "a long option with a value"),
+                       ("-O extglob -c", "a shopt option with a value"),
+                       ("-eo pipefail -c", "a cluster plus a valued option")):
+    check(f"the -c operand is found past {_label}",
+          shellcmd.shell_c_expansions('bash ' + _flags + ' ' + _Q + 'git push' + _Q),
+          ['bash ' + _flags + ' ' + _Q + 'git push' + _Q, 'git push'])
+
+# The PROGRAM is resolved first, and nothing else is considered unless it is a
+# shell. A walk-back from the `-c` to the nearest non-flag token returned `sh`
+# for the first of these and produced a hard refusal on a command that runs
+# nothing.
+check("a -c belonging to no command word is not followed",
+      shellcmd.shell_c_expansions('echo sh -c ' + _Q + 'git push' + _Q),
+      ['echo sh -c ' + _Q + 'git push' + _Q])
+check("a -c argument of a non-shell program is not followed",
+      shellcmd.shell_c_expansions('printf %s sh -c ' + _Q + 'git push' + _Q),
+      ['printf %s sh -c ' + _Q + 'git push' + _Q])
+# `-C` is noclobber, which takes no command. Matching the flag
+# case-insensitively refused `bash -C <file>`, which runs a FILE by that name.
+check("-C is noclobber, not a command flag",
+      shellcmd.shell_c_expansions('bash -C ' + _Q + 'git push' + _Q),
+      ['bash -C ' + _Q + 'git push' + _Q])
+
+# A bypass guard's coverage is decided by its weakest spelling.
+for _shell in ("ash", "mksh", "pdksh", "/bin/bash-5.2", "busybox ash"):
+    check(f"{_shell} takes -c identically",
+          shellcmd.shell_c_expansions(_shell + ' -c ' + _Q + 'git push' + _Q),
+          [_shell + ' -c ' + _Q + 'git push' + _Q, "git push"])
+
+check("a wrapper with its own argument does not hide the shell",
+      shellcmd.shell_c_expansions('timeout 5 bash -c ' + _Q + 'git push' + _Q),
+      ['timeout 5 bash -c ' + _Q + 'git push' + _Q, "git push"])
+check("command_program resolves past assignments and wrappers",
+      shellcmd.command_program(["env", "FOO=1", "/bin/bash", "-c", "git push"]), 2)
+check("command_program stops at a non-shell head",
+      shellcmd.command_program(["echo", "sh", "-c", "git push"]), 0)
 
 # ------------------------------------------------- source-level hygiene
 #

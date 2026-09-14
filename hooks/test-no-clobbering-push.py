@@ -192,6 +192,76 @@ def bare_force_case(path, bare):
     return "git push --force"
 
 
+def shell_c_wrapped_case(path, bare):
+    """ai-config#1973: the force push wrapped in a shell's `-c` argument.
+
+    `shlex` collapses the embedded command into ONE opaque token, so `argv[0]`
+    is the interpreter and every `== "git"` comparison fails. Measured silent
+    on `main`, on the guard that DENIES.
+    """
+    _local_advances(path)
+    return 'sh -c "git push --force origin HEAD"'
+
+
+def shell_c_nonadjacent_operand_case(path, bare):
+    """After `-c`, bash keeps parsing options and takes the first OPERAND.
+
+    An adjacency assumption handed the descent `-x` and missed the command
+    entirely. `bash -c -x '<cmd>'` really runs `<cmd>` -- verified directly.
+    """
+    _local_advances(path)
+    return 'bash -c -x "git push --force origin HEAD"'
+
+
+def shell_c_option_value_case(path, bare):
+    """An option's VALUE is not a flag, so a walk-back from `-c` stopped on it.
+
+    `bash -o pipefail -c '<cmd>'` resolved a program of `pipefail` and
+    descended into nothing. Resolving the program from ARGV's head instead is
+    what fixes it.
+    """
+    _local_advances(path)
+    return 'bash -o pipefail -c "git push --force origin HEAD"'
+
+
+def shell_c_alt_shell_case(path, bare):
+    """A shell the first SHELL_PROGRAM spelling omitted.
+
+    `ash` is the default shell on Alpine and the busybox applet. A bypass
+    guard's coverage is decided by its weakest spelling.
+    """
+    _local_advances(path)
+    return 'ash -c "git push --force origin HEAD"'
+
+
+def dash_c_argument_of_non_shell_case(path, bare):
+    """`echo sh -c "<push>"` prints a string and pushes nothing.
+
+    A walk-back from the `-c` to the nearest non-flag token returned `sh` and
+    produced a hard REFUSAL on this, because it never asked whether that token
+    was in command position. A false deny on a guard is not merely noise: it
+    sends the author looking for a bypass.
+    """
+    _local_advances(path)
+    return 'echo sh -c "git push --force origin HEAD"'
+
+
+def noclobber_flag_case(path, bare):
+    """`-C` is `noclobber`, not `--command`.
+
+    `bash -C <file>` runs a FILE by that name and pushes nothing. Matching the
+    `-c` flag case-insensitively refused it.
+    """
+    _local_advances(path)
+    return 'bash -C "git push --force origin HEAD"'
+
+
+def python_c_case(path, bare):
+    """A PYTHON `-c` argument is SOURCE, not a command line."""
+    _local_advances(path)
+    return 'python3 -c "git push --force origin HEAD"'
+
+
 def short_f_case(path, bare):
     _local_advances(path)
     return "git push -f origin HEAD"
@@ -835,6 +905,17 @@ SHOULD_DENY = [
      "`git -C <dir> push --force` -- the global option is skipped first"),
     ("D9", warn_then_force_case,
      "a warn-worthy push chained BEFORE a bare force push must still deny"),
+    # ai-config#1973. Each of these four was measured SILENT before the
+    # descent, and each really runs the push -- verified by running the
+    # wrapper form directly under bash.
+    ("D1973a", shell_c_wrapped_case,
+     "a force push wrapped in a shell's `-c` argument"),
+    ("D1973b", shell_c_nonadjacent_operand_case,
+     "the `-c` operand is not adjacent: bash takes the first non-option word"),
+    ("D1973c", shell_c_option_value_case,
+     "an option's value before `-c` does not hide the shell"),
+    ("D1973d", shell_c_alt_shell_case,
+     "a shell spelling outside the first SHELL_PROGRAM list"),
 ]
 
 SHOULD_WARN = [
@@ -880,6 +961,15 @@ SHOULD_WARN = [
 ]
 
 SHOULD_STAY_SILENT = [
+    # The other half of ai-config#1973: resolving the program from ARGV's head
+    # rather than by walking back from the `-c` is what keeps these silent.
+    # Each was a hard DENY on a command that pushes nothing.
+    ("S1973a", dash_c_argument_of_non_shell_case,
+     "`echo sh -c \"<push>\"` prints a string and runs no shell"),
+    ("S1973b", noclobber_flag_case,
+     "`-C` is noclobber, not a command flag"),
+    ("S1973c", python_c_case,
+     "a python `-c` argument is source, not a command line"),
     ("S1", leased_fast_forward_case,
      "`--force-with-lease --force-if-includes` is the remedy, never refused"),
     ("S2", override_case, "`ALLOW_FORCE_PUSH=1` clears the refusal"),
@@ -1075,10 +1165,22 @@ def verdict(hook_path, repo, command, case_id=None, payload_cwd=None):
     # when invoked with an argument is to print an error and exit, not
     # block. Keep sys.executable for the guaranteed-correct-interpreter
     # reason; don't restate the blocking hypothesis as settled.
+    # The mutation harness copies ONE FILE to a temp directory, so a hook that
+    # imports a shared module cannot resolve it from `__file__` there -- the
+    # copy has no repo above it. Without this, `shell_c_expansions` lands as
+    # `None` in every mutant, the interpreter-wrapper cases go silent under
+    # EVERY clause, and they read as "flipped" for reasons that have nothing to
+    # do with the clause being reverted (ai-config#1973). A mutant is a
+    # reverted clause, not a broken install.
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(
+        [os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                      "scripts", "lib")]
+        + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
     proc = subprocess.run(
         [sys.executable, hook_path],
         input=json.dumps(bash(command, payload_cwd)),
-        capture_output=True, text=True, cwd=repo,
+        capture_output=True, text=True, cwd=repo, env=env,
     )
     if proc.returncode != 0:
         sys.exit(f"FATAL: hook exited {proc.returncode} on {command!r}\n"
@@ -1176,7 +1278,8 @@ MUTATIONS = {
         [('        if flags["force"] and not flags["dry_run"] and not override:\n'
           '            return "deny", DENY.format(segment=" ".join(argv))',
           "        pass")],
-        {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9"},
+        {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9",
+         "D1973a", "D1973b", "D1973c", "D1973d"},
     ),
     "force_ignores_lease": (
         "the refusal does NOT consult the lease -- `--force` disables it",

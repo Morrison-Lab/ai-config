@@ -962,7 +962,7 @@ def _describe(local, tip, cwd, limit=10):
     return len(lines), text
 
 
-def evaluate(command, base_cwd=None):
+def evaluate(command, base_cwd=None, deny_only=False):
     """`('deny', reason)`, `('warn', context)`, or `None`.
 
     `base_cwd` is the directory the Bash call starts in -- the payload's own
@@ -1072,6 +1072,13 @@ def evaluate(command, base_cwd=None):
     for argv, flags, _pos, _repo, _ok, override, _cwd in parsed:
         if flags["force"] and not flags["dry_run"] and not override:
             return "deny", DENY.format(segment=" ".join(argv))
+
+    # `deny_only` stops here. Pass 1 is lexical and directory-blind, so it is
+    # sound for a command whose starting directory is not knowable; Pass 2 is
+    # neither, and its own note below says what happens when it reads against
+    # the wrong repository. `evaluate_every_shell` passes it for nested pieces.
+    if deny_only:
+        return None
 
     # Pass 2 -- the reading. Only reached when nothing is refused.
     for argv, flags, positionals, repo_opt, ok, _override, cwd in parsed:
@@ -1185,70 +1192,71 @@ def evaluate(command, base_cwd=None):
 
 
 def evaluate_every_shell(command, base_cwd=None):
-    """`evaluate` over COMMAND and every command line nested in a shell's `-c`.
+    """`evaluate` over COMMAND, plus a DENY-ONLY pass over each nested shell.
 
     WHY
     ---
     This guard tokenizes and compares exact tokens, so wrapping the push in an
     interpreter's `-c` argument bypassed it outright: `shlex` collapses the
     embedded command into ONE opaque token, `argv[0]` is the interpreter, and
-    every `== "git"` comparison fails immediately.
+    every `== "git"` comparison fails immediately. Measured on `main`
+    (ai-config#1973): `git push --force origin main` denies, and
+    `sh -c "git push --force origin main"` is silently allowed.
 
-    Measured on `main` (ai-config#1973): `git push --force origin main` denies,
-    and `sh -c "git push --force origin main"` produces no output and is
-    silently allowed. That is the direction `shared/principles/fail-fast.md`
-    calls the dangerous one -- a silent discharge rather than an over-warn --
-    and this guard is the mechanism behind CLAUDE.md's "Check the remote
-    immediately before every push".
-
-    EACH PIECE SEPARATELY, NEVER MERGED
+    WHY THE NESTED PIECES ARE DENY-ONLY
     -----------------------------------
-    `evaluate` models shell STATE: it tracks a working directory per subshell
-    so a `cd` moves the pushes after it. A nested `-c` argument is a DIFFERENT
-    SHELL, so concatenating its simple commands into the outer analysis would
-    attribute the nested shell's `cd` to the caller. Calling `evaluate` once
-    per piece keeps each scope intact, which is why this is a wrapper rather
-    than a widening of `_simple_commands`.
+    A nested `-c` argument is a different shell, and this module's whole output
+    is a comparison against a HEAD, so every reading depends on which directory
+    that shell starts in. `shell_c_expansions` cannot say: the answer depends
+    on the `cd`s the outer shell ran first, which live in the outer analysis.
 
-    PRECEDENCE
-    ----------
-    A deny anywhere outranks a warn anywhere, matching `evaluate`'s own reason
-    for scanning every simple command before reporting: a refusal blocks the
-    whole Bash call regardless of position, so a warn found earlier must not
-    suppress a deny found later.
+    Evaluating a nested piece fully anyway did exactly what Pass 2's own note
+    warns about. Measured across two repositories: `cd B && sh -c "git push
+    origin br0"` produced a warning quoting repository A's commits, about a
+    push that is a clean fast-forward in a repository the command never
+    touches -- and the mirrored case suppressed a warning that was genuinely
+    owed. "A comparison against the wrong repository ... is worse than
+    silence: it names a cause and prescribes a merge" is that note, and a
+    fabricated one is worse still.
 
-    WHAT IT STILL CANNOT SEE
-    ------------------------
-    A nested shell inherits the caller's directory as of the moment it starts,
-    and that is NOT threaded through here -- each piece is evaluated from
-    `base_cwd`. The deny path is unaffected, since a refusal is decided from
-    the command text alone and spends no read; a warn on a nested push can name
-    the wrong directory when an outer `cd` preceded it. That is the same class
-    as ai-config#3544, where a `git -C` is judged against the session's own
-    HEAD, and it is left to that issue rather than half-fixed here.
+    So a nested piece contributes only what Pass 1 decides: a refusal, which is
+    lexical, directory-blind, and true wherever the command runs. `--force` is
+    a force push in any directory.
+
+    That also settles the cost. A full `evaluate` per piece spends Pass 2's
+    `git ls-remote` reads, each with an 8-second timeout, BEFORE reaching a
+    refusal in a later piece -- measured at 11 reads ahead of one deny, where
+    the flat path spends none. Pass 1 spends nothing, so the descent adds no
+    network work at all.
+
+    WHAT THIS STILL CANNOT SEE
+    --------------------------
+    A nested push that deserves a WARNING is not warned about, because the
+    directory is unknowable. That is a real gap and it is the honest side of
+    the trade: the alternative is a warning whose central claim may be false.
+    Resolving it needs the `cd` stack and the nested pieces reconciled into one
+    analysis, which is ai-config#3178's shape of change rather than this one's.
 
     A `ssh host "<push>"`, a shell function, an `eval`, and a command built
-    from a variable are all still invisible, as they are to the reference
+    from a variable remain invisible, as they are to the reference
     implementation in `hooks/no-empty-promise.py`.
     """
-    pieces = [command]
+    verdict = evaluate(command, base_cwd)
+    if verdict is not None and verdict[0] == "deny":
+        return verdict
+    pieces = []
     if shell_c_expansions is not None:
         try:
-            pieces = shell_c_expansions(command)
+            pieces = shell_c_expansions(command)[1:]
         except Exception as exc:  # never let the descent break the base guard
             print(f"no-clobbering-push: could not expand nested shells ({exc}); "
                   f"evaluating the outer command only", file=sys.stderr)
-            pieces = [command]
-    warning = None
+            pieces = []
     for piece in pieces:
-        verdict = evaluate(piece, base_cwd)
-        if verdict is None:
-            continue
-        if verdict[0] == "deny":
-            return verdict
-        if warning is None:
-            warning = verdict
-    return warning
+        nested = evaluate(piece, base_cwd, deny_only=True)
+        if nested is not None:
+            return nested
+    return verdict
 
 
 def _read_payload() -> tuple[dict, bool]:

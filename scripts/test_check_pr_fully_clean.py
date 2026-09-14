@@ -6211,6 +6211,26 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check("check_review_threads: mixed threads has exactly one blocking issue", len(blocking) == 1 and "main.py:5" in blocking[0])
     check("check_review_threads: mixed threads has exactly one note", len(notes) == 1 and "old.py:10" in notes[0])
 
+    # --- check_review_comments in-flight review requests (ai-config#3570) ---
+    class FakePRWithRequests:
+        def __init__(self, review_requests):
+            self.pr_num = "123"
+            self.head_sha = "abc123456789"
+            self.repo = "o/r"
+            self.review_decision = ""
+            self.branch = "feat"
+            self.review_requests = review_requests
+
+        def get_comments(self):
+            return []
+
+        def get_reviews(self):
+            return []
+
+    ok, issues = original_check_review_comments(FakePRWithRequests([{"login": "copilot-pull-request-reviewer"}]))
+    check("check_review_comments: pending review request blocks clean status", not ok)
+    check("check_review_comments: pending review request names in-flight reviewer", any("copilot-pull-request-reviewer" in i for i in issues))
+
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

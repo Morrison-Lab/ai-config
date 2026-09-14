@@ -81,6 +81,7 @@ from fences import (  # noqa: E402
     strip_code_spans,
 )
 from payload_fetcher import PayloadError, PayloadFetcher  # noqa: E402
+from pull_request import extract_request_names  # noqa: E402
 from review_payload import (  # noqa: E402
     extract_structured_review,
     payload_findings,
@@ -2960,6 +2961,15 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
     reviews = [{"state": r.state, "author": {"login": r.author_login}, "submittedAt": r.submitted_at, "body": r.body, "commit": {"oid": r.commit_oid}, "authorAssociation": r.author_association} for r in pr.get_reviews()]
 
     issues = []
+
+    # Check for pending review requests: reviews still in flight block clean status (ai-config#3570)
+    pending_reviewers = getattr(pr, "pending_review_requests", None)
+    if pending_reviewers is None:
+        pending_reviewers = extract_request_names(getattr(pr, "review_requests", []))
+    if pending_reviewers:
+        issues.append(
+            f"PR has pending review request(s) still in flight: {', '.join(sorted(pending_reviewers))}"
+        )
 
     # Direct GitHub computed review decision check
     if review_decision in ("CHANGES_REQUESTED", "REJECTED"):

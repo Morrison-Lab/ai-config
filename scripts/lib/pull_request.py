@@ -37,6 +37,21 @@ class ReviewThread:
         self.path: str = data.get("path") or ""
         self.line: Optional[int] = data.get("line")
 
+def extract_request_names(review_requests: Any) -> List[str]:
+    """Extract reviewer logins or team slugs from reviewRequests."""
+    names = []
+    if not review_requests:
+        return names
+    for r in review_requests:
+        if isinstance(r, dict):
+            name = r.get("login") or r.get("name") or r.get("slug") or ""
+        else:
+            name = str(r).strip()
+        if name:
+            names.append(name)
+    return names
+
+
 class PullRequest:
     def __init__(self, pr_num: str, repo: str, fetcher: Callable[[List[str]], str] = default_fetcher):
         self.pr_num = str(pr_num)
@@ -49,11 +64,19 @@ class PullRequest:
     def _fetch_pr_data(self) -> Dict[str, Any]:
         fields = [
             "headRefOid", "headRefName", "state", "commits", 
-            "reviewDecision", "reviews", "comments"
+            "reviewDecision", "reviews", "comments", "reviewRequests"
         ]
         cmd = ["gh", "pr", "view", self.pr_num, "--repo", self.repo, "--json", ",".join(fields)]
         stdout = self._fetcher(cmd)
         return json.loads(stdout)
+
+    @property
+    def review_requests(self) -> List[Dict[str, Any]]:
+        return list(self._data.get("reviewRequests") or [])
+
+    @property
+    def pending_review_requests(self) -> List[str]:
+        return extract_request_names(self.review_requests)
 
     @property
     def head_sha(self) -> str:

@@ -262,6 +262,23 @@ def main():
     check("snake_case is_resolved False blocks clean status", code == 1)
     check("...and names snake_case path and line", "src/snake.py:7" in out)
 
+    # --- reviewRequests payload validation and in-flight reviews ---
+    p = base_payload()
+    p["pr"]["reviewRequests"] = "invalid"
+    code, _ = run_script(p)
+    check("pr.reviewRequests as string exits 2, NOT 1", code == 2)
+
+    p = base_payload()
+    p["pr"]["reviewRequests"] = ["invalid"]
+    code, _ = run_script(p)
+    check("pr.reviewRequests with non-dict item exits 2, NOT 1", code == 2)
+
+    p = base_payload()
+    p["pr"]["reviewRequests"] = [{"login": "copilot-pull-request-reviewer"}]
+    code, out = run_script(p)
+    check("pending review request in flight exits 1 (not clean)", code == 1)
+    check("...and names in-flight reviewer", "copilot-pull-request-reviewer" in out)
+
     # An end-to-end run WITHOUT -R must exercise resolve_repo through the
     # payload rather than shelling out; a run WITH a realistic Actions URL
     # must exercise the actions/runs call site.

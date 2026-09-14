@@ -52,7 +52,7 @@ def review(login, state, body="", commit=HEAD, assoc="MEMBER"):
 
 def pr(reviews=(), comments=(), checks=(), head=HEAD,
        url="https://github.com/Lacaedemon/sparta/pull/1427",
-       author="pr-opener"):
+       author="pr-opener", review_requests=()):
     return {
         "reviews": list(reviews),
         "comments": list(comments),
@@ -60,6 +60,7 @@ def pr(reviews=(), comments=(), checks=(), head=HEAD,
         "headRefOid": head,
         "url": url,
         "author": {"login": author},
+        "reviewRequests": list(review_requests),
     }
 
 
@@ -80,6 +81,149 @@ MERGE_CMD = "gh pr merge 1427 -R Lacaedemon/sparta --squash"
 
 
 class TestEvaluate(unittest.TestCase):
+    def test_pending_review_requests_denied(self):
+        """A PR with pending review requests cannot merge while reviews are in flight (ai-config#3570)."""
+        state = pr(
+            comments=[CLEAN_VERDICT],
+            review_requests=[{"login": "copilot-pull-request-reviewer"}],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("pending review request", decision["reason"])
+        self.assertIn("copilot-pull-request-reviewer", decision["reason"])
+
+    def test_copilot_changes_recommended_denies_beside_clean_verdict(self):
+        """A Copilot review recommending changes blocks merge even if another review is clean (ai-config#3570, #3469)."""
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body="### 🟡 Changes recommended\n\nUnresolved parser correctness issues.",
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+        self.assertIn("copilot-pull-request-reviewer", decision["reason"])
+
+    def test_copilot_approval_recommended_allows(self):
+        """A Copilot review recommending approval allows when consensus clean exists."""
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body="### 🟢 Approval recommended\n\nLooks good.",
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
+
+    def test_pending_review_requests_teams_and_strings(self):
+        """Pending review requests with team slugs or string representations block merge."""
+        state = pr(
+            comments=[CLEAN_VERDICT],
+            review_requests=[{"slug": "frontend-team"}, "external-reviewer"],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("frontend-team", decision["reason"])
+        self.assertIn("external-reviewer", decision["reason"])
+
+    def test_copilot_needs_a_closer_look_denies(self):
+        """Copilot 'Needs a closer look' header blocks merge."""
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body="## Needs a closer look\n\nPotential performance bottleneck.",
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_suppressed_comments_denies(self):
+        """Copilot approval with suppressed comments blocks merge."""
+        for suppressed_block in (
+            "### Suppressed comments (2)\n\n- nit 1\n- nit 2",
+            "<summary>Comments suppressed due to low confidence (1)</summary>",
+        ):
+            state = pr(
+                reviews=[review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body=f"### Approval recommended\n\n{suppressed_block}",
+                    commit=HEAD,
+                )],
+                comments=[CLEAN_VERDICT],
+            )
+            decision = gate.evaluate(MERGE_CMD, state)
+            self.assertEqual(decision["decision"], "deny", suppressed_block)
+            self.assertIn("not clean", decision["reason"])
+
+    def test_bot_changes_requested_superseded_by_approved(self):
+        """A bot CHANGES_REQUESTED review superseded by APPROVED allows merge."""
+        state = pr(
+            reviews=[
+                review("coderabbitai[bot]", "CHANGES_REQUESTED", commit=HEAD),
+                review("coderabbitai[bot]", "APPROVED", commit=HEAD),
+            ],
+            comments=[CLEAN_VERDICT],
+        )
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
+
+    def test_bot_dismissed_review_allows(self):
+        """A bot CHANGES_REQUESTED review dismissed by maintainer allows merge."""
+        state = pr(
+            reviews=[
+                review("coderabbitai[bot]", "CHANGES_REQUESTED", commit=HEAD),
+                review("coderabbitai[bot]", "DISMISSED", commit=HEAD),
+            ],
+            comments=[CLEAN_VERDICT],
+        )
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
+
+    def test_standing_bot_not_clean_on_older_commit_blocks_new_head(self):
+        """A bot not-clean review on an older commit stands across commits until cleared."""
+        older_sha = "1111111111111111111111111111111111111111"
+        state = pr(
+            reviews=[
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body="### Changes recommended\n\nFound a race condition.",
+                    commit=older_sha,
+                ),
+            ],
+            comments=[CLEAN_VERDICT],  # comments says clean for HEAD, but Copilot hasn't cleared older_sha
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("copilot-pull-request-reviewer", decision["reason"])
+
+    def test_bot_short_oid_does_not_clear_or_match_head(self):
+        """A 1-character commit oid in a bot review is not head-bound."""
+        short_sha = HEAD[0]
+        state = pr(
+            reviews=[
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body="### Approval recommended\n\nAll good.",
+                    commit=short_sha,
+                ),
+            ],
+            comments=[NEEDS_WORK_VERDICT],
+        )
+        # Should not approve or allow
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+
     def test_sparta_1427_regression_denied(self):
         """Zero reviews + Needs-more-work verdict + later demo-diff comment."""
         state = pr(comments=[NEEDS_WORK_VERDICT, DEMO_DIFF])
@@ -894,11 +1038,12 @@ class TestMain(unittest.TestCase):
             state = view if view is not None else pr()
             view_payload = {k: state[k] for k in
                             ("url", "author", "reviews",
-                             "statusCheckRollup", "headRefOid")}
+                             "statusCheckRollup", "headRefOid", "reviewRequests") if k in state}
             side_effect = [
                 gh_result(stdout=json.dumps(view_payload)),
                 gh_result(stdout=json.dumps(comments if comments is not None
                                             else state["comments"])),
+                gh_result(stdout=json.dumps([])),
             ]
         with patch.object(sys, "stdin", io.StringIO(json.dumps(payload))), \
              patch.object(sys, "stdout", stdout), \
@@ -1084,9 +1229,47 @@ class TestMain(unittest.TestCase):
         decision, _ = self.run_main(
             self.payload(MERGE_CMD),
             side_effect=[gh_result(stdout=json.dumps(view_payload)),
-                         gh_result(stdout=pages)],
+                         gh_result(stdout=pages),
+                         gh_result(stdout=json.dumps([]))],
         )
         self.assertEqual(decision["decision"], "allow")
+
+    def test_check_runs_fetched_via_rest(self):
+        _, run_mock = self.run_main(
+            self.payload(MERGE_CMD), view=pr(comments=[CLEAN_VERDICT]))
+        api_cmd = run_mock.call_args_list[2][0][0]
+        self.assertIn("api", api_cmd)
+        self.assertIn("--paginate", api_cmd)
+        self.assertIn(f"repos/Lacaedemon/sparta/commits/{HEAD}/check-runs", api_cmd)
+
+    def test_check_runs_fetch_failure_denies(self):
+        state = pr(comments=[CLEAN_VERDICT])
+        view_payload = {k: state[k] for k in
+                        ("url", "author", "reviews", "statusCheckRollup",
+                         "headRefOid", "reviewRequests") if k in state}
+        decision, _ = self.run_main(
+            self.payload(MERGE_CMD),
+            side_effect=[gh_result(stdout=json.dumps(view_payload)),
+                         gh_result(stdout=json.dumps(state["comments"])),
+                         gh_result(rc=1, stderr="check-runs fetch failed")],
+        )
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("commit check-runs", decision["reason"])
+
+    def test_in_flight_copilot_check_run_denies(self):
+        state = pr(comments=[CLEAN_VERDICT])
+        view_payload = {k: state[k] for k in
+                        ("url", "author", "reviews", "statusCheckRollup",
+                         "headRefOid", "reviewRequests") if k in state}
+        check_runs = [{"name": "copilot-pull-request-reviewer", "status": "in_progress", "conclusion": ""}]
+        decision, _ = self.run_main(
+            self.payload(MERGE_CMD),
+            side_effect=[gh_result(stdout=json.dumps(view_payload)),
+                         gh_result(stdout=json.dumps(state["comments"])),
+                         gh_result(stdout=json.dumps(check_runs))],
+        )
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("copilot-pull-request-reviewer", decision["reason"])
 
     def test_repo_flag_forwarded(self):
         _, run_mock = self.run_main(

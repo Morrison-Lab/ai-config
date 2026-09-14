@@ -171,3 +171,30 @@ ai-config#2969 (ai-config#694 pattern) to keep both files well under the
     answer it again by citing that disposition when nothing has changed.
   - **Don't:** treat repeated comment text as proof that an earlier fix did
     not land, or as a new finding, without checking the thread.
+- **A PR does not count as clean for MWC while Copilot (or any review) is still running, even if another reviewer reported clean.**
+  In [#3469](https://github.com/Morrison-Lab/ai-config/pull/3469#pullrequestreview-5175527714), Claude review finished clean at `06:09:39Z`,
+  while Copilot was still running until `06:19:33Z` when it submitted `### 🟡 Changes recommended`.
+  An in-flight review blocks clean status;
+  consensus clean verdicts across all active reviewers are required before merging under MWC (ai-config#3570).
+  - **Do:** wait for all running reviews (check runs in progress or pending review requests) to complete before evaluating whether the PR is fully clean.
+  - **Don't:** declare clean or merge under MWC when one reviewer has finished clean while another review is still in flight.
+- **Automated bot review tracking must account for formal states, header variations, and commit boundaries.**
+  In `plugins/ai-config/enforce-mwc-review-gate.py`, bot reviews (like Copilot and CodeRabbit) require:
+  1. Recognizing both formal states (`CHANGES_REQUESTED`, `APPROVED`, `DISMISSED`) and header verdicts (`Changes recommended`, `Needs a closer look`, `Approval recommended`).
+  2. Preserving earlier `NOT_CLEAN` verdicts across commit pushes until the same reviewer evaluates the new HEAD commit or is dismissed/approved.
+  3. Verifying `Suppressed comments` blocks even when the header states `Approval recommended`.
+  4. Guarding against short commit abbreviations (`len(oid) >= 7`) before matching head OIDs.
+  - **Do:** ensure bot review gates require a later clean review from the same bot or formal dismissal before clearing standing negative reviews across pushes.
+  - **Don't:** drop standing bot findings simply because a new commit moved `HEAD`.
+- **`reviewRequests` is uninformative for Copilot in-flight status.**
+  Check runs and review bodies govern instead.
+  As measured in `memories/gh-cli.md`, `gh pr view --json reviewRequests` and REST `requested_reviewers`
+  clear within moments of a request landing, even while Copilot is actively running or queued to review (as occurred in #3469).
+  While `reviewRequests` catches pending requests when present (e.g. human reviewers), detecting Copilot in flight requires:
+  1. Checking for queued or in-progress check runs (e.g. `copilot-pull-request-reviewer`)
+     via the commit check-runs REST endpoint (`commits/<sha>/check-runs`),
+     since GitHub GraphQL `statusCheckRollup` drops `copilot-pull-request-reviewer`
+     (ai-config#3570, `fully-clean.cases.md:79`).
+  2. Preserving prior `NOT_CLEAN` verdicts across pushes until a new clean review is posted on HEAD.
+  - **Do:** check check-run status via the commit check-runs REST endpoint and poll `reviews[]` rather than relying on `reviewRequests` to know if Copilot is in flight.
+  - **Don't:** treat an empty `reviewRequests` response as proof that Copilot has completed its review.

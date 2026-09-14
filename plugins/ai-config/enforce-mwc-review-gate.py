@@ -95,6 +95,19 @@ NOT_CLEAN_VERDICT_RE = re.compile(
 REVIEWED_COMMIT_RE = re.compile(
     r"Reviewed[-\s]commit[:\s]+`?([0-9a-f]{7,40})`?", re.IGNORECASE
 )
+_COPILOT_HEADING_PREFIX = r"(?:^|\n)[ \t]*#{1,6}[ \t]*(?:[^\w\n\'\"]+[ \t]*)?"
+COPILOT_AFFIRMATIVE_HEADER = re.compile(
+    _COPILOT_HEADING_PREFIX + r"\bApproval\s+recommended\b", re.IGNORECASE
+)
+COPILOT_NEGATIVE_HEADER = re.compile(
+    _COPILOT_HEADING_PREFIX
+    + r"\b(?:Changes\s+recommended|Needs\s+a\s+closer\s+look)\b",
+    re.IGNORECASE,
+)
+COPILOT_SUPPRESSED_BLOCK = re.compile(
+    r"\b(?:Suppressed\s+comments|Comments\s+suppressed\s+due\s+to\s+low\s+confidence)\b",
+    re.IGNORECASE,
+)
 # Shortest sha abbreviation a head-binding prefix test will accept.
 ABBREV_SHA_LEN = 7
 # Markdown emphasis and terminal punctuation around an approval headline,
@@ -311,6 +324,71 @@ def latest_human_review_states(reviews, head_oid="", pr_author=""):
     return states
 
 
+def extract_request_names(review_requests):
+    """Extract reviewer logins or team slugs from reviewRequests.
+
+    Defined self-contained here so the enforcement hook has no external
+    library or module import dependencies when run across standalone or
+    minimal plugin environments.
+    """
+    names = []
+    for r in review_requests:
+        if isinstance(r, dict):
+            name = r.get("login") or r.get("name") or r.get("slug") or ""
+        else:
+            name = str(r).strip()
+        if name:
+            names.append(name)
+    return names
+
+
+def latest_bot_review_states(reviews, head_oid=""):
+    """Latest standing per bot author.
+
+    Tracks whether any bot review (e.g. Copilot, Coderabbit) submitted a formal
+    CHANGES_REQUESTED review or has a negative verdict header (such as
+    'Changes recommended' or 'Needs a closer look').
+    A formal CHANGES_REQUESTED or an admissible negative verdict stands across commits
+    until superseded by a clean review on the current head or dismissed.
+    """
+    states = {}
+    for r in reviews:
+        login = (r.get("author") or {}).get("login", "")
+        if not login or not is_bot_login(login):
+            continue
+        state = (r.get("state") or "").upper()
+        if state == "DISMISSED":
+            states.pop(login, None)
+            continue
+        if state in ("CHANGES_REQUESTED", "REJECTED"):
+            states[login] = state
+            continue
+        if state == "APPROVED":
+            states[login] = "APPROVED"
+            continue
+        raw_body = r.get("body", "") or ""
+        oid = ((r.get("commit") or {}).get("oid") or "")
+        is_negative = bool(
+            COPILOT_NEGATIVE_HEADER.search(raw_body)
+            or NOT_CLEAN_VERDICT_RE.search(raw_body)
+            or (COPILOT_SUPPRESSED_BLOCK.search(raw_body) if COPILOT_AFFIRMATIVE_HEADER.search(raw_body) else False)
+        )
+        if is_negative:
+            states[login] = "NOT_CLEAN"
+            continue
+
+        is_affirmative = bool(
+            (COPILOT_AFFIRMATIVE_HEADER.search(raw_body) and not COPILOT_SUPPRESSED_BLOCK.search(raw_body))
+            or CLEAN_VERDICT_RE.search(raw_body)
+        )
+        if is_affirmative:
+            if head_oid and oid and len(oid) >= ABBREV_SHA_LEN and head_oid.startswith(oid):
+                states[login] = "CLEAN"
+            elif states.get(login) == "CLEAN":
+                states.pop(login, None)
+    return states
+
+
 def classify_verdict_body(body, head_oid):
     """Classify one blanked, marker-bearing verdict body."""
     section = VERDICT_MARKER_RE.split(body, maxsplit=1)[1]
@@ -405,16 +483,28 @@ def evaluate(cmd, pr_data):
     # entries carry only state (FAILURE/ERROR/PENDING/EXPECTED/SUCCESS).
     failures = [
         check.get("name") or check.get("context") for check in status_rollup
-        if check.get("conclusion") in BLOCKED_CI_CONCLUSIONS
-        or check.get("status") in PENDING_CI_STATUSES
-        or check.get("state") in BLOCKED_STATUS_STATES
+        if (check.get("conclusion") or "").upper() in BLOCKED_CI_CONCLUSIONS
+        or (check.get("status") or "").upper() in PENDING_CI_STATUSES
+        or (check.get("state") or "").upper() in BLOCKED_STATUS_STATES
     ]
+    failures = list(dict.fromkeys(failures))
     if failures:
         return deny(
             "Strict Merge Control Policy: Cannot merge with failing or "
             f"incomplete CI checks: {', '.join(failures)}. Never ignore red "
             "CI; wait for all checks to complete."
         )
+
+    # Reviews in flight check: never merge while reviews are still running/requested (ai-config#3570).
+    review_requests = pr_data.get("reviewRequests") or []
+    if review_requests:
+        req_names = extract_request_names(review_requests)
+        if req_names:
+            return deny(
+                "Strict Merge Control Policy: Cannot merge while reviews are still "
+                f"in flight: pending review request(s) for {', '.join(sorted(req_names))}. "
+                "Wait for all reviews to complete and post clean verdicts."
+            )
 
     human_states = latest_human_review_states(reviews, head_oid, pr_author)
     blockers = [k for k, v in human_states.items() if v == "CHANGES_REQUESTED"]
@@ -430,6 +520,16 @@ def evaluate(cmd, pr_data):
             "Strict Merge Control Policy: a human review body from "
             f"{', '.join(sorted(not_clean_bodies))} states this PR is not "
             "clean. Disagreement among reviews is not fully clean; address "
+            "it and get an approving review on the current head."
+        )
+
+    bot_states = latest_bot_review_states(reviews, head_oid)
+    bot_blockers = [k for k, v in bot_states.items() if v in ("CHANGES_REQUESTED", "REJECTED", "NOT_CLEAN")]
+    if bot_blockers:
+        return deny(
+            "Strict Merge Control Policy: automated review from "
+            f"{', '.join(sorted(bot_blockers))} states this PR is not clean. "
+            "Consensus clean verdicts across all reviewers are required to merge; address "
             "it and get an approving review on the current head."
         )
 
@@ -538,11 +638,29 @@ def run_gh(args, cwd):
     )
 
 
+def _merge_paginated_json(text, decoder=None):
+    """Merge whitespace-separated JSON-array pages emitted by gh --paginate."""
+    items = []
+    if not text:
+        return items
+    decoder = decoder or json.JSONDecoder()
+    pos = 0
+    while pos < len(text):
+        page, end = decoder.raw_decode(text, pos)
+        items.extend(page)
+        pos = end
+        while pos < len(text) and text[pos] in " \r\n":
+            pos += 1
+    return items
+
+
 def fetch_pr_data(cmd, cwd):
     """Resolve the merge target and fetch its state.
 
     Returns (pr_data, error_reason). Comments come from the paginated REST
-    endpoint so a long thread cannot truncate away the latest verdict.
+    endpoint so a long thread cannot truncate away the latest verdict. Check-runs
+    come from the commit check-runs REST endpoint to detect copilot-pull-request-reviewer
+    which is dropped by GraphQL statusCheckRollup (ai-config#3570).
     """
     api_match = GH_API_MERGE_RE.search(cmd)
     if api_match:
@@ -563,7 +681,7 @@ def fetch_pr_data(cmd, cwd):
 
     result = run_gh(
         view_args
-        + ["--json", "url,author,reviews,statusCheckRollup,headRefOid"],
+        + ["--json", "url,author,reviews,statusCheckRollup,headRefOid,reviewRequests"],
         cwd,
     )
     if result.returncode != 0:
@@ -589,18 +707,33 @@ def fetch_pr_data(cmd, cwd):
             "Hook failed to fetch the PR's comments (gh api returned "
             "non-zero). Output: " + comments_result.stderr
         )
-    # --paginate with --jq emits one JSON array per page; merge them.
-    comments = []
     decoder = json.JSONDecoder()
-    text = comments_result.stdout.strip()
-    pos = 0
-    while pos < len(text):
-        page, end = decoder.raw_decode(text, pos)
-        comments.extend(page)
-        pos = end
-        while pos < len(text) and text[pos] in " \r\n":
-            pos += 1
-    pr_data["comments"] = comments
+    pr_data["comments"] = _merge_paginated_json(comments_result.stdout.strip(), decoder)
+
+    # GraphQL statusCheckRollup drops copilot-pull-request-reviewer
+    # (ai-config#3570, fully-clean.cases.md:79). Query commit check-runs via REST
+    # and merge them into statusCheckRollup so active or failed reviewer runs block merge.
+    head_oid = pr_data.get("headRefOid", "") or ""
+    if head_oid:
+        check_runs_result = run_gh(
+            ["api", f"repos/{url_match.group(1)}/commits/{head_oid}/check-runs",
+             "--paginate", "--jq", "[.check_runs[]? | {name: .name, status: (.status // \"\"), conclusion: (.conclusion // \"\")}]"],
+            cwd,
+        )
+        if check_runs_result.returncode != 0:
+            return None, (
+                "Hook failed to fetch the PR's commit check-runs (gh api returned "
+                "non-zero). Output: " + check_runs_result.stderr
+            )
+        check_runs = _merge_paginated_json(check_runs_result.stdout.strip(), decoder)
+        existing_rollup = pr_data.get("statusCheckRollup") or []
+        for cr in check_runs:
+            existing_rollup.append({
+                "name": cr.get("name") or "",
+                "status": (cr.get("status") or "").upper(),
+                "conclusion": (cr.get("conclusion") or "").upper(),
+            })
+        pr_data["statusCheckRollup"] = existing_rollup
     return pr_data, None
 
 

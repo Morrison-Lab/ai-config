@@ -239,6 +239,15 @@ def build_payload(
         "commits": commits,
         "reviews": reviews,
         "comments": comments,
+        "reviewRequests": [
+            {"login": r.get("login") or ""}
+            for r in (pr_raw.get("requested_reviewers") or [])
+            if (r.get("login") or "")
+        ] + [
+            {"slug": t.get("slug") or t.get("name") or ""}
+            for t in (pr_raw.get("requested_teams") or [])
+            if (t.get("slug") or t.get("name") or "")
+        ],
     }
     check_runs = [
         {

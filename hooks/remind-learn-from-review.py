@@ -80,7 +80,7 @@ import re
 import sys
 import tempfile
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.realpath(__file__))
 
 # How near (in transcript records) a review signal must sit to an acceptance
 # for that acceptance to count as accepting a *reviewer's* finding rather than

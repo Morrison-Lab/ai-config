@@ -198,7 +198,7 @@ def start_monitor_for_url(url, cwd):
     if alive(read_json(path).get("pid")):
         return False
     try:
-        process = subprocess.Popen([sys.executable, os.path.abspath(__file__), "--poll", url, path],
+        process = subprocess.Popen([sys.executable, os.path.realpath(__file__), "--poll", url, path],
                                    cwd=cwd, stdin=subprocess.DEVNULL,
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                    start_new_session=True)

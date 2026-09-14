@@ -365,3 +365,42 @@ That is what makes repeating a demand costly rather than merely tedious, and it 
 
 (Tracked as [#3141](https://github.com/Morrison-Lab/ai-config/issues/3141), the original defect report;
 [#3156](https://github.com/Morrison-Lab/ai-config/issues/3156) is its corpus record and [#3185](https://github.com/Morrison-Lab/ai-config/issues/3185) a later recurrence.)
+
+## Resolve a hook's own directory with `realpath`, never lexical `abspath`
+
+A hook that reaches a sibling script or a data file computes its own directory from `__file__`.
+`os.path.abspath()` is the obvious call and is wrong here, because it collapses `..` **lexically** --- purely as text, without consulting the filesystem.
+
+That difference is invisible until a symlink sits in the path, and this corpus puts one there by construction.
+An ai-config checkout carries `.claude/skills` as a symlink to its own `skills/`, and the hooks-only skills-directory plugin registers every hook as `${CLAUDE_PLUGIN_ROOT}/../../hooks/<name>.py`.
+The harness resolves `CLAUDE_PLUGIN_ROOT` to `<checkout>/.claude/skills/ai-config-hooks`, the interpreter walks that `../../` **through** the symlink and opens the real file, and the hook runs normally --- so nothing about the failure looks like a path problem.
+`abspath` then collapses the same `..` against the symlink's own path and reports the hook's directory as `<checkout>/.claude/hooks`, a directory that exists and holds only `session-start.sh`.
+
+Measured 2026-09-13 in a worktree, against the real registration path:
+
+```
+exists (fs-resolved): True
+abspath dirname : .../.claude/hooks
+realpath dirname: .../hooks
+sibling via abspath exists : False
+sibling via realpath exists: True
+```
+
+The blast radius is the whole `hooks/` tree, not one guard: 18 sites across 16 non-test hooks resolved their directory this way.
+`no-push-without-self-review.py` was the visible one only because it fails closed --- with its detector unreachable it fell into degraded mode and denied any push-shaped command, including a heredoc whose body merely *quoted* a push line while writing an issue body, leaving `ALLOW_UNREVIEWED_PUSH=1` as the only way to run anything.
+The hooks that load a sibling for context fail the other way, silently: `no-empty-promise.py`'s `_sibling()` swallows the `ImportError` and returns `None`, so it simply runs without its sibling's code-region stripping.
+Measured the same day in the layout above --- `sibling loaded: False` under `abspath`, `True` under `realpath` --- for that hook;
+the remaining sites were fixed by inspection rather than each measured.
+
+`realpath` resolves symlinks before collapsing `..`, and is identical to `abspath` wherever no symlink is involved, so it strictly widens the set of layouts that work.
+It was already the idiom in the newer hooks (`no-commit-chained-to-push.py`, `warn-heredoc-doubled-backslash.py`);
+the older ones simply predated it.
+
+- **Do:** write `os.path.realpath(__file__)` in any hook that resolves its own directory to reach a sibling or a data file.
+- **Do:** test such a hook through a symlinked path, not only from the checkout --- a suite that runs it from `hooks/` cannot see this at all, which is why 310 cases passed over a live session-wide lockout.
+- **Don't:** read "the hook ran, so its path is fine" as covering the paths it computes --- the interpreter resolved the path through the filesystem and `abspath` did not.
+- **Don't:** diagnose this as a missing installation and add a second search path;
+  the first path was simply computed wrong.
+
+(Tracked as [#2981](https://github.com/Morrison-Lab/ai-config/issues/2981).
+An earlier wave's snapshot branch `fix/2981-self-review-guard-sibling-import` treated it as a missing install and added a `.git`-rooted fallback search, which is why the root cause is stated here rather than only the remedy.)

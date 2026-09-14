@@ -136,7 +136,7 @@ FALLBACK_BASES = ("main", "master", "trunk", "develop", "devel")
 def _load_sibling():
     """`no-push-without-self-review.py`, whose `iter_pushes` decides what a
     push is. Loaded by path because the filename is not an identifier."""
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+    path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                         "no-push-without-self-review.py")
     if not os.path.isfile(path):
         return None

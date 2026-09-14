@@ -379,7 +379,7 @@ def ensure():
     if alive(read_state().get("pid")):
         return True
     try:
-        process = subprocess.Popen([sys.executable, os.path.abspath(__file__), "--monitor"],
+        process = subprocess.Popen([sys.executable, os.path.realpath(__file__), "--monitor"],
                                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                    stderr=subprocess.DEVNULL, start_new_session=True)
     except OSError:

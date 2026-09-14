@@ -5,7 +5,7 @@ import subprocess
 
 
 def main():
-    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "monitor-open-prs.py")
+    script = os.path.join(os.path.dirname(os.path.realpath(__file__)), "monitor-open-prs.py")
     try:
         subprocess.run(["python3", script], stdin=subprocess.DEVNULL,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,

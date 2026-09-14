@@ -80,7 +80,7 @@ import re
 import shlex
 import sys
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
+_HERE = os.path.dirname(os.path.realpath(__file__))
 
 
 @functools.lru_cache(maxsize=None)

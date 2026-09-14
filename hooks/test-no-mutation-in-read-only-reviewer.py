@@ -433,6 +433,50 @@ try:
     payload_p10 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p10}
     hit = hook.offending("Bash", payload_p10["tool_input"], payload_p10)
     check("must NOT block git commit when prompt uses 'without editing files outside' with commit directive", hit, None)
+
+    # 12k. Prohibitive review brief with negated write verb (Finding 1)
+    p11 = os.path.join(prohibitive_dir, "subagents", "agent-prohibit-write-tests.jsonl")
+    with open(p11, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Adversarial code review. Do not write tests; review only."},
+        }) + "\n")
+    payload_p11 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p11}
+    hit = hook.offending("Bash", payload_p11["tool_input"], payload_p11)
+    check("must block git commit when review brief negates write verbs ('Do not write tests')", hit is not None, True)
+
+    # 12l. Prohibitive review brief with negated code/file writing (Finding 1)
+    p12 = os.path.join(prohibitive_dir, "subagents", "agent-prohibit-write-code.jsonl")
+    with open(p12, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Review the code. Do not write code or edit any files."},
+        }) + "\n")
+    payload_p12 = {"tool_name": "Bash", "tool_input": {"command": "git checkout -b sneak"}, "transcript_path": p12}
+    hit = hook.offending("Bash", payload_p12["tool_input"], payload_p12)
+    check("must block git checkout when brief says 'Do not write code or edit any files'", hit is not None, True)
+
+    # 12m. Scoped with 'any files outside' and affirmative commit (Finding 3)
+    p13 = os.path.join(prohibitive_dir, "subagents", "agent-never-any-outside.jsonl")
+    with open(p13, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Never edit any files outside your worktree. Fix the failing tests and commit."},
+        }) + "\n")
+    payload_p13 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p13}
+    hit = hook.offending("Bash", payload_p13["tool_input"], payload_p13)
+    check("must NOT block git commit when prompt uses 'Never edit any files outside' with commit directive", hit, None)
+
+    # 12n. Scoped with 'Do not edit any files outside' and affirmative commit (Finding 3)
+    p14 = os.path.join(prohibitive_dir, "subagents", "agent-do-not-any-outside.jsonl")
+    with open(p14, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Do not edit any files outside your worktree. Fix the failing tests and commit."},
+        }) + "\n")
+    payload_p14 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p14}
+    hit = hook.offending("Bash", payload_p14["tool_input"], payload_p14)
+    check("must NOT block git commit when prompt uses 'Do not edit any files outside' with commit directive", hit, None)
 finally:
     try:
         import shutil

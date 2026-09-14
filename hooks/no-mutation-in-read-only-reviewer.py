@@ -98,17 +98,17 @@ READ_ONLY_NAME_RE = re.compile(
 )
 
 REVIEW_PROMPT_RE = re.compile(
-    r"\b(?:adversarial(?:[- ]code)?[- ]review|self-review)\b",
+    r"\b(?:adversarial(?:[- ]code)?[- ](?:review|reviewer)|code[- ]reviewer|self-review)\b",
     re.I,
 )
 
 RX_READ_ONLY = re.compile(
     r"\bread[- ]only\b"
-    r"|\bdo(?:es)? not\s+(?:(?:edit|modify|write|change|fix|commit|mutate)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|mutate)\b.*?\bany(?:thing| files?)?\b"
-    r"|\bdon't\s+(?:(?:edit|modify|write|change|fix|commit|mutate)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|mutate)\b.*?\bany(?:thing| files?)?\b"
-    r"|\bnever\s+(?:(?:edit|modify|write|change|fix|commit|mutate)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|mutate)\b.*?\bany(?:thing| files?)?\b"
+    r"|\bdo(?:es)? not\s+(?:(?:edit|modify|write|change|fix|commit|mutate)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|mutate)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
+    r"|\bdon't\s+(?:(?:edit|modify|write|change|fix|commit|mutate)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|mutate)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
+    r"|\bnever\s+(?:(?:edit|modify|write|change|fix|commit|mutate)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|mutate)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
     r"|\bmake no changes\b"
-    r"|\bwithout\s+(?:(?:editing|modifying|writing|changing|fixing|committing)[,\s]+(?:and\s+|or\s+)?)*(?:editing|modifying|writing|changing)\b.*?\bany(?:thing| files?)?\b",
+    r"|\bwithout\s+(?:(?:editing|modifying|writing|changing|fixing|committing)[,\s]+(?:and\s+|or\s+)?)*(?:editing|modifying|writing|changing)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)",
     re.I,
 )
 
@@ -116,11 +116,11 @@ RX_NOT_READ_ONLY = re.compile(r"\bnot\s+read[- ]only\b", re.I)
 
 RX_AFFIRMATIVE_WRITE = re.compile(
     r"\band\s+then\s+(?:fix|commit|patch|repair|edit|modify|write|create)\b"
-    r"|\band\s+(?:fix|commit|patch|repair|edit|modify|write|create)\s+(?:the\s+|a\s+|an\s+|any\s+|all\s+|every\s+|each\s+|new\s+|these\s+|those\s+|issues?|bugs?|errors?|defects?|tests?|files?|patches?|scripts?)"
-    r"|\b(?:fix|patch|repair|address)\s+(?:every|all|any|the|each|issues?|bugs?|errors?|defects?|findings?)\b"
+    r"|\band\s+(?:fix|commit|patch|repair|edit|modify|write|create)\s+(?:(?:the|a|an|any|all|every|each|new|these|those)\s+|(?:issues?|bugs?|errors?|defects?|tests?|files?|patches?|scripts?)\b)"
+    r"|(?<!\bdo not\s)(?<!\bdon't\s)(?<!\bnever\s)(?<!\bwithout\s)(?<!\bnot\s)\b(?:fix|patch|repair|address)\s+(?:every|all|any|the|each|issues?|bugs?|errors?|defects?|findings?)\b"
     r"|\bcommitt?(?:ing|ed)?\s+as\s+you\s+go\b"
-    r"|\b(?:make|apply)\s+(?:the\s+|a\s+)?(?:fixes?|changes?|edits?|patches?|modifications?)\b"
-    r"|\b(?:write|create)\s+(?:the\s+|a\s+|an\s+|new\s+)?(?:fixes?|tests?|files?|code|patches?|scripts?)\b",
+    r"|(?<!\bdo not\s)(?<!\bdon't\s)(?<!\bnever\s)(?<!\bwithout\s)(?<!\bnot\s)\b(?:make|apply)\s+(?:the\s+|a\s+)?(?:fixes?|changes?|edits?|patches?|modifications?)\b"
+    r"|(?<!\bdo not\s)(?<!\bdon't\s)(?<!\bnever\s)(?<!\bwithout\s)(?<!\bnot\s)\b(?:write|create)\s+(?:the\s+|a\s+|an\s+|new\s+)?(?:fixes?|tests?|files?|code|patches?|scripts?)\b",
     re.I,
 )
 
@@ -335,9 +335,9 @@ def is_read_only_persona(payload: dict) -> tuple[bool, str]:
                                 elif isinstance(record.get("content"), str):
                                     content = record["content"]
                             if content and not RX_NOT_READ_ONLY.search(content):
-                                if RX_AFFIRMATIVE_WRITE.search(content):
-                                    continue
-                                if RX_READ_ONLY.search(content) or REVIEW_PROMPT_RE.search(content):
+                                if RX_READ_ONLY.search(content):
+                                    return True, "read-only reviewer subagent"
+                                if REVIEW_PROMPT_RE.search(content) and not RX_AFFIRMATIVE_WRITE.search(content):
                                     return True, "read-only reviewer subagent"
             except Exception:
                 pass

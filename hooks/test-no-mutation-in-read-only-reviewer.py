@@ -103,6 +103,12 @@ MUTATING_COMMANDS = [
     ("git tag v1.0.0", "tag creation"),
     ("git init", "git init"),
     ("git clone https://example.com/repo.git", "git clone"),
+    ("git pull", "git pull"),
+    ("git pull origin main", "git pull with args"),
+    ("git add .", "git add dot"),
+    ("git add -A", "git add all"),
+    ("git add file.py", "git add file"),
+    ("git stage file.py", "git stage file"),
     # Wrapped and chained variations
     ("sudo git commit -m 'root commit'", "sudo git commit"),
     ("cd /path && git checkout -b fix", "chained checkout -b"),
@@ -185,6 +191,10 @@ for write_stype in ("general-purpose", "author", "coder", "refactorer"):
 for ro_stype in ("adversarial-reviewer", "code-reviewer", "security-reviewer", "reviewer", "Explore", "Plan", "explore", "plan"):
     hit = hook.offending("Bash", {"command": "git commit -m 'fix'"}, {"subagent_type": ro_stype})
     check(f"must recognize read-only subagent_type ({ro_stype})", hit is not None, True)
+
+for ro_role in ("Adversarial Reviewer", "Code Reviewer", "Security Reviewer", "adversarial reviewer", "code reviewer", "security reviewer"):
+    hit = hook.offending("Bash", {"command": "git commit -m 'fix'"}, {"Role": ro_role})
+    check(f"must recognize read-only Role with spaces ({ro_role})", hit is not None, True)
 
 # 7. Authorized escape valve / overrides
 OVERRIDE_CASES = [

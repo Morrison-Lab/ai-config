@@ -924,6 +924,14 @@
             "timeout": 10,
             "script": "flag-unread-commit-citation.py",
             "why": "The Write half of the Bash entry above. ai-config#3471: warns when writing a commit SHA citation into a non-scratch prose file (.md/.markdown/.txt/.rst/.qmd/.rmd/.ipynb -- a case entry, a memory file) with no read of that commit in the transcript since the current turn began. Scoped to those extensions, not every tracked file, after adversarial review found a GitHub Actions SHA pin and a lockfile hash both false-positive under a broader scope."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-mutation-in-read-only-reviewer.py\"'",
+            "timeout": 10,
+            "script": "no-mutation-in-read-only-reviewer.py",
+            "why": "ai-config#3612: mechanically blocks file write tools (Write, Edit, NotebookEdit) in read-only personas such as adversarial-reviewer, Explore, and Plan.",
+            "_note_see_bash_entry": "Design notes live on this hook's Bash entry. Repeating them per matcher guarantees sibling divergence on the next correction."
           }
         ]
       },
@@ -950,6 +958,14 @@
             "timeout": 10,
             "script": "flag-unread-commit-citation.py",
             "why": "The Edit half of the Bash entry above. ai-config#3471: warns when editing a commit SHA citation into a non-scratch prose file (.md/.markdown/.txt/.rst/.qmd/.rmd/.ipynb) with no read of that commit in the transcript since the current turn began."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-mutation-in-read-only-reviewer.py\"'",
+            "timeout": 10,
+            "script": "no-mutation-in-read-only-reviewer.py",
+            "why": "ai-config#3612: mechanically blocks file write tools (Write, Edit, NotebookEdit) in read-only personas such as adversarial-reviewer, Explore, and Plan.",
+            "_note_see_bash_entry": "Design notes live on this hook's Bash entry. Repeating them per matcher guarantees sibling divergence on the next correction."
           }
         ]
       },
@@ -976,6 +992,14 @@
             "timeout": 10,
             "script": "flag-unread-commit-citation.py",
             "why": "The NotebookEdit half of the Bash entry above. ai-config#3471: warns when a notebook cell edit writes a commit SHA citation into a non-scratch prose file (.md/.markdown/.txt/.rst/.qmd/.rmd/.ipynb) with no read of that commit in the transcript since the current turn began."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-mutation-in-read-only-reviewer.py\"'",
+            "timeout": 10,
+            "script": "no-mutation-in-read-only-reviewer.py",
+            "why": "ai-config#3612: mechanically blocks file write tools (Write, Edit, NotebookEdit) in read-only personas such as adversarial-reviewer, Explore, and Plan.",
+            "_note_see_bash_entry": "Design notes live on this hook's Bash entry. Repeating them per matcher guarantees sibling divergence on the next correction."
           }
         ]
       },

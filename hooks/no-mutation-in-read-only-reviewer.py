@@ -82,17 +82,18 @@ OVERRIDE_ENV_VARS = frozenset({
 
 READ_ONLY_PERSONA_NAMES = frozenset({
     "adversarial-reviewer",
+    "adversarial reviewer",
     "code-reviewer",
+    "code reviewer",
     "security-reviewer",
+    "security reviewer",
     "reviewer",
-    "Explore",
-    "Plan",
     "explore",
     "plan",
 })
 
 READ_ONLY_NAME_RE = re.compile(
-    r"^(?:(?:[a-z0-9_-]+/)?(?:adversarial-reviewer|code-reviewer|reviewer|security-reviewer|explore|plan))$",
+    r"^(?:(?:[a-z0-9_ -]+/)?(?:adversarial[-_ ]reviewer|code[-_ ]reviewer|reviewer|security[-_ ]reviewer|explore|plan))$",
     re.I,
 )
 
@@ -129,6 +130,9 @@ ALWAYS_MUTATING_GIT_SUBCMDS = frozenset({
     "push",
     "init",
     "clone",
+    "add",
+    "stage",
+    "pull",
 })
 
 MUTATING_BRANCH_FLAGS = frozenset({
@@ -246,17 +250,17 @@ def is_read_only_persona(payload: dict) -> tuple[bool, str]:
     )
     for k in keys:
         v = payload.get(k)
-        if isinstance(v, str) and (v in READ_ONLY_PERSONA_NAMES or READ_ONLY_NAME_RE.match(v)):
+        if isinstance(v, str) and (v.lower().strip() in READ_ONLY_PERSONA_NAMES or READ_ONLY_NAME_RE.match(v.strip())):
             return True, v
         ti = payload.get("tool_input")
         if isinstance(ti, dict):
             ti_v = ti.get(k)
-            if isinstance(ti_v, str) and (ti_v in READ_ONLY_PERSONA_NAMES or READ_ONLY_NAME_RE.match(ti_v)):
+            if isinstance(ti_v, str) and (ti_v.lower().strip() in READ_ONLY_PERSONA_NAMES or READ_ONLY_NAME_RE.match(ti_v.strip())):
                 return True, ti_v
         msg = payload.get("message")
         if isinstance(msg, dict):
             msg_v = msg.get(k)
-            if isinstance(msg_v, str) and (msg_v in READ_ONLY_PERSONA_NAMES or READ_ONLY_NAME_RE.match(msg_v)):
+            if isinstance(msg_v, str) and (msg_v.lower().strip() in READ_ONLY_PERSONA_NAMES or READ_ONLY_NAME_RE.match(msg_v.strip())):
                 return True, msg_v
 
     # 4. Transcript inspection

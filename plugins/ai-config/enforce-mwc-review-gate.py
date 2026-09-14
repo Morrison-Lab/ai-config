@@ -638,11 +638,29 @@ def run_gh(args, cwd):
     )
 
 
+def _merge_paginated_json(text, decoder=None):
+    """Merge whitespace-separated JSON-array pages emitted by gh --paginate."""
+    items = []
+    if not text:
+        return items
+    decoder = decoder or json.JSONDecoder()
+    pos = 0
+    while pos < len(text):
+        page, end = decoder.raw_decode(text, pos)
+        items.extend(page)
+        pos = end
+        while pos < len(text) and text[pos] in " \r\n":
+            pos += 1
+    return items
+
+
 def fetch_pr_data(cmd, cwd):
     """Resolve the merge target and fetch its state.
 
     Returns (pr_data, error_reason). Comments come from the paginated REST
-    endpoint so a long thread cannot truncate away the latest verdict.
+    endpoint so a long thread cannot truncate away the latest verdict. Check-runs
+    come from the commit check-runs REST endpoint to detect copilot-pull-request-reviewer
+    which is dropped by GraphQL statusCheckRollup (ai-config#3570).
     """
     api_match = GH_API_MERGE_RE.search(cmd)
     if api_match:
@@ -689,18 +707,8 @@ def fetch_pr_data(cmd, cwd):
             "Hook failed to fetch the PR's comments (gh api returned "
             "non-zero). Output: " + comments_result.stderr
         )
-    # --paginate with --jq emits one JSON array per page; merge them.
-    comments = []
     decoder = json.JSONDecoder()
-    text = comments_result.stdout.strip()
-    pos = 0
-    while pos < len(text):
-        page, end = decoder.raw_decode(text, pos)
-        comments.extend(page)
-        pos = end
-        while pos < len(text) and text[pos] in " \r\n":
-            pos += 1
-    pr_data["comments"] = comments
+    pr_data["comments"] = _merge_paginated_json(comments_result.stdout.strip(), decoder)
 
     # GraphQL statusCheckRollup drops copilot-pull-request-reviewer
     # (ai-config#3570, fully-clean.cases.md:79). Query commit check-runs via REST
@@ -717,22 +725,15 @@ def fetch_pr_data(cmd, cwd):
                 "Hook failed to fetch the PR's commit check-runs (gh api returned "
                 "non-zero). Output: " + check_runs_result.stderr
             )
-        check_runs = []
-        text = check_runs_result.stdout.strip()
-        pos = 0
-        while pos < len(text):
-            page, end = decoder.raw_decode(text, pos)
-            check_runs.extend(page)
-            pos = end
-            while pos < len(text) and text[pos] in " \r\n":
-                pos += 1
-        existing_rollup = pr_data.setdefault("statusCheckRollup", [])
+        check_runs = _merge_paginated_json(check_runs_result.stdout.strip(), decoder)
+        existing_rollup = pr_data.get("statusCheckRollup") or []
         for cr in check_runs:
             existing_rollup.append({
                 "name": cr.get("name") or "",
                 "status": (cr.get("status") or "").upper(),
                 "conclusion": (cr.get("conclusion") or "").upper(),
             })
+        pr_data["statusCheckRollup"] = existing_rollup
     return pr_data, None
 
 

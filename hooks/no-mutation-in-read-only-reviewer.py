@@ -106,16 +106,17 @@ RX_READ_ONLY = re.compile(
     r"\bread[- ]only\b"
     r"|\bdo(?:es)? not\s+(?:(?:edit|modify|write|change|fix|commit|mutate)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|mutate)\b.*?\bany(?:thing| files?)?\b"
     r"|\bdon't\s+(?:(?:edit|modify|write|change|fix|commit|mutate)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|mutate)\b.*?\bany(?:thing| files?)?\b"
-    r"|\bnever\s+(?:(?:edit|modify|write|change|fix|commit|mutate)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|mutate)\b"
+    r"|\bnever\s+(?:(?:edit|modify|write|change|fix|commit|mutate)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|mutate)\b.*?\bany(?:thing| files?)?\b"
     r"|\bmake no changes\b"
-    r"|\bwithout\s+(?:(?:editing|modifying|writing|changing|fixing|committing)[,\s]+(?:and\s+|or\s+)?)*(?:editing|modifying|writing|changing)\b",
+    r"|\bwithout\s+(?:(?:editing|modifying|writing|changing|fixing|committing)[,\s]+(?:and\s+|or\s+)?)*(?:editing|modifying|writing|changing)\b.*?\bany(?:thing| files?)?\b",
     re.I,
 )
 
 RX_NOT_READ_ONLY = re.compile(r"\bnot\s+read[- ]only\b", re.I)
 
 RX_AFFIRMATIVE_WRITE = re.compile(
-    r"\b(?:and|then)\s+(?:fix|commit|patch|repair|edit|modify|write|create)\b"
+    r"\band\s+then\s+(?:fix|commit|patch|repair|edit|modify|write|create)\b"
+    r"|\band\s+(?:fix|commit|patch|repair|edit|modify|write|create)\s+(?:the\s+|a\s+|an\s+|any\s+|all\s+|every\s+|each\s+|new\s+|these\s+|those\s+|issues?|bugs?|errors?|defects?|tests?|files?|patches?|scripts?)"
     r"|\b(?:fix|patch|repair|address)\s+(?:every|all|any|the|each|issues?|bugs?|errors?|defects?|findings?)\b"
     r"|\bcommitt?(?:ing|ed)?\s+as\s+you\s+go\b"
     r"|\b(?:make|apply)\s+(?:the\s+|a\s+)?(?:fixes?|changes?|edits?|patches?|modifications?)\b"
@@ -334,9 +335,9 @@ def is_read_only_persona(payload: dict) -> tuple[bool, str]:
                                 elif isinstance(record.get("content"), str):
                                     content = record["content"]
                             if content and not RX_NOT_READ_ONLY.search(content):
-                                if RX_READ_ONLY.search(content):
-                                    return True, "read-only reviewer subagent"
-                                if REVIEW_PROMPT_RE.search(content) and not RX_AFFIRMATIVE_WRITE.search(content):
+                                if RX_AFFIRMATIVE_WRITE.search(content):
+                                    continue
+                                if RX_READ_ONLY.search(content) or REVIEW_PROMPT_RE.search(content):
                                     return True, "read-only reviewer subagent"
             except Exception:
                 pass

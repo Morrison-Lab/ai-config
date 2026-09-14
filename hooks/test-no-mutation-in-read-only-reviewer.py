@@ -411,6 +411,28 @@ try:
     payload_p8 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p8}
     hit = hook.offending("Bash", payload_p8["tool_input"], payload_p8)
     check("must detect read-only persona on compound multi-verb prohibition", hit is not None, True)
+
+    # 12i. Scoped 'never edit files outside' instruction with affirmative commit directive (Claude review finding)
+    p9 = os.path.join(prohibitive_dir, "subagents", "agent-never-scope.jsonl")
+    with open(p9, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Never edit files outside your worktree. Fix the failing tests and commit."},
+        }) + "\n")
+    payload_p9 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p9}
+    hit = hook.offending("Bash", payload_p9["tool_input"], payload_p9)
+    check("must NOT block git commit when prompt scopes edits with 'Never edit files outside' and directs commit", hit, None)
+
+    # 12j. Scoped 'without editing files outside' with affirmative commit
+    p10 = os.path.join(prohibitive_dir, "subagents", "agent-without-scope.jsonl")
+    with open(p10, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Perform the refactor without editing files outside your worktree. Fix defects and commit as you go."},
+        }) + "\n")
+    payload_p10 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p10}
+    hit = hook.offending("Bash", payload_p10["tool_input"], payload_p10)
+    check("must NOT block git commit when prompt uses 'without editing files outside' with commit directive", hit, None)
 finally:
     try:
         import shutil

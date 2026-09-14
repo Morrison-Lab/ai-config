@@ -475,7 +475,7 @@ Measured on `test-guard-slide-major-tag.py` before the sweep, invoking it throug
 a path that opens fine when it is not collapsed lexically.
 Running a suite against the real registration path is the natural way to reproduce this by hand,
 and under the lexical spelling the suite cannot run at all.
-Both halves are swept, and the checker below covers both.
+Both halves are swept, and `scripts/check-hook-file-resolution.py` covers both.
 `no-push-without-self-review.py` was the visible one only because it fails closed --- with its detector unreachable it fell into degraded mode and denied any push-shaped command, including a heredoc whose body merely *quoted* a push line while writing an issue body, leaving `ALLOW_UNREVIEWED_PUSH=1` as the only way to run anything.
 The hooks that load a sibling for context fail the other way, silently: `no-empty-promise.py`'s `_sibling()` catches a bare `Exception` --- the error actually raised is a `FileNotFoundError` out of `spec.loader.exec_module` --- and returns `None`, so it simply runs without its sibling's code-region stripping.
 Measured the same day in the layout above --- `sibling loaded: False` under `abspath`, `True` under `realpath` --- for that hook;

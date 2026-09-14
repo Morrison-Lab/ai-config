@@ -27,6 +27,7 @@ The two failure directions are both bad and only one is visible:
 
 The corpus has paid for this twice: once in `plugins/ai-config/
 claude-hook-adapter.py` under ai-config#2681, and again across 19 sites in
+18 non-test hooks (plus the subject resolution of 31 test suites) in
 `hooks/` under ai-config#2981, because the first fix was not swept. That is the
 recurrence bar in `shared/principles/deterministic-tools.md`, and this file is
 the instrument it asks for.

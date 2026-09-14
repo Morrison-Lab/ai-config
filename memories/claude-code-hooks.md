@@ -593,8 +593,9 @@ The tell, if you look for it, is that DIFFERENT mutations (say, inverting a patc
 The section above is about a hook importing another *hook's* helpers via `_sibling()`, whose fix is to keep the mutant in `hooks/` so the sibling's fixed basename still resolves next to it.
 A hook that instead does a path-relative import of `scripts/lib/<module>.py` (resolved off its own `__file__`, the same way `_sibling()` is) fails identically when its OWN mutation harness copies the hook file to a **temp directory** to produce each mutant: `scripts/lib` cannot be found relative to that temp copy, the import returns `None` or raises, and every mutant since then reads as caught for a reason unrelated to the clause under test.
 
-This is worse than the ad-hoc `/tmp cp` case above in one respect: it recurred inside two of the repo's own COMMITTED mutation harnesses, `hooks/test-no-clobbering-push.py` and `hooks/test-flag-reset-hard-uncommitted-work.py`, both testing a hook wired to `scripts/lib/shellcmd.py`.
-A committed test file reads as already correct, so nothing prompts re-checking it, and the bug shipped with the harness rather than being introduced by someone copying a hook elsewhere by hand.
+This is worse than the ad-hoc `/tmp cp` case above in one respect: it turns up inside the repo's own COMMITTED mutation harnesses, which read as already correct, so nothing prompts re-checking them.
+The bug then ships with the harness rather than being introduced by someone copying a hook elsewhere by hand.
+`hooks/test-no-clobbering-push.py` and `hooks/test-flag-reset-hard-uncommitted-work.py` are the two that hit it, on a branch that wires both hooks to `scripts/lib/shellcmd.py`.
 
 The remedy differs from `_sibling()`'s "relocate the mutant": there is no fixed sibling basename to sit next to, since the import is a package path rather than another hook's filename.
 Put the real `scripts/lib` directory on the mutant subprocess's own `PYTHONPATH` instead of trying to make the temp directory look like `hooks/`:
@@ -612,5 +613,10 @@ proc = subprocess.run([sys.executable, hook_path], ..., env=env, ...)
 - **Don't:** apply the `_sibling()` remedy ("keep the mutant in `hooks/`") here.
   It fixes a same-directory basename lookup and does nothing for a package import resolved off a different relative path.
 
-(`Morrison-Lab/ai-config#1973`, 2026-09-14: both `hooks/test-no-clobbering-push.py` and `hooks/test-flag-reset-hard-uncommitted-work.py` copy the hook under test to a temp directory and both exercise a hook importing `scripts/lib/shellcmd.py`.
-Fixed by adding the mutant subprocess's `PYTHONPATH` in both files, per the fixing commit: "A mutant is a reverted clause, not a broken install.")
+(Measured 2026-09-14 while working `Morrison-Lab/ai-config#1973`.
+Both harnesses copy the hook under test to a temp directory, and the fix under that issue makes both hooks import `scripts/lib/shellcmd.py`.
+Every new case then read as "flipped" under EVERY mutation, because the import landed as `None` in each mutant rather than because the reverted clause did anything.
+
+**The import wiring this describes is not on `main` as of that date** --- Issue #1973 is open and its fix is in flight, so a reader checking `main` will find neither the import nor the `PYTHONPATH` lines.
+The general rule above does not depend on that work landing: it is about any hook whose mutation harness copies one file while the hook imports a package path, and this repo will keep producing those.
+Stated this way deliberately, after a reviewer checked the first draft of this entry against `main`, found nothing, and reasonably read it as invented --- which is what a memory entry citing unpushed state looks like from outside.)

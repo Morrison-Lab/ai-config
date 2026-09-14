@@ -530,11 +530,15 @@ Round 5's suggested direction is this rule's remedy stated as a design change:
 "invert the default the way pass 2 already did --- treat a heredoc as executing
 unless its introducing line is provably fed to a non-executing consumer".
 
-**Third occurrence, ai-config#1308, 2026-09-14, in the same file's process-substitution scanner**: an unbalanced `<(` candidate (no matching `)` found) was dropped rather than treated as live, justified as "bash rejects the command outright" --- a claim about bash's own parser, standing in for the actual condition, which is whether THIS SCANNER'S paren model can be trusted whenever it cannot find a match.
+**Third occurrence, measured 2026-09-14 while working ai-config#1308**, in a process-substitution scanner for the same file.
+A `<(` candidate with no matching `)` was dropped rather than treated as live, justified as "bash rejects the command outright" --- a claim about bash's own parser, standing in for the actual condition, which is whether THIS SCANNER'S paren model can be trusted whenever it cannot find a match.
 `bash <(use_case=1; echo "<merge>")` is balanced and bash runs it.
-The scanner's model had simply misread it as unbalanced, and the drop-on-unbalanced default turned that misread, and every other present or future misread of the same shape, into a silent ALLOW.
-The fix inverted the default: an unmatched paren now fails closed, its body taken to the end of the text, catching this and any future modelling error by the same route.
-Same lesson as rounds 5 and 6 above, a different guard within the file, and the third time this file's own review history shows a "cannot resolve, so allow" default doing more damage than any single point-fix it was meant to guard against.)
+The scanner had simply misread it, and the drop-on-unbalanced default turned that misread, and every other present or future misread of the same shape, into a silent ALLOW.
+Inverting the default --- an unmatched paren failing closed, its body taken to the end of the text --- caught that case and, by the same route, a second one the round had not yet found.
+
+**That scanner is not on `main` as of this date.**
+Issue #1308 is open and the work is in flight, so a reader checking `main` will find no process-substitution scanner in that file at all.
+The occurrence is recorded because the LESSON is the file's own, repeated: a "cannot resolve, so allow" default doing more damage than any point-fix it was meant to guard against, for the third time in this file's review history, and the first two are on `main` and checkable today.)
 
 ## Repointing a configured path at a different artifact is reuse, and the accessor's own docs say what it is for
 
@@ -638,16 +642,22 @@ second question.
   that produces it does; the direction a give-up branch takes is fixed, and
   what that direction *costs* is decided anew by every caller.
 
-(`Morrison-Lab/ai-config#1973`, 2026-09-14: `shell_c_expansions` in
-`scripts/lib/shellcmd.py` is a direct extraction of
-`hooks/no-empty-promise.py`'s `_poller_executed`, which its own docstring
-names "the reference implementation" and which "spent four review rounds on
-this class."
-Wired into `hooks/no-clobbering-push.py` and
-`hooks/flag-reset-hard-uncommitted-work.py`, the review round that followed
-(14 findings) named the inversion directly: "The descent was copied out of
-`hooks/no-empty-promise.py`, where every give-up point fails CLOSED ... into
-two guards, where the identical give-up point fails OPEN."
-Six concrete `-c`-shaped bypasses were verified executing under real `bash`
-before the fix, and the docstring's own "unchanged from the reference
-implementation" sentence was the artifact that let the mismatch ship.)
+(Measured 2026-09-14 while working `Morrison-Lab/ai-config#1973`.
+The extraction was of `hooks/no-empty-promise.py`'s `_poller_executed` --- a
+function whose own docstring names itself the reference implementation and
+records four review rounds spent on this class --- into a shared helper wired
+into two guards.
+The review round that followed (14 findings) named the inversion directly:
+the descent was copied out of a place where every give-up point fails CLOSED
+into two guards where the identical give-up point fails OPEN.
+Six concrete `-c`-shaped bypasses were verified executing under real `bash`,
+and the new docstring's own "unchanged from the reference implementation"
+sentence was the artifact that let the mismatch ship.
+
+**Only the reference implementation is on `main` as of this date.**
+Issue #1973 is open and the extraction is in flight, so a reader can check
+`_poller_executed` and its four rounds today and cannot check the helper or
+the wiring.
+The rule above stands on the reference alone: the give-up branches are
+visible there, and the question it asks --- what does THIS caller pay for
+them --- is answerable against any consumer, present or future.)

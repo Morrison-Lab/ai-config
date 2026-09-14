@@ -357,16 +357,60 @@ try:
     hit = hook.offending("Bash", payload_p3["tool_input"], payload_p3)
     check("must NOT block when review brief has affirmative write directive ('and then fix...')", hit, None)
 
-    # 12d. Explicit 'not read-only' instruction
+    # 12d. Explicit 'not read-only' instruction alongside review terminology (Finding 1)
     p4 = os.path.join(prohibitive_dir, "subagents", "agent-not-ro.jsonl")
     with open(p4, "w", encoding="utf-8") as tf:
         tf.write(json.dumps({
             "type": "user",
-            "message": {"content": "This task is not read-only; perform review and repair any defects."},
+            "message": {"content": "This task is not read-only; perform an adversarial review and submit the findings."},
         }) + "\n")
     payload_p4 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p4}
     hit = hook.offending("Bash", payload_p4["tool_input"], payload_p4)
-    check("must NOT block when brief explicitly specifies 'not read-only'", hit, None)
+    check("must NOT block when brief explicitly specifies 'not read-only' even with review wording", hit, None)
+
+    # 12e. Singular noun affirmative write directive (Finding 2)
+    p5 = os.path.join(prohibitive_dir, "subagents", "agent-write-test.jsonl")
+    with open(p5, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Perform an adversarial review and write a test reproducing the defect."},
+        }) + "\n")
+    payload_p5 = {"tool_name": "Write", "tool_input": {"TargetFile": "tests/test_repro.py"}, "transcript_path": p5}
+    hit = hook.offending("Write", payload_p5["tool_input"], payload_p5)
+    check("must NOT block file write when review brief directs writing a reproduction test", hit, None)
+
+    # 12f. Reproduction script creation directive (Finding 2)
+    p6 = os.path.join(prohibitive_dir, "subagents", "agent-create-script.jsonl")
+    with open(p6, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Perform an adversarial code review and create a reproduction script."},
+        }) + "\n")
+    payload_p6 = {"tool_name": "Write", "tool_input": {"TargetFile": "repro.sh"}, "transcript_path": p6}
+    hit = hook.offending("Write", payload_p6["tool_input"], payload_p6)
+    check("must NOT block file write when review brief directs creating a reproduction script", hit, None)
+
+    # 12g. Non-reviewer subagent instructed not to commit must NOT have file writes blocked (Finding 3)
+    p7 = os.path.join(prohibitive_dir, "subagents", "agent-no-commit.jsonl")
+    with open(p7, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Refactor parser functions in foo.py to improve performance without committing."},
+        }) + "\n")
+    payload_p7 = {"tool_name": "Edit", "tool_input": {"TargetFile": "foo.py"}, "transcript_path": p7}
+    hit = hook.offending("Edit", payload_p7["tool_input"], payload_p7)
+    check("must NOT block file write tools on coding subagent briefed without committing", hit, None)
+
+    # 12h. Multi-verb compound negative prohibition (Finding 4)
+    p8 = os.path.join(prohibitive_dir, "subagents", "agent-multi-verb.jsonl")
+    with open(p8, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Do not edit, modify, or change anything; inspect the codebase only."},
+        }) + "\n")
+    payload_p8 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p8}
+    hit = hook.offending("Bash", payload_p8["tool_input"], payload_p8)
+    check("must detect read-only persona on compound multi-verb prohibition", hit is not None, True)
 finally:
     try:
         import shutil

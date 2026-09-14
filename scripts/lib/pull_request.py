@@ -49,11 +49,15 @@ class PullRequest:
     def _fetch_pr_data(self) -> Dict[str, Any]:
         fields = [
             "headRefOid", "headRefName", "state", "commits", 
-            "reviewDecision", "reviews", "comments"
+            "reviewDecision", "reviews", "comments", "reviewRequests"
         ]
         cmd = ["gh", "pr", "view", self.pr_num, "--repo", self.repo, "--json", ",".join(fields)]
         stdout = self._fetcher(cmd)
         return json.loads(stdout)
+
+    @property
+    def review_requests(self) -> List[Dict[str, Any]]:
+        return list(self._data.get("reviewRequests") or [])
 
     @property
     def head_sha(self) -> str:

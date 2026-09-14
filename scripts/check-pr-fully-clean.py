@@ -2961,6 +2961,19 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
 
     issues = []
 
+    # Check for pending review requests: reviews still in flight block clean status (ai-config#3570)
+    review_requests = getattr(pr, "review_requests", [])
+    if review_requests:
+        pending_reviewers = []
+        for req in review_requests:
+            login = req.get("login") or req.get("name") or req.get("slug") or str(req)
+            if login:
+                pending_reviewers.append(login)
+        if pending_reviewers:
+            issues.append(
+                f"PR has pending review request(s) still in flight: {', '.join(sorted(pending_reviewers))}"
+            )
+
     # Direct GitHub computed review decision check
     if review_decision in ("CHANGES_REQUESTED", "REJECTED"):
         issues.append(f"PR formal review decision is '{review_decision}'")

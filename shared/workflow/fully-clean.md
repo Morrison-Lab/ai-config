@@ -11,6 +11,19 @@ Actively query the current head's CI/pipeline runs and review verdicts (`gh` for
 - **Do:** actively poll and re-arm monitoring after every push until CI and review reach a terminal state at the current head.
 - **Don't:** stop polling while CI or reviews are in flight, or assume automated pipelines completed without querying the forge.
 
+**A PR/MR does not count as clean for MWC if there are reviews still running.**
+Consensus clean verdicts across all active and dispatched reviewers are strictly required to merge.
+If one reviewer (such as Claude Code Review) has reviewed a commit and reported clean,
+but another review (such as GitHub Copilot, an in-progress review check run, or a pending review request) is still running,
+the PR is not fully clean and cannot be merged under MWC.
+Wait for every in-flight review to complete and evaluate its verdict.
+A single clean verdict while another review is running does not authorize merge under MWC
+(Morrison-Lab/ai-config#3570, citing #3469 where Claude reported clean while Copilot was still running and subsequently recommended changes).
+
+- **Do:** wait for all in-flight reviews (check runs in progress, pending review requests) to finish and verify what each review says before declaring fully clean or merging under MWC.
+- **Do:** require consensus clean verdicts across all reviewers evaluating the current head.
+- **Don't:** declare a PR clean or merge under MWC when one reviewer has posted clean but another review is still in flight.
+
 **A forge's `mergeable` result is an integration-state signal, not a review verdict.**
 It can be true while a reviewer has left resolvable findings open.
 Do not report a PR/MR fully clean, ready to merge, or merge it until the review thread sweep is also clear.
@@ -129,8 +142,9 @@ one-line builder was named in the instrument's own `--help`
 | `actions_runs` | `actions_get` (`get_workflow_run`), keyed by run id; `build-pr-payload.py` fills it from each check run's run id ([#1697](https://github.com/Morrison-Lab/ai-config/issues/1697)) | Omitting it changes verdicts --- see below. |
 | `review_threads` | GraphQL `reviewThreads(first:100)` or `pull_request_read` | Required by `check-pr-fully-clean.py` (ai-config#3586). List of thread objects or `{"nodes": [...]}` envelope. |
 
-`pr` needs `headRefOid`, `headRefName`, `state`, `reviewDecision`, and
-`commits[].committedDate`, plus two nested shapes the scan reads directly:
+`pr` needs `headRefOid`, `headRefName`, `state`, `reviewDecision`,
+`commits[].committedDate`, and `reviewRequests` (for in-flight review tracking, ai-config#3570),
+plus two nested shapes the scan reads directly:
 each entry of `reviews[]` needs `state`, `submittedAt`, `body`,
 `commit.oid`, `author.login`, and `authorAssociation`, and each entry of
 `comments[]` needs `body`, `author.login`, `createdAt`, and

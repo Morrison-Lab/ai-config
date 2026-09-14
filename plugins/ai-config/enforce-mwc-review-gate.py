@@ -95,6 +95,12 @@ NOT_CLEAN_VERDICT_RE = re.compile(
 REVIEWED_COMMIT_RE = re.compile(
     r"Reviewed[-\s]commit[:\s]+`?([0-9a-f]{7,40})`?", re.IGNORECASE
 )
+COPILOT_NEGATIVE_HEADER = re.compile(
+    r"^\s*###\s+🟡\s+Changes recommended", re.MULTILINE
+)
+COPILOT_AFFIRMATIVE_HEADER = re.compile(
+    r"^\s*###\s+🟢\s+Approval recommended", re.MULTILINE
+)
 # Shortest sha abbreviation a head-binding prefix test will accept.
 ABBREV_SHA_LEN = 7
 # Markdown emphasis and terminal punctuation around an approval headline,
@@ -311,6 +317,33 @@ def latest_human_review_states(reviews, head_oid="", pr_author=""):
     return states
 
 
+def latest_bot_review_states(reviews, head_oid=""):
+    """Latest standing per bot author evaluating head_oid.
+
+    Tracks whether any bot review (e.g. Copilot, Coderabbit) submitted a formal
+    CHANGES_REQUESTED review or has a negative verdict header (such as
+    '### 🟡 Changes recommended') evaluating the current PR head.
+    A later clean review on the current head supersedes an earlier not-clean.
+    """
+    states = {}
+    for r in reviews:
+        login = (r.get("author") or {}).get("login", "")
+        if not login or not is_bot_login(login):
+            continue
+        state = (r.get("state") or "").upper()
+        if state in ("CHANGES_REQUESTED", "REJECTED"):
+            states[login] = state
+            continue
+        oid = ((r.get("commit") or {}).get("oid") or "")
+        if head_oid and oid and head_oid.startswith(oid):
+            raw_body = r.get("body", "") or ""
+            if COPILOT_NEGATIVE_HEADER.search(raw_body) or NOT_CLEAN_VERDICT_RE.search(raw_body):
+                states[login] = "NOT_CLEAN"
+            elif COPILOT_AFFIRMATIVE_HEADER.search(raw_body) or CLEAN_VERDICT_RE.search(raw_body):
+                states[login] = "CLEAN"
+    return states
+
+
 def classify_verdict_body(body, head_oid):
     """Classify one blanked, marker-bearing verdict body."""
     section = VERDICT_MARKER_RE.split(body, maxsplit=1)[1]
@@ -416,6 +449,21 @@ def evaluate(cmd, pr_data):
             "CI; wait for all checks to complete."
         )
 
+    # Reviews in flight check: never merge while reviews are still running/requested (ai-config#3570).
+    review_requests = pr_data.get("reviewRequests") or []
+    if review_requests:
+        req_names = [
+            r.get("login") or r.get("name") or r.get("slug") or str(r)
+            for r in review_requests
+            if (r.get("login") or r.get("name") or r.get("slug") or str(r))
+        ]
+        if req_names:
+            return deny(
+                "Strict Merge Control Policy: Cannot merge while reviews are still "
+                f"in flight: pending review request(s) for {', '.join(sorted(req_names))}. "
+                "Wait for all reviews to complete and post clean verdicts."
+            )
+
     human_states = latest_human_review_states(reviews, head_oid, pr_author)
     blockers = [k for k, v in human_states.items() if v == "CHANGES_REQUESTED"]
     if blockers:
@@ -430,6 +478,16 @@ def evaluate(cmd, pr_data):
             "Strict Merge Control Policy: a human review body from "
             f"{', '.join(sorted(not_clean_bodies))} states this PR is not "
             "clean. Disagreement among reviews is not fully clean; address "
+            "it and get an approving review on the current head."
+        )
+
+    bot_states = latest_bot_review_states(reviews, head_oid)
+    bot_blockers = [k for k, v in bot_states.items() if v in ("CHANGES_REQUESTED", "REJECTED", "NOT_CLEAN")]
+    if bot_blockers:
+        return deny(
+            "Strict Merge Control Policy: automated review from "
+            f"{', '.join(sorted(bot_blockers))} states this PR is not clean on the current head. "
+            "Consensus clean verdicts across all reviewers are required to merge; address "
             "it and get an approving review on the current head."
         )
 
@@ -563,7 +621,7 @@ def fetch_pr_data(cmd, cwd):
 
     result = run_gh(
         view_args
-        + ["--json", "url,author,reviews,statusCheckRollup,headRefOid"],
+        + ["--json", "url,author,reviews,statusCheckRollup,headRefOid,reviewRequests"],
         cwd,
     )
     if result.returncode != 0:

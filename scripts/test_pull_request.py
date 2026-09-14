@@ -19,6 +19,9 @@ class TestPullRequest(unittest.TestCase):
             ],
             "comments": [
                 {"body": "Looks good", "author": {"login": "friend"}, "createdAt": "2023-10-03T12:00:00Z"}
+            ],
+            "reviewRequests": [
+                {"login": "copilot-pull-request-reviewer"}
             ]
         }
         self.mock_check_runs_data = {
@@ -44,6 +47,7 @@ class TestPullRequest(unittest.TestCase):
         self.assertEqual(pr.state, "OPEN")
         self.assertEqual(pr.review_decision, "CHANGES_REQUESTED")
         self.assertEqual(pr.commit_date, "2023-10-01T12:00:00Z")
+        self.assertEqual(pr.review_requests, [{"login": "copilot-pull-request-reviewer"}])
         
         reviews = pr.get_reviews()
         self.assertEqual(len(reviews), 1)

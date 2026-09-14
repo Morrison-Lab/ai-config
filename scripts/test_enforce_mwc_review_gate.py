@@ -52,7 +52,7 @@ def review(login, state, body="", commit=HEAD, assoc="MEMBER"):
 
 def pr(reviews=(), comments=(), checks=(), head=HEAD,
        url="https://github.com/Lacaedemon/sparta/pull/1427",
-       author="pr-opener"):
+       author="pr-opener", review_requests=()):
     return {
         "reviews": list(reviews),
         "comments": list(comments),
@@ -60,6 +60,7 @@ def pr(reviews=(), comments=(), checks=(), head=HEAD,
         "headRefOid": head,
         "url": url,
         "author": {"login": author},
+        "reviewRequests": list(review_requests),
     }
 
 
@@ -80,6 +81,46 @@ MERGE_CMD = "gh pr merge 1427 -R Lacaedemon/sparta --squash"
 
 
 class TestEvaluate(unittest.TestCase):
+    def test_pending_review_requests_denied(self):
+        """A PR with pending review requests cannot merge while reviews are in flight (ai-config#3570)."""
+        state = pr(
+            comments=[CLEAN_VERDICT],
+            review_requests=[{"login": "copilot-pull-request-reviewer"}],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("pending review request", decision["reason"])
+        self.assertIn("copilot-pull-request-reviewer", decision["reason"])
+
+    def test_copilot_changes_recommended_denies_beside_clean_verdict(self):
+        """A Copilot review recommending changes blocks merge even if another review is clean (ai-config#3570, #3469)."""
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body="### 🟡 Changes recommended\n\nUnresolved parser correctness issues.",
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+        self.assertIn("copilot-pull-request-reviewer", decision["reason"])
+
+    def test_copilot_approval_recommended_allows(self):
+        """A Copilot review recommending approval allows when consensus clean exists."""
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body="### 🟢 Approval recommended\n\nLooks good.",
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
+
     def test_sparta_1427_regression_denied(self):
         """Zero reviews + Needs-more-work verdict + later demo-diff comment."""
         state = pr(comments=[NEEDS_WORK_VERDICT, DEMO_DIFF])

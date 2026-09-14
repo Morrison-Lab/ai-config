@@ -153,14 +153,14 @@ class PayloadFetcher:
                 "pull_request_read, map `head.sha` to `headRefOid`."
             )
 
-        for key, want in (("commits", list), ("reviews", list), ("comments", list)):
+        for key, want in (("commits", list), ("reviews", list), ("comments", list), ("reviewRequests", list)):
             val = pr.get(key)
             if val is not None and not isinstance(val, want):
                 raise PayloadError(
                     f"payload 'pr.{key}' must be a {want.__name__}, got "
                     f"{type(val).__name__}."
                 )
-        for key in ("reviews", "comments", "commits"):
+        for key in ("reviews", "comments", "commits", "reviewRequests"):
             for i, item in enumerate(pr.get(key) or []):
                 if not isinstance(item, dict):
                     raise PayloadError(

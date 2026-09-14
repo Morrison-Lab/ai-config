@@ -73,8 +73,13 @@ CHECK_RUNS_RAW = [
 
 
 def test_maps_pr_fields():
+    raw_pr = dict(
+        PR_RAW,
+        requested_reviewers=[{"login": "copilot-pull-request-reviewer"}],
+        requested_teams=[{"slug": "review-team"}],
+    )
     payload = build_pr_payload.build_payload(
-        "example-org/example-repo", PR_RAW, [], [], COMMITS_RAW, CHECK_RUNS_RAW
+        "example-org/example-repo", raw_pr, [], [], COMMITS_RAW, CHECK_RUNS_RAW
     )
     pr = payload["pr"]
     check("repo carried through", payload["repo"] == "example-org/example-repo")
@@ -88,6 +93,10 @@ def test_maps_pr_fields():
     check(
         "commit committedDate mapped from commit.committer.date",
         pr["commits"][0]["committedDate"] == "2026-09-01T12:00:00Z",
+    )
+    check(
+        "reviewRequests mapped from requested_reviewers and requested_teams",
+        pr["reviewRequests"] == [{"login": "copilot-pull-request-reviewer"}, {"slug": "review-team"}],
     )
 
 

@@ -294,8 +294,7 @@ When authoring a new hook:
    python3 scripts/check-hook-file-resolution.py
    python3 scripts/test_hooks.py
    ```
-   The third is the gate a new hook trips most easily: resolve the hook's own
-   path with `os.path.realpath(__file__)`, never `abspath`.
+   The third is the gate a new hook trips most easily: resolve the hook's own path with `os.path.realpath(__file__)`, never `abspath`.
    See [Resolve a hook's own directory with `realpath`, never lexical `abspath`](#resolve-a-hooks-own-directory-with-realpath-never-lexical-abspath).
 
 ## 5.5 A hook test that invokes the real hook is not hermetic against live git state
@@ -459,33 +458,25 @@ sibling via realpath exists: True
 ```
 
 The blast radius is the whole `hooks/` tree, not one guard.
-Across the 18 non-test hooks that carried it, 19 sites computed a path from `__file__` this way:
-17 resolving the hook's own directory to reach a sibling or a data file,
-and 2 (`monitor-open-prs.py`, `no-unmonitored-pr.py`) resolving the hook's own file to re-exec it.
+Across the 18 non-test hooks that carried it, 19 sites computed a path from `__file__` this way: 17 resolving the hook's own directory to reach a sibling or a data file, and 2 (`monitor-open-prs.py`, `no-unmonitored-pr.py`) resolving the hook's own file to re-exec it.
 
 The test suites carry a second, separate half, and the first sweep missed it.
-Counted by the checker's own AST semantics against `main` at `e388e906` on 2026-09-14, 34 suites were affected:
-16 carried a lexical call on `__file__`, 26 carried one on their `sys.argv` *subject*, and 8 carried both.
+Counted by the checker's own AST semantics against `main` at `e388e906` on 2026-09-14, 34 suites were affected: 16 carried a lexical call on `__file__`, 26 carried one on their `sys.argv` *subject*, and 8 carried both.
 
 That census was first reported as 31 / 16 / 23 / 8, and the three missing suites are the sharpest instance in this whole record of the class the rest of it is about.
 The instrument used to derive the number had a blind spot in exactly the half being counted: `_self_bound_names` followed one hop of name binding from `__file__` and had no equivalent arm for `sys.argv`, so `HOOK = sys.argv[1]` followed by `os.path.abspath(HOOK)` was invisible to it.
-Three live suites carried that shape while the gate read clean, and the count inherited the gap silently ---
-a number derived by an instrument is only as scoped as the instrument, and stating the instrument does not make the number trustworthy if the instrument is what is wrong.
+Three live suites carried that shape while the gate read clean, and the count inherited the gap silently --- a number derived by an instrument is only as scoped as the instrument, and stating the instrument does not make the number trustworthy if the instrument is what is wrong.
 An external reviewer found two of the three; fixing the arm surfaced the third.
-The ref is pinned and dated because `main` moved during this branch's review and took the count with it ---
-the 31st suite arrived with `no-mutation-in-read-only-reviewer.py`, and is swept here too.
-The subject count is the larger one because more suites resolve a subject at all, which is a property of the pre-existing population rather than of any sweep --- at that same ref, counting every call the checker recognizes as either lexical or resolving, 25 suites resolved a subject against 23 resolving `__file__`.
-(Those two figures predate the `sys.argv` binding arm and are therefore lower bounds, like the census above was.)
+The ref is pinned and dated because `main` moved during this branch's review and took the count with it --- the 31st suite arrived with `no-mutation-in-read-only-reviewer.py`, and is swept here too.
+The subject count is the larger one because more suites resolve a subject at all, which is a property of the pre-existing population rather than of any sweep --- at that same ref, counting every call the checker recognizes as either lexical or resolving, 25 suites resolved a subject against 23 resolving `__file__`. (Those two figures predate the `sys.argv` binding arm and are therefore lower bounds, like the census above was.)
 The first sweep did convert only the `__file__` half, but of the *hooks*: it converted no suite's resolution spelling (it did edit one suite, to add the regression cases).
 
 A first attempt at that measurement counted the literal `realpath` spelling and reported 0 and 1, which is wrong under this branch's own `_RESOLVERS = {"realpath", "resolve"}` --- the true figures for symlink-safe resolution at that ref are 2 and 8, since `Path(x).resolve()` is realpath-equivalent and seven suites already used it.
 Stating the instrument and then silently narrowing it one sentence later is the failure this very paragraph warns about, committed inside it.
 
 The subject half breaks for the same reason, and matters for a specific one.
-Measured on `test-guard-slide-major-tag.py` before the sweep, invoking it through the registration path raised `FileNotFoundError` on `<checkout>/.claude/hooks/guard-slide-major-tag.py`,
-a path that opens fine when it is not collapsed lexically.
-Running a suite against the real registration path is the natural way to reproduce this by hand,
-and under the lexical spelling the suite cannot run at all.
+Measured on `test-guard-slide-major-tag.py` before the sweep, invoking it through the registration path raised `FileNotFoundError` on `<checkout>/.claude/hooks/guard-slide-major-tag.py`, a path that opens fine when it is not collapsed lexically.
+Running a suite against the real registration path is the natural way to reproduce this by hand, and under the lexical spelling the suite cannot run at all.
 Both halves are swept, and `scripts/check-hook-file-resolution.py` covers both.
 `no-push-without-self-review.py` was the visible one only because it fails closed --- with its detector unreachable it fell into degraded mode and denied any push-shaped command, including a heredoc whose body merely *quoted* a push line while writing an issue body, leaving `ALLOW_UNREVIEWED_PUSH=1` as the only way to run anything.
 The hooks that load a sibling for context fail the other way, silently: `no-empty-promise.py`'s `_sibling()` catches a bare `Exception` --- the error actually raised is a `FileNotFoundError` out of `spec.loader.exec_module` --- and returns `None`, so it simply runs without its sibling's code-region stripping.
@@ -495,14 +486,11 @@ the remaining sites were fixed by inspection rather than each measured.
 `realpath` resolves symlinks before collapsing `..`, and is identical to `abspath` wherever no symlink is involved, so it strictly widens the set of layouts that work.
 It was already the idiom in the newer hooks (`no-commit-chained-to-push.py`, `warn-heredoc-doubled-backslash.py`).
 Read that as an incomplete sweep rather than as a style that had not reached them yet: this exact symlink-resolution failure was diagnosed and fixed under [#2681](https://github.com/Morrison-Lab/ai-config/issues/2681) in `plugins/ai-config/claude-hook-adapter.py`, whose comment says "resolving any symlinks via realpath" and whose test is named `test_symlink_invocation_resolves_repo_root_to_find_hooks_json`.
-The corpus had already paid for the lesson in an adjacent file and did not carry it into `hooks/`, which is the transferable part:
-a path fix belongs to every site that is *reached* the way the broken one was, not to the file where the symptom appeared.
+The corpus had already paid for the lesson in an adjacent file and did not carry it into `hooks/`, which is the transferable part: a path fix belongs to every site that is *reached* the way the broken one was, not to the file where the symptom appeared.
 
 That phrasing is the scope, and it is narrower than "every site that computes a path" on purpose.
 `scripts/` still holds lexical `abspath(__file__)` sites and they are deliberately left alone.
-The reason is not that hooks never reach into `scripts/`.
-15 non-test hooks do, counting by AST over `hooks/*.py` any `"scripts"`/`"scripts/..."` path literal or `from scripts.* import`, on this branch's merged tree on 2026-09-14 --
-most of them adding `scripts/lib` to `sys.path`, plus `flag-clean-claim-over-findings.py` importing `check-pr-fully-clean.py` and `warn-new-line-breaks-on-push.py` running the vendored line-break checker.
+The reason is not that hooks never reach into `scripts/`. 15 non-test hooks do, counting by AST over `hooks/*.py` any `"scripts"`/`"scripts/..."` path literal or `from scripts.* import`, on this branch's merged tree on 2026-09-14 -- most of them adding `scripts/lib` to `sys.path`, plus `flag-clean-claim-over-findings.py` importing `check-pr-fully-clean.py` and `warn-new-line-breaks-on-push.py` running the vendored line-break checker.
 
 That number took three attempts and then went stale on a merge, which is the more useful thing to record.
 A first pass grepped for a hand-listed set of call shapes and found none, and asserted the exclusion on it.
@@ -514,14 +502,30 @@ That is [`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md) twi
 A fourth attempt was needed after the merge: it was 14 until `main` added `no-mutation-in-read-only-reviewer.py`, which reaches `scripts/lib`.
 So a derived count over a moving population needs its ref and its date attached, not only its criterion --- the neighbouring suite count was pinned that way and survived the merge, and this one was not and did not.
 
-The exclusion survives anyway, for a reason that does not depend on the count:
-every path by which a hook reaches `scripts/` is already fully resolved.
+The exclusion survives anyway, for a reason that does not depend on the count: every path by which a hook reaches `scripts/` is already fully resolved.
 Thirteen of them compute that root as `realpath(__file__)` (or `realpath(_SELF)`) after this sweep;
 the other two take it from git --- `warn-new-line-breaks-on-push.py` from `git rev-parse --show-toplevel`, and `warn-generated-file-stale.py` by running with `cwd` set from the same `rev-parse`.
 A `scripts/` file opened through an already-resolved path has no `..` left to collapse, so `abspath` and `realpath` agree inside it.
 Widen the checker the day something under `scripts/` is reached through a path that is *not* already resolved, and not before.
 Sweeping them would be churn dressed as thoroughness.
 `scripts/check-hook-file-resolution.py` is the instrument, hard-gating in `validate.yml`: the condition is one AST walk over `hooks/*.py` and `plugins/ai-config/*.py`, the remedy is one word, and the corpus had already paid for the lesson twice without sweeping.
+
+**A set named for a behaviour invites membership by resemblance to the name.**
+`_LEXICAL` in the checker meant "collapses `..` without consulting the filesystem", and `absolute` was put in it because it reads like `abspath`.
+It does not collapse: CPython documents `Path.absolute()` as performing "no normalization or symlink resolution", and measured against this corpus's own registration path it preserves the `..` for the OS to walk and lands on a path that exists.
+So it belongs with `realpath`, and the gate had classified two constructs with identical behaviour oppositely --- while already permitting `os.path.dirname(__file__)`, which is safe for exactly the same reason.
+
+The cost is one a hard gate cannot absorb: rejecting `ROOT = Path(__file__).absolute().parent`, correct code that cannot cause this bug, under a message telling its author to do what they had already done.
+Two test cases were pinning the wrong belief, which is why it survived several review rounds --- a case asserting the wrong answer is stronger than no case, because it makes the error look checked.
+
+The deciding question is one command per candidate, and it was run for none of the three.
+Not "read the docs": a behaviour-named set has a membership test *by construction*, so the test is available whenever the set is.
+
+- **Do:** run the behaviour a set is named for against each candidate before adding it, and keep that measurement as the case.
+- **Do:** suspect a member that resembles the set's name more than it resembles the other members.
+- **Don't:** add to a behaviour-named set by category resemblance --- `absolute` reads like `abspath` and behaves like `realpath`.
+- **Don't:** treat a passing case as evidence the member belongs;
+  a case can pin the wrong answer as firmly as the right one.
 
 - **Do:** write `os.path.realpath(__file__)` in any hook that resolves its own directory to reach a sibling or a data file.
 - **Do:** test such a hook through a symlinked path, not only from the checkout --- a suite that runs it from `hooks/` cannot see this at all, which is why the 308 cases this guard had before the two added here all passed over a live session-wide lockout.

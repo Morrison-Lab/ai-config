@@ -494,6 +494,22 @@ ALLOW = [
     # in the ALLOW direction: `cat` reads its input, and no paren-model change
     # may make it execute.
     ('cat <(case x in x) echo "gh pr merge 411";; esac)', "a case pattern inside a substitution cat merely reads"),
+    # Restored. This was deleted in round 3 as vacuous-by-verdict, which was
+    # the wrong test to apply: it is the only guard in the suite against the
+    # PROSE direction of the `case` machinery, and EXEC_WRAP's own comment in
+    # the guard makes the argument for keeping a measured-dead path -- removing
+    # one on suite evidence alone fails OPEN if the suite is what is
+    # incomplete. Deleting it applied the opposite rule to the same evidence in
+    # the same commit (round 4 finding 8).
+    ('echo "case x in x) gh pr merge 411;; esac"', "a whole case construct quoted as prose"),
+    # Round 5. `case` now requires its `in` before a `)` is read as a pattern
+    # terminator. Without that, a bare word `case` used as an ARGUMENT armed
+    # pattern mode, the substitution's own closer was skipped, the fail-closed
+    # default ran the body to end-of-text, and every later quoted merge mention
+    # on the line became live -- the documentation-blocking failure this file
+    # cites as its own bar (round 4 finding 7).
+    ('bash <(grep -c case f) ; echo "you cannot gh pr merge 411 here"', "a bare word case is an argument, not a construct"),
+    ('source <(grep -v case ~/.bashrc) ; echo "gh pr merge 411"', "the same through source"),
 ]
 
 
@@ -973,11 +989,14 @@ for tool_name, tool_input, desc in MCP_ALLOW:
 
 # ------------------------------------------------ scanner-level assertions
 #
-# Two round-4 clauses are load-bearing but NOT reachable through a verdict,
-# because the fail-closed default catches the same commands for a different
-# reason. A verdict case for either would pass with the clause deleted, which
-# this file calls a case that cannot fail -- so assert the SPAN instead, which
-# is what the clause actually changes.
+# These assert the SPAN rather than a verdict, because a span is what the
+# clause changes and a verdict can be reached by a different route.
+#
+# An earlier version of this comment said the clauses were "NOT reachable
+# through a verdict". That was false and this file's own cases refute it:
+# deleting the quote-blind merge flips 2 verdict cases, the word break 1, and
+# the `case` skipping 2 (round 4 finding 5). The span checks are a sharper
+# instrument, not the only one -- which is the honest reason to have both.
 import importlib.util as _ilu
 
 _spec = _ilu.spec_from_file_location("_guard", HOOK)
@@ -1007,11 +1026,27 @@ _span_check("a word ending in case leaves the closer intact",
 _span_check("a case pattern's `)` is not the closer",
             'bash <(case x in x) echo hi;; esac)',
             [(7, 34)])
-# An odd quote makes the quote-aware read unreliable by its own account, so
-# the scan is redone ignoring quotes -- which finds the region rather than
-# silently seeing nothing.
-_span_check("an unbalanced quote falls back to a quote-blind scan",
-            "don't\nbash <(echo hi)", [(13, 20)])
+# An odd quote makes the quote-aware read unreliable by its own account, so a
+# quote-blind pass is MERGED in -- which finds the region rather than silently
+# seeing nothing. The body then runs to the end of the text (index 21, one past
+# the last character) rather than to the `)` at 20, because only one of the two
+# passes saw the region at all and the other cannot vouch for a closer it never
+# found. Substituting the blind reading instead of merging it produced strictly
+# SHORTER bodies and 213 executing fail-opens in a 4,000-case fuzz.
+# The depth cap was described in a commit message as "a performance bound with
+# no reachable behavioural test". That was wrong: past the cap the analysis
+# stops and the body is assumed executed, so a nest one level past it blocks
+# WITH the cap and is allowed without it (round 4 finding 6). A `cat`-only nest
+# isolates the cap, since no executor appears anywhere in it.
+_DEEP = "cat " + "<(cat " * 7 + '<(echo "gh pr merge 411")' + ")" * 7
+checks += 1
+if not _guard.offending(_DEEP):
+    wrong += 1
+print(("  ok    " if _guard.offending(_DEEP) else "  WRONG ")
+      + " a nest past the depth cap fails closed")
+
+_span_check("an unbalanced quote merges a quote-blind scan, failing closed",
+            "don't\nbash <(echo hi)", [(13, 21)])
 
 total = checks
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))

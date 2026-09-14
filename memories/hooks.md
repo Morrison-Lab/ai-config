@@ -469,7 +469,7 @@ Counted by the checker's own AST semantics against `main` at `e388e906` on 2026-
 The ref is pinned and dated because `main` moved during this branch's review and took the count with it ---
 the 31st suite arrived with `no-mutation-in-read-only-reviewer.py`, and is swept here too.
 The subject count is the larger one because more suites resolve a subject at all, which is a property of the pre-existing population rather than of any sweep --- at that same ref, counting every call the checker recognizes as either lexical or resolving, 25 suites resolved a subject against 23 resolving `__file__`.
-The first sweep did convert only the `__file__` half, but of the *hooks*: it left the suites untouched entirely.
+The first sweep did convert only the `__file__` half, but of the *hooks*: it converted no suite's resolution spelling (it did edit one suite, to add the regression cases).
 
 A first attempt at that measurement counted the literal `realpath` spelling and reported 0 and 1, which is wrong under this branch's own `_RESOLVERS = {"realpath", "resolve"}` --- the true figures for symlink-safe resolution at that ref are 2 and 8, since `Path(x).resolve()` is realpath-equivalent and seven suites already used it.
 Stating the instrument and then silently narrowing it one sentence later is the failure this very paragraph warns about, committed inside it.

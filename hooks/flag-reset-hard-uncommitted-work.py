@@ -62,6 +62,13 @@ misfires is worse than a missing one" -- no `permissionDecision`, ever.
       "Forced switches" below)
   M4  `git status --porcelain`, scoped to the whole tree for `reset --hard`
       or to the resolved pathspecs for `checkout`/`restore`, reports at
+  M5  a command line nested in a shell's `-c` argument is matched too, via
+      `scripts/lib/shellcmd.py`'s `shell_c_expansions`. A nested piece
+      contributes only the kinds decided LEXICALLY -- `reset-hard` and
+      `checkout-force`, which discard the whole tracked tree wherever they run.
+      A `checkout`/`restore` pathspec is not one of them: classifying a bare
+      word as a pathspec runs `git rev-parse` in this hook's own directory, and
+      for a nested piece that is the wrong repository (ai-config#1973 review).
       least one entry that is NOT untracked (`??`) -- i.e. at least one
       tracked file in scope has a staged or unstaged change relative to
       HEAD, which the command will discard
@@ -398,14 +405,32 @@ def offending(command):
                   f"shells ({exc}); checking the outer command only",
                   file=sys.stderr)
             pieces = [command]
-    # Unlike its sibling, this hook needs no per-piece caveat: `offending_here`
-    # reads the command TEXT and resolves nothing against a directory, so a
-    # nested piece is answerable on exactly the terms a flat one is. The
-    # directory only enters later, in `_tracked_changes`, which runs once on
-    # the hook's own cwd whatever piece matched.
-    for piece in pieces:
+    # A nested piece is answerable only on what the TEXT decides.
+    #
+    # The comment here used to claim `offending_here` "resolves nothing against
+    # a directory". That is false: `_looks_like_path` calls `_resolves_as_ref`,
+    # which runs `git rev-parse --verify <arg>^{commit}` in the hook's OWN
+    # directory, so whether a `git checkout <word>` reads as a pathspec or as a
+    # branch depends on which repository is asked. For a nested piece that
+    # repository is the wrong one -- `sh -c "cd OTHER && git checkout
+    # feature-x"` reported discarding a tracked file named `feature-x` in THIS
+    # repo, for a command that switches branches in the other and discards
+    # nothing (ai-config#1973 review, round 2 finding 2).
+    #
+    # That is the same defect the sibling guard's `deny_only` exists to
+    # prevent, and this hook asserted its negation in one sentence while the
+    # sibling argued the correct premise at length -- in the same commit.
+    #
+    # So a nested piece contributes only the kinds decided lexically:
+    # `reset-hard` and `checkout-force` discard the whole tracked tree wherever
+    # they run, and carry no resolved pathspec. `checkout`/`restore` with a
+    # pathspec list do, and are skipped for nested pieces.
+    match = offending_here(command)
+    if match is not None:
+        return match
+    for piece in pieces[1:]:
         match = offending_here(piece)
-        if match is not None:
+        if match is not None and match[2] is None:
             return match
     return None
 

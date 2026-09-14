@@ -638,26 +638,51 @@ _MULTICALL = re.compile(r"\A(?:[\w.@/-]*/)?busybox\Z", re.I)
 # and every shell here spells `-c` as one letter, so a cluster CONTAINING `c`
 # sets it: `bash -cx 'git push'` really pushes.
 #
-# NOT case-insensitive, which the first version was. `-C` is `noclobber`, a
-# different option that takes no command, and matching it produced a hard
-# refusal on `bash -C "git push --force origin main"` -- a command that runs a
-# FILE by that name and pushes nothing.
+# A LOWERCASE `c` is required, and any case is allowed around it. `-C` alone is
+# `noclobber`, a different option taking no command, and matching it
+# case-insensitively produced a hard refusal on `bash -C <file>`, which runs a
+# FILE by that name and pushes nothing. But dropping case-insensitivity from
+# the whole cluster went too far the other way: `bash -cC '<cmd>'` really runs
+# `<cmd>`, and an all-lowercase cluster arm cannot express "contains a
+# lowercase `c`" (ai-config#1973 review, round 2 finding 8).
 #
-# Over-detection is harmless here only because the PROGRAM is checked first: a
-# `-check` on something that is not a shell is never reached. That ordering is
-# what the earlier walk-back design lacked, and it is why `-check` need not be
-# excluded the way the reference excludes it -- bash parses `-check` as
-# `-c -h -e -c -k`, so it really is a `-c`.
-DASH_C_FLAG = re.compile(r"\A(?:--command|-[a-z]*c[a-z]*)\Z")
+# `-check` is deliberately matched, unlike in the reference implementation:
+# bash parses it as `-c -h -e -c -k`, so it really is a `-c`. Over-detecting a
+# flag is bounded here because the PROGRAM is checked first AND the scan stops
+# at the script operand -- without that second stop, `bash script.sh -c "x"`
+# was refused for a `-c` belonging to the script's own argv (round 2 finding
+# 5).
+DASH_C_FLAG = re.compile(r"\A(?:--command|-[A-Za-z]*c[A-Za-z]*)\Z")
 
-# Tokens that may precede the program without changing what runs. `sudo`,
-# `setsid` and `stdbuf` are the additions over COMMAND_WRAPPERS; the rest of
-# what looks like an addition is already in it.
-_DESCENT_SKIPPABLE = COMMAND_WRAPPERS | {"sudo", "setsid"}
+# Tokens that may precede the program without changing what runs.
+#
+# `setsid` is the ONLY addition over COMMAND_WRAPPERS. An earlier version of
+# this comment named `sudo` and `stdbuf` as additions too; both are already
+# members, and `stdbuf` never appeared in the literal at all (ai-config#1973
+# review, round 2 finding 6). The wording had been written against
+# `hooks/no-empty-promise.py`'s `_EXEC_PREFIX`, which lists a different set.
+_DESCENT_SKIPPABLE = COMMAND_WRAPPERS | {"setsid"}
+
+
+# Shell options that consume the NEXT token as their value, so that token is
+# not the script operand. Enumerated rather than inferred: bash's own option
+# grammar is the only thing that decides this, and the list is short and
+# stable. Over-listing costs a token of scan; under-listing hides a push.
+_SHELL_VALUE_OPTIONS = {"-o", "+o", "-O", "+O", "--rcfile", "--init-file"}
+# A short-flag CLUSTER whose last letter takes a value, so `-eo pipefail`
+# consumes `pipefail` exactly as `-o pipefail` does.
+_SHELL_VALUE_CLUSTER = re.compile(r"\A[-+][A-Za-z]*[oO]\Z")
 
 
 def command_program(argv):
-    """Index of the token ARGV actually runs, or `len(argv)` if there is none.
+    """Index of ARGV's program token, for the purpose of finding a SHELL.
+
+    Not a general program resolver, and the summary used to read as one. When
+    the wrapper look-ahead finds no shell, this returns the index of the
+    wrapper's first ARGUMENT rather than of the program:
+    `command_program(["timeout", "5", "git", "push"])` is 1, which is `"5"`
+    (ai-config#1973 review, round 2 finding 10). That is harmless to the only
+    caller, which rejects a non-shell immediately, and would mislead any other.
 
     Leading `VAR=value` assignments and wrappers are skipped. A wrapper with
     its own arguments (`sudo -u me bash`, `timeout 5 bash`, `env -i bash`) is
@@ -679,7 +704,12 @@ def command_program(argv):
             index += 1
             after_wrapper = False
             continue
-        if token in _DESCENT_SKIPPABLE:
+        # Basename first. The membership test used to be an exact string
+        # while SHELL_PROGRAM allows a `(?:[\w.@/-]*/)?` prefix, so
+        # `/bin/sh -c` was followed and `/usr/bin/env bash -c` was not --
+        # measured silent on both guards while really running the push
+        # (ai-config#1973 review, round 2 finding 1).
+        if os.path.basename(token) in _DESCENT_SKIPPABLE:
             index += 1
             after_wrapper = True
             continue
@@ -712,9 +742,33 @@ def nested_shell_command(argv):
     if index >= len(argv) or not SHELL_PROGRAM.match(argv[index]):
         return None
     saw_dash_c = False
+    expect_value = False
     for token in argv[index + 1:]:
         if not saw_dash_c:
-            saw_dash_c = bool(DASH_C_FLAG.match(token))
+            if expect_value:
+                expect_value = False
+                continue
+            if DASH_C_FLAG.match(token):
+                saw_dash_c = True
+                continue
+            if token in _SHELL_VALUE_OPTIONS or _SHELL_VALUE_CLUSTER.match(token):
+                expect_value = True
+                continue
+            # The first non-option word that is not an option's VALUE is the
+            # script operand, and everything after it is the script's own argv.
+            # Scanning past it refused `bash script.sh -c "<push>"` for a `-c`
+            # belonging to the script -- a hard DENY on a command that runs the
+            # script and pushes nothing (ai-config#1973 review, round 2
+            # finding 5).
+            #
+            # The value test has to come first, and getting that order wrong
+            # trades an over-block for a HOLE: `bash --rcfile /dev/null -c
+            # "<push>"` and `bash -O extglob -c "<push>"` both really push, and
+            # reading their values as the script operand stopped the scan
+            # before the `-c`. Over-detecting a value-taker costs one more
+            # token of scan; under-detecting one hides a push.
+            if token != "--" and not (token.startswith("-") and len(token) > 1):
+                return None
             continue
         if token == "--" or (token.startswith("-") and len(token) > 1):
             continue
@@ -767,14 +821,26 @@ def shell_c_expansions(command, max_depth=3):
     command sent by `ssh`, a `-c` operand built by expansion, and any shell not
     in SHELL_PROGRAM all yield nothing extra.
 
+    So does a wrapper chain longer than `WRAPPER_ARG_WINDOW` tokens --
+    `sudo -u me -H -E -i -n bash -c "<push>"` measured silent -- and a wrapper
+    the set does not know, such as `flock /tmp/x bash -c` or
+    `git bisect run sh -c`. `bash -s` reads its script from stdin, which is not
+    in the argv at all. Each of these is a HOLE rather than a design boundary,
+    and they are named here because the previous version of this section listed
+    only the first group and so read as exhaustive (ai-config#1973 review,
+    round 2 finding 9).
+
     BOUNDS
     ------
-    `max_depth` and the `seen` set bound the walk. Neither is what makes it
-    terminate -- a `-c` operand is always a strict substring of the text it was
-    parsed out of, so the recursion is structurally finite and both bounds
-    revert with no hang. They cap work on adversarial input rather than
-    preventing a loop, which is what an earlier version of this paragraph
-    claimed.
+    `max_depth` and the `seen` set bound the walk, and neither is what makes it
+    terminate. The operand is NOT always a substring of its parent, which this
+    paragraph claimed until round 2 of ai-config#1973's review: `simple_commands`
+    returns DEQUOTED tokens, so `bash -c "git commit -m \\"x\\""` yields
+    `git commit -m "x"`, which its parent does not contain. What is true, and
+    is what makes the recursion finite, is that dequoting never lengthens and
+    the program plus its `-c` are always consumed, so each operand is strictly
+    shorter than the text it came from. The bounds cap work on adversarial
+    input rather than preventing a loop.
 
     An unparseable piece yields no children and does not discard the pieces
     already found.

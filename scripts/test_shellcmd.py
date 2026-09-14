@@ -15,6 +15,7 @@ Run:  python3 scripts/test_shellcmd.py
 """
 import os
 import py_compile
+import time
 import sys
 import tempfile
 import warnings
@@ -460,6 +461,59 @@ check("command_program resolves past assignments and wrappers",
       shellcmd.command_program(["env", "FOO=1", "/bin/bash", "-c", "git push"]), 2)
 check("command_program stops at a non-shell head",
       shellcmd.command_program(["echo", "sh", "-c", "git push"]), 0)
+
+# An ENV ASSIGNMENT before the program, with no wrapper to compensate. The
+# existing `env FOO=1 /bin/bash -c` case does NOT cover this branch: the
+# wrapper look-ahead finds the shell anyway when `env` precedes the
+# assignment. Reverting the assignment branch leaves that case green and
+# silences the guard on this one (ai-config#1973 review, round 2 finding 4).
+check("a bare assignment before the shell does not hide it",
+      shellcmd.shell_c_expansions('FOO=1 bash -c ' + _Q + 'git push' + _Q),
+      ['FOO=1 bash -c ' + _Q + 'git push' + _Q, "git push"])
+check("setsid is skippable",
+      shellcmd.shell_c_expansions('setsid bash -c ' + _Q + 'git push' + _Q),
+      ['setsid bash -c ' + _Q + 'git push' + _Q, "git push"])
+# A wrapper and a shell may BOTH be path-qualified. The membership test used to
+# be an exact string while SHELL_PROGRAM allowed a path prefix.
+for _wrapper in ("/usr/bin/env", "/usr/bin/nice -n 5", "/bin/nohup"):
+    check(_wrapper + " does not hide the shell",
+          shellcmd.shell_c_expansions(_wrapper + ' bash -c ' + _Q + 'git push' + _Q),
+          [_wrapper + ' bash -c ' + _Q + 'git push' + _Q, "git push"])
+# The scan must stop at the SCRIPT OPERAND, but not at an option's VALUE.
+check("a script operand ends the option scan",
+      shellcmd.shell_c_expansions('bash script.sh -c ' + _Q + 'git push' + _Q),
+      ['bash script.sh -c ' + _Q + 'git push' + _Q])
+check("an option value is not the script operand",
+      shellcmd.shell_c_expansions('bash --rcfile /dev/null -c ' + _Q + 'git push' + _Q),
+      ['bash --rcfile /dev/null -c ' + _Q + 'git push' + _Q, "git push"])
+check("a cluster ending in a value-taking letter consumes its value",
+      shellcmd.shell_c_expansions('bash -eo pipefail -c ' + _Q + 'git push' + _Q),
+      ['bash -eo pipefail -c ' + _Q + 'git push' + _Q, "git push"])
+# A cluster CONTAINING a lowercase `c` is a `-c`, whatever case surrounds it.
+# Bare `-C` is noclobber and takes no command.
+check("a mixed-case cluster containing c still hands over a command line",
+      shellcmd.shell_c_expansions('bash -cC ' + _Q + 'git push' + _Q),
+      ['bash -cC ' + _Q + 'git push' + _Q, "git push"])
+check("bare -C is noclobber, not a command flag",
+      shellcmd.shell_c_expansions('bash -C ' + _Q + 'git push' + _Q),
+      ['bash -C ' + _Q + 'git push' + _Q])
+# The `seen` set: a repeated nested string is not queued twice.
+check("an identical nested command is not expanded twice",
+      shellcmd.shell_c_expansions(
+          'bash -c ' + _Q + 'git push' + _Q + ' ; sh -c ' + _Q + 'git push' + _Q),
+      ['bash -c ' + _Q + 'git push' + _Q + ' ; sh -c ' + _Q + 'git push' + _Q,
+       "git push"])
+
+# `memories/hooks.md` 5.6: a hot-path guard's correctness suite does not
+# exercise its performance envelope, so measure adversarial length separately.
+# This runs before every Bash call.
+_WIDE = " ; ".join(
+    ['bash -c ' + _Q + 'git push ' + str(i) + _Q for i in range(2000)])
+_start = time.perf_counter()
+_pieces = shellcmd.shell_c_expansions(_WIDE)
+_elapsed = time.perf_counter() - _start
+check("2000 sibling nested shells all expand", len(_pieces), 2001)
+check("and do so in under two seconds", _elapsed < 2.0, True)
 
 # ------------------------------------------------- source-level hygiene
 #

@@ -278,7 +278,18 @@ cannot be the worktree a push runs in.
       `skills/clean-branches`' territory, not this guard's)
 
 Deny additionally requires a `--force` or `-f` token and no
-`ALLOW_FORCE_PUSH=1` prefix. It deliberately does NOT look at
+`ALLOW_FORCE_PUSH=1` prefix. The prefix is honoured whether it precedes the
+push itself or the WRAPPER around it: `ALLOW_FORCE_PUSH=1 bash -c "<push>"`
+really sets the variable for the inner `git`, and reading it only from the same
+simple command refused a wrapped push with no way to comply
+(ai-config#1973 review).
+
+  M5  a command line nested in a shell's `-c` argument is matched too, via
+      `scripts/lib/shellcmd.py`'s `shell_c_expansions`. A nested piece can
+      only ever produce a REFUSAL, never a reading: its starting directory
+      depends on `cd`s in the outer shell and is not knowable here, and a
+      reading against the wrong repository is what `evaluate`'s Pass 2 already
+      declines to do. It deliberately does NOT look at
 `--force-with-lease`, for the reason given above: `--force` disables the lease
 check, so the pair is a plain force push.
 
@@ -1191,6 +1202,13 @@ def evaluate(command, base_cwd=None, deny_only=False):
     return None
 
 
+FORCE_OVERRIDE = "ALLOW_FORCE_PUSH"
+# The override as an ENV ASSIGNMENT, anywhere in the command text. Deliberately
+# not anchored to a command position: this only ever decides whether to carry
+# the author's own escape hatch onto a nested piece they wrapped.
+OVERRIDE_ASSIGNMENT = re.compile(r"(?:^|[\s;&|(])ALLOW_FORCE_PUSH=(?:\"1\"|'1'|1)\b")
+
+
 def evaluate_every_shell(command, base_cwd=None):
     """`evaluate` over COMMAND, plus a DENY-ONLY pass over each nested shell.
 
@@ -1241,9 +1259,6 @@ def evaluate_every_shell(command, base_cwd=None):
     from a variable remain invisible, as they are to the reference
     implementation in `hooks/no-empty-promise.py`.
     """
-    verdict = evaluate(command, base_cwd)
-    if verdict is not None and verdict[0] == "deny":
-        return verdict
     pieces = []
     if shell_c_expansions is not None:
         try:
@@ -1252,11 +1267,34 @@ def evaluate_every_shell(command, base_cwd=None):
             print(f"no-clobbering-push: could not expand nested shells ({exc}); "
                   f"evaluating the outer command only", file=sys.stderr)
             pieces = []
-    for piece in pieces:
-        nested = evaluate(piece, base_cwd, deny_only=True)
-        if nested is not None:
-            return nested
-    return verdict
+
+    # REFUSALS FIRST, across the outer command AND every nested piece, before
+    # any reading. `evaluate`'s own docstring states the invariant -- "a
+    # refusal blocks the whole Bash call regardless of position, so scanning
+    # every simple command for one before reporting any warning is both
+    # correct and cheaper" -- and running the full outer `evaluate` first broke
+    # it at the outer/nested boundary: a nested refusal was reached only after
+    # the outer command's Pass 2 had spent its `git ls-remote` reads, measured
+    # at 3 reads (8s timeout each) ahead of one deny (ai-config#1973 review,
+    # round 2 finding 3).
+    #
+    # `ALLOW_FORCE_PUSH=1` written before the WRAPPER really reaches the inner
+    # `git`, but `_lead_prefix` reads an override only from the same simple
+    # command, so a wrapped push was refused with no way to comply -- the
+    # escape hatch this module's docstring calls "the escape hatch" silently
+    # stopped working the moment the push was wrapped (round 2 finding 7).
+    # Carrying the outer override onto each piece restores it. The reading is
+    # deliberately loose, matching this module's existing choice on the same
+    # question: "a refused override sends the author looking for a bypass".
+    override = OVERRIDE_ASSIGNMENT.search(command) is not None
+    for piece in [command] + pieces:
+        if piece is not command and override:
+            piece = f"{FORCE_OVERRIDE}=1 " + piece
+        refusal = evaluate(piece, base_cwd, deny_only=True)
+        if refusal is not None:
+            return refusal
+
+    return evaluate(command, base_cwd)
 
 
 def _read_payload() -> tuple[dict, bool]:

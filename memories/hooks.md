@@ -372,9 +372,11 @@ That is what makes repeating a demand costly rather than merely tedious, and it 
 `hooks/no-mutation-in-read-only-reviewer.py` enforces read-only discipline across reviewer personas (`adversarial-reviewer`, `Explore`, `Plan`, etc.) to protect shared working trees and indices from accidental contamination (ai-config#3612, #3602, #3584).
 Adversarial review (ai-config#3623) established two key boundary requirements for deny-by-default persona guards:
 
-1. **Never conflate review-instruction mentions with read-only roles:**
+1. **Never conflate review-instruction mentions with read-only roles, but prioritize explicit read-only instructions over prohibited action verbs:**
    A subagent brief saying "Review the diff and then fix every issue you find, committing as you go" is a write-capable fix-and-commit dispatch, not a read-only reviewer.
-   Prompt-sniffing heuristics must check for write intent (`fix`, `commit`, `write`, `edit`, `patch`, `repair`) and stay inert when write actions are requested.
+   However, a guard must not short-circuit on bare action verbs (`fix`, `edit`, `write`, `commit`) without negation awareness.
+   Prohibitive briefs (e.g. "Do not edit, fix, or commit anything") or agent definitions stating "Its declared allowlist omits Edit and Write" mention those verbs specifically to prohibit them.
+   Explicit read-only instructions (`read-only`, `do not edit/commit`, `make no changes`) must take priority, with affirmative write checks targeting directive phrasing (`and then fix`, `committing as you go`, `make the fixes`) rather than bare verb occurrences.
 2. **Isolate subagent transcripts from orchestrator transcripts:**
    Parent orchestrator transcripts often record historical subagent dispatches (with `attributionAgent` or `isSidechain: True`).
    A guard scanning transcript records must restrict attribution reads to dedicated subagent transcripts (`subagents/agent-*.jsonl`), preventing an earlier review dispatch from poisoning subsequent orchestrator commands (`git push`, `git commit`).

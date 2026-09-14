@@ -154,6 +154,18 @@ HEREDOC_EXECUTOR = EXEC_AT_CMD_POS
 # are LIVE. Same asymmetry as the heredoc anchor above: over-detecting means
 # declining to mask, which costs a scan, while under-detecting hides a merge.
 EXEC_BEFORE_QUOTE = EXEC_AT_CMD_POS
+# `source` and `.` run the CONTENTS of what they are handed, so a process
+# substitution given to either is a script exactly as `bash <(...)` is.
+#
+# Deliberately NOT folded into EXEC_PROGS. That list's other two consumers read
+# an operand as a COMMAND, while `source`'s operand is a FILENAME -- adding it
+# there would keep `source "gh pr merge"` live for no gain. And `.` cannot take
+# the `\b` those consumers append: `\b` after a non-word character requires a
+# word character next, which `. <(` does not have. The lookahead is what keeps
+# `./script.sh` and a bare `.` pathspec from matching.
+DOT_SOURCE_AT_CMD_POS = re.compile(
+    PERMISSIVE_LEAD + ENV_WRAP + r"(?:source|\.)(?=[ \t])"
+)
 # Where the current simple command begins. An operand cannot be separated from
 # its executor by a command separator, so scanning back only this far keeps
 # `bash -c "x"; echo "prose"` from treating the second quote as live.
@@ -329,6 +341,115 @@ def mask_subexpressions(val: str) -> str:
     return "".join(result)
 
 
+def _paren_matches(text: str):
+    """One quote-aware left-to-right pass returning two things at once.
+
+    `(open_index -> close_index)` for every balanced paren, and the ordered
+    list of `(lt_index, open_index)` for each `<(` that bash would actually
+    expand -- one inside quotes is literal, so it is not one.
+
+    Built as a single stack pass rather than a scan-forward-per-`<(` helper.
+    Scanning forward is quadratic when the parens do not balance: each `<(`
+    then reads to end of string. Measured on `bash <(` repeated with no closer:
+    130ms at 500 repetitions, 438ms at 1000, 1712ms at 2000, against a guard
+    that runs before every Bash call. The same trap `live_operand_test` and
+    VAR_PREFIX each carry a note about, reached a third way.
+    """
+    closes = {}
+    starts = []
+    stack = []
+    in_single = in_double = escaped = False
+    i = 0
+    n = len(text)
+    while i < n:
+        c = text[i]
+        if escaped:
+            escaped = False
+        elif c == "\\" and not in_single:
+            escaped = True
+        elif c == "'" and not in_double:
+            in_single = not in_single
+        elif c == '"' and not in_single:
+            in_double = not in_double
+        elif not in_single and not in_double:
+            if c == "(":
+                stack.append(i)
+            elif c == ")":
+                if stack:
+                    closes[stack.pop()] = i
+            elif c == "<" and i + 1 < n and text[i + 1] == "(":
+                starts.append((i, i + 1))
+                stack.append(i + 1)
+                i += 2
+                continue
+        i += 1
+    return closes, starts
+
+
+def live_proc_subst_spans(text: str) -> list:
+    """Body spans of `<(...)` process substitutions whose output is EXECUTED.
+
+    `<(...)` runs the body and hands the caller a `/dev/fd/N` path whose
+    contents are the body's OUTPUT. When the caller is an executor, that output
+    is a script -- so `bash <(echo "<merge>")`, `sh <(printf "%s" "<merge>")`,
+    `source <(...)` and `. <(...)` all run the merge, while the merge text never
+    appears at a command position anywhere in the command line.
+
+    `mask_inert_quotes` could not see it. `(` is a COMMAND_SEPARATOR, so
+    scanning back from a quote inside the body stops at the `(` and never
+    reaches the `bash` in front of it: the quoted merge was masked as prose and
+    the guard returned allow (ai-config#1308). Widening the command-position
+    anchor does not reach this, and neither does the live-operand rule -- the
+    executor is plainly visible and it is the OPERAND that is unreachable.
+
+    Returns maximal `(body_start, body_end)` pairs, disjoint and sorted by
+    start. Disjoint because a `<(` found INSIDE an already-live body is skipped
+    rather than recorded: its own enclosing command may well not be an executor
+    (`bash <(cat <(echo "<merge>"))`), and the outer span already covers it.
+    That is the fail-CLOSED direction, matching every other masking decision in
+    this file -- over-detecting an executor costs a scan, under-detecting hides
+    a merge.
+
+    `cat <(echo "<merge>")` is deliberately NOT a span: `cat` does not run its
+    input, so nothing merges and the text is prose. An UNBALANCED `<(` is not
+    one either -- bash rejects the command outright, so there is nothing to
+    hide a merge in.
+    """
+    closes, candidates = _paren_matches(text)
+    if not candidates:
+        return []
+
+    sep_ends = [m.end() for m in COMMAND_SEPARATOR.finditer(text)]
+    exec_ends = sorted(
+        [m.end() for m in EXEC_AT_CMD_POS.finditer(text)]
+        + [m.end() for m in DOT_SOURCE_AT_CMD_POS.finditer(text)]
+    )
+
+    def executor_precedes(lt_idx: int) -> bool:
+        """Does an executor occupy this `<(`'s own simple command?
+
+        Precomputed offsets plus binary search, not a per-`<(` rescan, for the
+        same reason `live_operand_test` precomputes its own.
+        """
+        j = bisect.bisect_right(exec_ends, lt_idx)
+        if j == 0:
+            return False
+        i = bisect.bisect_left(sep_ends, lt_idx)
+        seg_start = sep_ends[i - 1] if i else 0
+        return exec_ends[j - 1] >= seg_start
+
+    spans = []
+    for lt_idx, open_idx in candidates:
+        if spans and spans[-1][0] <= lt_idx < spans[-1][1]:
+            continue  # already covered by an enclosing executed body
+        close_idx = closes.get(open_idx)
+        if close_idx is None:
+            continue
+        if executor_precedes(lt_idx):
+            spans.append((open_idx + 1, close_idx))
+    return spans
+
+
 def mask_inert_quotes(text: str, exec_subject: str | None = None) -> str:
     """Blank quoted spans that bash cannot execute, preserving length.
 
@@ -375,6 +496,11 @@ def mask_inert_quotes(text: str, exec_subject: str | None = None) -> str:
     if exec_subject is None or len(exec_subject) != len(text):
         exec_subject = text
     exec_ends = [m.end() for m in EXEC_AT_CMD_POS.finditer(exec_subject)]
+    # Read off the SAME subject the executor scan reads, for the same reason:
+    # `mask_payloads` can blank the executor word before this function sees it.
+    # Both strings are length-preserving, so these offsets index either.
+    proc_spans = live_proc_subst_spans(exec_subject)
+    proc_starts = [start for start, _ in proc_spans]
 
     def live_operand_test(subject: str):
         """A `quote_start -> bool` test over one fixed subject string.
@@ -391,6 +517,14 @@ def mask_inert_quotes(text: str, exec_subject: str | None = None) -> str:
         seps = [m.end() for m in COMMAND_SEPARATOR.finditer(subject)]
 
         def test(quote_start: int) -> bool:
+            # A quote anywhere inside an EXECUTED process-substitution body is
+            # live, whatever separators sit between it and the `<(`. Bash runs
+            # the body's whole output, so `bash <(echo a; echo "<merge>")`
+            # merges exactly as `bash <(echo "<merge>")` does -- and the `;`
+            # would otherwise reset the command position past the executor.
+            k = bisect.bisect_right(proc_starts, quote_start)
+            if k and quote_start < proc_spans[k - 1][1]:
+                return True
             j = bisect.bisect_right(exec_ends, quote_start)
             if j == 0:
                 return False

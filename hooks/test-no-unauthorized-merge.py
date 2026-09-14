@@ -290,6 +290,24 @@ BLOCK = [
     ("gh api graphql -X POST repos/Morrison-Lab/ai-config/pulls/1/merge"
      " -f query='mutation { mergePullRequest(input: {...}) }'",
      "a PR merge that also matches the GraphQL pattern is ambiguous"),
+    # ai-config#1308: `<(...)` runs its body and hands the caller a /dev/fd path
+    # whose contents are that body's OUTPUT. When the caller runs what it is
+    # given, the output is a script -- and the merge text never appears at a
+    # command position anywhere in the command line, so neither a wider
+    # command-position anchor nor the live-operand rule reaches it.
+    ('bash <(echo "gh pr merge 411")', "a process substitution fed to bash"),
+    ("sh <(printf %s 'gh pr merge 411')", "printf building the script body"),
+    ('zsh <(echo "gh pr merge 411")', "a non-bash shell reading the substitution"),
+    ('source <(echo "gh pr merge 411")', "source runs the contents it is handed"),
+    ('. <(echo "gh pr merge 411")', "the dot form of source"),
+    ('bash < <(echo "gh pr merge 411")', "a redirection from a process substitution"),
+    ('timeout 30 bash <(echo "gh pr merge 411")', "a wrapper with an argument before the executor"),
+    ('sudo -u x bash <(echo "gh pr merge 411")', "a wrapper carrying its own flag"),
+    ('FOO=1 bash <(echo "gh pr merge 411")', "an env assignment before the executor"),
+    ('bash <(echo a; echo "gh pr merge 411")', "a separator inside the body does not reset the command position"),
+    ('bash <(cat <(echo "gh pr merge 411"))', "a nested substitution inside an executed body"),
+    ("bash <(gh pr merge 411)", "the merge at a command position inside the body"),
+    ('echo x > >(bash -c "gh pr merge 411")', "an output process substitution running an executor"),
 ]
 
 ALLOW = [
@@ -386,6 +404,19 @@ ALLOW = [
      "a second repo named only inside a masked payload does not create ambiguity"),
     ("cd /repo && gh pr merge 1352 -R Morrison-Lab/ai-config --squash",
      "the granted target survives a cd && segment split"),
+    # The other half of ai-config#1308. `cat` consumes its input as data, so a
+    # process substitution handed to one merges nothing -- and a `<(` inside
+    # quotes is literal to bash, so describing the construct in a comment body
+    # is prose. Refusing either is the documentation-blocking failure defect 2
+    # (ai-config#1279) fixed once already.
+    ('cat <(echo "gh pr merge 411")', "a process substitution fed to a non-executor"),
+    ('grep -q x <(echo "gh pr merge 411")', "grep reads the substitution as data"),
+    ('echo "bash <(echo \'gh pr merge 411\')"', "the construct quoted as prose"),
+    ('gh pr comment 1 --body "repro: bash <(echo \'gh pr merge 411\')"', "the construct inside a comment body"),
+    ('ALLOW_MERGE=1 bash <(echo "gh pr merge 411")', "an explicit override on the substitution form"),
+    ("bash <(echo hello)", "a process substitution with no merge in it"),
+    ("ls . <(echo hello)", "a bare dot pathspec is not the source builtin"),
+    ("bash <(echo 'gh pr view 411'", "an unbalanced opener bash would reject anyway"),
 ]
 
 

@@ -564,7 +564,7 @@ That `HERE` spelling was `os.path.abspath(__file__)` until [#2981](https://githu
 (Three non-test hooks elsewhere in `hooks/` already used `Path(__file__).resolve()` and were not touched:
 `flag-unattributable-reviewer-request.py`, `no-misattributed-quote.py` and `no-unauthorized-merge.py`.
 Only the first of those uses `_sibling()`, so the other two are outside this section's population.)
-Nothing in this section changes: the two agree for a mutant copied into a real directory, and the `/tmp` trap above is about the directory, not about how it is spelled.
+Nothing in this section changes: `abspath` and `realpath` agree for a mutant copied into a real directory, and the `/tmp` trap above is about the directory, not about how it is spelled.
 
 The failure is invisible from the test runner's output alone: the suite still reports a pass/fail count, and a coincidentally-similar count to the unmutated baseline reads as "the mutation had no effect" rather than "the mutant never really ran the code being mutated."
 The tell, if you look for it, is that DIFFERENT mutations (say, inverting a patch-flag check vs. widening a SHA regex) produce an IDENTICAL failing-test list --- both are actually failing for the same reason (broken sibling imports), not for their own distinct reasons.

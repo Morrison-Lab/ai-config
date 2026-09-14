@@ -12,6 +12,7 @@ Run: python3 scripts/test_check_hook_file_resolution.py
 from __future__ import annotations
 
 import importlib.util
+import os
 import shutil
 import sys
 import tempfile
@@ -156,6 +157,20 @@ CASES = [
     # and these two cases were pinning the wrong one.
     ("Path(__file__).absolute() preserves `..`, so it is not an offender",
      "from pathlib import Path\nROOT = Path(__file__).absolute().parent\n", 0),
+    # `relpath` was the member missed longest, because it reads as being about
+    # relativeness rather than normalization -- but posixpath.relpath calls
+    # abspath() on both operands, and relpath("a/b/../c/d.py") returns
+    # "a/c/d.py", collapsed as text. It is live in the tree
+    # (flag-add-a-outside-pathspec.py calls it), and an external adversarial
+    # round found it after `absolute` had been removed, which is the shape to
+    # notice: correcting one member of a behaviour-named set is not the same
+    # as re-deriving the set.
+    ("relpath over __file__",
+     "import os\nH = os.path.dirname(os.path.relpath(__file__))\n", 1),
+    ("relpath with a second operand",
+     "import os\nH = os.path.relpath(__file__, ROOT)\n", 1),
+    ("relpath on a path that is not __file__",
+     "import os\nH = os.path.relpath(os.getcwd(), top)\n", 0),
     ("normpath on a path that is not __file__",
      "import os\nX = os.path.normpath(os.path.join(a, b))\n", 0),
     # Already-resolved prefixes. These were false positives before `_mentions`
@@ -300,6 +315,55 @@ SUBJECT_CASES = [
 ]
 
 
+def lexical_set_is_derived(mod) -> tuple[int, int]:
+    """Assert `_LEXICAL` equals the set the checker NAMES, derived by running it.
+
+    `_LEXICAL` is documented as "every spelling that collapses `..` without
+    consulting the filesystem", minus the symlink-resolving ones. That is an
+    executable definition, so the set does not have to be maintained by
+    judgment -- and twice it was, wrongly, in opposite directions:
+
+      - `absolute` was IN it, because it reads like `abspath`. It performs no
+        normalization and preserves `..`, so it never belonged.
+      - `relpath` was OUT of it, because it reads as being about relativeness.
+        `posixpath.relpath` calls `abspath()` on both operands and collapses
+        exactly like it.
+
+    Each survived several review rounds, and `absolute` survived with two test
+    cases pinning the wrong answer -- a case asserting the wrong thing is
+    stronger than no case, because it makes the error look checked. Correcting
+    one member is also not the same as re-deriving the set: fixing `absolute`
+    is what made `relpath`'s absence the next thing to find.
+
+    This derives the membership instead of asserting it, so neither direction
+    can recur silently.
+    """
+    probe = "a/b/../c/d.py"
+    collapsing = set()
+    for name in dir(os.path):
+        if name.startswith("_"):
+            continue
+        fn = getattr(os.path, name)
+        if not callable(fn):
+            continue
+        try:
+            out = fn(probe)
+        except Exception:
+            continue  # wrong arity or wrong type for this probe: not a candidate
+        if isinstance(out, str) and ".." not in out and out.replace(os.sep, "/").endswith("a/c/d.py"):
+            collapsing.add(name)
+
+    expected = collapsing - mod._RESOLVERS
+    if mod._LEXICAL == expected:
+        print(f"PASS: _LEXICAL is exactly the derived collapsing set "
+              f"({sorted(expected)})")
+        return 0, 1
+    print(f"FAIL: _LEXICAL is {sorted(mod._LEXICAL)}, derived set is "
+          f"{sorted(expected)} "
+          f"(collapsing={sorted(collapsing)}, resolvers={sorted(mod._RESOLVERS)})")
+    return 1, 1
+
+
 def main() -> int:
     mod = _load()
     failures = 0
@@ -352,8 +416,11 @@ def main() -> int:
         print(f"PASS: hooks/ and plugins/ai-config/ are clean "
               f"({len(scanned)} files)")
 
+    f, r = lexical_set_is_derived(mod)
+    failures += f
+
     total = (len(CASES) + len(SUBJECT_CASES) + len(MAIN_CASES)
-             + len(PLUGIN_DIR_CASES) + 1)
+             + len(PLUGIN_DIR_CASES) + 1 + r)
     print(f"\n{total - failures}/{total} cases passed")
     return 1 if failures else 0
 

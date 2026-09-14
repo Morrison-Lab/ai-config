@@ -56,13 +56,20 @@ and two argument shapes:
     `<checkout>/.claude/hooks/guard-slide-major-tag.py`, a path that opens
     fine when it is not collapsed lexically.
 
-Two collapsing spellings are matched, because `abspath` is not the only one:
-`os.path.abspath` and `os.path.normpath`. `normpath` alone accounts for 25
+Three collapsing spellings are matched, because `abspath` is not the only one:
+`os.path.abspath`, `os.path.normpath` and `os.path.relpath`.
+`relpath` was the one missed longest, because it reads as being about
+*relativeness* rather than about normalization --- but `posixpath.relpath`
+calls `abspath()` on both operands, and `os.path.relpath("a/b/../c/d.py")`
+returns `a/c/d.py`, collapsed as text with no such directory on disk. It is
+live in the scanned tree (`flag-add-a-outside-pathspec.py` calls it), and
+`dirname(relpath(<registration path>))` lands on the same wrong
+`<checkout>/.claude/hooks` that `abspath` does, measured. `normpath` alone accounts for 25
 call sites across 7 files in `hooks/`, 12 of them in 5 non-test hooks, counted
 at `e388e906` on 2026-09-14 -- a moving population, so the ref and the date
-are attached rather than only the criterion. That figure is `normpath`'s, not
-the pair's: both spellings together are 91 calls across 56 files at the same
-ref. It is quoted to show `normpath` is a live idiom here rather than a
+are attached rather than only the criterion. That figure is `normpath`'s
+alone, not the set's: `abspath` and `normpath` together are 91 calls across 56
+files at the same ref. It is quoted to show `normpath` is a live idiom here rather than a
 hypothetical.
 
 `Path(...).absolute()` is deliberately NOT among them, and an earlier revision
@@ -158,7 +165,7 @@ FAILURE_EXIT = 1
 # Every spelling that collapses `..` without consulting the filesystem.
 # `realpath` and `Path.resolve()` are the symlink-resolving counterparts and
 # are deliberately absent.
-_LEXICAL = frozenset({"abspath", "normpath"})
+_LEXICAL = frozenset({"abspath", "normpath", "relpath"})
 
 
 def _is_lexical_call(node: ast.AST) -> bool:
@@ -166,7 +173,8 @@ def _is_lexical_call(node: ast.AST) -> bool:
     if not isinstance(node, ast.Call):
         return False
     func = node.func
-    # `os.path.abspath(x)` and `path.normpath(x)`; a bare `abspath(x)` from
+    # `os.path.abspath(x)`, `path.normpath(x)`, `os.path.relpath(x)`; a bare
+    # `abspath(x)` from
     # `from os.path import abspath` counts too, since the hazard is the
     # function rather than the spelling used to reach it. `Path(x).absolute()`
     # is deliberately NOT here -- see the module docstring; it preserves `..`
@@ -369,7 +377,8 @@ def main() -> int:
               "(use os.path.realpath / Path.resolve):\n", file=sys.stderr)
         for line in failures:
             print(f"  {line}", file=sys.stderr)
-        print("\nabspath and normpath collapse `..` as text, so a hook reached "
+        print("\nabspath, normpath and relpath collapse `..` as text, so a hook "
+              "reached "
               "through the .claude/skills symlink resolves its own directory "
               "to <checkout>/.claude/hooks, which holds none of the hooks a "
               "sibling import looks for. "

@@ -468,7 +468,8 @@ The instrument used to derive the number had a blind spot in exactly the half be
 Three live suites carried that shape while the gate read clean, and the count inherited the gap silently --- a number derived by an instrument is only as scoped as the instrument, and stating the instrument does not make the number trustworthy if the instrument is what is wrong.
 An external reviewer found two of the three; fixing the arm surfaced the third.
 The ref is pinned and dated because `main` moved during this branch's review and took the count with it --- the 31st suite arrived with `no-mutation-in-read-only-reviewer.py`, and is swept here too.
-The subject count is the larger one because more suites resolve a subject at all, which is a property of the pre-existing population rather than of any sweep --- at that same ref, counting every call the checker recognizes as either lexical or resolving, 25 suites resolved a subject against 23 resolving `__file__`. (Those two figures predate the `sys.argv` binding arm and are therefore lower bounds, like the census above was.)
+The subject count is the larger one because more suites resolve a subject at all, which is a property of the pre-existing population rather than of any sweep --- at that same ref, counting every call the checker recognizes as either lexical or resolving, 25 suites resolved a subject against 23 resolving `__file__`.
+(Those two figures predate the `sys.argv` binding arm and are therefore lower bounds, like the census above was.)
 The first sweep did convert only the `__file__` half, but of the *hooks*: it converted no suite's resolution spelling (it did edit one suite, to add the regression cases).
 
 A first attempt at that measurement counted the literal `realpath` spelling and reported 0 and 1, which is wrong under this branch's own `_RESOLVERS = {"realpath", "resolve"}` --- the true figures for symlink-safe resolution at that ref are 2 and 8, since `Path(x).resolve()` is realpath-equivalent and seven suites already used it.
@@ -522,11 +523,30 @@ Two test cases were pinning the wrong belief, which is why it survived several r
 The deciding question is one command per candidate, and it was run for none of the three.
 Not "read the docs": a behaviour-named set has a membership test *by construction*, so the test is available whenever the set is.
 
-- **Do:** run the behaviour a set is named for against each candidate before adding it, and keep that measurement as the case.
+**Correcting one member is not re-deriving the set, and that is the sharper half.**
+Removing `absolute` was right and left the set still wrong in the other direction:
+`relpath` was missing.
+`posixpath.relpath` calls `abspath()` on both operands, and `os.path.relpath("a/b/../c/d.py")` returns `a/c/d.py` --- collapsed as text, with no such directory on disk.
+It was missed because it reads as being about *relativeness* rather than about normalization,
+which is the same resemblance-to-the-name reasoning that put `absolute` in.
+It is live in the tree, and an external round found it immediately after the `absolute` fix landed.
+
+**Because the definition is executable, the set need not be maintained by judgment at all.**
+`scripts/test_check_hook_file_resolution.py` now derives it:
+run every `os.path` callable against a probe carrying `..`, keep the ones that collapse it, subtract `_RESOLVERS`, and assert `_LEXICAL` equals the result.
+Measured, that yields `{abspath, normpath, realpath, relpath}` minus the resolvers.
+Both historical errors fail it --- adding `absolute` gives 53/55, dropping `relpath` gives 52/55 --- so neither direction can recur silently.
+That is the general move:
+a set named for a behaviour has a membership test by construction, so derive the membership rather than curating it.
+
+- **Do:** derive a behaviour-named set's membership in a test, rather than maintaining the list by hand.
+- **Do:** re-derive the whole set after correcting any one member, since the reasoning that admitted a wrong member also excludes right ones.
 - **Do:** suspect a member that resembles the set's name more than it resembles the other members.
-- **Don't:** add to a behaviour-named set by category resemblance --- `absolute` reads like `abspath` and behaves like `realpath`.
+- **Don't:** add to a behaviour-named set by category resemblance.
+  `absolute` reads like `abspath` and behaves like `realpath`;
+  `relpath` reads like neither and behaves like `abspath`.
 - **Don't:** treat a passing case as evidence the member belongs;
-  a case can pin the wrong answer as firmly as the right one.
+  a case can pin the wrong answer as firmly as the right one, and two of them did.
 
 - **Do:** write `os.path.realpath(__file__)` in any hook that resolves its own directory to reach a sibling or a data file.
 - **Do:** test such a hook through a symlinked path, not only from the checkout --- a suite that runs it from `hooks/` cannot see this at all, which is why the 308 cases this guard had before the two added here all passed over a live session-wide lockout.

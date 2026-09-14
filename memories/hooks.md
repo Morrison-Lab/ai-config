@@ -387,3 +387,4 @@ Adversarial review (ai-config#3623) established three key boundary requirements 
    or scope staging (e.g. "Make no changes to unrelated files, but fix the reported bug and commit your change").
    Prohibition regexes (`never`, `do not`, `without`, `make no changes`) must require trailing totality indicators (`any`, `anything`, `any files`) or negative lookahead for scoping prepositions (`to any files outside/except`, `to unrelated/other files`, `outside`, `except`),
    preventing scoped tasks from matching `RX_READ_ONLY` so that affirmative write directives (`RX_AFFIRMATIVE_WRITE`, e.g. `and then fix`, `write reproduction tests`, `fix defects and commit as you go`) keep the task write-capable under `REVIEW_PROMPT_RE`.
+   Conversely, blanket prohibitions without scoping (such as "Make no changes to files. Report findings only.") must not be excluded by overly broad lookaheads (e.g. bare `files\b` in lookaheads) and must strictly match `RX_READ_ONLY`.

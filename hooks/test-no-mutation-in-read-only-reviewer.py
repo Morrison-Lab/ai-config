@@ -521,6 +521,17 @@ try:
     payload_p18 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p18}
     hit = hook.offending("Bash", payload_p18["tool_input"], payload_p18)
     check("must NOT block git commit when prompt uses 'Make no changes to any files outside' with commit directive", hit, None)
+
+    # 12s. Blanket 'Make no changes to files' prohibition (Claude review round 6)
+    p19 = os.path.join(prohibitive_dir, "subagents", "agent-make-no-changes-to-files.jsonl")
+    with open(p19, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Make no changes to files. Report findings only."},
+        }) + "\n")
+    payload_p19 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'oops'"}, "transcript_path": p19}
+    hit = hook.offending("Bash", payload_p19["tool_input"], payload_p19)
+    check("must block git commit when prompt issues blanket 'Make no changes to files' prohibition", hit is not None, True)
 finally:
     try:
         import shutil

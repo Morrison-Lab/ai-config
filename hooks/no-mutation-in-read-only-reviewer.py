@@ -107,7 +107,7 @@ RX_READ_ONLY = re.compile(
     r"|\bdo(?:es)? not\s+(?:(?:edit|modify|write|change|fix|commit|mutate)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|mutate)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
     r"|\bdon't\s+(?:(?:edit|modify|write|change|fix|commit|mutate)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|mutate)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
     r"|\bnever\s+(?:(?:edit|modify|write|change|fix|commit|mutate)[,\s]+(?:and\s+|or\s+)?)*(?:edit|modify|write|change|mutate)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)"
-    r"|\bmake no changes\b(?!\s+(?:to\s+(?:any\s+files\s+(?:outside|other than|except)|(?:unrelated|other|existing|arbitrary)\s+files?|files\b)|outside|other than|except)\b)"
+    r"|\bmake no changes\b(?!\s+(?:to\s+(?:any\s+files\s+(?:outside|other than|except)|(?:unrelated|other|existing|arbitrary)\s+files?)|outside|other than|except)\b)"
     r"|\bwithout\s+(?:(?:editing|modifying|writing|changing|fixing|committing)[,\s]+(?:and\s+|or\s+)?)*(?:editing|modifying|writing|changing)\b.*?\b(?:anything|any\s+files?)\b(?!\s+(?:outside|other than|except)\b)",
     re.I,
 )

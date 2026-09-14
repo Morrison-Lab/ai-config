@@ -417,13 +417,19 @@ Adversarial review (ai-config#3623) established three key boundary requirements 
    Negator alternations (`RX_PROHIBITION`, `RX_NEGATED_OR_ADVISORY`, `RX_NEGATED_WRITE_ACTION`) must explicitly include
    `won't`, `will\s+not`, `would(?:n't|\s+not)`, and `shall\s+not|shan't` alongside `do not`, `don't`, `never`, `must not`, and `cannot`.
 
-7. **Include subordinate conjunctions in clause boundary splitting:**
-   Clauses introduced by subordinate conjunctions
-   (such as `until`, `till`, `unless`, `before`, `after`, `so that`, `in order to`, `because`, `since`, `as soon as`, `once`)
-   separate preceding main clauses from condition/purpose clauses.
-   In prompts like "This is an adversarial review, and you won't stop until you fix the bugs and commit the changes",
-   the negative modal phrase ("won't stop") precedes the subordinate conjunction ("until").
-   `RX_BOUNDARY_SPLIT` must include subordinate conjunctions
-   (`until|till|unless|before|after|so\s+that|in\s+order\s+to|because|since|as\s+soon\s+as|once`)
-   to isolate affirmative write directives from unrelated preceding negators in earlier clauses,
-   preventing write-capable sessions from being misclassified as read-only reviewers.
+7. **Recognize negative persistence idioms rather than broad subordinate boundary splitting:**
+   Broadly adding subordinate or temporal conjunctions
+   (such as `before`, `after`, `since`, `until`, `because`)
+   to `RX_BOUNDARY_SPLIT` causes a fail-open regression on prohibition clauses containing multiple write actions
+   (e.g. "Do not fix bugs before committing changes"
+   or "Never edit any files before you have finished committing your changes"),
+   because the temporal conjunction severs the governing prohibition from the subsequent write verbs.
+   Instead, keep `RX_BOUNDARY_SPLIT` restricted to sentence boundaries, contrasting conjunctions (`but`, `however`),
+   and affirmative markers (`and then`, `make sure`, `ensure`, `please`).
+   To isolate intended affirmative write actions under persistence phrasing
+   (e.g. "This is an adversarial review, and you won't stop until you fix the bugs and commit the changes"),
+   recognize the specific negative persistence idiom
+   (`RX_PERSISTENCE_UNTIL`, matching negators like `won't`, `will not`, `must not`, `don't`
+   governing persistence verbs `stop`, `rest`, `pause`, `quit`, `cease`, `hesitate`, `wait` followed by `until|till`),
+   and strip that persistence idiom from `clause_prefix` when checking `RX_NEGATED_OR_ADVISORY`.
+   This allows affirmative directives in persistence contexts while keeping prohibitions strictly intact across temporal connectives.

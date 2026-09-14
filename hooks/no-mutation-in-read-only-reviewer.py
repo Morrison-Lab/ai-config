@@ -167,8 +167,14 @@ RX_AFFIRMATIVE_MARKER = re.compile(
 
 RX_BOUNDARY_SPLIT = re.compile(
     r"[;:.!?\n]"
-    r"|\b(?:but|however|yet|nevertheless|nonetheless|until|till|unless|before|after|so\s+that|in\s+order\s+to|because|since|as\s+soon\s+as|once)\b"
+    r"|\b(?:but|however|yet|nevertheless|nonetheless)\b"
     r"|\b(?:and\s+then|make\s+sure(?:\s+you)?|ensure(?:\s+you)?|be\s+sure\s+to|please)\b",
+    re.I,
+)
+
+RX_PERSISTENCE_UNTIL = re.compile(
+    r"\b(?:won't|will\s+not|would(?:n't|\s+not)|must(?:n't|\s+not)|do(?:es)?\s+not|don't|cannot|can't|should(?:n't|\s+not)|shall\s+not|shan't)\s+"
+    r"(?:(?:ever|at\s+all|simply|just)\s+)?(?:stop|rest|pause|quit|cease|hesitate|wait|give\s+up)\s+(?:until|till)\b",
     re.I,
 )
 
@@ -206,7 +212,8 @@ def has_affirmative_write(content: str) -> bool:
             clause_start = separators[-1].end() if separators else 0
             clause_prefix = content[clause_start:start]
 
-        if RX_NEGATED_OR_ADVISORY.search(clause_prefix):
+        clause_effective = RX_PERSISTENCE_UNTIL.sub("", clause_prefix)
+        if RX_NEGATED_OR_ADVISORY.search(clause_effective):
             continue
         return True
     return False

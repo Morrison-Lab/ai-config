@@ -785,6 +785,39 @@ try:
     payload_p42 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p42}
     hit = hook.offending("Bash", payload_p42["tool_input"], payload_p42)
     check("must block git commit when prompt states 'Do not commit any files until you are told to do so.'", hit is not None, True)
+
+    # 12z18. Prohibition with temporal connective 'before' blocks subsequent write verbs
+    p43 = os.path.join(prohibitive_dir, "subagents", "agent-do-not-fix-before-commit.jsonl")
+    with open(p43, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "This is an adversarial review. Do not fix bugs before committing changes."},
+        }) + "\n")
+    payload_p43 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p43}
+    hit = hook.offending("Bash", payload_p43["tool_input"], payload_p43)
+    check("must block git commit when prompt states 'Do not fix bugs before committing changes.'", hit is not None, True)
+
+    # 12z19. Prohibition with 'Never' and temporal connective 'before' blocks
+    p44 = os.path.join(prohibitive_dir, "subagents", "agent-never-edit-before-commit.jsonl")
+    with open(p44, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Never edit any files before you have finished committing your changes."},
+        }) + "\n")
+    payload_p44 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p44}
+    hit = hook.offending("Bash", payload_p44["tool_input"], payload_p44)
+    check("must block git commit when prompt states 'Never edit any files before you have finished committing your changes.'", hit is not None, True)
+
+    # 12z20. Prohibition with non-persistence 'until' and multiple write verbs blocks
+    p45 = os.path.join(prohibitive_dir, "subagents", "agent-do-not-fix-until-commit.jsonl")
+    with open(p45, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "This is an adversarial review. Do not fix bugs until committing changes."},
+        }) + "\n")
+    payload_p45 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p45}
+    hit = hook.offending("Bash", payload_p45["tool_input"], payload_p45)
+    check("must block git commit when prompt states 'Do not fix bugs until committing changes.'", hit is not None, True)
 finally:
     try:
         import shutil

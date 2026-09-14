@@ -185,6 +185,10 @@ the drift so this skill gets updated.
 
 ## Relationship to other skills
 
+- **`prose-editor` agent** ([`.claude/agents/prose-editor.md`](../../.claude/agents/prose-editor.md)) --- the dedicated editor subagent.
+  Writing agents work iteratively: draft substantively-correct content first,
+  then hand off to `prose-editor` to tighten prose style and enforce PSW compliance.
+  See [`shared/workflow/iterative-editing.md`](../../shared/workflow/iterative-editing.md).
 - **`find-ai-tells`** --- the detector counterpart.
   It *scans* finished text for AI-authorship tells.
   This skill *prescribes* how to write up front.

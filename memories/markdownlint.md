@@ -66,5 +66,10 @@ Split out of [`tools.md`](tools.md) on 2026-09-01 when that file crossed the 125
   Claude slash commands (`/ums`, `/plugin`, `/also`) and other application-level directives are not shell-executable, so `bash` implies a reader can run them and they fail when someone tries.
   Tag those `text` instead.
 
+- **`lint-qmd` in Morrison-Lab/gha enforces line-length (MD013) on `.qmd` files even when repo-level `.markdownlint-cli2.jsonc` disables it.**
+  Markdown in `.md` files in this repository permits long lines (MD013 disabled), but Quarto markdown (`.qmd`) files checked by the reusable `lint-qmd.yml` workflow enforce line-length limits (80 characters for prose, headings, and lists).
+  When authoring or updating `.qmd` documents (such as `agents.qmd`), wrap prose lines to <= 80 characters, and take care when editing wrapped lines to avoid truncating mid-sentence clauses across line boundaries.
+  (Morrison-Lab/ai-config#3619, 2026-09-12.)
+
 (Recovered 2026-07-30 from `a739c69`, an orphaned commit on `ums/ardi-review-link-handling`: it landed about 30 minutes after its own PR [#650](https://github.com/Morrison-Lab/ai-config/pull/650) merged, so it never reached `main` and sat unnoticed for a week.
 Both rules were first learned on [#645](https://github.com/Morrison-Lab/ai-config/pull/645).)

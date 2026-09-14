@@ -30,3 +30,8 @@ When PSW and this guidance disagree, PSW wins.
 This is a default, not an absolute rule. Keep a clause or a technical term when
 removing it would lose meaning or precision. Never trade an honest hedge for
 false confidence.
+
+Writing agents do not need to enforce all style guidelines on first draft.
+Work iteratively: write a substantively-correct but stylistically loose first draft,
+and then hand off to the prose editor agent ([`prose-editor`](../../.claude/agents/prose-editor.md)) for revisions.
+See [`iterative-editing`](../workflow/iterative-editing.md).

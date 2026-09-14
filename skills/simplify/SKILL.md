@@ -88,3 +88,5 @@ unreachable.
   and deleting provably unreferenced functions, files, configs, and stale docs
   across the codebase, whereas this skill specifically sweeps unreachable paths
   locally after a context-narrowing change.
+- **`code-editor` agent** ([`.claude/agents/code-editor.md`](../../.claude/agents/code-editor.md)) --- the dedicated code editor subagent that enforces coding style guidelines and refactors implementations cleanly.
+

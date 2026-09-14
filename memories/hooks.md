@@ -468,7 +468,9 @@ Counted by the checker's own AST semantics against `main` at `e388e906` on 2026-
 16 carried a lexical call on `__file__`, 23 carried one on their `sys.argv` *subject*, and 8 carried both.
 The ref is pinned and dated because `main` moved during this branch's review and took the count with it ---
 the 31st suite arrived with `no-mutation-in-read-only-reviewer.py`, and is swept here too.
-The first sweep converted only the `__file__` half, which is why the subject count is the larger one.
+The subject count is the larger one because more suites resolve a subject than resolve `__file__`, which is a property of the pre-existing population rather than of any sweep:
+at that same ref, 0 suites resolved a subject with `realpath` and 1 resolved `__file__` with it, so neither half had been converted by anything.
+The first sweep did convert only the `__file__` half --- but of the *hooks*, not the suites, which it left untouched entirely.
 
 The subject half breaks for the same reason, and matters for a specific one.
 Measured on `test-guard-slide-major-tag.py` before the sweep, invoking it through the registration path raised `FileNotFoundError` on `<checkout>/.claude/hooks/guard-slide-major-tag.py`,

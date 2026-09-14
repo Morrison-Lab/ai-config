@@ -528,7 +528,13 @@ Both rounds trace to composing the narrow variant into a consumer whose false
 negative is unrecoverable, and neither is a defect in `LEAD` itself.
 Round 5's suggested direction is this rule's remedy stated as a design change:
 "invert the default the way pass 2 already did --- treat a heredoc as executing
-unless its introducing line is provably fed to a non-executing consumer".)
+unless its introducing line is provably fed to a non-executing consumer".
+
+**Third occurrence, ai-config#1308, 2026-09-14, in the same file's process-substitution scanner**: an unbalanced `<(` candidate (no matching `)` found) was dropped rather than treated as live, justified as "bash rejects the command outright" --- a claim about bash's own parser, standing in for the actual condition, which is whether THIS SCANNER'S paren model can be trusted whenever it cannot find a match.
+`bash <(use_case=1; echo "<merge>")` is balanced and bash runs it.
+The scanner's model had simply misread it as unbalanced, and the drop-on-unbalanced default turned that misread, and every other present or future misread of the same shape, into a silent ALLOW.
+The fix inverted the default: an unmatched paren now fails closed, its body taken to the end of the text, catching this and any future modelling error by the same route.
+Same lesson as rounds 5 and 6 above, a different guard within the file, and the third time this file's own review history shows a "cannot resolve, so allow" default doing more damage than any single point-fix it was meant to guard against.)
 
 ## Repointing a configured path at a different artifact is reuse, and the accessor's own docs say what it is for
 
@@ -592,3 +598,56 @@ The accessor's own roxygen says the path is "a derived cache of the AB507BS raw
 RDS, not a second copy of the all8sites cohort" --- a sentence written to
 forbid exactly the substitution that was made.
 It was never read.)
+
+## A reused decision procedure keeps its failure DIRECTION; the new caller decides what that direction now costs
+
+Everything above asks whether the original's purpose and the new one's are
+the same kind of thing, and finds the mismatch when that question goes
+unasked.
+This is the case where the question gets asked and answered correctly, and
+the copy is still wrong, because the property that actually transfers is
+narrower than "does it do the same thing": a procedure with a "cannot tell,
+give up" branch carries a *fixed polarity* at every such branch, and polarity
+is not the same thing as purpose.
+
+The reference implementation was written for a check that discharges a
+promise at `Stop` time: when it cannot see through a shell function, an
+`eval`, or a variable-assembled command, it gives up --- and for that caller,
+giving up means treating the promise as *not yet discharged*, the safe
+direction when the worst case is one extra nag.
+Extracted into a shared module and wired into two `PreToolUse` guards over a
+destructive action, the identical give-up points, running the identical code,
+now mean the guard never looked inside that shell function, `eval`, or
+variable at all --- which is a silent ALLOW of whatever the command actually
+ran.
+The new module's docstring said its limits were "unchanged from the reference
+implementation."
+That was true, and it was the wrong thing to verify: the limits are a
+property of the CODE, while whether they are safe to ship is a property of
+the CALLER, and the true, unchanged-limits claim answers nothing about the
+second question.
+
+- **Do:** for every "cannot tell, give up" branch in code you are reusing,
+  name the ORIGINAL caller's worst case on that branch, then ask the same
+  question of the NEW caller --- the branch is identical, and the two
+  answers can differ.
+- **Do:** treat "the limits are unchanged from the reference" as a claim
+  about the code, not a clearance --- it says nothing about whether the new
+  consumer can afford those limits.
+- **Don't:** assume a fail direction survives extraction because the logic
+  that produces it does; the direction a give-up branch takes is fixed, and
+  what that direction *costs* is decided anew by every caller.
+
+(`Morrison-Lab/ai-config#1973`, 2026-09-14: `shell_c_expansions` in
+`scripts/lib/shellcmd.py` is a direct extraction of
+`hooks/no-empty-promise.py`'s `_poller_executed`, which its own docstring
+names "the reference implementation" and which "spent four review rounds on
+this class."
+Wired into `hooks/no-clobbering-push.py` and
+`hooks/flag-reset-hard-uncommitted-work.py`, the review round that followed
+(14 findings) named the inversion directly: "The descent was copied out of
+`hooks/no-empty-promise.py`, where every give-up point fails CLOSED ... into
+two guards, where the identical give-up point fails OPEN."
+Six concrete `-c`-shaped bypasses were verified executing under real `bash`
+before the fix, and the docstring's own "unchanged from the reference
+implementation" sentence was the artifact that let the mismatch ship.)

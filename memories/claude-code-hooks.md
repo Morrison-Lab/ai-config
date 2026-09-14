@@ -318,6 +318,18 @@ That is wasteful for a warn-only hook and is not benign for a blocking one.
 
 **Catalog validator:** `scripts/check-hook-catalog.py` parses compound matcher entries (e.g. `PreToolUse (Bash, mcp__github__.*)`) using `ROW` regex matcher class `[A-Za-z0-9_.*, -]`, plus a backslash-escaped pipe for an alternation cell, and aggregates multiple matcher groups for the same script and event.
 
+## A `PreToolUse` payload's `cwd` sits at the top level, not inside `tool_input`
+
+`payload.get("cwd")` is the established convention across this repo's hooks --- confirmed by grep, roughly twenty non-test hooks read it this way
+(`flag-cd-into-main-checkout.py`, `flag-dispatch-over-uncommitted.py`, `no-clobbering-push.py`, `no-unmonitored-pr.py`, and others), and two (`no-handrolled-verdict-parse.py`, `warn-verdict-line-filter.py`) fall back to `tool_input.cwd` only as a defensive second read.
+`tool_input` carries the tool's own arguments (`command`, `file_path`, ...).
+`cwd` is a property of the call itself and sits beside `tool_name`/`tool_input`, not inside it.
+
+Building a hand-crafted probe payload with `cwd` nested under `tool_input` is silently wrong rather than loudly wrong: every hook above reads `payload.get("cwd")` at the top level, gets `None`, and falls through to its `os.getcwd()` (or equivalent) fallback --- so the probe runs, the hook exits 0, and a directory-sensitive guard reads as "did not fire on this input" for a reason that has nothing to do with the behaviour under test.
+
+- **Do:** put `cwd` at the top level of a constructed `PreToolUse` payload, beside `tool_name` and `tool_input`, never nested inside `tool_input`.
+- **Don't:** read a probe's silence as a verdict about the hook before checking the payload shape it was actually fed.
+
 ## Complete hook lifecycle catalog (27 events)
 
 Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236).
@@ -575,3 +587,30 @@ The tell, if you look for it, is that DIFFERENT mutations (say, inverting a patc
 - **Don't:** trust a mutation-test run's pass/fail count without spot-checking that the mutation itself is present in the file actually being tested.
 
 (Measured 2026-09-09 authoring `hooks/flag-unread-commit-citation.py` (ai-config#3471): a `/tmp`-copied mutant produced `body=None` from `_post_from_payload` for a completely unrelated reason --- its `_sibling()` call for `flag-unmeasured-timestamp.py` returned `None` because `/tmp/flag-unmeasured-timestamp.py` does not exist --- and a later `hooks/`-placed rerun of the identical mutation correctly failed the suite.)
+
+**Second occurrence, a different import mechanism and a different remedy: a hook that imports a SHARED MODULE under `scripts/lib` breaks the same way, and "keep the mutant in `hooks/`" does not fix it.**
+
+The section above is about a hook importing another *hook's* helpers via `_sibling()`, whose fix is to keep the mutant in `hooks/` so the sibling's fixed basename still resolves next to it.
+A hook that instead does a path-relative import of `scripts/lib/<module>.py` (resolved off its own `__file__`, the same way `_sibling()` is) fails identically when its OWN mutation harness copies the hook file to a **temp directory** to produce each mutant: `scripts/lib` cannot be found relative to that temp copy, the import returns `None` or raises, and every mutant since then reads as caught for a reason unrelated to the clause under test.
+
+This is worse than the ad-hoc `/tmp cp` case above in one respect: it recurred inside two of the repo's own COMMITTED mutation harnesses, `hooks/test-no-clobbering-push.py` and `hooks/test-flag-reset-hard-uncommitted-work.py`, both testing a hook wired to `scripts/lib/shellcmd.py`.
+A committed test file reads as already correct, so nothing prompts re-checking it, and the bug shipped with the harness rather than being introduced by someone copying a hook elsewhere by hand.
+
+The remedy differs from `_sibling()`'s "relocate the mutant": there is no fixed sibling basename to sit next to, since the import is a package path rather than another hook's filename.
+Put the real `scripts/lib` directory on the mutant subprocess's own `PYTHONPATH` instead of trying to make the temp directory look like `hooks/`:
+
+```python
+env = dict(os.environ)
+env["PYTHONPATH"] = os.pathsep.join(
+    [REAL_SCRIPTS_LIB] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
+proc = subprocess.run([sys.executable, hook_path], ..., env=env, ...)
+```
+
+- **Do:** when a hook's mutation harness runs the mutant as a subprocess in a temp directory, check whether the hook imports anything besides sibling hooks --- a `scripts/lib` module counts --- and set `PYTHONPATH` to that module's real location.
+- **Do:** treat "this is a committed test file" as no reason to skip the check.
+  It is exactly the population this class of bug hides in longest.
+- **Don't:** apply the `_sibling()` remedy ("keep the mutant in `hooks/`") here.
+  It fixes a same-directory basename lookup and does nothing for a package import resolved off a different relative path.
+
+(`Morrison-Lab/ai-config#1973`, 2026-09-14: both `hooks/test-no-clobbering-push.py` and `hooks/test-flag-reset-hard-uncommitted-work.py` copy the hook under test to a temp directory and both exercise a hook importing `scripts/lib/shellcmd.py`.
+Fixed by adding the mutant subprocess's `PYTHONPATH` in both files, per the fixing commit: "A mutant is a reverted clause, not a broken install.")

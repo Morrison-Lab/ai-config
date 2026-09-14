@@ -19,10 +19,18 @@ the PR is not fully clean and cannot be merged under MWC.
 Wait for every in-flight review to complete and evaluate its verdict.
 A single clean verdict while another review is running does not authorize merge under MWC
 (Morrison-Lab/ai-config#3570, citing #3469 where Claude reported clean while Copilot was still running and subsequently recommended changes).
+Note that while `reviewRequests` catches pending requests when present,
+`memories/gh-cli.md` documents that Copilot review requests frequently clear from `reviewRequests` upon worker pickup before review completion.
+Therefore, in-flight review detection for automated reviewers like Copilot must not rely on `reviewRequests` alone;
+it additionally relies on active check runs in `statusCheckRollup` (e.g. `copilot-pull-request-reviewer`),
+persisting standing `NOT_CLEAN` review states from prior rounds across commits,
+and requiring consensus clean verdicts at the current HEAD.
 
 - **Do:** wait for all in-flight reviews (check runs in progress, pending review requests) to finish and verify what each review says before declaring fully clean or merging under MWC.
 - **Do:** require consensus clean verdicts across all reviewers evaluating the current head.
 - **Don't:** declare a PR clean or merge under MWC when one reviewer has posted clean but another review is still in flight.
+- **Don't:** assume an empty `reviewRequests` list means a bot review has completed ---
+  inspect check runs and review bodies instead.
 
 **A forge's `mergeable` result is an integration-state signal, not a review verdict.**
 It can be true while a reviewer has left resolvable findings open.

@@ -297,6 +297,19 @@ import shlex
 import subprocess
 import sys
 
+try:
+    _LIB = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+        "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from shellcmd import shell_c_expansions
+except Exception as _exc:  # broken install: degrade, do not fail open further
+    print(f"no-clobbering-push: cannot load scripts/lib/shellcmd.py ({_exc}); "
+          f"a push wrapped in an interpreter's -c will not be seen",
+          file=sys.stderr)
+    shell_c_expansions = None
+
 RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
 
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
@@ -1171,6 +1184,73 @@ def evaluate(command, base_cwd=None):
     return None
 
 
+def evaluate_every_shell(command, base_cwd=None):
+    """`evaluate` over COMMAND and every command line nested in a shell's `-c`.
+
+    WHY
+    ---
+    This guard tokenizes and compares exact tokens, so wrapping the push in an
+    interpreter's `-c` argument bypassed it outright: `shlex` collapses the
+    embedded command into ONE opaque token, `argv[0]` is the interpreter, and
+    every `== "git"` comparison fails immediately.
+
+    Measured on `main` (ai-config#1973): `git push --force origin main` denies,
+    and `sh -c "git push --force origin main"` produces no output and is
+    silently allowed. That is the direction `shared/principles/fail-fast.md`
+    calls the dangerous one -- a silent discharge rather than an over-warn --
+    and this guard is the mechanism behind CLAUDE.md's "Check the remote
+    immediately before every push".
+
+    EACH PIECE SEPARATELY, NEVER MERGED
+    -----------------------------------
+    `evaluate` models shell STATE: it tracks a working directory per subshell
+    so a `cd` moves the pushes after it. A nested `-c` argument is a DIFFERENT
+    SHELL, so concatenating its simple commands into the outer analysis would
+    attribute the nested shell's `cd` to the caller. Calling `evaluate` once
+    per piece keeps each scope intact, which is why this is a wrapper rather
+    than a widening of `_simple_commands`.
+
+    PRECEDENCE
+    ----------
+    A deny anywhere outranks a warn anywhere, matching `evaluate`'s own reason
+    for scanning every simple command before reporting: a refusal blocks the
+    whole Bash call regardless of position, so a warn found earlier must not
+    suppress a deny found later.
+
+    WHAT IT STILL CANNOT SEE
+    ------------------------
+    A nested shell inherits the caller's directory as of the moment it starts,
+    and that is NOT threaded through here -- each piece is evaluated from
+    `base_cwd`. The deny path is unaffected, since a refusal is decided from
+    the command text alone and spends no read; a warn on a nested push can name
+    the wrong directory when an outer `cd` preceded it. That is the same class
+    as ai-config#3544, where a `git -C` is judged against the session's own
+    HEAD, and it is left to that issue rather than half-fixed here.
+
+    A `ssh host "<push>"`, a shell function, an `eval`, and a command built
+    from a variable are all still invisible, as they are to the reference
+    implementation in `hooks/no-empty-promise.py`.
+    """
+    pieces = [command]
+    if shell_c_expansions is not None:
+        try:
+            pieces = shell_c_expansions(command)
+        except Exception as exc:  # never let the descent break the base guard
+            print(f"no-clobbering-push: could not expand nested shells ({exc}); "
+                  f"evaluating the outer command only", file=sys.stderr)
+            pieces = [command]
+    warning = None
+    for piece in pieces:
+        verdict = evaluate(piece, base_cwd)
+        if verdict is None:
+            continue
+        if verdict[0] == "deny":
+            return verdict
+        if warning is None:
+            warning = verdict
+    return warning
+
+
 def _read_payload() -> tuple[dict, bool]:
     """Parse payload from sys.argv (--dry-run / --simulate) or sys.stdin."""
     args = sys.argv[1:]
@@ -1214,7 +1294,7 @@ def main() -> int:
         return 0
 
     try:
-        verdict = evaluate(command, payload.get("cwd"))
+        verdict = evaluate_every_shell(command, payload.get("cwd"))
     except Exception as exc:  # fail open on any parse or subprocess trouble
         print(f"no-clobbering-push: could not evaluate command ({exc})",
               file=sys.stderr)

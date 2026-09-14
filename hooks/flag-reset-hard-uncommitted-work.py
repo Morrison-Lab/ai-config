@@ -123,6 +123,19 @@ import shlex
 import subprocess
 import sys
 
+try:
+    _LIB = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+        "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from shellcmd import shell_c_expansions
+except Exception as _exc:  # broken install: degrade to the outer command only
+    print(f"flag-reset-hard-uncommitted-work: cannot load "
+          f"scripts/lib/shellcmd.py ({_exc}); a discard wrapped in an "
+          f"interpreter's -c will not be seen", file=sys.stderr)
+    shell_c_expansions = None
+
 RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
 
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
@@ -301,7 +314,7 @@ def _looks_like_path(arg):
     return _resolves_as_ref(arg) is False
 
 
-def offending(command):
+def offending_here(command):
     """The matched destructive-discard invocation in `command`, or None.
 
     Returns (kind, segment, paths). `kind` is "reset-hard" or
@@ -348,6 +361,47 @@ def offending(command):
                 return "checkout-force", " ".join(argv), None
             continue
         return sub, " ".join(argv), paths
+    return None
+
+
+def offending(command):
+    """`offending_here` over COMMAND and every shell `-c` nested command line.
+
+    This hook compares exact tokens, so an interpreter wrapper bypassed it
+    outright: `shlex` collapses the embedded command into ONE opaque token,
+    `argv[0]` is the interpreter, and `rest[0] != "git"` rejects it before any
+    subcommand is read.
+
+    Measured 2026-09-14 against a deliberately DIRTY tree, which is what the
+    check needs -- this hook fires on uncommitted work, so a clean checkout
+    makes the bare form silent too and the probe says nothing either way
+    (ai-config#1973 records an earlier inconclusive one):
+
+        git reset --hard origin/main            -> warns
+        sh -c "git reset --hard origin/main"    -> SILENT
+        bash -c "git reset --hard origin/main"  -> SILENT
+
+    Each piece is analysed separately rather than merged, per
+    `shell_c_expansions`' own contract: a nested `-c` argument is a different
+    shell. Nothing here models shell state, so the separation costs nothing and
+    keeps this call site identical in shape to its sibling guards'.
+
+    First hit wins, matching `offending_here`, which returns on the first
+    destructive invocation it finds rather than collecting them.
+    """
+    pieces = [command]
+    if shell_c_expansions is not None:
+        try:
+            pieces = shell_c_expansions(command)
+        except Exception as exc:  # never let the descent break the base check
+            print(f"flag-reset-hard-uncommitted-work: could not expand nested "
+                  f"shells ({exc}); checking the outer command only",
+                  file=sys.stderr)
+            pieces = [command]
+    for piece in pieces:
+        match = offending_here(piece)
+        if match is not None:
+            return match
     return None
 
 

@@ -608,3 +608,114 @@ def resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
     if cur_dir is not None:
         return os.path.normpath(os.path.join(cur_dir, target))
     return os.path.normpath(target)
+
+
+# A SHELL specifically, which is a narrower question than "an interpreter".
+# Only a shell's `-c` takes a nested COMMAND LINE. `python -c` takes Python
+# SOURCE, where `git push` is a syntax error rather than a push, so re-testing
+# a Python `-c` argument under shell semantics invents commands nobody ran.
+# The distinction is `hooks/no-empty-promise.py`'s, which spent four review
+# rounds on this class and is the reference implementation.
+SHELL_PROGRAM = re.compile(r"\A(?:[\w.@/-]*/)?(?:bash|sh|zsh|dash|ksh)\Z", re.I)
+
+# A `-c`-shaped flag hands the NEXT token to the shell as a command STRING.
+#
+# WIDER than the reference implementation's `-[a-z]*c`, which anchors the `c`
+# last and so reads `-ec` and misses `-cx`. Short options cluster in any order,
+# and every shell here spells `-c` as a single letter, so a cluster CONTAINING
+# `c` sets it: `bash -cx 'git push'` really runs the push. The direction is the
+# safe one for a guard -- over-detecting a `-c` means scanning a token that was
+# never a command line, which finds nothing, while under-detecting hides
+# whatever the real one carried.
+DASH_C_FLAG = re.compile(r"\A(?:--command|-[a-z]*c[a-z]*)\Z", re.I)
+
+# Tokens that may sit between a command position and the shell without
+# changing what runs. `COMMAND_WRAPPERS` already names the same idea for
+# `strip_env`; this reuses it rather than forking a second list.
+_DESCENT_SKIPPABLE = COMMAND_WRAPPERS | {"sudo", "setsid", "stdbuf", "timeout"}
+
+
+def command_head(argv, index):
+    """`(head token introducing ARGV[INDEX], whether a `-c` was crossed)`.
+
+    Walks back past flags, `VAR=value` prefixes, and `nohup`-style wrappers,
+    none of which change what runs. A `-c`-shaped flag along the way is
+    REPORTED rather than skipped, because it changes what the token IS: an
+    argument to the interpreter rather than a script operand.
+    """
+    via_dash_c = False
+    previous = index - 1
+    while previous >= 0:
+        token = argv[previous]
+        if DASH_C_FLAG.match(token):
+            via_dash_c = True
+        elif not (token.startswith("-") or token in _DESCENT_SKIPPABLE
+                  or ENV_ASSIGNMENT.match(token)):
+            break
+        previous -= 1
+    return (argv[previous] if previous >= 0 else "", via_dash_c)
+
+
+def shell_c_expansions(command, max_depth=3):
+    """`command` first, then every nested command line reachable via a shell's `-c`.
+
+    WHY THIS EXISTS
+    ---------------
+    A hook that tokenizes and compares exact tokens is bypassed outright by
+    wrapping the gated command in an interpreter's `-c` argument. `shlex`
+    collapses the embedded command into ONE opaque token, so `argv[0]` is the
+    interpreter and every head-token comparison fails immediately.
+
+    Measured on `main` (ai-config#1973): `git push --force origin main` fed to
+    `hooks/no-clobbering-push.py` denies, and `sh -c "git push --force origin
+    main"` produces no output and is silently allowed. That is the dangerous
+    direction under `shared/principles/fail-fast.md` -- a silent discharge
+    rather than an over-warn -- and it defeats the mechanism behind CLAUDE.md's
+    "Check the remote immediately before every push".
+
+    HOW TO USE IT
+    -------------
+    Analyse each returned string SEPARATELY, on its own terms. Do not
+    concatenate their argv lists into one analysis: a nested `-c` argument is a
+    DIFFERENT SHELL, so its `cd` moves that shell and not the caller's, and any
+    caller modelling subshell scope or working directory would attribute the
+    nested shell's moves to the outer one.
+
+    The original command is always first, so a caller wanting the outer
+    analysis unchanged can take `[0]` and treat the rest as additional.
+
+    BOUNDS AND FAILURE DIRECTION
+    ----------------------------
+    Depth is capped at `max_depth`, and an already-seen string is not queued
+    again -- `bash -c "bash -c \"...\""` terminates rather than recursing on a
+    self-similar expansion. An unparseable piece (unbalanced quotes) yields no
+    children and does not discard the pieces already found.
+
+    What this CANNOT see is unchanged from the reference implementation: a
+    shell function, an `eval`, a command assembled from a variable, or a remote
+    command sent by `ssh`. Those return nothing extra rather than a guess.
+    """
+    found = [command]
+    seen = {command}
+    frontier = [(command, 0)]
+    while frontier:
+        text, depth = frontier.pop(0)
+        if depth >= max_depth:
+            continue
+        argvs = simple_commands(text)
+        if argvs is None:
+            continue  # unparseable: no children, and the rest still stands
+        for argv in argvs:
+            for index, token in enumerate(argv):
+                if not DASH_C_FLAG.match(token) or index + 1 >= len(argv):
+                    continue
+                head, _ = command_head(argv, index)
+                if not SHELL_PROGRAM.match(head):
+                    continue
+                nested = argv[index + 1]
+                if nested in seen:
+                    continue
+                seen.add(nested)
+                found.append(nested)
+                frontier.append((nested, depth + 1))
+    return found

@@ -169,6 +169,50 @@ def lead_word_case(path):
     return "sudo FOO=1 git reset --hard"
 
 
+def shell_c_wrapped_case(path):
+    """ai-config#1973: wrapping the discard in a shell's `-c` argument.
+
+    `shlex` collapses the embedded command into ONE opaque token, so `argv[0]`
+    is the interpreter and `rest[0] != "git"` rejected it before any subcommand
+    was read. Measured silent on `main` against a dirty tree -- which is the
+    measurement this needs, since a clean tree makes the BARE form silent too
+    and the probe then distinguishes nothing.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return 'sh -c "git reset --hard origin/main"'
+
+
+def shell_c_cluster_case(path):
+    """A `-c` inside a short-flag CLUSTER still hands over a command line.
+
+    `bash -cx '...'` really runs it. The reference implementation this descent
+    was extracted from anchors the `c` last (`-[a-z]*c`), which reads `-ec` and
+    misses this.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return 'bash -cx "git reset --hard"'
+
+
+def python_c_case(path):
+    """A PYTHON `-c` argument is SOURCE, not a command line.
+
+    `git reset --hard x` is a syntax error there, not a discard, so descending
+    into it would warn about a command nobody ran. Only a shell's `-c` is
+    followed.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return 'python3 -c "git reset --hard x"'
+
+
 def mention_in_string_case(path):
     """A mention of the command inside a quoted string is not an
     invocation."""
@@ -461,6 +505,10 @@ SHOULD_WARN = [
     ("W6", lead_word_case,
      "a lead word (`sudo`) and an assignment are both skipped before "
      "matching the invocation"),
+    ("W1973a", shell_c_wrapped_case,
+     "a discard wrapped in a shell's `-c` argument (ai-config#1973)"),
+    ("W1973b", shell_c_cluster_case,
+     "a `-c` inside a short-flag cluster still hands over a command line"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -473,6 +521,9 @@ SHOULD_STAY_SILENT = [
      "`git reset` with no `--hard` never discards working-tree content"),
     ("S4", mention_in_string_case,
      "a mention inside a quoted string is not an invocation"),
+    ("S1973", python_c_case,
+     "a PYTHON `-c` argument is source, not a command line, so it is not "
+     "descended into"),
     ("S5", heredoc_mention_case,
      "a heredoc that MENTIONS the command runs neither"),
     ("S6", different_subcommand_case, "a different git subcommand entirely"),
@@ -541,11 +592,26 @@ SHOULD_STAY_SILENT += [
 ]
 
 
+# The mutation harness copies ONE FILE to a temp directory, so a hook that
+# imports a shared module cannot resolve it from `__file__` there -- the copy
+# has no repo above it. Without this, `shell_c_expansions` lands as `None` in
+# every mutant, the interpreter-wrapper cases go silent under EVERY clause, and
+# they read as "flipped" for reasons that have nothing to do with the clause
+# being reverted (ai-config#1973). The mutant is a reverted clause, not a
+# broken install; the degraded path is exercised on its own terms instead.
+_REAL_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+    "scripts", "lib")
+
+
 def verdict(hook_path, repo, command):
     payload = bash(command)
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(
+        [_REAL_LIB] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
     proc = subprocess.run(
         [sys.executable, hook_path], input=json.dumps(payload),
-        capture_output=True, text=True, cwd=repo,
+        capture_output=True, text=True, cwd=repo, env=env,
     )
     if proc.returncode != 0:
         sys.exit(f"FATAL: hook exited {proc.returncode} on {command!r}\n"

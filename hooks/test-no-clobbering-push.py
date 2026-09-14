@@ -1459,8 +1459,8 @@ MUTATIONS = {
     "base_is_the_payload_cwd": (
         "the directory a push starts in is the Bash call's own `cwd`, not the "
         "hook process's",
-        [('        verdict = evaluate(command, payload.get("cwd"))',
-          "        verdict = evaluate(command)")],
+        [('        verdict = evaluate_every_shell(command, payload.get("cwd"))',
+          "        verdict = evaluate_every_shell(command)")],
         {"W10"},
     ),
     "subshell_scopes_cd": (

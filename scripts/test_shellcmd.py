@@ -356,6 +356,55 @@ check("nesting is a scope path, and the depth is its length",
 check("a parse error is None on the scope-aware split too",
       shellcmd.simple_commands_with_scope("git commit -m \'unclosed"), None)
 
+# ------------------------------------------- interpreter descent (#1973)
+#
+# A hook that compares exact tokens is bypassed outright by an interpreter
+# wrapper: `shlex` collapses the embedded command into ONE opaque token, so
+# `argv[0]` is the interpreter and every head-token comparison fails. Measured
+# on `main`: `git push --force origin main` denies and
+# `sh -c "git push --force origin main"` is silently allowed.
+#
+# The command itself is always first, so a caller can take `[0]` for the
+# unchanged outer analysis and treat the rest as additional.
+check("the command itself comes back even with nothing nested",
+      shellcmd.shell_c_expansions("git push --force origin main"),
+      ["git push --force origin main"])
+check("a shell's -c argument is a nested command line",
+      shellcmd.shell_c_expansions('sh -c "git push --force origin main"'),
+      ['sh -c "git push --force origin main"', "git push --force origin main"])
+# Only a SHELL's `-c` takes a command line. `python -c` takes Python SOURCE,
+# where `git push` is a syntax error rather than a push, so descending into it
+# would invent a command nobody ran.
+check("a python -c argument is source, not a command line",
+      shellcmd.shell_c_expansions('python3 -c "git push --force origin main"'),
+      ['python3 -c "git push --force origin main"'])
+# WIDER than the reference implementation in hooks/no-empty-promise.py, whose
+# `-[a-z]*c` anchors the `c` last and so reads `-ec` and misses `-cx`. Short
+# options cluster in any order and `bash -cx 'git push'` really pushes.
+check("a -c inside a short-flag cluster still hands over a command line",
+      shellcmd.shell_c_expansions('bash -cx "git push --force origin main"'),
+      ['bash -cx "git push --force origin main"', "git push --force origin main"])
+check("assignments and wrappers before the shell do not hide it",
+      shellcmd.shell_c_expansions('env FOO=1 /bin/bash -c "git push origin main"'),
+      ['env FOO=1 /bin/bash -c "git push origin main"', "git push origin main"])
+check("descent is recursive and terminates",
+      shellcmd.shell_c_expansions('bash -c "bash -c ' + chr(92) + '"git push' + chr(92) + '""'),
+      ['bash -c "bash -c ' + chr(92) + '"git push' + chr(92) + '""',
+       'bash -c "git push"', "git push"])
+# `-c` must be a FLAG TOKEN, not text that merely contains one, or quoting the
+# construct in prose would descend into it.
+check("quoted prose naming the construct is not descended into",
+      shellcmd.shell_c_expansions('echo "sh -c stuff"'), ['echo "sh -c stuff"'])
+check("a -c with no operand yields nothing extra",
+      shellcmd.shell_c_expansions("sh -c"), ["sh -c"])
+# An unparseable piece yields no children and does not discard what was
+# already found -- the outer command is still returned.
+check("an unbalanced quote does not lose the outer command",
+      shellcmd.shell_c_expansions("git commit -m 'unclosed"),
+      ["git commit -m 'unclosed"])
+check("depth is capped",
+      len(shellcmd.shell_c_expansions("git push", max_depth=0)), 1)
+
 # ------------------------------------------------- source-level hygiene
 #
 # THIS MODULE QUOTES REGEX SOURCE IN ITS PROSE, so a docstring can carry an

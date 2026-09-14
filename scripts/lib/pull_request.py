@@ -132,5 +132,3 @@ class PullRequest:
                     break
             self._review_threads = [ReviewThread(node) for node in nodes]
         return self._review_threads
-
-

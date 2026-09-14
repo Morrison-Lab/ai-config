@@ -214,12 +214,30 @@ class PayloadFetcher:
                 raise PayloadError(
                     "'review_threads' must be a list, or an object with a 'nodes' key."
                 )
+            nodes = []
             for i, item in enumerate(threads.get("nodes") or []):
                 if not isinstance(item, dict):
                     raise PayloadError(
                         f"payload 'review_threads[{i}]' must be an object, got "
                         f"{type(item).__name__}."
                     )
+                is_resolved = (
+                    item.get("isResolved")
+                    if "isResolved" in item
+                    else item.get("is_resolved", False)
+                )
+                is_outdated = (
+                    item.get("isOutdated")
+                    if "isOutdated" in item
+                    else item.get("is_outdated", False)
+                )
+                nodes.append({
+                    "id": item.get("id") or "",
+                    "isResolved": bool(is_resolved),
+                    "isOutdated": bool(is_outdated),
+                    "path": item.get("path") or "",
+                    "line": item.get("line"),
+                })
             page_info = threads.get("pageInfo") or {"hasNextPage": False, "endCursor": None}
             return json.dumps({
                 "data": {
@@ -227,7 +245,7 @@ class PayloadFetcher:
                         "pullRequest": {
                             "reviewThreads": {
                                 "pageInfo": page_info,
-                                "nodes": threads.get("nodes") or [],
+                                "nodes": nodes,
                             }
                         }
                     }

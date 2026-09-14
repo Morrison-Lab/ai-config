@@ -127,6 +127,7 @@ one-line builder was named in the instrument's own `--help`
 | `pr` | `pull_request_read` (`get`, `get_reviews`, `get_comments`) | See the field list below. |
 | `check_runs` | `pull_request_read` (`get_check_runs`) | Bare list or the REST `{"check_runs": [...]}` envelope. |
 | `actions_runs` | `actions_get` (`get_workflow_run`), keyed by run id; `build-pr-payload.py` fills it from each check run's run id ([#1697](https://github.com/Morrison-Lab/ai-config/issues/1697)) | Omitting it changes verdicts --- see below. |
+| `review_threads` | GraphQL `reviewThreads(first:100)` or `pull_request_read` | Required by `check-pr-fully-clean.py` (ai-config#3586). List of thread objects or `{"nodes": [...]}` envelope. |
 
 `pr` needs `headRefOid`, `headRefName`, `state`, `reviewDecision`, and
 `commits[].committedDate`, plus two nested shapes the scan reads directly:
@@ -137,6 +138,13 @@ each entry of `reviews[]` needs `state`, `submittedAt`, `body`,
 `commit.oid` is the exact-SHA gate, and `submittedAt`/`createdAt` order the
 latest-verdict selection, so a payload omitting them is accepted and scored on
 weaker evidence.
+
+`review_threads` entries require `id`, `path`, and `line`,
+plus resolution flags `isResolved` (or `is_resolved`) and `isOutdated` (or `is_outdated`).
+Unresolved live threads block clean status;
+unresolved outdated threads emit a non-blocking `NOTE:`.
+An absent `review_threads` key exits 2 rather than assuming zero unresolved threads,
+so a data gap never launders into a clean verdict.
 
 The field names are `gh pr view --json`'s rather than the MCP tool's, so a
 small mapping is needed --- `head.sha` becomes `headRefOid`, and an author

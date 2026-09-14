@@ -254,6 +254,14 @@ def main():
     check("unresolved outdated review thread exits 0 (clean)", code == 0)
     check("...and notes outdated thread", "Unresolved outdated review thread at src/old.py:10" in out)
 
+    p = base_payload()
+    p["review_threads"] = [
+        {"id": "t3", "is_resolved": False, "is_outdated": False, "path": "src/snake.py", "line": 7}
+    ]
+    code, out = run_script(p)
+    check("snake_case is_resolved False blocks clean status", code == 1)
+    check("...and names snake_case path and line", "src/snake.py:7" in out)
+
     # An end-to-end run WITHOUT -R must exercise resolve_repo through the
     # payload rather than shelling out; a run WITH a realistic Actions URL
     # must exercise the actions/runs call site.

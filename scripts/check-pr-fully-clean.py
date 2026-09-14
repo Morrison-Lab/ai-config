@@ -412,7 +412,8 @@ NOTICE_PREFIX_WINDOW = 200
 #
 # Read that limit precisely, because it decides how much this release costs.
 # The CI, review thread, and HEAD criteria are checked here and still apply.
-# Unresolved review threads are checked via GraphQL (ai-config#3586).
+# Unresolved review threads are checked via GraphQL in the default gh-CLI path,
+# or via the review_threads payload key under --from-json (ai-config#3586).
 #
 # Matched against a prefix window for the same reason the notice markers above
 # are: this corpus quotes the wording, and a real review discussing an outage
@@ -765,7 +766,6 @@ def check_review_threads(pr) -> Tuple[bool, List[str]]:
             print("\u2713 No review threads found.")
 
     return len(blocking) == 0, issues
-
 
 
 # origin/main's own inline-span pattern, reused verbatim. The scan text this

@@ -598,6 +598,50 @@ try:
     payload_p25 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p25}
     hit = hook.offending("Bash", payload_p25["tool_input"], payload_p25)
     check("must NOT block git commit when prompt directs 'and commit your changes' after unrelated negation", hit, None)
+
+    # 12z1. 'and then commit' after comma/negation (Finding 1)
+    p26 = os.path.join(prohibitive_dir, "subagents", "agent-and-then-commit.jsonl")
+    with open(p26, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Do not edit config.json, and then commit your changes."},
+        }) + "\n")
+    payload_p26 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p26}
+    hit = hook.offending("Bash", payload_p26["tool_input"], payload_p26)
+    check("must NOT block git commit when prompt directs 'and then commit your changes' after negation", hit, None)
+
+    # 12z2. Oxford-comma list with add, delete (Finding 2)
+    p27 = os.path.join(prohibitive_dir, "subagents", "agent-oxford-add-delete.jsonl")
+    with open(p27, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Review the code. Do not add, delete, and commit any files."},
+        }) + "\n")
+    payload_p27 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p27}
+    hit = hook.offending("Bash", payload_p27["tool_input"], payload_p27)
+    check("must block git commit when Oxford-comma list uses add/delete verbs", hit is not None, True)
+
+    # 12z3. Demonstrative 'this change' (Finding 3)
+    p28 = os.path.join(prohibitive_dir, "subagents", "agent-commit-this-change.jsonl")
+    with open(p28, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Don't skip any tests, and commit this change."},
+        }) + "\n")
+    payload_p28 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p28}
+    hit = hook.offending("Bash", payload_p28["tool_input"], payload_p28)
+    check("must NOT block git commit with demonstrative 'and commit this change'", hit, None)
+
+    # 12z4. Pronoun target 'and fix it' (Finding 3)
+    p29 = os.path.join(prohibitive_dir, "subagents", "agent-fix-it.jsonl")
+    with open(p29, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "Don't skip any tests, and fix it."},
+        }) + "\n")
+    payload_p29 = {"tool_name": "Edit", "tool_input": {"file_path": "main.py"}, "transcript_path": p29}
+    hit = hook.offending("Edit", payload_p29["tool_input"], payload_p29)
+    check("must NOT block Edit with pronoun target 'and fix it'", hit, None)
 finally:
     try:
         import shutil

@@ -326,6 +326,26 @@ The natural reading was contamination from the several worktrees active at once,
 Every run was `flag-unassigned-worktree.py` correctly returning `deny` against a fixture that only ever constructed the `warn` case.
 The quiet-tree run is what makes that distinguishable: without a control run on a committed, unedited tree, "several worktrees were active" explains a real defect exactly as comfortably as a contaminated one.)
 
+## 5.6 A hot-path guard's own correctness suite does not exercise its performance envelope --- test adversarial-length input separately
+
+A guard's test suite proves each case classifies correctly.
+It says nothing about how the classifier's own helpers scale, because every hand-written fixture is short and every hand-written example naturally parses.
+A scan-forward-per-match helper --- one that, for each match found, walks forward through the remaining text looking for its counterpart --- is linear per call and quadratic in aggregate whenever the input can carry many unresolved matches at once.
+`hooks/no-unauthorized-merge.py` has hit this same trap three times, by three different routes, and every one of the adversarial inputs is **unbalanced**: a repeated opener with no matching closer, which a correctness-case list never constructs because a human naturally writes examples that parse.
+
+- `VAR_PREFIX`'s bounded-repetition note: an unbounded empty-expansion prefix rescanned the rest of a long substitution chain from every command position --- 610ms on 800 chained backtick pairs, fixed by capping the repetition.
+- `live_operand_test`'s precompute-and-bisect note: scanning for an executor per quote was quadratic in the number of quoted spans --- 1787ms at 2000 quoted spans, fixed by precomputing separator and executor offsets once and answering each quote with a binary search (305ms).
+- The #1308 fix (PR #3635, not yet merged at the time this entry was written --- the branch carried only an empty placeholder commit, so these figures are as reported by the implementing session rather than independently re-measured here): a `_matching_paren(text, open_idx)` helper that scanned forward from each `<(` measured 130ms at 500 repeated `bash <(` opens with no closing paren, 438ms at 1000, 1712ms at 2000.
+  It was rewritten as one quote-aware stack pass building an `open -> close` map in a single linear scan, 29ms at 2000.
+  A 260-case correctness suite passed at every stage, including with the quadratic version.
+  The defect was found only by deliberately constructing the adversarial-length input.
+
+- **Do:** for any scan-forward-per-match helper added to a `PreToolUse` guard, time it separately against repeated, unbalanced instances of its own trigger token (a repeated opener with no closer, a repeated separator with no terminator) at increasing counts, and confirm the growth is linear.
+- **Do:** prefer one linear pass that builds a lookup structure (a stack, or precomputed offsets answered by binary search) over any helper that re-scans remaining text per match.
+- **Don't:** trust a green, all-cases-pass correctness suite as evidence about a hot-path guard's scaling --- a suite built from hand-written cases is built from balanced input by construction and cannot exercise this.
+- **Don't:** treat this as closed after one helper's fix --- three separate helpers in the same file have hit it by three different routes.
+  A new scan-forward-per-match helper anywhere in `hooks/` is a candidate until measured against unbalanced input.
+
 ## 6. A guard that keeps firing after you satisfied it: stop, and read the copy that runs
 
 [`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md) already carries this defect in full --- the fail-open direction of a dated constant, why the newest cache directory is not a valid proxy for the loaded copy, and the `ps -eo args` capture that resolved it.

@@ -543,6 +543,17 @@ try:
     payload_p20 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix'"}, "transcript_path": p20}
     hit = hook.offending("Bash", payload_p20["tool_input"], payload_p20)
     check("must NOT block git commit when prompt scopes read-only to a resource and directs commit", hit, None)
+
+    # 12u. Negator separated from verb by intervening words (Claude review round 8)
+    p21 = os.path.join(prohibitive_dir, "subagents", "agent-intervening-words-negation.jsonl")
+    with open(p21, "w", encoding="utf-8") as tf:
+        tf.write(json.dumps({
+            "type": "user",
+            "message": {"content": "This is an adversarial review. Do not try to fix any bugs you find; only report them."},
+        }) + "\n")
+    payload_p21 = {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'sneaky'"}, "transcript_path": p21}
+    hit = hook.offending("Bash", payload_p21["tool_input"], payload_p21)
+    check("must block git commit when review prompt has negator separated from verb ('Do not try to fix')", hit is not None, True)
 finally:
     try:
         import shutil

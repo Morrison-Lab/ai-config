@@ -131,27 +131,36 @@ RX_READ_ONLY = re.compile(
 
 RX_NOT_READ_ONLY = re.compile(r"\bnot\s+read[- ]only\b", re.I)
 
-ADVISORY_PREFIX = re.compile(r"\b(?:how to|propose|suggest|explain|recommend)\s+", re.I)
-NEGATION_LOOKBEHINDS = r"(?<!\bdo not\s)(?<!\bdon't\s)(?<!\bnever\s)(?<!\bwithout\s)(?<!\bnot\s)"
-
 RX_AFFIRMATIVE_WRITE = re.compile(
     r"\band\s+then\s+(?:fix|commit|patch|repair|edit|modify|write|create)\b"
     r"|\band\s+(?:fix|commit|patch|repair|edit|modify|write|create)\s+(?:(?:the|a|an|any|all|every|each|new|these|those)\s+|(?:issues?|bugs?|errors?|defects?|tests?|files?|patches?|scripts?)\b)"
-    r"|" + NEGATION_LOOKBEHINDS + r"\b(?:fix|patch|repair|address)\s+(?:every|all|any|the|each|issues?|bugs?|errors?|defects?|findings?)\b"
+    r"|\b(?:fix|patch|repair|address)\s+(?:every|all|any|the|each|issues?|bugs?|errors?|defects?|findings?)\b"
     r"|\bcommitt?(?:ing|ed)?\s+as\s+you\s+go\b"
-    r"|" + NEGATION_LOOKBEHINDS + r"\b(?:make|apply)\s+(?:the\s+|a\s+)?(?:fixes?|changes?|edits?|patches?|modifications?)\b"
-    r"|" + NEGATION_LOOKBEHINDS + r"\b(?:write|create)\s+(?:the\s+|a\s+|an\s+|new\s+)?(?:fixes?|tests?|files?|code|patches?|scripts?)\b",
+    r"|\b(?:make|apply)\s+(?:the\s+|a\s+)?(?:fixes?|changes?|edits?|patches?|modifications?)\b"
+    r"|\b(?:write|create)\s+(?:the\s+|a\s+|an\s+|new\s+)?(?:fixes?|tests?|files?|code|patches?|scripts?)\b",
     re.I,
 )
 
+RX_NEGATED_OR_ADVISORY = re.compile(
+    r"\b(?:do(?:es)?\s+not|don't|did(?:n't|\s+not)|never|without|not|avoid|refrain\s+from|no\s+need\s+to|should(?:n't|\s+not)|must(?:n't|\s+not)|cannot|can't)\b"
+    r"|\b(?:how\s+to|propose|suggest|explain|recommend|tell\s+(?:us|me)\s+how\s+to)\b",
+    re.I,
+)
+
+RX_CLAUSE_SPLIT = re.compile(r"[,;:.!?\n]|\bbut\b|\bhowever\b|\byet\b", re.I)
+
 
 def has_affirmative_write(content: str) -> bool:
-    """Check if content commands affirmative write actions (excluding advisory requests)."""
+    """Check if content commands affirmative write actions (excluding advisory or negated verbs)."""
     for m in RX_AFFIRMATIVE_WRITE.finditer(content):
         start = m.start()
-        prefix = content[max(0, start - 25):start]
-        if not ADVISORY_PREFIX.search(prefix):
-            return True
+        preceding = content[:start]
+        separators = list(RX_CLAUSE_SPLIT.finditer(preceding))
+        clause_start = separators[-1].end() if separators else 0
+        clause_prefix = content[clause_start:start]
+        if RX_NEGATED_OR_ADVISORY.search(clause_prefix):
+            continue
+        return True
     return False
 
 ALWAYS_MUTATING_GIT_SUBCMDS = frozenset({

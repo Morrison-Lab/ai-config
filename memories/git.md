@@ -790,12 +790,16 @@ ancestor of `main` and the citation went dead, on the same schedule this
 section already describes.
 The fix was the one this section already prescribes -- drop the SHAs and cite
 `#3624`/`#3647` by number, which survives the squash.
-The incident was additionally hedged as proposed-and-open at the time, which
-was right then and expired six minutes later when #3647 merged: a hedge keyed
-to merge status has to be swept again whenever the PR it names lands, and
-`skills/ardi/SKILL.md` scopes that sweep to the PR's touched FILES rather than
-to its own added lines, precisely because the expiring line is usually one
-somebody else wrote.
+The incident was additionally hedged as proposed-and-open, and that hedge was
+false the moment it landed: #3647 merged at `2026-09-15T02:47:27Z` and the
+sibling PR carrying the hedge merged at `02:53:45Z`, six minutes LATER.
+The direction matters, because the weaker reading -- a hedge that was right
+when written and expired later -- suggests a sweep at write time would have
+caught it, and no sweep of that PR's own additions ever could.
+What catches it is `skills/ardi/SKILL.md`'s scoping of the sweep to the PR's
+touched FILES rather than to its own added lines, run again at push time:
+the expiring line is usually one somebody else wrote, arriving through a
+`main` merge, and it can be false before you ever see it.
 The durable point is not that citing an unpushed branch SHA is a new failure
 mode; it is that the very entry stating this rule did not stop a same-day
 session from writing one anyway, which is what the count is for.

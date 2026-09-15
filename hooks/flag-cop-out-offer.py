@@ -120,16 +120,22 @@ def offer_windows(text):
     push a preceding offer out of a fixed tail, so the pre-marker region
     cannot simply be ignored either.
 
-    So: the tail of the text BEFORE the declaration, and the whole of what
-    follows it. Keeping a tail on the first preserves the reason the window
-    is short at all -- a mid-message aside still must not fire.
+    So: the tail of the whole reply, which is the ordinary closing move and
+    covers an offer sitting at the end of the pending-work section; plus the
+    tail of the text BEFORE the declaration, which is the region the
+    declaration displaced.
+
+    Both are tails. Handing back the post-marker region whole would let an
+    aside buried mid-block fire with paragraphs of unrelated status after it,
+    which is the very thing TAIL_CHARS exists to prevent -- the first attempt
+    at this did that, and it was caught in review on ai-config#3695.
     """
     body = text.strip()
     matches = list(STOPPING_POINT_RX.finditer(body))
     if not matches:
         return [body[-TAIL_CHARS:]]
     cut = matches[-1].start()
-    return [body[:cut].strip()[-TAIL_CHARS:], body[cut:]]
+    return [body[-TAIL_CHARS:], body[:cut].strip()[-TAIL_CHARS:]]
 
 
 def find_offer(text):

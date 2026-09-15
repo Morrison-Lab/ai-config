@@ -74,7 +74,17 @@ CASES = [
     ([TOOL, say("Merged and pushed.\n\n**Stopping Point**: Not a clean "
                 "stopping point / work remains queued: the array is mid-run. "
                 "Want me to push the fix now?")], True,
-     "an offer INSIDE the pending-work block still warns"),
+     "an offer at the END of the pending-work block still warns"),
+
+    # The second patch handed back the post-marker region WHOLE, with no tail
+    # slice, which let an aside buried mid-block fire with paragraphs of
+    # status after it -- reintroducing inside the pending-work section the
+    # exact false positive TAIL_CHARS exists to prevent. Caught in review on
+    # ai-config#3695; both windows are tails now.
+    ([TOOL, say("Merged and pushed.\n\n**Stopping Point**: Not a clean "
+                "stopping point / work remains queued: would you like me to "
+                "try that? " + LONG)], False,
+     "an aside mid-pending-block, with status after it, stays silent"),
 
     # Negatives that decide the anchoring.
     ([TOOL, say("Want me to do this? No -- it was already authorized, so I "

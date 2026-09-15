@@ -626,9 +626,12 @@ with tempfile.TemporaryDirectory() as td:
     root = Path(td)
     (root / "hooks").mkdir()
     (root / "hooks" / "x.sh").write_text("#!/bin/sh" + chr(10), encoding="utf-8")
-    # `-b main` pins the fixture's initial branch: without it the repo inherits
-    # the machine's `init.defaultBranch`, which makes the suite's behaviour a
-    # property of the host's git config rather than of the subject.
+    # `-b main` pins the fixture's initial branch. Nothing here reads the
+    # branch name -- `check_executable_bits` reads the index, and the state
+    # these cases assert is identical under `main`, `master` or anything else
+    # -- so pinning it keeps the fixture reproducible and satisfies
+    # `scripts/check-unpinned-git-fixtures.py`, rather than repairing a flake
+    # this suite ever had.
     subprocess.run(["git", "init", "-q", "-b", "main"], cwd=root, check=True)
     subprocess.run(["git", "add", "hooks/x.sh"], cwd=root, check=True)
 

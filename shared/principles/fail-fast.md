@@ -79,10 +79,10 @@ job".
 (Driving `Morrison-Lab/ai-config#3673` (issue #3669), hardening
 `.github/workflows/upload-skills.yml`: a job already gated on
 `github.repository` carried a further secret-presence branch that `exit
-0`'d when the secret was absent. 94 consecutive runs were green and
-uploaded nothing for two weeks before the gap was noticed --- every run
-took the same silent-skip branch, and nothing about a green check
-distinguished it from a real upload.)
+0`'d when the secret was absent.
+94 consecutive runs were green and uploaded nothing for two weeks before
+the gap was noticed --- every run took the same silent-skip branch, and
+nothing about a green check distinguished it from a real upload.)
 
 ## Catch conditions by class, never by message text
 

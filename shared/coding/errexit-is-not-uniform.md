@@ -465,8 +465,8 @@ adversarial review rounds, reading the same diff, had not.)
 
 ### An ad-hoc `&&` chain is the same defect with nowhere to put the remedy
 
-The section above assumes a script, so both its examples end in `|| fallback`
-and its preferred fix is a `set` line to amend.
+The pipe-discard section above assumes a script, so both its examples end in
+`|| fallback` and its preferred fix is a `set` line to amend.
 A batch of checks run as a single shell invocation has neither.
 There is no `set -e`, no `set -o pipefail`, and no file to add either one to,
 so the `&&` between the stages is the entire error handling.

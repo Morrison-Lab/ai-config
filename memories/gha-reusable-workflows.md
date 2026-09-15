@@ -344,7 +344,7 @@ into a `preview.yml` call reads "empty" as meaning the same thing.
 
 Getting it wrong **does not fail the build**.
 It deploys a preview whose pages have no CSS, because per-format renders prune
-each other's `site_libs` (see `quarto-sites.md`).
+each other's `site_libs` (see [`quarto-sites.md`](quarto-sites.md)).
 
 **`tinytex: true` on `preview.yml` needs the R `tinytex` package.**
 The composite installs its extra TeX packages by shelling out to

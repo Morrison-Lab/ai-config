@@ -413,8 +413,30 @@ happened to render last.
 - **Do:** render every format in one `quarto render`.
 - **Do:** check rendered `<link>`/`<script>` targets resolve, not just that pages exist.
 - **Don't:** read `--no-clean` as preserving anything beyond pages.
-- **Don't:** assume `d-morrison/rme` is affected because it splits per format ---
-  its published `gh-pages` carries `site_libs/revealjs/dist/reveal.js` at 107 KB
-  (checked 2026-09-15), so something about that setup escapes this.
-Check a
-  specific site before claiming it has the bug.
+**`gha`'s `quarto-publish` composite runs the same pattern**, so this is not
+only a preview-side concern: give its `formats` input a list and it renders the
+first format plain and each later one with `--no-clean`, exactly as measured
+above (`quarto-publish/action.yml`, the `else` branch of its render step).
+Its own input description offers `'pdf docx revealjs html'` as the example.
+
+**But the trigger is narrower than the mechanism**, and the counter-example is a
+live production site.
+`d-morrison/rme` renders by hand, in its own `publish.yml` run block, the
+sequence `--to pdf`, `--to docx --no-clean`, `--to revealjs --no-clean`,
+`--to html --no-clean` --- the same shape that pruned `site_libs/revealjs` in
+the measurement above.
+Its published `gh-pages` nevertheless carries both `site_libs/bootstrap` and
+`site_libs/revealjs/dist/reveal.js` (107,670 bytes, checked 2026-09-15), so
+nothing was pruned there.
+Why rme escapes it is not established --- candidate differences include the
+explicit `--output-dir` and `--profile` flags the measurement used and rme's CI
+does not, and the Quarto version.
+
+So treat a per-format split as **suspect rather than broken**: check the rendered
+output of the specific site rather than inferring from the command sequence, in
+either direction.
+
+- **Don't:** assume a site is affected because it splits per format --- rme does
+  and is not.
+- **Don't:** assume one is safe because rme is --- the measurement above is real
+  and was taken twice.

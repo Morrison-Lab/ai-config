@@ -163,9 +163,16 @@ workflow's own `deploy` job holding the same group:
 - `conclusion` is **`failure`**, not `cancelled`.
 - `created_at`, `started_at` and `completed_at` are all the same second.
 - The job object carries **zero steps**.
-- The logs endpoint returns **HTTP 404** --- there is nothing to read at all.
-- The job object carries **no `runner_id` or `runner_name` field**, where a
-  sibling job that actually ran carries both.
+- **The log is unretrievable**, which is worth stating carefully because
+  the layers disagree: `GET /actions/jobs/<id>/logs` answers **302** with a
+  blob URL, and fetching that URL answers **404**.
+  So a client that follows redirects reports 404 while a client that does not
+  reports a redirect to something real.
+  Neither yields any log text.
+  Do not read the 302 as evidence a log exists.
+- The job object's **`runner_id` and `runner_name` are `null`** --- present as
+  keys, not absent --- where a sibling job that actually ran carries real
+  values for both.
 
 That last one is the cleanest discriminator, because it is a positive fact
 rather than an absence you have to interpret: no runner was ever assigned, so
@@ -196,11 +203,20 @@ stops publishing"
 Read the stub for the workflow you are calling before writing the caller, not
 only this file.
 
-**Two confirmed instances across two different reusable workflows make this a
-property of gha callers**, rather than of `claude-code-review.yml` --- so the
-Do bullets above apply to every gha call, and the safe group name is one
-derived from the caller's own workflow (`quarto-publish-${{ github.ref }}`)
-rather than from what the work is about.
+**The reason this generalizes is the mechanism, not the instance count.**
+Deadlock detection between a caller and a nested job is a GitHub Actions
+platform behaviour rather than anything either workflow implements, so any
+caller whose group name matches a nested job's will deadlock --- which is a
+stronger argument than the three occurrences now on record
+(`claude-code-review.yml`, this one, and the prior independent report in
+gha#809) could carry on their own.
+Count the instances as corroboration of a mechanism, not as the basis for the
+rule.
+
+So the safe group name is one derived from the caller's own workflow
+(`quarto-publish-${{ github.ref }}`) rather than from what the work is about
+--- a name chosen that way cannot collide with any nested job, whatever that
+job happens to be called, so it does not depend on having read the callee.
 
 - **Do:** read a zero-step, zero-log, instant job failure as a job that never
   started, and check for a concurrency collision first.

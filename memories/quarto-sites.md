@@ -460,12 +460,21 @@ Measured 2026-09-15 converting `Morrison-Lab/machine_learning_lecture_materials`
   Pre-render them to SVG instead (`pdflatex` with the `standalone` class, then
   `pdftocairo -svg`), which also frees the website build from needing a LaTeX
   toolchain at all.
-- **A `{\color{red}...}` group inside a `tabular` cell is dropped, while the
-  same construct in prose survives.**
-  This erased four "this measurement is suspect" caveats from a results table,
-  so four numbers the author had flagged as unreliable were published with
-  none.
-  Rewrite to `\textcolor{red}{...}` before the pandoc pass.
+- **A `{\color{c}X}` group loses its colour everywhere, and loses its *text*
+  when a `\quad`, `\qquad`, or `\hfill` precedes it.**
+  Measured on pandoc 3.1.3, and both halves matter separately.
+  The colour goes in prose and in a `tabular` cell alike --- pandoc emits a
+  bare `<span>` with no `style` --- whereas `\textcolor{c}{X}` keeps it in
+  both, so the distinction is the **macro**, never the surrounding context.
+  On top of that, a `\quad`, `\qquad`, or `\hfill` immediately before the group
+  makes the group's text vanish outright;
+  `\hspace{...}`, `\;` and `\,` do not, and plain text after a `\quad` survives.
+  So the erasure needs the switch **and** one of those three spacing commands.
+  In this conversion all four `{\color{red}Suspect: ...}` caveats in a results
+  table followed a `\quad`, so all four vanished and four numbers the author had
+  flagged as unreliable were published with nothing marking them.
+  Rewrite to `\textcolor{c}{X}` before the pandoc pass, which fixes both halves
+  at once.
 - **The row before the second `\hline` is read as a header.**
   A table that rules *every* row has no header at all, so its first data row
   is promoted to a column heading.

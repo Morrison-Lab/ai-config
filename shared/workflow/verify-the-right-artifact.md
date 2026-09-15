@@ -76,6 +76,16 @@ Recognizable in advance, which is the point of enumerating them:
   A directory that happens to contain the files you expected
   is not thereby the path they are read from.
   It can coincide today and diverge tomorrow.
+- **A different endpoint for the same-sounding metric.**
+  Two APIs can describe overlapping but distinct populations under names
+  that read as synonyms --- GitHub's `pages/builds` and its
+  `deployments?environment=github-pages` each answer "how many times has
+  this site deployed," and do not count the same events.
+  Re-measuring a prior claim through the *other* endpoint and getting a
+  different number is evidence the two endpoints disagree, not evidence the
+  original figure decayed.
+  Use the endpoint the original measurement named; when checking someone
+  else's number, use theirs before concluding drift.
 
 **A document that delegates carries claims about its delegate, and those are
 the ones nobody checks.**
@@ -755,7 +765,8 @@ the code.)
 that capability through a different one.**
 
 The shapes above substitute a cached copy for an origin, a checkout for a run,
-half a mechanism for the whole, a neighbour for the target.
+half a mechanism for the whole, a neighbour for the target, a different
+endpoint for the same-sounding metric.
 This is another: the documentation is correct, your reading of it is correct,
 every quotation checks out --- and it describes the feature as reached through
 a surface your code does not use.

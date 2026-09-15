@@ -1211,3 +1211,78 @@ Filed the checker-side fix as
 --- rename/copy-detection in the diff, or a base-tree existence check before
 flagging a line as added --- but until that lands, the workaround above is
 the only path to a green check on a split.)
+
+## `check-new-line-breaks` has no local teeth in a repo that only consumes the reusable workflow
+
+A repo can enforce semantic line breaks in CI (`uses: Morrison-Lab/gha/check-new-line-breaks@vN`) while having **no local copy** of the checker script at all --- the composite action fetches its own copy from `Morrison-Lab/gha` at run time, and nothing requires the consumer to vendor one.
+`Morrison-Lab/qbt` is exactly this shape: its workflow runs `check / check-new-line-breaks` on every PR, but `scripts/` in the repo has no `check-new-line-breaks.py` or `vendor/gha-check-new-line-breaks.py`.
+
+`ai-config`'s own local tooling for this rule --- both `hooks/warn-new-line-breaks-on-push.py` (warns before `git push`) and its composition-time sibling `hooks/warn-new-line-breaks-on-edit.py` (warns before a `Write`/`Edit` lands the violating line) --- resolves the checker by looking for that same local vendor copy inside the TARGET repo.
+Neither fires in a repo like `qbt`, so a session working there gets zero local warning at any point: not while composing the prose, not before pushing it.
+The only signal is the CI run itself, which is exactly what happened: a PR against `.github/rulesets/README.md` caught 6 added lines packing more than one sentence, and the very commit written to fix that failure introduced fresh violations of the same rule while narrating the fix (measured 2026-09-14/15, `Morrison-Lab/qbt` PR `ci: serialize gh-pages writes by adopting gha's two-tier preview split`).
+
+- **Do:** before composing prose in a repo you have not checked, grep its `scripts/` for a vendored NLB checker (or run `gh api repos/<owner>/<repo>/contents/scripts/vendor` / just look).
+  If there is none and the repo's workflows reference `Morrison-Lab/gha/check-new-line-breaks`, assume no local hook will catch a violation and read each added line for "does this pack more than one sentence" before it leaves your hands.
+- **Do:** when no vendored copy exists, fetch the pinned script directly and run it locally (same remedy the file-split section above already gives) rather than relying on either `ai-config` hook to fire.
+- **Don't:** assume `ai-config`'s push-time or edit-time NLB hooks protect every repo that enforces the rule in CI --- they protect only repos that vendor the checker script locally, which is a strict subset.
+- **Don't:** read a composition-time or push-time silence from those hooks as "this repo does not enforce semantic line breaks" --- silence there is also the signature of a repo that enforces the rule purely through the reusable workflow, with no local copy to check against.
+
+Extending the hooks' checker resolution to fall back to `ai-config`'s own bundled `scripts/vendor/gha-check-new-line-breaks.py` for a target repo with no vendored copy of its own would close this gap for every `gha` consumer at once;
+tracked as a follow-up rather than folded into either hook, to keep each hook's behavior identical to its sibling's.
+
+## `concurrency:` accepts a `queue` key that actionlint (as of v1.7.12) does not know
+
+GitHub's own workflow-syntax reference documents a `queue` key inside a `concurrency:` block, alongside the already-familiar `group` and `cancel-in-progress`.
+Two values: `single` (the default --- at most one run waits) and `max` (up to 100 runs may queue instead of the newest cancelling the one waiting).
+`queue: max` is mutually exclusive with `cancel-in-progress: true`;
+setting both is a GitHub-side validation error at job submission, not merely a lint warning.
+
+`actionlint` v1.7.12 (current release as of 2026-09-14) does not know this key at all, and reports it as a hard `syntax-check` error: `unexpected key "queue" for "concurrency" section`.
+Tracked upstream as [rhysd/actionlint#657](https://github.com/rhysd/actionlint/issues/657), open as of that date.
+A workflow using `queue: max` is therefore VALID GitHub Actions YAML that a current `actionlint` run (local, pre-commit, or CI) will flag as broken.
+
+The false positive is suppressible per-path via `.github/actionlint.yaml`:
+
+```yaml
+paths:
+  .github/workflows/some-workflow.yml:
+    ignore:
+      - 'unexpected key "queue" for "concurrency" section'
+```
+
+- **Do:** when a workflow genuinely needs `queue: max` (a caller that should queue several runs rather than cancelling all-but-the-latest), add the per-path `ignore:` entry rather than dropping the key or disabling `actionlint` more broadly.
+- **Do:** check whether `actionlint` has shipped a release past v1.7.12 that closes rhysd/actionlint#657 before assuming the suppression is still needed --- this is a volatile, time-stamped claim (see [`timestamp-volatile-claims.md`](../shared/writing/timestamp-volatile-claims.md)).
+- **Don't:** claim `queue: max`/`cancel-in-progress: true` can be combined --- GitHub rejects that combination outright.
+
+See the next section for how a test of the `.github/actionlint.yaml` suppression can itself mislead if run outside a git repository.
+
+## Verify an experiment's preconditions before reporting a capability absent
+
+Testing whether `.github/actionlint.yaml`'s `paths:`/`ignore:` suppression (previous section) actually works, in a throwaway scratch directory, and watching `actionlint` still report the `queue` key error, is not evidence the suppression "cannot be suppressed."
+`actionlint` discovers `.github/actionlint.yaml` by walking up from the target file to the git project root it detects --- a scratch directory that is not itself a git repository has no project root for actionlint to find, so the config file sitting right next to the workflow is never loaded, and the run proceeds with zero config.
+Re-run inside an actual git repository (even a bare `git init` in the same scratch directory is enough) and the suppression takes effect.
+
+The general shape: an experiment's negative result is evidence about **that experiment**, not automatically about the capability under test, whenever the tool being tested has its own notion of "the right place to look" that a scratch environment does not satisfy by default (a project root, a config search path, a working directory convention).
+A failed test feels conclusive in exactly the way a passing one does --- nothing about the failure mode announces "your environment was wrong" --- so the instinct to trust a negative result needs the same scrutiny as trusting a positive one.
+
+- **Do:** before reporting a tool incapable of something, check what environment/location assumptions it makes (read its docs, or strace/trace its file lookups) and confirm the test environment satisfies them.
+- **Do:** when a scratch-directory test of a git-aware tool fails unexpectedly, try the same test inside a real (or minimally initialized) git repository before concluding the tool lacks the capability.
+- **Don't:** generalize a single negative result straight to "X cannot be done" without first asking what the test's own environment was missing.
+- **Don't:** treat a scratch `/tmp` directory as a neutral stand-in for a project checkout --- many tools (actionlint, git itself, pre-commit, linters with project-root-relative config) behave differently, or not at all, outside one.
+
+## GitHub counts a SKIPPED required check as SATISFIED, with consequences for splitting a job
+
+A required status check (branch protection, or a repository/org ruleset) that completes with conclusion `skipped` counts as SATISFIED for merge purposes, exactly like `success` --- GitHub does not distinguish "this check ran and passed" from "this check was skipped" when deciding whether a required context is met.
+This is a documented GitHub behavior, not an `ai-config`/`gha` convention, and it has two concrete consequences worth keeping straight:
+
+1. **Splitting a job that emits a required check's context retires that context.**
+   A required check is matched by NAME against an emitted check-run --- `no-underived-required-check.py`'s own subject.
+   If a job named `lint` is split into `lint-markdown` + `lint-yaml` and the ruleset still requires the context `lint`, that context is never emitted again by anything, and it sits as `Expected` forever, blocking every future merge silently (the same failure mode `no-underived-required-check.py` guards against from the other direction --- a context nothing ever emitted).
+2. **An aggregator job that replaces a split context must treat every non-success outcome as a fail, not just `failure`.**
+   If a ruleset is updated to require a new aggregator job (e.g. `all-checks-passed`) that `needs:` the split jobs, that aggregator must explicitly check each dependency's result and fail on anything other than `success` --- `skipped` and `cancelled` included --- because GitHub's own required-check satisfaction logic does NOT do this filtering for you once the aggregator itself reports `skipped` or `success`.
+   Concretely: `if: always()` on the aggregator job (so it is never itself skipped, which would then count as satisfying the NEW required context too), followed by a step that inspects `needs.<job>.result` for each dependency and fails the aggregator if any of them is not `success`.
+
+- **Do:** before renaming or splitting a job that a ruleset/branch protection requires by name, update the required-context list in the same change, and verify the new context is actually emitted (a real PR's check-run list, not just the workflow YAML).
+- **Do:** write an aggregator job with `if: always()` and an explicit per-dependency result check, never a bare `needs:` with no result inspection.
+- **Don't:** assume `skipped` is safely distinct from `success` for a required check --- GitHub treats them the same for merge-gating purposes.
+- **Don't:** let a job rename/split ship without a same-change audit of every ruleset/branch-protection rule that names the old job.

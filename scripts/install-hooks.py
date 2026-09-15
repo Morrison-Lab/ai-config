@@ -232,57 +232,71 @@ def check_interpreters(rows: list[dict]) -> int:
     interpreter spelling rather than per hook: the answer is a property of the
     interpreter, and a hundred identical subprocesses would only be slower.
 
-    A row this check cannot probe is REPORTED, never dropped. That is the
-    whole point of the bucket: a plugin-root command carries `${CLAUDE_PLUGIN_
-    ROOT}`, which only the plugin loader expands, so its path is `skipped`
-    above and there is no resolvable target to probe the interpreter against
-    -- and that is precisely the registration shape #3624 was observed in.
-    Silently skipping it would end this check on an all-clear for the one case
-    it was written for.
+    **Every row lands in exactly one bucket, and every bucket is printed.** The
+    accounting is the feature rather than the bookkeeping: an unreported row
+    is one this check could not speak about while the closing line says
+    everything is fine, which is the failure #3624 is a case of. Each
+    unprobeable row carries *its own* reason -- a plugin-root path, a command
+    naming no script, an interpreter `-c` cannot ask anything of -- because
+    asserting one cause for all of them is the same error in miniature.
 
     Returns the number of interpreters observed **blind** -- and only those.
     `blind` is something this function watched happen: the interpreter ran,
-    and reported a file that is right there as absent. Every other non-ok
-    verdict means the probe reached no answer at all, and an absent answer is
-    not a finding: `unlaunchable` in particular says only that the name did
-    not resolve *here*, while the harness spawns hooks through its own shell
-    -- which is exactly the mismatch #3624 is about, so reading it backwards
-    and failing the install would be the same error pointed the other way.
+    and reported a file that is right there as absent. Every other verdict
+    means the probe reached no answer at all, and an absent answer is not a
+    finding: `unlaunchable` in particular says only that the name did not
+    resolve *here*, while the harness spawns hooks through its own shell --
+    which is exactly the mismatch #3624 is about, so reading it backwards and
+    failing the install would be the same error pointed the other way.
     """
-    # A probe target must be a path that already resolved, and it need not
-    # come from the row being explained: the question is what this interpreter
-    # can see, not what it can see of one particular hook.
+    # A probe target must be a path that already resolved, and it need not come
+    # from the row being explained: the question is what this interpreter can
+    # see, not what it can see of one particular hook.
     representative: dict[str, str] = {}
-    unprobeable: dict[str, str] = {}
+    unprobeable: dict[str, tuple[str, str]] = {}
+    direct = 0
+    already_failing = 0
     for row in rows:
         interp = hp.interpreter_token(row["command"])
         if not interp:
+            # A `.sh` hook is registered as a bare quoted path and runs itself,
+            # so there is no interpreter to ask. Counted, not dropped.
+            direct += 1
             continue
         if row["status"] == "ok":
             representative.setdefault(interp, row["path"])
         elif row["status"] == "skipped":
-            unprobeable.setdefault(interp, row["command"])
+            reason = ("its script path expands only in the plugin loader, so "
+                      "there is no path here to probe it against"
+                      if row["path"] else
+                      "this command names no script, so there is no path to "
+                      "probe it against")
+            unprobeable.setdefault(interp, (row["command"], reason))
+        else:
+            # `missing` is already a finding, reported above with its own
+            # remedy. Counted here so the accounting stays whole.
+            already_failing += 1
 
     verdicts = {i: hp.probe_interpreter(i, p)
                 for i, p in representative.items()}
-    # Counts only the interpreters that actually answered. `unlaunchable`,
-    # `timeout` and `unknown` produced no observation, and counting them would
-    # defeat the reason this line exists -- a check that examined nothing and a
-    # check that found nothing print the same absence otherwise.
+    # Counts only interpreters that actually answered. `unlaunchable`,
+    # `timeout`, `unknown` and `skipped` produced no observation, and counting
+    # them would defeat the reason this line exists -- a check that examined
+    # nothing and a check that found nothing print the same absence otherwise.
     answered = sum(1 for v in verdicts.values() if v in ("ok", "blind"))
+    blind = sorted(i for i, v in verdicts.items() if v == "blind")
     unanswered = {i: v for i, v in verdicts.items()
                   if v in ("unlaunchable", "timeout", "unknown")}
-    still_unprobed = {i: c for i, c in unprobeable.items()
+    not_python = sorted(i for i, v in verdicts.items() if v == "skipped")
+    still_unprobed = {i: r for i, r in unprobeable.items()
                       if i not in representative}
 
     print(f"  probed {answered} interpreter(s) against a hook path they are "
           "registered with")
-    if answered and not any(v == "blind" for v in verdicts.values()):
+    if answered and not blind:
         print("  every one of them could read it")
 
-    for interp, verdict in sorted(verdicts.items()):
-        if verdict != "blind":
-            continue
+    for interp in blind:
         print()
         print(f"  BLIND    {interp}")
         print(f"           ran, and reported {representative[interp]} absent")
@@ -301,18 +315,20 @@ def check_interpreters(rows: list[dict]) -> int:
         print(f"  {label:<8} {interp}")
         print(f"           {detail}")
 
-    for interp, command in sorted(still_unprobed.items()):
+    for interp in not_python:
+        print()
+        print(f"  NOT PY   {interp}")
+        print("           not a Python interpreter, so `-c` cannot ask it "
+              "whether")
+        print("           it can read a file; probe it by hand if its hooks "
+              "are Python")
+
+    for interp, (command, reason) in sorted(still_unprobed.items()):
         print()
         print(f"  UNPROBED {interp}")
         print(f"           {command}")
-        print("           no resolvable path to probe it against: this "
-              "command's")
-        print("           script path expands only in the plugin loader, so "
-              "the")
-        print("           interpreter check #3624 is about could not be run "
-              "here.")
+        print(f"           {reason}")
 
-    blind = [i for i, v in verdicts.items() if v == "blind"]
     if blind:
         print()
         print("An interpreter that cannot read its own hook scripts is the")
@@ -321,10 +337,18 @@ def check_interpreters(rows: list[dict]) -> int:
         print("`python3` App Execution Alias -- turn it off under Settings >")
         print("Apps > Advanced app settings > App execution aliases, or put a")
         print("real Python ahead of WindowsApps on PATH. See ai-config#3624.")
-    elif unanswered or still_unprobed:
+    elif unanswered or not_python or still_unprobed:
         print()
         print("Not findings: the rows above reached no verdict, so they are")
         print("neither evidence of a working interpreter nor of a broken one.")
+
+    # The whole-population line. Without it, a row silently missing from every
+    # bucket above is invisible, and silence is what this check exists to stop.
+    accounted = (answered + len(unanswered) + len(not_python)
+                 + len(still_unprobed) + direct + already_failing)
+    print(f"  accounted for {accounted} of {len(rows)} registered command(s) "
+          f"({direct} run a script directly, {already_failing} already "
+          "reported above)")
     return len(blind)
 
 

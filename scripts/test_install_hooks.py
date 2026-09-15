@@ -274,6 +274,32 @@ with tempfile.TemporaryDirectory() as tmp:
     check("--check does not claim to have probed it",
           "probed 0 interpreter(s)" in result.stdout)
 
+    # `py` is the standard Windows launcher -- the platform this whole change
+    # exists for -- and its name is not Python-shaped, so `-c` cannot ask it
+    # anything. It must still be NAMED: a row that leaves this check
+    # unmentioned while the closing line says everything resolves is the
+    # failure #3624 is a case of.
+    write_settings(home, settings_with(f'py -3 "{present}"'))
+    result = run_check(home)
+    check("--check names a non-Python interpreter rather than dropping it",
+          "NOT PY" in result.stdout and "py" in result.stdout)
+    check("--check does not count a non-Python interpreter as probed",
+          "probed 0 interpreter(s)" in result.stdout)
+
+    # Each unprobeable row carries ITS OWN reason. `skipped` has two causes,
+    # and asserting the plugin-loader one for a command that simply names no
+    # script is the same "claim a cause nobody observed" error in miniature.
+    write_settings(home, settings_with("python3 -c 'import sys'"))
+    result = run_check(home)
+    check("--check gives a scriptless command its own reason",
+          "names no script" in result.stdout)
+    check("--check does not blame the plugin loader for a scriptless command",
+          "expands only in the plugin loader" not in result.stdout)
+
+    # The whole-population line: a row in no bucket is invisible otherwise.
+    check("--check accounts for every registered command",
+          "accounted for 1 of 1 registered command(s)" in result.stdout)
+
 with tempfile.TemporaryDirectory() as tmp:
     present = Path(tmp) / "hook.py"
     present.write_text("")

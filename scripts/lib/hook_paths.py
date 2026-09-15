@@ -125,7 +125,12 @@ _PROBE = "import os, sys; sys.exit(0 if os.path.exists(sys.argv[1]) else 1)"
 
 
 def probe_interpreter(interpreter: str, script: str, timeout: float = 15) -> str:
-    """Can `interpreter` actually read `script`? One of ok/blind/unlaunchable/unknown.
+    """Can `interpreter` actually read `script`? One of six verdicts.
+
+    ok, blind, unlaunchable, timeout, unknown, skipped -- and a caller that
+    branches on them must handle all six. The list is spelled out here rather
+    than summarised because an under-stated one is how `skipped` came to be
+    dropped silently by the first version of this function's own caller.
 
     `classify_command` above answers "does this path exist", asked by this
     process. That is a different question from "can the interpreter the hook
@@ -141,14 +146,14 @@ def probe_interpreter(interpreter: str, script: str, timeout: float = 15) -> str
     probed: `-c` is a Python flag, and handing it to `sh` or `node` would test
     the prober rather than the hook.
 
-    Five verdicts, and only two of them are observations. `ok` and `blind` mean
-    the interpreter ran and answered; `blind` is the finding this exists for --
-    it reported a file that is right there as absent. `unlaunchable`,
-    `timeout` and `unknown` each mean the probe reached no answer, and they are
-    kept apart rather than folded together because each licenses a different
-    next step. None of them is evidence of the Store-alias condition: claiming
-    a cause nobody observed is what sent #3624 looking at the plugin cache for
-    hours.
+    Only two of the six are observations. `ok` and `blind` mean the
+    interpreter ran and answered; `blind` is the finding this exists for --
+    it reported a file that is right there as absent. `skipped`,
+    `unlaunchable`, `timeout` and `unknown` each mean the probe reached no
+    answer, and they are kept apart rather than folded together because each
+    licenses a different next step. None of the four is evidence of the
+    Store-alias condition: claiming a cause nobody observed is what sent #3624
+    looking at the plugin cache for hours.
     """
     if not Path(interpreter).name.lower().startswith("python"):
         return "skipped"

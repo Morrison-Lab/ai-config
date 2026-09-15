@@ -22,7 +22,7 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh '\"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-python3-cannot-read-hooks.sh\"'",
             "timeout": 20,
             "script": "warn-python3-cannot-read-hooks.sh",
-            "why": "ai-config#3624 -- names the interpreter when `python3` cannot read the plugin root. A PreToolUse hook that fails to launch DENIES the call, so that condition blocks Bash, Edit, Write and Agent at once while every denial names a hook rather than the interpreter. Shell rather than Python because in the failure it reports, no Python hook can run."
+            "why": "ai-config#3624 -- names the interpreter when `python3` cannot read the plugin root. A PreToolUse hook that fails to launch DENIES the call, so that condition blocks Bash, Edit, Write and Agent at once while every denial names a hook rather than the interpreter. Shell rather than Python because in the failure this hook reports, no Python hook can run."
           },
           {
             "type": "command",

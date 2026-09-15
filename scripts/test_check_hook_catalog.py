@@ -654,7 +654,32 @@ with tempfile.TemporaryDirectory() as td:
         # all, which is a finding rather than a silent pass.
         (fails, examined), out = modes({"untracked.sh": ("Stop", "")})
         check("a registered .sh hook missing from the index fails",
-              fails == 1 and "not tracked in git" in out)
+              fails == 1 and "no stage-0 entry in the index" in out)
+
+        # A conflicted merge emits one row per stage for the SAME path.
+        # Counting those separately drove the shortfall arithmetic negative,
+        # and `failures += missing` then subtracted from the run's total --
+        # cancelling real findings from the other checks. A negative count is
+        # therefore not a cosmetic defect, and the assertion pins the sign.
+        conflicted = root / "conflict.txt"
+        conflicted.write_text(
+            "100755 " + ("a" * 40) + " 1\thooks/x.sh" + chr(0)
+            + "100755 " + ("b" * 40) + " 2\thooks/x.sh" + chr(0)
+            + "100755 " + ("c" * 40) + " 3\thooks/x.sh" + chr(0),
+            encoding="utf-8", newline="")
+
+        class _Staged:
+            returncode = 0
+            stderr = ""
+            stdout = conflicted.read_text(encoding="utf-8")
+
+        with patch.object(_catalog.subprocess, "run",
+                          lambda *a, **k: _Staged()):
+            (fails, examined), out = modes({"x.sh": ("Stop", "")})
+        check("an unmerged path never yields a negative failure count",
+              fails >= 0 and examined >= 0)
+        check("an unmerged path with no stage 0 is reported once, not thrice",
+              fails == 1 and out.count("FAIL:") == 1)
 
 # Outside a git repository the modes are unreadable, which says nothing about
 # them -- so it skips rather than failing the whole catalog check.

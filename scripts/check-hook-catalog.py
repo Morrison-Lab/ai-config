@@ -631,9 +631,13 @@ def check_executable_bits(reg):
     shell_hooks = sorted(s for s in reg if s.endswith(".sh"))
     if not shell_hooks:
         return 0, 0
+    want = {f"hooks/{s}" for s in shell_hooks}
     try:
+        # `-z` because `core.quotepath` otherwise C-quotes a non-ASCII path,
+        # which would make the name we compare against the requested set a
+        # different string from the one on disk.
         out = subprocess.run(
-            ["git", "ls-files", "-s", "--"] + [f"hooks/{s}" for s in shell_hooks],
+            ["git", "ls-files", "-s", "-z", "--"] + sorted(want),
             cwd=ROOT, capture_output=True, text=True, timeout=30)
     except (OSError, subprocess.SubprocessError) as exc:
         # Not a finding: an unavailable git says nothing about the modes.
@@ -644,25 +648,39 @@ def check_executable_bits(reg):
         return 0, 0
 
     failures = 0
-    examined = 0
-    for line in out.stdout.splitlines():
-        if not line.strip():
+    seen = set()
+    for record in out.stdout.split("\0"):
+        if not record.strip():
             continue
-        mode, _, rest = line.partition(" ")
-        path = rest.split("\t", 1)[-1]
-        examined += 1
+        meta, _, path = record.partition("\t")
+        fields = meta.split()
+        if len(fields) != 3:
+            continue
+        mode, _sha, stage = fields
+        # During a conflicted merge git emits one row per stage (1, 2, 3) for
+        # the same path. Counting those as separate files made the shortfall
+        # arithmetic below go NEGATIVE, and `failures += missing` then
+        # SUBTRACTED from the run's total -- cancelling real findings from the
+        # other checks and letting the gate exit 0 over them. Stage 0 is the
+        # ordinary merged entry, and it is the only one that describes what
+        # other machines receive.
+        if stage != "0":
+            continue
+        seen.add(path)
         if mode != "100755":
             print(f"FAIL: {path} is registered as a directly-executed path "
                   f"but is mode {mode} in the index; the harness cannot exec "
                   "it on macOS or Linux. Run: git update-index --chmod=+x "
                   f"{path}")
             failures += 1
-    missing = len(shell_hooks) - examined
-    if missing:
-        print(f"FAIL: {missing} registered .sh hook(s) are not tracked in git, "
-              "so their mode cannot be recorded")
-        failures += missing
-    return failures, examined
+    # A set difference rather than a subtraction, so this cannot go negative
+    # however many rows git returned.
+    for path in sorted(want - seen):
+        print(f"FAIL: {path} is a registered .sh hook with no stage-0 entry in "
+              "the index, so its mode cannot be recorded; add it, or resolve "
+              "the conflict on it")
+        failures += 1
+    return failures, len(seen)
 
 
 def main() -> int:

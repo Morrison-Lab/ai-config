@@ -346,6 +346,42 @@ A scan-forward-per-match helper --- one that, for each match found, walks forwar
 - **Don't:** treat this as closed after one helper's fix --- three separate helpers in the same file have hit it by three different routes.
   A new scan-forward-per-match helper anywhere in `hooks/` is a candidate until measured against unbalanced input.
 
+## 5.7 A test invoking a `.sh` hook as `sh <path>` can never see a missing exec bit
+
+Every hook suite in this repo runs a shell-script subject by handing its path
+to `sh` (or an equivalent explicit interpreter), which is hermetic and
+correct for testing what the hook *emits*.
+But a `.sh` hook is registered in `hooks.json` as a bare quoted path, so the
+real harness execs it directly rather than passing it to a shell --- and on
+that path, mode `100644` fails with `EACCES` instead of running.
+A suite that always supplies the interpreter the real invocation does not
+can never observe this: the catalog row is present, the binding is correct,
+and the suite is green while the hook is permanently dead in production.
+
+The general form: when a test harness supplies something the real
+invocation does not (here, the interpreter; elsewhere, an argument, an
+environment variable, a working directory), the suite is blind to the
+*absence* of that thing by construction, no matter how thorough its
+case list is.
+
+- **Do:** for any `.sh` hook, check its exec bit as recorded in the git
+  index (`git ls-files -s hooks/<name>.sh`, expect `100755`) as a check
+  independent of the test suite, since the suite's own invocation style
+  cannot exercise this.
+- **Do:** ask, for any test harness, exactly what it supplies on the subject's
+  behalf that the real invocation path does not.
+- **Don't:** read a green hook-test suite as evidence a `.sh` hook is
+  correctly installed --- it proves the script's logic, not its mode bit.
+
+(Proposed on Morrison-Lab/ai-config#3647, closes #3624, not yet merged at
+this writing: a `.sh` hook shipped at mode `100644` in its first commit,
+undetected by the suite for exactly this reason, and caught only by
+adversarial review rather than by anything in the repo. The mechanism now
+exists as `check_executable_bits` in `scripts/check-hook-catalog.py`; see
+`memories/git.md`'s `git ls-files -s` stage-semantics entry and
+`shared/principles/fail-fast.md`'s aggregate-count entry for how that check
+itself needed two more rounds to land soundly.)
+
 ## 6. A guard that keeps firing after you satisfied it: stop, and read the copy that runs
 
 [`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md) already carries this defect in full --- the fail-open direction of a dated constant, why the newest cache directory is not a valid proxy for the loaded copy, and the `ps -eo args` capture that resolved it.

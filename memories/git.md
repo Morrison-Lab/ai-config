@@ -405,6 +405,36 @@ its committed mode explicitly (`git ls-tree HEAD -- <path>`, compare against
 an existing sibling script) rather than trusting the code review alone to
 catch it.
 
+## `git ls-files -s` emits one row per STAGE during a conflict, not one row per path
+
+`git ls-files -s <paths>` normally emits one row per path (stage `0`, the
+ordinary merged entry).
+During an unmerged (conflicted) state, a single conflicted path instead
+emits up to three rows -- stages `1` (common ancestor), `2` (ours), and `3`
+(theirs) -- and no stage-0 row at all.
+A script that parses this output as one line per requested path is wrong
+the moment the repo is mid-conflict: the row count for a set of N paths can
+read anywhere from 0 to 3N, not N.
+
+- **Do:** filter on the stage field and keep only stage `0` when the goal is
+  "what would other machines receive", since that is the only stage
+  describing the merged content.
+- **Do:** pass `-z` (`git ls-files -s -z -- <paths>`, NUL-separated records)
+  when a path might contain non-ASCII characters -- `core.quotepath`
+  otherwise C-quotes such a path into a different string than the one on
+  disk, so a plain string comparison against the requested path silently
+  fails.
+- **Don't:** assume `git ls-files -s` returns exactly one row per path you
+  asked for; the row count is a function of repository *state*
+  (conflicted vs. clean), not only of how many paths you named.
+
+(Proposed on Morrison-Lab/ai-config#3647, closes #3624, not yet merged at
+this writing: `check_executable_bits` in `scripts/check-hook-catalog.py`
+read `git ls-files -s` output as one row per path, and a conflicted index
+produced three rows for one path -- see the aggregate-count entry this same
+PR taught, in `shared/principles/fail-fast.md`'s "An aggregate failure count
+must never go NEGATIVE".)
+
 ## Windows Git Bash: MSYS path conversion mangles a colon-refspec that contains a slash
 
 Git Bash's MSYS layer auto-converts POSIX-looking arguments into Windows paths,

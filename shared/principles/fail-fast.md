@@ -1048,6 +1048,36 @@ reminder guard is the cheap direction.
   condition; it governs discharging on weak evidence, not triggering on
   strong.
 
+## An aggregate failure count must never go NEGATIVE
+
+A check that folds its own shortfall into a script's running total by
+subtraction --- `failures += len(wanted) - examined` --- assumes `examined`
+never exceeds `len(wanted)`.
+When it can, the subtraction goes negative, and the addition then
+**subtracts** from the total: it cancels genuine findings from unrelated
+checks in the same script and lets the whole gate exit 0 over them.
+A guard that can silently suppress other guards is worse than no guard,
+because the other guards read as having run and passed.
+
+- **Do:** derive a shortfall as a set difference (`len(wanted - seen)`),
+  which cannot go negative however many rows the underlying query returns.
+- **Do:** treat any `failures += <count>`-shaped line feeding a shared total
+  as a candidate for this class whenever the count is not already bounded
+  to be non-negative by construction.
+- **Don't:** derive a shortfall by subtracting two counts collected from
+  different code paths and add the (possibly negative) result to a total
+  shared with other checks.
+- **Don't:** assume a query answering "how many rows describe this set of
+  paths" returns one row per path; a query whose row count depends on
+  repository *state* --- an index read mid-conflict, a paginated API, a scan
+  that revisits an item --- can return more rows than paths requested.
+
+(Proposed on Morrison-Lab/ai-config#3647, closes #3624, not yet merged at
+this writing: `check_executable_bits` in `scripts/check-hook-catalog.py`
+derived its shortfall this way, and a conflicted-merge index pushed the row
+count above the requested set, found in the PR's second adversarial review
+round.)
+
 ## An empty substitution changes what the command operates on
 
 Every case in "In a check you run by hand" above is a check whose failure

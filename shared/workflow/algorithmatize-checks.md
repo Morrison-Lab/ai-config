@@ -2322,3 +2322,35 @@ The orchestrator removed it as unsound, since a command carrying a flag has thre
 The next review round asked for the check again, and the underlying gap was real: a manifest staged by something other than this repo can carry a path with a space, and nothing on the reading side caught it.
 What made the restored version defensible was not a different test but a stated reason, namely that the canonical form in `plugins/ai-config/hooks.json` is an interpreter and a script with no arguments and that all eleven of that manifest's commands have exactly two tokens, so a third means whitespace inside a path.
 The docstring says that, and says it would not survive a manifest whose commands take arguments.)
+
+## A discrepancy detector whose two operands are in different units cannot detect anything
+
+A count-versus-count check --- "N of M accounted for" --- is only as sound
+as the claim that N and M count the same kind of thing.
+An accounting line can sum per-**interpreter** bucket sizes and compare that
+sum against a per-**row** total, and the two look like the same number until
+you ask what each side actually counts.
+
+- **Do:** before trusting a count-vs-count check, write down what each side's
+  unit is and confirm they match, the same way a unit check catches a
+  physics formula adding metres to seconds.
+- **Do:** prefer counting the same population on both sides of a comparison
+  --- rows against rows, files against files --- over counting a summary of
+  one against a raw total of the other.
+- **Don't:** assume a mismatch will surface as an obviously wrong number; a
+  unit mismatch that happens to produce a plausible-looking figure on
+  today's healthy input passes review and ships.
+- **Don't:** trust that a discrepancy check is "wired up" because it prints a
+  fraction --- confirm the fraction can actually move when a real row goes
+  missing, not just that it renders.
+
+(Proposed on Morrison-Lab/ai-config#3647, closes #3624, not yet merged at
+this writing, found by round 3 of its adversarial review: an accounting
+line in `scripts/install-hooks.py` summed per-interpreter bucket sizes
+against a per-row total, so a healthy install reported "accounted for 3 of
+10" on a small fixture, and would have read roughly "3 of 81" on this repo's
+own hook count, because many hooks share one `python3` spelling and collapse
+to one interpreter bucket while the total counted rows. A genuinely dropped
+row would have moved that number by one against a baseline shortfall already
+in the dozens --- invisible in exactly the way the line was added to
+prevent.)

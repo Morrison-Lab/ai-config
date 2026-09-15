@@ -283,7 +283,7 @@ KNOWN_LIMITS = {
     "MAX_LINES counts NON-BLANK lines, so a release sequence of eight "
     "commands padded with blank lines (18 raw lines) is admitted",
     "the corpus holds ONE genuine incident, so it establishes that the "
-    "matcher is quiet on the other 15 in-scope fenced messages and nothing "
+    "matcher is quiet on the other 13 in-scope fenced messages and nothing "
     "about the true false-positive rate. The constructed negatives above are "
     "the real evidence",
 }

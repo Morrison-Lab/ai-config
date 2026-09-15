@@ -380,7 +380,7 @@ never given a chance to print anything.
 under `set -eu` reported every branch deleted, including the ones `git` had
 refused.)
 
-### `PIPESTATUS` is destroyed by the first read that is not a whole-array copy
+### `PIPESTATUS` is destroyed by the first intervening command that is not a whole-array copy
 
 `${PIPESTATUS[0]}` is the remedy the section above names, and it is correct
 only if nothing runs between the pipeline and the read.

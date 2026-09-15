@@ -56,8 +56,8 @@ being absent is that the repository itself is misconfigured.
 
 The two conditions --- "this run legitimately has no secret" and "this run
 should have a secret and doesn't" --- produce the identical observable exit
-code, so nothing at the surfaces a human or a status check reads (a green
-run, a checkmark in the job list, `continue-on-error`'s own summary) tells
+code, so none of the surfaces a human or a status check reads (a green
+run, a checkmark in the job list, `continue-on-error`'s own summary) tell
 them apart.
 A step guarded this way can run green indefinitely while doing nothing, and
 every consumer of its output --- a status badge, a downstream job, a human
@@ -86,7 +86,8 @@ distinguished it from a real upload.)
 
 ## Catch conditions by class, never by message text
 
-The rule above bans swallowing every error.
+The "Don't swallow errors" bullet in `## In code` above bans swallowing
+every error.
 
 [`fail-fast.rationale.md`](fail-fast.rationale.md) carries the argument.
 

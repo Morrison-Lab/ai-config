@@ -974,10 +974,11 @@ findings listed, consistent with this corpus's own practice of running
 review rounds locally and posting only the terminal verdict.
 A fix for one round-1 finding introduced the `PIPESTATUS`-clobbering bug
 recorded in [`errexit-is-not-uniform`](errexit-is-not-uniform.md)'s
-"`PIPESTATUS` is destroyed by the first read that is not a whole-array
-copy" section, and fixes for two round-2 findings introduced an unhandled
-`iconv -c` exit status (that file's "A command's own non-zero exit can be
-the normal, correct outcome" section) and a related `grep`-no-match miss.
+"`PIPESTATUS` is destroyed by the first intervening command that is not a
+whole-array copy" section.
+Fixes for two round-2 findings introduced an unhandled `iconv -c` exit
+status (that file's "A command's own non-zero exit can be the normal,
+correct outcome" section) and a related `grep`-no-match miss.
 Executing the extracted shell against stub scripts caught all three of
 those fix-introduced bugs, in three separate executions, where reading had
 not.

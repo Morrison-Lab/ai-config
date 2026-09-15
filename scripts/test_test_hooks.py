@@ -310,7 +310,13 @@ check('no hooks/test-*.py spawns its hook via a bare "python3"',
 
 runner_src = SCRIPT.read_text(encoding="utf-8")
 declared = re.findall(r"(\d+) cases plus (\d+) rounds", runner_src)
-case_ids = set(re.findall(r'\(\s*"([DWS]\d+)"\s*,', src))
+# The id may carry a LETTER SUFFIX. Requiring it to end in digits made the
+# instrument silently non-discriminating the moment a suffixed family was
+# added: 14 ids of the form `D1973a` / `S1973f` went unmatched, the derived
+# population read 64 for a 78-case suite, and this check passed on the stale
+# number it exists to catch (ai-config#3655; ai-config#3645 pre-merge gate,
+# finding 5).
+case_ids = set(re.findall(r'\(\s*"([DWS]\d+[a-z]*)"\s*,', src))
 clauses = re.findall(r'^    "\w+": \($',
                      src[src.index("MUTATIONS = {"):], re.M)
 check("the timeout comment states the population it was measured on",

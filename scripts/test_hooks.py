@@ -51,7 +51,7 @@ HOOKS = os.path.join(ROOT, "hooks")
 # whenever the suite grows rather than leaving a stale count behind: 32 cases
 # plus 17 mutation rounds finished in 178s on a Linux cloud runner
 # (2026-08-26), 64 cases plus 42 rounds finished in 159s on another one
-# (2026-09-04), and 64 cases plus 45 rounds finished in 160s in a Linux
+# (2026-09-04), and 89 cases plus 54 rounds finished in 228s in a Linux
 # container (2026-09-14). The unit is a test CASE, not a scratch repository:
 # every case
 # builds a working repo AND a bare origin, and several build a clone or a

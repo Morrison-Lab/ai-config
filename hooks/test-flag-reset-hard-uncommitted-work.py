@@ -222,6 +222,103 @@ def nested_cd_then_reset_case(path):
     return 'sh -c "cd /nonexistent-elsewhere && git reset --hard origin/main"'
 
 
+def nested_git_dir_redirect_case(path):
+    """A nested piece that redirects the REPOSITORY without moving the shell.
+
+    `GIT_DIR=/other/.git git reset --hard` runs `cd` nowhere, so a shortcut
+    asking only "does this text contain a `cd`" read it as acting here and
+    listed THIS repository's dirty files as what would be lost -- the
+    cross-repository report `NOTE_NESTED_UNSCOPED` calls worse than silence
+    (ai-config#3645 pre-merge gate, finding 2).
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return ('sh -c "GIT_DIR=/nonexistent-elsewhere/.git '
+            'git reset --hard origin/main"')
+
+
+def nested_eval_cd_case(path):
+    """A nested piece that moves the shell with no `cd` TOKEN in it.
+
+    `eval 'cd /other'` is one quoted token whose basename is `other`, so a
+    token scan for `cd` finds nothing while the shell really moves --
+    measured: `sh -c "eval 'cd /tmp'; pwd"` prints `/tmp`. The sibling of the
+    case above, for the other half of the same wrong premise.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return ('sh -c "eval \'cd /nonexistent-elsewhere\'; '
+            'git reset --hard origin/main"')
+
+
+def nested_work_tree_redirect_case(path):
+    """`GIT_WORK_TREE=` alone, without the `GIT_DIR=` its sibling case uses.
+
+    Each redirect spelling needs its own case: reverting them one at a time
+    left the suite at 42/42 while only `GIT_DIR=` was exercised
+    (ai-config#3645 self-review, finding 4).
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return ('sh -c "GIT_WORK_TREE=/nonexistent-elsewhere '
+            'git reset --hard origin/main"')
+
+
+def nested_common_dir_redirect_case(path):
+    """`GIT_COMMON_DIR=`, the one spelling beyond the sibling guard's pair."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return ('sh -c "GIT_COMMON_DIR=/nonexistent-elsewhere/.git '
+            'git reset --hard origin/main"')
+
+
+def nested_git_dir_option_case(path):
+    """A `--git-dir` OPTION in a sibling command of the same piece.
+
+    Deliberately not `git --git-dir=X reset --hard`, which `offending_here`
+    does not classify as a reset at all -- a pre-existing gap filed as
+    ai-config#3661. The option only ever reaches `_may_change_repository`
+    beside a command that IS classified, so that is the shape pinned here.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return ('sh -c "git reset --hard origin/main; '
+            'git --git-dir=/nonexistent-elsewhere/.git log -1"')
+
+
+def nested_dash_c_option_case(path):
+    """A bare `-C` in a sibling command, for the same reason as above."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return ('sh -c "git reset --hard origin/main; '
+            'git -C /nonexistent-elsewhere log -1"')
+
+
+def nested_source_case(path):
+    """`source` runs another file's `cd`s in this shell, with no `cd` token.
+
+    The `eval` case's sibling, for the other half of `_OPAQUE_WORDS`.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return ('sh -c "source /nonexistent-elsewhere/env.sh; '
+            'git reset --hard origin/main"')
+
+
 def nested_checkout_word_case(path):
     """A nested `git checkout <word>` is not classified against THIS repo.
 
@@ -571,6 +668,22 @@ SHOULD_WARN = [
      "no files"),
     ("W1973b", shell_c_cluster_case,
      "a `-c` inside a short-flag cluster still hands over a command line"),
+    ("W1973d", nested_git_dir_redirect_case,
+     "a nested piece carrying `GIT_DIR=` redirects the repository without "
+     "moving the shell, so it gets the unscoped report"),
+    ("W1973e", nested_eval_cd_case,
+     "a nested `eval 'cd ...'` moves the shell with no `cd` token, so it "
+     "gets the unscoped report"),
+    ("W1973f", nested_work_tree_redirect_case,
+     "`GIT_WORK_TREE=` alone redirects the repository"),
+    ("W1973g", nested_common_dir_redirect_case,
+     "`GIT_COMMON_DIR=` redirects it too"),
+    ("W1973h", nested_git_dir_option_case,
+     "a `--git-dir` option in a sibling command of the piece"),
+    ("W1973i", nested_dash_c_option_case,
+     "a bare `-C` in a sibling command of the piece"),
+    ("W1973j", nested_source_case,
+     "`source` runs another file's `cd`s in this shell, with no `cd` token"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -745,7 +858,10 @@ EXPECTED.update({case_id: "silent" for case_id, *_ in SHOULD_STAY_SILENT})
 # local reading is sound for them -- returning the unscoped note regardless made
 # `sh -c "git reset --hard"` warn over a CLEAN tree, since that path returns
 # before the M4 status gate runs (round 4 finding 7).
-EXPECTED.update({case_id: "WARN-unscoped" for case_id in ("W1973c",)})
+EXPECTED.update({case_id: "WARN-unscoped"
+                 for case_id in ("W1973c", "W1973d", "W1973e",
+                                 "W1973f", "W1973g", "W1973h", "W1973i",
+                                 "W1973j")})
 CASES = {case_id: builder
          for case_id, builder, _ in SHOULD_WARN + SHOULD_STAY_SILENT}
 
@@ -780,7 +896,12 @@ MUTATIONS = {
           "                                  or argv[i] in LEAD_WORDS):\n"
           "            i += 1",
           "        pass")],
-        {"W6"},
+        # The `GIT_*=` cases ride on this clause too: each redirection is
+        # spelled as a leading assignment, so without the skip the `git` never
+        # reaches the head of the argv and the piece matches nothing at all.
+        # The option-spelled and `source` cases do not, since their redirect
+        # sits in a sibling command rather than in the reset's own prefix.
+        {"W6", "W1973d", "W1973f", "W1973g"},
     ),
     "M2_subcommand_gate": (
         "only `checkout`/`restore` route through the pathspec logic, not "
@@ -832,6 +953,54 @@ MUTATIONS = {
         # unscoped report, it returned BEFORE the gate, so the wrapped form
         # could not exercise it (round 4 finding 7).
         {"S1", "S2", "S1973c"},
+    ),
+    "M5_stationary_shortcut": (
+        "a nested piece that cannot reach another repository takes the "
+        "ordinary local reading, rather than the unscoped note",
+        [("        if (not _may_change_repository(command)\n"
+          "                and not _may_change_repository(piece)):\n"
+          "            return match",
+          "        pass")],
+        # S1973b is deliberately absent: its nested `git checkout <word>`
+        # is never classified lexically, so it matches nothing and the
+        # shortcut is not on its path at all.
+        {"W1973a", "W1973b", "S1973c"},
+    ),
+    "M5_repo_redirect_env_counts": (
+        "a `GIT_DIR=`-family assignment redirects the repository without "
+        "moving any directory",
+        [("            if token.startswith(_REPO_REDIRECT_ENV):\n"
+          "                return True",
+          "            pass")],
+        {"W1973d", "W1973f", "W1973g"},
+    ),
+    "M5_repo_redirect_opts_count": (
+        "a `--git-dir` / `--work-tree` option does the same",
+        [("            if token.startswith(_REPO_REDIRECT_OPTS):\n"
+          "                return True",
+          "            pass")],
+        {"W1973h"},
+    ),
+    "M5_dash_c_counts": (
+        "`git -C <dir>` reads and writes that directory's repository",
+        [('            if token == "-C":\n                return True',
+          "            pass")],
+        {"W1973i"},
+    ),
+    "M5_opaque_words_count": (
+        "a word whose command is built at run time (`eval`, `source`) makes "
+        "the piece unscoped, although it carries no `cd` token",
+        [("            if os.path.basename(token) in _OPAQUE_WORDS:\n"
+          "                return True",
+          "            pass")],
+        {"W1973e", "W1973j"},
+    ),
+    "M5_cd_words_count": (
+        "a `cd` in the piece makes it unscoped",
+        [("            if os.path.basename(token) in _CD_WORDS:\n"
+          "                return True",
+          "            pass")],
+        {"W1973c"},
     ),
     "M4_untracked_excluded": (
         "an untracked (`??`) entry does not count as a change `--hard` "

@@ -72,9 +72,12 @@ misfires is worse than a missing one" -- no `permissionDecision`, ever.
       run. A `checkout`/`restore` pathspec is not one of them: classifying a
       bare word as a pathspec runs `git rev-parse` in this hook's own
       directory, and for a nested piece that is the wrong repository
-      (ai-config#1973 review). A piece that contains no `cd` provably starts
-      where the outer command did, so it takes the ordinary local reading --
-      M4's status gate included -- rather than the unscoped note
+      (ai-config#1973 review). A piece that can act only on THIS repository
+      takes the ordinary local reading -- M4's status gate included -- rather
+      than the unscoped note. That is a wider question than "contains no
+      `cd`", which is about the shell's directory: `GIT_DIR=` redirects the
+      repository without moving the shell, and `eval` moves the shell without
+      a `cd` token. `_may_change_repository` decides it
 
 ## Ref-vs-path disambiguation
 
@@ -392,13 +395,46 @@ def offending_here(command, lexical_only=False):
 
 _CD_WORDS = ("cd", "pushd", "popd")
 
+# Words that move the shell, and tokens that move the REPOSITORY without
+# moving the shell. The second group is why this is not a `cd` scan: the
+# question a caller asks is which repository the command acts on, and a
+# `cd` is only one of the ways that stops being the shell's own directory.
+# `no-clobbering-push.py` names the same spellings as `GIT_REPO_OPTS` and
+# `GIT_ENV_REDIRECT`; they are restated rather than imported because that
+# guard is not importable from here. `GIT_COMMON_DIR=` is the one addition
+# over that pair's union, and it redirects the same way.
+_REPO_REDIRECT_ENV = ("GIT_DIR=", "GIT_WORK_TREE=", "GIT_COMMON_DIR=")
+_REPO_REDIRECT_OPTS = ("--git-dir", "--work-tree")
+# `eval` builds its command at run time, so nothing lexical can say where it
+# leaves the shell. `source` (and its `.` spelling) runs another file's `cd`s
+# in this shell.
+_OPAQUE_WORDS = ("eval", "source", ".")
 
-def _moves_directory(text):
-    """True when TEXT might change the shell's working directory.
 
-    Deliberately over-reports: unparseable text counts as moving, so an
-    unreadable piece keeps the conservative unscoped report rather than
-    claiming the directory is knowable.
+def _may_change_repository(text):
+    """True when TEXT might act on a repository other than this directory's.
+
+    NOT a `cd` scan, although a `cd` is the obvious case. The premise "a piece
+    containing no `cd` provably starts where the outer command did" is true
+    about the SHELL'S DIRECTORY and does not support the conclusion drawn from
+    it about the REPOSITORY: `GIT_DIR=/other/.git git reset --hard` never
+    moves the shell and discards another repository's work, and
+    `eval 'cd /other'` moves the shell with no `cd` token in sight -- the
+    token is the whole string, whose basename is `other`. Both took the local
+    reading and listed THIS repository's dirty files as what would be lost,
+    which is the cross-repository report `NOTE_NESTED_UNSCOPED` exists to
+    prevent and calls "worse than silence" (ai-config#3645 pre-merge gate,
+    finding 2).
+
+    Deliberately over-reports, and in two ways worth naming so neither reads
+    as a bug. A bare `-C` counts although `grep -C 3` is not a git option, and
+    unparseable text counts as redirecting. Both cost only the file list.
+
+    The unparseable branch is DEFENSIVE and no case reaches it: `offending`
+    calls this only after `shell_c_expansions` has parsed the same text, and
+    the two parsers were measured to fail together on every shape tried
+    (2026-09-14). It stays because dropping it turns a `None` into a
+    `TypeError` that would take the whole guard down.
     """
     cmds = _simple_commands(text)
     if cmds is None:
@@ -406,6 +442,15 @@ def _moves_directory(text):
     for argv in cmds:
         for token in argv:
             if os.path.basename(token) in _CD_WORDS:
+                return True
+            if os.path.basename(token) in _OPAQUE_WORDS:
+                return True
+            if token.startswith(_REPO_REDIRECT_ENV):
+                return True
+            if token.startswith(_REPO_REDIRECT_OPTS):
+                return True
+            # `git -C <dir>` reads and writes that directory's repository.
+            if token == "-C":
                 return True
     return False
 
@@ -495,7 +540,8 @@ def offending(command):
         # form is silent, because the unscoped path returns before the M4
         # status gate runs (ai-config#1973 review, round 4 finding 7,
         # reproduced independently by the @claude review of #3645).
-        if not _moves_directory(command) and not _moves_directory(piece):
+        if (not _may_change_repository(command)
+                and not _may_change_repository(piece)):
             return match
         return "nested-unscoped", match[1], None
     return None

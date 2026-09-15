@@ -801,11 +801,28 @@ def _env_split_string(argv):
     Over-detects on purpose, like the rest of this module: a token that is not
     really a command line costs one wasted scan, while a missed one is an
     unguarded destructive command.
+
+    The `env` is looked for in a WINDOW from the head rather than at `argv[0]`
+    alone. Testing only the head asked whether `env` was typed first, which is
+    a different question from whether `env` runs: every one of `command`,
+    `sudo`, `nohup` and `exec` is already in `COMMAND_WRAPPERS`, which
+    `command_program` skips two functions up, so the module knew those words
+    were transparent while this function did not -- and `command env -S "bash
+    -c '<push>'"` ran the push with both guards silent, where the bare `env -S`
+    spelling denied (ai-config#3645 pre-merge gate, finding 3).
+
+    A window rather than a wrapper-by-wrapper skip, for the reason
+    `nested_shell_commands` gives at length: the enumeration is not finishable
+    and does not have to be, because a wrong guess costs one scan of a token
+    that carries no gated command.
     """
-    if not argv or not _ENV_PROGRAM.match(os.path.basename(argv[0])):
+    start = next((position for position, token
+                  in enumerate(argv[:1 + WRAPPER_ARG_WINDOW])
+                  if _ENV_PROGRAM.match(os.path.basename(token))), None)
+    if start is None:
         return []
     out = []
-    for position, token in enumerate(argv[1:], start=1):
+    for position, token in enumerate(argv[start + 1:], start=start + 1):
         attached = _SPLIT_STRING_ATTACHED.match(token)
         if attached:
             out.append(attached.group(1))
@@ -877,6 +894,13 @@ def shell_c_expansions(command, max_depth=3):
     only the first group and so read as exhaustive (ai-config#1973 review,
     round 2 finding 9).
 
+    So does a `-c` nested more than `max_depth` levels deep. Measured at the
+    default of 3: one, two and three levels of `bash -c` reach the push, four
+    and five do not. It is listed among the holes rather than only under
+    BOUNDS below, because a reader auditing coverage reads the enumerated
+    list and a cap named elsewhere as a performance knob does not register as
+    a bypass (ai-config#3645 pre-merge gate, finding 8).
+
     BOUNDS
     ------
     `max_depth` and the `seen` set bound the walk, and neither is what makes it
@@ -887,7 +911,10 @@ def shell_c_expansions(command, max_depth=3):
     is what makes the recursion finite, is that dequoting never lengthens and
     the program plus its `-c` are always consumed, so each operand is strictly
     shorter than the text it came from. The bounds cap work on adversarial
-    input rather than preventing a loop.
+    input rather than preventing a loop. `max_depth` is nonetheless a real
+    hole, and it is named as one in LIMITS above: raising it is nearly free
+    for the `deny_only`, network-free lexical pass both guards run, and the
+    default stays at 3 only because nothing has yet been measured past it.
 
     An unparseable piece yields no children and does not discard the pieces
     already found.

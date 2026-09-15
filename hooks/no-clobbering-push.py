@@ -1057,6 +1057,15 @@ def evaluate(command, base_cwd=None, deny_only=False,
     # from the caller's directory rather than from what its predecessor moved
     # to.
     dirs = {(): base}
+    # Subshell paths carrying an exported override, grown as the split is
+    # read. Without it the guard was strictly MORE PERMISSIVE for a wrapped
+    # push than a bare one: `export ALLOW_FORCE_PUSH=1; bash -c "<push>"` was
+    # cleared by `_override_before_wrapper` while
+    # `export ALLOW_FORCE_PUSH=1; git push --force origin main` was refused,
+    # although bash sets the variable for both (measured `inner=[1]`). An
+    # escape hatch that works only once the command is wrapped teaches
+    # wrapping (ai-config#3645 pre-merge gate, finding 4).
+    exported = []
     # How many compound-statement bodies enclose the command being read. The
     # count is flat rather than per-subshell because these regions nest
     # lexically, in the order the split hands them back.
@@ -1087,9 +1096,11 @@ def evaluate(command, base_cwd=None, deny_only=False,
             else:
                 dirs[scope] = _resolve_cd(head, dirs[scope])
             continue
+        _record_export(exported, scope, argv, sep, after, region)
         rest, override, cdirs = _push_argv(argv)
         if rest is None:
             continue
+        override = override or _scope_exported(scope, exported)
         flags, positionals, repo_opt, ok = _parse_push(rest)
         parsed.append((argv, flags, positionals, repo_opt, ok, override,
                        _push_cwd(dirs[scope], cdirs)))
@@ -1286,35 +1297,162 @@ def _override_before_wrapper(command):
         # only if THIS command is the one that runs it.
         if nested_shell_commands(argv[found:]):
             return True
-    # `export ALLOW_FORCE_PUSH=1` is a different simple command from the one
-    # that wraps the push, so the loop above cannot see it -- and unlike a
-    # prefix assignment, an export really does reach every LATER command in
-    # the same shell:
-    #
-    #   $ bash -c 'export ALLOW_FORCE_PUSH=1; bash -c "echo [$ALLOW_FORCE_PUSH]"'
-    #   [1]
-    #
-    # Refusing it left the escape hatch unusable in its most natural spelling,
-    # with no way to comply (ai-config#1973 review, round 4 finding 8, second
-    # half; reproduced independently by the @claude review of #3645).
-    #
-    # Scoped deliberately: only an `export` that PRECEDES a later command
-    # carrying a nested shell counts, so an export written after the push --
-    # which bash has not run yet when the push executes -- does not clear it.
-    exported = False
-    for entry in scoped:
-        argv = list(entry[1])
+    # An `export` is a different simple command from the one that wraps the
+    # push, so the loop above cannot see it. `_record_export` says when one
+    # counts and `_scope_exported` says which commands it reaches; the two are
+    # interleaved in ONE pass because order matters as much as scope -- an
+    # export written after the push has not run when the push executes, and
+    # collecting every export first would have cleared it.
+    exported = []
+    # The compound-statement REGION is counted here for the same reason
+    # `evaluate` counts it: an `export` inside an `if`/`while`/`for`/`case`
+    # body may never run. Leaving it out relied on the body's keyword still
+    # heading the argv, which holds only while the export is the body's FIRST
+    # command -- one `echo` in front detaches it, and
+    # `if false; then echo a; export ALLOW_FORCE_PUSH=1; fi; sh -c "<push>"`
+    # then cleared the refusal while bash left the variable unset and ran the
+    # push (ai-config#3645 self-review, finding 1). The bare-push sibling was
+    # already correct, because `evaluate` passed the region it tracks.
+    region = 0
+    for scope, raw, sep, after in scoped:
+        argv = list(raw)
         while argv and os.path.basename(argv[0]) in COMMAND_WRAPPERS:
             argv = argv[1:]
-        if exported and nested_shell_commands(argv):
+        if _scope_exported(scope, exported) and nested_shell_commands(argv):
             return True
-        if argv and os.path.basename(argv[0]) == "export":
-            for token in argv[1:]:
-                if not ASSIGNMENT.match(token):
-                    continue
-                name, _, value = token.partition("=")
-                if name == OVERRIDE and value.strip() == "1":
-                    exported = True
+        lead, _o, _r = _lead_prefix(raw)
+        head = raw[lead:]
+        if head and head[0] in BLOCK_OPEN:
+            region += 1
+        elif head and head[0] in BLOCK_CLOSE:
+            region = max(region - 1, 0)
+        _record_export(exported, scope, raw, sep, after, region)
+    return False
+
+
+def _scope_exported(scope, exported):
+    """True when an `export` recorded in EXPORTED reaches a command in SCOPE.
+
+    An export reaches its own shell and every subshell opened underneath it,
+    which is exactly "the exporting scope is a PREFIX of this one". Sibling
+    subshells carry different serial numbers, so `(1,)` is not a prefix of
+    `(2,)` and one sibling's export does not leak into the next.
+    """
+    return any(scope[:len(done)] == done for done in exported)
+
+
+# Separators that leave an `export` possibly unexecuted. Wider than
+# `evaluate`'s `BRANCH_SEPS`, and deliberately so: the two readers fail in
+# OPPOSITE directions. Reading a `cd` that did not run yields an indeterminate
+# directory, which declines the reading and is safe; reading an `export` that
+# did not run SUPPRESSES A REFUSAL. So `&&` counts here although `evaluate`
+# omits it -- `false && export ALLOW_FORCE_PUSH=1` runs nothing. The FORKING
+# separators are the same set `evaluate` uses, and are reused rather than
+# restated.
+_EXPORT_CONDITIONAL_SEPS = {"&&", "||", "|"}
+
+
+def _record_export(exported, scope, raw, sep, after, region=0):
+    """Append SCOPE to EXPORTED when RAW really exports the override there.
+
+    RAW is the unstripped argv, and the wrapper strip happens HERE so both
+    callers apply the same rule. It deliberately skips only
+    `COMMAND_WRAPPERS`, never a shell KEYWORD: `then export ALLOW_FORCE_PUSH=1`
+    arrives with the keyword attached, and stripping it would record an export
+    the shell may never reach. `region` is the same guard said explicitly, for
+    a body whose keyword has already come off.
+
+    Unlike a prefix assignment, an export reaches every LATER command in the
+    same shell:
+
+        $ bash -c 'export ALLOW_FORCE_PUSH=1; bash -c "echo [$ALLOW_FORCE_PUSH]"'
+        [1]
+
+    Refusing it left the escape hatch unusable in its most natural spelling,
+    with no way to comply (ai-config#1973 review, round 4 finding 8, second
+    half; reproduced independently by the @claude review of #3645).
+
+    Honouring it by POSITION ALONE was that fix's own fail-open. It asked "did
+    an export appear before this command in the token stream", which is a
+    weaker question than "does bash set the variable for it", and two shapes
+    cleared a refusal bash never authorized -- each measured with an empty
+    `inner=[]` from real bash and the push still executing (ai-config#3645
+    pre-merge gate, finding 1):
+
+        ( export ALLOW_FORCE_PUSH=1 ); sh -c "<push>"
+        false && export ALLOW_FORCE_PUSH=1; sh -c "<push>"
+
+    So an export counts only when it is UNCONDITIONALLY REACHED, and it then
+    covers its own subshell path and everything nested under it.
+    """
+    argv = list(raw)
+    while argv and os.path.basename(argv[0]) in COMMAND_WRAPPERS:
+        argv = argv[1:]
+    if not argv:
+        return
+    # RETIRING RUNS FIRST, and unconditionally. Recording an override and
+    # never taking it back read `export ALLOW_FORCE_PUSH=1` as permanent, so
+    # `export ALLOW_FORCE_PUSH=1; export ALLOW_FORCE_PUSH=0; git push --force`
+    # dropped from a refusal to a non-blocking warning while bash ran the push
+    # with the variable set to `0` (ai-config#3645 self-review, finding 2).
+    #
+    # Deliberately unconditional, where RECORDING is guarded: a retirement the
+    # shell never reaches costs a refused escape hatch, and a recording the
+    # shell never reaches costs a suppressed refusal. Same reasoning as
+    # `_EXPORT_CONDITIONAL_SEPS`, applied to the other half of the pair.
+    if _retires_override(argv):
+        exported[:] = [done for done in exported if scope[:len(done)] != done]
+        return
+    if os.path.basename(argv[0]) != "export":
+        return
+    if region or sep in _EXPORT_CONDITIONAL_SEPS or after in FORK_SEPS:
+        return
+    # No value test here: `_retires_override` above returns True for EVERY
+    # value other than `1`, so an `export ALLOW_FORCE_PUSH=<anything else>`
+    # has already returned. Repeating the test read as defence in depth and
+    # was measured unreachable -- reverting it left the suite at 89/89, which
+    # is this branch's own definition of an untested clause.
+    for token in argv[1:]:
+        if not ASSIGNMENT.match(token):
+            continue
+        if token.partition("=")[0] == OVERRIDE:
+            exported.append(scope)
+
+
+# Words that put a variable into the environment. Only `export` RECORDS an
+# override, because only it is measured; all of them RETIRE one, since the
+# retiring direction is the safe one to over-apply.
+_EXPORT_WORDS = ("export", "declare", "typeset", "readonly")
+
+
+def _retires_override(argv):
+    """True when ARGV sets the override to something other than `1`, or unsets it.
+
+    A PREFIX assignment is deliberately not one: `ALLOW_FORCE_PUSH=0 echo hi`
+    scopes the value to `echo` and leaves the shell's own variable alone, so
+    only a command that is NOTHING BUT assignments changes the shell.
+
+    Over-retires across subshell boundaries, which is the safe direction:
+    `export ALLOW_FORCE_PUSH=1; ( unset ALLOW_FORCE_PUSH ); git push --force`
+    really does leave the parent's variable set, and is refused here. The cost
+    is a re-spelling; the cost of the opposite error is an unguarded force
+    push.
+    """
+    word = os.path.basename(argv[0])
+    if word == "unset":
+        return any(token == OVERRIDE for token in argv[1:])
+    if word in _EXPORT_WORDS:
+        tokens = argv[1:]
+    elif all(ASSIGNMENT.match(token) for token in argv):
+        tokens = argv
+    else:
+        return False
+    for token in tokens:
+        if not ASSIGNMENT.match(token):
+            continue
+        name, _, value = token.partition("=")
+        if name == OVERRIDE and value.strip() != "1":
+            return True
     return False
 
 

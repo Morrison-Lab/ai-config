@@ -286,6 +286,148 @@ def exported_override_after_push_case(path, bare):
             'export ALLOW_FORCE_PUSH=1')
 
 
+def exported_override_in_a_subshell_case(path, bare):
+    """An export inside `( ... )` never reaches the parent shell.
+
+    Measured against real bash:
+
+        $ bash -c '( export ALLOW_FORCE_PUSH=1 ); sh -c "echo [$ALLOW_FORCE_PUSH]"'
+        inner=[]
+
+    so the push runs unexempted. Honouring the export by POSITION alone
+    cleared the refusal here (ai-config#3645 pre-merge gate, finding 1).
+    """
+    _local_advances(path)
+    return ('( export ALLOW_FORCE_PUSH=1 ); '
+            'sh -c "git push --force origin HEAD"')
+
+
+def exported_override_behind_a_branch_case(path, bare):
+    """An export on the dead side of a short-circuit never runs.
+
+    The sibling shape of the case above, and the reason the conditional
+    separators here are WIDER than `evaluate`'s: `false && export VAR=1`
+    executes nothing, and bash prints an empty `inner=[]`.
+    """
+    _local_advances(path)
+    return ('false && export ALLOW_FORCE_PUSH=1; '
+            'sh -c "git push --force origin HEAD"')
+
+
+def exported_override_value_not_one_case(path, bare):
+    """`export ALLOW_FORCE_PUSH=0` is an export of something else.
+
+    Only the value test keeps it from clearing the refusal, and without this
+    case dropping that test was a silent no-op.
+    """
+    _local_advances(path)
+    return ('export ALLOW_FORCE_PUSH=0; '
+            'sh -c "git push --force origin HEAD"')
+
+
+def exported_override_reaches_no_wrapper_case(path, bare):
+    """An export followed by a command that runs NO nested shell.
+
+    The push comes first, so the export cannot reach it; a later `echo`
+    carries no nested shell, so it cannot carry the override either. Dropping
+    the requirement that the covered command actually run a nested shell
+    turned the whole command silent, and no earlier case distinguished it
+    (ai-config#3645 pre-merge gate, finding 6).
+    """
+    _local_advances(path)
+    return ('sh -c "git push --force origin HEAD"; '
+            'export ALLOW_FORCE_PUSH=1; echo done')
+
+
+def wrapped_env_split_string_case(path, bare):
+    """`env -S` behind a wrapper word still execs the shell it names.
+
+    Measured: `command env -S "bash -c 'echo RAN'"` prints `RAN`. Testing
+    only `argv[0]` for `env` asked whether it was TYPED first rather than
+    whether it RUNS, and reopened the bypass the unwrapped case closes
+    (ai-config#3645 pre-merge gate, finding 3).
+    """
+    _local_advances(path)
+    return 'command env -S "bash -c \'git push --force origin HEAD\'"'
+
+
+def exported_override_wrapper_prefix_case(path, bare):
+    """`env ALLOW_FORCE_PUSH=1 bash -c "<push>"` really sets the variable.
+
+    `env` is a transparent wrapper, so the assignment behind it is still a
+    prefix of the command that runs the shell -- and refusing it left the
+    escape hatch unusable with no way to comply (round 4 finding 8). Only the
+    wrapper skip in the prefix arm allows it, and the existing
+    `timeout 5 ALLOW_FORCE_PUSH=1 ...` case cannot test that skip: it expects
+    a DENY either way (ai-config#3645 pre-merge gate, finding 6).
+    """
+    _local_advances(path)
+    return 'env ALLOW_FORCE_PUSH=1 bash -c "git push --force origin HEAD"'
+
+
+def exported_override_bare_push_case(path, bare):
+    """An earlier `export` exempts an UNWRAPPED push too.
+
+    Measured: `export ALLOW_FORCE_PUSH=1; git push ...` really sees
+    `inner=[1]`. Honouring it only for a wrapped push left the guard strictly
+    more permissive for `bash -c "<push>"` than for the bare command, which
+    teaches wrapping (ai-config#3645 pre-merge gate, finding 4).
+    """
+    _local_advances(path)
+    return 'export ALLOW_FORCE_PUSH=1; git push --force origin HEAD'
+
+
+def exported_override_in_a_block_body_case(path, bare):
+    """An export inside a branch body bash never takes, with a command before it.
+
+    `if false; then echo a; export ALLOW_FORCE_PUSH=1; fi` sets nothing --
+    measured `inner=[]` from real bash, and the push runs. The leading `echo`
+    is the whole point: without it the export heads the body and arrives with
+    the `then` keyword still attached, which was the accidental defence the
+    region guard replaced (ai-config#3645 self-review, findings 1 and 3).
+    """
+    _local_advances(path)
+    return ('if false; then echo a; export ALLOW_FORCE_PUSH=1; fi; '
+            'sh -c "git push --force origin HEAD"')
+
+
+def retired_override_wrapped_case(path, bare):
+    """`export ALLOW_FORCE_PUSH=1` taken back before the push.
+
+    Recording an override and never retiring it read the first `export` as
+    permanent, so this dropped from a refusal to a non-blocking warning while
+    bash ran the push with the variable set to `0` (ai-config#3645
+    self-review, finding 2).
+    """
+    _local_advances(path)
+    return ('export ALLOW_FORCE_PUSH=1; export ALLOW_FORCE_PUSH=0; '
+            'sh -c "git push --force origin HEAD"')
+
+
+def unset_override_bare_case(path, bare):
+    """The same retirement spelled `unset`, on an UNWRAPPED push.
+
+    The bare arm needs its own case because the override reaches it through
+    `evaluate`'s loop rather than through `_override_before_wrapper`.
+    """
+    _local_advances(path)
+    return ('export ALLOW_FORCE_PUSH=1; unset ALLOW_FORCE_PUSH; '
+            'git push --force origin HEAD')
+
+
+def prefix_assignment_does_not_retire_case(path, bare):
+    """`ALLOW_FORCE_PUSH=0 echo hi` scopes the value to `echo`, not the shell.
+
+    The other direction of the retirement: a PREFIX assignment leaves the
+    exported variable alone, so the hatch must stay open. Without this case,
+    widening the retirement to any assignment anywhere would be a silent
+    no-op.
+    """
+    _local_advances(path)
+    return ('export ALLOW_FORCE_PUSH=1; ALLOW_FORCE_PUSH=0 echo hi; '
+            'sh -c "git push --force origin HEAD"')
+
+
 def bare_override_mid_command_case(path, bare):
     """A BARE `ALLOW_FORCE_PUSH=1` token that is not a command prefix.
 
@@ -1016,6 +1158,22 @@ SHOULD_DENY = [
      "an `export` written AFTER the push does not clear it"),
     ("D1973g", override_behind_a_wrapper_argument_case,
      "the override behind a wrapper's own argument does not clear a refusal"),
+    ("D1973i", exported_override_in_a_subshell_case,
+     "an `export` inside a subshell does not reach the parent shell"),
+    ("D1973j", exported_override_behind_a_branch_case,
+     "an `export` on the dead side of a short-circuit never runs"),
+    ("D1973k", exported_override_value_not_one_case,
+     "`export ALLOW_FORCE_PUSH=0` exports something else"),
+    ("D1973l", exported_override_reaches_no_wrapper_case,
+     "an `export` reaches only a LATER command that runs a nested shell"),
+    ("D1973m", wrapped_env_split_string_case,
+     "`env -S` behind a wrapper word still hands its argument to a shell"),
+    ("D1973n", exported_override_in_a_block_body_case,
+     "an `export` in a branch body the shell never takes does not count"),
+    ("D1973o", retired_override_wrapped_case,
+     "an override set back to `0` before the push is retired"),
+    ("D1973p", unset_override_bare_case,
+     "an `unset` retires the override for an unwrapped push too"),
     ("D1973f", bare_override_mid_command_case,
      "a bare override token away from the argv head does not clear a refusal"),
 ]
@@ -1076,6 +1234,15 @@ SHOULD_STAY_SILENT = [
      "a nested piece is refusal-only, so a warn-worthy nested push is silent"),
     ("S1973e", nested_override_case,
      "a real override before the WRAPPER clears the nested refusal"),
+    ("S1973g", exported_override_wrapper_prefix_case,
+     "an override behind a transparent wrapper is still a prefix of the "
+     "command that runs the shell"),
+    ("S1973h", exported_override_bare_push_case,
+     "an earlier `export` exempts an unwrapped push, as it does a wrapped "
+     "one"),
+    ("S1973i", prefix_assignment_does_not_retire_case,
+     "a PREFIX assignment does not change the shell's own variable, so it "
+     "retires nothing"),
     ("S1973f", exported_override_case,
      "an `export` in an earlier simple command carries onto the wrapper"),
     ("S1", leased_fast_forward_case,
@@ -1390,7 +1557,7 @@ MUTATIONS = {
         "a real override before the wrapper reaches the nested piece",
         [("    override = _override_before_wrapper(command)",
           "    override = False")],
-        {"S1973e", "S1973f"},
+        {"S1973e", "S1973f", "S1973g", "S1973i"},
     ),
     "override_must_head_a_simple_command": (
         "the override counts as an assignment at an argv head, not as a mention",
@@ -1405,6 +1572,87 @@ MUTATIONS = {
         # that does -- an override behind a wrapper's own argument.
         {"D1973g"},
     ),
+    "export_must_be_reached": (
+        "an `export` counts only where bash really runs it -- not inside a "
+        "subshell, and not on the dead side of a short-circuit",
+        [("    if region or sep in _EXPORT_CONDITIONAL_SEPS "
+          "or after in FORK_SEPS:\n        return",
+          "    if False:\n        return")],
+        # D1973i is deliberately absent: a subshell export is caught by the
+        # scope clause below before reachability is consulted, so declaring
+        # it here would hide that this clause rests on the branch case alone.
+        # D1973n rides on it because this anchor reverts the whole guard,
+        # region included; `export_region_guard` reverts only that term.
+        {"D1973j", "D1973n"},
+    ),
+    "export_scope_is_a_prefix": (
+        "an `export` reaches its own shell and the subshells under it, not "
+        "a sibling subshell's",
+        [("    return any(scope[:len(done)] == done for done in exported)",
+          "    return bool(exported)")],
+        {"D1973i"},
+    ),
+    "export_needs_a_nested_shell": (
+        "an exported override is carried only onto a command that really "
+        "runs a nested shell",
+        [("        if _scope_exported(scope, exported) "
+          "and nested_shell_commands(argv):",
+          "        if _scope_exported(scope, exported):")],
+        {"D1973l", "D1973o"},
+    ),
+    # `_env_split_string`'s wrapper window is NOT declared here, and cannot
+    # be: `verdict` puts the real `scripts/lib` on PYTHONPATH so a one-file
+    # mutant can still import it, which is exactly what stops every nested
+    # case reading as flipped under every clause -- and it also means a
+    # mutation of `shellcmd.py` never reaches the subprocess. D1973m is the
+    # end-to-end case; the direct checks live in `scripts/test_shellcmd.py`.
+    "export_region_guard": (
+        "an `export` inside a compound-statement body does not count, "
+        "whether the push is wrapped or bare",
+        [("    if region or sep in _EXPORT_CONDITIONAL_SEPS "
+          "or after in FORK_SEPS:",
+          "    if sep in _EXPORT_CONDITIONAL_SEPS or after in FORK_SEPS:")],
+        {"D1973n"},
+    ),
+    "wrapper_arm_tracks_the_region": (
+        "`_override_before_wrapper` counts the region too, rather than "
+        "relying on a body keyword still heading the argv",
+        [("        _record_export(exported, scope, raw, sep, after, region)",
+          "        _record_export(exported, scope, raw, sep, after)")],
+        {"D1973n"},
+    ),
+    "override_is_retired": (
+        "an override set to something else, or unset, stops counting",
+        [("    if _retires_override(argv):\n"
+          "        exported[:] = [done for done in exported "
+          "if scope[:len(done)] != done]\n"
+          "        return",
+          "    if False:\n        return")],
+        {"D1973o", "D1973p", "D1973k"},
+    ),
+    "retirement_needs_a_standalone_assignment": (
+        "a PREFIX assignment is scoped to the command it heads and retires "
+        "nothing",
+        [("    elif all(ASSIGNMENT.match(token) for token in argv):\n"
+          "        tokens = argv",
+          "    elif any(ASSIGNMENT.match(token) for token in argv):\n"
+          "        tokens = argv")],
+        {"S1973i"},
+    ),
+    "override_prefix_skips_wrappers": (
+        "a transparent wrapper before the assignment leaves it a prefix",
+        [("        while argv and os.path.basename(argv[0]) in "
+          "COMMAND_WRAPPERS:\n            argv = argv[1:]\n"
+          "        found = False",
+          "        found = False")],
+        {"S1973g"},
+    ),
+    "exported_override_reaches_a_bare_push": (
+        "an exported override exempts an unwrapped push too",
+        [("        override = override or _scope_exported(scope, exported)",
+          "        pass")],
+        {"S1973h"},
+    ),
     "force_deny": (
         "a force push is refused",
         [('        if (flags["force"] and not flags["dry_run"] and not override\n'
@@ -1413,7 +1661,8 @@ MUTATIONS = {
           "        pass")],
         {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9",
          "D1973a", "D1973b", "D1973c", "D1973d", "D1973e", "D1973f",
-         "D1973g", "D1973h"},
+         "D1973g", "D1973h", "D1973i", "D1973j", "D1973k", "D1973l",
+         "D1973m", "D1973n", "D1973o", "D1973p"},
     ),
     "force_ignores_lease": (
         "the refusal does NOT consult the lease -- `--force` disables it",
@@ -1464,7 +1713,10 @@ MUTATIONS = {
           '                and not assume_override):',
           '        if (flags["force"] and not flags["dry_run"]\n'
           '                and not assume_override):')],
-        {"S2"},
+        # S1973h rides on this clause too: its override arrives from an
+        # earlier `export` rather than from a prefix, and both feed the same
+        # `not override` conjunct in the refusal.
+        {"S2", "S1973h"},
     ),
     "out_of_scope_gate": (
         "dry-run, delete, ref-set, and unparsed pushes get no reading",
@@ -1532,8 +1784,9 @@ MUTATIONS = {
         # makes all of them warn -- the harness caught this set being
         # under-declared the first time. S17 and S38 join them: each is a
         # fast-forward READ IN THE RIGHT DIRECTORY, so both flip here as well
-        # as under the `cd` clause below.
-        {"S1", "S2", "S5", "S11", "S17", "S38"},
+        # as under the `cd` clause below. S1973h joins them once its exported
+        # override clears the refusal and lets it reach Pass 2 at all.
+        {"S1", "S2", "S5", "S11", "S17", "S38", "S1973h"},
     ),
     "subcommand": (
         "only `git push` matches, not another git subcommand",
@@ -1582,6 +1835,10 @@ MUTATIONS = {
         "pipeline element -- makes the directory indeterminate rather than "
         "moving it",
         [('BRANCH_SEPS = {"||", "|"}', "BRANCH_SEPS = set()")],
+        # D1973j does NOT ride on this clause, although it is a dead-side
+        # `export`: `_record_export` reads `_EXPORT_CONDITIONAL_SEPS`, which
+        # is deliberately wider than `BRANCH_SEPS` because the two readers
+        # fail in opposite directions.
         {"S24", "S31", "S36", "S37"},
     ),
     "forked_cd_declines": (
@@ -1600,7 +1857,10 @@ MUTATIONS = {
           "                        pass")],
         # S23, S27 and S28 cannot see this: their decline comes from the
         # region an `if` opened, which no separator reports.
-        {"S24", "S31", "S36", "S37"},
+        # D1973j rides on this clause: an `export` on the dead side of a
+        # short-circuit is recognized from its LEADING separator, so losing
+        # the separator makes it count and the refusal disappears.
+        {"S24", "S31", "S36", "S37", "D1973j"},
     ),
     "separator_reads_the_first_operator": (
         "the leading punctuation run reports the operator it STARTS with, so "
@@ -1720,7 +1980,10 @@ MUTATIONS = {
         # two-sided pin rather than one case asserting silence. S39 is the
         # same pin around a case statement: its `cd` is in the OUTER subshell,
         # so a leak past the closing parenthesis reaches the push after it.
-        {"S21", "S22", "S39"},
+        # D1973i rides on this clause: an `export` is scoped to its subshell
+        # by the same parentheses tracking, so losing the scope lets it reach
+        # a push outside the subshell.
+        {"S21", "S22", "S39", "D1973i"},
     ),
     "subshells_have_identities": (
         "a subshell is identified, not merely counted, so a `cd` in one does "

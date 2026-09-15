@@ -560,6 +560,20 @@ check("an ordinary env wrapper is unaffected",
 check("-S on a non-env program hands over nothing",
       shellcmd.nested_shell_commands(["echo", "-S", "bash -c x"]), [])
 
+# The `env` is looked for in a window from the head, not at argv[0] alone.
+# Testing only the head asked whether `env` was TYPED first rather than
+# whether it RUNS, and every one of these words is already in
+# `COMMAND_WRAPPERS`: `command env -S "bash -c '<push>'"` really executes
+# (measured) and both guards were silent on it, while the bare `env -S`
+# spelling denied (ai-config#3645 pre-merge gate, finding 3).
+for _wrapper in ("command", "sudo", "nohup", "exec"):
+    check(f"a {_wrapper} before env -S still hands over the command line",
+          descends_to(f"{_wrapper} env -S 'bash -c \"git push --force\"'",
+                      'bash -c "git push --force"'), True)
+check("an env -S past the wrapper window is not searched for",
+      shellcmd.nested_shell_commands(
+          ["a", "b", "c", "d", "e", "f", "g", "env", "-S", "bash -c x"]), [])
+
 # ------------------------------------------------- source-level hygiene
 #
 # THIS MODULE QUOTES REGEX SOURCE IN ITS PROSE, so a docstring can carry an

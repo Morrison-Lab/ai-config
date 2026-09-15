@@ -95,8 +95,8 @@ returned `allow`.
 The same gate reported no executing bypass remaining at that head, across
 29,813 differential strings and 5,034 constructed executing shapes.
 Six of the seven findings were documentation or coverage defects;
-the seventh was source hygiene --- a dropped `_body_end` underscore that
-#3682 restored in code.
+the seventh was source hygiene ---
+a dropped `_body_end` underscore that #3682 restored in code.
 None was a behaviour change, which is the property the decision turned on,
 and it is worth stating as the property rather than as the tally: "all
 documentation" would have been a stronger claim than the evidence supported

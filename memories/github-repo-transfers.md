@@ -283,8 +283,9 @@ is what makes detaching look impossible.
 The **manual** procedure has no visibility restriction: bare-clone the fork,
 delete it, create a fresh repository, mirror-push.
 There is also a support-request path.
-So the remedy below is not a workaround around GitHub's process;
-it *is* GitHub's documented process, minus reusing the old name.
+So recreating the repository standalone is not a workaround around GitHub's
+process;
+it *is* that manual procedure, minus the step that reuses the old name.
 
 **What a recreate carries, and what it does not.**
 GitHub's own warning on that page is the authority: the new repository *"will

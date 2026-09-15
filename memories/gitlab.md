@@ -58,6 +58,8 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   other platforms use their own config-dir convention.
 - **`glab api` has no `--jq` flag**, unlike `gh api`: passing one errors with `Unknown flag: --jq`.
   Pipe the raw JSON to `jq` separately instead: `glab api "projects/<id>" | jq '.default_branch'`.
+  **2nd occurrence (2026-09-14, HACtions !56; 1st: 2026-08-06):**
+  A pipeline-monitoring loop repeated the same unsupported flag until stopped and rewritten with a pipe.
 - **Use the paginated MR notes endpoint as the authoritative unresolved-inline-comment sweep.**
   `GET /projects/:id/merge_requests/:iid/notes` can return resolvable unresolved `DiffNote`s that a Discussions API sweep does not expose as an unresolved discussion.
   Filter every page on `.resolvable == true and .resolved == false`, then use the Discussions API only to locate and resolve the corresponding thread.

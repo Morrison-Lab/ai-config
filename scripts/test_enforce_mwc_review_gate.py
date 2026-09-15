@@ -1368,7 +1368,7 @@ class StructuredReviewDataTests(unittest.TestCase):
         self.assertEqual(self.classify(c), "ambiguous")
 
     def test_payload_without_schema_version_does_not_clear(self):
-        """A payload missing the contract's version marker may block, never
+        r"""A payload missing the contract's version marker may block, never
         clear -- for EVERY accepted spelling of a clean verdict, not just the
         one whose letters happen to miss `CLEAN_VERDICT_RE`.
 

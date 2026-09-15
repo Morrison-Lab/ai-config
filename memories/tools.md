@@ -445,6 +445,8 @@ with an unverified command if neither launcher actually works. (ai-config#635,
 again scripting a one-off text replacement after an `Edit` tool call's
 `old_string` failed to match despite `grep` showing byte-identical content
 in the file.)
+When a *registered hook command* hits this and can't swap to `py`, see
+[`claude-code-hooks.md`](claude-code-hooks.md)'s "A third route" section instead.
 
 ## Windows console encoding: a repo check can exit 1 on the line that says it passed
 

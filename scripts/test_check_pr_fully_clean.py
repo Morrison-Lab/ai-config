@@ -119,6 +119,35 @@ def wrapped_check_review_comments(pr_num, sha, repo, review_decision="", branch=
 checker.check_ci_runs = wrapped_check_ci_runs
 checker.check_review_comments = wrapped_check_review_comments
 
+
+def _no_review_issue(is_draft):
+    """`check_review_comments`' message when a PR has NO automated review.
+
+    Built directly rather than through the wrapper above, which does not carry
+    `isDraft`. The two states produce the same absence and need opposite
+    responses, so the message has to distinguish them (ai-config#3651).
+    """
+    pr = PullRequest.__new__(PullRequest)
+    pr.pr_num, pr.repo = "3635", TEST_REPO
+    pr._fetcher = checker.run_cmd
+    pr._data = {"headRefOid": "sha123", "reviewDecision": "",
+                "headRefName": "b", "comments": [], "reviews": [],
+                "isDraft": is_draft}
+    pr._check_runs = None
+    ok, issues = original_check_review_comments(pr, 1)
+    assert not ok, "a PR with no review must never read clean"
+    return " ".join(issues)
+
+
+_draft_msg = _no_review_issue(True)
+_ready_msg = _no_review_issue(False)
+check("a DRAFT with no review says the workflow will not run on it",
+      "DRAFT" in _draft_msg and "Mark it ready" in _draft_msg)
+check("a READY PR with no review does not claim it is a draft",
+      "DRAFT" not in _ready_msg and "No automated review" in _ready_msg)
+check("a draft and a ready PR do not produce the identical no-review message",
+      _draft_msg != _ready_msg)
+
 def best_of_three(fn, *args):
     """Fastest of three runs, with the last return value.
 

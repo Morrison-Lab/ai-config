@@ -174,5 +174,207 @@ with tempfile.TemporaryDirectory() as tmp:
     check("--check exits 0 for skipped alone",
           result.returncode == 0)
 
+# --- interpreter probe (ai-config#3624) -------------------------------------
+#
+# Every check above asks THIS process whether a path exists. That is the wrong
+# process: the harness spawns the hook command, and the interpreter it resolves
+# may not see the same filesystem. On Windows bare `python3` commonly resolves
+# to the Store App Execution Alias, which cannot read %APPDATA%\Claude -- so
+# every path above reports ok while every hook denies every tool call.
+#
+# Known-positive first, per this file's own negative-control rule: a probe that
+# never returns "blind" is indistinguishable from one that never runs.
+
+check("interpreter_token reads the interpreter out of a hook command",
+      hp.interpreter_token('python3 "/x/y.py"') == "python3")
+check("interpreter_token returns None for a script that runs itself",
+      hp.interpreter_token('"/x/y.sh"') is None)
+check("interpreter_token returns None for an empty command",
+      hp.interpreter_token("") is None)
+
+with tempfile.TemporaryDirectory() as tmp:
+    present = Path(tmp) / "hook.py"
+    present.write_text("")
+    absent = Path(tmp) / "no-such-hook.py"
+
+    check("probe_interpreter reports ok when the interpreter can read the file",
+          hp.probe_interpreter(sys.executable, str(present)) == "ok")
+    # The known-positive. A real interpreter pointed at a file that is really
+    # absent produces the same observation the Store alias produces for a file
+    # that is present -- which is what makes the verdict meaningful.
+    check("probe_interpreter reports blind when the interpreter cannot see it",
+          hp.probe_interpreter(sys.executable, str(absent)) == "blind")
+    check("probe_interpreter reports unlaunchable for a name that will not run",
+          hp.probe_interpreter("python3-no-such-interpreter-xyz",
+                               str(present)) == "unlaunchable")
+    # `-c` is a Python flag. Handing it to sh or node would test the prober.
+    check("probe_interpreter skips a non-Python interpreter",
+          hp.probe_interpreter("node", str(present)) == "skipped")
+
+    # End to end: --check runs the probe and says how many it probed, so a
+    # silent pass cannot be mistaken for a clean one.
+    home = Path(tmp) / "claude"
+    write_settings(home, settings_with(f'"{sys.executable}" "{present}"'))
+    result = run_check(home)
+    check("--check reports how many interpreters it probed",
+          "probed 1 interpreter(s)" in result.stdout)
+    check("--check stays green when the interpreter can read its hook",
+          result.returncode == 0)
+
+    # An interpreter that did not resolve HERE is not a finding: the harness
+    # spawns hooks through its own shell, and reading our PATH backwards would
+    # be the same mistake #3624 is about, pointed the other way.
+    write_settings(home, settings_with(
+        f'python3-no-such-interpreter-xyz "{present}"'))
+    result = run_check(home)
+    check("--check names an interpreter it could not launch",
+          "NO EXEC" in result.stdout)
+    check("--check does not fail the install over an unlaunchable name",
+          result.returncode == 0 and "Not findings" in result.stdout)
+    # The count is the whole reason that line exists, so it must not credit a
+    # probe that reached no answer.
+    check("--check does not count an unlaunchable name as probed",
+          "probed 0 interpreter(s)" in result.stdout)
+
+    # The END-TO-END known positive. Without it, deleting the escalation
+    # entirely leaves the suite green: every other case here is either a unit
+    # call or a clean run.
+    stub_dir = Path(tmp) / "stub"
+    stub_dir.mkdir()
+
+    def make_stub(name, exit_code):
+        """An interpreter stub with a Python-shaped name and a fixed status.
+
+        The name must start with `python` or `probe_interpreter` skips it, and
+        `-c` is a Python flag so a real non-Python interpreter would be the
+        wrong subject here.
+        """
+        if os.name == "nt":
+            path = stub_dir / (name + ".bat")
+            path.write_text("@exit /b " + str(exit_code) + NL)
+        else:
+            path = stub_dir / name
+            path.write_text("#!/bin/sh" + NL + "exit " + str(exit_code) + NL)
+            path.chmod(0o755)
+        return path
+
+    stub = make_stub("python3blind", 1)
+    write_settings(home, settings_with(f'"{stub}" "{present}"'))
+    result = run_check(home)
+    check("--check names an interpreter that reported a present file absent",
+          "BLIND" in result.stdout)
+    check("--check counts the blind interpreter as probed",
+          "probed 1 interpreter(s)" in result.stdout)
+    check("--check fails the install on a blind interpreter",
+          result.returncode == 1)
+    check("--check gives the blind interpreter's remedy",
+          "App execution aliases" in result.stdout)
+    check("--check does not also print the all-clear sentence",
+          "Every registered hook path resolves." not in result.stdout)
+
+    # An interpreter that exits with neither 0 nor 1 reported nothing about
+    # the file. Folding that into `blind` would make --check fail the install
+    # with the Store-alias remedy over an interpreter that merely crashed --
+    # the same "claim a cause nobody observed" error the six-verdict list
+    # exists to prevent. Pinned in both directions, because without the
+    # negative half the fold ships silently.
+    odd = make_stub("python3odd", 7)
+    check("probe_interpreter reports unknown for a status it does not model",
+          hp.probe_interpreter(str(odd), str(present)) == "unknown")
+    write_settings(home, settings_with(f'"{odd}" "{present}"'))
+    result = run_check(home)
+    check("--check names an interpreter that reached no verdict",
+          "UNKNOWN" in result.stdout)
+    check("--check does not count it as probed",
+          "probed 0 interpreter(s)" in result.stdout)
+    check("--check does not treat it as a finding",
+          result.returncode == 0 and "BLIND" not in result.stdout
+          and "App execution aliases" not in result.stdout)
+
+    # A plugin-root command is `skipped` by the path check -- and it is the
+    # exact registration shape #3624 was observed in, so dropping it silently
+    # would end this check on an all-clear for the one case it is written for.
+    write_settings(home, settings_with(
+        'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/a.py"'))
+    result = run_check(home)
+    check("--check reports a plugin-root command as unprobed, not as clean",
+          "UNPROBED" in result.stdout)
+    check("--check says why the plugin-root command could not be probed",
+          "expands only in the plugin loader" in result.stdout)
+    check("--check does not claim to have probed it",
+          "probed 0 interpreter(s)" in result.stdout)
+
+    # `py` is the standard Windows launcher -- the platform this whole change
+    # exists for -- and its name is not Python-shaped, so `-c` cannot ask it
+    # anything. It must still be NAMED: a row that leaves this check
+    # unmentioned while the closing line says everything resolves is the
+    # failure #3624 is a case of.
+    write_settings(home, settings_with(f'py -3 "{present}"'))
+    result = run_check(home)
+    check("--check names a non-Python interpreter rather than dropping it",
+          "NOT PY" in result.stdout and "py" in result.stdout)
+    check("--check does not count a non-Python interpreter as probed",
+          "probed 0 interpreter(s)" in result.stdout)
+
+    # Each unprobeable row carries ITS OWN reason. `skipped` has two causes,
+    # and asserting the plugin-loader one for a command that simply names no
+    # script is the same "claim a cause nobody observed" error in miniature.
+    write_settings(home, settings_with("python3 -c 'import sys'"))
+    result = run_check(home)
+    check("--check gives a scriptless command its own reason",
+          "names no script" in result.stdout)
+    check("--check does not blame the plugin loader for a scriptless command",
+          "expands only in the plugin loader" not in result.stdout)
+
+    # The distribution line counts ROWS against rows. Counting per-interpreter
+    # buckets against `len(rows)` reported "3 of 10" on a healthy install,
+    # because every hook sharing one `python3` spelling collapses to one
+    # interpreter -- so a genuinely dropped row was invisible against the
+    # baseline shortfall. This case registers several rows on ONE interpreter,
+    # which is exactly what made the old line wrong.
+    write_settings(home, settings_with(f'python3 "{present}"'))
+    with open(home / "settings.json") as fh:
+        blob = json.load(fh)
+    blob["hooks"]["PreToolUse"][0]["hooks"] *= 4
+    (home / "settings.json").write_text(json.dumps(blob))
+    result = run_check(home)
+    check("the distribution line counts rows, not interpreters",
+          "4 registered command(s): 4 probeable" in result.stdout)
+    check("several rows sharing one interpreter still probe it once",
+          "probed 1 interpreter(s)" in result.stdout)
+
+    # Two skipped rows on the SAME interpreter with DIFFERENT causes: keying
+    # the bucket by interpreter alone kept the first row's reason and printed
+    # it over the second.
+    write_settings(home, settings_with(
+        'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/a.py"'))
+    with open(home / "settings.json") as fh:
+        blob = json.load(fh)
+    blob["hooks"]["PreToolUse"][0]["hooks"].append(
+        {"type": "command", "command": "python3 -c 'import sys'"})
+    (home / "settings.json").write_text(json.dumps(blob))
+    result = run_check(home)
+    check("two unprobeable rows on one interpreter each keep their own reason",
+          "expands only in the plugin loader" in result.stdout
+          and "names no script" in result.stdout)
+    check("the distribution line counts both unprobeable rows",
+          "2 registered command(s): 0 probeable, 2 unprobeable" in result.stdout)
+
+with tempfile.TemporaryDirectory() as tmp:
+    present = Path(tmp) / "hook.py"
+    present.write_text("")
+    # A leading assignment is part of the command, not the name of it.
+    check("interpreter_token skips a leading environment assignment",
+          hp.interpreter_token('PYTHONPATH=/x python3 "/y/a.py"') == "python3")
+    check("interpreter_token skips several leading assignments",
+          hp.interpreter_token('A=1 B=2 python3 "/y/a.py"') == "python3")
+    check("interpreter_token does not mistake a path containing = for one",
+          hp.interpreter_token('/opt/a=b/python3 "/y/a.py"') == "/opt/a=b/python3")
+    # TimeoutExpired IS a SubprocessError, so folding them would report an
+    # interpreter that launched and hung as one that never launched.
+    check("probe_interpreter separates a hang from a failure to launch",
+          hp.probe_interpreter(sys.executable,
+                               str(present), timeout=0.0) == "timeout")
+
 print(NL + f"{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

@@ -430,6 +430,7 @@ The payload gaps that remain and the per-guard status are in
 | hook | event | enforces |
 |---|---|---|
 | `inject-local-time.sh` | `UserPromptSubmit` | supplies the real local time, so a recap timestamp is never recalled |
+| `warn-python3-cannot-read-hooks.sh` | `UserPromptSubmit` | names the interpreter when the `python3` on `PATH` cannot read the directory the hooks live in -- a condition that denies `Bash`, `Edit`, `Write` and `Agent` at once (every tool a `PreToolUse` matcher names; `Read` and `Grep` are unaffected), while each denial names a hook rather than the interpreter. Shell, not Python: in the failure this hook reports, no Python hook can run. Silent when the interpreter is fine; see the hook's own header for the mechanism (ai-config#3624) |
 | `require-gh-repo-flag.py` | `PreToolUse` (Bash) | blocks a mutating repo-scoped `gh` command that omits `-R` |
 | `no-offer-to-file.py` | `Stop` | blocks a reply that *offers* to file or record instead of doing it |
 | `no-empty-promise.py` | `Stop` | blocks a reply committing to future behaviour when the same turn shipped no mechanism: a rule ("going forward, I will/won't") needs a durable write, an owed action ("I owe #N the ARDI loop") needs that or an armed timer/watcher |

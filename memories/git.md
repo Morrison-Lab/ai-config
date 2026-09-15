@@ -777,6 +777,26 @@ refs/pull/3060/head` returns `f9068299`, the default refspec is
 not brought down, and the record anchors instead on commits that
 `git merge-base --is-ancestor ... origin/main` accepts.)
 
+Another occurrence, Morrison-Lab/ai-config#3650, 2026-09-14, and an earlier-stage
+variant of the same mistake: `shared/principles/fail-fast.md` cited two
+branch SHAs from an open, unmerged PR (#3647) as the site of a fixed bug.
+An adversarial review called both fabricated, having unshallowed the repo and
+found neither object -- correct evidence at review time, since the branch was
+local-only and unpushed when the review ran.
+Pushing the branch made the SHAs resolve, but that only proves the citation
+was reachable *today*; this repo squash-merges (`git log origin/main
+--first-parent -30 --format='%h %p'` returns 30 commits with exactly one
+parent each), so once #3647 lands neither SHA becomes an ancestor of `main`
+and the citation goes dead anyway, on the same schedule this section already
+describes.
+The fix was the one this section already prescribes -- drop the SHAs, cite
+`#3624`/`#3647` by number, and hedge the incident as proposed-and-open rather
+than settled fact, the same way `memories/claude-code-hooks.md`'s sibling
+"third route" entry already did.
+The durable point is not that citing an unpushed branch SHA is a new failure
+mode; it is that the very entry stating this rule did not stop a same-day
+session from writing one anyway, which is what the count is for.
+
 That a repository's merge strategy is chosen per pull request, and so cannot
 be read off the last one, is not a hypothetical.
 This entry originally cited `082f369` as a still-reachable example, on the

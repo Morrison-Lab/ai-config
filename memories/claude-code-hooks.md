@@ -1,6 +1,6 @@
 # Claude Code hooks: manifest, registration, and install failures
 
-How this repo's hooks reach a machine and how that goes wrong --- the native `hooks/hooks.json` schema, the split between `install-hooks.py` (which binds) and a manual copy (which places, the plugin loader serving its hooks from the plugin root instead), and the two routes to a registered hook whose script is absent, one of which takes the whole `Bash` tool down.
+How this repo's hooks reach a machine and how that goes wrong --- the native `hooks/hooks.json` schema, the split between `install-hooks.py` (which binds) and a manual copy (which places, the plugin loader serving its hooks from the plugin root instead), and three routes to a registered hook that blocks the whole `Bash` tool: two where the script is genuinely absent, and one (Windows) where it exists and `python3` cannot see it.
 For the complete catalog of active hooks and rules for proactively complying with each hook, see [`hooks.md`](hooks.md).
 `check-install.py`, this file's original placement instrument, was removed along with the symlink install it verified.
 [ai-config#2352](https://github.com/Morrison-Lab/ai-config/issues/2352) tracks a replacement, so read every reference to it below as historical.
@@ -200,6 +200,46 @@ registered-but-absent state the 2026-08-05 incident produced.
 The order in the Do bullet above is the recovery as well as the
 prevention.
 
+### A third route: the file exists and `python3` still cannot see it (Windows App Execution Alias)
+
+The two routes above both leave the registered path genuinely absent from disk.
+This route leaves the file exactly where the registration says it is, and the interpreter still cannot open it --- so `Test-Path`/`ls` on the named file answers True, which makes the corrupt-cache or stale-registration diagnosis above look confirmed when it is refuted.
+
+On Windows, bare `python3` on `PATH` commonly resolves to the Microsoft Store App Execution Alias, a stub that forwards to a real interpreter.
+That stub runs it inside a packaged-app filesystem view with no access to `%APPDATA%\Claude` --- exactly where the plugin, and therefore every hook file, lives.
+Every Python hook is registered as `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/<name>.py"`, so every one of them dies the same way, each denial naming a different hook and never the interpreter:
+
+```
+PreToolUse:Bash hook error: [python3 "...\hooks\flag-unmeasured-timestamp.py"]:
+...python.exe: can't open file '...': [Errno 2] No such file or directory
+```
+
+A `PreToolUse` hook that fails to launch DENIES the call (exit 2, per the section above), so the outage is total: Bash, Edit, Write and Agent all stop working at once, each error naming a hook rather than the shared cause.
+
+`hooks/warn-python3-cannot-read-hooks.sh`
+(proposed in [#3647](https://github.com/Morrison-Lab/ai-config/pull/3647), not yet on `main` as of this writing)
+is the detector: a `UserPromptSubmit` shell hook (Python cannot run to diagnose a Python-interpreter failure, so this one is deliberately POSIX `sh`) that probes whether `python3` can read `$0` --- the hook's own script file, in the same directory every Python hook lives in --- and names the interpreter on the first turn when it cannot.
+
+**Two remedies, and only one worked on a machine actually tried:**
+
+- Turn OFF the alias (Windows Settings > Apps > Advanced app settings > App execution aliases > "python3") so a real Python wins on `PATH`.
+- Put a real `python3` ahead of `WindowsApps` on `PATH`.
+  The obvious move --- copy `python.exe` to `python3.exe` inside the existing Python install directory --- can fail.
+  A system-wide install under `C:\Python313` is admin-owned, and copying into it is denied even though it precedes `WindowsApps` on `PATH`.
+  A user-local install (`C:\Users\<user>\AppData\Local\Programs\Python\Python3xx`) is both writable and, on a per-user install, ahead of `WindowsApps` on `PATH` --- the copy succeeds there.
+  Confirm precedence before assuming a location works: a writable directory that sits *after* `WindowsApps` on `PATH` fixes nothing.
+
+Restart the session after either remedy.
+Hooks load at session start, so `command -v python3` inside the current shell can still be stale.
+
+- **Do:** read every hook-denial error naming a missing file as this bug first, on Windows, when the named file demonstrably exists.
+- **Do:** check `PATH` order before picking a directory to place `python3.exe` in --- writable and ahead of `WindowsApps` are both required, and a system-wide Python install directory is commonly writable-but-behind or ahead-but-not-writable.
+- **Don't:** conclude the plugin cache is corrupt because the named file exists --- that check passes in exactly this failure.
+- **Don't:** assume disabling the alias is available --- a managed/locked-down machine may refuse the settings change, which is why the PATH-order remedy exists as an alternative.
+
+(Morrison-Lab/ai-config#3624: filed, with the detector hook above proposed in PR #3647 (open as of this writing).
+The per-machine remedy that actually worked is recorded here because the first location tried did not: `C:\Python313\python3.exe` failed with Access Denied, while `C:\Users\<user>\AppData\Local\Programs\Python\Python311\python3.exe` succeeded, being both writable and ahead of `WindowsApps` on that machine's `PATH`.)
+
 ## A hook's deny rejects the WHOLE call, so a compound command's setup segments never run either
 
 The two sections above are about *which calls* a hook blocks.
@@ -317,6 +357,49 @@ That is wasteful for a warn-only hook and is not benign for a blocking one.
   `set(_matchers) >= {"Agent", "Task", "SendMessage"}`, which a single alternation group would fail.
 
 **Catalog validator:** `scripts/check-hook-catalog.py` parses compound matcher entries (e.g. `PreToolUse (Bash, mcp__github__.*)`) using `ROW` regex matcher class `[A-Za-z0-9_.*, -]`, plus a backslash-escaped pipe for an alternation cell, and aggregates multiple matcher groups for the same script and event.
+
+## A `PreToolUse` payload's `cwd` sits at the top level, not inside `tool_input`
+
+`payload.get("cwd")` is the established convention across this repo's hooks.
+Derive the count rather than citing this one, since hooks are added often:
+
+```bash
+grep -lE 'payload\.get\(\s*["'"'"']cwd' hooks/*.py | grep -v '/test-' | wc -l
+```
+
+That printed **18** on `main` on 2026-09-14.
+The set spans EVENTS, so pick an exemplar by the event you care about rather than off the top of the list: `flag-cd-into-main-checkout.py`, `flag-dispatch-over-uncommitted.py` and `no-clobbering-push.py` are `PreToolUse`, while `no-unmonitored-pr.py` and `no-unshipped-commit.py` are `Stop`, whose payloads carry no `tool_input` at all, so neither is evidence for anything about nesting.
+
+Derive a hook's events PER COMMAND, never per event group:
+
+```bash
+python3 -c 'import json
+h = json.load(open("hooks/hooks.json"))["hooks"]
+for ev, groups in h.items():
+    for g in groups:
+        for entry in g.get("hooks", []):
+            if "no-unmonitored-pr.py" in entry.get("command", ""):
+                print(ev)'
+```
+
+A first version of this paragraph said `no-unmonitored-pr.py` was also on `UserPromptSubmit`.
+It is not: the query above prints only `Stop`, and `README.md`'s hook catalog and `memories/hooks.md` both agree.
+The false claim came from a query that dumped each event GROUP to JSON and substring-matched the whole thing, so any hook sharing a group with a `UserPromptSubmit` entry inherited that event.
+The `UserPromptSubmit` poller hooks are `inject-pr-monitor-status.py` and `ensure-open-pr-monitor.py`;
+`no-unmonitored-pr.py`'s module docstring calls one of them "the companion UserPromptSubmit hook", which is the phrase a careless read turns into a registration.
+Two of the 18 (`no-handrolled-verdict-parse.py`, `warn-verdict-line-filter.py`) additionally fall back to `tool_input.cwd` as a defensive second read.
+
+Eighteen consumers agreeing is evidence about this repo's convention and not, by itself, evidence about the harness's schema --- they could share one wrong assumption, which is the substitution [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md) warns about.
+The independent source is the published hook schema at <https://code.claude.com/docs/en/hooks>, which lists `cwd` as a top-level key beside `session_id`, `transcript_path`, `hook_event_name`, `tool_name` and `tool_input`.
+`.cursor/hooks/adapt-claude-hooks.py` agrees and is NOT independent: it lives in this repo, and its own docstring says it translates a Cursor payload "into the Claude Code payload the existing scripts expect", so it was built to match those 18 consumers and shares their assumption by construction.
+Citing it as the corroboration was the very substitution the sentence above warns about.
+`tool_input` carries the tool's own arguments (`command`, `file_path`, ...).
+`cwd` is a property of the call itself and sits beside `tool_name`/`tool_input`, not inside it.
+
+Building a hand-crafted probe payload with `cwd` nested under `tool_input` is silently wrong rather than loudly wrong: every hook above reads `payload.get("cwd")` at the top level, gets `None`, and takes whatever fallback it has --- usually `os.getcwd()`, but `guard-slide-major-tag.py` tries `CLAUDE_PROJECT_DIR` first, and `no-unshipped-commit.py` has no `os.getcwd()` at all: its docstring says that without a `cwd` "repository state is unknowable", so it abandons repository state and falls back to the transcript scan --- so the probe runs, the hook exits 0, and a directory-sensitive guard reads as "did not fire on this input" for a reason that has nothing to do with the behaviour under test.
+
+- **Do:** put `cwd` at the top level of a constructed `PreToolUse` payload, beside `tool_name` and `tool_input`, never nested inside `tool_input`.
+- **Don't:** read a probe's silence as a verdict about the hook before checking the payload shape it was actually fed.
 
 ## Complete hook lifecycle catalog (27 events)
 
@@ -554,15 +637,13 @@ This is the adjacent-artifact substitution [`verify-the-right-artifact`](../shar
 (Measured 2026-09-11.
 [ai-config#3577](https://github.com/Morrison-Lab/ai-config/issues/3577) was filed on the behaviour and corrected once the repo files were read.)
 
-## Mutation-testing a hook that uses `_sibling()` cross-imports needs the mutant copy IN `hooks/`, not `/tmp`
+## Mutation-testing a hook that resolves an import off its own `__file__` (a sibling hook, or a `scripts/lib` module) needs the mutant copy IN `hooks/`, not `/tmp`
 
 Every hook that imports another hook's helpers uses the `_sibling()` pattern (`flag-unmeasured-timestamp.py`, `flag-unread-commit-citation.py`, ...), which resolves the sibling's path off `HERE = os.path.dirname(os.path.realpath(__file__))` --- the mutant's OWN directory, not the original hook's.
 Copying a mutated hook file to `/tmp` for mutation-testing (`cp hook.py /tmp/mut.py`, or writing the mutant there directly) silently breaks every `_sibling()` import, because `/tmp/flag-unmeasured-timestamp.py` does not exist.
 `_sibling()` fails open (returns `None` on any exception), so the mutant does not crash --- it just runs with every imported regex/function replaced by `None` or a narrow local fallback, which changes its behaviour for reasons that have nothing to do with the mutation under test.
 
-That `HERE` spelling was `os.path.abspath(__file__)` until [#2981](https://github.com/Morrison-Lab/ai-config/issues/2981) changed every non-test hook that used it to `realpath`.
-(Three non-test hooks elsewhere in `hooks/` already used `Path(__file__).resolve()` and were not touched:
-`flag-unattributable-reviewer-request.py`, `no-misattributed-quote.py` and `no-unauthorized-merge.py`.
+That `HERE` spelling was `os.path.abspath(__file__)` until [#2981](https://github.com/Morrison-Lab/ai-config/issues/2981) changed every non-test hook that used it to `realpath`. (Three non-test hooks elsewhere in `hooks/` already used `Path(__file__).resolve()` and were not touched: `flag-unattributable-reviewer-request.py`, `no-misattributed-quote.py` and `no-unauthorized-merge.py`.
 Only the first of those uses `_sibling()`, so the other two are outside this section's population.)
 Nothing in this section changes: `abspath` and `realpath` agree for a mutant copied into a real directory, and the `/tmp` trap above is about the directory, not about how it is spelled.
 
@@ -575,3 +656,160 @@ The tell, if you look for it, is that DIFFERENT mutations (say, inverting a patc
 - **Don't:** trust a mutation-test run's pass/fail count without spot-checking that the mutation itself is present in the file actually being tested.
 
 (Measured 2026-09-09 authoring `hooks/flag-unread-commit-citation.py` (ai-config#3471): a `/tmp`-copied mutant produced `body=None` from `_post_from_payload` for a completely unrelated reason --- its `_sibling()` call for `flag-unmeasured-timestamp.py` returned `None` because `/tmp/flag-unmeasured-timestamp.py` does not exist --- and a later `hooks/`-placed rerun of the identical mutation correctly failed the suite.)
+
+**The population is wider than `_sibling()`, and the remedy is the same one --- which is the part I got wrong.**
+
+The section above is written around a hook importing another *hook's* helpers via `_sibling()`.
+A hook that instead does a path-relative import of a `scripts/lib` module fails identically when its mutant is written somewhere other than `hooks/`, because both resolve off the same thing: the running file's own directory.
+
+```python
+_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+    "scripts", "lib")
+```
+
+That is `hooks/warn-heredoc-doubled-backslash.py`, and `os.path.realpath(__file__)` is the mutant's path, not the original's.
+So "keep the mutant in `hooks/`" fixes a `scripts/lib` import exactly as it fixes a sibling import.
+Measured 2026-09-14 by copying that hook to two places and feeding each the same payload: the copy in `hooks/` evaluated normally, and the copy in a temp directory printed `cannot load scripts/lib/shellcmd.py (No module named 'shellcmd')` and declined to evaluate.
+
+**The repo already encodes this, which is the actual lesson.**
+Three committed harnesses pass `dir=os.path.dirname(HOOK)` to `mkstemp` for the same file-relative resolution --- two for a `scripts/lib` import and the third for a sibling import, which is the point, since the remedy does not care which --- `hooks/test-warn-heredoc-doubled-backslash.py`, `hooks/test-warn-blanket-worktree-force-remove.py`, and `hooks/test-flag-conflict-with-base.py` --- and the first carries a comment naming the mechanism and the symptom:
+
+> The mutated copy must live NEXT TO the real hook, not in the OS temp directory.
+> The hook resolves `scripts/lib/shellcmd.py` relative to its own `__file__` (two directories up), so a mutated copy dropped elsewhere silently fails that import [...]
+> That reads as every clause being load-bearing, which is not what the mutation is testing.
+
+I hit this symptom on a branch that added a `scripts/lib` import to two hooks whose harnesses copy one file to a temp directory, and reached for a `PYTHONPATH` shim without grepping for how the repo already solved it.
+The first draft of this entry then recorded the shim as a *different* remedy and told future sessions **not** to relocate the mutant --- steering them away from the fix three committed harnesses already use, on a false premise the same draft contradicted two paragraphs earlier by calling the import "resolved off its own `__file__`, the same way `_sibling()` is".
+That is [`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md): a UMS pass concluded the corpus lacked coverage without querying for it, and nearly wrote a rule that inverts working practice.
+
+`PYTHONPATH` is a valid fallback, not a replacement --- use it only where the harness genuinely cannot write into `hooks/`, and point it at the directory the hook's OWN spelling needs.
+The two spellings need different roots, so one value does not serve both: a bare `import shellcmd` after joining `"scripts", "lib"` needs `<repo>/scripts/lib`, while `from scripts.lib.X import ...` needs the repo ROOT and fails with `No module named 'scripts'` given the other.
+There is no safe default, so READ THE HOOK'S OWN IMPORT LINE and set `HOOK_IMPORT_ROOT` from it: `<repo>/scripts/lib` for the bare spelling, the repo ROOT for the package spelling.
+Measured on `main`, 2026-09-14: 11 of the 13 importers use the bare spelling ONLY (`comm -23` of the two greps), 1 uses the package spelling only (`flag-unread-commit-citation.py`), and 1 matches BOTH greps (`no-push-without-self-review.py`).
+That last one is a grep artifact rather than a hook using two spellings: its only `import` is the package form, and its `"scripts", "lib"` hit is a path join feeding `spec_from_file_location` in an `ImportError` fallback that inserts both roots off its own `__file__`.
+So it is the worst exemplar to reason from, and the reason the instruction above is to read the hook's own import LINE rather than to count grep hits.
+
+A first version of this paragraph named the placeholder `REAL_SCRIPTS_LIB`, and a "fix" then renamed it and declared the repo ROOT "the safe value when in doubt".
+That is wrong for 11 of the 13, and it blamed the name that carried the right value for the majority --- the same shape as the mistake this section already narrates two paragraphs up, where a first draft told future sessions NOT to relocate the mutant.
+Twice in one file, a self-correction inverted a working default.
+The lesson is not to correct more carefully;
+it is that a prescription is a claim, so it needs the query beside it rather than a confident adverb:
+
+```bash
+comm -23 <(grep -lE '"scripts", "lib"' hooks/*.py | grep -v '/test-' | sort) \
+         <(grep -lE 'from scripts\.lib\.' hooks/*.py | grep -v '/test-' | sort) | wc -l
+```
+
+```python
+env = dict(os.environ)
+env["PYTHONPATH"] = os.pathsep.join(
+    [HOOK_IMPORT_ROOT] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
+proc = subprocess.run([sys.executable, hook_path], ..., env=env, ...)
+```
+
+**Derive the exposed set rather than remembering it, and make the predicate as wide as the claim.**
+The predicate is: a hook resolving ANY import off its own `__file__` --- a sibling hook or a `scripts/lib` module --- whose own harness materializes a mutant `.py` somewhere other than `hooks/`.
+
+Getting that wrong is how a first version of this entry produced a false all-clear.
+Its loop greped only for `scripts/lib` imports while the paragraph above it had already widened the population to include `_sibling()`, so the loop could not see the half the conclusion covered, and the entry then reported that no committed harness had the bug.
+One does.
+A detector narrower than the sentence it supports is worse than no detector, because the sentence reads as measured.
+
+```bash
+for f in hooks/*.py; do
+  case "$f" in hooks/test-*) continue;; esac
+  grep -qE '"scripts", "lib"|from scripts\.lib\.|_sibling\(|_load_sibling' "$f" || continue
+  t="hooks/test-$(basename "$f" .py).py"
+  [ -f "$t" ] || continue
+  grep -qE 'mkstemp\(suffix="\.py"|shutil\.copy\(HOOK|mutant-.*\.py' "$t" || continue
+  grep -qE 'dir=os\.path\.dirname\(HOOK\)' "$t" && continue
+  echo "EXPOSED: $f -> $t"
+done
+```
+
+Both `scripts/lib` spellings are in the first grep because neither alone covers that half: `"scripts", "lib"` matches 12 non-test hooks and `from scripts.lib.` matches 2, with `hooks/no-push-without-self-review.py` in both, for a union of 13.
+
+Run on `main` on 2026-09-14 it printed three files.
+Two are false positives that say so themselves --- `hooks/test-no-push-without-self-review.py:1116` and `hooks/test-remind-learn-from-review.py:257` each copy the hook without its sibling on purpose, to pin the degraded path.
+The third, `hooks/warn-new-line-breaks-on-push.py`, is a real instance: its harness writes the mutant to a bare temp directory, so all three of its clauses "pass" while flipping the identical five cases.
+Filed as [ai-config#3648](https://github.com/Morrison-Lab/ai-config/issues/3648).
+Re-derive rather than citing these figures.
+
+Three known limits of the loop, so the next reader does not mistake it for complete, and one it USED to have.
+Its exclusion test is FILE-level, so a harness with two mutant sites where only one passes `dir=` is silently dropped.
+And it only sees harnesses that materialize a `.py` file at all, which is a proxy for "runs a mutant as a subprocess" rather than the thing itself.
+The third is this section's own mistake one level down: the grep matches four SPELLINGS (`"scripts", "lib"`, `from scripts.lib.`, `_sibling(`, `_load_sibling`) while the predicate above says "any import resolved off `__file__`", so a hook using a differently-named helper is invisible to it.
+`hooks/no-underived-required-check.py` is one today, resolving a sibling through `_HERE` and `spec_from_file_location`.
+It is not exposed --- its harness loads mutants in memory rather than writing them --- so the three-file result stands, but the gap bites the moment such a hook grows a file-materializing harness.
+
+The retired one is worth recording, because it was the same defect a third time and in the same loop.
+The materialization grep matched two spellings, `mkstemp(suffix=".py"` and `shutil.copy(HOOK`, and five committed harnesses write their mutant as `mutant-{clause}.py` instead --- among them `test-no-clobbering-push.py`, `test-flag-reset-hard-uncommitted-work.py`, `test-flag-add-a-outside-pathspec.py`, `test-flag-stale-branch-mutation.py` and `test-flag-unchained-branch-switch.py`.
+Four of those five belong to hooks [ai-config#1973](https://github.com/Morrison-Lab/ai-config/issues/1973)'s Scope section lists as token-comparing, and which its Suggested direction would route through a shared descent helper, so the loop would have returned a false all-clear for them the moment that extraction landed --- which is verbatim the failure this section already narrates about its own first version.
+
+Which directory the helper lands in does not change that, and saying it does was this entry's own fifth citation slip.
+A first version of this sentence said #1973 proposes giving those hooks a `scripts/lib` import.
+The issue says no such thing --- `grep` it and `scripts/lib` appears nowhere;
+its Suggested direction reads "a shared helper under `hooks/`".
+`scripts/lib` is where [ai-config#3645](https://github.com/Morrison-Lab/ai-config/pull/3645) actually put it, which is a true fact about that PR attached to the wrong source.
+That shape is worth naming because it is not fabrication and does not feel like one: every noun in the sentence was real, and only the attribution was invented.
+Either directory resolves off the hook's own `__file__`, which is the predicate that matters here.
+The third alternative is in the grep now, and adding it changed nothing today: the loop still prints the same three files.
+
+- **Do:** write a mutant into `hooks/` (`dir=os.path.dirname(HOOK)`), which covers sibling imports and `scripts/lib` imports alike.
+- **Do:** grep for how the repo already solves a harness problem before inventing a remedy for it --- three harnesses carried the answer and one carried the explanation.
+- **Don't:** reach for `PYTHONPATH` first;
+  it is the fallback for a harness that cannot write into `hooks/`.
+- **Don't:** record a remedy as novel because your own branch hit the symptom --- that is a claim about the corpus, and it needs the query.
+
+(The SYMPTOM is what makes this findable, and it is worth recognising on sight: every case reads as "flipped" under EVERY mutation clause, including clauses that have nothing to do with it.
+That pattern means the mutant is not running the code under test at all --- the import landed as `None` and the hook degraded --- rather than that the reverted clause did anything.
+A single clause flipping unexpected cases is a test problem.
+ALL of them flipping the same new cases is an import problem.)
+
+**Whichever remedy you pick, a one-file mutant harness cannot mutate the imported module --- and the remedy is what guarantees it.**
+
+Everything above is about making the mutant's import *work*.
+The corollary is that a working import is an import of the **real** module, so
+a clause living in `scripts/lib/shellcmd.py` is unreachable from a `MUTATIONS`
+table that rewrites one hook file.
+Placing the mutant in `hooks/` resolves the import off the repo above it;
+the `PYTHONPATH` fallback points at the real `scripts/lib` by construction.
+Both routes hand the subprocess the unmutated module, so a `MUTATIONS` entry
+naming a shared-module clause reverts nothing and scores as "the tests caught
+it" --- outcome one of
+[`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md)'s
+inapplicable-mutation list,
+arrived at from a direction that never looks like an inapplicable mutation,
+because the edit really was written and really did apply to the file the
+harness copied.
+
+`hooks/test-no-clobbering-push.py`'s `verdict()` on the
+[ai-config#1973](https://github.com/Morrison-Lab/ai-config/issues/1973) branch
+is the worked case, and its own comment states the mechanism:
+
+> The mutation harness copies ONE FILE to a temp directory, so a hook that
+> imports a shared module cannot resolve it from `__file__` there -- the copy
+> has no repo above it.
+> Without this, `shell_c_expansions` lands as `None` in
+> every mutant, the interpreter-wrapper cases go silent under EVERY clause, and
+> they read as "flipped" for reasons that have nothing to do with the clause
+> being reverted.
+
+So a cross-file clause needs a different instrument, not a better mutation:
+a direct-assertion suite against the module itself
+(`scripts/test_shellcmd.py` here), plus at least one end-to-end case through
+the hook that fails when the module's clause is reverted.
+Reverting the clause and running the module's own suite is the non-vacuity
+check, and it is the one a `MUTATIONS` table cannot perform for you.
+
+- **Do:** keep `MUTATIONS` scoped to clauses in the file the harness copies,
+  and pin a shared module's clauses with that module's own assertion suite.
+- **Do:** add an end-to-end case through the hook for each shared-module
+  clause, so the wiring is covered even though the clause is not mutable here.
+- **Do:** revert the shared clause and run the module's suite, to show the
+  assertions are non-vacuous.
+- **Don't:** list a shared-module clause in a one-file harness's `MUTATIONS` ---
+  it scores green for the same reason it cannot fail.
+- **Don't:** read an all-clauses-pass run as covering the imported code; the
+  imported code was never the mutant.

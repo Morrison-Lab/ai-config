@@ -293,3 +293,59 @@ see ai-config#2030.)
 A reviewer found it and suggested `^[ \t]*>[^\n]*$`;
 that plus a regression test -- a genuine unquoted assertion following a blockquote --
 is what shipped.)
+
+## A descent closes the detection asymmetry and opens an exemption one
+
+Everything above is about *reaching* the wrapped command.
+The mirror case arrives once you have: a guard that descends into `-c` now
+evaluates the same push twice, under two code paths, and the paths that
+decide an **exemption** are not the paths the descent was written for.
+
+The direction of the asymmetry flips, and that is what makes it hard to see.
+Before the descent, the bare form is caught and the wrapped form escapes, so
+every test you write is a wrapped command that ought to be refused.
+After it, the exemption path can honour a spelling for the wrapped command that
+the bare-command path still refuses --- and no test of the shape "is the
+wrapper still caught" can fail on that, because the wrapper *is* caught,
+just not when the author asks for the escape hatch.
+
+An escape hatch that works only for the wrapped spelling teaches wrapping.
+It is a worse outcome than the original bypass, because the original was an
+oversight nobody was steered toward, while this one trains the habit on the
+exact author who read the refusal and tried to comply.
+
+Measured 2026-09-15 on `hooks/no-clobbering-push.py` at `8711c8d4`
+(the [ai-config#1973](https://github.com/Morrison-Lab/ai-config/issues/1973)
+branch), running the hook with `--dry-run`:
+
+```
+export ALLOW_FORCE_PUSH=1; git push --force origin main          -> deny
+export ALLOW_FORCE_PUSH=1; sh -c "git push --force origin main"  -> silent
+ALLOW_FORCE_PUSH=1 git push --force origin main                  -> silent
+sh -c "git push --force origin main"                             -> deny
+```
+
+`_override_before_wrapper` grew an `export` arm so the hatch works in its most
+natural spelling for a wrapped push.
+`_lead_prefix`, which decides the override for the unwrapped push, still reads
+an assignment only from the same simple command's own head, so `export` does
+not reach it.
+Filed as
+[ai-config#3664](https://github.com/Morrison-Lab/ai-config/issues/3664).
+
+The check is one table, and it costs nothing once the descent exists: for each
+spelling of the exemption, record the verdict for the bare command and for the
+wrapped one, and read any row where they differ as a defect whichever way it
+leans.
+A row that is stricter for the wrapped form is the over-warning complaint;
+a row that is looser is this one.
+
+- **Do:** enumerate the exemption spellings and run each one bare and wrapped,
+  as a table, after adding a descent.
+- **Do:** fix a disagreeing row in either direction --- teach the bare path the
+  spelling, or drop it from the wrapped path --- rather than picking the arm
+  that is easier to edit.
+- **Don't:** read "the wrapped form is still caught" as covering the exemption
+  paths; those tests pass on exactly the command the hatch is not being used on.
+- **Don't:** leave the looser arm standing because the escape hatch is meant to
+  be usable --- usable in one spelling only is a lesson in how to wrap.

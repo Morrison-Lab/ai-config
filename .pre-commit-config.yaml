@@ -134,6 +134,18 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: hook-file-resolution
+        name: hook file resolution (realpath, not lexical abspath)
+        entry: python scripts/check-hook-file-resolution.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: hook-file-resolution-tests
+        name: hook-file-resolution check tests
+        entry: python scripts/test_check_hook_file_resolution.py
+        language: python
+        pass_filenames: false
+        always_run: true
       - id: check-pr-body-figures-tests
         name: check-pr-body-figures check tests
         entry: python scripts/test_check_pr_body_figures.py

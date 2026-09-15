@@ -28,9 +28,9 @@ import subprocess
 import sys
 import tempfile
 
-HOOK = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else os.path.abspath(
+HOOK = os.path.realpath(sys.argv[1]) if len(sys.argv) > 1 else os.path.abspath(
     "hooks/flag-conflict-with-base.py")
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 ENV = {
     **os.environ,

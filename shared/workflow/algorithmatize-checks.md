@@ -1160,6 +1160,46 @@ code.
 A `diff -q` guard confirmed the file had changed and did not catch
 the miss.)
 
+**An anchor's uniqueness is a property of the whole file's text, and the
+sibling occurrence that defeats it most often is the same line indented
+deeper.**
+
+The case above is about a code string colliding with prose.
+The collision that survives "anchor on the code's own syntax" is between two
+pieces of code: leading whitespace makes a shallower-indented anchor a
+**substring** of its own deeper-indented twin, so `"        if X:"` is found
+inside `"            if X:"` and a `str.count` over the file returns 2.
+Nothing about the anchor looks ambiguous, because it was copied verbatim out
+of the one function it was meant for --- and reading that function is exactly
+what cannot settle the question.
+
+The failure direction depends on whether the harness asserts uniqueness.
+Where it does, the run aborts with a count of 2 and costs a minute.
+Where it does not, the substitution silently edits whichever occurrence comes
+first, which is the same wrong-line outcome as the prose case and just as
+invisible.
+
+Extending the anchor by one following line is usually enough, and it is the
+cheap fix precisely because the twin lines diverge immediately after the
+shared one.
+Do not fix it by trimming the anchor's leading whitespace, which widens the
+match rather than narrowing it.
+
+- **Do:** count the anchor's occurrences over the whole file before using it,
+  and extend it with a following line until the count is 1.
+- **Do:** suspect an indented twin first when a code anchor is not unique ---
+  a nested version of the same guard, the same early return in a sibling
+  branch.
+- **Don't:** treat an anchor as unique because the function it was copied from
+  contains it once.
+- **Don't:** strip an anchor's indentation to make it match; that is the
+  mechanism of the collision, not a workaround for it.
+
+(Measured 2026-09-14 in `hooks/test-no-clobbering-push.py`, whose mutation
+anchors are matched with `str.count`: an anchor taken from a helper at
+8-space indentation also matched the same line at 12 spaces elsewhere in the
+file, and the harness stopped with a count of 2.)
+
 **The same collision reaches the ASSERTION, not only the mutation, and there it makes the whole test vacuous.**
 
 The outcome above is about a mutation landing on the wrong occurrence of a string.
@@ -2322,3 +2362,35 @@ The orchestrator removed it as unsound, since a command carrying a flag has thre
 The next review round asked for the check again, and the underlying gap was real: a manifest staged by something other than this repo can carry a path with a space, and nothing on the reading side caught it.
 What made the restored version defensible was not a different test but a stated reason, namely that the canonical form in `plugins/ai-config/hooks.json` is an interpreter and a script with no arguments and that all eleven of that manifest's commands have exactly two tokens, so a third means whitespace inside a path.
 The docstring says that, and says it would not survive a manifest whose commands take arguments.)
+
+## A discrepancy detector whose two operands are in different units cannot detect anything
+
+A count-versus-count check --- "N of M accounted for" --- is only as sound
+as the claim that N and M count the same kind of thing.
+An accounting line can sum per-**interpreter** bucket sizes and compare that
+sum against a per-**row** total, and the two look like the same number until
+you ask what each side actually counts.
+
+- **Do:** before trusting a count-vs-count check, write down what each side's
+  unit is and confirm they match, the same way a unit check catches a
+  physics formula adding metres to seconds.
+- **Do:** prefer counting the same population on both sides of a comparison
+  --- rows against rows, files against files --- over counting a summary of
+  one against a raw total of the other.
+- **Don't:** assume a mismatch will surface as an obviously wrong number; a
+  unit mismatch that happens to produce a plausible-looking figure on
+  today's healthy input passes review and ships.
+- **Don't:** trust that a discrepancy check is "wired up" because it prints a
+  fraction --- confirm the fraction can actually move when a real row goes
+  missing, not just that it renders.
+
+(Morrison-Lab/ai-config#3647, which closed #3624, merged 2026-09-14,
+found by round 3 of its adversarial review: an accounting
+line in `scripts/install-hooks.py` summed per-interpreter bucket sizes
+against a per-row total, so a healthy install reported "accounted for 3 of
+10" on a small fixture, and would have read roughly "3 of 81" on this repo's
+own hook count, because many hooks share one `python3` spelling and collapse
+to one interpreter bucket while the total counted rows.
+A genuinely dropped row would have moved that number by one against a
+baseline shortfall already in the dozens --- invisible in exactly the way
+the line was added to prevent.)

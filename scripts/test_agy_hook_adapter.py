@@ -2180,6 +2180,41 @@ class TestAgyHookAdapter(unittest.TestCase):
             with patch.dict(os.environ, {"AI_CONFIG_ROOT": repo_dir}):
                 self.assertEqual(self.adapter.find_repo_root("/nonexistent/path/adapter.py"), repo_dir)
 
+            # 4b. Environment override through a SYMLINK carrying `..`, built
+            # to the real shape: `.claude/skills` is a symlink to the
+            # checkout's own `skills/`, and CLAUDE_PLUGIN_ROOT points inside
+            # it, so the registration path climbs back out through `..`.
+            # Walking it on the filesystem reaches the checkout; collapsing it
+            # LEXICALLY eats the symlink component and lands somewhere else.
+            #
+            # The case above cannot discriminate -- it passes an already
+            # realpath'd absolute path, on which abspath and realpath return
+            # the identical string -- so branch 4's realpath was untested and
+            # a one-word revert to abspath passed the whole suite (ai-config#2981).
+            os.makedirs(os.path.join(repo_dir, "skills", "plug"), exist_ok=True)
+            link_parent = os.path.join(tmpdir, "dotclaude")
+            os.makedirs(link_parent, exist_ok=True)
+            os.symlink(os.path.join(repo_dir, "skills"),
+                       os.path.join(link_parent, "skills"))
+            via_symlink = os.path.join(link_parent, "skills", "plug", "..", "..")
+            # Negative control: the probe must reach hooks.json through the
+            # filesystem, and must NOT reach it once collapsed lexically --
+            # otherwise the case passes under either spelling and tests nothing.
+            self.assertTrue(
+                os.path.isfile(os.path.join(via_symlink, "hooks", "hooks.json")),
+                "the probe must reach hooks.json through the filesystem")
+            self.assertFalse(
+                os.path.isfile(os.path.join(os.path.abspath(via_symlink),
+                                            "hooks", "hooks.json")),
+                "the probe must NOT reach hooks.json once collapsed lexically")
+            with patch.dict(os.environ, {"AI_CONFIG_ROOT": via_symlink}):
+                returned = self.adapter.find_repo_root("/nonexistent/path/adapter.py")
+            self.assertTrue(
+                os.path.isfile(os.path.join(returned, "hooks", "hooks.json")),
+                f"branch 4 returned {returned!r}, which does not contain the "
+                f"hooks/hooks.json it just verified was there")
+            self.assertEqual(os.path.realpath(returned), repo_dir)
+
     def test_staging_runtime_layout_with_copied_adapter_and_symlinked_hooks(self):
         """Under staging layout with copied adapter and symlinked hooks/,
         find_repo_root finds hooks/hooks.json and dispatches PreToolUse, Stop,

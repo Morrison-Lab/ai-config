@@ -30,7 +30,7 @@ import subprocess
 import sys
 import types
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.realpath(__file__))
 HOOK = os.path.join(HERE, "warn-status-read-after-pipe.py")
 
 spec = importlib.util.spec_from_file_location("hook", HOOK)

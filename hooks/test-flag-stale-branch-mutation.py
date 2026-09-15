@@ -36,7 +36,7 @@ import tempfile
 import time
 import uuid
 
-HOOK = os.path.abspath(sys.argv[1])
+HOOK = os.path.realpath(sys.argv[1])
 _TMPDIRS = []
 _COUNTER = [0]
 

@@ -31,7 +31,7 @@ import subprocess
 import sys
 import tempfile
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.realpath(__file__))
 TARGET = os.path.join(HERE, "no-move-without-inbound-sweep.py")
 
 spec = importlib.util.spec_from_file_location("guard", TARGET)
@@ -563,7 +563,7 @@ def test_mutations():
         env = dict(os.environ)
         env["MUTANT_TARGET"] = mutant
         out = subprocess.run(
-            [sys.executable, os.path.abspath(__file__), "--against-mutant"],
+            [sys.executable, os.path.realpath(__file__), "--against-mutant"],
             capture_output=True, text=True, env=env, timeout=120)
         check(f"suite CATCHES mutation: {name}", out.returncode != 0)
 

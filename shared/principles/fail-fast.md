@@ -310,6 +310,27 @@ That reads exactly like a failed deploy or a lost edit, and the natural response
 
 See [`fail-fast.cases.md`](fail-fast.cases.md), "A cache-busted re-fetch resolved a preview page that looked like a failed deploy".
 
+### A seventh cause: the routing condition that selects who gets checked is also the failure condition
+
+The causes above all describe the check itself going wrong --- broken, empty, collapsed, pointed at the wrong subject, absorbed by a fallback, or reading a stale copy.
+This one is a check that is correct on every row it reaches, and a routing step in front of it that decides which rows reach it at all.
+When the routing condition is "this row already looks fine" and the very thing under test is "does this row actually resolve," the two conditions are close enough to collide: a row that fails resolution never satisfies the routing condition, so it never reaches the check, and it also never reaches the summary line's denominator.
+The report reads as complete precisely because nothing failing was ever counted as attempted.
+
+The tell is a routing filter phrased as a precondition for running the real check ("only probe a path that already resolved"), sitting immediately upstream of a check whose whole purpose is to catch paths that do not resolve.
+That is not a bug in the probe; the probe is fine on everything it sees.
+It is a bug in the gate, and the two look identical in a summary line that only ever reports what got through the gate.
+
+- **Do:** ask, of any filter placed in front of a check, whether the filter's own condition can be false for exactly the same reason the check would fail --- and if so, route the excluded rows to their own reported outcome instead of dropping them.
+- **Do:** give a row the routing step cannot forward its own named status (e.g. `UNPROBED`, with a reason), so it appears in the summary rather than vanishing between the routing step and the check.
+- **Don't:** trust a "probed N, N clean" line without first reading what the routing step in front of the probe excludes and why.
+- **Don't:** assume a precondition for running a check is neutral --- the precondition can select for the very rows already known to pass.
+
+(Morrison-Lab/ai-config#3624, closed by PR #3647, merged 2026-09-14 --- cited by issue and PR number rather than by branch SHA, per `memories/git.md`'s "Citing evidence that lives in a PR's own superseded commits" section, which is the durable reason and not a consequence of the PR having been open: a hook install-check built its probe set only from rows whose registered path already resolved, and a plugin-root command whose path is unexpanded carried a different status instead --- so it never entered the probe set, never appeared in the reported count, and the run declared success having probed nothing.
+That is the exact registration shape #3624 was filed about.
+An adversarial review caught it during PR #3647's own review round.
+The proposed fix gives the excluded rows their own reported status, so a row the check cannot reach is visible rather than silently absent from the count.)
+
 ### A named regression test is checked against its rule, not against a commit
 
 The causes above are about a check that cannot see a failure.
@@ -1047,6 +1068,35 @@ reminder guard is the cheap direction.
 - **Don't:** read the release rule above as forbidding a narrowed fire
   condition; it governs discharging on weak evidence, not triggering on
   strong.
+
+## An aggregate failure count must never go NEGATIVE
+
+A check that folds its own shortfall into a script's running total by
+subtraction --- `failures += len(wanted) - examined` --- assumes `examined`
+never exceeds `len(wanted)`.
+When it can, the subtraction goes negative, and the addition then
+**subtracts** from the total: it cancels genuine findings from unrelated
+checks in the same script and lets the whole gate exit 0 over them.
+A guard that can silently suppress other guards is worse than no guard,
+because the other guards read as having run and passed.
+
+- **Do:** derive a shortfall as a set difference (`len(wanted - seen)`),
+  which cannot go negative however many rows the underlying query returns.
+- **Do:** treat any `failures += <count>`-shaped line feeding a shared total
+  as a candidate for this class whenever the count is not already bounded
+  to be non-negative by construction.
+- **Don't:** derive a shortfall by subtracting two counts collected from
+  different code paths and add the (possibly negative) result to a total
+  shared with other checks.
+- **Don't:** assume a query answering "how many rows describe this set of
+  paths" returns one row per path; a query whose row count depends on
+  repository *state* --- an index read mid-conflict, a paginated API, a scan
+  that revisits an item --- can return more rows than paths requested.
+
+(Morrison-Lab/ai-config#3647, which closed #3624, merged 2026-09-14: `check_executable_bits` in `scripts/check-hook-catalog.py`
+derived its shortfall this way, and a conflicted-merge index pushed the row
+count above the requested set, found in the PR's second adversarial review
+round.)
 
 ## An empty substitution changes what the command operates on
 

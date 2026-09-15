@@ -86,7 +86,7 @@ import os
 import re
 import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.realpath(__file__))
 ROOT = os.path.dirname(HERE)
 MAPPINGS_PATH = os.path.join(ROOT, "tool-mappings.yml")
 

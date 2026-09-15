@@ -430,6 +430,7 @@ The payload gaps that remain and the per-guard status are in
 | hook | event | enforces |
 |---|---|---|
 | `inject-local-time.sh` | `UserPromptSubmit` | supplies the real local time, so a recap timestamp is never recalled |
+| `warn-python3-cannot-read-hooks.sh` | `UserPromptSubmit` | names the interpreter when the `python3` on `PATH` cannot read the directory the hooks live in -- a condition that denies `Bash`, `Edit`, `Write` and `Agent` at once (every tool a `PreToolUse` matcher names; `Read` and `Grep` are unaffected), while each denial names a hook rather than the interpreter. Shell, not Python: in the failure this hook reports, no Python hook can run. Silent when the interpreter is fine; see the hook's own header for the mechanism (ai-config#3624) |
 | `require-gh-repo-flag.py` | `PreToolUse` (Bash) | blocks a mutating repo-scoped `gh` command that omits `-R` |
 | `no-offer-to-file.py` | `Stop` | blocks a reply that *offers* to file or record instead of doing it |
 | `no-empty-promise.py` | `Stop` | blocks a reply committing to future behaviour when the same turn shipped no mechanism: a rule ("going forward, I will/won't") needs a durable write, an owed action ("I owe #N the ARDI loop") needs that or an armed timer/watcher |
@@ -571,7 +572,7 @@ So when adding a warn-only hook:
 - mutation-check it: revert `systemMessage` to `reason` and require the suite to
   fail
 
-`scripts/check-hook-output-shape.py` enforces this on every run: it verifies that
+`scripts/check-hook-output-shape.py` is a hard gate enforcing this on every run: it verifies that
 warn-only hooks never emit `reason` alone, that warn-only `Stop` hooks emit
 `systemMessage`, that warn-only `PreToolUse` hooks emit `additionalContext` or
 `systemMessage`, and that their test suites inspect the payload shape rather than
@@ -620,6 +621,23 @@ the same condition, which this narrowing does not touch.
   printed payload.
 - **Don't:** treat an error-path `return 1` as a blocking channel --- the
   checker reads status 2 alone.
+
+A second hard gate covers how a hook finds its own files.
+`scripts/check-hook-file-resolution.py` refuses `os.path.abspath(__file__)` and
+the other lexical spellings (`normpath`, `relpath`) across
+`hooks/*.py` and `plugins/ai-config/*.py`, including a test suite resolving its
+`sys.argv` subject.
+
+So when adding a hook, resolve its own path with `os.path.realpath(__file__)`
+(or `Path(__file__).resolve()`), never `abspath`.
+`abspath` collapses `..` as text without consulting the filesystem, and this
+repo's `.claude/skills` is a symlink to its own `skills/`, so a hook reached
+through the skills-directory plugin registration computes its directory as
+`<checkout>/.claude/hooks` --- a directory that exists and holds only
+`session-start.sh`, none of the Python hooks a sibling import would look for.
+A fail-closed guard then denies every command it can no longer classify, and a
+fail-open one silently runs without its sibling's helpers.
+See `memories/hooks.md` and ai-config#2981.
 
 A **`PreToolUse`** hook that emits **both** channels should gate its
 `systemMessage` on `ANTIGRAVITY_AGENT` being unset.

@@ -23,6 +23,7 @@ from __future__ import annotations
 import os
 import re
 import shlex
+import subprocess
 from pathlib import Path
 from typing import Iterator
 
@@ -36,6 +37,9 @@ PLUGIN_ROOT_VAR = "CLAUDE_PLUGIN_ROOT"
 # a backslash unless it precedes a quote, a backslash, a dollar sign or a
 # backtick, so a quoted Windows path needs no help.
 RX_BARE_DRIVE_PATH = re.compile(r"(?:^|(?<=[\s=]))[A-Za-z]:[/\\]\S*")
+# A leading `NAME=value` environment assignment, which precedes the command
+# rather than being it. Anchored whole, so a path containing `=` is untouched.
+RX_ENV_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z_0-9]*=")
 
 
 def script_token(command: str) -> str | None:
@@ -88,6 +92,83 @@ def classify_command(command: str) -> tuple[str, str | None]:
         # uncheckable.
         return "missing", path
     return ("ok" if Path(path).expanduser().is_file() else "missing"), path
+
+
+def interpreter_token(command: str) -> str | None:
+    """The interpreter `command` invokes, or None when it runs a script directly.
+
+    `"<path>/foo.sh"` runs itself and has no interpreter; `python3 "<path>"`
+    has one. Returns the token as written, because the *spelling* is the whole
+    question: a bare name is resolved through PATH at fire time by whatever
+    process the harness spawns, which is not this one.
+    """
+    protected = RX_BARE_DRIVE_PATH.sub(
+        lambda m: m.group(0).replace('\\', '\\' + '\\'), command)
+    try:
+        tokens = shlex.split(protected, posix=True)
+    except ValueError:
+        tokens = command.split()
+    # `VAR=value python3 script.py` is one command with a leading assignment,
+    # not a command named `VAR=value`. Dropping the prefix keeps the row
+    # probeable; keeping it would make the row silently contribute nothing,
+    # which is the failure mode this whole check exists to remove.
+    while tokens and RX_ENV_ASSIGNMENT.match(tokens[0]):
+        tokens = tokens[1:]
+    if not tokens or tokens[0].endswith(SCRIPT_SUFFIXES):
+        return None
+    return tokens[0]
+
+
+# Asks the interpreter itself whether it can see a path, which is the question
+# `Path.is_file()` in THIS process cannot answer for it -- see probe_interpreter.
+_PROBE = "import os, sys; sys.exit(0 if os.path.exists(sys.argv[1]) else 1)"
+
+
+def probe_interpreter(interpreter: str, script: str, timeout: float = 15) -> str:
+    """Can `interpreter` actually read `script`? One of six verdicts.
+
+    ok, blind, unlaunchable, timeout, unknown, skipped -- and a caller that
+    branches on them must handle all six. The list is spelled out here rather
+    than summarised because an under-stated one is how `skipped` came to be
+    dropped silently by the first version of this function's own caller.
+
+    `classify_command` above answers "does this path exist", asked by this
+    process. That is a different question from "can the interpreter the hook
+    command names open this file", and on Windows the two disagree: bare
+    `python3` commonly resolves to the Microsoft Store App Execution Alias,
+    which runs a real interpreter inside a packaged-app filesystem view with no
+    access to `%APPDATA%\\Claude`. Every hook then dies on a file `Path.is_file`
+    reports as plainly there, `--check` reports `ok` for all of them, and the
+    session is fully blocked with nothing pointing at the interpreter
+    ([#3624](https://github.com/Morrison-Lab/ai-config/issues/3624)).
+
+    So the probe is executed, not reasoned about. Only Python interpreters are
+    probed: `-c` is a Python flag, and handing it to `sh` or `node` would test
+    the prober rather than the hook.
+
+    Only two of the six are observations. `ok` and `blind` mean the
+    interpreter ran and answered; `blind` is the finding this exists for --
+    it reported a file that is right there as absent. `skipped`,
+    `unlaunchable`, `timeout` and `unknown` each mean the probe reached no
+    answer, and they are kept apart rather than folded together because each
+    licenses a different next step. None of the four is evidence of the
+    Store-alias condition: claiming a cause nobody observed is what sent #3624
+    looking at the plugin cache for hours.
+    """
+    if not Path(interpreter).name.lower().startswith("python"):
+        return "skipped"
+    try:
+        done = subprocess.run([interpreter, "-c", _PROBE, script],
+                              capture_output=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        # Caught ahead of the clause below because TimeoutExpired IS a
+        # SubprocessError, so folding the two would report an interpreter that
+        # launched fine and then hung as one that never launched -- a false
+        # statement about the more alarming of the two observations.
+        return "timeout"
+    except (OSError, subprocess.SubprocessError):
+        return "unlaunchable"
+    return {0: "ok", 1: "blind"}.get(done.returncode, "unknown")
 
 
 def _iter_hooks(settings: dict) -> Iterator[tuple[str, str, dict]]:

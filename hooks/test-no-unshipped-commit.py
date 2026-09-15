@@ -509,7 +509,7 @@ commit_and_push = transcript(["git commit -m hook", "git push origin main"])
 
 # main() end-to-end harness: a private TMPDIR, so the sentinel the hook
 # writes lands inside a directory this suite removes afterwards.
-hook = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+hook = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                     "no-unshipped-commit.py")
 hook_tmp = tempfile.mkdtemp()
 hook_env = dict(os.environ, TMPDIR=hook_tmp,
@@ -1180,7 +1180,7 @@ assert hook_git_flags == git_cmd_flags, f"fallback _GIT_FLAGS drifted: {hook_git
 
 # Test fallback exception branch logs warning to stderr on import failure
 import subprocess  # noqa: E402
-hook_abs = os.path.abspath(sys.argv[1])
+hook_abs = os.path.realpath(sys.argv[1])
 proc = subprocess.run(
     [sys.executable, "-c",
      f"import sys; sys.modules['git_cmd'] = None; "

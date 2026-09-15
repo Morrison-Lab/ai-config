@@ -63,6 +63,10 @@ committed pass.
   Watch for it too when a skill *ends* in a UMS step (`post-merge`, `ardi`,
   `wrap-up`): reporting that skill complete asserts its final step ran, so
   confirm the pass happened rather than only the steps before it.
+  Loading the skill is not confirmation.
+  A valid no-change pass must still complete the context scan and, for every candidate, categorize it and grep the destination's full `memories/` directory plus the relevant skill and shared-workflow files;
+  report the candidates and searches instead of merely asserting that no update was needed. (Recurrence, 2026-09-14: after a merge, the skill was loaded and one narrow grep was run, but the merge was reported wrapped up with "UMS review found no additional durable memory update needed";
+  the user's "what about ums?" exposed that the actual pass had never run.)
 - User says "ums", "update memories and skills", "record what we learned"
 - **At the start of `/clear`** — a backstop, not the primary trigger: catch
   anything accumulated since the last proactive pass before context is lost

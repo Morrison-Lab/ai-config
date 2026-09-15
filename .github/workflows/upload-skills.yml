@@ -51,11 +51,75 @@ jobs:
           FORCE: ${{ inputs.force && '1' || '0' }}
           PRUNE: ${{ github.event_name == 'workflow_dispatch' && inputs.prune == false && '0' || '1' }}
         run: |
+          # The job's own `if: github.repository == ...` guard already keeps
+          # forks out, so a missing key here is a misconfiguration of this
+          # repository rather than an expected fork condition. Exiting 0 on it
+          # kept every run green while nothing was ever uploaded
+          # (ai-config#3669: 94 consecutive green no-op runs).
           if [ -z "$ANTHROPIC_API_KEY" ]; then
-            echo "ANTHROPIC_API_KEY secret not configured; skipping upload"
-            exit 0
+            echo "::error::No Anthropic API key available. This step reads ANTHROPIC_WORKSPACE_API_KEY and falls back to ANTHROPIC_API_KEY; neither is set. Prefer ANTHROPIC_WORKSPACE_API_KEY -- custom skills are workspace-scoped, so a key without workspace scope will not work against the Skills API."
+            exit 1
           fi
-          ./upload_skills.sh
+
+          # Mirror the script's tallies into the run summary, so a run that
+          # uploads less than expected stays legible without opening the log.
+          # errexit is lifted around the pipeline so BOTH stage statuses can be
+          # read: taking only PIPESTATUS[0] would let a tee failure pass as
+          # success, which is the silent-failure shape this step was just
+          # fixed for. `|| true` would not work here -- it clobbers PIPESTATUS.
+          LOG=/tmp/upload-skills.log
+          set +e
+          ./upload_skills.sh 2>&1 | tee "$LOG"
+          # Copy the whole array in ONE command: any command in between --
+          # including the first `x="${PIPESTATUS[0]}"` assignment -- resets
+          # PIPESTATUS, which left tee_rc empty and every run exiting 1.
+          stage_rc=("${PIPESTATUS[@]}")
+          set -e
+          script_rc="${stage_rc[0]}"
+          tee_rc="${stage_rc[1]}"
+
+          if [ "$tee_rc" -ne 0 ]; then
+            echo "::error::Could not capture the upload log (tee exited $tee_rc); the run summary is unreliable for this run."
+          fi
+
+          # The log can carry a raw unparsed API response, so it may contain
+          # ANY character sequence. A fixed fence is therefore unsound in both
+          # directions: backticks break on a ``` line, and tildes break on a
+          # ~~~ line, which is the same defect with a rarer trigger. GFM closes
+          # a fence only on a run at least as long as the opener, so size the
+          # opener from the content instead of picking a character and hoping.
+          # head -c counts BYTES, so it can cut a multi-byte UTF-8 character in
+          # half; iconv -c drops the resulting partial sequence.
+          CAP=200000
+          if [ -r "$LOG" ]; then
+            # `|| true` inside the group: no tilde run is the COMMON case, and
+            # grep exits 1 on no match, which pipefail turns into a step-killing
+            # failure. See shared/coding/errexit-is-not-uniform.md.
+            longest=$({ grep -oE '~{3,}' "$LOG" || true; } | awk '{ if (length > m) m = length } END { print m+0 }')
+            fence_len=$(( longest >= 3 ? longest + 1 : 3 ))
+            fence=$(printf '~%.0s' $(seq 1 "$fence_len"))
+            {
+              echo '### upload_skills.sh'
+              echo
+              echo "$fence"
+              # iconv exits non-zero on the INCOMPLETE sequence at the cut,
+              # which is precisely the byte we want dropped -- and it still
+              # emits the valid prefix first. Tolerate the status rather than
+              # failing the step over a cosmetic truncation artefact. (`-c`
+              # covers invalid characters; the dangling tail is a separate
+              # error both BSD and GNU iconv report.)
+              head -c "$CAP" "$LOG" | { iconv -c -f UTF-8 -t UTF-8 || true; }
+              if [ "$(wc -c < "$LOG")" -gt "$CAP" ]; then
+                printf '\n[log truncated at %s bytes; full output is in the step log]\n' "$CAP"
+              fi
+              echo "$fence"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::No readable upload log at $LOG; skipping the run summary."
+          fi
+
+          [ "$script_rc" -eq 0 ] || exit "$script_rc"
+          [ "$tee_rc" -eq 0 ] || exit 1
 
       - name: Save skill upload state cache
         if: always()

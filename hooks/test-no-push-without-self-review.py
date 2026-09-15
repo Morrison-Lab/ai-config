@@ -27,8 +27,18 @@ import tempfile
 import time
 
 # Absolute, because every case runs the hook with `cwd` set to a throwaway
-# repository rather than the repo root.
-HOOK = os.path.abspath(sys.argv[1])
+# repository rather than the repo root. `realpath` rather than `abspath` for
+# the same reason the subject itself uses it (ai-config#2981): invoking this
+# suite against the hook's real registration path --
+# `.claude/skills/ai-config-hooks/../../hooks/<name>.py`, the natural way to
+# reproduce that issue by hand -- collapses under `abspath` to
+# `<checkout>/.claude/hooks`, where no hook lives. Measured on the pre-fix
+# spelling: 181 case lines print first, 177 of them `FAIL (exit 2)` because
+# every case runs a subject that does not exist, and the run then aborts in
+# `orphan_cases()` where `shutil.copy(HOOK, orphan)` raises FileNotFoundError
+# on the hook itself. So the failure is loud but misattributed -- it reads as
+# 177 broken cases rather than as one wrong path.
+HOOK = os.path.realpath(sys.argv[1])
 
 _next_id = [0]
 
@@ -1133,6 +1143,95 @@ def orphan_cases() -> tuple[int, int]:
     return failures, ran
 
 
+def symlinked_plugin_root_cases() -> tuple[int, int]:
+    """The guard reached through a symlinked plugin root (ai-config#2981).
+
+    An ai-config checkout carries `.claude/skills` as a symlink to its own
+    `skills/`, and the hooks-only skills-directory plugin registers each hook
+    as `${CLAUDE_PLUGIN_ROOT}/../../hooks/<name>.py`. The interpreter opens
+    that path through the filesystem, which walks the symlink and finds the
+    real file -- so the hook runs. `os.path.abspath()` collapses the `..`
+    LEXICALLY instead, without consulting the filesystem, and reports the
+    hook's directory as `<checkout>/.claude/hooks`, where the sibling detector
+    does not live. The guard then fell into degraded mode on every session in a
+    worktree, denying any push-shaped command with a broken-installation
+    message and no reachable verdict path.
+
+    `os.path.realpath()` resolves the symlink before collapsing `..`, so the
+    two agree wherever no symlink is involved and only this layout changes.
+
+    The layout below is the checkout's, in miniature:
+
+        root/hooks/<guard>, <sibling>      the real files
+        root/real/plug/                    the plugin directory
+        root/dotclaude/skills -> ../real   the symlink the harness resolves
+    """
+    failures = 0
+    ran = 0
+    d = tempfile.mkdtemp(prefix="npwsr-symlink-")
+    try:
+        hooks_dir = os.path.join(d, "hooks")
+        plug = os.path.join(d, "real", "plug")
+        dotclaude = os.path.join(d, "dotclaude")
+        os.makedirs(hooks_dir)
+        os.makedirs(plug)
+        os.makedirs(dotclaude)
+        shutil.copy(HOOK, hooks_dir)
+        shutil.copy(os.path.join(os.path.dirname(HOOK), "no-unreviewed-pr.py"),
+                    hooks_dir)
+        try:
+            os.symlink(os.path.join("..", "real"),
+                       os.path.join(dotclaude, "skills"))
+        except (OSError, NotImplementedError) as exc:
+            # Not a pass. Reported as a skip with ran=0 so the suite's own
+            # count shows the case did not execute, rather than a green line
+            # standing in for a check that never ran.
+            print(f"SKIP (symlinks unavailable: {exc}): symlinked plugin root")
+            return 0, 0
+
+        # The registration path, verbatim in shape: through the symlink, then
+        # back out twice.
+        via_symlink = os.path.join(dotclaude, "skills", "plug", "..", "..",
+                                   "hooks", os.path.basename(HOOK))
+        # The second case is the symptom the issue actually reported: a
+        # heredoc writing an issue body that QUOTES a push line. Degraded mode
+        # keys its deny on a narrow `git ... push` match over the whole
+        # command text, which that body matches, so the broken installation
+        # blocked a command that pushes nothing. Both cases discriminate --
+        # measured against the pre-fix guard in the same layout, the first
+        # reports the degraded message and the second is denied outright.
+        for label, cmd, should_deny in (
+            ("a push through a symlinked plugin root loads the detector",
+             "git push origin main", True),
+            ("a heredoc quoting a push line is not denied by a broken install",
+             "cat > body.md <<'XEOF'\nrefused when I ran git push -u origin b\nXEOF",
+             False),
+        ):
+            ran += 1
+            res = subprocess.run(
+                [sys.executable, via_symlink],
+                input=json.dumps({"tool_name": "Bash",
+                                  "tool_input": {"command": cmd},
+                                  "transcript_path": ""}),
+                capture_output=True, text=True, cwd=REPO)
+            # The assertion is about the DETECTOR, not about the verdict: a
+            # push with no transcript is still denied, correctly, by the
+            # policy the guard exists to enforce. What must not appear is the
+            # degraded-mode message, which says the guard could not tell
+            # whether the command pushes at all.
+            broken = "could not load its push detector" in res.stdout
+            denied = '"deny"' in res.stdout
+            if res.returncode != 0 or broken or denied != should_deny:
+                print(f"FAIL (degraded={broken}, deny={denied}, "
+                      f"wanted deny={should_deny}, rc={res.returncode}): {label}")
+                failures += 1
+            else:
+                print(f"PASS: {label}")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    return failures, ran
+
+
 def _isolated_git_env(default_branch: str) -> dict:
     """A git env whose init.defaultBranch cannot leak in from the user config."""
     return {
@@ -2195,7 +2294,8 @@ def main():
                    structured_payload_cases, transcript_scoping_cases,
                    cd_tracking_cases, fallback_cases,
                    fingerprint_guidance_cases, fingerprint_resolution_cases,
-                   omo_cases, external_reviewer_cases):
+                   omo_cases, external_reviewer_cases,
+                   symlinked_plugin_root_cases):
             f, r = fn()
             failed += f
             extra += r

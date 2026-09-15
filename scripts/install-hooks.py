@@ -72,6 +72,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from plugin_overlap import enabled_ai_config_plugins  # noqa: E402
+import hook_paths as hp  # noqa: E402
 from hook_paths import check_settings  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
@@ -215,6 +216,158 @@ def settings_files(cdir: Path) -> list[Path]:
             if p.is_file()]
 
 
+def check_interpreters(rows: list[dict]) -> int:
+    """Run each distinct interpreter against a path it is registered with.
+
+    Every check above this one is this process asking the filesystem a
+    question. That is the wrong process: the harness spawns the hook command,
+    and the interpreter *it* resolves may not see the same filesystem we do.
+    On Windows a bare `python3` commonly resolves to the Microsoft Store App
+    Execution Alias, which cannot read `%APPDATA%\\Claude` -- so every path
+    above reports `ok` while every hook denies every tool call
+    ([#3624](https://github.com/Morrison-Lab/ai-config/issues/3624)).
+
+    Probes against a path that already resolved, so a `blind` verdict cannot
+    be a missing file wearing a different label. One probe per distinct
+    interpreter spelling rather than per hook: the answer is a property of the
+    interpreter, and a hundred identical subprocesses would only be slower.
+
+    **Every row lands in exactly one bucket, and every bucket is printed.** The
+    accounting is the feature rather than the bookkeeping: an unreported row
+    is one this check could not speak about while the closing line says
+    everything is fine, which is the failure #3624 is a case of. Each
+    unprobeable row carries *its own* reason -- a plugin-root path, a command
+    naming no script, an interpreter `-c` cannot ask anything of -- because
+    asserting one cause for all of them is the same error in miniature.
+
+    Returns the number of interpreters observed **blind** -- and only those.
+    `blind` is something this function watched happen: the interpreter ran,
+    and reported a file that is right there as absent. Every other verdict
+    means the probe reached no answer at all, and an absent answer is not a
+    finding: `unlaunchable` in particular says only that the name did not
+    resolve *here*, while the harness spawns hooks through its own shell --
+    which is exactly the mismatch #3624 is about, so reading it backwards and
+    failing the install would be the same error pointed the other way.
+    """
+    # A probe target must be a path that already resolved, and it need not come
+    # from the row being explained: the question is what this interpreter can
+    # see, not what it can see of one particular hook.
+    representative: dict[str, str] = {}
+    unprobeable: dict[tuple[str, str], str] = {}
+    probeable_rows = 0
+    unprobeable_rows = 0
+    direct = 0
+    already_failing = 0
+    for row in rows:
+        interp = hp.interpreter_token(row["command"])
+        if not interp:
+            # A `.sh` hook is registered as a bare quoted path and runs itself,
+            # so there is no interpreter to ask. Counted, not dropped.
+            direct += 1
+            continue
+        if row["status"] == "ok":
+            probeable_rows += 1
+            representative.setdefault(interp, row["path"])
+        elif row["status"] == "skipped":
+            reason = ("its script path expands only in the plugin loader, so "
+                      "there is no path here to probe it against"
+                      if row["path"] else
+                      "this command names no script, so there is no path to "
+                      "probe it against")
+            unprobeable_rows += 1
+            # Keyed by (interpreter, reason) rather than by interpreter alone.
+            # `skipped` has two causes, so keying on the interpreter would keep
+            # the first row's reason and silently print it over a second row
+            # that does not share it -- which is the "one cause asserted for
+            # all of them" error, moved from the string into the dict key.
+            unprobeable.setdefault((interp, reason), row["command"])
+        else:
+            # `missing` is already a finding, reported above with its own
+            # remedy. Counted here so the distribution stays whole.
+            already_failing += 1
+
+    verdicts = {i: hp.probe_interpreter(i, p)
+                for i, p in representative.items()}
+    # Counts only interpreters that actually answered. `unlaunchable`,
+    # `timeout`, `unknown` and `skipped` produced no observation, and counting
+    # them would defeat the reason this line exists -- a check that examined
+    # nothing and a check that found nothing print the same absence otherwise.
+    answered = sum(1 for v in verdicts.values() if v in ("ok", "blind"))
+    blind = sorted(i for i, v in verdicts.items() if v == "blind")
+    unanswered = {i: v for i, v in verdicts.items()
+                  if v in ("unlaunchable", "timeout", "unknown")}
+    not_python = sorted(i for i, v in verdicts.items() if v == "skipped")
+    still_unprobed = {key: command for key, command in unprobeable.items()
+                      if key[0] not in representative}
+
+    print(f"  probed {answered} interpreter(s) against a hook path they are "
+          "registered with")
+    if answered and not blind:
+        print("  every one of them could read it")
+
+    for interp in blind:
+        print()
+        print(f"  BLIND    {interp}")
+        print(f"           ran, and reported {representative[interp]} absent")
+        print("           -- that file exists; the interpreter cannot see it.")
+
+    for interp, verdict in sorted(unanswered.items()):
+        label = {"unlaunchable": "NO EXEC", "timeout": "TIMEOUT",
+                 "unknown": "UNKNOWN"}[verdict]
+        detail = {
+            "unlaunchable": "could not be launched from this process",
+            "timeout": "launched, then did not answer before the deadline",
+            "unknown": ("neither reported the file present nor reported it "
+                        "absent"),
+        }[verdict]
+        print()
+        print(f"  {label:<8} {interp}")
+        print(f"           {detail}")
+
+    for interp in not_python:
+        print()
+        print(f"  NOT PY   {interp}")
+        print("           not a Python interpreter, so `-c` cannot ask it "
+              "whether")
+        print("           it can read a file; probe it by hand if its hooks "
+              "are Python")
+
+    for (interp, reason), command in sorted(still_unprobed.items()):
+        print()
+        print(f"  UNPROBED {interp}")
+        print(f"           {command}")
+        print(f"           {reason}")
+
+    if blind:
+        print()
+        print("An interpreter that cannot read its own hook scripts is the")
+        print("same outage as a missing path, and harder to see: every path")
+        print("above resolves. On Windows this is the Microsoft Store")
+        print("`python3` App Execution Alias -- turn it off under Settings >")
+        print("Apps > Advanced app settings > App execution aliases, or put a")
+        print("real Python ahead of WindowsApps on PATH. See ai-config#3624.")
+    elif unanswered or not_python or still_unprobed:
+        print()
+        print("Not findings: the rows above reached no verdict, so they are")
+        print("neither evidence of a working interpreter nor of a broken one.")
+
+    # The distribution, in ROWS. An earlier version summed the per-interpreter
+    # bucket sizes against `len(rows)` and so reported "3 of 81" on a healthy
+    # install, because every hook sharing one `python3` spelling collapses to
+    # one interpreter: the shortfall a dropped row would cause was invisible
+    # against a baseline shortfall of 78. Counting rows against rows makes the
+    # line mean something, and the mismatch branch below can then only fire on
+    # a real bookkeeping bug.
+    seen_rows = probeable_rows + unprobeable_rows + direct + already_failing
+    print(f"  {len(rows)} registered command(s): {probeable_rows} probeable, "
+          f"{unprobeable_rows} unprobeable, {direct} run a script directly, "
+          f"{already_failing} already reported above")
+    if seen_rows != len(rows):
+        print(f"  WARNING: {len(rows) - seen_rows} registered command(s) fell "
+              "into no bucket; this check cannot speak for them")
+    return len(blind)
+
+
 def check_registered_paths() -> int:
     """Report every registered hook whose script path does not resolve.
 
@@ -255,10 +408,15 @@ def check_registered_paths() -> int:
           + ", ".join(str(p) for p in files))
     print(f"  ok={counts['ok']} missing={counts['missing']} "
           f"skipped={counts['skipped']}")
-    if not counts["missing"]:
+
+    blind = check_interpreters(rows)
+
+    if not counts["missing"] and not blind:
         print()
         print("Every registered hook path resolves.")
         return 0
+    if not counts["missing"]:
+        return 1
     print()
     print("A registered path that does not resolve is not an inert guard:")
     print("python3 exits 2 on a file it cannot open, and exit 2 is the")

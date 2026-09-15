@@ -54,7 +54,7 @@ import sys
 
 
 def _load_sibling():
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "no-push-without-self-review.py")
+    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "no-push-without-self-review.py")
     if not os.path.isfile(path):
         return None
     spec = importlib.util.spec_from_file_location("no_push_without_self_review", path)

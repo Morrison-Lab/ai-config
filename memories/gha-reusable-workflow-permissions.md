@@ -148,6 +148,65 @@ get a warning added to the example/README.
   identically-named group on a nested job, this deadlocks rather than merely
   racing.
 
+### The same deadlock has a second, silent signature, and the one above is the readable one
+
+Everything above describes `claude-code-review.yml`, which fails legibly:
+GitHub names the deadlock, names both sides, and reports the run as
+**cancelled**.
+
+`quarto-publish.yml` produces none of that.
+Measured 2026-09-15 on
+[machine_learning_lecture_materials run 35027908547](https://github.com/Morrison-Lab/machine_learning_lecture_materials/actions/runs/35027908547),
+whose caller declared a top-level `group: gh-pages` against the reusable
+workflow's own `deploy` job holding the same group:
+
+- `conclusion` is **`failure`**, not `cancelled`.
+- `created_at`, `started_at` and `completed_at` are all the same second.
+- The job object carries **zero steps**.
+- The logs endpoint returns **HTTP 404** --- there is nothing to read at all.
+
+**That combination defeats the entry above rather than merely differing from
+it.**
+A reader who knows this section goes looking for `Canceling since a deadlock
+was detected`, does not find it, sees `failure` where the entry says
+`cancelled`, and concludes this is some other problem.
+The recorded signature becomes a false negative for the unrecorded one, which
+is worse than no signature at all.
+
+So match on the **shape** rather than the message: a job that fails with no
+runner, no steps, and no retrievable log has not run, and a concurrency
+collision with the workflow calling it is the first thing to check.
+
+**gha's own example stub is the authority here, and it is more complete than
+this file was.**
+`examples/quarto-publish.yml` warns in its opening lines, names both the
+top-level and calling-job forms as deadlocking identically, and describes this
+exact signature --- "no runner, no steps, and no log, so the site silently
+stops publishing"
+([gha#809](https://github.com/Morrison-Lab/gha/issues/809),
+[gha#811](https://github.com/Morrison-Lab/gha/pull/811)).
+Read the stub for the workflow you are calling before writing the caller, not
+only this file.
+
+**Two confirmed instances across two different reusable workflows make this a
+property of gha callers**, rather than of `claude-code-review.yml` --- so the
+Do bullets above apply to every gha call, and the safe group name is one
+derived from the caller's own workflow (`quarto-publish-${{ github.ref }}`)
+rather than from what the work is about.
+
+- **Do:** read a zero-step, zero-log, instant job failure as a job that never
+  started, and check for a concurrency collision first.
+- **Do:** name a caller's group after the caller, so it cannot collide with
+  any nested job whatever that job is named.
+- **Don't:** rule the diagnosis out because the run says `failure` rather than
+  `cancelled`, or because no deadlock message appears --- one of the two known
+  instances emits neither.
+
+(Tracked as [ai-config#3719](https://github.com/Morrison-Lab/ai-config/issues/3719),
+which also carries the discoverability problem: this section is about
+concurrency and lives in a file named for permissions, where nobody debugging
+a concurrency failure would look.)
+
 ## A missing review is not a pending one; redispatch posts a comment but does not make the PR mergeable
 
 Fourth occurrence of the same permission-mismatch class this file already

@@ -410,9 +410,6 @@ hrefs finds it.
 A page-existence check does not, and neither does opening the format that
 happened to render last.
 
-- **Do:** render every format in one `quarto render`.
-- **Do:** check rendered `<link>`/`<script>` targets resolve, not just that pages exist.
-- **Don't:** read `--no-clean` as preserving anything beyond pages.
 **`gha`'s `quarto-publish` composite runs the same pattern**, so this is not
 only a preview-side concern: give its `formats` input a list and it renders the
 first format plain and each later one with `--no-clean`, exactly as measured
@@ -436,6 +433,9 @@ So treat a per-format split as **suspect rather than broken**: check the rendere
 output of the specific site rather than inferring from the command sequence, in
 either direction.
 
+- **Do:** render every format in one `quarto render`.
+- **Do:** check rendered `<link>`/`<script>` targets resolve, not just that pages exist.
+- **Don't:** read `--no-clean` as preserving anything beyond pages.
 - **Don't:** assume a site is affected because it splits per format --- rme does
   and is not.
 - **Don't:** assume one is safe because rme is --- the measurement above is real

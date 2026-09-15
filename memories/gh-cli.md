@@ -602,6 +602,10 @@
   That disappearance is **not** explained by the `review_on_push: true` rule above, and [`shared/workflow/pr-on-claim.md`](../shared/workflow/pr-on-claim.md)'s "blocked-request test has a false positive" section owns the argument and the deriving queries.
   The short version: `Morrison-Lab/ai-config` reproduces the identical 201-then-empty signature while carrying no `copilot_code_review` rule at either scope, so an empty pending list is evidence neither that the request was blocked nor that a review is coming.
   Only the posted review **body** settles whether a review is actually coming.
+  Measured on `Morrison-Lab/ai-config` on 2026-09-15: no body ever came.
+  Across roughly three hours and eight POSTs spread over three PRs (#3629, #3696, #3699), every request returned 200 with an empty `requested_reviewers`, and `gh pr view --json reviews` counted zero Copilot reviews at every head throughout.
+  So for this repo the open question above currently resolves to "no review is coming", which matters because `hooks/no-unreviewed-pr.py` demands a request whose only satisfying evidence is a landing review --- see [ai-config#3700](https://github.com/Morrison-Lab/ai-config/issues/3700).
+  That is a claim about a repository setting and can change, so re-measure rather than carrying it forward.
   The timeline event described next settles the strictly narrower question of whether the request was *accepted*, which those three surfaces also cannot answer --- so the two conclusions divide the question rather than competing for it.
 
   **The issue timeline's `review_requested` event is a fourth surface, and it is the one that does discriminate whether the request landed.**

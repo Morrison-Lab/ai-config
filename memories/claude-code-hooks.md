@@ -833,3 +833,26 @@ check, and it is the one a `MUTATIONS` table cannot perform for you.
   it scores green for the same reason it cannot fail.
 - **Don't:** read an all-clauses-pass run as covering the imported code; the
   imported code was never the mutant.
+
+## A reviewer resumed with `SendMessage` leaves the pre-push guard on the old verdict
+
+`hooks/no-push-without-self-review.py` takes the verdict from the `tool_result` of an **`Agent` call**.
+Its docstring says so, and says why: a transcript-wide search for the phrase cannot work in a corpus that quotes verdict vocabulary constantly.
+
+`SendMessage` to a finished reviewer resumes it with its context intact, which is the cheaper and more natural way to ask for a second look.
+Its report comes back as a **task notification**, not as an `Agent` tool result.
+The guard therefore never sees it, and the standing verdict stays whatever the last real `Agent` call returned.
+
+Measured 2026-09-14 on ai-config#3629.
+The first dispatch returned NOT_CLEAN with four findings.
+Two `SendMessage` follow-ups returned "Ready for merge" with zero findings, and the push was still refused, quoting the first verdict.
+A fresh foreground `Agent` call on the same commit cleared it immediately.
+
+This is NOT [ai-config#3045](https://github.com/Morrison-Lab/ai-config/issues/3045), which is the harness backgrounding a foreground `Agent` call.
+Here the call was never made; the continuation replaced it.
+The two look identical from the refusal message, so check which one you did before reaching for `ALLOW_UNREVIEWED_PUSH=1` --- the override is for when no verdict can exist, and here one can.
+
+- **Do:** dispatch a fresh foreground `Agent` call for the review round you intend to push on.
+- **Do:** use `SendMessage` freely for a reviewer you are not about to push behind --- to ask a question, or to have it verify its own earlier claim.
+- **Don't:** read a clean verdict that arrived by task notification as one the guard can see.
+- **Don't:** override on this --- re-dispatching costs one call and leaves a verdict the guard and a later reader both accept.

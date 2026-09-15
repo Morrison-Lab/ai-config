@@ -1002,3 +1002,25 @@ gh pr view <N> --json state,mergedAt,mergeCommit
 
 - **Do:** confirm a merge from a state query rather than from the merge command's own output.
 - **Don't:** read empty output from `gh pr merge` as failure, and don't retry on it.
+
+## `gh pr merge` needs `-R` for the standing-grant repo check to fire
+
+`CLAUDE.md` gives PRs targeting `Morrison-Lab/ai-config` a standing `mwc` grant, and `hooks/no-unauthorized-merge.py` implements it by reading the merge's **target repo off the command**.
+
+So the grant is not resolved from the checkout.
+Run this from an ai-config worktree, on an ai-config PR, and it is refused:
+
+```console
+$ gh pr merge 3635 --squash --delete-branch
+MECHANISTIC PROHIBITION: `gh pr merge` is strictly blocked without explicit permission.
+```
+
+Add `-R Morrison-Lab/ai-config` and the identical merge succeeds.
+Nothing in the refusal says the repo could not be determined --- it reads as a policy denial, which invites the wrong remedy (asking for permission, or reaching for an override) when the fix is one flag.
+
+The same reasoning covers the `gh api .../pulls/N/merge` form, which names the repo in the URL and so always resolves.
+
+- **Do:** pass `-R <owner>/<repo>` on every `gh pr merge`, including from a checkout of that same repo.
+- **Don't:** read the refusal as a missing grant --- check first whether the command names the repo the grant is scoped to.
+
+(Measured 2026-09-14 merging ai-config#3635.)

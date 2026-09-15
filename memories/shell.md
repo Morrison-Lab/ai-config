@@ -356,3 +356,60 @@ The landed form calls `_lead_index(argv)` --- skip assignments and lead words, t
 - **Don't:** read `argv[0]` as the command word --- the splitter never removed the keyword heading a compound command's body.
 - **Don't:** answer an over-detection with the first narrowing that removes it;
   a narrowing moves a check toward silence, which is the direction a guard cannot afford.
+
+## The heredoc backslash collapse has a second stage when the heredoc writes code
+
+[`heredoc-backslash-collapse`](../shared/coding/heredoc-backslash-collapse.md) records the collapse itself: a doubled `\\` inside a Bash-tool heredoc body can arrive as a single `\`, even with a quoted delimiter.
+Its worked cases are regexes, where the damage is a pattern that still compiles and matches the wrong thing.
+
+A heredoc that writes a **Python generator script** adds a second stage, and the two compose in a way neither one predicts.
+The script is itself Python, so a `\n` that survives the collapse is then read by Python's own string literal:
+
+```console
+$ cat > /tmp/gen.py <<'EOF'
+block = """    line_start = body.rfind("\\n", 0, m.start()) + 1"""
+EOF
+```
+
+The transport collapses `\\n` to `\n`, and the non-raw `"""..."""` turns that into a REAL NEWLINE.
+The generated file gets a line break where the source was meant to say backslash-n, and the result is a syntax error or, worse, a string literal that silently spans lines.
+
+Measured 2026-09-14 on Windows MINGW64 while generating `plugins/ai-config/enforce-mwc-review-gate.py`.
+`grep` on the written file showed `line_start = body.rfind("` with the rest of the line gone.
+It happened a second time the same session, in a heredoc patching a test file, after the rule had already been read once --- which is the fragment's own "having read this rule is not the check" point, measured twice in one session.
+
+**How much of a doubled escape survives, measured.**
+A probe written through the same Bash-tool heredoc, reading back both the source line and the value:
+
+| typed | backslashes in the source | Python value |
+| --- | --- | --- |
+| `a\nb` | 1 | a real newline |
+| `a\\nb` | 1 | a real newline |
+| `a\\\\nb` | 2 | backslash then `n` --- the intended one |
+
+So the collapse is one pairwise halving, applied once, and quadrupling cancels it.
+
+**Three forms, two of them portable.**
+
+- The **Write tool** with a raw string, `r` plus triple quotes, is the cleanest: its content is JSON-encoded on the way to disk, so nothing collapses, and a raw literal keeps `\n` as two characters.
+  This is the form to reach for when generating code.
+- A **placeholder** in a heredoc: write `@BS@n`, and end the literal with `.replace("@BS@", chr(92))`.
+  No escape sequence is ever typed, so there is nothing to collapse.
+- Quadrupling produces the right literal in the table above, and is still the wrong remedy.
+  It encodes the collapse into the source, and the fragment above records that collapse as a property of the ENVIRONMENT, absent on a GitHub Actions Linux runner and in a Linux remote container.
+  So it is correct exactly where the collapse happens and wrong everywhere else: on a transport that does not collapse, the same four backslashes arrive as four and Python reads two.
+
+**`repr()` doubles a backslash, so the readback needs halving before it is a count.**
+This is how the table above was first published with the wrong numbers, and it is worth more than the numbers are.
+`repr()` is the right instrument --- it is the only thing that separates a real newline from a backslash and an `n` --- and its output is itself escaped, so a source line holding ONE backslash prints as two.
+Reading the printed count as the actual count reports no collapse at every level at once, which is internally inconsistent in a way the surrounding prose can state and the table cannot.
+Count the characters in the file instead, with `cat -A` or a `.count(chr(92))`, and use `repr()` for the question it actually answers.
+
+**Print `repr()` of the written line, not the line.**
+A terminal renders a real newline as a line break and a backslash-n as `\n`, and at a glance in a diff the two look like ordinary formatting.
+`repr()` is what separates them.
+
+- **Do:** generate code with the Write tool and a raw string, or with a placeholder substituted via `chr(92)`.
+- **Do:** read back the written line with `repr()` before trusting it.
+- **Don't:** type a doubled backslash in a heredoc that writes a Python string literal --- two interpreters get a turn at it, not one.
+- **Don't:** answer a collapse by adding more backslashes.

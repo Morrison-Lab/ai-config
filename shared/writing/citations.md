@@ -779,12 +779,12 @@ Expect the parent's range to be wrong at both ends: the content can start a page
 Turning a run-on list into bullets is also a restatement of the source's own enumeration, so an item the parent sentence had already dropped stays dropped, now in a form that displays the gap as a complete list.
 Count the source's items and the bullets, and say how many of how many you are giving.
 
-**Two shapes here are decidable, so grep for them rather than reading for them:**
+**Two shapes here need no reader --- one takes a grep, one takes a diff:**
 
 - `(p. 22-23)` --- the singular `p.` with a range, found by `grep -nE '\(p\. *[0-9]+ *- *[0-9]+\)'`.
 - A child range that is not a subrange of the parent's, which a diff of the two makes mechanical when the parent citation is still on the `-` side of the hunk.
 
-Neither needs a person, and the first is the kind of finding a repo whose prose carries page citations should own as a check rather than as a habit --- see [`algorithmatize-checks`](../workflow/algorithmatize-checks.md).
+Neither needs a person, and the first belongs in a check, not a habit, in any repo whose prose carries page citations --- see [`algorithmatize-checks`](../workflow/algorithmatize-checks.md).
 
 - **Do:** re-open the source and derive a locator for every sentence a split created, including the one that keeps the parent's wording.
 - **Do:** check the split enumeration against the source's own enumeration for completeness, not only its pages.

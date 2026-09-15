@@ -432,17 +432,22 @@ The plugin does not close that gap either: its root is the ai-config repository 
 **In that repo, use the fallback the guard already admits, and get its two conditions right.**
 `no-push-without-self-review.py`'s `FALLBACK_AGENT_NAME` accepts `general-purpose`, `general`, `reviewer`, `code-reviewer`, `research` and `self` (with an optional `-`, `_` or space inside the two-word spellings), but only when the dispatch's own prompt matches `REVIEW_PROMPT_RE` --- `adversarial review`, `adversarial self-review`, `pre-push review`, or `self-review`, again with an optional separator.
 "Review this adversarially" satisfies a reader and not the regex.
-The report then has to meet the verdict-line contract stated in the "Structured review data" sections below, with `Reviewed-Commit: <sha>` after the verdict.
+The report then has to meet the verdict-line contract, which "A verdict phrase separated from its heading by a line break is no verdict" and "Structured review data (JSON payload)" state below between them.
 
 **Read which denial you got: the two messages fail at different stages, and the second has three causes.**
 "No `adversarial-reviewer` subagent or recognized external reviewer ... was dispatched" means the dispatch was not recognized --- wrong persona name, or a prompt the regex missed.
-"An `adversarial-reviewer` subagent was dispatched, but no verdict came back as that call's own result" means it *was* recognized and no verdict was extracted: a background dispatch, an errored result, or a report whose verdict line does not match that contract.
+"An `adversarial-reviewer` subagent was dispatched, but no verdict came back as that call's own result" means it *was* recognized and no verdict was extracted: a background dispatch, an errored result, or a verdict line that does not match that contract.
+A missing `Reviewed-Commit:` is not one of them --- that has its own message, about a clean verdict that does not say which commit it read.
 Where you chose to background the dispatch, the guard's own message gives the fix and it is a foreground re-dispatch.
 Where the harness backgrounds it regardless --- #3045's two variants, below --- re-dispatching changes nothing and the `ALLOW_UNREVIEWED_PUSH=1` route below is the remedy.
 
+- **Don't:** reach for `ALLOW_UNREVIEWED_PUSH=1` on the second message from a foreground dispatch that returned a report.
+  It says the report was read and no verdict was found in it, which is a formatting fix, and the override is sanctioned only for the harness-forced case above.
+
 (Measured on ucdavis/lbt, 2026-09-15, with the plugin enabled: the desktop session's agent list held only `claude`, `claude-code-guide`, `Explore`, `general-purpose`, `Plan` and `statusline-setup`.
-Three foreground `general-purpose` fallback reviews returned verdicts and each push was still refused with the second message, so every push used the override.
-Which part of the contract those reports missed was not captured at the time, and that is the thing to capture next time --- the three causes above are distinguishable only from the report itself.)
+Three foreground `general-purpose` fallback reviews returned verdicts and each push was still refused with the second message, so every push used the override --- which the Don't above rules out, and which is why this is a case record rather than a precedent.
+The step nobody took is the one this file already prescribes below: run the guard's own reader over the live transcript and print what it parsed.
+Doing that would have named the defect instead of leaving three overrides and no diagnosis.)
 
 Note what that CLI fallback does to the pre-push guard, since the two rules meet here and pull opposite ways.
 A CLI's verdict never becomes an `Agent` call's `tool_result`, so the guard cannot see it however real the review was.
@@ -943,9 +948,7 @@ The shape the hazard is actually about is a fingerprint line with the trailer gl
 Reviewed-Commit: <sha>agentId: <id> (use SendMessage with to: '...')
 ```
 
-That second block was constructed to show the shape rather than captured when this section was written.
-It has since been captured: on 2026-09-15 an `Agent` result reached a Claude Code desktop session as `Reviewed-Commit: 14e01f48agentId: a2823bf0...`, the fingerprint abbreviated to eight characters.
-That is the truncation table's bottom row arriving in the wild rather than the safe sentinel case, and the remedy is still the full sha settled below, not a sentinel.
+That second block is constructed to show the shape, not captured.
 
 **The zero and the sightings are about different artifacts, and that is what has to be settled before either number means anything.**
 The sweep read **stored** transcript JSONL.

@@ -1204,7 +1204,7 @@ shows that the figure ever changed.
 (Recurrence, ucdavis/lbt#7, 2026-09-15: the original commit and its first amend each carried the same two figures that disagreed with their own diff, and the second amend fixed both.
 "145 packed lines" where the diff showed 117, and "three negation-reversal antitheses" where two were antitheses and the third was a metaphor removal.
 The second widens the class this section states.
-It counts the *kinds* of edit in the diff rather than its size, so `git show --stat` cannot settle it and only reading the hunks can --- which is why a message describing a mixed cleanup is likelier to carry one of these than a message describing a single mechanical change.
+It counts the *kinds* of edit in the diff, not its size, so `git show --stat` cannot settle it and only reading the hunks can --- which is why a message describing a mixed cleanup is likelier to carry one of these than a message describing a single mechanical change.
 A parenthetical in the same message named four of the five items its own lead-in counted, which is [`check-leadin-counts.py`](../../scripts/check-leadin-counts.py)'s defect class on a surface that checker does not read --- and not its shape: that checker requires the count to open the last sentence of a lead-in line with the enumeration below it, while this count sat mid-sentence inside a bullet with the items inline in parentheses.
 [`hooks/flag-positional-figure-in-commit-message.py`](../../hooks/flag-positional-figure-in-commit-message.py) shows the surface is reachable --- a `PreToolUse` guard sees the message before the commit exists --- so a commit-message count check is buildable, though it needs a predicate for the inline-parenthetical form rather than a port of the existing bounds.)
 

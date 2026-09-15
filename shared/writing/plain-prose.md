@@ -29,11 +29,11 @@ When PSW and this guidance disagree, PSW wins.
 
 This is a default, not an absolute rule. Keep a clause or a technical term when
 removing it would lose meaning or precision. Never trade an honest hedge for
-false confidence --- and note that a hedge can be carried by a figure of
-speech rather than by a hedge word, so replacing a metaphor with its "precise
-equivalent" can harden a likeness into an assertion with nothing hedge-shaped
-having been deleted
-([`find-ai-tells`](../../skills/find-ai-tells/SKILL.md)'s anti-patterns).
+false confidence.
+A simile or an as-though construction is a hedge too, so swapping one for its
+"precise equivalent" can assert a mechanism the original only likened, with no
+hedge word deleted
+(see [`find-ai-tells`](../../skills/find-ai-tells/SKILL.md)'s anti-patterns).
 
 Writing agents do not need to enforce all style guidelines on first draft.
 Work iteratively: write a substantively-correct but stylistically loose first draft,

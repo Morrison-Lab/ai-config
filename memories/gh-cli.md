@@ -607,13 +607,12 @@
   Identical answers, opposite states, so the query discriminates nothing here: `CAN_BE_ASSIGNED` is about the **coding agent** you can assign an issue to, a different product from the PR reviewer, whose login never appears in that list on either repo.
   A session also reported the GraphQL `requestReviews` mutation carrying the reviewer bot's node id behaving like the REST POST --- returning without errors while the reviewer list stayed empty --- but that one is narration rather than measurement here: no repo, PR, node id, or response body was kept, and re-running it would be an outward mutation.
 
-  **What does bear on it is the repository's own review history**, which is re-derivable and needs no probe:
-  `gh api "repos/<o>/<r>/pulls/<N>/reviews" --jq '[.[] | .user.login]'` across the PRs that exist.
-  All six of `ucdavis/lbt`'s PRs (1 and 3 through 7) return no reviews at all, which is evidence about that repository rather than about the endpoint that was probed.
-  This is the per-repo, historical form of the "only the posted review **body** settles whether a review is actually coming" conclusion below, rather than a competing discriminator.
-  Where the history comes out empty, no documented request mechanism will discharge a no-unreviewed-PR obligation there, and the obligation has to be met by another reviewer (`claude-review`, or the local adversarial self-review) instead of by more requests.
+  The repository's own history is the closest thing to an answer, and it is weaker than it looks.
+  `gh api "repos/<o>/<r>/pulls/<N>/reviews"` over all six of `ucdavis/lbt`'s PRs (1 and 3 through 7) returns no reviews at all.
+  That is a fact about the repository, not about the endpoint that was probed, and it is still not a provisioning verdict: nobody controlled for whether a review was ever requested on those PRs, which is the confound the "both candidate directions are unconfirmed" passage below already states for this file.
+  Where a per-head answer is what you need, [`memories/copilot-reviews.md`](copilot-reviews.md)'s check-run query separates "never ran" from "ran and posted nothing".
+  This file's standing Do, to read the posted review body, is unchanged.
 
-  - **Do:** answer "does Copilot review here at all" from the repo's existing `reviews` lists, not from a request endpoint's status code.
   - **Don't:** read a `suggestedActors` list whose only bot is `copilot-swe-agent` as evidence about PR code review --- ai-config returns the same single bot while being reviewed.
   - **Don't:** escalate from REST to GraphQL when the REST call already returned success ---
     both add the same nobody, and each attempt spends quota that is often the real cause.

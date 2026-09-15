@@ -1818,3 +1818,53 @@ The remedy is to read the file an unresolved thread names on the default branch 
 
 - **Do:** read the file an unresolved thread names on the default branch (e.g., with `git show origin/main:<path>`), and file only what is still true there.
 - **Don't:** treat an unresolved review thread on a merged pull request as evidence of an open defect in the code.
+
+## When the check that would refute the claim is unavailable, the claim is unverified --- not merely caveated
+
+The four shapes above all describe verifying the *wrong* artifact.
+This one describes the case where the right artifact is identified correctly
+and simply **cannot be reached** --- a blocked egress proxy, a missing
+credential, a UI with no API behind it.
+
+The failure is not that the check is skipped.
+It is what happens to the claim afterwards.
+The unreachable check gets demoted to a parenthetical, the claim is stated at
+full confidence, and the caveat reads as thoroughness rather than as the
+warning it is.
+Nobody is deceived about the blocked check, because it is disclosed --- they
+are deceived about the claim, which was never downgraded to match.
+
+Measured 2026-09-15.
+A Quarto site was rendered, deployed to `gh-pages`, and the branch confirmed to
+hold 36 HTML pages, 21 PDFs and every asset directory.
+Every one of those is a fact about the **branch**.
+The claim made was that the site was *published*, with one routine settings
+step left --- a fact about **serving**, which the session could not check
+because its proxy blocked `github.io`, and which it noted in passing while
+stating the claim anyway.
+The setting did not exist: the repository was a private fork, and GitHub Pages
+was unavailable to it entirely (see
+[`github-repo-transfers`](../../memories/github-repo-transfers.md)).
+The maintainer had to supply what the blocked check would have shown.
+
+**The asymmetry to notice is that a blocked check removes evidence against the
+claim while leaving every piece of evidence for it intact.**
+So the remaining evidence looks unanimous, and confidence goes *up* exactly
+when it should go down.
+That inverts the usual relationship between missing information and certainty,
+which is why disclosing the gap does not correct for it.
+
+The test is the one this fragment already states, applied to reachability
+rather than to identity: ask what would have to be true for the claim to be
+false, then ask whether the artifact that would show it is one you can
+actually reach.
+When it is not, say the claim is unverified and name what would settle it.
+
+- **Do:** state the claim at the confidence the reachable evidence supports,
+  and say plainly which part is unverified.
+- **Do:** name the specific check that would settle it, so whoever can run it
+  knows what to run.
+- **Don't:** disclose the blocked check and then assert the claim anyway --- a
+  caveat beside a confident claim is read as rigour, not as doubt.
+- **Don't:** treat unanimous surviving evidence as strong when the blocked
+  check was the only thing that could have disagreed.

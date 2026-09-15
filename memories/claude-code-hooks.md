@@ -237,7 +237,7 @@ Hooks load at session start, so `command -v python3` inside the current shell ca
 - **Don't:** conclude the plugin cache is corrupt because the named file exists --- that check passes in exactly this failure.
 - **Don't:** assume disabling the alias is available --- a managed/locked-down machine may refuse the settings change, which is why the PATH-order remedy exists as an alternative.
 
-(Morrison-Lab/ai-config#3624: filed and fixed via the detector hook above (PR #3647).
+(Morrison-Lab/ai-config#3624: filed, with the detector hook above proposed in PR #3647 (open as of this writing).
 The per-machine remedy that actually worked is recorded here because the first location tried did not: `C:\Python313\python3.exe` failed with Access Denied, while `C:\Users\<user>\AppData\Local\Programs\Python\Python311\python3.exe` succeeded, being both writable and ahead of `WindowsApps` on that machine's `PATH`.)
 
 ## A hook's deny rejects the WHOLE call, so a compound command's setup segments never run either

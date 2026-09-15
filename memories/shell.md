@@ -392,8 +392,8 @@ Which one a command has to satisfy is decided by **where the command goes**, not
 [`hooks/warn-bash-command-for-powershell-user.py`](../hooks/warn-bash-command-for-powershell-user.py) is this entry's guard, and what it is *not* keyed on is the interesting part.
 
 The obvious trigger --- a fenced block containing `&&` while the user runs PowerShell --- fires four times over the 120 transcripts under `~/.claude/projects` for three true positives (all one incident, re-issued) and one quoted session.
-The discriminator that suggests itself, suppressing when the surrounding prose is retrospective ("failed", "the error was", "I handed you"), marks **all four identically, the true positive included**, because the offending message also discussed a failure at length.
-Suppressing on it would have removed the only real hit and kept nothing;
+The discriminator that suggests itself, suppressing when the surrounding prose is retrospective ("failed", "the error was", "I handed you"), marks **all four identically, the true positives included**, because the offending message also discussed a failure at length.
+Suppressing on it would have removed the only real incident and kept nothing;
 firing on it is the [ai-config#2997](https://github.com/Morrison-Lab/ai-config/issues/2997) pattern, a guard that fires on the explanation of the mistake it polices.
 
 What separates the two classes is the **shape of the block**, not the prose around it.
@@ -402,7 +402,7 @@ a quotation of a failure shows its prompt, or the error beneath it, or runs long
 At a bound of eight non-blank lines the corpus yields three firings, all the same genuine directive, and no false positives --- and the corrected PowerShell form of that very command, which also appears in the corpus, is silent.
 
 Say plainly what that does and does not establish, because the first draft of this entry overstated it and adversarial review caught the figure.
-The corpus holds **one** incident across 500 readable assistant messages, so it shows the matcher is quiet on the other fifteen fenced messages in it and nothing about the false-positive rate.
+The corpus holds **one** incident across 500 readable assistant messages, so it shows the matcher is quiet on the other thirteen fenced messages in it and nothing about the false-positive rate.
 The real evidence is the constructed negatives in the hook's suite --- a Dockerfile `RUN` line, a Make recipe, a git alias, a CI step, a session prompted `user@host:~$`, a heredoc merely named in a comment --- every one of which fired against the first implementation and is now pinned as a case.
 The line bound is defence in depth rather than a measured ceiling: after quote and comment masking were added the firing count is flat at three for every bound, including unbounded.
 
@@ -412,6 +412,7 @@ What is new here is *which* consumer a fenced block in a reply is addressed to.
 - **Do:** when a prose-context discriminator looks necessary, check whether a structural one exists first --- prose framing marked a directive and a post-mortem identically here.
 - **Don't:** quote a failing command in a bare short block;
   show it with its prompt and its error, which is both the honest presentation and the one the guard reads as a citation.
+
 ## The heredoc backslash collapse has a second stage when the heredoc writes code
 
 [`heredoc-backslash-collapse`](../shared/coding/heredoc-backslash-collapse.md) records the collapse itself: a doubled `\\` inside a Bash-tool heredoc body can arrive as a single `\`, even with a quoted delimiter.

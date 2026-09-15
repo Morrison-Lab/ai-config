@@ -52,9 +52,11 @@ wrong to quote 3/0 as if they did.
 
 The real evidence is the suite's CONSTRUCTED negatives. Round-1 review built
 the false positives the corpus lacks -- a Dockerfile `RUN` line, a CI `run:`
-step, a Make recipe, a git alias, a remote-host command, a quoted session
-prompted `user@host:~$` -- and every one of them fired. Those are fixed and
-pinned as cases. A reader weighing this guard should weigh those, not the
+step, a Make recipe, a git alias, a quoted session prompted `user@host:~$`, a
+heredoc merely named in a comment -- and every one of them fired. Those are
+fixed and pinned as cases. A command meant for a REMOTE host or container
+shell is NOT among them: it has no signal, stays a declared KNOWN_LIMIT, and
+is the largest false-positive class. A reader weighing this guard should weigh those, not the
 corpus counts.
 
 WHY THE PROSE AROUND THE BLOCK IS NOT THE DISCRIMINATOR

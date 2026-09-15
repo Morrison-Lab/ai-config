@@ -252,14 +252,17 @@ WHY = {
 }
 
 KNOWN_LIMITS = {
-    "backtick command substitution is NOT a construct. Measured over the same "
-    "corpus it added two firings, both false (an option description and a "
-    "JSON stdout dump), and contributed nothing to the true positive",
+    "backtick command substitution is NOT a construct. OUT of scope it added "
+    "two firings, both false (an option description and a JSON stdout dump), "
+    "and contributed nothing to the true positive; IN scope it adds nothing "
+    "either way, so the exclusion rests on out-of-scope evidence and the "
+    "shape of the risk rather than on an in-scope measurement",
     "a tilde-fenced block (~~~) is not matched at all; the harness emits "
     "backtick fences",
     "a directive longer than MAX_LINES lines is missed, which is the price of "
-    "excluding script listings -- 8 is one line below where the first false "
-    "positive appears in the corpus",
+    "excluding script listings. 8 is defence in depth, NOT a measured "
+    "ceiling: after quote and comment masking the firing count is flat at "
+    "three for every bound, including unbounded",
     "a session whose transcript carries no environment brief is never warned, "
     "because an unknown shell must not produce a warning about the wrong one",
     "a block the user is told to run in Git Bash DELIBERATELY still warns; "
@@ -390,8 +393,9 @@ MUTATIONS = {
         {"S10", "S11"},
     ),
     "M2_max_lines_bound": (
-        "a long block is a script being shown, not a command to paste; 8 is "
-        "one line below where the corpus's first false positive appears",
+        "a long block is a script being shown, not a command to paste. The "
+        "bound is defence in depth, not a measured ceiling -- the corpus "
+        "firing count is flat at three for every bound",
         # anchored with its comment: the bare assignment also appears in the
         # module docstring, where the measurement is recorded
         [("named in the suite's KNOWN_LIMITS.\nMAX_LINES = 8",

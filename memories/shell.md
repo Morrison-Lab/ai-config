@@ -261,6 +261,39 @@ pre-empt these when authoring shell, especially under `set -euo pipefail`:
   **associative arrays do NOT** (4.0+).
   Parse key=value records with `while IFS='=' read -r k v; do case "$k" in ...`.
 
+## A `while read` loop's own stdin can be silently stolen by a command in its body
+
+`while read -r x; do <cmd using $x>; done < <(source)` (or `< file`) hands
+the loop's file descriptor 0 to every command in the body, not just to
+`read`.
+If the body runs something that reads stdin with no explicit redirect of
+its own (any interactive-shaped `gh`/`git`/`ssh`/`curl` call lacking a
+`< /dev/null` or its own `< file`), that command consumes whatever lines
+are still buffered on the loop's stdin --- so the loop appears to run to
+completion, exits cleanly, and reports nothing wrong, while having
+actually processed only the lines that arrived before the first
+stdin-reading child ran.
+
+- **Do:** redirect every other stdin use inside the loop body explicitly
+  (`< /dev/null` for a command that reads none, or its own `< file`), so
+  nothing but the loop's own `read` ever touches fd 0.
+- **Do:** count iterations against the source's own line/record count when
+  a `while read` loop's correctness matters, rather than trusting a clean
+  exit.
+- **Don't:** hand-build a `while read` loop over a maintained instrument's
+  own job when one already exists and owns its input internally --- see
+  [`derive-dont-enumerate`](../shared/workflow/derive-dont-enumerate.md)'s
+  "Which local checks predict CI is itself a derivable set" section, whose
+  `scripts/run-local-validation.py` has neither this bug nor the
+  hand-picking one it documents.
+
+(2026-09-14: a hand-built `grep ... .github/workflows/validate.yml | while
+read job; do gh run ...; done` loop to run CI checks locally silently ran
+27 of 104 jobs --- a `gh` call inside the loop body read from the loop's own
+redirected stdin and consumed the remaining lines.
+`run-local-validation.py`, the maintained instrument for exactly this
+task, was available the whole time and has neither bug.)
+
 ## Git Bash process substitution fails for a native-Windows consumer
 
 In Git Bash on Windows, `<(...)` works for msys-native consumers and fails only when the consumer is a **native Windows binary** that has to reopen the msys `/proc/NNNN/fd/N` path.

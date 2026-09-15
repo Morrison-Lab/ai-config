@@ -664,6 +664,71 @@ lines added since `NLB_BASE_REF`.
 check flagged all 7 while `validate` stayed green, and the review bot did not
 catch them either --- they were found only by reading the check's own output.)
 
+**`NLB_BASE_REF` is the input whose absence disables the check outright, and
+the script announces that in a line shaped like ordinary CI noise.**
+
+The paragraph above names `NLB_PATHS_IGNORE` as the input a local run has to
+supply, because its default **over**-reports, which is the safe direction.
+`NLB_BASE_REF` fails the other way.
+With it unset the script runs no check at all, prints one `::warning::` line,
+and exits 0.
+Measured 2026-09-15 against the SHA this repo vendors:
+
+```console
+$ python3 scripts/vendor/gha-check-new-line-breaks.py
+::warning::Skipping the new-line-breaks check for this run (no base-ref given; not falling back to a whole-tree scan, which would reflag pre-existing long lines).
+$ echo $?
+0
+```
+
+The exit status is the whole problem.
+A skip and a clean run return the same byte, so any caller reading `$?` --- a
+`&&` chain, a pre-push sweep, a person glancing at a terminal --- gets a pass.
+The `::warning::` prefix compounds it, because that token is addressed to
+GitHub Actions' annotation parser and reads outside CI as decoration rather
+than as the verdict.
+
+A second route reaches the same skip **with the variable set**, so "always set
+it" is not by itself the remedy.
+Where the ref cannot be diffed --- an unfetched ref, a shallow clone ---
+`find_violations` returns its `skipped` flag and `main()` returns 0 just the
+same, naming the ref in the reason:
+
+```console
+$ NLB_BASE_REF=origin/does-not-exist python3 scripts/vendor/gha-check-new-line-breaks.py
+::warning::Skipping the new-line-breaks check for this run (could not diff against 'origin/does-not-exist'; not falling back to a whole-tree scan, which would reflag pre-existing long lines).
+$ echo $?
+0
+```
+
+So read the output either way.
+`No lines missing semantic breaks.` is the only clean verdict this script
+emits, and it is printed only on a run that actually diffed something.
+
+This is the fifth recorded false clean from this checker, after the four the
+paragraph below counts, and the first in which the check never ran.
+The four below all describe a run that examined a real diff and examined the
+wrong one;
+this one examined nothing and said so.
+(Reported 2026-09-15 during the post-merge pass for
+[ai-config#3635](https://github.com/Morrison-Lab/ai-config/pull/3635) and
+[#3682](https://github.com/Morrison-Lab/ai-config/pull/3682): a local run with
+the variable unset was read as a pass, the push went out, and CI's own
+`new-line-breaks` job --- which does supply a base ref --- flagged the line the
+local run would have caught.
+The two console blocks above are this entry's own measurement;
+the incident is the reported occasion for taking it.)
+
+- **Do:** set `NLB_BASE_REF` on every local invocation, per the command block
+  above, and read the script's output rather than its exit status.
+- **Do:** treat any line beginning `::warning::Skipping` as "the check did not
+  run", whatever the status was.
+- **Don't:** read exit 0 from this script as a pass --- a skip and a clean run
+  are indistinguishable by status.
+- **Don't:** assume supplying the variable is sufficient;
+  an unfetchable ref skips with it set, and the reason string is the only place
+  that difference appears.
+
 **Run it AFTER committing, not before: it diffs `<base>...HEAD`, so
 uncommitted work is invisible to it and a pre-commit run reports clean
 vacuously.**

@@ -213,6 +213,82 @@ stay red after the fix and need a full re-run rather than a `--failed` one.
 Neither late reply would have changed the merge decision,
 and a five-minute window is expected to miss a slow reply now and then.)
 
+**Derive that a peer is gone; never assert it.**
+
+The twenty-minute threshold and the five-minute window are both inferences
+about a session you cannot reach, and both are written above as inferences.
+"The session that opened it is no longer running on this machine" is not one.
+It is a claim about the world, asserted in the very sentence that invites the
+peer to refute it, and no reader of that comment can check it.
+
+There is a one-command derivation, and it is independent of the verdict clock
+the section above measures:
+
+```bash
+git log -1 --format=%cI origin/<branch>
+```
+
+A branch's last push is the cheapest liveness signal available, and it is the
+one a live session moves.
+A branch pushed twenty minutes ago is a session that was working twenty minutes
+ago, whatever the verdict age says --- and the verdict age can be comfortably
+past the threshold while the push is not, because a session that pushes, gets a
+clean verdict, and then keeps working leaves the verdict clock running and the
+push clock short.
+So read both, state both, and phrase the conclusion as what you measured:
+"no push in N minutes, verdict clean for M" rather than "the session is gone".
+
+**A hold-off ends the window; it does not shorten it.**
+
+Above, "honour a hold-off reply" is the whole of what is said, which leaves the
+commonest shape unaddressed: the hold-off arrives and the five minutes keep
+running.
+They do not.
+The window exists to collect an objection, so an objection collected ends it,
+and no amount of subsequent silence converts a hold-off into consent.
+
+The same applies to anything else that lands inside the window.
+The grant is conditioned on a **fully clean** reading (see
+[`fully-clean`](../../shared/workflow/fully-clean.md)), and that reading is a
+snapshot rather than a standing guarantee, so a NOT_CLEAN result posted after
+the announcement invalidates it exactly as a check flipping red would.
+The window is precisely when such a thing arrives, since announcing an
+intention to merge is what prompts the owner to publish what it has.
+Re-read the PR immediately before merging, not the reading that opened the
+window.
+
+- **Do:** derive a peer's liveness from `git log -1 --format=%cI origin/<branch>`
+  before writing anything about it, and put the timestamp in the comment.
+- **Do:** state the inference as an inference, naming both clocks you read.
+- **Do:** treat a hold-off as terminating the window at the moment it arrives.
+- **Do:** re-read the PR's clean state immediately before the merge.
+- **Don't:** assert that a session has stopped --- nothing available to you
+  observes that, and the claim is unfalsifiable to the reader you are asking to
+  refute it.
+- **Don't:** run the remaining minutes out after a hold-off and merge on the
+  silence;
+  the objection you asked for has already arrived.
+- **Don't:** merge on the readiness reading that opened the window.
+
+(Measured 2026-09-15 on
+[ai-config#3635](https://github.com/Morrison-Lab/ai-config/pull/3635), from the
+PR's own comment timestamps.
+A merge-intent comment at `05:51:13Z` asserted the PR "was opened by a session
+that is no longer running on this machine".
+The owning session replied at `05:51:39Z` --- 26 seconds in --- that it had
+pushed to the branch four times that night, most recently about twenty minutes
+earlier, and that a pre-merge adversarial gate was running against that exact
+head.
+That gate posted **NOT_CLEAN, 7 findings** at `05:52:12Z`.
+The PR merged at `05:58:47Z`: 7 minutes 8 seconds after the hold-off and 6
+minutes 35 seconds after the gate result, putting all seven findings on `main`.
+They were closed forward by
+[#3681](https://github.com/Morrison-Lab/ai-config/issues/3681) ->
+[#3682](https://github.com/Morrison-Lab/ai-config/pull/3682) rather than by a
+revert, for the reason
+[`revert-premature-merge`](../../shared/workflow/revert-premature-merge.md)
+now records.)
+
 ## The standing per-repository grant
 
 One repository carries the grant **standing**, with no session step at all:

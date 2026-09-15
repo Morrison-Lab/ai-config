@@ -407,8 +407,13 @@ def _paren_scan(text: str, quote_aware: bool):
     `closes` maps an opener index to its closer; `starts` lists each expandable
     `<(` as `(lt_index, open_index)`.
 
-    THREE THINGS MAKE A `)` NOT A CLOSER, and each was found the same way --
-    by a reviewer executing a merge the scanner had read past.
+    SOME `)` CHARACTERS ARE NOT CLOSERS. The three below are the ones this
+    scanner models, each found the same way -- by a reviewer executing a merge
+    the scanner had read past. They are NOT the whole set: this docstring once
+    said "THREE THINGS" and there turned out to be at least five, which is why
+    `_body_is_simple` now trusts a matched `)` only for a body containing none
+    of `_APPROXIMATED`. Read that function's comment for the ones NOT modelled
+    here; do not read this list as exhaustive.
 
     A `case` PATTERN's `)` opened nothing (round 3). Pairing it with the
     nearest open paren truncated that paren's body, so
@@ -433,6 +438,7 @@ def _paren_scan(text: str, quote_aware: bool):
     case_depths = []      # stack depth at each `case`, once its `in` is seen
     pending_case = []     # stack depth at each `case` awaiting its `in`
     separated = False     # a command separator seen since the pending `case`
+    at_cmd_pos = True     # the word about to be flushed starts a command
     prev_word = ""        # the last complete unquoted word
     word = ""
     in_single = in_double = in_backtick = escaped = ansi_c = False
@@ -494,18 +500,42 @@ def _paren_scan(text: str, quote_aware: bool):
                 # preceding word can (round 5 finding 9).
                 if word == "case" and prev_word not in ("for", "select"):
                     pending_case.append(len(stack))
+                    # A pending `case` opens its OWN window for the `in` that
+                    # follows it, so a separator seen BEFORE the keyword is no
+                    # longer what `separated` is asking about. Leaving it set
+                    # made every `case` after the body's first command fail to
+                    # arm; the arm's `)` then popped the `proc` frame, and the
+                    # truncated body carried no `_APPROXIMATED` token, so
+                    # `_body_is_simple` trusted the truncated closer.
+                    # `bash <(true; case b in b) echo "<merge>";; esac)` ran a
+                    # real merge here while rounds 4 and 5 both blocked it
+                    # (round 6 finding 1).
+                    separated = False
                 elif word == "in" and pending_case:
                     if pending_case.pop() == len(stack) and not separated:
                         case_depths.append(len(stack))
-                elif word == "esac":
-                    if case_depths:
+                elif word == "esac" and at_cmd_pos:
+                    # Guarded on COMMAND POSITION and on DEPTH. With neither,
+                    # an ordinary argument word `esac` (`echo esac`,
+                    # `grep esac f`) disarmed a live `case` mid-construct and
+                    # the next arm's `)` truncated the body the same way
+                    # (round 6 finding 2). A real `esac` always follows `;;`
+                    # or a newline, so it is always at a command position.
+                    if case_depths and case_depths[-1] == len(stack):
                         case_depths.pop()
-                    elif pending_case:
+                    elif pending_case and pending_case[-1] == len(stack):
                         pending_case.pop()
                 if c in ";&|\n":
                     separated = True
                 elif word == "" and c not in " \t":
                     separated = False
+                # A command position is the start of the region, or anything
+                # just past a separator or an opening `(`. Flushing a real
+                # word consumes it: the NEXT word is an argument.
+                if c in ";&|\n(":
+                    at_cmd_pos = True
+                elif word:
+                    at_cmd_pos = False
                 if word:
                     prev_word = word
                 word = ""
@@ -618,8 +648,9 @@ MAX_PROC_SUBST_DEPTH = 6
 # quoting and this scanner does not, and a `)` inside an executing heredoc body
 # that `mask_heredocs` deliberately leaves live.
 #
-# Each was found by a reviewer executing a real merge. The docstring below used
-# to enumerate "THREE THINGS" that make a `)` not a closer; there were at least
+# Each was found by a reviewer executing a real merge. `_paren_scan`'s
+# docstring ABOVE enumerates the three this scanner models, and says there that
+# the list is not exhaustive; there were at least
 # five, and this file records the same enumeration failing five separate times
 # for command-position anchors. An enumeration of what BREAKS the model cannot
 # be finished. An enumeration of what the model provably HANDLES can.
@@ -640,13 +671,27 @@ def _body_is_simple(text: str, body_start: int, body_end: int) -> bool:
     construct it looks like. A `#` inside a word is not a comment, and paying
     an over-block for it is the whole design.
 
-    `case` is deliberately NOT listed, because this scanner does model it --
-    tracking the keyword, requiring its `in`, and skipping a pattern `)` by
-    stack depth. Listing it extended every body merely MENTIONING the word to
-    end of text, which re-created the exact over-block the `in` requirement was
-    added to remove: `bash <(grep -c case f); echo "<prose>"` blocking a prose
-    mention. A `case` nested inside `$( )`, which the model does not handle, is
-    covered by `$(` being listed.
+    `case` is the one construct NOT listed, and that exemption is the weakest
+    joint in this design. The whitelist's safety argument is "everything not
+    on the list is modelled", so exempting a construct is a claim that needs a
+    proof rather than an assertion -- and the first version of this paragraph
+    asserted it. Round 6 of review then executed two real merges straight
+    through the `case` model: a `case` after any separator failed to arm, and
+    an argument word `esac` disarmed a live one. Round 6 was therefore a
+    REGRESSION against rounds 4 and 5, which both blocked those strings.
+
+    Both holes are closed in `_paren_scan` (see its `separated` and
+    `at_cmd_pos` handling), and the six regression cases are in the suite. The
+    exemption stays because listing `case` extends every body merely MENTIONING
+    the word to end of text, re-creating the over-block the `in` requirement
+    was added to remove -- `bash <(grep -c case f); echo "<prose>"` blocking a
+    prose mention. A `case` nested inside `$( )`, which the model does not
+    handle, is covered by `$(` being listed.
+
+    Treat this exemption as load-bearing and under-proven: a fail-open found
+    anywhere in the `case` model is a fail-open in the whitelist itself, and
+    the honest alternative if a third one turns up is to list `case` and pay
+    the over-block.
     """
     body = text[body_start:body_end]
     return not any(token in body for token in _APPROXIMATED)
@@ -704,12 +749,19 @@ def _proc_subst_regions(text: str) -> list:
 # cannot start (ai-config#1308 review, finding 5).
 #
 # `_FILL` fixes the WHITESPACE shape and not the others. A run of `$(` is still
-# quadratic in EXEC_AT_CMD_POS itself, and running that scan once per depth
-# view multiplies it: measured at 6 KB of `$( ` repetitions, 380ms on `main`
-# against 923ms here (round 5 finding 12). `MAX_PROC_SUBST_DEPTH` bounds the
-# multiplier at 7 rather than at the nesting depth, so this is a constant
-# factor on a pre-existing quadratic rather than a new order. The quadratic
-# itself is ai-config#3640.
+# quadratic in EXEC_AT_CMD_POS itself, and where a depth view IS built, running
+# that scan once per view multiplies it -- bounded by `MAX_PROC_SUBST_DEPTH` at
+# 7 rather than by the nesting depth, so a constant factor on a pre-existing
+# quadratic rather than a new order. The quadratic itself is ai-config#3640.
+#
+# An earlier version of this comment quoted "380ms on `main` against 923ms
+# here" for 6 KB of `$( ` repetitions. Re-measured on this revision: 385ms,
+# against 381ms on `main`. The figure was wrong AND the mechanism could not
+# have applied to that input, because `'$( ' * 2000` contains no `<(` at all --
+# `_proc_subst_regions` returns 0 regions, `live_proc_subst_spans` returns at
+# `if not regions`, and `_depth_view` is never called. A measurement quoted
+# beside a mechanism it cannot exercise is how the next reader learns a wrong
+# cost model (round 6 finding 7).
 _FILL = "\x00"
 
 
@@ -802,14 +854,22 @@ def live_proc_subst_spans(text: str) -> list:
     `< <(...) bash` are the same command and both run the body's output. See
     `_depth_view`.
 
-    Comments are masked first, and removing that call was a fail-open. It
-    reverted with zero failing suite cases, which is what made it look dead --
-    and a `)` inside a shell comment is literal to bash, structural to this
-    scanner, and leaves the quote state BALANCED, so the quote-blind merge
-    never runs and the body is truncated. `sh <(#)\necho "<merge>")` ran a real
-    merge with the call removed (round 5 finding 1). Zero failing cases meant
-    the suite did not cover it; the claim that the merge "covers that case and
-    every sibling of it" was the error.
+    Comments are masked first. A `)` inside a shell comment is literal to bash,
+    structural to this scanner, and leaves the quote state BALANCED, so the
+    quote-blind merge never runs and the body is truncated -- which is why the
+    call belongs here.
+
+    Its history is worth stating precisely, because the obvious summary is now
+    wrong. Removing the call WAS a fail-open in round 5's code, where
+    `sh <(#)\necho "<merge>")` ran a real merge with it gone (round 5
+    finding 1). It is no longer, because `_APPROXIMATED` lists `#`: with the
+    masking removed the body reads `#`, `_body_is_simple` returns False, the
+    region runs to end of text, and all three variants still BLOCK (verified
+    round 6 finding 6). So this call is now redundant with the whitelist for
+    the case that motivated it, and is kept because the whitelist's coverage of
+    `#` is itself the thing under review -- not because removing it would
+    reopen that merge today. Stating the round-5 finding in the present tense
+    was the error the round-5 docstring made about round 4, one revision on.
 
     Returns maximal `(body_start, body_end)` pairs, disjoint and sorted by
     start. Disjoint because a substitution inside an already-live body is

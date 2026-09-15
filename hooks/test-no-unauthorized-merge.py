@@ -348,6 +348,51 @@ BLOCK = [
     # live span. One character defeated the whole scanner.
     ('bash <(case x in x) echo "gh pr merge 411";; esac)', "a case pattern's `)` is not a paren closer"),
     ('< <(case x in x) echo "gh pr merge 411";; esac) bash', "the same with the executor written after"),
+    # Round 6 of ai-config#1308's review, and the sharpest finding the guard
+    # has had: round 6 was a REGRESSION against rounds 4 and 5. Exempting
+    # `case` from `_APPROXIMATED` on the ground that "this scanner does model
+    # it" was an assertion, not a proof, and the model failed in two shapes
+    # that both execute real merges under bash. Each string below is valid
+    # under `bash -n` and prints a merge against a `gh` stub.
+    #
+    # 1. `separated` was never cleared when a new `case` was pushed, so any
+    #    `case` that was not the body's FIRST command failed to arm pattern
+    #    mode, and the arm's `)` truncated the body.
+    ('bash <(true; case b in b) echo "gh pr merge 411";; esac)',
+     "a case after a separator inside a substitution body"),
+    ('bash <(echo hi && case b in b) echo "gh pr merge 411";; esac)',
+     "the same after `&&` rather than `;`"),
+    ('source <(x=1; case b in b) echo "gh pr merge 411";; esac)',
+     "the same under source with an assignment first"),
+    ('< <(true; case b in b) echo "gh pr merge 411";; esac) bash',
+     "the same with the executor written after"),
+    # 2. The `esac` pop had no command-position or depth test, so an ordinary
+    #    ARGUMENT word `esac` disarmed a live `case` mid-construct.
+    ('bash <(case b in a) echo esac;; b) echo "gh pr merge 411";; esac)',
+     "an argument word `esac` does not disarm a live case"),
+    ('bash <(case b in a) grep esac f;; b) echo "gh pr merge 411";; esac)',
+     "the same with grep rather than echo"),
+    # The DEPTH half of that same guard, asserted separately because nothing
+    # else in this file reaches it. Both strings below are bash SYNTAX ERRORS
+    # -- `esac` is valid only as a case terminator, so it can never sit at a
+    # command position at a different stack depth from its own `case`, and no
+    # EXECUTABLE input distinguishes the depth test. It is kept as a
+    # fail-closed guard against the scanner desynchronizing, and these cases
+    # exist so that removing it stops being a silent no-op: with
+    # `case_depths[-1] == len(stack)` dropped, both revert to allow.
+    ('bash <(case b in a) (esac);; b) echo "gh pr merge 411";; esac)',
+     "SYNTAX ERROR, span guard: a deeper `esac` does not pop the outer case"),
+    ('bash <(case b in a) cat <(echo hi; esac);; b) echo "gh pr merge 411";; esac)',
+     "SYNTAX ERROR, span guard: the same one substitution deeper"),
+    # The COST of `_APPROXIMATED`, asserted rather than left undocumented.
+    # A body containing any listed token runs to end of TEXT (not end of line),
+    # so a later merge-shaped mention anywhere in the command goes live. Round
+    # 6 finding 9 found seven plausible commands newly blocked; two are pinned
+    # here so that widening this cost stops being invisible.
+    ('bash <(echo "${SCRIPT}"); echo "never gh pr merge here"',
+     "ACCEPTED OVER-BLOCK: a `${` in the body extends it over a later mention"),
+    ('bash <(echo "${X}")\nls -l\necho "policy: never gh pr merge"',
+     "ACCEPTED OVER-BLOCK: the extended body reaches the whole text, not the line"),
     # One level past MAX_PROC_SUBST_DEPTH: the region at the cap was skipped
     # without being marked covered, so its child re-recorded a span INSIDE an
     # already-recorded one and the bisect then read the quote as dead.
@@ -1055,14 +1100,6 @@ _span_check("a word ending in case leaves the closer intact",
 _span_check("a case pattern's `)` is not the closer",
             'bash <(case x in x) echo hi;; esac)',
             [(7, 34)])
-# An odd quote makes the quote-aware read unreliable by its own account, so a
-# quote-blind pass is MERGED in -- which finds the region rather than silently
-# seeing nothing. The body then runs to the end of the text (index 21, one past
-# the last character) rather than to the `)` at 20, because only one of the two
-# passes saw the region at all and the other cannot vouch for a closer it never
-# found. Substituting the blind reading instead of merging it produced strictly
-# SHORTER bodies and 213 executing fail-opens in a 4,000-case fuzz.
-
 # The depth cap was described in a commit message as "a performance bound with
 # no reachable behavioural test". That was wrong: past the cap the analysis
 # stops and the body is assumed executed, so a nest one level past it blocks

@@ -356,3 +356,52 @@ The landed form calls `_lead_index(argv)` --- skip assignments and lead words, t
 - **Don't:** read `argv[0]` as the command word --- the splitter never removed the keyword heading a compound command's body.
 - **Don't:** answer an over-detection with the first narrowing that removes it;
   a narrowing moves a check toward silence, which is the direction a guard cannot afford.
+
+## A command in a fenced block is addressed to the USER's shell, not your Bash tool's
+
+Two shells coexist on this machine and they are different programs.
+The `Bash` tool runs Git Bash;
+the user's terminal, per the session's own environment brief, is **Windows PowerShell 5.1**.
+Which one a command has to satisfy is decided by **where the command goes**, not by which one you last used.
+
+- **Measured 2026-09-15, Windows 11 Pro 26200.**
+  The environment brief for that session said `Shell: PowerShell (primary)`, and listed the relevant constructs as errors in as many words: `&&` is a parser error, inline `VAR=value cmd` prefixes do not exist, Unix paths do not resolve.
+  The reply nonetheless handed the user this, in a fenced block, to paste into their terminal:
+
+  ```console
+  $ cd /d/GitHub/ai-config/.claude/worktrees/ums-media-type-guard && ALLOW_UNREVIEWED_PUSH=1 git push -u origin ums/cross-drive-media-type-guard
+  The token '&&' is not a valid statement separator in this version.
+  ```
+
+  Three incompatibilities in one line --- `&&`, the MSYS `/d/...` path, and the env-var prefix --- each of them separately named in a document that was in context the whole time.
+  The correct form is `Set-Location D:\GitHub\...; $env:ALLOW_UNREVIEWED_PUSH='1'; git push ...`.
+
+  The belief that produced it was "I am composing a shell command", where the shell in mind was simply the one the tool calls had been using all session.
+  Nothing in the act of writing a fenced block prompts the question "whose shell is this for?", which is why the rule was available and not consulted: the brief is read at session start and the command is composed hours later.
+  This is the same family as [`shared/writing/examples-are-scanned.md`](../shared/writing/examples-are-scanned.md) --- a fenced block has a consumer you did not picture --- reached from the shell side rather than the scanner side.
+
+  - **Do:** ask "whose shell runs this?" before writing any fenced command in a reply, and write it in the **user's** shell dialect.
+  - **Do:** translate at the boundary --- `;` for `&&`, `$env:VAR='v'; cmd` for the prefix, `D:\...` for `/d/...`, `2>$null` for `2>/dev/null`, `@'...'@` for a heredoc.
+  - **Do:** say which shell a block is for when it is deliberately Git Bash, since nothing else in the block says so.
+  - **Don't:** carry the dialect of your own `Bash` tool calls into a block the user will paste --- the tool you used is not evidence about the terminal they are sitting in.
+  - **Don't:** treat the environment brief as read-once orientation.
+    It states the target shell, and that fact is needed at composition time, not at session start.
+
+## Mechanism
+
+[`hooks/warn-bash-command-for-powershell-user.py`](../hooks/warn-bash-command-for-powershell-user.py) is this entry's guard, and what it is *not* keyed on is the interesting part.
+
+The obvious trigger --- a fenced block containing `&&` while the user runs PowerShell --- was measured against the 118 transcripts under `~/.claude/projects` and fires **13 times for one true positive**.
+The discriminator that suggests itself, suppressing when the surrounding prose is retrospective ("failed", "the error was", "I handed you"), marks **all thirteen identically, the true positive included**, because the offending message also discussed a failure at length.
+Suppressing on it would have removed the only real hit and kept nothing;
+firing on it is the [ai-config#2997](https://github.com/Morrison-Lab/ai-config/issues/2997) pattern, a guard that fires on the explanation of the mistake it polices.
+
+What separates the two classes is the **shape of the block**, not the prose around it.
+A command handed over to be pasted is short, carries no prompt, and shows no output;
+a quotation of a failure shows its prompt, or the error beneath it, or runs long.
+At a bound of eight non-blank lines the corpus yields three firings, all the same genuine directive, and no false positives --- and the corrected PowerShell form of that very command, which also appears in the corpus, is silent.
+Twelve lines is where the first false positive appears, so the bound is measured rather than chosen.
+
+- **Do:** when a prose-context discriminator looks necessary, check whether a structural one exists first --- prose framing marked a directive and a post-mortem identically here.
+- **Don't:** quote a failing command in a bare short block;
+  show it with its prompt and its error, which is both the honest presentation and the one the guard reads as a citation.

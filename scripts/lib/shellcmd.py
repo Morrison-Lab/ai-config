@@ -759,13 +759,49 @@ def nested_shell_commands(argv):
     token really does carry a gated command -- in which case blocking a command
     that executes nothing is the cheap error.
     """
+    split_string = _env_split_string(argv)
     index = command_program(argv)
     if index >= len(argv) or not SHELL_PROGRAM.match(argv[index]):
-        return []
+        return split_string
     rest = argv[index + 1:]
     if not any(DASH_C_FLAG.match(token) for token in rest):
+        return split_string
+    return split_string + [
+        token for token in rest if not DASH_C_FLAG.match(token)]
+
+
+# `env -S` / `--split-string` takes ONE argument and splits it into a command
+# line itself, so `env -S 'bash -c "<cmd>"'` really execs that shell -- but the
+# whole invocation is a single already-quoted token, and `command_program`
+# skips `env` as a bare wrapper and then finds no shell. The descent never
+# reached it, and `env -S 'bash -c "git push --force origin main"'` ran the
+# push while the guard stayed silent (ai-config#1973 review, round 4 finding 5,
+# reproduced independently by the @claude review of #3645).
+#
+# Both spellings, attached and detached, and `-vS` style clusters: `env` reads
+# `-S` anywhere in a short cluster.
+_ENV_PROGRAM = re.compile(r"\A(?:[\w.@/-]*/)?env\Z")
+_SPLIT_STRING_ATTACHED = re.compile(r"\A(?:-[A-Za-z]*S|--split-string=)(.+)\Z")
+_SPLIT_STRING_BARE = re.compile(r"\A(?:-[A-Za-z]*S|--split-string)\Z")
+
+
+def _env_split_string(argv):
+    """The command lines `env -S` would split out of ARGV, in argv order.
+
+    Over-detects on purpose, like the rest of this module: a token that is not
+    really a command line costs one wasted scan, while a missed one is an
+    unguarded destructive command.
+    """
+    if not argv or not _ENV_PROGRAM.match(os.path.basename(argv[0])):
         return []
-    return [token for token in rest if not DASH_C_FLAG.match(token)]
+    out = []
+    for position, token in enumerate(argv[1:], start=1):
+        attached = _SPLIT_STRING_ATTACHED.match(token)
+        if attached:
+            out.append(attached.group(1))
+        elif _SPLIT_STRING_BARE.match(token) and position + 1 < len(argv):
+            out.append(argv[position + 1])
+    return out
 
 
 def shell_c_expansions(command, max_depth=3):

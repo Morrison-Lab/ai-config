@@ -256,6 +256,36 @@ def nested_override_case(path, bare):
     return 'ALLOW_FORCE_PUSH=1 bash -c "git push --force origin HEAD"'
 
 
+def exported_override_case(path, bare):
+    """`export ALLOW_FORCE_PUSH=1` in an EARLIER simple command still carries.
+
+    Unlike a prefix assignment, an export reaches every later command in the
+    same shell, which is checkable:
+
+        $ bash -c 'export ALLOW_FORCE_PUSH=1; bash -c "echo [$ALLOW_FORCE_PUSH]"'
+        [1]
+
+    So refusing it left the escape hatch unusable in its most natural
+    spelling, with no way to comply (round 4 finding 8).
+    """
+    _local_advances(path)
+    return ('export ALLOW_FORCE_PUSH=1; '
+            'bash -c "git push --force origin HEAD"')
+
+
+def exported_override_after_push_case(path, bare):
+    """An export written AFTER the push does not clear it.
+
+    The scoping half of the case above. bash has not run the export when the
+    push executes, so carrying it backwards would be a fail-open dressed as an
+    escape hatch -- and without this case, dropping the ordering condition
+    would be a silent no-op.
+    """
+    _local_advances(path)
+    return ('bash -c "git push --force origin HEAD"; '
+            'export ALLOW_FORCE_PUSH=1')
+
+
 def bare_override_mid_command_case(path, bare):
     """A BARE `ALLOW_FORCE_PUSH=1` token that is not a command prefix.
 
@@ -982,6 +1012,8 @@ SHOULD_DENY = [
      "a shell spelling outside the first SHELL_PROGRAM list"),
     ("D1973e", mentioned_override_case,
      "the override MENTIONED rather than assigned does not clear a refusal"),
+    ("D1973h", exported_override_after_push_case,
+     "an `export` written AFTER the push does not clear it"),
     ("D1973g", override_behind_a_wrapper_argument_case,
      "the override behind a wrapper's own argument does not clear a refusal"),
     ("D1973f", bare_override_mid_command_case,
@@ -1044,6 +1076,8 @@ SHOULD_STAY_SILENT = [
      "a nested piece is refusal-only, so a warn-worthy nested push is silent"),
     ("S1973e", nested_override_case,
      "a real override before the WRAPPER clears the nested refusal"),
+    ("S1973f", exported_override_case,
+     "an `export` in an earlier simple command carries onto the wrapper"),
     ("S1", leased_fast_forward_case,
      "`--force-with-lease --force-if-includes` is the remedy, never refused"),
     ("S2", override_case, "`ALLOW_FORCE_PUSH=1` clears the refusal"),
@@ -1356,7 +1390,7 @@ MUTATIONS = {
         "a real override before the wrapper reaches the nested piece",
         [("    override = _override_before_wrapper(command)",
           "    override = False")],
-        {"S1973e"},
+        {"S1973e", "S1973f"},
     ),
     "override_must_head_a_simple_command": (
         "the override counts as an assignment at an argv head, not as a mention",
@@ -1379,7 +1413,7 @@ MUTATIONS = {
           "        pass")],
         {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9",
          "D1973a", "D1973b", "D1973c", "D1973d", "D1973e", "D1973f",
-         "D1973g"},
+         "D1973g", "D1973h"},
     ),
     "force_ignores_lease": (
         "the refusal does NOT consult the lease -- `--force` disables it",

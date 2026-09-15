@@ -528,6 +528,38 @@ _elapsed = time.perf_counter() - _start
 check("2000 sibling nested shells all expand", len(_pieces), 2001)
 check("and do so in under two seconds", _elapsed < 2.0, True)
 
+# ------------------------------------------------- env -S (--split-string)
+#
+# `env -S` splits ONE argument into a command line and execs it, so
+# `env -S 'bash -c "<cmd>"'` really runs that shell -- verified against real
+# env, which printed the stubbed command. But the whole invocation is a single
+# already-quoted token and `env` is skipped as a bare wrapper, so the descent
+# found no shell and the push ran with the guard silent (ai-config#1973 review,
+# round 4 finding 5).
+check("env -S hands over its argument as a command line",
+      descends_to("env -S 'bash -c \"git push --force origin main\"'",
+                  'bash -c "git push --force origin main"'), True)
+check("the attached short form is read too",
+      descends_to("env -Sbash\\ -c\\ x", "bash -c x") or
+      descends_to("env '-Sbash -c x'", "bash -c x"), True)
+check("--split-string is the same flag",
+      descends_to("env --split-string 'bash -c \"git push --force\"'",
+                  'bash -c "git push --force"'), True)
+check("the attached long form is read too",
+      descends_to("env '--split-string=bash -c \"git push --force\"'",
+                  'bash -c "git push --force"'), True)
+check("S inside a short cluster counts, as env reads it",
+      descends_to("env -vS 'bash -c \"git push --force\"'",
+                  'bash -c "git push --force"'), True)
+check("a path-spelled env is still env",
+      descends_to("/usr/bin/env -S 'bash -c \"git push --force\"'",
+                  'bash -c "git push --force"'), True)
+check("an ordinary env wrapper is unaffected",
+      descends_to("env FOO=1 bash -c 'git push --force'", "git push --force"),
+      True)
+check("-S on a non-env program hands over nothing",
+      shellcmd.nested_shell_commands(["echo", "-S", "bash -c x"]), [])
+
 # ------------------------------------------------- source-level hygiene
 #
 # THIS MODULE QUOTES REGEX SOURCE IN ITS PROSE, so a docstring can carry an

@@ -387,6 +387,26 @@ def offending_here(command, lexical_only=False):
     return None
 
 
+_CD_WORDS = ("cd", "pushd", "popd")
+
+
+def _moves_directory(text):
+    """True when TEXT might change the shell's working directory.
+
+    Deliberately over-reports: unparseable text counts as moving, so an
+    unreadable piece keeps the conservative unscoped report rather than
+    claiming the directory is knowable.
+    """
+    cmds = _simple_commands(text)
+    if cmds is None:
+        return True
+    for argv in cmds:
+        for token in argv:
+            if os.path.basename(token) in _CD_WORDS:
+                return True
+    return False
+
+
 def offending(command):
     """`offending_here` over COMMAND and every shell `-c` nested command line.
 
@@ -462,6 +482,18 @@ def offending(command):
         # A nested piece is worth flagging and not worth enumerating. The
         # caller emits a warning that names the construct and says which
         # repository it cannot see, with no file list.
+        #
+        # UNLESS the piece provably stays put. The note's own text blames
+        # `cd`s the outer shell might have run -- so when neither the outer
+        # command nor the piece contains one, that reason does not hold and
+        # the guard is entitled to the ordinary local reading, status gate and
+        # file list included. Returning `nested-unscoped` regardless made
+        # `sh -c "git reset --hard"` warn over a CLEAN tree where the bare
+        # form is silent, because the unscoped path returns before the M4
+        # status gate runs (ai-config#1973 review, round 4 finding 7,
+        # reproduced independently by the @claude review of #3645).
+        if not _moves_directory(command) and not _moves_directory(piece):
+            return match
         return "nested-unscoped", match[1], None
     return None
 

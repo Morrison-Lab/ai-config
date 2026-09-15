@@ -1271,6 +1271,35 @@ def _override_before_wrapper(command):
         # only if THIS command is the one that runs it.
         if nested_shell_commands(argv[found:]):
             return True
+    # `export ALLOW_FORCE_PUSH=1` is a different simple command from the one
+    # that wraps the push, so the loop above cannot see it -- and unlike a
+    # prefix assignment, an export really does reach every LATER command in
+    # the same shell:
+    #
+    #   $ bash -c 'export ALLOW_FORCE_PUSH=1; bash -c "echo [$ALLOW_FORCE_PUSH]"'
+    #   [1]
+    #
+    # Refusing it left the escape hatch unusable in its most natural spelling,
+    # with no way to comply (ai-config#1973 review, round 4 finding 8, second
+    # half; reproduced independently by the @claude review of #3645).
+    #
+    # Scoped deliberately: only an `export` that PRECEDES a later command
+    # carrying a nested shell counts, so an export written after the push --
+    # which bash has not run yet when the push executes -- does not clear it.
+    exported = False
+    for entry in scoped:
+        argv = list(entry[1])
+        while argv and os.path.basename(argv[0]) in COMMAND_WRAPPERS:
+            argv = argv[1:]
+        if exported and nested_shell_commands(argv):
+            return True
+        if argv and os.path.basename(argv[0]) == "export":
+            for token in argv[1:]:
+                if not ASSIGNMENT.match(token):
+                    continue
+                name, _, value = token.partition("=")
+                if name == OVERRIDE and value.strip() == "1":
+                    exported = True
     return False
 
 

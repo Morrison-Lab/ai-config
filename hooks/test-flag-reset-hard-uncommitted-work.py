@@ -185,6 +185,43 @@ def shell_c_wrapped_case(path):
     return 'sh -c "git reset --hard origin/main"'
 
 
+def nested_reset_clean_tree_case(path):
+    """A nested `reset --hard` over a CLEAN tree stays silent, as the bare form does.
+
+    This is the over-block the stationary shortcut exists to remove. The
+    unscoped path returns before the M4 status gate, so while every nested
+    piece took it, `sh -c "git reset --hard"` warned over a tree with nothing
+    to lose while `git reset --hard` on the same tree was silent -- a guard
+    strictly noisier for a wrapped command than a bare one, in the direction
+    that trains people to ignore it (round 4 finding 7).
+
+    The tree is left CLEAN deliberately: committed and untouched.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    return 'sh -c "git reset --hard"'
+
+
+def nested_cd_then_reset_case(path):
+    """A nested piece that MOVES, so the unscoped report is the right one.
+
+    W1973a/b carry no `cd`, so the nested shell provably starts where the
+    outer command did and the ordinary local reading -- status gate and file
+    list -- is sound for them. This case is the other half: once a `cd` is in
+    the piece, the directory really is unknowable from here, and the guard
+    must fall back to the note that lists nothing.
+
+    Without this case the unscoped path has no coverage at all, which is how
+    it would go quietly dead the moment the stationary shortcut was added.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return 'sh -c "cd /nonexistent-elsewhere && git reset --hard origin/main"'
+
+
 def nested_checkout_word_case(path):
     """A nested `git checkout <word>` is not classified against THIS repo.
 
@@ -529,6 +566,9 @@ SHOULD_WARN = [
      "matching the invocation"),
     ("W1973a", shell_c_wrapped_case,
      "a discard wrapped in a shell's `-c` argument (ai-config#1973)"),
+    ("W1973c", nested_cd_then_reset_case,
+     "a nested piece that `cd`s first gets the unscoped report, which lists "
+     "no files"),
     ("W1973b", shell_c_cluster_case,
      "a `-c` inside a short-flag cluster still hands over a command line"),
 ]
@@ -543,6 +583,8 @@ SHOULD_STAY_SILENT = [
      "`git reset` with no `--hard` never discards working-tree content"),
     ("S4", mention_in_string_case,
      "a mention inside a quoted string is not an invocation"),
+    ("S1973c", nested_reset_clean_tree_case,
+     "a nested `reset --hard` over a CLEAN tree is silent, like the bare form"),
     ("S1973b", nested_checkout_word_case,
      "a nested `git checkout <word>` is not classified against THIS "
      "repository's refs"),
@@ -698,7 +740,12 @@ EXPECTED.update({case_id: "silent" for case_id, *_ in SHOULD_STAY_SILENT})
 # explicitly rather than derived from the case id, so that adding a nested
 # case without deciding which report it should produce is a visible omission
 # rather than a silent default to "WARN".
-EXPECTED.update({case_id: "WARN-unscoped" for case_id in ("W1973a", "W1973b")})
+# Only a piece that MOVES gets the unscoped report. W1973a/b carry no `cd`, so
+# the nested shell provably starts where the outer command did and the ordinary
+# local reading is sound for them -- returning the unscoped note regardless made
+# `sh -c "git reset --hard"` warn over a CLEAN tree, since that path returns
+# before the M4 status gate runs (round 4 finding 7).
+EXPECTED.update({case_id: "WARN-unscoped" for case_id in ("W1973c",)})
 CASES = {case_id: builder
          for case_id, builder, _ in SHOULD_WARN + SHOULD_STAY_SILENT}
 
@@ -780,7 +827,11 @@ MUTATIONS = {
         [("    if not changed:\n        return 0  # None (git unreachable) "
           "or empty (clean tree) -- fail open",
           "    if False:\n        return 0")],
-        {"S1", "S2"},
+        # S1973c joins S1 and S2 because a nested piece that does not move now
+        # reaches this gate at all. While every nested piece returned the
+        # unscoped report, it returned BEFORE the gate, so the wrapped form
+        # could not exercise it (round 4 finding 7).
+        {"S1", "S2", "S1973c"},
     ),
     "M4_untracked_excluded": (
         "an untracked (`??`) entry does not count as a change `--hard` "

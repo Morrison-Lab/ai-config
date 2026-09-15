@@ -437,7 +437,6 @@ def _paren_scan(text: str, quote_aware: bool):
     stack = []            # (kind, index); kind is proc, paren, subst or brace
     case_depths = []      # stack depth at each `case`, once its `in` is seen
     pending_case = []     # stack depth at each `case` awaiting its `in`
-    separated = False     # a command separator seen since the pending `case`
     at_cmd_pos = True     # the word about to be flushed starts a command
     prev_word = ""        # the last complete unquoted word
     word = ""
@@ -509,19 +508,8 @@ def _paren_scan(text: str, quote_aware: bool):
                 # preceding word can (round 5 finding 9).
                 if word == "case" and prev_word not in ("for", "select"):
                     pending_case.append(len(stack))
-                    # A pending `case` opens its OWN window for the `in` that
-                    # follows it, so a separator seen BEFORE the keyword is no
-                    # longer what `separated` is asking about. Leaving it set
-                    # made every `case` after the body's first command fail to
-                    # arm; the arm's `)` then popped the `proc` frame, and the
-                    # truncated body carried no `_APPROXIMATED` token, so
-                    # `_body_is_simple` trusted the truncated closer.
-                    # `bash <(true; case b in b) echo "<merge>";; esac)` ran a
-                    # real merge here while rounds 4 and 5 both blocked it
-                    # (round 6 finding 1).
-                    separated = False
                 elif word == "in" and pending_case:
-                    if pending_case.pop() == len(stack) and not separated:
+                    if pending_case.pop() == len(stack):
                         case_depths.append(len(stack))
                 elif word == "esac" and at_cmd_pos:
                     # Guarded on COMMAND POSITION and on DEPTH. With neither,
@@ -553,10 +541,8 @@ def _paren_scan(text: str, quote_aware: bool):
                 # (`grep -c case f` then `grep -c in f` on the next line) now
                 # arms pattern mode and extends the body. That is the
                 # fail-closed direction, and it is narrower than the `;`-
-                # separated shape round 5 finding 9 was about, which the
-                # separator test still catches.
-                if c in ";&|" or (c == "\n" and not pending_case):
-                    separated = True
+                # separated shape round 5 finding 9 was about, which
+                # `del pending_case[:]` below still catches.
                 if c in ";&|":
                     # A real separator proves every PENDING `case` was not a
                     # construct: bash allows only whitespace and newlines
@@ -578,9 +564,27 @@ def _paren_scan(text: str, quote_aware: bool):
                     # A newline deliberately does NOT clear it, because
                     # `case b` / `in b)` across two lines is legal bash and is
                     # the round-7 fail-open.
+                    #
+                    # THIS LINE SUBSUMED A WHOLE `separated` FLAG, which used
+                    # to gate the `in` above and is now removed. The flag was
+                    # set on `;&|` and on a newline with nothing pending; the
+                    # first case clears `pending_case` on the very next line,
+                    # and the second leaves it empty -- so reaching the `in`
+                    # branch at all needs a `case` pushed afterwards, which
+                    # is where the flag was reset. It could therefore never be
+                    # True where it was read.
+                    #
+                    # Measured rather than argued alone: reverting the
+                    # conjunct failed 0 of 343 cases, reverting its assignment
+                    # failed 0, and an instrumented build recorded 0 hits at
+                    # the read site across 300,000 random token strings, while
+                    # a sanity mutant on the same harness failed 2. The file
+                    # annotates its other measured-dead clauses (`EXEC_WRAP`,
+                    # the ANSI-C `$'` branch) rather than leaving them to read
+                    # as load-bearing; this one was removed instead, because
+                    # unlike those it has a proof and not only a measurement
+                    # (ai-config#3635 pre-merge gate).
                     del pending_case[:]
-                elif word == "" and c not in " \t":
-                    separated = False
                 # A command position is the start of the TEXT, or anything
                 # just past a separator or a bare `(`. Flushing a real word
                 # consumes it: the NEXT word is an argument.
@@ -663,7 +667,17 @@ def _paren_matches(text: str):
     same start while only one finds a closer, and the earlier wording here --
     "when only one pass saw the region at all" -- described a narrower
     condition than the code applies (round 5 finding 10). The implemented rule
-    is the more fail-closed of the two, and it is the one stated now.
+    is the one stated now.
+
+    Calling it "the more fail-closed of the two" was false when written, and
+    is true only because of a later fix. Dropping the closer leaves
+    `_proc_subst_regions` with no entry for that opener, and blanking to the
+    defaulted end of text erased a TRAILING executor -- so an apostrophe or a
+    lone backtick in an executing heredoc body, which is what makes this pass
+    run at all, opened an executing bypass rather than closing one
+    (ai-config#3635 pre-merge gate). `_depth_view` now reads the region's
+    `closed` field and blanks only the `<(` delimiter in that case, which is
+    what makes the sentence hold.
 
     `starts` from the fallback may include a `<(` inside quotes, which bash
     would not expand. That is an over-detection and it is deliberate: the pass
@@ -746,7 +760,7 @@ def _body_is_simple(text: str, body_start: int, body_end: int) -> bool:
     an argument word `esac` disarmed a live one. Round 6 was therefore a
     REGRESSION against rounds 4 and 5, which both blocked those strings.
 
-    Both holes are closed in `_paren_scan` (see its `separated` and
+    Both holes are closed in `_paren_scan` (see its `del pending_case[:]` and
     `at_cmd_pos` handling), and the six regression cases are in the suite. The
     exemption stays because listing `case` extends every body merely MENTIONING
     the word to end of text, re-creating the over-block the `in` requirement
@@ -761,38 +775,49 @@ def _body_is_simple(text: str, body_start: int, body_end: int) -> bool:
     rather than argued away.
 
     Listing `case` (word-bounded, which is the cheaper of the two spellings)
-    moves 8 suite cases. An earlier version of this paragraph read that as
-    "8 over-blocks and ALSO three fail-opens", which double-counts: the 8 is
-    the TOTAL, and it decomposes into 3 fail-opens, 4 over-blocks and 1
-    scanner-level span change. The substantive claim was right and the
-    arithmetic beside it was not.
+    moves 6 suite cases, and every one of them is an OVER-BLOCK. Re-derived at
+    this commit rather than carried forward: the span for
 
-    The three fail-opens:
+        < <(case x in x) echo "<merge>";; esac) bash
 
-        < <(case x in x) echo "<merge>";; esac) bash   BLOCK -> allow
+    goes `[(4, 46)]` to `[(4, 52)]` -- longer, with `len(text) = 52` -- and
+    the verdict stays BLOCK.
 
-    The premise underneath the instruction is that extending a body to end of
-    text is uniformly the fail-closed direction. It is not. For the
-    executor-written-AFTER form, the extended body swallows the trailing
-    executor, so `live_proc_subst_spans` returns NO span at all rather than a
-    longer one -- the region stops being seen as executed, and the merge
-    inside it goes unread. Measured: `[(4, 46)]` becomes `[]`.
+    THAT IS A CHANGE, and the paragraph it replaces is worth stating because
+    the correction runs the reassuring way. It read "8 suite cases ... 3
+    fail-opens ... `[(4, 46)]` becomes `[]`", and all three figures were true
+    when written. The commit that split `real_end` from the extended
+    `close_idx` -- and its follow-up, which stopped blanking past a region
+    whose closer was never recorded -- invalidated them without touching this
+    paragraph. A measurement quoted beside a mechanism it can no longer
+    exercise is how the next reader learns a wrong cost model, which is what
+    the sibling suite legislates against: re-measure, never copy forward.
 
-    So the exemption stays, and stays load-bearing and under-proven: a
-    fail-open anywhere in the `case` model is a fail-open in the whitelist
-    itself. What has changed is that the escape hatch this paragraph used to
-    offer is closed, and a fourth fail-open cannot be answered by reaching for
-    it -- one duly turned up, a stale `pending_case` popped by an argument
-    word `in`, and `_paren_scan` now discards pending entries at a separator.
+    So the ARGUMENT for the exemption has changed even though the exemption
+    has not. It used to be that listing `case` opened fail-opens, which made
+    keeping it out mandatory. It is now that listing `case` extends every body
+    merely MENTIONING the word to end of text, re-creating the over-block the
+    `in` requirement was added to remove -- `bash <(grep -c case f); echo
+    "<prose>"` blocking a prose mention. A cost, not a hazard.
+
+    The model still has to hold, because the whitelist's safety argument is
+    "everything not on the list is modelled". Four fail-opens have been found
+    in it, the last a stale `pending_case` popped by an argument word `in`,
+    which `_paren_scan` now discards at a separator.
 
     The general property -- that extending a body is fail-closed for a leading
     executor and fail-OPEN for a trailing one -- is ai-config#3649, and it is
     NOT a constraint on future entries only. That is how a previous version of
     this paragraph and of #3649 both put it, and it was the more damaging
     error: five of the six entries ALREADY shipped an executing bypass, each
-    blocked by four earlier revisions of this branch. `_proc_subst_regions`
-    now blanks to the real closer, which restores the premise the whitelist
-    rests on, and the suite carries one trailing-executor case per member.
+    blocked by four earlier revisions of this branch.
+
+    Blanking to the real closer restores the premise the whitelist rests on
+    ONLY where a closer was recorded. Where none was, `real_end` defaults to
+    end of text and the split is a no-op -- two more executing bypasses lived
+    there, and `_depth_view` now reads the region's `closed` field instead.
+    The suite carries one trailing-executor case per whitelist member, and one
+    per no-recorded-closer route.
 
     Finding a mechanism that invalidates a design premise and then scoping it
     to future work reads as diligence -- a rule written, an issue filed --

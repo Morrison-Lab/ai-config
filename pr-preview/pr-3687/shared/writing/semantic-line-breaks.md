@@ -705,10 +705,11 @@ So read the output either way.
 `No lines missing semantic breaks.` is the only clean verdict this script
 emits, and it is printed only on a run that actually diffed something.
 
-This is the fifth recorded false clean from this checker, after the four the
-paragraph below counts, and the first in which the check never ran.
-The four below all describe a run that examined a real diff and examined the
-wrong one;
+This is the fifth recorded false clean from this checker, and the first in
+which the check never ran.
+The four already recorded --- ai-config#752, `memories/git-diffing.md`'s two,
+and ai-config#2381 --- each describe a run that examined a real diff and
+examined the wrong one;
 this one examined nothing and said so.
 (Reported 2026-09-15 during the post-merge pass for
 [ai-config#3635](https://github.com/Morrison-Lab/ai-config/pull/3635) and

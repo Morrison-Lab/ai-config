@@ -1152,7 +1152,7 @@ delimiter-only blanking in `hooks/no-unauthorized-merge.py`'s `_depth_view`:
 
 ```
 else -> pass                                   343/343   (0 WRONG)
-else -> _blank(view, lt_idx, _body_start + 1)  343/343   (0 WRONG)
+else -> _blank(view, lt_idx, body_start + 1)   343/343   (0 WRONG)
 ```
 
 Deleting the clause outright and mis-sizing it by one character each passed the

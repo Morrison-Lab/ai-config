@@ -785,13 +785,17 @@ local-only and unpushed when the review ran.
 Pushing the branch made the SHAs resolve, but that only proves the citation
 was reachable *today*; this repo squash-merges (`git log origin/main
 --first-parent -30 --format='%h %p'` returns 30 commits with exactly one
-parent each), so once #3647 lands neither SHA becomes an ancestor of `main`
-and the citation goes dead anyway, on the same schedule this section already
-describes.
-The fix was the one this section already prescribes -- drop the SHAs, cite
-`#3624`/`#3647` by number, and hedge the incident as proposed-and-open rather
-than settled fact, the same way `memories/claude-code-hooks.md`'s sibling
-"third route" entry already did.
+parent each), so when #3647 merged on 2026-09-14 neither SHA became an
+ancestor of `main` and the citation went dead, on the same schedule this
+section already describes.
+The fix was the one this section already prescribes -- drop the SHAs and cite
+`#3624`/`#3647` by number, which survives the squash.
+The incident was additionally hedged as proposed-and-open at the time, which
+was right then and expired six minutes later when #3647 merged: a hedge keyed
+to merge status has to be swept again whenever the PR it names lands, and
+`skills/ardi/SKILL.md` scopes that sweep to the PR's touched FILES rather than
+to its own added lines, precisely because the expiring line is usually one
+somebody else wrote.
 The durable point is not that citing an unpushed branch SHA is a new failure
 mode; it is that the very entry stating this rule did not stop a same-day
 session from writing one anyway, which is what the count is for.

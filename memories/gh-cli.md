@@ -604,7 +604,9 @@
   Only the posted review **body** settles whether a review is actually coming.
   Measured on `Morrison-Lab/ai-config` on 2026-09-15: no body ever came.
   Across roughly three hours and eight POSTs spread over three PRs (#3629, #3696, #3699), every request returned 200 with an empty `requested_reviewers`, and `gh pr view --json reviews` counted zero Copilot reviews at every head throughout.
-  So for this repo the open question above currently resolves to "no review is coming", which matters because `hooks/no-unreviewed-pr.py` demands a request whose only satisfying evidence is a landing review --- see [ai-config#3700](https://github.com/Morrison-Lab/ai-config/issues/3700).
+  So for this repo the open question above currently resolves to "no review is coming".
+  What that does NOT affect is `hooks/no-unreviewed-pr.py`: its `_argv_request` discharges on a successful mutating POST to the endpoint, never on a review arriving, so the obligation is satisfiable here whatever Copilot does.
+  What it does affect is [`copilot-review-before-human`](../shared/vendored/copilot-review-before-human.md), whose point is an AI review BEFORE a human one --- on this repo that cannot be had from Copilot, so the adversarial self-review is the only AI reader a PR gets.
   That is a claim about a repository setting and can change, so re-measure rather than carrying it forward.
   The timeline event described next settles the strictly narrower question of whether the request was *accepted*, which those three surfaces also cannot answer --- so the two conclusions divide the question rather than competing for it.
 

@@ -245,12 +245,19 @@ CASES = {
     # ... and the same transcript with NO media check must still WARN, which
     # is what isolates the guard from the widened `except` behind it.
     "W22": bash(rf"robocopy {J} D:\julia /E", transcript=MALFORMED_UNCHECKED),
+    # R-3 across verb families: the wsl arm was an `if not candidates`
+    # fallback, so ANY ordinary relocator in the command suppressed it.
+    # This is the canonical WSL move -- stage the tar, then import it.
+    "W23": bash(r"cp ubuntu.tar D:\ubuntu.tar; "
+                r"wsl --import Ubuntu D:\WSL\Ubuntu D:\ubuntu.tar"),
 }
 
 EXPECTED = {cid: cid.startswith("W") for cid in CASES}
 
 WHY = {
     "S1": "an ordinary backup -- the HDD is the correct destination",
+    "W23": "an unrelated `cp` earlier in the command must not suppress the "
+           "wsl arm -- staging the tar first is the canonical recipe",
     "S2": "a game library: large, cold, sequentially read",
     "S3": "a media library, same class as S2",
     "S4": "a BACKUP of a depot is still a backup",
@@ -399,12 +406,15 @@ MUTATIONS = {
         # ever consulted -- that clause is M5's, and keeping the two apart is
         # what stops one mutation vouching for both.
         #
-        # W4 flips the other way, from warn to MISS, which is the direction
-        # that catches an over-broad carve-out: unanchored, `\bmove\b` matches
-        # inside `--move`, so `wsl --manage ... --move` is read as a plain
-        # `move` verb, loses the WSL arm's single-volume allowance, and goes
-        # silent. The anchor is what keeps the two verbs apart.
-        {"S11", "W4"},
+        # W4 USED to flip here, warn to MISS: unanchored, `\bmove\b` matches
+        # inside `--move`, which produced a RELOCATOR candidate -- and the
+        # wsl arm was an `if not candidates` FALLBACK, so any candidate
+        # suppressed it. That fallback was R-3 reintroduced across verb
+        # families (round-9 review): `; cp a b` appended to W4 silenced it.
+        # The arm now contributes unconditionally, so W4 survives this
+        # mutation. Losing a flip to a real fix is the right trade -- the
+        # anchor is still pinned by S11, and W23 pins the new behaviour.
+        {"S11"},
     ),
     "M2_two_volumes_required": (
         "a relocation within ONE drive is not a media decision and must "
@@ -572,7 +582,10 @@ MUTATIONS = {
         # `wsl --manage --move D:\WSL\Ubuntu` nor an import whose two tokens
         # are a plain directory and a `.tar` carries anything the generic
         # TOOLCHAIN scan recognises, so losing this arm loses both outright.
-        {"W4", "W11"},
+        # W23 joins them once the wsl arm stopped being an `if not
+        # candidates` fallback: it is an import whose tokens the generic
+        # TOOLCHAIN scan does not recognise either.
+        {"W4", "W11", "W23"},
     ),
     "M21_backup_list_admission_test": (
         "`vault` and `restore` came off the exemption list for failing the "

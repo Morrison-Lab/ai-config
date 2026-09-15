@@ -50,7 +50,8 @@ Two things make that acceptable rather than disqualifying:
     deliberately-written label, not a paragraph;
   * both word lists are chosen so each entry INDEPENDENTLY carries its meaning.
     Every REVERSIBLE entry means "this rebuilds itself"; every IRREPLACEABLE
-    entry names a live filesystem or volume, not a thing that re-downloads.
+    entry names a live filesystem or volume -- or, in the one case that is
+    not storage, uncommitted work -- rather than a thing that re-downloads.
     Adversarial review of a331d675 found four entries that failed that test
     and they were removed rather than defended; the comment beside the regex
     names each and why it went.
@@ -74,6 +75,10 @@ form. So `docker`, `container`, `image`, `wsl` and `vm` are NOT triggers on
 their own. The irreplaceable list is keyed on VM/container **disk images** by
 file extension, on named **volumes**, and on explicit
 filesystem wording -- the things that hold state nothing can re-fetch.
+`uncommitted` is the one entry that is not storage: it describes WORK rather
+than a place, and it earns its slot on the same test, since uncommitted work
+exists nowhere else. Stated explicitly because a maintainer applying the
+storage-shaped reading of this paragraph would otherwise strike it.
 
 Likewise `npm cache`, `pip cache`, `browser cache`, `Temp`, `.gradle caches`
 and `model downloads` are all silent: each re-downloads, and none matches the

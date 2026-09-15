@@ -378,9 +378,16 @@ def find_risky_move(command):
     # `--import`, a source file. The thing being placed is a live `ext4.vhdx`
     # by definition, so this arm needs neither a second volume nor a
     # recognised toolchain path -- the verb supplies both facts.
-    if not candidates:
-        candidates = [("wsl --import/--move", m.end(), True)
-                      for m in WSL_RELOCATOR.finditer(text)]
+    # EXTEND, never fall back. This was an `if not candidates` gate, which
+    # recreated R-3 across verb families: any ordinary relocator anywhere in
+    # the command suppressed the wsl arm entirely, so appending `; cp a b` to
+    # W4 silenced it, and the canonical WSL move -- stage the tar with `cp`,
+    # then `wsl --import` -- was silent for exactly the relocation this guard
+    # exists for (round-9 review of 418e5821). The two patterns cannot
+    # double-report: RELOCATOR's command-position anchor stops `\bmove\b`
+    # matching inside `--move` (see M1).
+    candidates += [("wsl --import/--move", m.end(), True)
+                   for m in WSL_RELOCATOR.finditer(text)]
     if not candidates:
         return None
 

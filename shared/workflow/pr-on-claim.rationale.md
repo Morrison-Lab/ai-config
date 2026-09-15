@@ -103,7 +103,7 @@ Reusing the Stop hook's own parser for a block would therefore inherit a bias ca
 
 [`hooks/no-unauthorized-merge.py`](../../hooks/no-unauthorized-merge.py) is the concrete evidence for how much engineering a *correctly calibrated* PreToolUse block over arbitrary shell-command structure costs in this repo: six review rounds (ai-config#1279, #1287) closing false-negative gaps in what counts as a command position, with its own comments stating the enumeration "cannot be finished."
 That cost is per CONSTRUCT rather than per file, which is the part worth carrying forward: closing one class of bypass in a guard does not shorten the next class's review, because each new construct brings its own shell syntax the scanner does not yet model.
-ai-config#1308 is an open instance for the same guard, on a different construct.
+ai-config#1308 was an open instance for the same guard, on a different construct, as of 2026-09-14, with ai-config#3635 in flight against it --- so re-check its state before citing it.
 That investment is proportionate there because the thing being prevented is an unauthorized merge.
 It is not proportionate here, because the thing this new hook would prevent is a single wasted Bash call with a working safety net already in place -- the Stop hook already protects the actual invariant (no PR ships without a review request) and gives a one-round, self-explanatory fix.
 

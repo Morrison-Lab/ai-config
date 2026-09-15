@@ -608,14 +608,14 @@
   A session also reported the GraphQL `requestReviews` mutation carrying the reviewer bot's node id behaving like the REST POST --- returning without errors while the reviewer list stayed empty --- but that one is narration rather than measurement here: no repo, PR, node id, or response body was kept, and re-running it would be an outward mutation.
 
   The repository's own history is the closest thing to an answer, and it is weaker than it looks.
-  `gh api "repos/<o>/<r>/pulls/<N>/reviews"` over all six of `ucdavis/lbt`'s PRs (1 and 3 through 7) returns no reviews at all.
+  As of 2026-09-15, `gh api "repos/<o>/<r>/pulls/<N>/reviews"` over all six of `ucdavis/lbt`'s PRs then open or merged (1 and 3 through 7) returns no reviews at all.
   That is a fact about the repository, not about the endpoint that was probed, and it is still not a provisioning verdict: nobody controlled for whether a review was ever requested on those PRs, which is the confound the "both candidate directions are unconfirmed" passage below already states for this file.
   Where a per-head answer is what you need, [`memories/copilot-reviews.md`](copilot-reviews.md)'s check-run query separates "never ran" from "ran and posted nothing".
   This file's standing Do, to read the posted review body, is unchanged.
 
   - **Don't:** read a `suggestedActors` list whose only bot is `copilot-swe-agent` as evidence about PR code review --- ai-config returns the same single bot while being reviewed.
   - **Don't:** escalate from REST to GraphQL when the REST call already returned success ---
-    both add the same nobody, and each attempt spends quota that is often the real cause.
+    the mutation was reported to add the same nobody, and each attempt spends quota that is often the real cause.
 
   That 201-then-empty disappearance is **not** explained by the `review_on_push: true` rule above, and [`shared/workflow/pr-on-claim.md`](../shared/workflow/pr-on-claim.md)'s "blocked-request test has a false positive" section owns the argument and the deriving queries.
   The short version: `Morrison-Lab/ai-config` reproduces the identical 201-then-empty signature while carrying no `copilot_code_review` rule at either scope, so an empty pending list is evidence neither that the request was blocked nor that a review is coming.

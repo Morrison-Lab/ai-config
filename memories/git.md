@@ -1116,3 +1116,27 @@ mid-session with no self-review yet dispatched, and `git push --dry-run
 --repo=/nonexistent origin main` was the fallback that measured git's `--repo`
 precedence without a real push or the override.)
 
+## `FETCH_HEAD` is a scratch file, not a ref, and every fetch rewrites it
+
+A comparison whose operand is `FETCH_HEAD` resolves to whatever the **most
+recent** fetch wrote, so an intervening fetch --- including an unrelated one,
+or the second ref of a multi-ref fetch --- silently swaps it.
+Comparing a commit against itself does not error;
+it reports no conflict and no difference, which is the reading you were hoping
+for.
+
+Pin it in the same command that fetches it:
+
+```bash
+git fetch origin "$ref" && sha=$(git rev-parse --verify FETCH_HEAD)
+```
+
+Measured 2026-09-15 on
+[ai-config#3687](https://github.com/Morrison-Lab/ai-config/pull/3687)
+(ai-config#3704).
+[`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)'s
+"A ref that names a different commit each time you read it" carries the full
+case and the pattern/anti-pattern pair.
+
+- **Do:** capture the SHA immediately after the fetch, or name the SHA outright.
+- **Don't:** reuse `FETCH_HEAD` after any later fetch.

@@ -423,6 +423,67 @@ If the answer is that it has no opinion, the base cannot testify.
 - **Don't:** baseline against the default branch for a feature the default branch does not have;
   that arm agrees with every revision, including the regressed one.
 
+## A ref that names a different commit each time you read it
+
+The shapes above substitute one artifact for another, and in every one of them
+you can at least point at the wrong artifact afterwards and see that it was
+wrong.
+A **moving ref** is the case where the operand you named is correct and the
+commit it resolved to is not, so there is nothing to point at: the command line
+reads the same before and after.
+
+`FETCH_HEAD` is the everyday instance.
+It is not a ref at all but a scratch file that every `git fetch` rewrites, so a
+fetch you ran for an unrelated reason silently replaces the operand of a
+comparison you set up earlier.
+A multi-ref fetch does the same thing in one command, since `FETCH_HEAD` keeps
+only the last ref named.
+
+The failure direction is what earns it an entry.
+Comparing a commit against itself does not error;
+`git merge-tree` reports no conflict, a diff reports no change, a count matches.
+Every one of those reads as the good outcome, and the wrong comparison is
+strictly *more* reassuring than the right one would have been.
+
+Measured 2026-09-15 on
+[ai-config#3687](https://github.com/Morrison-Lab/ai-config/pull/3687), checking
+whether it collided with a peer PR:
+
+```bash
+git fetch -q origin ums/qbt-session-2026-09-14 main   # FETCH_HEAD = main
+git merge-tree --write-tree HEAD FETCH_HEAD           # compares HEAD to main
+```
+
+Three successive comparisons ran `main` against `main` and each returned no
+difference.
+Nothing exposed it until a bullet-count query returned identical numbers for
+what were supposed to be two different revisions, which was implausible enough
+to force a re-read of which operands had actually been passed.
+
+This fragment's own test settles it in one reading: ask what would have to be
+true for the claim to be **false**, and whether the artifact in hand could show
+it.
+A comparison against the same commit cannot show a conflict, so a clean result
+from one is arithmetic rather than evidence --- the same emptiness
+[`algorithmatize-checks`](algorithmatize-checks.md) names for a baseline that
+classifies the whole family one way by default.
+
+Note the near-miss, because it is the reason this survived a careful session:
+a negative control **was** run, and it was a pair already expected to be clean.
+A control that cannot fail proves nothing about the detector, and it could not
+have caught this error either, since both the control and the real comparison
+resolved through the same clobbered ref.
+
+- **Do:** pin a fetched ref to a SHA in the same command that fetches it
+  (`git fetch origin <ref> && sha=$(git rev-parse --verify FETCH_HEAD)`), or
+  name the SHA outright.
+- **Do:** treat two refs producing *identical* results as a prompt to confirm
+  which commits were compared, rather than as agreement.
+- **Don't:** reuse `FETCH_HEAD` across any later fetch, or after a multi-ref
+  fetch where it holds only the last ref named.
+- **Don't:** read "no conflict" or "no difference" as being about the pair you
+  meant without confirming both operands resolved where you thought.
+
 ## A measurement of the right artifact can still be scoped narrower than the claim made from it
 
 Every shape above is a *substitution*: the thing read is not the thing the claim is about.

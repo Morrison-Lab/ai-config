@@ -44,6 +44,7 @@ Claude's: `codex`, `agy`, and OpenCode's `opencode-go/*` tier.
 | CLI / Provider | plan | skill |
 |---|---|---|
 | `codex` | ChatGPT | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
+| `codex --profile <databricks-profile>` | institution-hosted Databricks Model Serving, when configured | [`delegate-to-databricks`](../skills/delegate-to-databricks/SKILL.md) |
 | `agy` (Google Antigravity) | API retired, **CLI available** (2026-08-25) | none --- invoke `agy --print` directly |
 | `opencode` | OpenCode Go (`opencode-go/*`, $10/mo windowed) + free hosted (`opencode/*`, opencode Zen) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 | `openrouter` | prepaid credit balance, reached through OpenCode's `openrouter` provider | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)'s "A third destination" section |
@@ -240,6 +241,48 @@ reaffirmed 2026-07-06 ("always use codex first
 (until we hit the 5-hour limits) before using up claude quota"),
 and widened 2026-08-15 ("in addition to codex, we have agy quota to use;
 try using both of those as subagents before exhausting claude quota").
+
+## Codex can be pointed at an institution's Databricks-hosted models, via a command-backed auth provider
+
+Discovered and verified 2026-09-15.
+Codex's `model_providers.<name>` config table takes an `auth.command` --- an
+external command Codex re-runs on a `refresh_interval_ms` cadence to mint a
+fresh bearer token --- as an alternative to a static `env_key`.
+That solves a problem `opencode`'s custom-provider config cannot: Databricks'
+recommended OAuth U2M auth (`databricks auth login`) issues short-lived
+tokens by design, so any mechanism wanting a long-lived static key either
+needs a PAT that may not exist on a given workspace, or goes stale mid-session.
+A found-in-the-wild setup on the user's machine already wired this up ---
+`[model_providers.databricks]` in `~/.codex/config.toml`, `auth.command`
+pointing at a tiny script that shells out to `databricks auth token`, and one
+`~/.codex/<profile>.config.toml` layering file per selectable model --- and a
+live smoke test (`codex exec --profile databricks --sandbox read-only
+--skip-git-repo-check "Reply with exactly: OK" < /dev/null`) round-tripped
+correctly against a Databricks-hosted GPT-5.6-family model, at a measured
+~49,000-token Codex-side agent-mode overhead for that single turn.
+[`delegate-to-databricks`](../skills/delegate-to-databricks/SKILL.md) is the
+mechanism; this file's ladder table above points to it.
+Tracked as [ai-config#3726](https://github.com/Morrison-Lab/ai-config/issues/3726).
+
+Two benign warnings observed during that smoke test are worth recording so a
+later session does not misdiagnose them as failures: Codex's own periodic
+`<base_url>/models` list-refresh call 404s against Databricks
+(`ENDPOINT_NOT_FOUND`, since Databricks has no such endpoint), and Codex logs
+"Model metadata ... not found. Defaulting to fallback metadata" for any
+`databricks-<model-id>` name it has no built-in profile for --- meaning its
+own context-window budgeting for that model is a guess, not the vendor's real
+figure.
+
+- **Do:** use `auth.command` (not a static `env_key`) for any custom Codex
+  `model_providers` entry whose upstream issues short-lived or rotating
+  credentials --- this generalizes past Databricks to any OAuth-only
+  OpenAI-compatible provider.
+- **Do:** treat the two warnings above as expected noise for a
+  Databricks-hosted `model_providers` entry, not as dispatch failures.
+- **Don't:** assume `opencode`'s custom-provider mechanism is the only way to
+  reach a custom OpenAI-compatible endpoint from a delegation-ladder CLI ---
+  Codex's command-backed auth covers a case opencode's static-key config
+  cannot.
 
 ## agy on Windows
 

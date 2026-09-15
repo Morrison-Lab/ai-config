@@ -526,16 +526,21 @@ path and the executor's quoted operand (`bash -c "..."`, `eval "..."`), with a
 14-row table showing every one allowing at the head and blocking on `main`.
 Both rounds trace to composing the narrow variant into a consumer whose false
 negative is unrecoverable, and neither is a defect in `LEAD` itself.
-Round 5's suggested direction is this rule's remedy stated as a design change:
-"invert the default the way pass 2 already did --- treat a heredoc as executing
-unless its introducing line is provably fed to a non-executing consumer".)
+Round 5's suggested direction is this rule's remedy stated as a design change: "invert the default the way pass 2 already did --- treat a heredoc as executing unless its introducing line is provably fed to a non-executing consumer".)
+
+**The general form, and why the two occurrences above are enough to state it.**
+Both are the same shape: a branch the code could not resolve, whose DEFAULT decided the guard's safety, chosen on a ground other than the condition being tested.
+Round 5's is `HEREDOC_EXECUTOR` deciding whether a heredoc body is inert prose --- a question about the body's CONSUMER, settled before either matching pass sees the text.
+Round 6's is `KEYWORD_PREFIX`'s closed enumeration of what may precede a command word --- a question about which wrappers someone thought to list.
+Neither ground is "can this code tell what the text does".
+
+The test that catches both, before any third case is needed: for every "cannot tell" branch, say what the default does, and check that the ground for that default is the CONDITION the branch tests rather than something adjacent to it.
+A ground that names bash's parser, or the caller's intent, or the code this was copied from, is not about whether THIS code can tell.
 
 ## Repointing a configured path at a different artifact is reuse, and the accessor's own docs say what it is for
 
-Everything above concerns reusing a **structure** --- a template, a script, a
-neighbouring file's shape.
-The same failure arrives through **data**, and there it wears the clothes of
-debugging rather than of authorship.
+Everything above concerns reusing a **structure** --- a template, a script, a neighbouring file's shape.
+The same failure arrives through **data**, and there it wears the clothes of debugging rather than of authorship.
 
 An artifact the code expects is missing.
 A configured path --- an environment variable, a config key, a CLI flag ---
@@ -588,7 +593,40 @@ against.
 
 (`ucdavis/bcs#679`, 2026-08-20: `AB507BS_PARQUET_PATH` was set to the
 all8sites cohort dataset to get past a missing file.
-The accessor's own roxygen says the path is "a derived cache of the AB507BS raw
-RDS, not a second copy of the all8sites cohort" --- a sentence written to
-forbid exactly the substitution that was made.
+The accessor's own roxygen says the path is "a derived cache of the AB507BS raw RDS, not a second copy of the all8sites cohort" --- a sentence written to forbid exactly the substitution that was made.
 It was never read.)
+
+## A reused decision procedure keeps its failure DIRECTION; the new caller decides what that direction now costs
+
+Everything above asks whether the original's purpose and the new one's are the same kind of thing, and finds the mismatch when that question goes unasked.
+This is the case where the question gets asked and answered correctly, and the copy is still wrong, because the property that actually transfers is narrower than "does it do the same thing": a procedure with a "cannot tell, give up" branch carries a *fixed polarity* at every such branch, and polarity is not the same thing as purpose.
+
+The worked case below is a **proposal**, not an incident: the reuse it describes has not happened, and the code it reuses is on `main` and readable today.
+That is what makes it worth writing down before rather than after --- [`Morrison-Lab/ai-config#1973`](https://github.com/Morrison-Lab/ai-config/issues/1973) proposes the extraction, so the question is live, and its answer is decidable from artifacts you can open right now.
+
+`hooks/no-empty-promise.py`'s `_poller_executed` was written for a check that discharges a promise at `Stop` time: when it cannot see through a shell function, an `eval`, or a variable-assembled command, it returns False --- and for that caller, giving up means treating the promise as *not yet discharged*, the safe direction when the worst case is one extra nag.
+Extract that descent into a shared module and wire it into a `PreToolUse` guard over a destructive action, and the identical give-up points, running the identical code, would instead mean the guard never looked inside that shell function, `eval`, or variable at all --- a silent ALLOW of whatever the command actually ran.
+
+The check such an extraction invites is whether the limits are unchanged from the original.
+They would be, and that is the wrong thing to verify: the limits are a property of the CODE, while whether they are safe to ship is a property of the CALLER, and a true unchanged-limits claim answers nothing about the second question.
+
+Distinct from the general-form test earlier in this file, which asks whether a default's GROUND matches the condition its branch tests.
+This one takes the default as given and asks what its direction COSTS the new caller.
+A default can be correctly grounded and still be unaffordable one consumer over, which is the whole of this section.
+
+- **Do:** for every "cannot tell, give up" branch in code you are reusing, name the ORIGINAL caller's worst case on that branch, then ask the same question of the NEW caller --- the branch is identical, and the two answers can differ.
+- **Do:** treat "the limits are unchanged from the reference" as a claim about the code, not a clearance --- it says nothing about whether the new consumer can afford those limits.
+- **Don't:** assume a fail direction survives extraction because the logic that produces it does;
+  the direction a give-up branch takes is fixed, and what that direction *costs* is decided anew by every caller.
+
+(What makes `_poller_executed` the case is that it states its own direction in a comment, so nothing here has to be inferred:
+
+"a missed arming is visible to its author and one plainer command from clearing, whereas a false discharge defeats the guard silently".
+
+That sentence is correct for a discharge check, where the worst outcome of giving up is a promise that does not clear.
+Read it in a GUARD and the same branch has the opposite worst outcome, because what gives up there is the thing deciding whether a destructive command is allowed.
+Nothing in the function changes; the cost of its limits does.
+
+`#1973`'s Scope section names six token-comparing hooks that would consume such a helper, and its defect section reports the bypass measured against two of them --- `hooks/no-clobbering-push.py` and `hooks/flag-reset-hard-uncommitted-work.py`.
+Read the issue for the proposal and its measurements;
+the rule here needs only `_poller_executed` itself, since the give-up branches and their stated direction are both in front of you.)

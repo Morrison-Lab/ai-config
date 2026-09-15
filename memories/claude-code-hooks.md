@@ -834,6 +834,36 @@ check, and it is the one a `MUTATIONS` table cannot perform for you.
 - **Don't:** read an all-clauses-pass run as covering the imported code; the
   imported code was never the mutant.
 
+## A reviewer whose verdict is formatted differently also leaves the guard on the old verdict
+
+The sibling section below covers a report the guard never sees.
+This is a report it sees and cannot parse, which produces the same symptom from a different cause, and the refusal text does not distinguish them.
+
+`hooks/no-push-without-self-review.py` takes the verdict from the last line that IS a verdict and then searches FORWARD for the `Reviewed-Commit:` line that binds it to a commit.
+A reviewer that opens with a bolded summary verdict and puts the commit line far below satisfies neither half reliably.
+
+Measured 2026-09-15 on ai-config#3701.
+An `adversarial-reviewer` dispatched on `haiku` returned a genuinely clean report whose first line was `**Verdict: APPROVED**`, with `Reviewed-Commit:` near the end.
+The guard kept refusing, quoting a verdict for an EARLIER commit, across three successive push attempts.
+Re-dispatching the identical brief with an explicit instruction to end the report with
+
+```
+### Verdict: Ready for merge
+
+Reviewed-Commit: <full sha>
+```
+
+as its last two lines was accepted immediately, and the push went through.
+
+The refusal is the same text in both cases, so the cheap discriminator is the SHA it names: a verdict quoted for an earlier commit means the newest report was not parsed, whereas no verdict at all means none was seen.
+Neither is a reason to override.
+
+- **Do:** tell a dispatched reviewer the exact ending format when the push depends on its verdict, especially on a cheaper tier that formats more freely.
+- **Do:** read the SHA in the refusal --- an earlier commit's SHA points at a parse failure rather than a missing review.
+- **Don't:** read a repeated refusal after a clean report as the guard malfunctioning;
+  it is reporting what it could parse.
+- **Don't:** reach for `ALLOW_UNREVIEWED_PUSH=1` here --- a verdict exists and the fix is to restate it in the shape the guard reads.
+
 ## A reviewer resumed with `SendMessage` leaves the pre-push guard on the old verdict
 
 `hooks/no-push-without-self-review.py` takes the verdict from the `tool_result` of an **`Agent` call**.

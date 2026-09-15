@@ -12,6 +12,30 @@ The modern standard is native plugin installation: `Morrison-Lab/gha`'s reusable
 
 If a repository uses `ai-config` (or any other tool) as both a native plugin and a git submodule, **remove the submodule** per [`remove-redundant-plugin-submodules.md`](../shared/workflow/remove-redundant-plugin-submodules.md).
 
+**The plugin ships skills, commands, and hooks --- it does not ship the `.claude/agents/` personas, and one shipped hook requires one.**
+Checked on the repo at `c7201140`, 2026-09-15: the Claude Code plugin's root is the repository root (`.claude-plugin/plugin.json`), which carries `skills/`, `commands/`, and `hooks/hooks.json` but no `agents/` directory.
+Every reviewer persona lives in `.claude/agents/` instead, which is *project* scope: it loads for a session whose working directory is an ai-config checkout, and nowhere else.
+[`agent-builder`](../skills/agent-builder/SKILL.md) states the same fact from the authoring side --- "there's no central agent list to update" --- without naming this consequence.
+
+So in a consumer repo that installs the plugin, `hooks/no-push-without-self-review.py` is live while `adversarial-reviewer` is not registered, and the session's agent list holds only the built-ins plus whatever that repo defines itself.
+The guard anticipates this: `FALLBACK_AGENT_NAME` admits `general-purpose` (also `reviewer`, `code-reviewer`, `research`, `self`) **provided** the dispatch's prompt matches `REVIEW_PROMPT_RE` --- literally `adversarial review`, `adversarial self-review`, `pre-push review`, or `self-review`, with `-`, `_`, or a space between the words.
+A prompt that says "review this adversarially" satisfies a reader and not the regex.
+
+**Read which of the guard's two denials you got, because they fail at different stages and only one is about the persona.**
+"No `adversarial-reviewer` subagent or recognized external reviewer ... was dispatched" means the dispatch was not recognized: wrong `subagent_type`, or a prompt the regex missed.
+"An `adversarial-reviewer` subagent was dispatched, but no verdict came back as that call's own result" means the dispatch *was* recognized and the report was not parsed --- the verdict must be a line beginning `Verdict: Ready for merge` or `Verdict: Needs work` (optionally as a heading, optionally bolded, and not inside a code fence), with a `Reviewed-Commit: <sha>` line **after** it.
+A verdict phrased any other way, or placed in a fenced block, produces the second message no matter how the reviewer was dispatched, so re-dispatching under a different persona name is the wrong response to it.
+
+- **Do:** when the plugin's hooks fire in a repo that is not ai-config, dispatch the fallback as `general-purpose` in the foreground with the literal phrase "adversarial self-review" in the prompt, and require the report to end with an anchored `Verdict:` line followed by `Reviewed-Commit:`.
+- **Don't:** reach for `ALLOW_UNREVIEWED_PUSH=1` on the second message --- it says the review was seen and its report was unreadable, which is a formatting fix.
+- **Don't:** assume a persona named in a hook, a skill, or a shared fragment exists in the session that loaded it ---
+  the plugin's own agent inventory is empty.
+
+(ucdavis/lbt, 2026-09-15: a Claude Code desktop session with the plugin enabled listed only `claude`, `claude-code-guide`, `Explore`, `general-purpose`, `Plan`, and `statusline-setup`.
+Three foreground `general-purpose` fallback reviews returned verdicts and the guard still answered with the second message above, so every push needed the override.
+Which half of the verdict contract the reports missed was not recorded at the time --- capture the reviewer's closing lines verbatim next time, since that is what distinguishes a guard defect from a report-format defect.
+Worth an issue either way: the persona could ship in the plugin, or the guard's denial could quote the contract it is matching against.)
+
 Historically (prior to native plugins), consumer repos vendored ai-config as a submodule with a committed `.claude/skills` symlink (e.g. `d-morrison/rme#982` and `ucdavis/epi204#360`, later migrated off the submodule in `d-morrison/rme#1074` and `ucdavis/epi204#380`):
 
 1. `git submodule add https://github.com/Morrison-Lab/ai-config.git .ai-config`

@@ -756,3 +756,46 @@ The near-miss is compressing the source's phrasing for rhythm and letting the un
 - **Don't:** shorten "27 files with X" to "27 X" in the name of concision.
 
 (Review finding on ai-config#2955, 2026-09-01: a case record wrote "27 multi-line signatures at +4" where the cited serocalculator#672 comment had counted 27 files.)
+
+## Splitting one cited sentence gives each new sentence a citation to re-derive
+
+The section above governs a figure restated from a source.
+This governs the locator, under the one edit that multiplies locators without anyone deciding to write a new one: splitting a long cited sentence into several sentences, or into a bulleted list.
+
+The parent sentence carried one citation over its whole content, so the range was true of the sentence as a unit and said nothing about which part sat on which page.
+Splitting it asks a question the original never answered.
+Each fragment now needs a locator of its own, and the range that covered all of them covers none of them exactly --- so dividing the parent's range across the children is guesswork wearing the parent's authority.
+An inherited range is a **new** claim about a narrower body of text, not a preserved one.
+
+Two things make this the citation defect most likely to ship.
+The split is performed for a reason that has nothing to do with citations (a list is more readable, a sentence is too long), so attention is on structure while the numbers ride along.
+And the result is *more* precise-looking than the original, which is [`An edit made for precision can assert what the loose version never did`](fact-check-prose.md#an-edit-made-for-precision-can-assert-what-the-loose-version-never-did) arriving through a structural edit rather than a lexical one.
+
+**Re-derive every child's locator from the source, at the moment of the split.**
+Open the document, find where each fragment's content actually begins and ends, and write that.
+Expect the parent's range to be wrong at both ends: the content can start a page earlier than the parent's range admits as easily as it can stop a page short of it.
+
+**A split enumeration owes the source its item set as well as its pages.**
+Turning a run-on list into bullets is also a restatement of the source's own enumeration, so an item the parent sentence had already dropped stays dropped, now in a form that displays the gap as a complete list.
+Count the source's items and the bullets, and say how many of how many you are giving.
+
+**Two shapes here are decidable, so grep for them rather than reading for them:**
+
+- `(p. 22-23)` --- the singular `p.` with a range, found by `grep -nE '\(p\. *[0-9]+ *- *[0-9]+\)'`.
+- A child range that is not a subrange of the parent's, which a diff of the two makes mechanical when the parent citation is still on the `-` side of the hunk.
+
+Neither needs a person, and the first is the kind of finding a repo whose prose carries page citations should own as a check rather than as a habit --- see [`algorithmatize-checks`](../workflow/algorithmatize-checks.md).
+
+- **Do:** re-open the source and derive a locator for every sentence a split created, including the one that keeps the parent's wording.
+- **Do:** check the split enumeration against the source's own enumeration for completeness, not only its pages.
+- **Don't:** divide a parent's page range across its children by proportion, position, or plausibility.
+- **Don't:** read "I did not change that citation" as a defence --- the sentence under it is new, so the citation is a new claim.
+
+(ucdavis/lbt#7, 2026-09-15.
+A 110-word enumeration of Barr's reception headings was split into bullets plus a follow-on sentence.
+The parent sentence's `(pp. 304-307)` was divided across the children by guesswork.
+Re-reading the PDF put the seven bulleted headings at pp. 304-306 and the follow-on heading's content on p. 306, so the parent's range ran a page past everything the split produced.
+Foreground adversarial review caught that one and the Pinter list stem, `(p. 22-23)` --- wrong range and singular `p.` at once --- for four items that run pp. 23-24, before the push.
+Two more of the same shape survived into the PR and were fixed in `72d1902`.
+`(pp. 307-309)` became `(pp. 306-309)` in the Barr summary, again because the content opens at the foot of the earlier page.
+And the Wendland applications bullets, restating that source's own special-interests enumeration, had dropped its first item.)

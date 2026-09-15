@@ -641,6 +641,21 @@ of having left it alone.
 - **Don't:** read this as covered by the import rule above; there is no source
   to have been faithful to, which is what removes the moment of doubt.
 
+**The worst case is a rewrite that raises the burden on the clause it left alone.**
+Above, the carried clause keeps asserting what it always asserted, and the defect is that nobody re-checked it.
+Here the rewrite changes what the clause has to support.
+A sentence rewritten to say where in a source something appears --- "in his conclusion", "in the opening section", "in the abstract" --- turns a locator that only had to land somewhere in the document into a claim about that document's structure.
+The citation's text is unchanged, so it reads as untouched; its job is not.
+The tell is a rewrite that adds a structural noun about the source, and the check is to open the source and find that structure, not merely the content.
+
+- **Do:** re-verify a locator whenever the rewritten sentence makes a claim about where in the source the material sits, even though the locator itself was not edited.
+- **Don't:** treat a pre-existing citation as pre-verified --- it was only ever as good as the weaker claim it used to carry.
+
+(ucdavis/lbt#7, 2026-09-15: replacing a hollow "In conclusion," opening with "Pinter states in his conclusion that ... (pp. 32-33)" made the inherited, already-wrong citation load-bearing.
+The conclusion is on p. 31.
+pp. 32-33 are the references and the author's address.
+Caught by foreground adversarial review, and the same pass had to re-check the other four "In conclusion," rewrites in the branch for the same reason.)
+
 ## When each rewrite is refuted on a NEW clause, the passage is over-specified
 
 The section above governs one rewrite: every clause you carried through it is
@@ -1185,6 +1200,13 @@ different number in the same sentence inherits the credibility of the fix.
 And the rewrite destroys its own evidence, per the case record above: there is
 no diff between a message and its predecessor, so nothing a later reader sees
 shows that the figure ever changed.
+
+(Recurrence, ucdavis/lbt#7, 2026-09-15: two successive amends each shipped a figure that disagreed with their own diff.
+"145 packed lines" where the diff showed 117, and "three antitheses" where two were antitheses and the third was a metaphor removal.
+The second widens the class this section states.
+It counts the *kinds* of edit in the diff rather than its size, so `git show --stat` cannot settle it and only reading the hunks can --- which is why a message describing a mixed cleanup is likelier to carry one of these than a message describing a single mechanical change.
+A parenthetical in the same message named four of five items, which is [`check-leadin-counts.py`](../../scripts/check-leadin-counts.py)'s exact shape on a surface that checker does not read.
+[`hooks/flag-positional-figure-in-commit-message.py`](../../hooks/flag-positional-figure-in-commit-message.py) shows the surface is reachable --- a `PreToolUse` guard sees the message before the commit exists --- so a lead-in-count check on `-m` bodies is a build, not a wish.)
 
 **A *positional* figure is in scope here, not only a measurement of the
 change.**

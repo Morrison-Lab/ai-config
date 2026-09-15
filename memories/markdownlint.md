@@ -61,6 +61,22 @@ Split out of [`tools.md`](tools.md) on 2026-09-01 when that file crossed the 125
   itself for an empty-match signal, which direct reproduction disproved, and
   a review round then caught the entry substantially duplicating the
   already-on-main sections cited above.)
+- **One sentence per line and gha's list-item-splice check collide inside a list, and the check names the item you did not touch.**
+  The two rules are individually reasonable and jointly mean a multi-sentence list item cannot be split in place.
+  `lint-markdown`'s `check_list_item_splices.mjs` (Morrison-Lab/gha, read 2026-09-15) walks the file and, for every line that is a list marker, looks at the line *before* it: a finding is raised when that previous line is non-blank and is not itself a list item, heading, blockquote, table row, or horizontal rule.
+  Splitting item K across two source lines makes item K's second sentence a bare continuation line, so item **K+1** becomes a marker following a continuation line and is what the error names.
+  Diff-scoping does not save you: the check reports the finding when either the flagged line or the previous line is in the added set, and the continuation line you added is the previous line.
+  So the reported file, line number, and quoted text all belong to an item the commit never edited, which sends the fix to the wrong place.
+  The remedy is a blank line between the items, which is also what MD032 wants.
+  The alternative is to leave that item on one line.
+  **Do:** after applying one-sentence-per-line inside a list, put a blank line between every pair of items in that list, and read a splice finding as pointing at the item *after* the one you split.
+  **Don't:** debug the item the error names --- check the line above it first.
+  **Candidate check.**
+  `scripts/run-local-validation.py` already declares list-item splices as one of the three `lint-markdown` companions it has no local equivalent for, so this reaches a session only as a red CI job.
+  `scripts/vendor/gha-check-new-line-breaks.py` plus `scripts/sync-nlb-checker.py` is the established shape for vendoring one of gha's checkers so it can run before the push.
+  The splice checker is the same kind of small, self-contained, diff-scoped script.
+  (ucdavis/lbt#7, 2026-09-15: a numbered link checklist was reflowed one-sentence-per-line, `lint-markdown` went red, and `b3f3ba2` fixed it by separating the items with blank lines.)
+
 - **Don't tag a non-shell CLI block `bash`/`sh` (MD040).**
   MD040 wants a language on every fence, which invites tagging anything command-shaped as `bash`.
   Claude slash commands (`/ums`, `/plugin`, `/also`) and other application-level directives are not shell-executable, so `bash` implies a reader can run them and they fail when someone tries.

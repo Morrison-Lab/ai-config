@@ -310,25 +310,26 @@ That reads exactly like a failed deploy or a lost edit, and the natural response
 
 See [`fail-fast.cases.md`](fail-fast.cases.md), "A cache-busted re-fetch resolved a preview page that looked like a failed deploy".
 
-### A seventh cause: the outcome taxonomy has an uncounted bucket
+### A seventh cause: the routing condition that selects who gets checked is also the failure condition
 
-The six causes above all leave the check running over the wrong population, the wrong subject, or the wrong copy.
-This one runs over the right population and classifies every row correctly --- the defect is in the summary line, which counts only *some* of the classifier's own outcome categories as "examined."
-A row that lands in an uncounted category is neither a pass nor a failure in the report.
-It is invisible, and invisible is exactly what a row the check most needs to see looks like when that row happens to be the one the uncounted category exists for.
+The causes above all describe the check itself going wrong --- broken, empty, collapsed, pointed at the wrong subject, absorbed by a fallback, or reading a stale copy.
+This one is a check that is correct on every row it reaches, and a routing step in front of it that decides which rows reach it at all.
+When the routing condition is "this row already looks fine" and the very thing under test is "does this row actually resolve," the two conditions are close enough to collide: a row that fails resolution never satisfies the routing condition, so it never reaches the check, and it also never reaches the summary line's denominator.
+The report reads as complete precisely because nothing failing was ever counted as attempted.
 
-The tell is a classifier with more outcome labels than the summary has terms in its sum --- `ok`, `skipped`, `unlaunchable`, `timeout`, `unknown` computed, but the headline ratio built from only `ok` over `ok + failed`.
-Every row that could not even be classified into `ok` or `failed` silently drops out of both the numerator and the denominator, so a run that probed zero interpreters and found zero failures reports the same "all resolve" line a run that genuinely checked everything would.
+The tell is a routing filter phrased as a precondition for running the real check ("only probe a path that already resolved"), sitting immediately upstream of a check whose whole purpose is to catch paths that do not resolve.
+That is not a bug in the probe; the probe is fine on everything it sees.
+It is a bug in the gate, and the two look identical in a summary line that only ever reports what got through the gate.
 
-- **Do:** sum every outcome category the classifier can produce into the reported denominator, not only the ones that can fail.
-- **Do:** give an unprobeable row its own reported status (`UNPROBED`, with a reason) rather than dropping it from the count silently.
-- **Don't:** trust a coverage ratio built from a subset of the classifier's own labels --- read the classifier's full label set before trusting what a summary line sums.
-- **Don't:** assume a filter that requires a precondition to run the real check is equivalent to running the check on every row --- the precondition can be the exact thing under test.
+- **Do:** ask, of any filter placed in front of a check, whether the filter's own condition can be false for exactly the same reason the check would fail --- and if so, route the excluded rows to their own reported outcome instead of dropping them.
+- **Do:** give a row the routing step cannot forward its own named status (e.g. `UNPROBED`, with a reason), so it appears in the summary rather than vanishing between the routing step and the check.
+- **Don't:** trust a "probed N, N clean" line without first reading what the routing step in front of the probe excludes and why.
+- **Don't:** assume a precondition for running a check is neutral --- the precondition can select for the very rows already known to pass.
 
-(Morrison-Lab/ai-config#3624, PR #3647, commit `5fa13ee9`: `check_interpreters()` in `scripts/install-hooks.py` probed only rows whose path already resolved and classified an unprobeable plugin-root command as `skipped` rather than as its own counted outcome.
-The exact registration shape #3624 was filed about --- a `python3` that cannot read the plugin root --- probed zero interpreters and printed "Every registered hook path resolves."
+(Morrison-Lab/ai-config#3624, PR #3647, commit `5fa13ee9`: `check_interpreters()` in `scripts/install-hooks.py` built its probe set only from rows whose registered path already resolved (`row["status"] == "ok"`), and a plugin-root command whose path is unexpanded (`${CLAUDE_PLUGIN_ROOT}/...`) carries `status == "skipped"` instead --- so it never entered the probe set, never appeared in the `probed N interpreter(s)` count, and the run printed "every one of them could read it" having probed zero.
+That is the exact registration shape #3624 was filed about.
 An adversarial review caught it before merge.
-The fix reports unprobeable rows as `UNPROBED` with a reason, and the probed-count line now sums only the categories that are real observations (`ok` and `blind`), excluding non-observations (`unlaunchable`, `timeout`, `unknown`) it had previously credited toward coverage.)
+The fix routes `skipped` rows into their own `unprobeable` bucket and reports each as `UNPROBED` with a reason, so a row the check cannot reach is visible rather than silently absent from the count.)
 
 ### A named regression test is checked against its rule, not against a commit
 

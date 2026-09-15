@@ -440,3 +440,107 @@ either direction.
   and is not.
 - **Don't:** assume one is safe because rme is --- the measurement above is real
   and was taken twice.
+
+## `pandoc` loses LaTeX content on the way to Markdown, silently and selectively
+
+Converting `.tex` sources to `.qmd` with `pandoc` exits 0 and produces
+plausible Markdown while dropping content outright.
+Measured 2026-09-15 converting `Morrison-Lab/machine_learning_lecture_materials`
+(19 chapters), each of these on real sources:
+
+- **`\begin{tikzpicture}` is dropped entirely**, emitting nothing whatever.
+  Any empty element left behind is the surviving **wrapper**, not a
+  placeholder for the diagram.
+  Measured on pandoc 3.1.3: a bare `tikzpicture` produces no output at all, one
+  inside `\begin{center}` leaves an empty `<div class="center">`, and one
+  inside a `figure` leaves an empty `<figure>` **still carrying its caption**.
+  That last case is the dangerous one, because a caption describing a diagram
+  that is not there reads as a rendering glitch rather than as lost content.
+  That was all 25 diagrams in the notes.
+  Pre-render them to SVG instead (`pdflatex` with the `standalone` class, then
+  `pdftocairo -svg`), which also frees the website build from needing a LaTeX
+  toolchain at all.
+- **A `{\color{c}X}` group loses its colour everywhere, and loses its *text*
+  when a `\quad`, `\qquad`, or `\hfill` precedes it.**
+  Measured on pandoc 3.1.3, and both halves matter separately.
+  The colour goes in prose and in a `tabular` cell alike --- pandoc emits a
+  bare `<span>` with no `style` --- whereas `\textcolor{c}{X}` keeps it in
+  both, so the distinction is the **macro**, never the surrounding context.
+  On top of that, a `\quad`, `\qquad`, or `\hfill` immediately before the group
+  makes the group's text vanish outright;
+  `\hspace{...}`, `\;` and `\,` do not, and plain text after a `\quad` survives.
+  So the erasure needs the switch **and** one of those three spacing commands.
+  In this conversion all four `{\color{red}Suspect: ...}` caveats in a results
+  table followed a `\quad`, so all four vanished and four numbers the author had
+  flagged as unreliable were published with nothing marking them.
+  Rewrite to `\textcolor{c}{X}` before the pandoc pass, which fixes both halves
+  at once.
+- **The row before the second `\hline` is read as a header.**
+  A table that rules *every* row has no header at all, so its first data row
+  is promoted to a column heading.
+  Strip the interior rules from a fully-ruled table first.
+- **`colour!percent` is copied into `style` attributes**, where
+  `background-color: green!30` is not valid CSS and the browser drops it.
+
+**The selectivity is what makes the second one dangerous.**
+Spot-checking a colour in prose confirms colour works, so the table case reads
+as covered.
+The general shape is worse than an ordinary lossy conversion: every one of
+these is invisible in the rendered output unless you already know what the
+source said, and a diff review cannot catch them when the conversion deletes
+the `.tex` in the same change.
+Diff a chapter's rendered text against the original PDF, or check the
+conversion script's own counters, rather than reading the output for
+plausibility.
+
+- **Do:** pre-render TikZ, and repair colour groups and fully-ruled tables
+  before pandoc sees them.
+- **Do:** check the converted output against the original render, since
+  comparing it against the `.tex` source is exactly what these losses survive.
+- **Don't:** infer from a construct surviving in prose that it survives in a
+  table.
+- **Don't:** read a clean `pandoc` exit, or plausible-looking Markdown, as
+  evidence nothing was lost.
+
+## Math portable across one format is not portable across the others, and the two directions fail oppositely
+
+Quarto typesets HTML math client-side with MathJax and PDF math with LaTeX, so
+a multi-format project renders the same expression through two engines that
+accept different commands.
+**This applies to any repo rendering both HTML and PDF, `d-morrison/rme`
+included --- not only to a conversion.**
+
+- **MathJax-only**, such as `\bbox`: renders on the website and **fails the
+  PDF build loudly**.
+- **LaTeX-only**, such as an xcolor `orange!80!black` mix: compiles into the
+  PDF and is **silently dropped by the browser** --- the same
+  xcolor-syntax-is-not-CSS failure the section above records for `style`
+  attributes, reaching math this time rather than a table cell.
+- `\boxed` works in both, and is the portable choice where either would do.
+
+**The asymmetry is the whole point.**
+The first direction turns a build red and gets fixed within the hour.
+The second ships a website missing emphasis the author wrote, with nothing red
+anywhere --- so the failure that survives is the one no instrument reports.
+
+A third case belongs here because it looks like neither: **a blank line inside
+a `$$...$$` block** is legal in a LaTeX source and tolerated by MathJax, and is
+fatal to the PDF render (`\begin{aligned} allowed only in math mode`).
+
+Because MathJax fails silently at build time, a malformed expression is
+invisible to the render.
+Check the equations in a browser --- a headless pass over the built site
+counting `mjx-container` elements against `mjx-merror` ones is the instrument,
+and is what `.github/workflows/check-equation-renders.yml` automates in the
+consuming repos.
+
+- **Do:** prefer a construct both engines accept, and check a new one in both
+  outputs.
+- **Do:** run the equation check over the rendered site rather than reading
+  the source.
+- **Don't:** read a green PDF build as evidence the website shows the same
+  thing --- that is the direction that fails silently.
+
+(Both measured 2026-09-15 on
+[machine_learning_lecture_materials#2](https://github.com/Morrison-Lab/machine_learning_lecture_materials/pull/2);
+tracked as [ai-config#3717](https://github.com/Morrison-Lab/ai-config/issues/3717).)

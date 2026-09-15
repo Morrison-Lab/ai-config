@@ -434,7 +434,7 @@ Prefix the push itself with `ALLOW_UNREVIEWED_PUSH=1` there, and say in the same
 The same applies to a session whose reviewer is registered from a stale definition, which is the case on any rollout of a change to the persona itself.
 Where no second context is reachable at all, say so in the review itself rather than letting an inline pass be reported as a dispatched one.
 
-**A harness that always backgrounds the `Agent` tool is a third variant of the same gap, and the guard's partial fix for it has a specific extraction bug.**
+**A harness that always backgrounds the `Agent` tool is a third case where the guard cannot see a verdict it should, alongside no reviewer being registered and a stale reviewer definition above --- and the guard's partial fix for this one has a specific extraction bug.**
 [`ai-config#3045`](https://github.com/Morrison-Lab/ai-config/issues/3045) tracks the general case: a harness whose `Agent` dispatch never returns synchronously, so the guard's own "dispatch in the foreground" remedy is unfollowable.
 That issue's own report is one manifestation --- `run_in_background: false` explicitly set, and the dispatch still backgrounded.
 A second, distinct manifestation is a harness whose `Agent` tool carries no `run_in_background` field in its schema at all, so there is nothing to set.
@@ -443,7 +443,16 @@ Both produce the identical symptom --- "Async agent launched successfully" with 
 
 `read_latest_review()` in `hooks/no-push-without-self-review.py` already has a partial fix for exactly this (added for #3045, the "Genuine task notifications from tracked background reviewer dispatches" block): it tries to recover a task id from the dispatch's own tool result, then matches a later task-notification against that id and parses its text for a verdict.
 The recovery step tries `json.loads()` first, and on failure falls back to a regex requiring the literal key `task[-_]?id` or `conversationId`.
-One session's tool result read `agentId: a29a955ac15b38f72`, which matches neither alternative, so the id was never captured, the later notification never matched, and the guard refused the push on all four dispatches in that session despite each one returning a genuine, independently verified verdict --- reproduced directly (`re.search(r"\b(?:task[-_ ]?id|conversationId)[:=]\s*[`\"']?([\w-]+)", "agentId: a29a955ac15b38f72", re.I)` returns `None`) and posted to #3045 with a proposed one-line fix (widen the key alternation to include `agentId`).
+One session's tool result read `agentId: a29a955ac15b38f72`, which matches neither alternative, so the id was never captured, the later notification never matched, and the guard refused the push on all four dispatches in that session despite each one returning a genuine, independently verified verdict.
+Reproduced directly:
+
+```python
+re.search(r"\b(?:task[-_ ]?id|conversationId)[:=]\s*[`\"']?([\w-]+)",
+           "agentId: a29a955ac15b38f72", re.I)
+# -> None
+```
+
+Posted to #3045 with a proposed one-line fix: widen the key alternation to include `agentId`.
 
 Until that lands, the remedy is the CLI-fallback one given above: run the review (the async dispatch still produces a real report, just not as the call's own synchronous result, and the guard's automatic matching cannot yet recover it either), confirm the reported `Reviewed-Commit` matches what the push will actually ship, and use `ALLOW_UNREVIEWED_PUSH=1` on the push itself, stating in the same reply which review produced the verdict and that the harness's dispatch could not satisfy the guard's own foreground check.
 Re-dispatching the same reviewer again on the theory that a different `run_in_background` phrasing will change the outcome does not.

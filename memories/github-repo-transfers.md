@@ -230,3 +230,61 @@ The hand copy is the whole remedy, and it has three parts, none optional:
 The original was filed in `rme` precisely because that session's write access
 was scoped there, with the body opening "Filed here for transfer to
 `Morrison-Lab/ai-config`" --- a transfer that was never available.)
+
+## A private fork takes its features from the ROOT OWNER's plan, so Pages is unavailable and no setting unlocks it
+
+Measured 2026-09-15 on `Morrison-Lab/machine_learning_lecture_materials`, a
+private fork of a personal-account repository.
+
+A private fork draws its available features from the **root owner's** plan
+rather than from the organization holding the fork.
+So a private fork sitting in a paid org can lack a feature every other repo in
+that org has, and GitHub Pages is one of them.
+
+**Both obvious escapes are closed.**
+GitHub permits neither detaching a private fork from its parent nor changing
+its visibility.
+There is no setting that fixes this, so the only remedy is to recreate the
+repository standalone and push the history across.
+
+**The failure is invisible from every angle an agent can check**, which is what
+makes it worth recording rather than rediscovering.
+In this case the site rendered clean, the publish workflow deployed
+successfully, and `gh-pages` ended up carrying a complete site --- 36 HTML
+pages, 21 PDFs, every `site_libs` directory.
+Every check was green.
+The **Settings -> Pages** UI is simply absent, and no API call, workflow run,
+or branch inspection reports its absence.
+The session reported the site as published and named the Pages setting as a
+routine last step; it did not exist, and the maintainer had to say so.
+
+**The discriminator is fork-versus-standalone, not private-versus-public.**
+A sibling private repo in the same org offered private Pages normally, so
+"private repos here cannot do Pages" is the wrong conclusion and sends you
+toward a plan upgrade that changes nothing.
+Check whether the repo is a fork first.
+
+**What a recreate-standalone migration carries, and what it does not:**
+
+- **Commit history** transfers by a plain push, so anything reachable in the
+  old history stays reachable --- worth confirming with
+  `git rev-parse --is-shallow-repository` first, since a shallow clone would
+  silently truncate it.
+- **Issues** transfer only within one owner, per this file's own section on
+  that, so a same-org recreate can move them and a cross-owner one cannot.
+- **Pull request threads never transfer at all.**
+  Review discussion, diagnoses written in PR bodies, and the reasoning behind
+  merged changes are lost unless copied by hand.
+  Archive the predecessor rather than deleting it, so fully-qualified links
+  into those threads keep resolving.
+
+- **Do:** check `fork` on the repo object before promising any plan-gated
+  feature, and recreate standalone when a private fork needs one.
+- **Do:** treat a green deploy to `gh-pages` as evidence about the *branch*
+  and never about whether Pages serves it.
+- **Don't:** read a sibling private repo's working Pages as proof the org's
+  plan covers this repo.
+- **Don't:** delete the predecessor once the recreate lands --- its PR threads
+  cannot be moved and every link into them dies with it.
+
+(Tracked as [ai-config#3720](https://github.com/Morrison-Lab/ai-config/issues/3720).)

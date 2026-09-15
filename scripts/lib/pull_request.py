@@ -62,9 +62,17 @@ class PullRequest:
         self._review_threads = None
         
     def _fetch_pr_data(self) -> Dict[str, Any]:
+        # `gh pr view --json` returns ONLY the fields named here, so a
+        # property reading an unrequested key gets `None` forever and its
+        # consumer silently takes the wrong branch. `isDraft` was added as a
+        # property without being added here, which made the draft-detection
+        # branch in `check-pr-fully-clean.py` dead code against every real PR
+        # while its unit test passed, because the test injected `_data`
+        # directly and never went through this call (ai-config#3651 review).
         fields = [
-            "headRefOid", "headRefName", "state", "commits", 
-            "reviewDecision", "reviews", "comments", "reviewRequests"
+            "headRefOid", "headRefName", "state", "commits",
+            "reviewDecision", "reviews", "comments", "reviewRequests",
+            "isDraft",
         ]
         cmd = ["gh", "pr", "view", self.pr_num, "--repo", self.repo, "--json", ",".join(fields)]
         stdout = self._fetcher(cmd)
@@ -93,6 +101,17 @@ class PullRequest:
     @property
     def review_decision(self) -> str:
         return self._data.get("reviewDecision") or ""
+
+    @property
+    def is_draft(self) -> bool:
+        """True when the PR is still a draft.
+
+        Load-bearing for the review check rather than cosmetic: a draft does
+        not trigger the `@claude` review workflow, so "no automated review
+        found" on a draft is a permanent state rather than a pending one
+        (ai-config#3651).
+        """
+        return bool(self._data.get("isDraft"))
 
     @property
     def commit_date(self) -> str:

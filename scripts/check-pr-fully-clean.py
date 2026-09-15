@@ -3063,7 +3063,22 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
             all_items.append(("review", submitted_at, body, commit_oid, state, author_login))
 
     if not all_items:
-        issues.append(f"No automated review comments or reviews found on PR #{pr_num}")
+        # Say WHY there is no review when the reason is knowable, because the
+        # two cases look identical and need opposite responses. On a ready PR
+        # this line means "the review has not arrived yet", and waiting is
+        # correct. On a DRAFT it means the review workflow will never run, so
+        # waiting is the wrong action forever -- measured on ai-config#3635,
+        # which sat as a draft through seven review rounds and ten commits
+        # while this exact message read as an ordinary pending state
+        # (ai-config#3651).
+        if getattr(pr, "is_draft", False):
+            issues.append(
+                f"No automated review found on PR #{pr_num}, and it is a "
+                "DRAFT -- the review workflow does not run on drafts, so this "
+                "will not resolve on its own. Mark it ready for review."
+            )
+        else:
+            issues.append(f"No automated review comments or reviews found on PR #{pr_num}")
         return False, issues
 
     # Criterion 4, evaluated over the WHOLE review history rather than only the

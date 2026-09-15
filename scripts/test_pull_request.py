@@ -6,6 +6,51 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.lib.pull_request import PullRequest, Review, IssueComment, CheckRun, ReviewThread
 
+class TestFetchedFieldPlumbing(unittest.TestCase):
+    """Every property reading `_data` must have its key REQUESTED from `gh`.
+
+    `gh pr view --json a,b` returns only `a` and `b`, so a property reading an
+    unrequested key gets `None` forever and its consumer silently takes the
+    wrong branch. That is how `is_draft` shipped inert: the property existed,
+    `isDraft` was not in the field list, and the unit test for the consumer
+    injected `_data` directly and so never exercised this path at all
+    (ai-config#3651 review).
+
+    The fetcher below mimics `gh`'s filtering rather than returning a fixed
+    dict, so a property whose key is not requested fails here instead of
+    passing on a mock that is more generous than the real command.
+    """
+
+    SERVER_SIDE = {
+        "headRefOid": "abc", "headRefName": "b", "state": "OPEN",
+        "commits": [], "reviewDecision": "", "reviews": [], "comments": [],
+        "reviewRequests": [], "isDraft": True,
+    }
+
+    def _filtering_fetcher(self, requested):
+        def fetch(cmd):
+            self.assertIn("--json", cmd, "the fetch must go through --json")
+            names = cmd[cmd.index("--json") + 1].split(",")
+            requested.extend(names)
+            return json.dumps({k: v for k, v in self.SERVER_SIDE.items()
+                               if k in names})
+        return fetch
+
+    def test_is_draft_survives_the_gh_field_filter(self):
+        requested = []
+        pr = PullRequest("1", "o/r", fetcher=self._filtering_fetcher(requested))
+        self.assertIn("isDraft", requested,
+                      "isDraft must be in the --json field list, or is_draft "
+                      "reads None for every real PR")
+        self.assertTrue(pr.is_draft,
+                        "a draft PR must read as a draft after a real fetch")
+
+    def test_a_ready_pr_reads_as_ready(self):
+        self.SERVER_SIDE = dict(self.SERVER_SIDE, isDraft=False)
+        pr = PullRequest("1", "o/r", fetcher=self._filtering_fetcher([]))
+        self.assertFalse(pr.is_draft)
+
+
 class TestPullRequest(unittest.TestCase):
     def setUp(self):
         self.mock_data = {

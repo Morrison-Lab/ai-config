@@ -319,6 +319,54 @@ def nested_source_case(path):
             'git reset --hard origin/main"')
 
 
+def nested_dot_path_argument_case(path):
+    """A bare `.` as a PATH argument is not the `source` builtin.
+
+    `git add .` is one of the commonest shapes there is, and reading `.`
+    positionally made it look like a `source`, so the piece lost the local
+    reading -- file list included -- that the M5 shortcut exists to give it
+    (ai-config#3645 review round 2). The expected report here is the ordinary
+    local one, which is what distinguishes this case.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return 'sh -c "git add . ; git reset --hard origin/main"'
+
+
+def nested_dot_source_case(path):
+    """The same `.` as the COMMAND WORD really is `source`.
+
+    The other direction of the case above, so scoping the check to the
+    command word cannot be widened back to "never match a dot" without a
+    case failing.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return ('sh -c ". /nonexistent-elsewhere/env.sh; '
+            'git reset --hard origin/main"')
+
+
+def nested_keyword_prefixed_cd_case(path):
+    """A `cd` inside a branch body arrives with the keyword still attached.
+
+    `_simple_commands` splits on operators only, so `then cd /other` hands
+    back `["then", "cd", "/other"]` and the command word is `then`. Reading
+    `argv[0]` without taking the prefix off first would call this piece
+    stationary, which is the fail-open direction -- the shortcut would then
+    list THIS repository's files for a command acting elsewhere.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return ('sh -c "if true; then cd /nonexistent-elsewhere; fi; '
+            'git reset --hard origin/main"')
+
+
 def nested_checkout_word_case(path):
     """A nested `git checkout <word>` is not classified against THIS repo.
 
@@ -682,6 +730,14 @@ SHOULD_WARN = [
      "a `--git-dir` option in a sibling command of the piece"),
     ("W1973i", nested_dash_c_option_case,
      "a bare `-C` in a sibling command of the piece"),
+    ("W1973m", nested_keyword_prefixed_cd_case,
+     "a `cd` behind a body keyword is still a `cd`, so the prefix comes off "
+     "before the command word is read"),
+    ("W1973k", nested_dot_path_argument_case,
+     "a bare `.` PATH argument is not `source`, so the piece keeps the "
+     "ordinary local reading"),
+    ("W1973l", nested_dot_source_case,
+     "a bare `.` as the COMMAND WORD is `source`, so the piece is unscoped"),
     ("W1973j", nested_source_case,
      "`source` runs another file's `cd`s in this shell, with no `cd` token"),
 ]
@@ -861,7 +917,7 @@ EXPECTED.update({case_id: "silent" for case_id, *_ in SHOULD_STAY_SILENT})
 EXPECTED.update({case_id: "WARN-unscoped"
                  for case_id in ("W1973c", "W1973d", "W1973e",
                                  "W1973f", "W1973g", "W1973h", "W1973i",
-                                 "W1973j")})
+                                 "W1973j", "W1973l", "W1973m")})
 CASES = {case_id: builder
          for case_id, builder, _ in SHOULD_WARN + SHOULD_STAY_SILENT}
 
@@ -964,7 +1020,7 @@ MUTATIONS = {
         # S1973b is deliberately absent: its nested `git checkout <word>`
         # is never classified lexically, so it matches nothing and the
         # shortcut is not on its path at all.
-        {"W1973a", "W1973b", "S1973c"},
+        {"W1973a", "W1973b", "S1973c", "W1973k"},
     ),
     "M5_repo_redirect_env_counts": (
         "a `GIT_DIR=`-family assignment redirects the repository without "
@@ -987,20 +1043,33 @@ MUTATIONS = {
           "            pass")],
         {"W1973i"},
     ),
-    "M5_opaque_words_count": (
-        "a word whose command is built at run time (`eval`, `source`) makes "
-        "the piece unscoped, although it carries no `cd` token",
-        [("            if os.path.basename(token) in _OPAQUE_WORDS:\n"
+    "M5_command_word_counts": (
+        "a `cd`/`eval`/`source` COMMAND WORD makes the piece unscoped",
+        [("            if word in _CD_WORDS or word in _OPAQUE_WORDS:\n"
           "                return True",
           "            pass")],
-        {"W1973e", "W1973j"},
+        {"W1973c", "W1973e", "W1973j", "W1973l", "W1973m"},
     ),
-    "M5_cd_words_count": (
-        "a `cd` in the piece makes it unscoped",
-        [("            if os.path.basename(token) in _CD_WORDS:\n"
+    "M5_only_the_command_word_counts": (
+        "`cd`/`eval`/`source`/`.` are those commands only where they are RUN, "
+        "so a bare `.` path argument does not make the piece unscoped",
+        [("            word = os.path.basename(argv[lead])\n"
+          "            if word in _CD_WORDS or word in _OPAQUE_WORDS:\n"
           "                return True",
-          "            pass")],
-        {"W1973c"},
+          "            if any(os.path.basename(t) in _CD_WORDS\n"
+          "                   or os.path.basename(t) in _OPAQUE_WORDS\n"
+          "                   for t in argv):\n"
+          "                return True")],
+        {"W1973k"},
+    ),
+    "M5_lead_prefix_comes_off_first": (
+        "a body keyword is skipped before the command word is read, so "
+        "`then cd /other` still counts",
+        [("        while lead < len(argv) and (ASSIGNMENT.match(argv[lead])\n"
+          "                                    or argv[lead] in LEAD_WORDS):\n"
+          "            lead += 1",
+          "        pass")],
+        {"W1973m"},
     ),
     "M4_untracked_excluded": (
         "an untracked (`??`) entry does not count as a change `--hard` "

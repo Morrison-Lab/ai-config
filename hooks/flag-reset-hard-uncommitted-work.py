@@ -430,6 +430,11 @@ def _may_change_repository(text):
     as a bug. A bare `-C` counts although `grep -C 3` is not a git option, and
     unparseable text counts as redirecting. Both cost only the file list.
 
+    What is deliberately NOT over-reported is a `cd`, `eval`, `source` or `.`
+    sitting anywhere other than the command word. Those four are only those
+    commands when they are being RUN, and reading them positionally made a
+    bare `.` path argument -- `git add .` -- look like a `source`.
+
     The unparseable branch is DEFENSIVE and no case reaches it: `offending`
     calls this only after `shell_c_expansions` has parsed the same text, and
     the two parsers were measured to fail together on every shape tried
@@ -440,11 +445,28 @@ def _may_change_repository(text):
     if cmds is None:
         return True
     for argv in cmds:
+        # A WORD is only `cd` or `source` when it is the command being run.
+        # Scanning every token instead matched a bare `.` as the POSIX
+        # spelling of `source`, so `sh -c "git add . ; git reset --hard"` --
+        # one of the commonest shapes there is -- lost the local reading this
+        # shortcut exists to give it, and the docstring's list of accepted
+        # over-detections did not name it (ai-config#3645 review round 2).
+        #
+        # The prefix comes off first, because a body's keyword arrives
+        # attached: `then cd /other` splits with `then` at the head, and
+        # testing `argv[0]` alone would read that piece as stationary.
+        lead = 0
+        while lead < len(argv) and (ASSIGNMENT.match(argv[lead])
+                                    or argv[lead] in LEAD_WORDS):
+            lead += 1
+        if lead < len(argv):
+            word = os.path.basename(argv[lead])
+            if word in _CD_WORDS or word in _OPAQUE_WORDS:
+                return True
+        # The REDIRECTION spellings are options and assignments rather than
+        # command words, so they really can sit anywhere in an argv -- and
+        # `nested_git_dir_option_case` pins one in a sibling command.
         for token in argv:
-            if os.path.basename(token) in _CD_WORDS:
-                return True
-            if os.path.basename(token) in _OPAQUE_WORDS:
-                return True
             if token.startswith(_REPO_REDIRECT_ENV):
                 return True
             if token.startswith(_REPO_REDIRECT_OPTS):

@@ -37,3 +37,11 @@ _site/
 *.db-wal
 *.db-shm
 .orchestrator/
+
+# Codex project-local config, generated on this machine and never tracked.
+# `.codex/agents/*.toml` mirrors `.claude/agents/*.md` one-for-one, and
+# `.codex/hooks.json` hardcodes an absolute worktree path, so a committed copy
+# would be wrong in every other checkout. Nothing in this repo writes it; the
+# Codex tooling does, mid-session, which is how `git add -A` swept it into an
+# unrelated commit (ai-config#3683).
+.codex/

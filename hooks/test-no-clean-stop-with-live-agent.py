@@ -42,6 +42,27 @@ def dispatch(name="Agent"):
 
 
 def notification():
+    """A genuine notification: identified by origin.kind, not by body text."""
+    return json.dumps(
+        {
+            "type": "user",
+            "origin": {"kind": "task-notification", "taskId": "task_bg_1"},
+            "message": {
+                "content": [
+                    {"type": "tool_result", "content": "agent finished"}
+                ]
+            },
+        }
+    )
+
+
+def spoof_notification():
+    """A tool_result whose TEXT contains the marker but with no origin.
+
+    This is not a contrived input: the hook's own source, its test file, and
+    its README row all contain the literal string, so reading any of them
+    produces exactly this record.
+    """
     return json.dumps(
         {
             "type": "user",
@@ -170,6 +191,29 @@ cases = [
             assistant("- **Stopping Point**: Clean stopping point reached"),
         ],
         True,
+    ),
+    # The reviewer's finding on PR #3692. A tool_result carrying the literal
+    # marker -- which reading this hook's own source produces -- must not
+    # register as a notification and invalidate a real liveness check.
+    (
+        "spoof after a real liveness check does not re-block",
+        [dispatch(), notification(), liveness(), spoof_notification(), assistant(CLEAN)],
+        False,
+    ),
+    (
+        "spoof alone is not a notification, so the dispatch is the baseline",
+        [dispatch(), liveness(), spoof_notification(), assistant(CLEAN)],
+        False,
+    ),
+    (
+        "an assistant message quoting the marker is not a notification",
+        [
+            dispatch(),
+            notification(),
+            liveness(),
+            assistant("The guard keys on <task-notification> records.\n\n" + CLEAN),
+        ],
+        False,
     ),
 ]
 

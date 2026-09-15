@@ -104,6 +104,28 @@ def declares_clean(text):
     return False
 
 
+def is_task_notification(record):
+    """True for a genuine harness task-notification record.
+
+    Keyed on the record's `origin.kind`, never on the literal text
+    `<task-notification>` appearing in a block. Substring matching is
+    spoofable, and self-spoofing here is not hypothetical: THIS FILE contains
+    that literal string, so a tool_result from reading this source -- or the
+    README row describing it, or its own test file -- would register as a
+    notification and reset the baseline, falsely blocking a declaration whose
+    liveness check was performed correctly.
+
+    `no-push-without-self-review.py` already made this exact choice for the
+    same reason, and its suite carries the negative case. Reused rather than
+    re-derived.
+    """
+    origin = record.get("origin")
+    return (
+        isinstance(origin, dict)
+        and origin.get("kind") in ("task-notification", "task_notification")
+    )
+
+
 def scan(path):
     """Return (last_text, dispatch_idx, notification_idx, liveness_idx).
 
@@ -127,11 +149,14 @@ def scan(path):
                 "content"
             ) or []
 
+            # Decided once per RECORD, from structured metadata, so no block's
+            # text can manufacture one.
+            if is_task_notification(event) and role != "assistant":
+                notification = i
+
             if isinstance(blocks, str):
                 if role == "assistant" and blocks.strip():
                     last_text = blocks
-                if "<task-notification>" in blocks:
-                    notification = i
                 continue
 
             if not isinstance(blocks, list):
@@ -153,17 +178,9 @@ def scan(path):
                         if RX_LIVENESS_BASH.search(cmd):
                             liveness = i
 
-                elif kind == "tool_result":
-                    content = b.get("content")
-                    text = content if isinstance(content, str) else json.dumps(content)
-                    if "<task-notification>" in text:
-                        notification = i
-
                 elif kind == "text":
                     if role == "assistant" and b.get("text", "").strip():
                         last_text = b["text"]
-                    if "<task-notification>" in (b.get("text") or ""):
-                        notification = i
 
     return last_text, dispatch, notification, liveness
 

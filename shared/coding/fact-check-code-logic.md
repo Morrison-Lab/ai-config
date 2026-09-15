@@ -824,6 +824,63 @@ A KaTeX-error detector (`_katex_error` in `scripts/check-rendered-page.py`) had 
 The fix (`_StripCode`, a narrow HTML parser stripping only `<code>`/`<pre>`) was mutation-tested in both directions named above: reverting the strip reddened the two code-quoting fixtures (revert, under-inclusive), and widening `_StripCode.DROP` to include `span` reddened the two genuine-error fixtures (over-broaden, over-inclusive) --- the second direction is exactly the one a revert-only mutation run cannot see, since a wider strip would have silenced a real KaTeX error the same way the pre-fix code silenced a real citation.
 See [`check-purpose-before-reusing`](../workflow/check-purpose-before-reusing.md)'s "mirror failure" section for the sibling lesson from the same review: which of `_visible_text`'s other guarantees a detector forfeits when it opts out of the shared helper for one specific reason.)
 
+### A default equal to the value you are distinguishing from makes the split a no-op
+
+The mutations above assume the fix does *something* on the input that
+motivated it.
+A fix that splits one value into two --- a strict end and an extended end, a
+recorded state and an assumed one --- can fail before any of that, by giving
+the new value a default equal to the old one.
+On every input that supplies the key, the two agree and the split is correct.
+On every input that does not, the default restores exactly the value the split
+was drawn to avoid, so the code is unchanged on precisely the inputs that
+produced the finding.
+
+Nothing about it reads as vacuous.
+The diff adds a name, threads it through, and does change behaviour --- on the
+inputs where the lookup hits.
+A regression case reports the same, because a fixture written to exercise the
+new name supplies the key by construction: you build it from the mechanism you
+have just reasoned about, and that mechanism is the recorded-key path.
+
+The check is one question asked of the lookup rather than of the fix: **what
+does this return on the inputs the fix exists for?**
+Where the answer is the default, the default is the specification, so carry
+the distinction as its own field instead of inferring it from a value.
+[`fail-fast`](../principles/fail-fast.md)'s "The third one arrives in the
+repair" is the same collision in a hand-run check, where one read supplies a
+chosen sentinel and the other a default;
+this is the shipped-code form, with one read rather than two.
+
+Measured 2026-09-14/15 on `hooks/no-unauthorized-merge.py`.
+`_proc_subst_regions` split `real_end` from the extended `close_idx` so that
+blanking would stop at a process substitution's real closer instead of running
+to end of text, which had been erasing a trailing executor and turning a block
+into an allow.
+The line was `real_end = closes.get(open_idx, len(text))`, so for a candidate
+whose closer was never recorded `real_end` *was* `len(text)` and the blanking
+reached exactly as far as before.
+Two routes reach that state on valid bash --- a `case` pattern's `)`, and the
+paren scanner popping a closer on quote imbalance --- and a `bash -n` clean
+command on each executed its hidden merge against a `gh` stub while the guard
+allowed it, with the leading-executor twin of the same command blocking
+throughout
+([ai-config#3635](https://github.com/Morrison-Lab/ai-config/pull/3635)
+pre-merge gate;
+both are standing holes rather than regressions, allowing on `HEAD~1` through
+`HEAD~4` as well).
+The landed fix records `open_idx in closes` as a seventh tuple field and reads
+that.
+
+- **Do:** ask what a new lookup returns on the inputs the fix was written for,
+  before writing a case for it.
+- **Do:** carry the distinction as an explicit field when the alternative is a
+  default that coincides with the other branch.
+- **Don't:** read a threaded-through new name as a behaviour change --- a
+  default equal to the old value is the old code with more variables in it.
+- **Don't:** build the regression fixture only from the path you reasoned
+  about; the untested path is the one whose key is missing.
+
 ### Three ways an assertion passes without ever seeing the value it names
 
 The vacuous modes above concern an assertion evaluated against an empty or self-satisfying collection.

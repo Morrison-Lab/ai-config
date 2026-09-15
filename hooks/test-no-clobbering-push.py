@@ -234,6 +234,54 @@ def shell_c_alt_shell_case(path, bare):
     return 'ash -c "git push --force origin HEAD"'
 
 
+def nested_diverged_case(path, bare):
+    """A warn-worthy push wrapped in a shell's `-c`.
+
+    Silent BECAUSE nested pieces get `deny_only`. Without that, `evaluate`
+    would read the remote and warn -- against a directory it cannot know the
+    nested shell starts in, which is what fabricated a cross-repository report
+    in the sibling guard (ai-config#1973 review).
+    """
+    _remote_advances(path, bare, keep_object=True)
+    return 'sh -c "git push origin HEAD"'
+
+
+def nested_override_case(path, bare):
+    """A real `ALLOW_FORCE_PUSH=1` prefixing the WRAPPER, not the push.
+
+    The variable really reaches the inner `git`, so the refusal must not fire.
+    Silent BECAUSE the override is carried onto the nested piece.
+    """
+    _local_advances(path)
+    return 'ALLOW_FORCE_PUSH=1 bash -c "git push --force origin HEAD"'
+
+
+def bare_override_mid_command_case(path, bare):
+    """A BARE `ALLOW_FORCE_PUSH=1` token that is not a command prefix.
+
+    `grep -r ALLOW_FORCE_PUSH=1 hooks/` really contains the assignment as its
+    own argv token, so only the requirement that it HEAD a simple command keeps
+    it from clearing the refusal. The quoted-mention case cannot test that: its
+    whole string is one token and never matches the assignment pattern at all.
+    """
+    _local_advances(path)
+    return ('grep -r ALLOW_FORCE_PUSH=1 hooks/ ; '
+            'sh -c "git push --force origin HEAD"')
+
+
+def mentioned_override_case(path, bare):
+    """The override MENTIONED, not assigned -- the refusal must still fire.
+
+    Searching the raw text for the assignment found it in a commit message, a
+    comment, a heredoc body or a `grep` argument, and silenced the nested
+    refusal. This repo documents the variable by name, so quoting it is the
+    ordinary case rather than the adversarial one.
+    """
+    _local_advances(path)
+    return ('echo "set ALLOW_FORCE_PUSH=1 to override" && '
+            'sh -c "git push --force origin HEAD"')
+
+
 def dash_c_argument_of_non_shell_case(path, bare):
     """`echo sh -c "<push>"` prints a string and pushes nothing.
 
@@ -916,6 +964,10 @@ SHOULD_DENY = [
      "an option's value before `-c` does not hide the shell"),
     ("D1973d", shell_c_alt_shell_case,
      "a shell spelling outside the first SHELL_PROGRAM list"),
+    ("D1973e", mentioned_override_case,
+     "the override MENTIONED rather than assigned does not clear a refusal"),
+    ("D1973f", bare_override_mid_command_case,
+     "a bare override token away from the argv head does not clear a refusal"),
 ]
 
 SHOULD_WARN = [
@@ -970,6 +1022,10 @@ SHOULD_STAY_SILENT = [
      "`-C` is noclobber, not a command flag"),
     ("S1973c", python_c_case,
      "a python `-c` argument is source, not a command line"),
+    ("S1973d", nested_diverged_case,
+     "a nested piece is refusal-only, so a warn-worthy nested push is silent"),
+    ("S1973e", nested_override_case,
+     "a real override before the WRAPPER clears the nested refusal"),
     ("S1", leased_fast_forward_case,
      "`--force-with-lease --force-if-includes` is the remedy, never refused"),
     ("S2", override_case, "`ALLOW_FORCE_PUSH=1` clears the refusal"),
@@ -1273,19 +1329,37 @@ print(f"{total - wrong}/{total} correct"
 # ------------------------------------------------------------ mutation harness
 
 MUTATIONS = {
+    "nested_pieces_are_refusal_only": (
+        "a nested `-c` piece contributes a refusal and never a reading",
+        [("    if deny_only:\n        return None", "    if False:\n        return None")],
+        {"S1973d"},
+    ),
+    "override_carried_onto_nested_piece": (
+        "a real override before the wrapper reaches the nested piece",
+        [("    override = _override_before_wrapper(command)",
+          "    override = False")],
+        {"S1973e"},
+    ),
+    "override_must_head_a_simple_command": (
+        "the override counts as an assignment at an argv head, not as a mention",
+        [("            if not ASSIGNMENT.match(token):\n                break",
+          "            if not ASSIGNMENT.match(token):\n                continue")],
+        {"D1973f"},
+    ),
     "force_deny": (
         "a force push is refused",
-        [('        if flags["force"] and not flags["dry_run"] and not override:\n'
+        [('        if (flags["force"] and not flags["dry_run"] and not override\n'
+          '                and not assume_override):\n'
           '            return "deny", DENY.format(segment=" ".join(argv))',
           "        pass")],
         {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9",
-         "D1973a", "D1973b", "D1973c", "D1973d"},
+         "D1973a", "D1973b", "D1973c", "D1973d", "D1973e", "D1973f"},
     ),
     "force_ignores_lease": (
         "the refusal does NOT consult the lease -- `--force` disables it",
-        [('        if flags["force"] and not flags["dry_run"] and not override:',
-          '        if flags["force"] and not flags["lease"] '
-          'and not flags["dry_run"] and not override:')],
+        [('        if (flags["force"] and not flags["dry_run"] and not override',
+          '        if (flags["force"] and not flags["lease"] '
+          'and not flags["dry_run"] and not override')],
         {"D5"},
     ),
     "force_token_exact": (
@@ -1326,9 +1400,10 @@ MUTATIONS = {
     ),
     "override": (
         "a real `ALLOW_FORCE_PUSH=1` assignment clears the refusal",
-        [('        if flags["force"] and not flags["dry_run"] '
-          "and not override:",
-          '        if flags["force"] and not flags["dry_run"]:')],
+        [('        if (flags["force"] and not flags["dry_run"] and not override\n'
+          '                and not assume_override):',
+          '        if (flags["force"] and not flags["dry_run"]\n'
+          '                and not assume_override):')],
         {"S2"},
     ),
     "out_of_scope_gate": (
@@ -1360,12 +1435,10 @@ MUTATIONS = {
     "deny_scans_every_command": (
         "the refusal pass examines every simple command, not just the first",
         [("    for argv, flags, _pos, _repo, _ok, override, _cwd in parsed:\n"
-          '        if flags["force"] and not flags["dry_run"] '
-          "and not override:",
+          '        if (flags["force"] and not flags["dry_run"] and not override',
           "    for argv, flags, _pos, _repo, _ok, override, _cwd in "
           "parsed[:1]:\n"
-          '        if flags["force"] and not flags["dry_run"] '
-          "and not override:")],
+          '        if (flags["force"] and not flags["dry_run"] and not override')],
         {"D9"},
     ),
     "on_source_is_not_the_HEAD_sentinel": (

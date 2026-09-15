@@ -973,7 +973,8 @@ def _describe(local, tip, cwd, limit=10):
     return len(lines), text
 
 
-def evaluate(command, base_cwd=None, deny_only=False):
+def evaluate(command, base_cwd=None, deny_only=False,
+             assume_override=False):
     """`('deny', reason)`, `('warn', context)`, or `None`.
 
     `base_cwd` is the directory the Bash call starts in -- the payload's own
@@ -1081,7 +1082,8 @@ def evaluate(command, base_cwd=None, deny_only=False):
     # a force push wherever it runs, so nothing about the refusal depends on
     # resolving one.
     for argv, flags, _pos, _repo, _ok, override, _cwd in parsed:
-        if flags["force"] and not flags["dry_run"] and not override:
+        if (flags["force"] and not flags["dry_run"] and not override
+                and not assume_override):
             return "deny", DENY.format(segment=" ".join(argv))
 
     # `deny_only` stops here. Pass 1 is lexical and directory-blind, so it is
@@ -1202,11 +1204,48 @@ def evaluate(command, base_cwd=None, deny_only=False):
     return None
 
 
-FORCE_OVERRIDE = "ALLOW_FORCE_PUSH"
-# The override as an ENV ASSIGNMENT, anywhere in the command text. Deliberately
-# not anchored to a command position: this only ever decides whether to carry
-# the author's own escape hatch onto a nested piece they wrapped.
-OVERRIDE_ASSIGNMENT = re.compile(r"(?:^|[\s;&|(])ALLOW_FORCE_PUSH=(?:\"1\"|'1'|1)\b")
+def _override_before_wrapper(command):
+    """True when a real `ALLOW_FORCE_PUSH=1` assignment HEADS a simple command.
+
+    The first version searched the raw text for the assignment anywhere, with a
+    comment claiming it "only ever decides whether to carry the author's own
+    escape hatch onto a nested piece they wrapped". It decided it for a
+    MENTION: a commit message, a shell comment, a heredoc body, a `grep`
+    argument. This repository documents the variable by name in `CLAUDE.md` and
+    `hooks/README.md`, so quoting it is the ordinary case, and each of those
+    silenced the nested refusal on a command that really force-pushes
+    (ai-config#1973 review, round 3 finding 3).
+
+    This module already ruled that out 800 lines above, at `OVERRIDE`: "counts
+    only as a real env assignment at the start of the same simple command,
+    never as a mention of the string elsewhere ... a guard that its own
+    documentation disables is worthless." Two rules for one question in one
+    file, and the newer, looser one won.
+
+    So the question is asked of the parsed argv, not of the text: does some
+    simple command begin with the assignment?
+    """
+    scoped = _simple_commands(command)
+    if scoped is None:
+        return False
+    for entry in scoped:
+        # Only a CONTIGUOUS RUN of assignments from the argv head is a prefix.
+        # Scanning a window instead found the token wherever it sat, so
+        # `echo "ALLOW_FORCE_PUSH=1" && sh -c "<push>"` disabled the refusal --
+        # the same mention-anywhere hole one step in from the text.
+        for token in entry[1][:_OVERRIDE_PREFIX_WINDOW]:
+            if not ASSIGNMENT.match(token):
+                break
+            name, _, value = token.partition("=")
+            if name == OVERRIDE and value.strip("\"'") == "1":
+                return True
+    return False
+
+
+# How far into a simple command an assignment may sit and still be a prefix.
+# `FOO=1 BAR=2 ALLOW_FORCE_PUSH=1 bash -c ...` is three assignments and a
+# command; beyond a few the token is not a prefix any more.
+_OVERRIDE_PREFIX_WINDOW = 6
 
 
 def evaluate_every_shell(command, base_cwd=None):
@@ -1286,11 +1325,19 @@ def evaluate_every_shell(command, base_cwd=None):
     # Carrying the outer override onto each piece restores it. The reading is
     # deliberately loose, matching this module's existing choice on the same
     # question: "a refused override sends the author looking for a bypass".
-    override = OVERRIDE_ASSIGNMENT.search(command) is not None
+    override = _override_before_wrapper(command)
     for piece in [command] + pieces:
-        if piece is not command and override:
-            piece = f"{FORCE_OVERRIDE}=1 " + piece
-        refusal = evaluate(piece, base_cwd, deny_only=True)
+        # An override carried onto a nested piece is passed as a FLAG, not
+        # prefixed to the text. `VAR=1 bash -c "a && b"` exports the variable
+        # to every command in the piece, while `_lead_prefix` reads one only
+        # from a simple command's own head -- so prefixing the piece as a whole
+        # exempted the first push and denied the second, with no way to comply
+        # (ai-config#1973 review, round 3 finding 7). Rebuilding the text to
+        # prefix each simple command means re-serializing a parse, which is the
+        # kind of round trip that loses a `&&`.
+        carried = override and piece is not command
+        refusal = evaluate(piece, base_cwd, deny_only=True,
+                           assume_override=carried)
         if refusal is not None:
             return refusal
 

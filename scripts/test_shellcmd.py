@@ -15,9 +15,9 @@ Run:  python3 scripts/test_shellcmd.py
 """
 import os
 import py_compile
-import time
 import sys
 import tempfile
+import time
 import warnings
 
 sys.dont_write_bytecode = True
@@ -32,6 +32,19 @@ failures = []
 def check(label, got, want):
     if got != want:
         failures.append(f"{label}: got {got!r}, want {want!r}")
+
+
+def descends_to(command, nested):
+    """Is `nested` among the command lines the descent reaches from `command`?
+
+    Membership rather than an exact list, because `nested_shell_commands`
+    deliberately OVER-DETECTS: when the program is a shell and a `-c`-shaped
+    flag is present, every later token is a candidate. A candidate that is not
+    a command line costs the caller one scan that finds nothing, while a missed
+    one is an unguarded destructive command -- so the contract is "reaches at
+    least", not "reaches exactly".
+    """
+    return nested in shellcmd.shell_c_expansions(command)[1:]
 
 
 def subs(command):
@@ -371,8 +384,8 @@ check("the command itself comes back even with nothing nested",
       shellcmd.shell_c_expansions("git push --force origin main"),
       ["git push --force origin main"])
 check("a shell's -c argument is a nested command line",
-      shellcmd.shell_c_expansions('sh -c "git push --force origin main"'),
-      ['sh -c "git push --force origin main"', "git push --force origin main"])
+      descends_to('sh -c "git push --force origin main"',
+                  "git push --force origin main"), True)
 # Only a SHELL's `-c` takes a command line. `python -c` takes Python SOURCE,
 # where `git push` is a syntax error rather than a push, so descending into it
 # would invent a command nobody ran.
@@ -383,11 +396,11 @@ check("a python -c argument is source, not a command line",
 # `-[a-z]*c` anchors the `c` last and so reads `-ec` and misses `-cx`. Short
 # options cluster in any order and `bash -cx 'git push'` really pushes.
 check("a -c inside a short-flag cluster still hands over a command line",
-      shellcmd.shell_c_expansions('bash -cx "git push --force origin main"'),
-      ['bash -cx "git push --force origin main"', "git push --force origin main"])
+      descends_to('bash -cx "git push --force origin main"',
+                  "git push --force origin main"), True)
 check("assignments and wrappers before the shell do not hide it",
-      shellcmd.shell_c_expansions('env FOO=1 /bin/bash -c "git push origin main"'),
-      ['env FOO=1 /bin/bash -c "git push origin main"', "git push origin main"])
+      descends_to('env FOO=1 /bin/bash -c "git push origin main"',
+                  "git push origin main"), True)
 check("descent is recursive and terminates",
       shellcmd.shell_c_expansions('bash -c "bash -c ' + chr(92) + '"git push' + chr(92) + '""'),
       ['bash -c "bash -c ' + chr(92) + '"git push' + chr(92) + '""',
@@ -422,15 +435,22 @@ check("depth 3 reaches all of them",
 # ai-config#1973 review. After `-c`, bash keeps parsing options and takes the
 # first non-option OPERAND, so the command string is not necessarily adjacent.
 # Each of these really runs the command -- verified directly under bash.
+# Three rounds of review found three separate holes in a model of bash's
+# option grammar, so there is no model any more: every token after a `-c`-shaped
+# flag is a candidate. Both positions of each spelling are covered here.
 for _flags, _label in (("-c -x", "a flag after -c"),
                        ("-c --", "an end-of-options marker after -c"),
                        ("-o pipefail -c", "an option VALUE before -c"),
                        ("--rcfile /dev/null -c", "a long option with a value"),
                        ("-O extglob -c", "a shopt option with a value"),
-                       ("-eo pipefail -c", "a cluster plus a valued option")):
-    check(f"the -c operand is found past {_label}",
-          shellcmd.shell_c_expansions('bash ' + _flags + ' ' + _Q + 'git push' + _Q),
-          ['bash ' + _flags + ' ' + _Q + 'git push' + _Q, 'git push'])
+                       ("-eo pipefail -c", "a cluster plus a valued option"),
+                       ("+x -c", "a `+`-prefixed set option before -c"),
+                       ("-c -o pipefail", "a valued option AFTER -c"),
+                       ("-c -O extglob", "a valued shopt option AFTER -c"),
+                       ("-c +x", "a `+`-prefixed option AFTER -c")):
+    check("the -c operand is found past " + _label,
+          descends_to('bash ' + _flags + ' ' + _Q + 'git push' + _Q, "git push"),
+          True)
 
 # The PROGRAM is resolved first, and nothing else is considered unless it is a
 # shell. A walk-back from the `-c` to the nearest non-flag token returned `sh`
@@ -450,13 +470,11 @@ check("-C is noclobber, not a command flag",
 
 # A bypass guard's coverage is decided by its weakest spelling.
 for _shell in ("ash", "mksh", "pdksh", "/bin/bash-5.2", "busybox ash"):
-    check(f"{_shell} takes -c identically",
-          shellcmd.shell_c_expansions(_shell + ' -c ' + _Q + 'git push' + _Q),
-          [_shell + ' -c ' + _Q + 'git push' + _Q, "git push"])
+    check(_shell + " takes -c identically",
+          descends_to(_shell + ' -c ' + _Q + 'git push' + _Q, "git push"), True)
 
 check("a wrapper with its own argument does not hide the shell",
-      shellcmd.shell_c_expansions('timeout 5 bash -c ' + _Q + 'git push' + _Q),
-      ['timeout 5 bash -c ' + _Q + 'git push' + _Q, "git push"])
+      descends_to('timeout 5 bash -c ' + _Q + 'git push' + _Q, "git push"), True)
 check("command_program resolves past assignments and wrappers",
       shellcmd.command_program(["env", "FOO=1", "/bin/bash", "-c", "git push"]), 2)
 check("command_program stops at a non-shell head",
@@ -468,32 +486,27 @@ check("command_program stops at a non-shell head",
 # assignment. Reverting the assignment branch leaves that case green and
 # silences the guard on this one (ai-config#1973 review, round 2 finding 4).
 check("a bare assignment before the shell does not hide it",
-      shellcmd.shell_c_expansions('FOO=1 bash -c ' + _Q + 'git push' + _Q),
-      ['FOO=1 bash -c ' + _Q + 'git push' + _Q, "git push"])
+      descends_to('FOO=1 bash -c ' + _Q + 'git push' + _Q, "git push"), True)
 check("setsid is skippable",
-      shellcmd.shell_c_expansions('setsid bash -c ' + _Q + 'git push' + _Q),
-      ['setsid bash -c ' + _Q + 'git push' + _Q, "git push"])
+      descends_to('setsid bash -c ' + _Q + 'git push' + _Q, "git push"), True)
 # A wrapper and a shell may BOTH be path-qualified. The membership test used to
 # be an exact string while SHELL_PROGRAM allowed a path prefix.
 for _wrapper in ("/usr/bin/env", "/usr/bin/nice -n 5", "/bin/nohup"):
     check(_wrapper + " does not hide the shell",
-          shellcmd.shell_c_expansions(_wrapper + ' bash -c ' + _Q + 'git push' + _Q),
-          [_wrapper + ' bash -c ' + _Q + 'git push' + _Q, "git push"])
+          descends_to(_wrapper + ' bash -c ' + _Q + 'git push' + _Q, "git push"), True)
 # The scan must stop at the SCRIPT OPERAND, but not at an option's VALUE.
-check("a script operand ends the option scan",
-      shellcmd.shell_c_expansions('bash script.sh -c ' + _Q + 'git push' + _Q),
-      ['bash script.sh -c ' + _Q + 'git push' + _Q])
-check("an option value is not the script operand",
-      shellcmd.shell_c_expansions('bash --rcfile /dev/null -c ' + _Q + 'git push' + _Q),
-      ['bash --rcfile /dev/null -c ' + _Q + 'git push' + _Q, "git push"])
-check("a cluster ending in a value-taking letter consumes its value",
-      shellcmd.shell_c_expansions('bash -eo pipefail -c ' + _Q + 'git push' + _Q),
-      ['bash -eo pipefail -c ' + _Q + 'git push' + _Q, "git push"])
+# ACCEPTED OVER-DETECTION. `bash script.sh -c "<cmd>"` hands `-c "<cmd>"` to
+# the script's own argv and runs no `<cmd>`; the descent scans it anyway.
+check("a script operand is scanned too, and costs only a scan",
+      descends_to('bash script.sh -c ' + _Q + 'git push' + _Q, "git push"), True)
+check("an option value does not stop the scan",
+      descends_to('bash --rcfile /dev/null -c ' + _Q + 'git push' + _Q, "git push"), True)
+check("a cluster ending in a value-taking letter does not stop the scan",
+      descends_to('bash -eo pipefail -c ' + _Q + 'git push' + _Q, "git push"), True)
 # A cluster CONTAINING a lowercase `c` is a `-c`, whatever case surrounds it.
 # Bare `-C` is noclobber and takes no command.
 check("a mixed-case cluster containing c still hands over a command line",
-      shellcmd.shell_c_expansions('bash -cC ' + _Q + 'git push' + _Q),
-      ['bash -cC ' + _Q + 'git push' + _Q, "git push"])
+      descends_to('bash -cC ' + _Q + 'git push' + _Q, "git push"), True)
 check("bare -C is noclobber, not a command flag",
       shellcmd.shell_c_expansions('bash -C ' + _Q + 'git push' + _Q),
       ['bash -C ' + _Q + 'git push' + _Q])

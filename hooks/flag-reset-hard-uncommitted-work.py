@@ -430,9 +430,43 @@ def offending(command):
         return match
     for piece in pieces[1:]:
         match = offending_here(piece)
-        if match is not None and match[2] is None:
-            return match
+        if match is None:
+            continue
+        # NESTED_UNSCOPED, not the matched kind. The `paths is None` filter
+        # this replaces narrowed the classification and left the REPORT alone,
+        # and the report is what was wrong: `_tracked_changes` runs
+        # `git status` in the hook's own directory whatever piece matched, so
+        # `sh -c "cd OTHER && git reset --hard"` listed THIS repo's dirty files
+        # as what the command would discard. The classification is
+        # directory-dependent too -- `_looks_like_path` resolves a bare word
+        # with `git rev-parse` here -- so filtering on its result could not
+        # have fixed it either (ai-config#1973 review, round 3, findings 4
+        # and 5).
+        #
+        # A nested piece is worth flagging and not worth enumerating. The
+        # caller emits a warning that names the construct and says which
+        # repository it cannot see, with no file list.
+        return "nested-unscoped", match[1], None
     return None
+
+
+NOTE_NESTED_UNSCOPED = """\
+A destructive discard is wrapped in a shell's `-c` argument:
+
+    {segment}
+
+This guard cannot list what would be lost. Which repository that nested shell
+starts in depends on `cd`s the outer shell runs first, and reading the working
+tree from here would name THIS repository's files for a command acting on
+another one -- which is worse than silence, because it names a cause and
+prescribes a fix.
+
+Before running it, check the target repository yourself:
+
+    git -C <target> status --porcelain
+
+Running the discard in its own Bash call, unwrapped, lets this guard answer
+properly."""
 
 
 def _tracked_changes(paths=None):
@@ -574,6 +608,22 @@ def main() -> int:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
     kind, segment, paths = match
+
+    if kind == "nested-unscoped":
+        # A destructive discard inside a nested shell. No file list, because
+        # this hook cannot know which repository that shell starts in: the
+        # answer depends on `cd`s the outer shell ran, and reading `git status`
+        # here named THIS repo's dirty files for a command acting on another
+        # (ai-config#1973 review, round 3). Naming the construct is what it can
+        # honestly do.
+        note = NOTE_NESTED_UNSCOPED.format(segment=segment)
+        summary = ("A destructive discard is wrapped in a nested shell; this "
+                   "guard cannot see which repository it runs in.")
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "additionalContext": note}}))
+        print(summary, file=sys.stderr)
+        return 0
 
     sim_dirty = os.environ.get("SIMULATE_DIRTY")
     if sim_dirty is not None:

@@ -646,13 +646,22 @@ _MULTICALL = re.compile(r"\A(?:[\w.@/-]*/)?busybox\Z", re.I)
 # `<cmd>`, and an all-lowercase cluster arm cannot express "contains a
 # lowercase `c`" (ai-config#1973 review, round 2 finding 8).
 #
+# `--command` was carried over from the reference implementation and removed:
+# no shell in SHELL_PROGRAM accepts it (`bash --command x` reports "invalid
+# option"), so it only ever produced a false DENY. Reusing a pattern
+# structurally without checking that each element transfers is exactly what
+# `shared/workflow/check-purpose-before-reusing.md` is about.
+#
+# `+` is accepted alongside `-` because every shell here spells its `set`
+# options both ways.
+#
 # `-check` is deliberately matched, unlike in the reference implementation:
 # bash parses it as `-c -h -e -c -k`, so it really is a `-c`. Over-detecting a
 # flag is bounded here because the PROGRAM is checked first AND the scan stops
 # at the script operand -- without that second stop, `bash script.sh -c "x"`
 # was refused for a `-c` belonging to the script's own argv (round 2 finding
 # 5).
-DASH_C_FLAG = re.compile(r"\A(?:--command|-[A-Za-z]*c[A-Za-z]*)\Z")
+DASH_C_FLAG = re.compile(r"\A[-+][A-Za-z]*c[A-Za-z]*\Z")
 
 # Tokens that may precede the program without changing what runs.
 #
@@ -664,38 +673,21 @@ DASH_C_FLAG = re.compile(r"\A(?:--command|-[A-Za-z]*c[A-Za-z]*)\Z")
 _DESCENT_SKIPPABLE = COMMAND_WRAPPERS | {"setsid"}
 
 
-# Shell options that consume the NEXT token as their value, so that token is
-# not the script operand. Enumerated rather than inferred: bash's own option
-# grammar is the only thing that decides this, and the list is short and
-# stable. Over-listing costs a token of scan; under-listing hides a push.
-_SHELL_VALUE_OPTIONS = {"-o", "+o", "-O", "+O", "--rcfile", "--init-file"}
-# A short-flag CLUSTER whose last letter takes a value, so `-eo pipefail`
-# consumes `pipefail` exactly as `-o pipefail` does.
-_SHELL_VALUE_CLUSTER = re.compile(r"\A[-+][A-Za-z]*[oO]\Z")
-
-
 def command_program(argv):
     """Index of ARGV's program token, for the purpose of finding a SHELL.
 
     Not a general program resolver, and the summary used to read as one. When
     the wrapper look-ahead finds no shell, this returns the index of the
     wrapper's first ARGUMENT rather than of the program:
-    `command_program(["timeout", "5", "git", "push"])` is 1, which is `"5"`
-    (ai-config#1973 review, round 2 finding 10). That is harmless to the only
-    caller, which rejects a non-shell immediately, and would mislead any other.
+    `command_program(["timeout", "5", "git", "push"])` is 1, which is `"5"`.
+    That is harmless to the only caller, which rejects a non-shell
+    immediately, and would mislead any other.
 
     Leading `VAR=value` assignments and wrappers are skipped. A wrapper with
     its own arguments (`sudo -u me bash`, `timeout 5 bash`, `env -i bash`) is
     handled by looking ahead a bounded distance for a shell rather than by
     modelling each wrapper's option grammar -- the same trick `strip_env` uses,
     and nothing is consumed unless a shell is actually found.
-
-    This REPLACES a walk-back from the `-c` flag to the nearest token that was
-    not a flag. That design had no notion of command position, so
-    `echo sh -c "git push --force origin main"` resolved a head of `sh` and
-    produced a hard refusal on a command that executes nothing; and an option's
-    VALUE stopped the walk, so `bash -o pipefail -c "..."` resolved `pipefail`
-    and descended into nothing at all. Both measured (ai-config#1973 review).
     """
     index, after_wrapper = 0, False
     while index < len(argv):
@@ -704,11 +696,10 @@ def command_program(argv):
             index += 1
             after_wrapper = False
             continue
-        # Basename first. The membership test used to be an exact string
-        # while SHELL_PROGRAM allows a `(?:[\w.@/-]*/)?` prefix, so
-        # `/bin/sh -c` was followed and `/usr/bin/env bash -c` was not --
-        # measured silent on both guards while really running the push
-        # (ai-config#1973 review, round 2 finding 1).
+        # Basename first. The membership test used to be an exact string while
+        # SHELL_PROGRAM allows a path prefix, so `/bin/sh -c` was followed and
+        # `/usr/bin/env bash -c` was not -- measured silent on both guards
+        # while really running the push (ai-config#1973 review, round 2).
         if os.path.basename(token) in _DESCENT_SKIPPABLE:
             index += 1
             after_wrapper = True
@@ -726,54 +717,42 @@ def command_program(argv):
     return index
 
 
-def nested_shell_command(argv):
-    """The command line a shell in ARGV is handed via `-c`, or `None`.
+def nested_shell_commands(argv):
+    """Every token in ARGV that a shell there might be handed as a command.
 
-    The program is resolved FIRST, and nothing else is considered unless it is
-    a shell. That ordering is what keeps an over-wide `-c` match harmless.
+    STOP MODELLING THE OPTION GRAMMAR. Three rounds of review found three
+    separate holes in it, each a real push executing while both guards stayed
+    silent: an operand assumed adjacent to `-c`; an option's VALUE read as the
+    script operand (`bash -o pipefail -c`); a `+`-prefixed set option read the
+    same way (`bash +x -c`), and a value-taking option AFTER the `-c`
+    (`bash -c -O extglob`) whose value was returned as the command. Each fix
+    named the next gap in its own comment. `bash --`, `bash -oc` and
+    `bash --command` were the over-blocks the same modelling produced.
 
-    After the `-c`, bash keeps parsing options and takes the first non-option
-    OPERAND, so the operand is not necessarily adjacent: `bash -c -x '<cmd>'`,
-    `bash -c -- '<cmd>'` and `bash -c -O extglob '<cmd>'` all run `<cmd>`, and
-    an adjacency assumption handed the descent `-x` and missed every one of
-    them (ai-config#1973 review).
+    The enumeration is not finishable, and it does not have to be, because
+    over-detection here is nearly free. A candidate that is not really a
+    command line is handed to the caller's own analysis, which finds no `git`
+    in it and reports nothing. The cost of a wrong guess is one wasted scan;
+    the cost of a missed one is an unguarded destructive command. So when the
+    program is a shell and a `-c`-shaped flag appears anywhere in its argv,
+    EVERY later token is a candidate.
+
+    Returns a list, possibly empty, in argv order.
+
+    What this over-detects, stated rather than discovered later: `bash -- -c
+    "<cmd>"` runs no `<cmd>` (the `--` makes `-c` the script name and bash
+    exits 127), and `bash script.sh -c "<cmd>"` hands `-c "<cmd>"` to the
+    script's own argv. Both are scanned, and both cost only a scan unless the
+    token really does carry a gated command -- in which case blocking a command
+    that executes nothing is the cheap error.
     """
     index = command_program(argv)
     if index >= len(argv) or not SHELL_PROGRAM.match(argv[index]):
-        return None
-    saw_dash_c = False
-    expect_value = False
-    for token in argv[index + 1:]:
-        if not saw_dash_c:
-            if expect_value:
-                expect_value = False
-                continue
-            if DASH_C_FLAG.match(token):
-                saw_dash_c = True
-                continue
-            if token in _SHELL_VALUE_OPTIONS or _SHELL_VALUE_CLUSTER.match(token):
-                expect_value = True
-                continue
-            # The first non-option word that is not an option's VALUE is the
-            # script operand, and everything after it is the script's own argv.
-            # Scanning past it refused `bash script.sh -c "<push>"` for a `-c`
-            # belonging to the script -- a hard DENY on a command that runs the
-            # script and pushes nothing (ai-config#1973 review, round 2
-            # finding 5).
-            #
-            # The value test has to come first, and getting that order wrong
-            # trades an over-block for a HOLE: `bash --rcfile /dev/null -c
-            # "<push>"` and `bash -O extglob -c "<push>"` both really push, and
-            # reading their values as the script operand stopped the scan
-            # before the `-c`. Over-detecting a value-taker costs one more
-            # token of scan; under-detecting one hides a push.
-            if token != "--" and not (token.startswith("-") and len(token) > 1):
-                return None
-            continue
-        if token == "--" or (token.startswith("-") and len(token) > 1):
-            continue
-        return token
-    return None
+        return []
+    rest = argv[index + 1:]
+    if not any(DASH_C_FLAG.match(token) for token in rest):
+        return []
+    return [token for token in rest if not DASH_C_FLAG.match(token)]
 
 
 def shell_c_expansions(command, max_depth=3):
@@ -856,10 +835,10 @@ def shell_c_expansions(command, max_depth=3):
         if argvs is None:
             continue  # unparseable: no children, and the rest still stands
         for argv in argvs:
-            nested = nested_shell_command(argv)
-            if nested is None or nested in seen:
-                continue
-            seen.add(nested)
-            found.append(nested)
-            frontier.append((nested, depth + 1))
+            for nested in nested_shell_commands(argv):
+                if nested in seen:
+                    continue
+                seen.add(nested)
+                found.append(nested)
+                frontier.append((nested, depth + 1))
     return found

@@ -1116,27 +1116,28 @@ mid-session with no self-review yet dispatched, and `git push --dry-run
 --repo=/nonexistent origin main` was the fallback that measured git's `--repo`
 precedence without a real push or the override.)
 
-## `FETCH_HEAD` is a scratch file, not a ref, and every fetch rewrites it
+## `FETCH_HEAD` is a file git replaces, and `rev-parse` reads its FIRST line
 
-A comparison whose operand is `FETCH_HEAD` resolves to whatever the **most
-recent** fetch wrote, so an intervening fetch --- including an unrelated one,
-or the second ref of a multi-ref fetch --- silently swaps it.
-Comparing a commit against itself does not error;
-it reports no conflict and no difference, which is the reading you were hoping
-for.
+Measured git 2.43.0, in a throwaway clone:
 
-Pin it in the same command that fetches it:
+- `git fetch origin feat main` writes **both** refs, one per line, in the order
+  named, and `git rev-parse FETCH_HEAD` returns the **first**.
+  Reversing the arguments reverses the answer.
+  So name the ref you want first; a multi-ref fetch is not itself the hazard.
+- A **later** fetch replaces the file, so an operand set up earlier silently
+  re-points.
+  This is the hazard.
+- A fetch naming a ref that does not exist truncates `.git/FETCH_HEAD` to zero
+  bytes, and `git rev-parse --verify FETCH_HEAD` then fails loudly instead of
+  returning a stale value --- the safe direction, and where the routine
+  `couldn't find remote ref` case after a squash-merge auto-delete lands.
+- `--dry-run` and `--no-write-fetch-head` leave the prior value intact.
 
-```bash
-git fetch origin "$ref" && sha=$(git rev-parse --verify FETCH_HEAD)
-```
+Resolve and **print** the SHA in the same command as the fetch, then use the
+printed SHA: `shared/workflow/fully-clean.md` records that a shell variable does
+not survive into a later tool call, so `$sha` is not a pin across a multi-call
+sequence.
 
-Measured 2026-09-15 on
-[ai-config#3687](https://github.com/Morrison-Lab/ai-config/pull/3687)
-(ai-config#3704).
 [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)'s
-"A ref that names a different commit each time you read it" carries the full
-case and the pattern/anti-pattern pair.
-
-- **Do:** capture the SHA immediately after the fetch, or name the SHA outright.
-- **Don't:** reuse `FETCH_HEAD` after any later fetch.
+"A ref that resolves to a different commit than it did a moment ago" carries the
+worked case and the pattern/anti-pattern pair (ai-config#3704).

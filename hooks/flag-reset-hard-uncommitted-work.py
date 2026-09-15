@@ -62,16 +62,19 @@ misfires is worse than a missing one" -- no `permissionDecision`, ever.
       "Forced switches" below)
   M4  `git status --porcelain`, scoped to the whole tree for `reset --hard`
       or to the resolved pathspecs for `checkout`/`restore`, reports at
-  M5  a command line nested in a shell's `-c` argument is matched too, via
-      `scripts/lib/shellcmd.py`'s `shell_c_expansions`. A nested piece
-      contributes only the kinds decided LEXICALLY -- `reset-hard` and
-      `checkout-force`, which discard the whole tracked tree wherever they run.
-      A `checkout`/`restore` pathspec is not one of them: classifying a bare
-      word as a pathspec runs `git rev-parse` in this hook's own directory, and
-      for a nested piece that is the wrong repository (ai-config#1973 review).
       least one entry that is NOT untracked (`??`) -- i.e. at least one
       tracked file in scope has a staged or unstaged change relative to
       HEAD, which the command will discard
+  M5  a command line nested in a shell's `-c` argument is matched too, via
+      `scripts/lib/shellcmd.py`'s `shell_c_expansions`. A nested piece
+      contributes only the kinds decided LEXICALLY -- `reset-hard` and
+      `checkout-force`, which discard the whole tracked tree wherever they
+      run. A `checkout`/`restore` pathspec is not one of them: classifying a
+      bare word as a pathspec runs `git rev-parse` in this hook's own
+      directory, and for a nested piece that is the wrong repository
+      (ai-config#1973 review). A piece that contains no `cd` provably starts
+      where the outer command did, so it takes the ordinary local reading --
+      M4's status gate included -- rather than the unscoped note
 
 ## Ref-vs-path disambiguation
 

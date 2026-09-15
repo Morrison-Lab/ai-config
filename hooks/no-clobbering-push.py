@@ -282,16 +282,19 @@ Deny additionally requires a `--force` or `-f` token and no
 push itself or the WRAPPER around it: `ALLOW_FORCE_PUSH=1 bash -c "<push>"`
 really sets the variable for the inner `git`, and reading it only from the same
 simple command refused a wrapped push with no way to comply
-(ai-config#1973 review).
+(ai-config#1973 review). An `export ALLOW_FORCE_PUSH=1` in an EARLIER simple
+command is honoured too, since an export really does reach every later command
+in the same shell; one written after the push is not, since bash has not run
+it yet. Deny deliberately does NOT look at `--force-with-lease`, for the
+reason given above: `--force` disables the lease check, so the pair is a plain
+force push.
 
   M5  a command line nested in a shell's `-c` argument is matched too, via
-      `scripts/lib/shellcmd.py`'s `shell_c_expansions`. A nested piece can
-      only ever produce a REFUSAL, never a reading: its starting directory
-      depends on `cd`s in the outer shell and is not knowable here, and a
-      reading against the wrong repository is what `evaluate`'s Pass 2 already
-      declines to do. It deliberately does NOT look at
-`--force-with-lease`, for the reason given above: `--force` disables the lease
-check, so the pair is a plain force push.
+      `scripts/lib/shellcmd.py`'s `shell_c_expansions`, and `env -S`'s single
+      argument counts as one. A nested piece can only ever produce a REFUSAL,
+      never a reading: its starting directory depends on `cd`s in the outer
+      shell and is not knowable here, and a reading against the wrong
+      repository is what `evaluate`'s Pass 2 already declines to do.
 
 `--mirror` and `--all` are deliberately out of scope: they push ref sets rather
 than one branch, so the single-branch reading below would misdescribe them.
@@ -979,6 +982,18 @@ def evaluate(command, base_cwd=None, deny_only=False,
              assume_override=False):
     """`('deny', reason)`, `('warn', context)`, or `None`.
 
+    `deny_only` runs Pass 1 and stops: refusals are decidable from the command
+    TEXT, while warnings need `git ls-remote` reads against a directory. A
+    NESTED piece has no knowable directory, so it gets this.
+
+    `assume_override` treats the caller as having supplied
+    `ALLOW_FORCE_PUSH=1`, which is how an override written before a WRAPPER
+    reaches the push inside it -- `_lead_prefix` reads an assignment only from
+    a simple command's own head, and the nested piece's text does not carry
+    the prefix. It DISABLES the deny path, so it is the one argument here that
+    changes a verdict rather than narrowing which verdicts are reachable, and
+    `evaluate_every_shell` is its only caller.
+
     `base_cwd` is the directory the Bash call starts in -- the payload's own
     `cwd` -- and a `cd` earlier in the same compound command moves it, as the
     push's own `git -C` moves it again. It is threaded through every read
@@ -1387,7 +1402,18 @@ def evaluate_every_shell(command, base_cwd=None):
     # deliberately loose, matching this module's existing choice on the same
     # question: "a refused override sends the author looking for a bypass".
     override = _override_before_wrapper(command)
-    for piece in [command] + pieces:
+    # The OUTER command is deliberately not in this loop. It used to be, with
+    # a `piece is not command` guard keeping the carried override off it --
+    # and that guard was unobservable, because the unconditional
+    # `evaluate(command, base_cwd)` below re-checks the outer command anyway
+    # without the flag, so an over-broad carry could only ever delay the same
+    # refusal by one call. Dropping the guard left the suite at 78/78, which
+    # is this branch's own definition of an untested clause
+    # (ai-config#1973 review, round 4 finding 10).
+    #
+    # Iterating the nested pieces only removes both the guard and the
+    # redundant pass, and says plainly what the loop is for.
+    for piece in pieces:
         # An override carried onto a nested piece is passed as a FLAG, not
         # prefixed to the text. `VAR=1 bash -c "a && b"` exports the variable
         # to every command in the piece, while `_lead_prefix` reads one only
@@ -1396,9 +1422,8 @@ def evaluate_every_shell(command, base_cwd=None):
         # (ai-config#1973 review, round 3 finding 7). Rebuilding the text to
         # prefix each simple command means re-serializing a parse, which is the
         # kind of round trip that loses a `&&`.
-        carried = override and piece is not command
         refusal = evaluate(piece, base_cwd, deny_only=True,
-                           assume_override=carried)
+                           assume_override=override)
         if refusal is not None:
             return refusal
 

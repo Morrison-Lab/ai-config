@@ -748,7 +748,17 @@ def nested_shell_commands(argv):
     in it and reports nothing. The cost of a wrong guess is one wasted scan;
     the cost of a missed one is an unguarded destructive command. So when the
     program is a shell and a `-c`-shaped flag appears anywhere in its argv,
-    EVERY later token is a candidate.
+    every token after the PROGRAM is a candidate, except the `-c`-shaped
+    tokens themselves.
+
+    Stated that precisely because the shorter "EVERY later token" is wrong in
+    both directions, and this sentence is the whole specification of the
+    design. Tokens BEFORE the flag are candidates too:
+
+        >>> nested_shell_commands(["bash", "-o", "pipefail", "-c", "git push"])
+        ['-o', 'pipefail', 'git push']
+
+    and a second `-c` AFTER the flag is not one (round 4 finding 13).
 
     Returns a list, possibly empty, in argv order.
 
@@ -848,6 +858,15 @@ def shell_c_expansions(command, max_depth=3):
     A shell function, an `eval`, a command assembled from a variable, a remote
     command sent by `ssh`, a `-c` operand built by expansion, and any shell not
     in SHELL_PROGRAM all yield nothing extra.
+
+    So does an interpreter that SHELLS OUT rather than taking a command line:
+    `python3 -c "import os; os.system('git push --force origin main')"` and
+    `perl -e "system(q(...))"` run the push and yield nothing here. That is
+    deliberate -- a Python `-c` argument is SOURCE, and reading it as shell
+    once made a bare path inside it look like an execution -- but it is named
+    because the issue this closes is titled around an interpreter's `-c`, and
+    a reader could otherwise take the silence for coverage (round 4
+    finding 9).
 
     So does a wrapper chain longer than `WRAPPER_ARG_WINDOW` tokens --
     `sudo -u me -H -E -i -n bash -c "<push>"` measured silent -- and a wrapper

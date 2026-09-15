@@ -447,16 +447,19 @@ Where the harness backgrounds it regardless --- #3045's two variants, below --- 
 (Measured on ucdavis/lbt, 2026-09-15, with the plugin enabled.
 Dispatching `adversarial-reviewer` returns an errored result reading "Agent type 'adversarial-reviewer' not found.
 Available agents: claude, claude-code-guide, Explore, general-purpose, Plan, statusline-setup".
-The session then ran foreground `general-purpose` fallback reviews, each push was refused with the second message anyway, and each used the override.
-Diagnosed the next day by the step this file prescribes below --- running `read_latest_review` over that session's own JSONL, which returned `(None, None, True)`: the dispatch was recognized, and **none of those reports contained a `Verdict:` line at all**, `grep -c Reviewed-Commit` over the transcript returning 0.
-So the guard was right on every refusal and each override was unnecessary.
-The lesson is about the brief: a fallback dispatch has to *ask* for the verdict and fingerprint lines, because a persona file supplies them and a `general-purpose` prompt does not.)
+The session then ran foreground `general-purpose` fallback reviews and pushed under the override anyway, and its four refusals split evenly between the two messages above.
+Two were the first message, because those prompts opened "You are an adversarial reviewer" and `REVIEW_PROMPT_RE` needs the word to end at `review`.
+Two were the second, from prompts the regex did match --- and `read_latest_review` over that session's own JSONL returns `(None, None, True)` with `grep -c Reviewed-Commit` at 0, so those reports carried no verdict line at all.
+Both branches were the brief rather than the guard, which was right every time: a fallback dispatch has to name the review in words the regex matches, and has to *ask* for the verdict and fingerprint lines, because a persona file supplies them and a `general-purpose` prompt does not.)
 
 **A subagent cannot discharge this guard at all, and the reason is where the transcript lives.**
 Measured 2026-09-15 in the Claude Code desktop harness: an `Agent` dispatched *by a subagent* writes both the call and its report to `<session>/subagents/agent-<id>.jsonl`, while the guard reads the session JSONL at the top level.
-Six clean reviews, each ending in a conforming `Verdict:`/`Reviewed-Commit:` pair, were reachable only through those per-subagent files --- `grep -rl "Reviewed-Commit: <sha>"` found them there, and `grep -c Reviewed-Commit` on the session transcript returned 0.
-This is the #3045 class rather than the formatting class: the verdict exists, is about the right commit, and is unreadable to the guard by construction.
-So a subagent that reviews before pushing takes the override, and says in its report which reviews produced which verdicts and where they live.
+Six conforming reviews of one branch --- five `Needs work` and a clean sixth --- were reachable only through those per-subagent files, with `grep -c Reviewed-Commit` on the session transcript returning 0.
+So the clean verdict exists, is about the right commit, and is unreadable to the guard by construction.
+This is a fourth member of the list above rather than #3045 itself, whose dispatch never returns synchronously.
+Here it returns synchronously to the subagent, which is not who the guard is reading.
+Note which denial that produces: with no top-level dispatch, `saw_reviewer_call` is false, so it is the **first** message, and the Don't above does not bite.
+A subagent that reviews before pushing takes the override, and says in its report which reviews produced which verdicts and where they live.
 
 Note what that CLI fallback does to the pre-push guard, since the two rules meet here and pull opposite ways.
 A CLI's verdict never becomes an `Agent` call's `tool_result`, so the guard cannot see it however real the review was.

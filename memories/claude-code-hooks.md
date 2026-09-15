@@ -596,8 +596,26 @@ A hook that instead does a path-relative import of `scripts/lib/<module>.py` (re
 This is worse than the ad-hoc `/tmp cp` case above in one respect: it turns up inside the repo's own COMMITTED mutation harnesses, which read as already correct, so nothing prompts re-checking them.
 The bug then ships with the harness rather than being introduced by someone copying a hook elsewhere by hand.
 
-The population to check is derivable rather than memorable: any harness that writes the hook under test to a temp directory, paired with any hook importing something that is not a sibling hook.
-`grep -ln "tempfile\|mktemp" hooks/test-*.py` gives the first half and `grep -ln "scripts.*lib" hooks/*.py` the second; the intersection is the exposure.
+The population to check is derivable rather than memorable: a hook that imports a package path, whose OWN harness writes it to a temp directory.
+
+Pairing the two greps by NAME is what makes that a derivation, and a first version of this entry intersected their outputs instead -- which computes nothing, since `hooks/test-X.py` and `hooks/X.py` never share a filename.
+It returned a plausible-looking three files for an unrelated reason.
+
+```bash
+for f in hooks/*.py; do
+  case "$f" in hooks/test-*) continue;; esac
+  grep -qE '"scripts", "lib"|from scripts\.lib\.' "$f" || continue
+  t="hooks/test-$(basename "$f" .py).py"
+  [ -f "$t" ] && grep -qE 'tempfile|mktemp' "$t" && echo "$f"
+done
+```
+
+BOTH import spellings, and the second is why: `flag-unread-commit-citation.py`
+inserts the repo ROOT on `sys.path` and writes `from scripts.lib.fences import
+...`, while the other twelve join `"scripts", "lib"` and import the module
+bare.
+A grep for either spelling alone is off by one, which is the concrete reason
+this is a loop in the file rather than a number in someone's head.
 
 The remedy differs from `_sibling()`'s "relocate the mutant": there is no fixed sibling basename to sit next to, since the import is a package path rather than another hook's filename.
 Put the real `scripts/lib` directory on the mutant subprocess's own `PYTHONPATH` instead of trying to make the temp directory look like `hooks/`:
@@ -620,4 +638,6 @@ That pattern means the mutant is not running the code under test at all -- the i
 A single clause flipping unexpected cases is a test problem.
 ALL of them flipping the same new cases is an import problem.
 
-Twelve non-test hooks already import `scripts/lib` on `main` today, so the exposure is live and growing whether or not any particular wiring lands.)
+Run on `main` on 2026-09-14, the loop printed 12 files, out of 13 non-test hooks importing `scripts/lib` at all.
+Both figures are outputs of the loop above rather than remembered counts, and a first draft of this entry carried a remembered "twelve importers" that was wrong by one.
+Re-derive before citing either.)

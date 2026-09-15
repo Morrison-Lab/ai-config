@@ -648,8 +648,10 @@ second question.
 
 (The case that prompts this rule is `hooks/no-empty-promise.py`'s
 `_poller_executed`, which is on `main` and readable today.
-Its own docstring names it the reference implementation, records four review
-rounds spent on its class, and states the direction its give-up branches take:
+Its own comments name it the reference implementation, record THREE review
+rounds spent on its class -- `hooks/no-empty-promise.py` says so at three
+separate lines, including the one quoted just below -- and state the direction
+its give-up branches take:
 "a missed arming is visible to its author and one plainer command from
 clearing, whereas a false discharge defeats the guard silently".
 

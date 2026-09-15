@@ -701,31 +701,66 @@ $ echo $?
 0
 ```
 
-So read the output either way.
+So read the output either way --- and read the right line.
 `No lines missing semantic breaks.` is the only clean verdict this script
-emits, and it is printed only on a run that actually diffed something.
+emits, and it is **not** evidence that anything was diffed:
+a base ref that resolves but selects nothing prints it over an empty diff.
 
-This is the fifth recorded false clean from this checker, and the first in
-which the check never ran.
-The four already recorded --- ai-config#752, `memories/git-diffing.md`'s two,
-and ai-config#2381 --- each describe a run that examined a real diff and
-examined the wrong one;
-this one examined nothing and said so.
-(Reported 2026-09-15 during the post-merge pass for
-[ai-config#3635](https://github.com/Morrison-Lab/ai-config/pull/3635) and
-[#3682](https://github.com/Morrison-Lab/ai-config/pull/3682): a local run with
-the variable unset was read as a pass, the push went out, and CI's own
+```console
+$ NLB_BASE_REF=HEAD python3 scripts/vendor/gha-check-new-line-breaks.py
+Checking for missing semantic line breaks (lines added since HEAD)
+
+Examined 0 added line(s) across 0 file(s) (scope: committed).
+No lines missing semantic breaks.
+```
+
+The line that carries the information is the one above it.
+`Examined N added line(s) across M file(s)` is the script's own report of what
+it looked at, so a clean verdict means something only when `N` is the size of
+the diff you meant to check --- which is the same reading
+[`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md) asks
+for a zero anywhere else: pair it with the count that shows the detector ran.
+
+This is at least the seventh recorded false clean from this checker, and the
+first in which it **emitted no verdict at all**.
+The six already on record, each in a different shape:
+ai-config#730, #732, #752 and #2381, a pre-commit run over an empty diff
+(`memories/git-diffing.md` for the first two, this file for the other two);
+ai-config#2542, the line-numbers-from-HEAD against content-from-the-tree
+mismatch, which is the dirty-tree section further down this file; and
+ai-config#2074, a green push-event run standing in for the pull_request-event
+run that is the PR's actual verdict.
+
+That is the novelty, and it is narrower than "the check never ran".
+The pre-commit family examined nothing either:
+with nothing committed, `HEAD` equals the base ref and the diff is empty.
+What every one of them still produced was the clean verdict string, over that
+empty diff, which is what got read.
+Here the script declined to diff at all, printed `::warning::Skipping` and no
+verdict, and the false clean came from reading **exit 0** as one.
+(Measured 2026-09-15 on
+[ai-config#3677](https://github.com/Morrison-Lab/ai-config/pull/3677): a local
+run with the variable unset was read as a pass, the push went out, and CI's own
 `new-line-breaks` job --- which does supply a base ref --- flagged the line the
 local run would have caught.
-The two console blocks above are this entry's own measurement;
-the incident is the reported occasion for taking it.)
+`c712ad9b`, "break the shellcmd population sentence at its clauses", is the
+follow-up commit that fixed it.
+The three console blocks above are this entry's own measurements, taken here
+rather than recovered from that run;
+the incident is the occasion for taking them.)
 
 - **Do:** set `NLB_BASE_REF` on every local invocation, per the command block
   above, and read the script's output rather than its exit status.
 - **Do:** treat any line beginning `::warning::Skipping` as "the check did not
   run", whatever the status was.
+- **Do:** read the `Examined N added line(s) across M file(s)` line and check
+  `N` against the diff you meant to check;
+  that is the only line that distinguishes a clean run from a vacuous one.
 - **Don't:** read exit 0 from this script as a pass --- a skip and a clean run
   are indistinguishable by status.
+- **Don't:** read `No lines missing semantic breaks.` as a pass either;
+  it prints over an empty diff, which is how four of the six already on record
+  happened.
 - **Don't:** assume supplying the variable is sufficient;
   an unfetchable ref skips with it set, and the reason string is the only place
   that difference appears.

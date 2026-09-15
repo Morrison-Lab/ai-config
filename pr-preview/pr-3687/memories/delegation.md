@@ -255,7 +255,23 @@ gh release download 1.1.24 -R google-antigravity/antigravity-cli \
 ```
 
 It authenticated with no extra step, reusing the Antigravity IDE's own login.
+
 `agy --version` reports `1.1.24`.
+
+**The binary is not necessarily on `PATH`, and that is how a session silently stops using it.**
+Measured 2026-09-15 on the same machine.
+`command -v agy` fails in the Bash tool, and `Get-Command agy` fails in PowerShell.
+`agy.exe` is nonetheless installed and working at `$env:LOCALAPPDATA/agy/bin/agy.exe`, not the `~/.local/bin/agy.exe` the install steps above place it at --- so an install done another way lands elsewhere.
+It reported version `1.2.3` there, against the `1.1.24` those steps record.
+
+The failure this produces is silent by construction.
+A session that probes `command -v agy`, or that simply never probes, concludes the CLI is unavailable and routes every dispatch to a Claude subagent instead --- which costs this account's quota and looks exactly like a session with no delegation budget.
+Nothing reports the substitution, and the whole session can run that way, as one did before this was measured.
+
+- **Do:** search for the binary before concluding it is absent --- `Get-ChildItem $env:LOCALAPPDATA -Filter "agy*" -Recurse -Depth 3` found it in seconds.
+- **Do:** invoke it by absolute path when it is off `PATH`, rather than treating an unresolved name as an unavailable tool.
+- **Don't:** read a failed `command -v` as a delegation budget being unavailable;
+  that is the degrade-silently-to-a-worse-fallback shape [`use-mcp-servers`](../shared/workflow/use-mcp-servers.md) names.
 
 **`agy models` lists a real roster**, unquoted here since a model roster is exactly the kind of fact a vendor changes without notice --- run the command rather than trusting a pasted list.
 As of 2026-09-02 it included `gemini-3.8-flash-{high,medium,low}`, `gemini-3.7-flash-{high,medium,low}`, `gemini-3.6-flash-{high,medium,low}`, `gemini-3.1-pro-{high,low}`, `claude-sonnet-4-6`, `claude-opus-4-6-thinking`, and `gpt-oss-120b-medium`.

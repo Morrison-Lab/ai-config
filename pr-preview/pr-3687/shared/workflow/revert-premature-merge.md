@@ -93,8 +93,14 @@ Reverting would have restored two executing bypasses of
 and both reproduced running a real `gh pr merge` against a stub while the hook
 returned `allow`.
 The same gate reported no executing bypass remaining at that head, across
-29,813 differential strings and 5,034 constructed executing shapes, and every
-one of the seven findings was a documentation or coverage defect.
+29,813 differential strings and 5,034 constructed executing shapes.
+Six of the seven findings were documentation or coverage defects;
+the seventh was source hygiene ---
+a dropped `_body_end` underscore that #3682 restored in code.
+None was a behaviour change, which is the property the decision turned on,
+and it is worth stating as the property rather than as the tally: "all
+documentation" would have been a stronger claim than the evidence supported
+and no more relevant to the choice.
 So the revert was the strictly worse action, and
 [#3681](https://github.com/Morrison-Lab/ai-config/issues/3681) ->
 [#3682](https://github.com/Morrison-Lab/ai-config/pull/3682) closed all seven on

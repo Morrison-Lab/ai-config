@@ -810,8 +810,15 @@ def _proc_subst_regions(text: str) -> list:
     always follows its parent. `parent` indexes back into this same list, or is
     `-1` at the top level.
 
-    A candidate with no matching `)` FAILS CLOSED: its body is taken to run to
-    the end of the text.
+    A candidate with no matching `)` has its BODY taken to run to the end of
+    the text, which is the fail-closed direction for `bash <(...)` and the
+    fail-OPEN direction for `< <(...) bash` -- the extended body swallows the
+    trailing executor, so the region is never classified as executed and the
+    span list comes back empty rather than longer. An earlier version of this
+    paragraph called the behaviour fail-closed without qualification, four
+    paragraphs after the note that records the asymmetry. The seventh tuple
+    field says whether a closer was actually recorded, and `_depth_view` reads
+    it so the blanking does not reach past the region.
 
     The earlier version dropped it, justified as "bash rejects the command
     outright". That is a claim about bash, and the condition is a claim about
@@ -851,8 +858,20 @@ def _proc_subst_regions(text: str) -> list:
         # The premise the whitelist rests on -- "extending a body is the
         # fail-closed direction" -- is therefore true only once blanking
         # stops at the real closer.
+        #
+        # `real_end` alone was not enough, and that is this fix's own missed
+        # half. `closes.get(open_idx, len(text))` DEFAULTS to end of text, so
+        # for a candidate with no recorded closer `real_end` IS the extended
+        # end and blanking erased the trailing executor exactly as before.
+        # Two routes reach that state with valid bash -- a `case` pattern's
+        # `)`, and `_paren_matches` popping the closer on quote imbalance --
+        # and each ran a real merge while the hook allowed it, with the
+        # leading-executor twin of the same command blocking (ai-config#3635
+        # pre-merge gate). `closed` is what lets `_depth_view` tell the two
+        # apart.
         regions.append((lt_idx, open_idx + 1, close_idx,
-                        len(stack), stack[-1] if stack else -1, real_end))
+                        len(stack), stack[-1] if stack else -1, real_end,
+                        open_idx in closes))
         stack.append(len(regions) - 1)
     return regions
 
@@ -943,7 +962,8 @@ def _depth_view(text: str, regions: list, depth: int) -> str:
         view = list(text)
     else:
         view = [_FILL] * len(text)
-        for _lt, body_start, body_end, region_depth, _parent, _real in regions:
+        for (_lt, body_start, body_end, region_depth, _parent, _real,
+                _closed) in regions:
             if region_depth == depth - 1:
                 view[body_start:body_end] = list(text[body_start:body_end])
                 # The `(` and `)` just outside the body become the command
@@ -952,10 +972,22 @@ def _depth_view(text: str, regions: list, depth: int) -> str:
                     view[body_start - 1] = " "
                 if body_end < len(view):
                     view[body_end] = " "
-    for lt_idx, _body_start, _body_end, region_depth, _parent, real_end in regions:
-        if region_depth == depth:
+    for (lt_idx, _body_start, body_end, region_depth, _parent, real_end,
+            closed) in regions:
+        if region_depth != depth:
+            continue
+        if closed:
             # `real_end`, never the extended end -- see `_proc_subst_regions`.
             _blank(view, lt_idx, real_end + 1)
+        else:
+            # No closer was recorded, so `real_end` is the extended end and
+            # blanking to it erases whatever follows -- including a trailing
+            # executor. Blank the `<(` DELIMITER only: that is what has to go,
+            # since `(` is a COMMAND_SEPARATOR and would otherwise cut the
+            # enclosing simple command in two. Everything after it stays
+            # legible, which is the over-detecting direction and the one this
+            # file takes everywhere else.
+            _blank(view, lt_idx, _body_start)
     return "".join(view)
 
 
@@ -1069,7 +1101,8 @@ def live_proc_subst_spans(text: str) -> list:
         sep_starts = [m.start() for m in separators]
         exec_ends = executes_its_input_ends(view)
         for index in at_depth:
-            lt_idx, body_start, body_end, _depth, parent, _real = regions[index]
+            (lt_idx, body_start, body_end, _depth, parent, _real,
+             _closed) = regions[index]
             if parent >= 0 and covered[parent]:
                 covered[index] = True
                 continue  # already covered by an enclosing executed body

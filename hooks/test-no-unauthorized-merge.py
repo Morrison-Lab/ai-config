@@ -498,6 +498,20 @@ BLOCK = [
     ('bash <(: "`: "a)"`"; echo "gh pr merge 411")', "a backtick nested inside double quotes"),
     ('bash <(bash <<EOF\n)\nEOF\necho "gh pr merge 411")',
      "a `)` inside an executing heredoc body, which mask_heredocs leaves live"),
+    # TRAILING EXECUTOR x NO RECORDED CLOSER -- the crossing that had zero
+    # coverage, which is why 339/339 was green over two executing bypasses
+    # (ai-config#3635 pre-merge gate). Both run a real merge against a `gh`
+    # stub and both are `bash -n` clean. Each is paired with its
+    # leading-executor twin, which blocked throughout: the PAIR is the test,
+    # since the defect was that the two forms disagreed on the same command.
+    ('< <(: case\ncase x in x) : in\necho "gh pr merge 411";; esac) bash',
+     "trailing executor, a case pattern eats the closer"),
+    ('bash <(: case\ncase x in x) : in\necho "gh pr merge 411";; esac)',
+     "leading executor, the same missing closer"),
+    ('bash <<EOF\ndon\'t\nEOF\n< <(echo "gh pr merge 411") bash',
+     "trailing executor, an apostrophe in an executing heredoc pops the closer"),
+    ('bash <<EOF\ndon\'t\nEOF\nbash <(echo "gh pr merge 411")',
+     "leading executor, the same popped closer"),
 ]
 
 ALLOW = [

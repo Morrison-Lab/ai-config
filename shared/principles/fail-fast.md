@@ -326,10 +326,10 @@ It is a bug in the gate, and the two look identical in a summary line that only 
 - **Don't:** trust a "probed N, N clean" line without first reading what the routing step in front of the probe excludes and why.
 - **Don't:** assume a precondition for running a check is neutral --- the precondition can select for the very rows already known to pass.
 
-(Morrison-Lab/ai-config#3624, PR #3647, commit `5fa13ee9`: `check_interpreters()` in `scripts/install-hooks.py` built its probe set only from rows whose registered path already resolved (`row["status"] == "ok"`), and a plugin-root command whose path is unexpanded (`${CLAUDE_PLUGIN_ROOT}/...`) carries `status == "skipped"` instead --- so it never entered the probe set, never appeared in the `probed N interpreter(s)` count, and the run printed "every one of them could read it" having probed zero.
+(Morrison-Lab/ai-config#3624, PR #3647 --- open, not yet on `main` as of this writing, so cited by issue/PR number only, per `memories/git.md`'s "Citing evidence that lives in a PR's own superseded commits" section: a hook install-check built its probe set only from rows whose registered path already resolved, and a plugin-root command whose path is unexpanded carried a different status instead --- so it never entered the probe set, never appeared in the reported count, and the run declared success having probed nothing.
 That is the exact registration shape #3624 was filed about.
-An adversarial review caught it before merge.
-The fix routes `skipped` rows into their own `unprobeable` bucket and reports each as `UNPROBED` with a reason, so a row the check cannot reach is visible rather than silently absent from the count.)
+An adversarial review caught it during PR #3647's own review round.
+The proposed fix gives the excluded rows their own reported status, so a row the check cannot reach is visible rather than silently absent from the count.)
 
 ### A named regression test is checked against its rule, not against a commit
 

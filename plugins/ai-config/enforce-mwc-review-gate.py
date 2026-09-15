@@ -126,7 +126,22 @@ PAYLOAD_CLEAN_VERDICTS = frozenset({
 # payload without `schema_version` may block but must never clear, and one
 # spelling its verdict `approved`, `approve`, or `Ready For Merge` cleared
 # anyway, flipping the gate from deny to allow (review finding, PR #3629).
-HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+#
+# `blank_comment_regions` does the stripping rather than a `<!--.*?-->` regex,
+# which was the first cut and was defeated twice in the same direction:
+#
+#   - An UNTERMINATED comment matches nothing, so a truncated payload's JSON
+#     stayed live in full.
+#   - A payload whose JSON contains a literal `-->` (a finding quoting the
+#     payload format, say) ends the non-greedy match early, leaving whatever
+#     follows -- including a later `verdict` field -- live.
+#
+# Both are the terminator ambiguity `extract_structured_review` already
+# refuses to have, by reading the object with `raw_decode` instead of matching
+# a closing delimiter (ai-config#3054). Stripping by regex reintroduced in one
+# half of the function the hazard the other half was hardened against, so the
+# two halves now share `iter_payload_spans` and neither guesses where a
+# payload ends.
 PAYLOAD_FENCE_LINE_RE = re.compile(
     r"^(?P<indent> {0,3})(?P<run>`{3,}|~{3,})(?P<info>[^\r\n]*)$"
 )
@@ -486,6 +501,75 @@ def normalize_payload_verdict(raw):
     return str(raw or "").strip().upper().replace("-", "_").replace(" ", "_")
 
 
+def iter_payload_spans(body):
+    """Yield `(start, end, data)` for each well-formed `review-data` payload.
+
+    `end` is derived from `raw_decode`, never from a search for `-->`, so a
+    finding whose own text contains that substring cannot shorten the span.
+    Both readers of a payload -- the one that classifies it and the one that
+    removes it from the prose -- take their boundaries from here, so the text
+    blanked is exactly the text parsed.
+    """
+    if not body or not isinstance(body, str):
+        return
+    mask = payload_code_mask(body)
+    for m in PAYLOAD_OPEN_RE.finditer(body):
+        if mask[m.start()]:
+            continue
+        line_start = body.rfind("\n", 0, m.start()) + 1
+        if body[line_start:m.start()].strip():
+            continue
+        json_start = m.end()
+        while json_start < len(body) and body[json_start] in " \t\r\n":
+            json_start += 1
+        if json_start >= len(body) or body[json_start] != "{":
+            continue
+        try:
+            data, end_idx = json.JSONDecoder().raw_decode(body, json_start)
+        except ValueError:
+            continue
+        tail = end_idx
+        while tail < len(body) and body[tail] in " \t\r\n":
+            tail += 1
+        if body[tail:tail + 3] != "-->":
+            continue
+        if isinstance(data, dict) and "verdict" in data:
+            yield m.start(), tail + 3, data
+
+
+def blank_comment_regions(text):
+    """Replace every HTML comment in *text* with a space.
+
+    Two rules the naive regex got wrong, both in the fail-open direction:
+
+    * A payload's span comes from :func:`iter_payload_spans`, so a literal
+      `-->` inside its JSON cannot end the region early.
+    * An UNTERMINATED `<!--` is swallowed to end of text rather than left
+      alone. That is the over-blanking direction, and it is the safe one here:
+      the worst case is a verdict this function hides, which classifies as
+      ambiguous and denies, where the alternative is quoted text read as a
+      verdict and a merge allowed.
+    """
+    chars = list(text)
+    for start, end, _ in iter_payload_spans(text):
+        chars[start:end] = " " * (end - start)
+    text = "".join(chars)
+
+    out = []
+    pos = 0
+    while True:
+        open_idx = text.find("<!--", pos)
+        if open_idx < 0:
+            out.append(text[pos:])
+            return "".join(out)
+        out.append(text[pos:open_idx])
+        out.append(" ")
+        close_idx = text.find("-->", open_idx + 4)
+        if close_idx < 0:
+            return "".join(out)
+        pos = close_idx + 3
+
+
 def extract_structured_review(body):
     """Return the LAST well-formed `review-data` payload in *body*, or None.
 
@@ -512,32 +596,9 @@ def extract_structured_review(body):
     so a finding's own text containing a literal close-brace-then-arrow
     substring cannot terminate the object early (ai-config#3054).
     """
-    if not body or not isinstance(body, str):
-        return None
     found = None
-    mask = payload_code_mask(body)
-    for m in PAYLOAD_OPEN_RE.finditer(body):
-        if mask[m.start()]:
-            continue
-        line_start = body.rfind("\n", 0, m.start()) + 1
-        if body[line_start:m.start()].strip():
-            continue
-        json_start = m.end()
-        while json_start < len(body) and body[json_start] in " \t\r\n":
-            json_start += 1
-        if json_start >= len(body) or body[json_start] != "{":
-            continue
-        try:
-            data, end_idx = json.JSONDecoder().raw_decode(body, json_start)
-        except ValueError:
-            continue
-        tail = end_idx
-        while tail < len(body) and body[tail] in " \t\r\n":
-            tail += 1
-        if body[tail:tail + 3] != "-->":
-            continue
-        if isinstance(data, dict) and "verdict" in data:
-            found = data
+    for _start, _end, data in iter_payload_spans(body):
+        found = data
     return found
 
 
@@ -628,7 +689,7 @@ def classify_verdict_body(body, head_oid):
     # of the function is deliberate: the payload block above needs the comment
     # intact, and the staleness check reads a `Reviewed commit:` line that a
     # reviewer may legitimately place inside one.
-    section = HTML_COMMENT_RE.sub(" ", section)
+    section = blank_comment_regions(section)
     # The headline (first non-empty line under the heading) outranks later
     # prose, so "Ready for merge --- the concern that this wasn't ready is
     # resolved" classifies by its headline rather than its narrative.

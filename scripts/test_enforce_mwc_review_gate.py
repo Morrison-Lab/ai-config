@@ -8,6 +8,7 @@ state of Lacaedemon/sparta#1427 at merge time (Morrison-Lab/ai-config#2676):
 zero formal reviews, a "Needs more work" verdict comment, and a later
 demo-diff bot comment that the old gate mistook for the review.
 """
+import collections
 import importlib.util
 import io
 import json
@@ -1403,6 +1404,74 @@ class StructuredReviewDataTests(unittest.TestCase):
                 "<!-- review-data: "
                 + payload("approved", [], schema=None) + " -->")
         self.assertEqual(gate.classify_verdict_body(body, HEAD), "ambiguous")
+
+    def test_unterminated_payload_comment_does_not_clear(self):
+        """A comment with no closing delimiter anywhere in the body.
+
+        A `<!--.*?-->` strip matches nothing here, so the whole payload stayed
+        live as prose. The payload reader correctly declines it (no trailing
+        `-->`), which is what makes the leak reachable: nothing blocks, and
+        the JSON's own verdict word is the only thing the phrase scan sees.
+        """
+        body = ("**Claude finished review**\n\n### Verdict\n"
+                "**Content review: inconclusive, needs a human look**\n\n"
+                "Reviewed commit: " + HEAD + "\n\n"
+                '<!-- review-data: {"schema_version": "1.0", '
+                '"verdict": "approved", "findings": []}')
+        self.assertIsNone(gate.extract_structured_review(body))
+        self.assertEqual(gate.classify_verdict_body(body, HEAD), "ambiguous")
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, pr(comments=[comment(body)]))["decision"],
+            "deny")
+
+    def test_payload_json_containing_the_terminator_does_not_clear(self):
+        """A well-formed payload whose JSON contains a literal `-->` before
+        its verdict field.
+
+        A non-greedy strip ends at that substring rather than at the comment's
+        real closer, leaving the tail -- including `"verdict": "approved"` --
+        live. The span comes from `raw_decode` now, so the blanked region is
+        exactly the region parsed.
+        """
+        data = collections.OrderedDict()
+        data["extra"] = "quoting the format: --> here"
+        data["findings"] = []
+        data["verdict"] = "approved"
+        body = ("**Claude finished review**\n\n### Verdict\n"
+                "**Content review: inconclusive, needs a human look**\n\n"
+                "Reviewed commit: " + HEAD + "\n\n"
+                "<!-- review-data: " + json.dumps(data) + " -->")
+        self.assertIsNotNone(gate.extract_structured_review(body))
+        self.assertEqual(gate.classify_verdict_body(body, HEAD), "ambiguous")
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, pr(comments=[comment(body)]))["decision"],
+            "deny")
+
+    def test_two_adjacent_comments_are_blanked_independently(self):
+        """The over-blanking direction: one closed comment must not swallow
+        the prose between it and the next."""
+        blanked = gate.blank_comment_regions(
+            "<!-- HIDDEN1 --> Ready for merge <!-- HIDDEN2 --> trailing prose")
+        self.assertNotIn("HIDDEN1", blanked)
+        self.assertNotIn("HIDDEN2", blanked)
+        self.assertIn("Ready for merge", blanked)
+        self.assertIn("trailing prose", blanked)
+
+    def test_extraction_and_blanking_agree_on_where_a_payload_ends(self):
+        """The two readers share `iter_payload_spans`, so the text removed is
+        exactly the text parsed. Asserted directly rather than through a
+        verdict, since a verdict cannot say which span was used."""
+        data = collections.OrderedDict()
+        data["note"] = "--> not the end"
+        data["verdict"] = "CLEAN"
+        data["findings"] = []
+        body = "<!-- review-data: " + json.dumps(data) + " -->"
+        spans = list(gate.iter_payload_spans(body))
+        self.assertEqual(len(spans), 1)
+        start, end, parsed = spans[0]
+        self.assertEqual((start, end), (0, len(body)))
+        self.assertEqual(parsed, gate.extract_structured_review(body))
+        self.assertEqual(gate.blank_comment_regions(body).strip(), "")
 
     def test_stripping_comments_does_not_hide_a_real_prose_verdict(self):
         """The over-strip direction: a clean verdict stated in ordinary prose

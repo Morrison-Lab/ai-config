@@ -1187,6 +1187,54 @@ A coordinator caught it by reading the accused PR's own text.)
 Those three rules belong to this case alone, in the same way the sets above it do;
 the section's standing Do/Don't list resumes below.
 
+**The premise need not be a measurement at all, and a deductively true one
+defeats the two-sentence test whenever both sentences are about "where".**
+
+Every instance above starts from something that was measured.
+The same gap opens under a premise that was *derived*, and there it is harder
+to see, because a derivation carries the word "provably" rather than a figure
+a reader can re-run.
+The two sentences then have different **properties** for their subject rather
+than different subjects, and shared vocabulary hides the switch: a premise
+about where a command's shell *stands* and a conclusion about which repository
+it *acts on* both read as claims about where the command runs.
+
+Naming the property in each sentence is the whole of the check, and it is
+cheaper than the measurement version because no command has to be run:
+
+> The premise establishes that the piece does not change the shell's **working
+> directory**.
+> The conclusion needs that the piece acts on **this repository**.
+
+Set out that way, the counterexamples are immediate, and both were confirmed
+2026-09-15 against `hooks/flag-reset-hard-uncommitted-work.py` on the
+[ai-config#1973](https://github.com/Morrison-Lab/ai-config/issues/1973)
+branch, whose `_moves_directory` decides the premise by scanning for
+`cd`, `pushd`, and `popd`:
+
+```
+sh -c "GIT_DIR=<repoB>/.git GIT_WORK_TREE=<repoB> git reset --hard"
+sh -c "eval 'cd <repoB>'; git reset --hard"
+```
+
+The first changes no directory and changes the repository;
+the second changes the directory with no `cd` token in any argv.
+Both took the local reading and named the *other* repository's dirty file as
+the one about to be discarded.
+Filed as
+[ai-config#3665](https://github.com/Morrison-Lab/ai-config/issues/3665).
+
+The general form is that a sound derivation establishes exactly one property,
+and the conclusion may need a different one that the shared word covers up.
+So write the property, not the location, into both sentences.
+
+- **Do:** write the property each sentence is about, not only its subject, when
+  the premise is a derivation rather than a measurement.
+- **Do:** read a "provably" in a justifying comment as the place to run this
+  check, since the word marks a step nobody re-derived.
+- **Don't:** accept a shared word --- "where", "which", "the same" --- as
+  evidence the two sentences are about one property.
+
 - **Do:** write what the measurement establishes and what you are claiming as
   two separate sentences, and confirm the second does not reach past the first.
 - **Do:** measure the illustrating instance separately whenever a verified

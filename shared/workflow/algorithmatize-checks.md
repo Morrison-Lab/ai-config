@@ -1160,6 +1160,46 @@ code.
 A `diff -q` guard confirmed the file had changed and did not catch
 the miss.)
 
+**An anchor's uniqueness is a property of the whole file's text, and the
+sibling occurrence that defeats it most often is the same line indented
+deeper.**
+
+The case above is about a code string colliding with prose.
+The collision that survives "anchor on the code's own syntax" is between two
+pieces of code: leading whitespace makes a shallower-indented anchor a
+**substring** of its own deeper-indented twin, so `"        if X:"` is found
+inside `"            if X:"` and a `str.count` over the file returns 2.
+Nothing about the anchor looks ambiguous, because it was copied verbatim out
+of the one function it was meant for --- and reading that function is exactly
+what cannot settle the question.
+
+The failure direction depends on whether the harness asserts uniqueness.
+Where it does, the run aborts with a count of 2 and costs a minute.
+Where it does not, the substitution silently edits whichever occurrence comes
+first, which is the same wrong-line outcome as the prose case and just as
+invisible.
+
+Extending the anchor by one following line is usually enough, and it is the
+cheap fix precisely because the twin lines diverge immediately after the
+shared one.
+Do not fix it by trimming the anchor's leading whitespace, which widens the
+match rather than narrowing it.
+
+- **Do:** count the anchor's occurrences over the whole file before using it,
+  and extend it with a following line until the count is 1.
+- **Do:** suspect an indented twin first when a code anchor is not unique ---
+  a nested version of the same guard, the same early return in a sibling
+  branch.
+- **Don't:** treat an anchor as unique because the function it was copied from
+  contains it once.
+- **Don't:** strip an anchor's indentation to make it match; that is the
+  mechanism of the collision, not a workaround for it.
+
+(Measured 2026-09-14 in `hooks/test-no-clobbering-push.py`, whose mutation
+anchors are matched with `str.count`: an anchor taken from a helper at
+8-space indentation also matched the same line at 12 spaces elsewhere in the
+file, and the harness stopped with a count of 2.)
+
 **The same collision reaches the ASSERTION, not only the mutation, and there it makes the whole test vacuous.**
 
 The outcome above is about a mutation landing on the wrong occurrence of a string.

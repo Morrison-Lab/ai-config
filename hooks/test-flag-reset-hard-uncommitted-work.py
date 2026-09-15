@@ -185,6 +185,28 @@ def shell_c_wrapped_case(path):
     return 'sh -c "git reset --hard origin/main"'
 
 
+def nested_checkout_word_case(path):
+    """A nested `git checkout <word>` is not classified against THIS repo.
+
+    `_looks_like_path` calls `_resolves_as_ref`, which runs `git rev-parse` in
+    the hook's own directory. For a nested piece that is the wrong repository,
+    so the verdict turned on an accident: a word that happens to name a ref
+    here read as a branch switch and stayed silent, while the same command
+    with a word that does not read as a pathspec and warned about files in a
+    repository the command never touches (ai-config#1973 review, round 4
+    finding 3).
+
+    The tree is left DIRTY so the silence is attributable to the
+    classification rather than to the status gate, and the word is chosen not
+    to resolve as a ref here -- which is the direction that used to warn.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return 'sh -c "cd /nonexistent-elsewhere && git checkout no-such-ref-xyz"'
+
+
 def shell_c_cluster_case(path):
     """A `-c` inside a short-flag CLUSTER still hands over a command line.
 
@@ -521,6 +543,9 @@ SHOULD_STAY_SILENT = [
      "`git reset` with no `--hard` never discards working-tree content"),
     ("S4", mention_in_string_case,
      "a mention inside a quoted string is not an invocation"),
+    ("S1973b", nested_checkout_word_case,
+     "a nested `git checkout <word>` is not classified against THIS "
+     "repository's refs"),
     ("S1973", python_c_case,
      "a PYTHON `-c` argument is source, not a command line, so it is not "
      "descended into"),
@@ -631,7 +656,23 @@ def verdict(hook_path, repo, command):
         sys.exit(f"FATAL: hook emitted permissionDecision="
                  f"{hso['permissionDecision']!r}; this guard must only ever "
                  "add context, never allow/deny/ask")
-    return "WARN" if hso.get("additionalContext") else "silent"
+    context = hso.get("additionalContext")
+    if not context:
+        return "silent"
+    # WARN is not one verdict. This guard has two report shapes, and the
+    # difference between them is the whole point of the nested path: a LOCAL
+    # match lists the tracked files the command would discard, while a NESTED
+    # match must not, because the working tree it can read belongs to a
+    # different repository than the one the nested shell will run in.
+    #
+    # Collapsing both to "WARN" meant reverting the `nested-unscoped`
+    # relabelling -- which reintroduces exactly that cross-repository file
+    # list -- passed the entire suite, every case and every mutation clause
+    # (ai-config#1973 review, round 4 finding 4). A test that cannot fail on
+    # the defect it was written for is not coverage.
+    if "cannot list what would be lost" in context:
+        return "WARN-unscoped"
+    return "WARN"
 
 
 def build_and_verdict(hook_path, builder):
@@ -653,21 +694,30 @@ with open(HOOK, encoding="utf-8") as handle:
 
 EXPECTED = {case_id: "WARN" for case_id, *_ in SHOULD_WARN}
 EXPECTED.update({case_id: "silent" for case_id, *_ in SHOULD_STAY_SILENT})
+# The nested cases must emit the UNSCOPED report, not the local one. Named
+# explicitly rather than derived from the case id, so that adding a nested
+# case without deciding which report it should produce is a visible omission
+# rather than a silent default to "WARN".
+EXPECTED.update({case_id: "WARN-unscoped" for case_id in ("W1973a", "W1973b")})
 CASES = {case_id: builder
          for case_id, builder, _ in SHOULD_WARN + SHOULD_STAY_SILENT}
 
+# Both loops compare against EXPECTED, which the mutation harness below also
+# reads. They used to compare against the literals "WARN" and "silent" while
+# the harness read EXPECTED, so the two disagreed the moment a case expected
+# anything else -- one source of truth for what a case should produce.
 wrong = 0
 print("should WARN:")
 for case_id, builder, desc in SHOULD_WARN:
     got = build_and_verdict(HOOK, builder)
-    wrong += got != "WARN"
-    print(f"  {got:<6} {case_id}  {desc}")
+    wrong += got != EXPECTED[case_id]
+    print(f"  {got:<14} {case_id}  {desc}")
 
 print("\nshould STAY SILENT:")
 for case_id, builder, desc in SHOULD_STAY_SILENT:
     got = build_and_verdict(HOOK, builder)
-    wrong += got != "silent"
-    print(f"  {got:<6} {case_id}  {desc}")
+    wrong += got != EXPECTED[case_id]
+    print(f"  {got:<14} {case_id}  {desc}")
 
 total = len(SHOULD_WARN) + len(SHOULD_STAY_SILENT)
 print(f"\n{total - wrong}/{total} correct"

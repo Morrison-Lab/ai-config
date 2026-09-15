@@ -321,13 +321,22 @@ def _looks_like_path(arg):
     return _resolves_as_ref(arg) is False
 
 
-def offending_here(command):
+def offending_here(command, lexical_only=False):
     """The matched destructive-discard invocation in `command`, or None.
 
     Returns (kind, segment, paths). `kind` is "reset-hard" or
     "checkout-force" (paths is None -- the whole tracked tree is in scope)
     or "checkout"/"restore" (paths is the resolved pathspec list that
     invocation would revert).
+
+    `lexical_only` restricts the answer to the two kinds the TEXT decides on
+    its own, and is what a NESTED piece gets. Without it this function reaches
+    `_looks_like_path` -> `_resolves_as_ref`, which runs `git rev-parse` in the
+    hook's own directory: `sh -c "cd OTHER && git checkout notes.txt"` then
+    warns or stays silent according to whether THIS repository happens to
+    carry a ref called `notes.txt`, which is a fact about the wrong repository
+    (ai-config#1973 review, round 4 finding 3). Relabelling the result
+    afterwards did not help, because the resolution had already happened.
     """
     cmds = _simple_commands(command)
     if cmds is None:
@@ -349,6 +358,13 @@ def offending_here(command):
             continue
         (pre, post, saw_sep, staged_no_worktree,
          saw_force) = _checkout_restore_targets(sub, rest[2:])
+        if lexical_only:
+            # `--force` is decided by the flag alone, so it survives here.
+            # Everything below this point needs a repository to resolve a
+            # pathspec against, and a nested piece does not have one.
+            if sub == "checkout" and saw_force and not staged_no_worktree:
+                return "checkout-force", " ".join(argv), None
+            continue
         if staged_no_worktree:
             continue
         if sub == "restore":
@@ -429,7 +445,7 @@ def offending(command):
     if match is not None:
         return match
     for piece in pieces[1:]:
-        match = offending_here(piece)
+        match = offending_here(piece, lexical_only=True)
         if match is None:
             continue
         # NESTED_UNSCOPED, not the matched kind. The `paths is None` filter

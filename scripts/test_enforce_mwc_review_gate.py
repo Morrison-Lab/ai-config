@@ -1542,6 +1542,39 @@ class StructuredReviewDataTests(unittest.TestCase):
             gate.evaluate(MERGE_CMD, pr(comments=[comment(neutral)]))["decision"],
             "deny")
 
+    def test_a_sole_fenced_payload_does_not_leave_the_prose_unopposed(self):
+        """The half the fenced rebuttal does NOT cover, and the pair below is
+        what separates them.
+
+        `evaluate_verdict` deletes a closed fence before the classifier runs,
+        so a body whose ONLY payload was fenced arrives looking like a body
+        that never had one, and a clean headline decides unopposed. That is
+        right when an unfenced payload also exists --- the fence held an
+        example --- and wrong when it does not, because the fence may be a
+        formatting slip around the reviewer's real verdict. The evidence is
+        the text the caller just deleted, so the caller passes the answer in.
+        """
+        sole = ("**Claude finished review**\n\n### Verdict\n"
+                "**Ready for merge**\n\n"
+                "```\n<!-- review-data: "
+                + payload("NOT_CLEAN", [{"file": "a.py"}]) + " -->\n```\n\n"
+                "Reviewed commit: " + HEAD)
+        self.assertEqual(gate.evaluate_verdict([comment(sole)], HEAD),
+                         "ambiguous")
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, pr(comments=[comment(sole)]))["decision"],
+            "deny")
+
+    def test_payload_stripped_is_the_callers_answer_not_the_bodys(self):
+        """Asserted on the parameter directly: the same blanked body reads
+        clean or ambiguous depending only on what the caller saw removed."""
+        blanked = ("**Claude finished review**\n\n### Verdict\n"
+                   "**Ready for merge**\n\nReviewed commit: " + HEAD)
+        self.assertEqual(gate.classify_verdict_body(blanked, HEAD), "clean")
+        self.assertEqual(
+            gate.classify_verdict_body(blanked, HEAD, payload_stripped=True),
+            "ambiguous")
+
     def test_a_closed_fenced_example_still_clears(self):
         """The mirror, and the reason the rule above is not simply "any
         mention denies".

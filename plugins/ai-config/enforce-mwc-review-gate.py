@@ -727,8 +727,14 @@ def payload_is_clean(payload):
     return verdict in PAYLOAD_CLEAN_VERDICTS
 
 
-def classify_verdict_body(body, head_oid):
-    """Classify one blanked, marker-bearing verdict body."""
+def classify_verdict_body(body, head_oid, payload_stripped=False):
+    """Classify one blanked, marker-bearing verdict body.
+
+    `payload_stripped` says the caller removed a `review-data` opener from
+    this body and left none behind --- see :func:`evaluate_verdict`, which
+    deletes closed fences before calling. The body cannot show that by
+    itself, because the evidence is exactly what was deleted.
+    """
     section = VERDICT_MARKER_RE.split(body, maxsplit=1)[1]
     # The verdict's own footer is the last "Reviewed commit:" line; earlier
     # occurrences may quote prior rounds. A format that prints the line
@@ -766,8 +772,18 @@ def classify_verdict_body(body, head_oid):
     # returned before the prose path ever ran. A reviewer quoting a NOT_CLEAN
     # payload mid-sentence and publishing a CLEAN one therefore cleared, while
     # the same quote beside a prose headline did not (review finding, #3629).
+    #
+    # `payload_stripped` covers the one position neither reader can see. A
+    # payload inside a CLOSED fence is deleted by the caller before this
+    # function runs, so a body whose ONLY payload was fenced arrives looking
+    # like a body that never had one, and a clean-reading headline then
+    # decides unopposed. That is right when an unfenced payload also exists
+    # --- the fence held a documentation example --- and wrong when it does
+    # not, because the fence may be a formatting slip around the reviewer's
+    # real verdict. Only the caller can tell those apart, so it passes the
+    # answer in.
     _, body_unreadable = blank_comment_regions(body)
-    payload_unreadable = payload_unreadable or body_unreadable
+    payload_unreadable = payload_unreadable or body_unreadable or payload_stripped
 
     # Blocking first, and once: a payload that blocks does so whether or not
     # it carries `schema_version`, so the two tests the fast path used to run
@@ -830,12 +846,19 @@ def evaluate_verdict(comments, head_oid):
         # verdict; fenced content (a comment showing the format) isn't either.
         unquoted = BLOCKQUOTE_LINE_RE.sub("", raw)
         blanked = FENCE_RE.sub("", unquoted)
+        # A payload the fence strip removed, with none left behind, is the
+        # reviewer's only one -- possibly its real verdict, wrapped in a stray
+        # fence. `classify_verdict_body` cannot see this: the evidence is the
+        # text just deleted.
+        stripped = (PAYLOAD_OPEN_RE.search(unquoted) is not None
+                    and PAYLOAD_OPEN_RE.search(blanked) is None)
         if VERDICT_MARKER_RE.search(blanked):
             if trusted:
-                trusted_state = classify_verdict_body(blanked, head_oid)
+                trusted_state = classify_verdict_body(blanked, head_oid, stripped)
                 trusted_idx = idx
             else:
-                untrusted.append((idx, classify_verdict_body(blanked, head_oid)))
+                untrusted.append(
+                    (idx, classify_verdict_body(blanked, head_oid, stripped)))
         elif trusted and VERDICT_MARKER_RE.search(unquoted):
             # The reviewer's own verdict heading was swallowed by a fence
             # (e.g. an unclosed code block): unreadable, so fail toward

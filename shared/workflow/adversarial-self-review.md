@@ -427,6 +427,23 @@ specify a target directly (`--engine <name>`)
 or pass `--exclude-engine cursor` in alternate mode
 until headless cursor dispatch is enabled.
 The `adversarial-reviewer` persona also lives at `.claude/agents/` and `.opencode/agents/`, which are project agents: a session rooted in another repo may not be able to resolve it at all ([ai-config#1921](https://github.com/Morrison-Lab/ai-config/issues/1921) tracks shipping it alongside the guard).
+The plugin does not close that gap either: its root is the ai-config repository root, which ships `skills/`, `commands/` and `hooks/hooks.json` and no `agents/` directory (checked at `c7201140`, 2026-09-15), so a consumer repo installs the guard and none of the personas it names.
+
+**In that repo, use the fallback the guard already admits, and get its two conditions right.**
+`no-push-without-self-review.py`'s `FALLBACK_AGENT_NAME` accepts `general-purpose`, `general`, `reviewer`, `code-reviewer`, `research` and `self` (with an optional `-`, `_` or space inside the two-word spellings), but only when the dispatch's own prompt matches `REVIEW_PROMPT_RE` --- `adversarial review`, `adversarial self-review`, `pre-push review`, or `self-review`, again with an optional separator.
+"Review this adversarially" satisfies a reader and not the regex.
+The verdict then has to be a line whose start is `Verdict:` (at most three spaces of indent, optionally behind a Markdown heading marker, `**` permitted only *after* the colon), reading `Ready for merge`, `Needs work`, or `Needs more work`, outside any code fence, with `Reviewed-Commit: <sha>` **after** it.
+
+**Read which denial you got, because the three causes take different fixes.**
+"No `adversarial-reviewer` subagent or recognized external reviewer ... was dispatched" means the dispatch was not recognized: wrong persona name, or a prompt the regex missed.
+"An `adversarial-reviewer` subagent was dispatched, but no verdict came back as that call's own result" means it *was* recognized and no verdict was extracted --- a background dispatch, an errored result, or a report whose verdict line does not match the shape above.
+Only the last of those is a formatting fix.
+The first is #3045's async case, whose remedy is the `ALLOW_UNREVIEWED_PUSH=1` route given above rather than a re-dispatch.
+
+**A trailing `Reviewed-Commit:` line is worth moving off the last line.**
+In the Claude Code desktop harness on 2026-09-15, an `Agent` call's result reached the calling session with `agentId: <id>` appended to the report's final character with no separator: a report ending `Reviewed-Commit: 14e01f48` arrived as `Reviewed-Commit: 14e01f48agentId: a2823bf0...`.
+`REVIEWED_COMMIT`'s `[0-9a-fA-F]{7,40}` is greedy and the id begins with hex, so the capture runs past the SHA and the commit comparison fails on a review that was genuinely clean and genuinely about that commit.
+Whether the transcript JSONL the guard actually reads carries the same concatenation was not checked, so treat this as a hypothesis to test against the transcript rather than a diagnosed guard defect --- but the mitigation costs nothing: ask the reviewer to put a short closing sentence, or a blank line, after `Reviewed-Commit:` so an appended id cannot touch it.
 
 Note what that CLI fallback does to the pre-push guard, since the two rules meet here and pull opposite ways.
 A CLI's verdict never becomes an `Agent` call's `tool_result`, so the guard cannot see it however real the review was.

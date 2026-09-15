@@ -61,14 +61,18 @@ Split out of [`tools.md`](tools.md) on 2026-09-01 when that file crossed the 125
   itself for an empty-match signal, which direct reproduction disproved, and
   a review round then caught the entry substantially duplicating the
   already-on-main sections cited above.)
+
 - **One sentence per line and gha's list-item-splice check collide inside a list, and the check names the item you did not touch.**
   The two rules are individually reasonable and jointly mean a multi-sentence list item cannot be split in place.
   `lint-markdown`'s `check_list_item_splices.mjs` (Morrison-Lab/gha, read 2026-09-15) walks the file and, for every line that is a list marker, looks at the line *before* it: a finding is raised when that previous line is non-blank and is not itself a list item, heading, blockquote, table row, or horizontal rule.
   Splitting item K across two source lines makes item K's second sentence a bare continuation line, so item **K+1** becomes a marker following a continuation line and is what the error names.
   Diff-scoping does not save you: the check reports the finding when either the flagged line or the previous line is in the added set, and the continuation line you added is the previous line.
   So the reported file, line number, and quoted text all belong to an item the commit never edited, which sends the fix to the wrong place.
-  The remedy is a blank line between the items, which is also what MD032 wants.
+  The remedy is a blank line between the items.
   The alternative is to leave that item on one line.
+  Markdownlint itself has no rule for this gap --- MD032 governs a list's outer boundaries, not the space between items, and is disabled here (`.markdownlint-cli2.jsonc`) --- which is why gha ships a separate checker for it.
+  [`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md) enumerates that checker among `lint-markdown`'s four, and [`batch-merge-and-resolve`](../shared/workflow/batch-merge-and-resolve.md) owns the splice's other direction: a *merge* that deletes a blank line adds neither line, so the added-lines scoping is blind to it.
+  The split case is the opposite --- you add the continuation line, and that is the `prevLineNo` the check tests.
   **Do:** after applying one-sentence-per-line inside a list, put a blank line between every pair of items in that list, and read a splice finding as pointing at the item *after* the one you split.
   **Don't:** debug the item the error names --- check the line above it first.
   **Candidate check.**

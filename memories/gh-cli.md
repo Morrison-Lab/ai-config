@@ -609,8 +609,9 @@
 
   **What does bear on it is the repository's own review history**, which is re-derivable and needs no probe:
   `gh api "repos/<o>/<r>/pulls/<N>/reviews" --jq '[.[] | .user.login]'` across the PRs that exist.
-  Every one of `ucdavis/lbt`'s seven PRs returns no reviews at all, which is evidence about that repository rather than about the endpoint that was probed.
-  Where that comes out empty, no documented request mechanism will discharge a no-unreviewed-PR obligation there, and the obligation has to be met by another reviewer (`claude-review`, or the local adversarial self-review) instead of by more requests.
+  All six of `ucdavis/lbt`'s PRs (1 and 3 through 7) return no reviews at all, which is evidence about that repository rather than about the endpoint that was probed.
+  This is the per-repo, historical form of the conclusion two paragraphs below --- that only a posted review body settles whether a review is coming --- rather than a competing discriminator.
+  Where the history comes out empty, no documented request mechanism will discharge a no-unreviewed-PR obligation there, and the obligation has to be met by another reviewer (`claude-review`, or the local adversarial self-review) instead of by more requests.
 
   - **Do:** answer "does Copilot review here at all" from the repo's existing `reviews` lists, not from a request endpoint's status code.
   - **Don't:** read a `suggestedActors` list that names only `copilot-swe-agent` as evidence about PR code review --- ai-config returns the same list while being reviewed.

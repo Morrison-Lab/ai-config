@@ -231,6 +231,7 @@ vs. *"One stray 'delve'; otherwise clean."*
 - **Don't** flag code, identifiers, or quoted source material as prose tells.
 - **Don't** skip the self-check on my own draft, then ship prose full of the
   very tells this skill exists to catch.
+
 - **Don't** replace a figure of speech without first asking what it was
   hedging.
   [`plain-prose`](../../shared/writing/plain-prose.md) already says never to

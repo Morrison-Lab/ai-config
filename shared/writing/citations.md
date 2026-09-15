@@ -767,7 +767,7 @@ Splitting it asks a question the original never answered.
 Each fragment now needs a locator of its own, and the range that covered all of them covers none of them exactly --- so dividing the parent's range across the children is guesswork wearing the parent's authority.
 An inherited range is a **new** claim about a narrower body of text, not a preserved one.
 
-Two things make this the citation defect most likely to ship.
+Two things make this easy to ship unnoticed.
 The split is performed for a reason that has nothing to do with citations (a list is more readable, a sentence is too long), so attention is on structure while the numbers ride along.
 And the result is *more* precise-looking than the original, which is [`An edit made for precision can assert what the loose version never did`](fact-check-prose.md#an-edit-made-for-precision-can-assert-what-the-loose-version-never-did) arriving through a structural edit rather than a lexical one.
 
@@ -792,10 +792,11 @@ Neither needs a person, and the first is the kind of finding a repo whose prose 
 - **Don't:** read "I did not change that citation" as a defence --- the sentence under it is new, so the citation is a new claim.
 
 (ucdavis/lbt#7, 2026-09-15.
-A 110-word enumeration of Barr's reception headings was split into bullets plus a follow-on sentence.
-The parent sentence's `(pp. 304-307)` was divided across the children by guesswork.
+A 110-word enumeration of Barr's reception headings was split into bullets plus a follow-on sentence, and the parent sentence's `(pp. 304-307)` was divided across the children by guesswork.
 Re-reading the PDF put the seven bulleted headings at pp. 304-306 and the follow-on heading's content on p. 306, so the parent's range ran a page past everything the split produced.
-Foreground adversarial review caught that one and the Pinter list stem, `(p. 22-23)` --- wrong range and singular `p.` at once --- for four items that run pp. 23-24, before the push.
-Two more of the same shape survived into the PR and were fixed in `72d1902`.
-`(pp. 307-309)` became `(pp. 306-309)` in the Barr summary, again because the content opens at the foot of the earlier page.
-And the Wendland applications bullets, restating that source's own special-interests enumeration, had dropped its first item.)
+Foreground adversarial review caught that before the push.
+The Wendland applications list is the enumeration half, and it survived into the PR: the bullets restated that source's own special-interests list with its first item missing, fixed in `72d1902`.
+
+The same commit fixed two locators the branch had never touched --- `(p. 22-23)` for four items that run pp. 23-24, and `(pp. 307-309)` for content that opens on p. 306 --- which is the follow-on worth keeping.
+Re-deriving one range from the source puts its neighbours within reach of the same check for the first time, and a page citation nobody has ever opened the PDF for is likelier to be wrong than one that survived a reading.
+Sweep the locators around a split, not only the ones the split created.)

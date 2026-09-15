@@ -314,3 +314,45 @@ Two unrelated platform failures of one construct is the argument for suspecting 
 - **Do:** write the content to a file when the consumer is a native Windows binary (`git`, and anything else not built against msys).
 - **Do:** grep for the construct rather than for an error string, since the message belongs to the consumer.
 - **Don't:** conclude process substitution is unavailable in Git Bash --- test it with `cat` and it works.
+
+## An argv split on operators alone leaves a compound body's keyword at `argv[0]`
+
+`scripts/lib/shellcmd.py`'s `simple_commands` --- and the hand-rolled copies under `hooks/`, whose bodies its module docstring records as identical --- cuts a command line at the characters in `_SHELL_OPS = set("();|&")`.
+Derive the population rather than reading a number off that docstring.
+It states 8 and 7 for two commands that both return 9, measured 2026-09-15:
+`grep -rlF '_SHELL_OPS = set("();|&")' hooks/` and
+`grep -rl "def _simple_commands" hooks/`.
+The stale docstring is
+[ai-config#3680](https://github.com/Morrison-Lab/ai-config/issues/3680), and
+it means [ai-config#3178](https://github.com/Morrison-Lab/ai-config/issues/3178)'s
+migration inventory is short.
+That models operators, not compound commands, so a body's keyword stays attached to the command it heads.
+Measured on this branch:
+
+```console
+$ python3 -c "import sys; sys.path.insert(0, 'scripts/lib'); import shellcmd; print(shellcmd.simple_commands('if [ -d w ]; then cd w; echo hi; fi'))"
+[['if', '[', '-d', 'w', ']'], ['then', 'cd', 'w'], ['echo', 'hi'], ['fi']]
+$ python3 -c "import sys; sys.path.insert(0, 'scripts/lib'); import shellcmd; print(shellcmd.simple_commands('while true; do cd w; done'))"
+[['while', 'true'], ['do', 'cd', 'w'], ['done']]
+```
+
+`then` and `do` are `argv[0]`;
+the word that decides what the piece does sits one position further in.
+`else`, `elif`, and a `{` group opener arrive the same way, and so do environment-assignment prefixes (`GIT_DIR=/other git reset --hard`).
+Only the body's **first** command carries the keyword, which is why a spot check on a two-command body reads as fine.
+
+The consequence is a rule about how to read the split, and it is sharpest when a check is being **narrowed**.
+An over-broad check that scans every token has an obvious repair --- test the command word --- and `argv[0]` is the obvious spelling of it.
+That spelling is wrong in the fail-open direction: a piece whose head is a keyword reads as an ordinary command whose verb is `then`, so the `cd` or the `git` behind the keyword is never seen.
+Skip the prefix first and read the token at that index.
+
+Measured 2026-09-14/15 on `hooks/flag-reset-hard-uncommitted-work.py` ([ai-config#3645](https://github.com/Morrison-Lab/ai-config/pull/3645)).
+`_may_change_repository` had scanned every token, so a bare `.` path argument in `git add .` matched the POSIX spelling of `source`, and `sh -c "git add . ; git reset --hard"` lost the local file list the scan exists to give it.
+Testing `argv[0]` instead would have made `then cd /other` read as stationary, which is the direction that reports another repository's work as this one's.
+The landed form calls `_lead_index(argv)` --- skip assignments and lead words, then read the command word --- and both callers in that hook share it.
+
+- **Do:** skip assignment prefixes and lead words before reading a command word out of this splitter's argv.
+- **Do:** ask what a narrowed check now MISSES, against the tokenizer's actual output rather than an idealized argv, whenever an over-detection is being repaired.
+- **Don't:** read `argv[0]` as the command word --- the splitter never removed the keyword heading a compound command's body.
+- **Don't:** answer an over-detection with the first narrowing that removes it;
+  a narrowing moves a check toward silence, which is the direction a guard cannot afford.

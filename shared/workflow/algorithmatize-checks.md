@@ -1200,6 +1200,62 @@ anchors are matched with `str.count`: an anchor taken from a helper at
 8-space indentation also matched the same line at 12 spaces elsewhere in the
 file, and the harness stopped with a count of 2.)
 
+**The second cause is your own refactor, and it ends the anchor's EXISTENCE
+rather than its uniqueness.**
+
+The indented twin above is a collision the file already contained, so a count
+taken at authoring time would have caught it.
+Extracting a helper is the opposite failure and wants stating separately,
+because the counts run in opposite directions and so do the silent
+consequences.
+
+Lifting a loop out of two callers **re-indents it**, so an anchor copied from
+either caller now matches **nothing**.
+Measured across the extraction
+([ai-config#3645](https://github.com/Morrison-Lab/ai-config/pull/3645),
+`ebf0b58d` to `712405f1`), where a lead-word-stripping loop at 8-space
+indentation became `_lead_index`'s body at 4:
+
+```
+M2_old   in PRE=1   in POST=0
+M5_old   in PRE=1   in POST=0
+M_new    in PRE=0   in POST=1
+```
+
+An earlier version of this section said such a clause "still matches, at the
+single surviving site", which is a count of 1 and would not have tripped the
+FATAL quoted below (ai-config#3677 review, finding 1).
+
+Where the harness asserts uniqueness this is loud, which is the outcome to
+want.
+`hooks/test-flag-reset-hard-uncommitted-work.py` stopped with `FATAL: clause
+M2_lead_words's anchor is not present exactly once ... (found 0)`.
+
+Without that assertion the failure is not a wrong edit but **no edit at all**:
+`str.replace` on a string that does not occur returns the text unchanged, so
+the mutant is byte-identical to the original and every case passes.
+The clause then reports **zero flips**, which is indistinguishable from the
+reading this whole section exists to raise --- "this clause is untested".
+A refactor can therefore convert a well-pinned clause into an apparently dead
+one, and the evidence for deleting it is manufactured by the same edit.
+
+**What the merge revealed is the more useful half.**
+The two clauses had each declared their own set of cases to flip.
+Merged, the two sets turned out to be the flips of one mechanism, and the
+surviving clause declares their union --- so while the duplication existed the
+clause table was reporting one mechanism as two, each half understating its
+reach.
+That is invisible from either clause alone, because each is individually
+correct about the copy it names.
+
+- **Do:** re-run the mutation harness after extracting a helper, and read an
+  anchor-uniqueness FATAL as the extraction reporting itself.
+- **Do:** merge colliding clauses and declare the union of their flips, rather
+  than re-anchoring one of them to keep two.
+- **Don't:** assume an anchor stays unique across a refactor it does not
+  appear in --- uniqueness is a property of the file, so any edit to the file
+  can end it.
+
 **The same collision reaches the ASSERTION, not only the mutation, and there it makes the whole test vacuous.**
 
 The outcome above is about a mutation landing on the wrong occurrence of a string.
@@ -1391,6 +1447,48 @@ here the same failure produces a green suite and a `MISSED` row that reads as a 
   silent fail-open.
 - **Don't:** read this as licence to keep every dead branch; the exemption is
   for guards, where the failure mode is silence, not for code generally.
+
+**What "on suite evidence alone" leaves open is what DOES license the
+deletion: a reachability argument read off the code.**
+
+The two sections above already name two ways out --- a role search that comes
+back empty, and flagging the removal as a separate reviewable simplification.
+What neither supplies is the strongest evidence available, and the difference
+is worth stating because it changes what you are allowed to conclude.
+The settling evidence is not another run.
+It is a statement about the two clauses that holds for every input --- when an
+earlier clause returns on every value but one, a later test for that value can
+only ever see the value it admits --- and that is checkable by reading, does
+not depend on which fixtures exist, and survives the suite changing underneath
+it.
+
+Measured 2026-09-14/15 on `hooks/no-clobbering-push.py`
+([ai-config#3645](https://github.com/Morrison-Lab/ai-config/pull/3645)).
+A round added `_retires_override`, which returns True for every override value
+other than `1`, ahead of the recording loop's own `value.strip() == "1"` test.
+That made the second test unreachable, and mutating it away left the suite at
+89/89 --- that branch's own definition of an untested clause.
+Reading the pair gave the reason the score could not move, so the clause was
+removed and a comment in its place records the argument beside the score.
+
+The stranding is worth separating from ordinary dead code, because nothing
+about it resembles a deletion.
+No line changed shape, nothing was removed, and a duplicated value test reads
+as defence in depth --- the shape a reviewer is least likely to question.
+Only re-running **every** clause after the fix, rather than the clauses the fix
+edited, puts the row in front of you at all.
+
+- **Do:** re-run the whole mutation matrix after a round that adds a clause,
+  not only the clauses that round touched.
+- **Do:** delete a stranded clause on a reachability argument you can state in
+  one sentence about the earlier clause, and record that argument where the
+  clause was.
+- **Don't:** read a duplicated test as defence in depth --- if an earlier
+  clause already returns on everything it excludes, the duplicate sees only
+  the admitted value.
+- **Don't:** leave a clause measured dead and unexplained because the guard
+  exemption above forbids deleting on suite evidence; supply the argument
+  instead.
 
 **The dual of those two sections: a case labelled NON-DISCRIMINATING is a claim
 about the current clause set, not about the case.**

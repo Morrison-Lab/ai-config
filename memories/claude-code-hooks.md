@@ -401,6 +401,22 @@ Building a hand-crafted probe payload with `cwd` nested under `tool_input` is si
 - **Do:** put `cwd` at the top level of a constructed `PreToolUse` payload, beside `tool_name` and `tool_input`, never nested inside `tool_input`.
 - **Don't:** read a probe's silence as a verdict about the hook before checking the payload shape it was actually fed.
 
+**A probe that reads only stdout cannot tell an allow from a crash, and the committed harnesses already check what it omits.**
+
+A `PreToolUse` hook allows by exiting 0 with nothing on stdout.
+A hook that raises exits 1 with nothing on stdout, and the exit-code section above records that 1 is "a bug, not a block", so the call proceeds.
+A probe whose verdict function reads stdout therefore prints `allow` for both, and the bytes it read for a crashed guard are the bytes it reads for a guard that deliberately passed.
+The harness makes the same reading, which is what makes this worth stating separately from an ordinary weak test: the probe is not merely lenient, it agrees with the runtime, so nothing anywhere reports that the guard stopped working.
+
+The committed suites do draw the distinction.
+`hooks/test-flag-reset-hard-uncommitted-work.py` exits with `FATAL: hook exited <rc> on <command>` before interpreting anything, and refuses non-JSON stdout a few lines later.
+The gap is the throwaway probe written to iterate quickly, which is exactly the instrument in hand while the hook is being changed.
+
+Measured 2026-09-14/15 on `hooks/no-unauthorized-merge.py`: widening a tuple left one unpacking site behind, the hook died with a `ValueError`, and an ad-hoc probe reported `allow` for every input until the exit status was read.
+
+- **Do:** read the exit status and stderr in any hand-written hook probe, and fail the probe loudly on a non-zero exit rather than classifying it as a verdict.
+- **Don't:** treat empty stdout as an allow --- a crashed guard produces the same bytes, and the harness lets that call through too.
+
 ## Complete hook lifecycle catalog (27 events)
 
 Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236).
@@ -773,6 +789,10 @@ Everything above is about making the mutant's import *work*.
 The corollary is that a working import is an import of the **real** module, so
 a clause living in `scripts/lib/shellcmd.py` is unreachable from a `MUTATIONS`
 table that rewrites one hook file.
+(That module's TOKENIZER behaviour --- what its operator-only split leaves at
+`argv[0]` --- is a fact about shells rather than about hooks, so it lives in
+[`shell.md`](shell.md) instead;
+this file owns how the module is imported and mutated.)
 Placing the mutant in `hooks/` resolves the import off the repo above it;
 the `PYTHONPATH` fallback points at the real `scripts/lib` by construction.
 Both routes hand the subprocess the unmutated module, so a `MUTATIONS` entry

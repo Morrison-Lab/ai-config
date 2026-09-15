@@ -508,13 +508,22 @@ def normalize_payload_verdict(raw):
 
 
 def iter_payload_spans(body):
-    """Yield `(start, end, data)` for each well-formed `review-data` payload.
+    """Yield `(start, end, data)` for every `review-data` opener at a readable
+    position: a well-formed payload as `(start, end, dict)`, and one that
+    could not be bounded as `(start, None, None)`.
 
     `end` is derived from `raw_decode`, never from a search for `-->`, so a
     finding whose own text contains that substring cannot shorten the span.
     Both readers of a payload -- the one that classifies it and the one that
     removes it from the prose -- take their boundaries from here, so the text
     blanked is exactly the text parsed.
+
+    REPORTING THE FAILURES is what makes "the last valid payload wins" safe.
+    Yielding only the valid ones cannot distinguish a body with one payload
+    from a body whose real, final payload has a trailing comma and whose only
+    parseable one is an earlier draft the reviewer had already corrected. The
+    second silently degrades to the first, so a CLEAN quoted above a genuine
+    NOT_CLEAN decided the merge (review finding, PR #3629).
     """
     if not body or not isinstance(body, str):
         return
@@ -529,18 +538,23 @@ def iter_payload_spans(body):
         while json_start < len(body) and body[json_start] in " \t\r\n":
             json_start += 1
         if json_start >= len(body) or body[json_start] != "{":
+            yield m.start(), None, None
             continue
         try:
             data, end_idx = json.JSONDecoder().raw_decode(body, json_start)
         except ValueError:
+            yield m.start(), None, None
             continue
         tail = end_idx
         while tail < len(body) and body[tail] in " \t\r\n":
             tail += 1
         if body[tail:tail + 3] != "-->":
+            yield m.start(), None, None
             continue
         if isinstance(data, dict) and "verdict" in data:
             yield m.start(), tail + 3, data
+        else:
+            yield m.start(), None, None
 
 
 def blank_comment_regions(text):
@@ -576,7 +590,8 @@ def blank_comment_regions(text):
     """
     chars = list(text)
     for start, end, _ in iter_payload_spans(text):
-        chars[start:end] = " " * (end - start)
+        if end is not None:
+            chars[start:end] = " " * (end - start)
     text = "".join(chars)
 
     out = []
@@ -630,10 +645,24 @@ def extract_structured_review(body):
     so a finding's own text containing a literal close-brace-then-arrow
     substring cannot terminate the object early (ai-config#3054).
     """
-    found = None
-    for _start, _end, data in iter_payload_spans(body):
-        found = data
-    return found
+    return read_payload_state(body)[0]
+
+
+def read_payload_state(body):
+    """Return `(last_valid_payload_or_None, unreadable)`.
+
+    `unreadable` is True when any `review-data` opener at a readable position
+    could not be bounded. A caller may still BLOCK on the payload it did get;
+    it must not CLEAR on one, because the payload that would have decided the
+    review may be the one that failed to parse.
+    """
+    found, unreadable = None, False
+    for _start, end, data in iter_payload_spans(body):
+        if end is None:
+            unreadable = True
+        else:
+            found = data
+    return found, unreadable
 
 
 def payload_findings_malformed(payload):
@@ -709,21 +738,25 @@ def classify_verdict_body(body, head_oid):
     # payload can clear there when the prose matches nothing. A gate that
     # refuses a merge is the wrong place to copy an extra allow path into, so
     # the block below only ever blocks once the fast path has declined.
-    structured = extract_structured_review(body)
-    if isinstance(structured, dict) and "schema_version" in structured:
-        if payload_is_blocking(structured):
-            return "not-clean"
-        if payload_is_clean(structured):
-            return "clean"
+    structured, payload_unreadable = read_payload_state(body)
+    # Blocking first, and once: a payload that blocks does so whether or not
+    # it carries `schema_version`, so the two tests the fast path used to run
+    # separately collapse into this one. Clearing then needs all three of the
+    # version marker, a payload that affirmatively clears, and no sibling
+    # opener this reader could not bound.
     if payload_is_blocking(structured):
         return "not-clean"
+    if (isinstance(structured, dict) and "schema_version" in structured
+            and payload_is_clean(structured) and not payload_unreadable):
+        return "clean"
 
     # Everything below is a scan of PROSE, so the payload's own JSON must not
     # reach it -- see `blank_comment_regions`. Stripping here rather than at
     # the top of the function is deliberate: the payload block above needs the
     # comment intact, and the staleness check reads a `Reviewed commit:` line
     # that a reviewer may legitimately place inside one.
-    section, payload_unreadable = blank_comment_regions(section)
+    section, section_unreadable = blank_comment_regions(section)
+    payload_unreadable = payload_unreadable or section_unreadable
     # The headline (first non-empty line under the heading) outranks later
     # prose, so "Ready for merge --- the concern that this wasn't ready is
     # resolved" classifies by its headline rather than its narrative.

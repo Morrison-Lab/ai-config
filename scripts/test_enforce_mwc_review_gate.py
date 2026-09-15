@@ -1471,6 +1471,55 @@ class StructuredReviewDataTests(unittest.TestCase):
             gate.evaluate(MERGE_CMD, pr(comments=[comment(body)]))["decision"],
             "deny")
 
+    def test_a_later_malformed_payload_invalidates_an_earlier_clean_one(self):
+        """"Last VALID payload wins" degrades silently, and this is the body
+        where that matters.
+
+        A reviewer quotes a CLEAN template, corrects itself, and states
+        NOT_CLEAN in a final payload carrying a trailing comma. The reader
+        cannot parse the last one, so it falls back to the first --- and the
+        clean fast path returned before the headline reading "Needs more work"
+        was ever scanned. `read_payload_state` reports the failure alongside
+        the payload now, so nothing clears while an opener is unreadable.
+        """
+        body = ("**Claude finished review**\n\n### Verdict\n"
+                "**Needs more work** --- see findings below.\n\n"
+                "Earlier draft mistakenly asserted this template line:\n\n"
+                "<!-- review-data: " + payload("CLEAN", []) + " -->\n\n"
+                "--- corrected after re-reading the diff, real payload below.\n\n"
+                "Reviewed commit: " + HEAD + "\n\n"
+                '<!-- review-data: {"schema_version": "1.0", '
+                '"verdict": "NOT_CLEAN", "findings": [{"file": "a.py"}],} -->')
+        self.assertEqual(gate.classify_verdict_body(body, HEAD), "not-clean")
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, pr(comments=[comment(body)]))["decision"],
+            "deny")
+
+    def test_a_later_malformed_payload_also_blocks_a_bare_clean_body(self):
+        """The same shape with no not-clean prose to fall back on: the earlier
+        payload still must not clear, so the reading is ambiguous."""
+        body = ("**Claude finished review**\n\n### Verdict\n"
+                "**Content review: inconclusive**\n\n"
+                "<!-- review-data: " + payload("CLEAN", []) + " -->\n\n"
+                "Reviewed commit: " + HEAD + "\n\n"
+                '<!-- review-data: {"schema_version": "1.0", '
+                '"verdict": "CLEAN", "findings": [],} -->')
+        self.assertEqual(gate.classify_verdict_body(body, HEAD), "ambiguous")
+
+    def test_read_payload_state_reports_the_failure_beside_the_payload(self):
+        """Asserted on the reader directly, because a verdict cannot say
+        whether the flag or the prose produced it."""
+        good = "<!-- review-data: " + payload("CLEAN", []) + " -->"
+        found, unreadable = gate.read_payload_state(good)
+        self.assertEqual(found, {"schema_version": "1.0", "verdict": "CLEAN",
+                                 "findings": []})
+        self.assertFalse(unreadable)
+
+        found, unreadable = gate.read_payload_state(
+            good + '\n<!-- review-data: {"verdict": "CLEAN",} -->')
+        self.assertIsNotNone(found)
+        self.assertTrue(unreadable)
+
     def test_malformed_payload_withholds_clean_but_keeps_not_clean(self):
         """The asymmetry, in both directions, over a TERMINATED payload whose
         JSON will not parse -- a trailing comma, the commonest slip a model

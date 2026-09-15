@@ -136,6 +136,33 @@ Measured 2026-09-10/11 on `Lacaedemon/sparta`, three times in one session:
 - An all-or-nothing validation pass was added,
   and its one early `continue` kept the very non-atomicity it was written to prevent.
 
+**Enumerate the branches of the function you are about to ship, not the one the
+reviewer read.**
+
+Deriving the set before fixing is right, and it enumerates the *pre-fix*
+control flow.
+A round that also **adds** a branch --- a second spelling of the thing being
+allowed, a second path to the same decision --- puts that branch outside every
+set derived before the edit, so the derivation was complete and the fix is
+still partial.
+Nothing flags it: the added branch is your own new code, so it reads as the
+fix rather than as another member of the class the fix is about.
+
+The cheap re-check is to re-run the enumeration over the post-fix function and
+ask of each arm the same question the finding asked.
+`hooks/no-clobbering-push.py`'s `_override_before_wrapper` is the worked case:
+one function, two arms answering "does the author's escape hatch reach this
+wrapped command", a prefix-assignment arm and an `export` arm, each scoped
+against the same bypass in a different review round
+([ai-config#1973](https://github.com/Morrison-Lab/ai-config/issues/1973),
+commits `038f7337` and `318f408a`).
+Two rounds for one question in one function is the signal.
+
+- **Do:** re-derive the branch list after writing the fix, and ask the
+  finding's question of each arm including the ones you just added.
+- **Don't:** treat a branch enumeration taken before the edit as covering the
+  function you are about to push.
+
 **Deriving the class is necessary and not sufficient, because you can derive the
 wrong one --- and the growth rate across rounds is what says so.**
 

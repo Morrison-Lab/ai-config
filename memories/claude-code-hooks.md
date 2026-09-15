@@ -766,3 +766,50 @@ The third alternative is in the grep now, and adding it changed nothing today: t
 That pattern means the mutant is not running the code under test at all --- the import landed as `None` and the hook degraded --- rather than that the reverted clause did anything.
 A single clause flipping unexpected cases is a test problem.
 ALL of them flipping the same new cases is an import problem.)
+
+**Whichever remedy you pick, a one-file mutant harness cannot mutate the imported module --- and the remedy is what guarantees it.**
+
+Everything above is about making the mutant's import *work*.
+The corollary is that a working import is an import of the **real** module, so
+a clause living in `scripts/lib/shellcmd.py` is unreachable from a `MUTATIONS`
+table that rewrites one hook file.
+Placing the mutant in `hooks/` resolves the import off the repo above it;
+the `PYTHONPATH` fallback points at the real `scripts/lib` by construction.
+Both routes hand the subprocess the unmutated module, so a `MUTATIONS` entry
+naming a shared-module clause reverts nothing and scores as "the tests caught
+it" --- outcome one of
+[`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md)'s
+inapplicable-mutation list,
+arrived at from a direction that never looks like an inapplicable mutation,
+because the edit really was written and really did apply to the file the
+harness copied.
+
+`hooks/test-no-clobbering-push.py`'s `verdict()` on the
+[ai-config#1973](https://github.com/Morrison-Lab/ai-config/issues/1973) branch
+is the worked case, and its own comment states the mechanism:
+
+> The mutation harness copies ONE FILE to a temp directory, so a hook that
+> imports a shared module cannot resolve it from `__file__` there -- the copy
+> has no repo above it.
+> Without this, `shell_c_expansions` lands as `None` in
+> every mutant, the interpreter-wrapper cases go silent under EVERY clause, and
+> they read as "flipped" for reasons that have nothing to do with the clause
+> being reverted.
+
+So a cross-file clause needs a different instrument, not a better mutation:
+a direct-assertion suite against the module itself
+(`scripts/test_shellcmd.py` here), plus at least one end-to-end case through
+the hook that fails when the module's clause is reverted.
+Reverting the clause and running the module's own suite is the non-vacuity
+check, and it is the one a `MUTATIONS` table cannot perform for you.
+
+- **Do:** keep `MUTATIONS` scoped to clauses in the file the harness copies,
+  and pin a shared module's clauses with that module's own assertion suite.
+- **Do:** add an end-to-end case through the hook for each shared-module
+  clause, so the wiring is covered even though the clause is not mutable here.
+- **Do:** revert the shared clause and run the module's suite, to show the
+  assertions are non-vacuous.
+- **Don't:** list a shared-module clause in a one-file harness's `MUTATIONS` ---
+  it scores green for the same reason it cannot fail.
+- **Don't:** read an all-clauses-pass run as covering the imported code; the
+  imported code was never the mutant.

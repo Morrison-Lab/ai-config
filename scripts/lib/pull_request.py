@@ -95,6 +95,17 @@ class PullRequest:
         return self._data.get("reviewDecision") or ""
 
     @property
+    def is_draft(self) -> bool:
+        """True when the PR is still a draft.
+
+        Load-bearing for the review check rather than cosmetic: a draft does
+        not trigger the `@claude` review workflow, so "no automated review
+        found" on a draft is a permanent state rather than a pending one
+        (ai-config#3651).
+        """
+        return bool(self._data.get("isDraft"))
+
+    @property
     def commit_date(self) -> str:
         commits = (self._data.get("commits") or [])
         if commits:

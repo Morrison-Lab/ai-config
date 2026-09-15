@@ -66,6 +66,16 @@ CASES = [
                 "clean stopping point / work remains queued: " + LONG)], False,
      "a stopping-point block with no offer before it stays silent"),
 
+    # The first patch for #3694 cut everything from the marker onward, which
+    # made the pending-work section -- where flag-session-boundaries puts the
+    # remaining work, and calls it the most visible element of the reply -- a
+    # permanently safe place to park an offer. A worse blind spot than the one
+    # being closed. Caught in review on ai-config#3695.
+    ([TOOL, say("Merged and pushed.\n\n**Stopping Point**: Not a clean "
+                "stopping point / work remains queued: the array is mid-run. "
+                "Want me to push the fix now?")], True,
+     "an offer INSIDE the pending-work block still warns"),
+
     # Negatives that decide the anchoring.
     ([TOOL, say("Want me to do this? No -- it was already authorized, so I "
                 "did it. " + LONG)], False,

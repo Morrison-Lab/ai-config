@@ -106,20 +106,39 @@ def last_assistant_text(path):
 STOPPING_POINT_RX = re.compile(r"\*\*Stopping Point\*\*", re.I)
 
 
-def strip_stopping_point(text):
-    """Drop a trailing stopping-point declaration and anything after it."""
-    matches = list(STOPPING_POINT_RX.finditer(text))
+def offer_windows(text):
+    """The regions of a reply where a closing move can appear.
+
+    Without a stopping-point declaration there is one: the tail.
+
+    With one there are two, and dropping either loses real offers.
+    `flag-session-boundaries` puts the pending work AFTER the declaration and
+    calls it "the final and most visible element of the reply", so an offer
+    can sit there -- and cutting everything from the marker onward would make
+    that position permanently safe, which is a worse blind spot than the one
+    this fix set out to close. But the declaration itself is long enough to
+    push a preceding offer out of a fixed tail, so the pre-marker region
+    cannot simply be ignored either.
+
+    So: the tail of the text BEFORE the declaration, and the whole of what
+    follows it. Keeping a tail on the first preserves the reason the window
+    is short at all -- a mid-message aside still must not fire.
+    """
+    body = text.strip()
+    matches = list(STOPPING_POINT_RX.finditer(body))
     if not matches:
-        return text
-    return text[: matches[-1].start()]
+        return [body[-TAIL_CHARS:]]
+    cut = matches[-1].start()
+    return [body[:cut].strip()[-TAIL_CHARS:], body[cut:]]
 
 
 def find_offer(text):
     """Return the matched offer phrase when the reply CLOSES on one."""
-    body = strip_stopping_point(text.strip()).strip()
-    tail = body[-TAIL_CHARS:]
-    m = RX.search(tail)
-    return m.group(0) if m else None
+    for window in offer_windows(text):
+        m = RX.search(window)
+        if m:
+            return m.group(0)
+    return None
 
 
 def main() -> int:

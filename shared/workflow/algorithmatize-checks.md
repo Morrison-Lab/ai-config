@@ -1200,26 +1200,44 @@ anchors are matched with `str.count`: an anchor taken from a helper at
 8-space indentation also matched the same line at 12 spaces elsewhere in the
 file, and the harness stopped with a count of 2.)
 
-**The second cause is your own refactor, and it ends a uniqueness that held
-when the anchor was written.**
+**The second cause is your own refactor, and it ends the anchor's EXISTENCE
+rather than its uniqueness.**
 
 The indented twin above is a collision the file already contained, so a count
 taken at authoring time would have caught it.
-Extracting a helper creates one afterwards: two callers that carried the same
-loop now call one function, and a `MUTATIONS` clause anchored on either copy
-still matches, at the single surviving site.
-The anchor did not change and its file did, so nothing in the clause's own
-history says it has become ambiguous.
+Extracting a helper is the opposite failure and wants stating separately,
+because the counts run in opposite directions and so do the silent
+consequences.
+
+Lifting a loop out of two callers **re-indents it**, so an anchor copied from
+either caller now matches **nothing**.
+Measured across the extraction
+([ai-config#3645](https://github.com/Morrison-Lab/ai-config/pull/3645),
+`ebf0b58d` to `712405f1`), where a lead-word-stripping loop at 8-space
+indentation became `_lead_index`'s body at 4:
+
+```
+M2_old   in PRE=1   in POST=0
+M5_old   in PRE=1   in POST=0
+M_new    in PRE=0   in POST=1
+```
+
+An earlier version of this section said such a clause "still matches, at the
+single surviving site", which is a count of 1 and would not have tripped the
+FATAL quoted below (ai-config#3677 review, finding 1).
 
 Where the harness asserts uniqueness this is loud, which is the outcome to
 want.
 `hooks/test-flag-reset-hard-uncommitted-work.py` stopped with `FATAL: clause
-M2_lead_words's anchor is not present exactly once` after a lead-word-stripping
-loop was lifted out of two functions into `_lead_index` (measured 2026-09-14/15,
-[ai-config#3645](https://github.com/Morrison-Lab/ai-config/pull/3645)).
-Without that assertion the same edit is silent: the substitution rewrites the
-first occurrence or both, and the clause then reports a score for a mutation
-nobody chose.
+M2_lead_words's anchor is not present exactly once ... (found 0)`.
+
+Without that assertion the failure is not a wrong edit but **no edit at all**:
+`str.replace` on a string that does not occur returns the text unchanged, so
+the mutant is byte-identical to the original and every case passes.
+The clause then reports **zero flips**, which is indistinguishable from the
+reading this whole section exists to raise --- "this clause is untested".
+A refactor can therefore convert a well-pinned clause into an apparently dead
+one, and the evidence for deleting it is manufactured by the same edit.
 
 **What the merge revealed is the more useful half.**
 The two clauses had each declared their own set of cases to flip.
@@ -1433,9 +1451,10 @@ here the same failure produces a green suite and a `MISSED` row that reads as a 
 **What "on suite evidence alone" leaves open is what DOES license the
 deletion: a reachability argument read off the code.**
 
-The two sections above rule out one kind of evidence and name no other, so a
-clause measured dead and correctly not deleted can sit there indefinitely with
-nothing available to settle it.
+The two sections above already name two ways out --- a role search that comes
+back empty, and flagging the removal as a separate reviewable simplification.
+What neither supplies is the strongest evidence available, and the difference
+is worth stating because it changes what you are allowed to conclude.
 The settling evidence is not another run.
 It is a statement about the two clauses that holds for every input --- when an
 earlier clause returns on every value but one, a later test for that value can

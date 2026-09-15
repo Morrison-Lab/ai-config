@@ -789,6 +789,10 @@ Everything above is about making the mutant's import *work*.
 The corollary is that a working import is an import of the **real** module, so
 a clause living in `scripts/lib/shellcmd.py` is unreachable from a `MUTATIONS`
 table that rewrites one hook file.
+(That module's TOKENIZER behaviour --- what its operator-only split leaves at
+`argv[0]` --- is a fact about shells rather than about hooks, so it lives in
+[`shell.md`](shell.md) instead;
+this file owns how the module is imported and mutated.)
 Placing the mutant in `hooks/` resolves the import off the repo above it;
 the `PYTHONPATH` fallback points at the real `scripts/lib` by construction.
 Both routes hand the subprocess the unmutated module, so a `MUTATIONS` entry

@@ -867,8 +867,8 @@ allowed it, with the leading-executor twin of the same command blocking
 throughout
 ([ai-config#3635](https://github.com/Morrison-Lab/ai-config/pull/3635)
 pre-merge gate;
-both are standing holes rather than regressions, allowing on `HEAD~1` through
-`HEAD~4` as well).
+both are standing holes rather than regressions, present on `d7169012` and
+every revision back to `dfa05a59`, and closed by `6449c317`).
 The landed fix records `open_idx in closes` as a seventh tuple field and reads
 that.
 

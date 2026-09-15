@@ -197,9 +197,18 @@ This one is the chat recap itself, which is what
 The direction is the same in all three, and that is the part worth carrying
 forward.
 Extrapolating from a sense of elapsed work over-estimates it, so the invented
-stamp lands in the **future** relative to the true clock: 12:15/12:40/12:58
-against a real 12:21, 16:20/16:23 against a real 16:19, and 21:04/21:12/21:18
-against a real 21:00.
+stamp lands in the **future** relative to **the reading it was extrapolated
+from**: 12:15/12:40/12:58 from a real 12:02, 16:20/16:23 from a real 16:19,
+and 21:04/21:12/21:18 from a real 20:49.
+
+The baseline has to be the LAST measured reading and not the next one, which
+an earlier version of this entry used --- and against which 12:15 runs
+*behind* a real 12:21, a counter-example sitting inside a list arguing the
+direction is uniform (ai-config#3677 review, finding 4).
+`timestamp-local-recaps.md` hedges that datapoint itself, with "up to an hour
+behind the invented stamps".
+The last reading is also the comparison the guard performs, so stating it that
+way makes the entry and the instrument agree.
 Running ahead is therefore the signature rather than an incidental detail, and
 it is the one direction that guard already refuses --- `_skew` against
 `TOLERANCE_MIN`, under a comment reading "the turn cannot have run forward of
@@ -216,7 +225,7 @@ Widening the comparison to the most recent readable reading anywhere in the
 transcript is filed as
 [ai-config#3675](https://github.com/Morrison-Lab/ai-config/issues/3675).
 Note also that the guard warns and never blocks, so its firing is not what
-decides whether a stamp goes out --- reading it is.
+decides whether a stamp goes out --- reading the warning is.
 
 - **Do:** treat a stamp later than your last real reading as unmeasured until
   the clock is run again, whichever turn that reading was in.

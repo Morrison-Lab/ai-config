@@ -909,6 +909,32 @@
   This happens commonly when reusable workflows (like a review action) are called by multiple caller workflows, or when two different files just happen to use the same `name`.
   The fix is to query by the **exact filename** instead of the display name: `gh run list -w workflow-b.yml`.
 
+## `gh pr view --json` returns ONLY the requested fields, so a consumer reading an unrequested key is dead
+
+`gh pr view <N> --json a,b` emits an object with exactly `a` and `b`.
+A key that was not asked for is absent, not null-valued and not defaulted, so anything reading it gets `None` and its caller silently takes the else branch.
+
+This is the supply side of a rule [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md) already states about the consuming side --- "a matcher is a claim about its input, not a supply of one".
+A property is the same kind of claim.
+Declaring `is_draft` as `self._data.get("isDraft")` asserts what the value means and supplies nothing;
+the field list one function away is what decides whether it ever arrives.
+
+Measured 2026-09-14 on `scripts/lib/pull_request.py` ([ai-config#3652](https://github.com/Morrison-Lab/ai-config/pull/3652)).
+An `is_draft` property was added without `"isDraft"` being added to `_fetch_pr_data`'s field list, so it returned `False` for every real PR including actual drafts, and the `check-pr-fully-clean.py` branch it gates was unreachable.
+
+**The test passed because the test was more generous than `gh`.**
+That is the part worth carrying, because it is what made the defect invisible rather than merely present.
+The suite built its `PullRequest` with `__new__` and injected `_data` with `isDraft` already in it, so 865 cases exercised the message formatting and none exercised the fetch.
+A fixture that supplies a field the real command would have withheld cannot fail on a missing field, whatever else it checks.
+The fix is a fetcher that MIMICS the filtering --- parse the `--json` argument, return only those keys --- so a property whose key is not requested fails in the suite instead of in production.
+
+Two adjacent traps in the same area, both already recorded above: a field name `gh --json` rejects outright (`merged`) errors loudly and is therefore the easy case, and the `--from-json` payload path does not filter at all, so a defect in the `gh` field list can be invisible from a remote session that only exercises payloads.
+
+- **Do:** add the field to the `--json` list in the same change that adds the property reading it.
+- **Do:** make a fetch fixture filter by the requested field list, so it is never more generous than `gh`.
+- **Don't:** read a property's existence as evidence its field is fetched.
+- **Don't:** trust a suite that injects the parsed data to say anything about how that data is obtained.
+
 ## `gh pr update-branch` creates a merge commit and triggers CI
 
 When a PR is out of date with the base branch,

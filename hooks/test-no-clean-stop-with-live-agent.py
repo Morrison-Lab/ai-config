@@ -165,6 +165,49 @@ cases = [
         [dispatch(), notification(), liveness("Bash", "git status"), assistant(CLEAN)],
         True,
     ),
+    # The reviewer's round-2 finding on PR #3692: a MENTION of the check is not
+    # the check. This direction is the dangerous one -- it silently discharges
+    # the guard rather than falsely arming it.
+    (
+        "grepping for the tool name is not a liveness check",
+        [
+            dispatch(),
+            notification(),
+            liveness("Bash", 'grep -n "ListAgents" hooks/no-clean-stop-with-live-agent.py'),
+            assistant(CLEAN),
+        ],
+        True,
+    ),
+    (
+        "echoing the command text is not a liveness check",
+        [
+            dispatch(),
+            notification(),
+            liveness("Bash", 'echo "run git worktree list to check"'),
+            assistant(CLEAN),
+        ],
+        True,
+    ),
+    (
+        "the command inside a comment is not a liveness check",
+        [
+            dispatch(),
+            notification(),
+            liveness("Bash", "git status  # git worktree list would show locks"),
+            assistant(CLEAN),
+        ],
+        True,
+    ),
+    (
+        "a real worktree query still counts when chained",
+        [
+            dispatch(),
+            notification(),
+            liveness("Bash", "cd /tmp && git worktree list --porcelain"),
+            assistant(CLEAN),
+        ],
+        False,
+    ),
     (
         "a fenced declaration is not a declaration",
         [

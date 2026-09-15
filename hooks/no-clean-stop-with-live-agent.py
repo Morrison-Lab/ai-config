@@ -75,9 +75,55 @@ DISPATCH_TOOLS = {"agent", "task"}
 # Tools that answer "is it still running?". ListAgents is the direct one; a
 # worktree lock query is the indirect one the measured case had in hand.
 LIVENESS_TOOLS = {"listagents"}
-RX_LIVENESS_BASH = re.compile(
-    r"git\s+worktree\s+list|ListAgents|worktree\s+--porcelain", re.I
-)
+
+try:
+    # `globals().get` rather than a bare `__file__`: the suite may exec this
+    # module, where a bare reference is unbound.
+    _SELF = globals().get("__file__") or sys.argv[0]
+    _LIB = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.realpath(_SELF))),
+        "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from shellcmd import git_subcommand, simple_commands
+except Exception as _exc:  # broken install
+    print("no-clean-stop-with-live-agent: cannot load scripts/lib/shellcmd.py "
+          "({0}); bash liveness checks will not be recognized".format(_exc),
+          file=sys.stderr)
+    git_subcommand = simple_commands = None
+
+
+def is_liveness_command(command):
+    """True when `command` actually RUNS a worktree-liveness query.
+
+    Parsed into simple commands rather than matched as text. A regex over the
+    raw command string counts a mere MENTION as a check -- `grep -n
+    "ListAgents" hooks/no-clean-stop-with-live-agent.py` looks exactly like
+    the real thing to a substring matcher, and silently discharges the guard.
+    That is the same defect as the notification side above, in the opposite
+    direction, and it is the more dangerous one: a false positive here means
+    the guard stays quiet when it should block.
+
+    `scripts/lib/shellcmd.py` already blanks heredoc bodies and comments and
+    splits on shell operators, so it is reused rather than re-derived.
+
+    A parse failure returns False, leaving the guard ARMED. The asymmetry is
+    deliberate: a wrongly-armed guard costs one tool call, a wrongly-discharged
+    one costs the incident it exists to prevent.
+    """
+    if simple_commands is None or git_subcommand is None:
+        return False
+    argvs = simple_commands(command)
+    if not argvs:
+        return False
+    for argv in argvs:
+        parsed = git_subcommand(argv)
+        if not parsed:
+            continue
+        sub, rest, _env = parsed
+        if sub == "worktree" and any(a == "list" for a in rest):
+            return True
+    return False
 
 
 def declares_clean(text):
@@ -175,7 +221,7 @@ def scan(path):
                         liveness = i
                     elif name == "bash":
                         cmd = (b.get("input") or {}).get("command") or ""
-                        if RX_LIVENESS_BASH.search(cmd):
+                        if is_liveness_command(cmd):
                             liveness = i
 
                 elif kind == "text":

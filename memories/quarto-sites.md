@@ -479,8 +479,8 @@ plausibility.
 
 - **Do:** pre-render TikZ, and repair colour groups and fully-ruled tables
   before pandoc sees them.
-- **Do:** check the converted output against the original render, since the
-  source is what the losses are invisible against.
+- **Do:** check the converted output against the original render, since
+  comparing it against the `.tex` source is exactly what these losses survive.
 - **Don't:** infer from a construct surviving in prose that it survives in a
   table.
 - **Don't:** read a clean `pandoc` exit, or plausible-looking Markdown, as
@@ -497,7 +497,9 @@ included --- not only to a conversion.**
 - **MathJax-only**, such as `\bbox`: renders on the website and **fails the
   PDF build loudly**.
 - **LaTeX-only**, such as an xcolor `orange!80!black` mix: compiles into the
-  PDF and is **silently dropped by the browser**.
+  PDF and is **silently dropped by the browser** --- the same
+  xcolor-syntax-is-not-CSS failure the section above records for `style`
+  attributes, reaching math this time rather than a table cell.
 - `\boxed` works in both, and is the portable choice where either would do.
 
 **The asymmetry is the whole point.**

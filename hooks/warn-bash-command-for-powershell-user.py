@@ -56,8 +56,8 @@ step, a Make recipe, a git alias, a quoted session prompted `user@host:~$`, a
 heredoc merely named in a comment -- and every one of them fired. Those are
 fixed and pinned as cases. A command meant for a REMOTE host or container
 shell is NOT among them: it has no signal, stays a declared KNOWN_LIMIT, and
-is the largest false-positive class. A reader weighing this guard should weigh those, not the
-corpus counts.
+is the largest false-positive class. A reader weighing this guard should
+weigh those, not the corpus counts.
 
 WHY THE PROSE AROUND THE BLOCK IS NOT THE DISCRIMINATOR
 -------------------------------------------------------

@@ -396,8 +396,9 @@ MUTATIONS = {
         "a long block is a script being shown, not a command to paste. The "
         "bound is defence in depth, not a measured ceiling -- the corpus "
         "firing count is flat at three for every bound",
-        # anchored with its comment: the bare assignment also appears in the
-        # module docstring, where the measurement is recorded
+        # anchored with its preceding line rather than bare. The assignment
+        # is unique in the file today; the anchor keeps this mutation pinned
+        # to the definition if a second occurrence is ever added.
         [("named in the suite's KNOWN_LIMITS.\nMAX_LINES = 8",
           "named in the suite's KNOWN_LIMITS.\nMAX_LINES = 999")],
         {"S5"},

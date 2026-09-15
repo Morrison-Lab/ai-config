@@ -2350,7 +2350,7 @@ line in `scripts/install-hooks.py` summed per-interpreter bucket sizes
 against a per-row total, so a healthy install reported "accounted for 3 of
 10" on a small fixture, and would have read roughly "3 of 81" on this repo's
 own hook count, because many hooks share one `python3` spelling and collapse
-to one interpreter bucket while the total counted rows. A genuinely dropped
-row would have moved that number by one against a baseline shortfall already
-in the dozens --- invisible in exactly the way the line was added to
-prevent.)
+to one interpreter bucket while the total counted rows.
+A genuinely dropped row would have moved that number by one against a
+baseline shortfall already in the dozens --- invisible in exactly the way
+the line was added to prevent.)

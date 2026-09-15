@@ -376,8 +376,9 @@ case list is.
 (Proposed on Morrison-Lab/ai-config#3647, closes #3624, not yet merged at
 this writing: a `.sh` hook shipped at mode `100644` in its first commit,
 undetected by the suite for exactly this reason, and caught only by
-adversarial review rather than by anything in the repo. The mechanism now
-exists as `check_executable_bits` in `scripts/check-hook-catalog.py`; see
+adversarial review rather than by anything in the repo.
+The mechanism now exists as `check_executable_bits` in
+`scripts/check-hook-catalog.py`; see
 `memories/git.md`'s `git ls-files -s` stage-semantics entry and
 `shared/principles/fail-fast.md`'s aggregate-count entry for how that check
 itself needed two more rounds to land soundly.)

@@ -32,7 +32,10 @@ The two halves are both transcript-decidable:
 
   1. the command's own argv -- a relocation verb at a command position whose
      own segment's path arguments span two different drive letters, at least
-     one of which names a package library, depot, or VM disk image;
+     one of which names a package library, depot, or VM disk image. The
+     `wsl --import`/`--move` arm is the deliberate exception: the verb itself
+     supplies both facts, so it needs neither a second volume nor a
+     recognised toolchain path (see the comment at that arm);
   2. session history -- whether any earlier tool call asked what the physical
      media are (`Get-PhysicalDisk`, `Get-Disk`, `lsblk ... ROTA`, and friends).
 
@@ -71,7 +74,11 @@ entry exists to prevent.
 
 WHAT IS NOT MATCHED
 -------------------
-  * A relocator inside a quoted argument, a heredoc body, or a `#` comment.
+  * A relocator inside a heredoc body or a `#` comment, and inside a quoted
+    argument that contains no command separator. Quoting alone does not
+    protect: the command-position class is blind to quotes, so
+    `echo "step one; robocopy C:\... D:\..."` DOES warn, where the same
+    string without the `;` does not (case S11 pins only the latter).
     The verb must sit at a command position (start of string, or after `;`,
     `&&`, `||`, `|`, a newline, or an opening paren/brace), which is what keeps
     this corpus's own prose about the rule from tripping it -- the failure
@@ -349,9 +356,12 @@ def command_is_media_check(text):
 def find_risky_move(command):
     """(verb, [volumes], toolchain_token) when the command needs the warning.
 
-    None when it does not. Every clause must hold: a relocation verb at a
-    command position, path tokens spanning at least two drive letters, at least
-    one toolchain path or toolchain env var, and no backup/archive path token.
+    None when it does not. For a general relocator every clause must hold: a
+    verb at a command position, path tokens spanning at least two drive
+    letters, at least one toolchain path or toolchain env var, and no
+    backup/archive path token. The `wsl --import`/`--move` arm is exempt from
+    the middle two -- the verb names the operation and the subject, so one
+    volume and no recognised toolchain token still warn (case W4).
     """
     if not isinstance(command, str) or not command.strip():
         return None

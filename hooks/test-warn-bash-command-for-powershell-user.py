@@ -31,11 +31,15 @@ all of that load -- `S2`, `S3`, `S21`-`S25`.
 `HARNESS NOTE`: the hook fires once per (transcript, reply) via a /tmp
 sentinel. The mutation section runs every case many times, so `verdict()`
 gives each subprocess a FRESH temp directory. Without it the suite goes RED at
-0/18 clauses rather than vacuously green -- every mutation reports NOTHING
-FLIPPED, because the sentinel suppresses the second run of each case while the
-41 case tests still pass on their unique paths. (Corrected after round-1
-review, which measured the failure mode; the earlier note called it a vacuous
-pass.) `fires the first time` / `fire-once sentinel suppresses the repeat`
+1/18 clauses rather than vacuously green, and the signature is worth stating
+because it is NOT the obvious one: the sentinel is written only when the hook
+is about to warn, so only the ten W positives leave one behind during the case
+loop. In the mutation loop those ten go silent and register as FLIPPED on
+every clause, so each mutation reports a flip list rather than NOTHING
+FLIPPED; M17 alone reads green, its declared set being exactly those ten. The
+41 case tests still pass on their unique paths. (Re-measured round 8 by
+rebuilding the pre-fix harness; rounds 1 and 4 each corrected the number here
+and left this mechanism description untouched.) `fires the first time` / `fire-once sentinel suppresses the repeat`
 assert the sentinel still works.
 """
 import importlib.util

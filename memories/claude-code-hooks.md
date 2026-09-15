@@ -646,7 +646,9 @@ That is [`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md): a 
 `PYTHONPATH` is a valid fallback, not a replacement --- use it only where the harness genuinely cannot write into `hooks/`, and point it at the directory the hook's OWN spelling needs.
 The two spellings need different roots, so one value does not serve both: a bare `import shellcmd` after joining `"scripts", "lib"` needs `<repo>/scripts/lib`, while `from scripts.lib.X import ...` needs the repo ROOT and fails with `No module named 'scripts'` given the other.
 There is no safe default, so READ THE HOOK'S OWN IMPORT LINE and set `HOOK_IMPORT_ROOT` from it: `<repo>/scripts/lib` for the bare spelling, the repo ROOT for the package spelling.
-Measured on `main`, 2026-09-14: 11 of the 13 importers use the bare spelling ONLY (`comm -23` of the two greps), 1 uses the package spelling only (`flag-unread-commit-citation.py`), and 1 uses both (`no-push-without-self-review.py`, which also falls back to inserting both roots off its own `__file__`, so it is the worst exemplar to reason from).
+Measured on `main`, 2026-09-14: 11 of the 13 importers use the bare spelling ONLY (`comm -23` of the two greps), 1 uses the package spelling only (`flag-unread-commit-citation.py`), and 1 matches BOTH greps (`no-push-without-self-review.py`).
+That last one is a grep artifact rather than a hook using two spellings: its only `import` is the package form, and its `"scripts", "lib"` hit is a path join feeding `spec_from_file_location` in an `ImportError` fallback that inserts both roots off its own `__file__`.
+So it is the worst exemplar to reason from, and the reason the instruction above is to read the hook's own import LINE rather than to count grep hits.
 
 A first version of this paragraph named the placeholder `REAL_SCRIPTS_LIB`, and a "fix" then renamed it and declared the repo ROOT "the safe value when in doubt".
 That is wrong for 11 of the 13, and it blamed the name that carried the right value for the majority --- the same shape as the mistake this section already narrates two paragraphs up, where a first draft told future sessions NOT to relocate the mutant.
@@ -680,7 +682,7 @@ for f in hooks/*.py; do
   grep -qE '"scripts", "lib"|from scripts\.lib\.|_sibling\(|_load_sibling' "$f" || continue
   t="hooks/test-$(basename "$f" .py).py"
   [ -f "$t" ] || continue
-  grep -qE 'mkstemp\(suffix="\.py"|shutil\.copy\(HOOK' "$t" || continue
+  grep -qE 'mkstemp\(suffix="\.py"|shutil\.copy\(HOOK|mutant-.*\.py' "$t" || continue
   grep -qE 'dir=os\.path\.dirname\(HOOK\)' "$t" && continue
   echo "EXPOSED: $f -> $t"
 done
@@ -694,12 +696,17 @@ The third, `hooks/warn-new-line-breaks-on-push.py`, is a real instance: its harn
 Filed as [ai-config#3648](https://github.com/Morrison-Lab/ai-config/issues/3648).
 Re-derive rather than citing these figures.
 
-Three known limits of the loop, so the next reader does not mistake it for complete.
+Three known limits of the loop, so the next reader does not mistake it for complete, and one it USED to have.
 Its exclusion test is FILE-level, so a harness with two mutant sites where only one passes `dir=` is silently dropped.
 And it only sees harnesses that materialize a `.py` file at all, which is a proxy for "runs a mutant as a subprocess" rather than the thing itself.
 The third is this section's own mistake one level down: the grep matches four SPELLINGS (`"scripts", "lib"`, `from scripts.lib.`, `_sibling(`, `_load_sibling`) while the predicate above says "any import resolved off `__file__`", so a hook using a differently-named helper is invisible to it.
 `hooks/no-underived-required-check.py` is one today, resolving a sibling through `_HERE` and `spec_from_file_location`.
 It is not exposed --- its harness loads mutants in memory rather than writing them --- so the three-file result stands, but the gap bites the moment such a hook grows a file-materializing harness.
+
+The retired one is worth recording, because it was the same defect a third time and in the same loop.
+The materialization grep matched two spellings, `mkstemp(suffix=".py"` and `shutil.copy(HOOK`, and five committed harnesses write their mutant as `mutant-{clause}.py` instead --- among them `test-no-clobbering-push.py`, `test-flag-reset-hard-uncommitted-work.py`, `test-flag-add-a-outside-pathspec.py`, `test-flag-stale-branch-mutation.py` and `test-flag-unchained-branch-switch.py`.
+Four of those five belong to hooks [ai-config#1973](https://github.com/Morrison-Lab/ai-config/issues/1973)'s Scope section proposes giving a `scripts/lib` import, so the loop would have returned a false all-clear for them the moment that extraction landed --- which is verbatim the failure this section already narrates about its own first version.
+The third alternative is in the grep now, and adding it changed nothing today: the loop still prints the same three files.
 
 - **Do:** write a mutant into `hooks/` (`dir=os.path.dirname(HOOK)`), which covers sibling imports and `scripts/lib` imports alike.
 - **Do:** grep for how the repo already solves a harness problem before inventing a remedy for it --- three harnesses carried the answer and one carried the explanation.

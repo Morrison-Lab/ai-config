@@ -1136,7 +1136,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-cross-drive-toolchain-move.py\"",
             "timeout": 15,
             "script": "warn-cross-drive-toolchain-move.py",
-            "why": "memories/storage-media-placement.md -- warns, never blocks, when a relocation verb moves a package library, depot or VM disk image across drive letters and no media-type query (Get-PhysicalDisk, lsblk ROTA) appears earlier in the session. Toolchain data on a spinning disk is ~100x slower at random reads and NOTHING FAILS to say so. Silent for a cross-drive copy naming no toolchain path, and for one naming a backup/archive location, because an HDD is the correct destination for both."
+            "why": "memories/storage-media-placement.md -- warns, never blocks, when a relocation verb moves a package library, depot or VM disk image across drive letters and no media-type query (Get-PhysicalDisk, lsblk ROTA) appears earlier in the session. Toolchain data on a spinning disk is ~100x slower at random reads and NOTHING FAILS to say so. Narrowed four ways: silent for a cross-drive copy naming no toolchain path, for one naming a backup/archive location (an HDD is correct for both), for a rehearsal (/L, -WhatIf, rsync -n), and for tokens belonging to a neighbouring command segment."
           }
         ]
       },
@@ -1148,7 +1148,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-irreplaceable-under-cache-label.py\"",
             "timeout": 15,
             "script": "warn-irreplaceable-under-cache-label.py",
-            "why": "memories/preferences.md 'Partition a deletion choice by BLAST RADIUS' -- warns, never blocks, when an AskUserQuestion option's LABEL promises reversibility (cache/temp/regenerable/safe-to-delete) while the option names irreplaceable storage (a VM or WSL disk image by extension, a named docker volume, a data or home directory). The label is what carries consent, so a bundle like that yields an uninformed approval. Keyed on disk-image extensions and volumes, never on the bare word docker, so 'clear the Docker build cache' stays silent."
+            "why": "memories/preferences.md 'Partition a deletion choice by BLAST RADIUS' -- warns, never blocks, when an AskUserQuestion option's LABEL promises reversibility (cache/temp/regenerable/safe-to-delete) while the option names irreplaceable storage (a VM or WSL disk image by extension, a named docker volume, pgdata, a home directory). The label is what carries consent, so a bundle like that yields an uninformed approval. Keyed on disk-image extensions and volumes, never on the bare word docker, so 'clear the Docker build cache' stays silent; polarity is checked per sentence, so an option naming an item in order to say it is safe is silent too."
           }
         ]
       }

@@ -69,6 +69,43 @@ UNCHECKED = _write("unchecked.jsonl", [
     "Get-ChildItem C:\\Users\\Work -Directory | Measure-Object Length -Sum",
 ])
 
+# A transcript whose SECOND line is valid JSON but not an object, with the
+# media check on the third. Without the `isinstance(entry, dict)` guard the
+# bare string raised out of the whole scan, `main`'s blanket handler swallowed
+# it, and the media check on line 3 was never reached -- a silently wrong
+# answer rather than a loud one (round-1 finding 4a, untested until round 2).
+def _write_malformed(name, last_command):
+    path = os.path.join(TMP, name)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(json.dumps({
+            "type": "assistant",
+            "message": {"content": [
+                {"type": "tool_use", "name": "Bash",
+                 "input": {"command": "git status --short"}},
+            ]},
+        }) + "\n")
+        fh.write('"a bare string line"\n')
+        fh.write(json.dumps({
+            "type": "assistant",
+            "message": {"content": [
+                {"type": "tool_use", "name": "Bash",
+                 "input": {"command": last_command}},
+            ]},
+        }) + "\n")
+    return path
+
+
+MALFORMED = _write_malformed(
+    "malformed.jsonl", "Get-PhysicalDisk | Format-Table MediaType")
+# The same shape with NO media check. This is the case that ISOLATES the
+# `isinstance` guard: with it, the scan reaches line 3, finds nothing, and the
+# hook warns. Without it the bare string raises, the (correctly) widened
+# `except` fails open, and the hook goes silent -- which is indistinguishable
+# from the discharged outcome, so MALFORMED alone could not tell the two
+# apart.
+MALFORMED_UNCHECKED = _write_malformed(
+    "malformed-unchecked.jsonl", "git log --oneline -5")
+
 # ---------------------------------------------------------------------------
 # Cases. `W*` must warn, `S*` must stay silent. Each is a full PreToolUse
 # payload, so the suite exercises the tool gate and the transcript discharge
@@ -128,8 +165,14 @@ CASES = {
                 rf"robocopy {J} D:\julia /E" "\nEOF"),
     # `wsl --export` writes a tar: a cold sequential archive, HDD-correct
     "S13": bash(r"wsl --export Ubuntu D:\images\ubuntu.tar"),
-    # a URL is not a drive letter
+    # a URL in a NEIGHBOURING segment. Round 2 caught this case's original
+    # rationale going stale: segment scoping means the `https://` is no longer
+    # in view at all, so it stopped testing the `DRIVE` lookbehind. S25 tests
+    # that; this now tests only what it actually exercises.
     "S14": bash(r"curl -fsSL https://example.com/x.tar && cp x.tar /tmp/"),
+    # a URL in the SAME segment as the relocator. `rsync://` must not read as
+    # drive C, which would give this command two volumes and a toolchain path.
+    "S25": bash(r"rsync -a /d/Users/Work/.m2 rsync://example.com/m2"),
     # cross-drive, but nothing toolchain-shaped is named
     "S15": bash(r"robocopy C:\Users\Work\Pictures D:\Pictures /E"),
     # a non-shell tool must never be evaluated at all
@@ -167,6 +210,41 @@ CASES = {
     # the source tar, and an HDD is right for that, so there is nothing to
     # warn about.
     "S23": bash(r"wsl --import Ubuntu . C:\downloads\ubuntu-22.04.tar"),
+
+    # -- cases added from round 2 of the adversarial review (b1694279) -----
+    # R-1: `-n` is rsync's dry-run flag and cp/mv's NO-CLOBBER flag, and
+    # `cp -n` copies. Putting it in REHEARSAL silenced every one of these.
+    "W13": bash(r"cp -n -r /c/Users/Work/.m2 /d/m2"),
+    "W14": bash(r"mv -n /mnt/c/Users/Work/.gradle /mnt/d/gradle"),
+    # R-2: REHEARSAL was matched against the whole command, so `-n` anywhere
+    # in a chain silenced a real relocation in another segment.
+    "W15": bash(rf"robocopy {J} D:\julia /E | head -n 5"),
+    # R-3: the first relocator won, so any harmless earlier copy blinded the
+    # guard completely.
+    "W16": bash(rf"cp notes.txt notes.bak; robocopy {J} D:\julia /E"),
+    # R-4: `(Join-Path ...)` is idiomatic PowerShell here, and a paren in the
+    # segment separator class amputated the destination.
+    "W17": bash(r"Move-Item C:\Users\Work\.julia "
+                r"-Destination (Join-Path D:\ 'julia')", tool="PowerShell"),
+    # R-6: `restore` is a BUILD verb before it is a backup noun, and `vault`
+    # names a product; both came off the exemption list.
+    "W18": bash(rf"robocopy {J} D:\restored\cargo /E"),
+    "W19": bash(rf"robocopy {J} D:\vaults\julia /E"),
+    # R-5: `--import --vhd` takes a `.vhdx` SOURCE, which the generic
+    # toolchain scan preferred to the install location.
+    "W20": bash(r"wsl --import Ubuntu D:\WSL\Ubuntu "
+                r"C:\dl\ubuntu.vhdx --vhd"),
+    # rsync IS the verb `-n` means dry-run for, so this one stays silent
+    "S24": bash(r"rsync -n -a /c/Users/Work/.m2 /d/m2"),
+    # R-2: a rehearsal flag belongs to ONE command. `/L` in a neighbouring
+    # segment must not silence the relocation in this one.
+    "W21": bash(rf"robocopy {J} D:\julia /E; ls /L"),
+    # 4a: the media check sits AFTER a line that is valid JSON but not an
+    # object, so reaching it at all is the test.
+    "S26": bash(rf"robocopy {J} D:\julia /E", transcript=MALFORMED),
+    # ... and the same transcript with NO media check must still WARN, which
+    # is what isolates the guard from the widened `except` behind it.
+    "W22": bash(rf"robocopy {J} D:\julia /E", transcript=MALFORMED_UNCHECKED),
 }
 
 EXPECTED = {cid: cid.startswith("W") for cid in CASES}
@@ -185,7 +263,8 @@ WHY = {
     "S11": "the verb is inside a quoted argument",
     "S12": "the verb is inside a heredoc body",
     "S13": "`wsl --export` writes a cold tar archive",
-    "S14": "an https scheme is not a drive letter",
+    "S14": "the URL is in a neighbouring segment, out of the token pool",
+    "S25": "an `rsync://` scheme is not drive C",
     "S15": "cross-drive but names nothing toolchain-shaped",
     "S16": "not a shell tool",
     "S17": "the tokens belong to a neighbouring command, not this one",
@@ -195,6 +274,8 @@ WHY = {
     "S21": "the separator sits inside a `#` comment",
     "S22": "`wsl --export` writes a cold archive whatever it is named",
     "S23": "the only drive-bearing token is the source tar",
+    "S24": "`-n` IS rsync's dry-run flag, unlike cp's and mv's",
+    "S26": "a malformed transcript line must not hide a later media check",
 }
 
 # Detections this design deliberately gives up. Each is a gap, not an
@@ -208,6 +289,18 @@ KNOWN_LIMITS = {
     "move made from inside WSL is invisible",
     "a path built from a variable (robocopy $src $dst) exposes no path "
     "token at all",
+    r"a path assembled by a cmdlet (Copy-Item (Join-Path C:\Users\Work "
+    r"'.julia') -Destination D:\julia) exposes no token carrying BOTH the "
+    r"drive and the depot name, so the toolchain test cannot see it -- "
+    r"unchanged by removing parens from the segment separators, which fixed "
+    r"only the case where the DESTINATION was amputated",
+    r"BACKUP matches `archiv` as a substring, so D:\dev\archived-projects "
+    r"is exempted; `vault` and `restore` were removed for failing that same "
+    r"admission test and `archiv` was kept, which is a judgement call rather "
+    r"than a derivation",
+    r"a `#` preceded by a space INSIDE a quoted argument still opens a "
+    r'comment, so robocopy /XF "*.log #tmp" D:\julia loses its second '
+    r"drive letter -- the same class as FN-2, narrowed but not closed",
     "a shell-within-a-shell (powershell -Command 'robocopy ...') hides the "
     "verb inside a quoted argument, so the command-position anchor -- which "
     "is what keeps this corpus's own prose out -- also silences it",
@@ -263,6 +356,19 @@ check("names the offending path",
       hook.find_risky_move(rf"robocopy {J} D:\julia /E")[2], J)
 check("names both volumes",
       hook.find_risky_move(rf"robocopy {J} D:\julia /E")[1], ["C", "D"])
+# R-5: a `--vhd` import's SOURCE is itself a `.vhdx`, and a redirect target is
+# a third path token. Neither may be the token the note names.
+check("wsl --import --vhd names the destination, not the .vhdx source",
+      hook.find_risky_move(
+          r"wsl --import Ubuntu D:\WSL\Ubuntu C:\dl\ubuntu.vhdx --vhd"
+      )[2], r"D:\WSL\Ubuntu")
+check("a redirect target is not the relocated image",
+      hook.find_risky_move(
+          r"wsl --import Ubuntu D:\WSL\Ubuntu C:\dl\u.tar > C:\log.txt"
+      )[2], r"D:\WSL\Ubuntu")
+# 4a, at the helper level as well as through the payload (S26).
+check("a bare-string transcript line does not hide a later media check",
+      hook.transcript_has_media_check(MALFORMED), True)
 # FN-1: `wsl --import <Distro> <InstallLocation> <FileName>`. The note must
 # name the live image's location, never the source tar -- the archive is the
 # one argument in that command an HDD is unambiguously right for.
@@ -306,15 +412,16 @@ MUTATIONS = {
         [("if not volumes or (len(volumes) < 2 and not is_wsl):",
           "if not volumes or (len(volumes) < 1 and not is_wsl):")],
         # S18 joins S6 once the two-volume test is gone: `/mnt/c/...` is a
-        # single volume, and `.julia` supplies the toolchain path.
-        {"S6", "S18"},
+        # single volume, and `.julia` supplies the toolchain path. S25 joins
+        # them for the same reason: one volume plus `.m2`.
+        {"S6", "S18", "S25"},
     ),
     "M3_toolchain_path_required": (
         "the narrowing that makes this defensible: a cross-drive copy "
         "naming no package library, depot or disk image must be silent, "
         "because that is the population the HDD is RIGHT for",
-        [("    if toolchain is None:\n        return None",
-          "    if toolchain is None:\n        toolchain = tokens[0][1]")],
+        [("        if toolchain is None:\n            continue",
+          "        if toolchain is None:\n            toolchain = tokens[0][1]")],
         # every ordinary cross-drive copy starts warning, including S17's
         # media move (whose tokens the segment scoping already isolates) and
         # S23, whose only token is a cold tar
@@ -324,9 +431,9 @@ MUTATIONS = {
         "a copy to a backup/archive/snapshot location is a backup, and an "
         "HDD is the correct destination for one even when the source is a "
         "depot",
-        [("    if any(BACKUP.search(raw) for _, raw in tokens):\n"
-          "        return None",
-          "    if False:\n        return None")],
+        [("        if any(BACKUP.search(raw) for _, raw in tokens):\n"
+          "            continue",
+          "        if False:\n            continue")],
         # S1 does not flip: `Documents` -> `D:\Backup\Documents` names no
         # toolchain path either, so M3's clause already holds it silent. Only
         # the two backups OF a depot depend on this exemption, which is
@@ -346,7 +453,9 @@ MUTATIONS = {
         [("        if transcript_has_media_check(payload.get("
           '"transcript_path") or ""):\n            return 0',
           "        if False:\n            return 0")],
-        {"S7"},
+        # S26's malformed transcript IS discharged (its third line carries
+        # the media check), so it nags alongside S7 once this clause goes.
+        {"S7", "S26"},
     ),
     "M7_same_command_discharge": (
         "a media check chained into this very command discharges it too",
@@ -376,7 +485,10 @@ MUTATIONS = {
         "over the whole command makes a survey chained to an unrelated move "
         "warn, and names a directory the command does not touch",
         [("    segment = _segment_at(text, at)", "    segment = text")],
-        {"S17"},
+        # W21 flips too, through the other consumer of `segment`: the
+        # rehearsal test then sees the `/L` in the neighbouring segment. The
+        # overlap is real and M17 isolates that half on its own.
+        {"S17", "W21"},
     ),
     "M12_toolchain_env_fallback": (
         "an env var naming a depot identifies the directory when neither "
@@ -389,15 +501,15 @@ MUTATIONS = {
         "a `#` only opens a comment at the start of a word -- the "
         "unanchored spelling truncated `/LOG:C:\\l#1.txt` and lost the "
         "second drive letter with it",
-        [(r'COMMENT = re.compile(r"(?m)(?:^|(?<=[ \t]))(?<![\\$])#[^\n]*$")',
-          r'COMMENT = re.compile(r"(?m)(?<![\\$])#[^\n]*$")')],
+        [(r'COMMENT = re.compile(r"(?m)(?:^|(?<=[ \t]))#[^\n]*$")',
+          r'COMMENT = re.compile(r"(?m)#[^\n]*$")')],
         {"W12"},
     ),
     "M14_rehearsal_flags": (
-        "`robocopy /L`, `-WhatIf` and `rsync -n` move nothing, so warning "
-        "about one is pure noise",
-        [("    if REHEARSAL.search(text):\n        return None",
-          "    if False:\n        return None")],
+        "`robocopy /L` and `-WhatIf` move nothing, so warning about one is "
+        "pure noise",
+        [(r'REHEARSAL = re.compile(r"(?:^|\s)(?:/L|-WhatIf)(?=\s|$)", re.I)',
+          r'REHEARSAL = re.compile(r"(?:^|\s)(?:-WhatIf)(?=\s|$)", re.I)')],
         {"S20"},
     ),
     "M15_archive_is_not_the_live_image": (
@@ -412,6 +524,74 @@ MUTATIONS = {
         # token IS the archive, so losing the filter turns a silent command
         # into a warning about a cold tar.
         {"S23"},
+    ),
+    # -- clauses added in round 2. Each covers code that round-2 review broke
+    # and found NOTHING flipped, which is how R-1, R-3, R-4 and R-5 got in:
+    # every one of those defects sat behind a clause no case asserted.
+    "M16_every_relocator_considered": (
+        "the FIRST relocation verb must not win -- any harmless earlier copy "
+        "would otherwise scope the guard to a segment with nothing in it",
+        [('''    candidates = [(m.group("verb").lower(), m.start("verb"), False)
+                  for m in RELOCATOR.finditer(text)]''',
+          '''    candidates = [(m.group("verb").lower(), m.start("verb"), False)
+                  for m in list(RELOCATOR.finditer(text))[:1]]''')],
+        {"W16"},
+    ),
+    "M17_rehearsal_is_segment_scoped": (
+        "a rehearsal flag belongs to ONE command, so a `/L` in a "
+        "neighbouring segment must not silence this one",
+        [("        if REHEARSAL.search(segment):",
+          "        if REHEARSAL.search(text):")],
+        {"W21"},
+    ),
+    "M18_dry_run_n_is_rsync_only": (
+        "`-n` is rsync's dry-run flag and cp/mv's NO-CLOBBER flag, and "
+        "`cp -n` copies -- one character deciding whether a relocation "
+        "happened at all",
+        [(r'REHEARSAL = re.compile(r"(?:^|\s)(?:/L|-WhatIf)(?=\s|$)", re.I)',
+          r'REHEARSAL = re.compile(r"(?:^|\s)(?:/L|-WhatIf|-n)(?=\s|$)", re.I)')],
+        {"W13", "W14"},
+    ),
+    "M19_paren_is_not_a_separator": (
+        "`(Join-Path ...)` is idiomatic PowerShell here, and a paren in the "
+        "segment separator class amputates the argument after it",
+        [(r'SEGMENT_SPLIT = re.compile(r"[;&|\n]")',
+          r'SEGMENT_SPLIT = re.compile(r"[;&|\n(){}]")')],
+        {"W17"},
+    ),
+    "M20_wsl_destination_is_first": (
+        "`wsl --import <Distro> <InstallLocation> <FileName>` puts the "
+        "destination FIRST, and running the generic toolchain scan instead "
+        "preferred a `--vhd` import's `.vhdx` SOURCE to it",
+        [("        if is_wsl:\n            # `wsl --import <Distro> "
+          "<InstallLocation> <FileName>` puts the",
+          "        if False:\n            # `wsl --import <Distro> "
+          "<InstallLocation> <FileName>` puts the")],
+        # W20 keeps warning -- only the NAMED token changes there, which the
+        # unit assertions above pin. W4 and W11 are the boolean half: neither
+        # `wsl --manage --move D:\WSL\Ubuntu` nor an import whose two tokens
+        # are a plain directory and a `.tar` carries anything the generic
+        # TOOLCHAIN scan recognises, so losing this arm loses both outright.
+        {"W4", "W11"},
+    ),
+    "M21_backup_list_admission_test": (
+        "`vault` and `restore` came off the exemption list for failing the "
+        "same admission test the sibling hook's irreplaceable list is held "
+        "to: `restore` is a BUILD verb before it is a backup noun",
+        [(r'    r"backups?|bkp|archiv|snapshot|cold[-_ ]?storage"',
+          r'    r"backups?|bkp|archiv|snapshot|cold[-_ ]?storage|vault|restore"')],
+        {"W18", "W19"},
+    ),
+    "M22_transcript_entry_isinstance": (
+        "a transcript line can be valid JSON and not an object; without the "
+        "guard one such line raised out of the whole scan and every later "
+        "media check went unseen, so the hook fell open in silence",
+        [("    if not isinstance(entry, dict):\n        return",
+          "    if False:\n        return")],
+        # W22, not S26: S26's transcript IS discharged, so the broken guard's
+        # fail-open produces the same silence the correct code produces.
+        # Only a malformed transcript with NO media check separates them.
+        {"W22"},
     ),
     "M9_shell_tool_gate": (
         "a non-shell tool carrying a `command` key must never be evaluated",

@@ -44,7 +44,18 @@ The subject is not "how much space is free" but **what the destination is made o
   Preconditions are checked before the first irreversible step, and deleting a source directory is an irreversible step.
 
   - **Do:** run the check before the first byte moves, and record which drive is which in the plan.
-    `Get-PhysicalDisk` alone prints **no drive letters**, so it cannot answer "is `D:` the slow one?" unaided --- join it through the partition: `Get-Partition -DriveLetter C,D | Get-Disk | Get-PhysicalDisk | Format-Table DeviceId, FriendlyName, MediaType, Size`.
+    `Get-PhysicalDisk` alone prints **no drive letters**, so it cannot answer "is `D:` the slow one?" unaided.
+    Joining it through the partition is necessary but not sufficient:
+
+    ```powershell
+    Get-Partition -DriveLetter C,D | Select-Object DriveLetter,
+      @{n='Media';e={($_ | Get-Disk | Get-PhysicalDisk).MediaType}},
+      @{n='Model';e={($_ | Get-Disk | Get-PhysicalDisk).FriendlyName}}
+    ```
+
+    The calculated properties are not decoration.
+    Piping a partition straight through (`Get-Partition | Get-Disk | Get-PhysicalDisk | Format-Table`) projects the drive letter away, and returns rows in **disk** order rather than the order you asked for --- so on this machine it prints the TOSHIBA first and a reader taking it positionally concludes `C:` is the platter.
+    That is the exact inverted claim this entry exists to prevent, reached by following the entry's own instruction.
     On Linux the equivalent is `lsblk -o NAME,ROTA,MOUNTPOINT`;
     `lsblk -d` suppresses partitions and so prints `ROTA` with nothing to attach it to. (Caught in adversarial review: the first draft of this entry, and of the hook's own note, gave the unjoined command --- the one command the entry exists to make people run.)
   - **Do:** ask, for any fact you are about to defer, whether learning it late would make already-done work wrong.
@@ -74,4 +85,5 @@ The subject is not "how much space is free" but **what the destination is made o
 [`hooks/warn-cross-drive-toolchain-move.py`](../hooks/warn-cross-drive-toolchain-move.py) is this entry's guard.
 It warns, never blocks, on a `PreToolUse` `Bash`/`PowerShell` relocation command (`robocopy`, `xcopy`, `Move-Item`, `Copy-Item`, `cp -r`, `mv`, `rsync`, `wsl --import`/`--move`) whose **own command segment's** path arguments span two drive letters **and** name a toolchain path, when no media-type query appears earlier in the transcript.
 Scoping the tokens to one segment is what keeps a size survey chained to an unrelated move from warning about the directory it merely measured.
-It is deliberately narrow in two directions the incident makes necessary: a cross-drive copy with no toolchain path (the ordinary backup, the media move) is silent, and so is one whose paths name a backup or archive location, because an HDD is the *correct* destination for both and a guard that cried wolf there would be worked around within a day.
+It is deliberately narrow in four directions, and the first two are the ones the incident makes necessary: a cross-drive copy with no toolchain path (the ordinary backup, the media move) is silent, and so is one whose paths name a backup or archive location, because an HDD is the *correct* destination for both and a guard that cried wolf there would be worked around within a day.
+Adversarial review added the other two: a rehearsal (`robocopy /L`, `-WhatIf`, `rsync -n`) moves nothing, and a path token in a neighbouring command segment belongs to a different command.

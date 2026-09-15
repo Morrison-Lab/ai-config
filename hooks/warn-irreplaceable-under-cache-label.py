@@ -72,7 +72,7 @@ that fired on the word `docker` would be switched off within a day, which is
 README's "a hook that misfires is worse than a missing one" in its sharpest
 form. So `docker`, `container`, `image`, `wsl` and `vm` are NOT triggers on
 their own. The irreplaceable list is keyed on VM/container **disk images** by
-file extension, on named **volumes** and **data directories**, and on explicit
+file extension, on named **volumes**, and on explicit
 filesystem wording -- the things that hold state nothing can re-fetch.
 
 Likewise `npm cache`, `pip cache`, `browser cache`, `Temp`, `.gradle caches`
@@ -112,7 +112,7 @@ REVERSIBLE = re.compile(
 
 # Storage that holds state nothing can re-fetch.
 #
-# Keyed on DISK IMAGE extensions, named volumes, and data directories -- never
+# Keyed on DISK IMAGE extensions and named volumes -- never
 # on `docker`, `container`, `image`, `wsl` or `vm` alone, because "clear the
 # Docker build cache" is a correct sentence and firing on it is what gets a
 # guard ignored.
@@ -150,12 +150,19 @@ IRREPLACEABLE = re.compile(
 # home directory are untouched." fired on `ext4` (finding FP-4). Punishing the
 # honest disclosure is the worst available misfire, so polarity is checked per
 # sentence.
+#
+# The entries are held to the same admission test as IRREPLACEABLE: each must
+# INDEPENDENTLY promise that the named thing survives. Round-2 review applied
+# it and `remains`/`remaining` and `excluded` failed -- "Deletes the remaining
+# ext4.vhdx images" and "Deletes home directory backups, excluded from the
+# nightly job" are destructive sentences containing them -- so both were
+# removed rather than defended (finding R-10).
 PRESERVED = re.compile(
     r"""\b(?:
-        untouched | unaffected | unchanged | intact | spared | excluded
+        untouched | unaffected | unchanged | intact | spared
       | preserve[sd]? | preserving | retain(?:s|ed|ing)? | kept | keeps
       | recreated | re-?created | regenerated | rebuilt | restored
-      | survives? | survived | remains? | remaining
+      | survives? | survived
     )\b
   | \bnot\s+(?:be\s+)?(?:affected|touched|removed|deleted|cleared|wiped)\b
   | \bnever\s+(?:affected|touched|removed|deleted)\b
@@ -172,7 +179,23 @@ PRESERVED = re.compile(
 # IRREPLACEABLE and stranded a reassurance in a different fragment from
 # the item it reassures about. A sentence break is a period followed by
 # space or end of string; a period inside a filename is not one.
-SENTENCE = re.compile(r"(?:[.;](?=\s|$)|\n)+")
+SENTENCE = re.compile(r"(?:[.;!?](?=\s|$)|\n)+")
+
+# Verbs that put the thing named after them at risk. A preservation marker
+# suppresses a hit only when NO destructive verb precedes the item in the same
+# sentence -- without that, one reassuring clause disarmed everything beside
+# it: "Purges the ext4.vhdx, leaving Windows files unaffected" and "Deletes the
+# ext4.vhdx, and the npm cache is preserved" both went silent (finding R-9).
+# The comma form is the natural English, and splitting harder on commas is not
+# the fix: "Your WSL2 ext4.vhdx and home directory are untouched" would then
+# lose its own reassurance.
+DESTRUCTIVE = re.compile(
+    r"\b(?:delete[sd]?|deleting|remove[sd]?|removing|purge[sd]?|purging"
+    r"|wipe[sd]?|wiping|clear[sd]?|clearing|erase[sd]?|erasing"
+    r"|destroy(?:s|ed)?|drop(?:s|ped)?|prune[sd]?|pruning|blow(?:s|n)?\s+away"
+    r"|free[sd]?|freeing|reclaim(?:s|ed)?|nuke[sd]?)\b",
+    re.I,
+)
 
 def _strings(node, keys, out):
     """Collect strings stored under any of `keys`, at any depth."""
@@ -210,7 +233,13 @@ def options(tool_input):
                 parts = []
                 _strings(node, {"description", "detail", "details", "body",
                                 "explanation", "summary"}, parts)
-                found.append((label, " ".join([label] + parts)))
+                # Joined with a FULL STOP, not a space: the label is its own
+                # sentence. Run together, a label like "Remove temp files"
+                # put a destructive verb in front of every item in the first
+                # description sentence, which cancelled the recreation
+                # exemption for "...scratch.vmdk, recreated by the packer
+                # build" (round-2 review of b1694279).
+                found.append((label, ". ".join([label] + parts)))
             for value in node.values():
                 walk(value)
         elif isinstance(node, list):
@@ -230,11 +259,17 @@ def _at_risk(body):
     second.
     """
     for sentence in SENTENCE.split(body):
-        if PRESERVED.search(sentence):
-            continue
         hit = IRREPLACEABLE.search(sentence)
-        if hit:
-            return hit.group(0)
+        if not hit:
+            continue
+        # A reassurance disarms the item only when nothing destructive is said
+        # about it first. "Your ext4.vhdx is untouched" reassures; "Purges the
+        # ext4.vhdx, leaving Windows files unaffected" does not, however
+        # reassuring its second clause sounds.
+        if (PRESERVED.search(sentence)
+                and not DESTRUCTIVE.search(sentence[:hit.start()])):
+            continue
+        return hit.group(0)
     return None
 
 

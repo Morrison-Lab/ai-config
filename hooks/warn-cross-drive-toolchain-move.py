@@ -238,22 +238,33 @@ TOOLCHAIN_ENV = re.compile(
 # The long words are matched as SUBSTRINGS rather than as whole segments,
 # because real backup directories carry affixes: `D:\MyBackups`, `D:\Backup2`,
 # `D:\BackupDrive`, `D:\Archive2026` all warned under a whole-word spelling
-# (adversarial review of a331d675, finding FP-3). Over-exempting is the safe
-# direction here -- a missed warning costs nothing, a warning on a backup costs
-# the guard's credibility. Only `bak` keeps word boundaries, since it is a
-# substring of ordinary words ("baker", "bakery").
+# (adversarial review of a331d675, finding FP-3).
+#
+# Each entry still has to INDEPENDENTLY mean "this is a backup" -- the same
+# admission test the sibling hook's irreplaceable list is held to. Round-2
+# review applied it here and `vault` and `restore` failed: `restore` is a BUILD
+# verb before it is a backup noun (`dotnet restore`, `renv::restore`,
+# `D:\nuget-restore-cache`), and `vault` names a product and a notes app
+# (finding R-6). Both were removed rather than defended. `archiv` stays, and
+# over-exempts `D:\dev\archived-projects` -- recorded in the suite's
+# KNOWN_LIMITS rather than left implicit. Only `bak` keeps word boundaries,
+# since it is a substring of ordinary words ("baker", "bakery").
 BACKUP = re.compile(
-    r"backups?|bkp|archiv|snapshot|cold[-_ ]?storage|vault|restore"
+    r"backups?|bkp|archiv|snapshot|cold[-_ ]?storage"
     r"|sicherung|sauvegarde|respaldo"
     r"|(?:^|[\\/_. -])bak(?:[\\/_. -]|$)",
     re.I,
 )
 
-# A rehearsal is not a relocation. `robocopy /L` lists without copying,
-# PowerShell's `-WhatIf` and rsync's `-n`/`--dry-run` are the same intent, and
-# warning about a command that moves nothing is pure noise (finding FP-7).
-REHEARSAL = re.compile(
-    r"(?:^|\s)(?:/L|-WhatIf|--dry-run|-n)(?=\s|$)", re.I)
+# A rehearsal is not a relocation. `robocopy /L` lists without copying and
+# PowerShell's `-WhatIf` is the same intent, so warning about a command that
+# moves nothing is pure noise (finding FP-7).
+REHEARSAL = re.compile(r"(?:^|\s)(?:/L|-WhatIf)(?=\s|$)", re.I)
+
+# `-n` is rsync's dry-run flag and cp/mv's NO-CLOBBER flag, and `cp -n` copies.
+# Keeping it in REHEARSAL silenced every `cp -n` and `mv -n` relocation
+# (finding R-1), so it is matched only against an rsync segment.
+RSYNC_DRY_RUN = re.compile(r"(?:^|\s)(?:-n|--dry-run)(?=\s|$)", re.I)
 
 # Cold sequential archives. A `.tar` named in a `wsl --import` is the SOURCE
 # the image is unpacked FROM, and an HDD is the right home for one, so it must
@@ -291,14 +302,26 @@ HEREDOC = re.compile(
 # whitespace because the unanchored spelling truncated real arguments --
 # `robocopy ... /LOG:C:\l#1.txt D:\julia` lost everything from the `#`,
 # including the second drive letter (finding FN-2).
-COMMENT = re.compile(r"(?m)(?:^|(?<=[ \t]))(?<![\\$])#[^\n]*$")
+#
+# The `(?<![\\$])` the first spelling carried was dropped in round 2: given the
+# whitespace anchor, the character before `#` is always start-of-line, a space
+# or a tab, so the lookbehind could never fire. Round-2 review proved it dead
+# by exhaustive enumeration, and dead code in a matcher reads as a guard that
+# is doing something (finding R-8).
+COMMENT = re.compile(r"(?m)(?:^|(?<=[ \t]))#[^\n]*$")
 
 # Command-list separators, used to scope path tokens to the relocator's OWN
 # segment. Pooling tokens over the whole command string made a survey chained
 # to an unrelated move warn about the surveyed directory:
 # `Get-ChildItem C:\...\.julia -Recurse | ...; robocopy C:\Videos D:\Media /E`
 # named `.julia`, which that command does not move (finding FP-2).
-SEGMENT_SPLIT = re.compile(r"[;&|\n(){}]")
+#
+# `(`, `)`, `{` and `}` were in this class in the first spelling and are not
+# any more: `Copy-Item (Join-Path C:\Users\Work '.julia') -Destination D:\julia`
+# is idiomatic PowerShell on this machine, and a paren in the separator class
+# amputated the destination so the two-volume test could never pass
+# (finding R-4). A paren is not a command-list separator in either shell.
+SEGMENT_SPLIT = re.compile(r"[;&|\n]")
 
 
 def strip_noise(command):
@@ -328,56 +351,70 @@ def find_risky_move(command):
         return None
     text = strip_noise(command)
 
-    hit = RELOCATOR.search(text)
-    verb = hit.group("verb").lower() if hit else None
-    at = hit.start("verb") if hit else None
-    # `wsl --import` / `--manage --move` names only its DESTINATION, so the
-    # source volume is never in the argv and the two-volume test below can
-    # never pass. The thing being placed is a live `ext4.vhdx` by definition,
-    # which is why this arm needs neither the second volume nor a recognised
-    # toolchain path -- the verb itself supplies both facts.
-    wsl_hit = WSL_RELOCATOR.search(text) if verb is None else None
-    is_wsl = wsl_hit is not None
-    if is_wsl:
-        verb = "wsl --import/--move"
-        at = wsl_hit.end()
-    if verb is None:
+    # EVERY relocation verb in the command is considered, not just the first.
+    # Taking `RELOCATOR.search`'s single hit and scoping to its segment meant
+    # any harmless earlier relocation blinded the guard --
+    # `cp notes.txt notes.bak; robocopy C:\...\.julia D:\julia /E` went silent
+    # (round-2 adversarial review of b1694279, finding R-3).
+    candidates = [(m.group("verb").lower(), m.start("verb"), False)
+                  for m in RELOCATOR.finditer(text)]
+    # `wsl --import` / `--manage --move` names its DESTINATION and, for
+    # `--import`, a source file. The thing being placed is a live `ext4.vhdx`
+    # by definition, so this arm needs neither a second volume nor a
+    # recognised toolchain path -- the verb supplies both facts.
+    if not candidates:
+        candidates = [("wsl --import/--move", m.end(), True)
+                      for m in WSL_RELOCATOR.finditer(text)]
+    if not candidates:
         return None
 
-    if REHEARSAL.search(text):
-        return None
+    for verb, at, is_wsl in candidates:
+        # Only the relocator's OWN command segment supplies path tokens or the
+        # rehearsal flags. A token in a neighbouring segment belongs to a
+        # different command, and naming it is worse than staying silent -- a
+        # guard that reports a path the command does not touch teaches people
+        # to stop reading it.
+        segment = _segment_at(text, at)
 
-    # Only the relocator's OWN command segment supplies path tokens. A token
-    # in a neighbouring segment belongs to a different command, and naming it
-    # is worse than staying silent -- a guard that reports a path the command
-    # does not touch teaches people to stop reading it.
-    segment = _segment_at(text, at)
+        # `-n` means dry-run for rsync and NO-CLOBBER for cp/mv, which do
+        # copy. Scoping the flag to the verb costs nothing and was the
+        # difference between a rehearsal and a real relocation (finding R-1).
+        if REHEARSAL.search(segment):
+            continue
+        if verb == "rsync" and RSYNC_DRY_RUN.search(segment):
+            continue
 
-    tokens = paths(segment)
-    volumes = sorted({vol for vol, _ in tokens})
-    if not volumes or (len(volumes) < 2 and not is_wsl):
-        return None
+        tokens = paths(segment)
+        volumes = sorted({vol for vol, _ in tokens})
+        if not volumes or (len(volumes) < 2 and not is_wsl):
+            continue
 
-    if any(BACKUP.search(raw) for _, raw in tokens):
-        return None
+        if any(BACKUP.search(raw) for _, raw in tokens):
+            continue
 
-    toolchain = next((raw for _, raw in tokens if TOOLCHAIN.search(raw)), None)
-    # The env var may be exported in an EARLIER segment (`$env:X='D:\d';
-    # robocopy ...`), so it is looked for across the whole command even though
-    # the path tokens are not.
-    if toolchain is None and TOOLCHAIN_ENV.search(text):
-        toolchain = tokens[0][1]
-    if toolchain is None and is_wsl:
-        # `wsl --import <Distro> <InstallLocation> <FileName>` carries BOTH a
-        # destination and a source tar. Name the live image's location, never
-        # the archive -- the archive is the one thing in the command an HDD is
-        # unambiguously right for (finding FN-1).
-        live = [raw for _, raw in tokens if not ARCHIVE_FILE.search(raw)]
-        toolchain = live[-1] if live else None
-    if toolchain is None:
-        return None
+        if is_wsl:
+            # `wsl --import <Distro> <InstallLocation> <FileName>` puts the
+            # DESTINATION first, so `live[0]` is the live image's location.
+            # This arm runs BEFORE the generic TOOLCHAIN scan, because a
+            # `--vhd` import's SOURCE is itself a `.vhdx` and the generic scan
+            # picked it -- naming the argument an HDD is arguably right for
+            # and omitting the one it is not (finding R-5).
+            live = [raw for _, raw in tokens if not ARCHIVE_FILE.search(raw)]
+            toolchain = live[0] if live else None
+        else:
+            toolchain = next(
+                (raw for _, raw in tokens if TOOLCHAIN.search(raw)), None)
+            # The env var may be exported in an EARLIER segment
+            # (`$env:X='D:\d'; robocopy ...`), so it is looked for across the
+            # whole command even though the path tokens are not.
+            if toolchain is None and TOOLCHAIN_ENV.search(text):
+                toolchain = tokens[0][1]
+        if toolchain is None:
+            continue
 
-    return verb, volumes, toolchain
+        return verb, volumes, toolchain
+
+    return None
 
 
 def _tool_uses(entry):
@@ -454,11 +491,17 @@ NOTE = (
     "7200rpm platter those run roughly two orders of magnitude slower than on "
     "NVMe, and NOTHING FAILS -- the copy succeeds, the toolchain still works, "
     "and the cost surfaces later as an unattributable slowdown.\n"
-    "Run `Get-Partition -DriveLetter C,D | Get-Disk | Get-PhysicalDisk | "
-    "Format-Table DeviceId, FriendlyName, MediaType, Size` (or "
-    "`lsblk -o NAME,ROTA,MOUNTPOINT`) FIRST and say which of {volumes} is "
-    "the SSD. `Get-PhysicalDisk` on its own prints no drive letters, so it "
-    "cannot answer this question unaided -- join it through the partition. "
+    "Run this FIRST and say which of {volumes} is the SSD:\n"
+    "  Get-Partition -DriveLetter {letters} | Select-Object DriveLetter, "
+    "@{{n='Media';e={{($_ | Get-Disk | Get-PhysicalDisk).MediaType}}}}, "
+    "@{{n='Model';e={{($_ | Get-Disk | Get-PhysicalDisk).FriendlyName}}}}\n"
+    "  (Linux: lsblk -o NAME,ROTA,MOUNTPOINT)\n"
+    "The calculated properties are not decoration. `Get-PhysicalDisk` prints "
+    "no drive letter at all, and piping a partition straight into it projects "
+    "the letter away -- so the shorter `Get-Partition | Get-Disk | "
+    "Get-PhysicalDisk | Format-Table` gives rows you cannot attach to a drive, "
+    "in DISK order rather than the order you asked for. Reading that output "
+    "positionally is how you get the answer exactly backwards. "
     "The media type is a precondition of the plan, not a detail: "
     "learning it late means already-done work has to be reverted, including "
     "any source directory already deleted.\n"
@@ -524,11 +567,16 @@ def main():
 
     verb, volumes, token = hit
     drives = " and ".join(f"{v}:" for v in volumes)
+    # The command literal is parameterised on the volumes this command
+    # actually touches. The first spelling hardcoded `C,D` while interpolating
+    # the real drives in the same sentence, so a move between E: and F: was
+    # told to query two volumes it does not touch (finding R-2 of round 2).
+    letters = ",".join(volumes)
     out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": NOTE.format(
-                verb=verb, token=token, volumes=drives),
+                verb=verb, token=token, volumes=drives, letters=letters),
         },
     }
     # Gated per README's Antigravity double-warn rule: the adapter's PreToolUse

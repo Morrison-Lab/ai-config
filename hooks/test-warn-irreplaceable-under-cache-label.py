@@ -142,6 +142,36 @@ CASES = {
     "W7": ask(("Clear caches",
                "Your home directory is untouched. Also deletes the dev VM's "
                "ext4.vhdx.")),
+
+    # -- cases added from round 2 of the adversarial review (b1694279) -----
+    # R-9: a reassurance about something ELSE, in the same sentence as the
+    # item being destroyed, disarmed the whole sentence. The comma form is
+    # the natural English and was the untested one.
+    "W8": ask(("Clear caches",
+               "Purges the ext4.vhdx, leaving Windows files unaffected.")),
+    "W9": ask(("Clear caches",
+               "Deletes the ext4.vhdx, and the npm cache is preserved.")),
+    "W10": ask(("Clear caches",
+                "Wipes docker volumes, but the images are kept for the "
+                "rebuild.")),
+    # R-10: `remaining` and `keeps` are ordinary English in a destructive
+    # sentence, and neither independently promises the item survives.
+    "W11": ask(("Clear caches", "Deletes the remaining ext4.vhdx images.")),
+    "W12": ask(("Clear caches",
+                "Deletes everything the VM keeps, including its ext4.vhdx.")),
+    # R-11: `?` and `!` end sentences too.
+    "W13": ask(("Clear caches",
+                "Deletes the dev VM's .vhdx? Home directory untouched.")),
+    # ... and W15 is the one that ISOLATES that clause: no destructive verb
+    # precedes the item, so only the sentence boundary keeps the next
+    # sentence's reassurance from guarding it.
+    "W15": ask(("Clear caches",
+                "Includes the dev VM's .vhdx! Your home directory is "
+                "untouched.")),
+    # `remaining` with nothing destructive before the item -- the case that
+    # isolates the preservation list's admission test from the precedence
+    # rule that otherwise subsumes it.
+    "W14": ask(("Clear caches", "The remaining ext4.vhdx images are stale.")),
 }
 
 EXPECTED = {cid: cid.startswith("W") for cid in CASES}
@@ -258,13 +288,18 @@ MUTATIONS = {
           '"details", "body",\n'
           '                                "explanation", "summary"}, parts)',
           "                parts = []")],
-        {"W1", "W2", "W3", "W4", "W5", "W6", "W7"},
+        # every positive, old and new: each names its irreplaceable item in
+        # the description rather than in the label
+        {"W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9",
+         "W10", "W11", "W12", "W13", "W14", "W15"},
     ),
     "M6_preservation_guard": (
         "naming an item in order to say it is SAFE is the opposite of "
         "putting it at risk -- without this the well-formed option the hook "
         "exists to produce was the one that warned (finding FP-4)",
-        [("        if PRESERVED.search(sentence):\n            continue",
+        [("        if (PRESERVED.search(sentence)\n"
+          "                and not DESTRUCTIVE.search(sentence[:hit.start()])):\n"
+          "            continue",
           "        if False:\n            continue")],
         {"S10", "S11", "S12", "S15"},
     ),
@@ -279,12 +314,66 @@ MUTATIONS = {
         "a sentence break is a period followed by space or end of string; a "
         "period inside `ext4.vhdx` is not one, and splitting there both hid "
         "the extension and stranded the reassurance in another fragment",
-        [(r'SENTENCE = re.compile(r"(?:[.;](?=\s|$)|\n)+")',
+        [(r'SENTENCE = re.compile(r"(?:[.;!?](?=\s|$)|\n)+")',
           r'SENTENCE = re.compile(r"[.;\n]+")')],
         # S10's reassurance is stranded from `ext4`; W2's `.vmdk` and W6's
         # `.vhdx` are each cut in half, so the only irreplaceable item in
         # those options disappears
-        {"S10", "W2", "W6"},
+        # W15 joins them: its `!` boundary is also lost under a plain
+        # `[.;\n]` split, so its reassurance guards the item beside it
+        {"S10", "W2", "W6", "W13", "W15"},
+    ),
+    # -- clauses added in round 2, each covering code that round-2 review
+    # broke with NOTHING flipping -- the gap that let R-9 and R-10 through.
+    "M9_destructive_verb_precedence": (
+        "a reassurance disarms an item only when nothing destructive is said "
+        "about it first: 'Purges the ext4.vhdx, leaving Windows files "
+        "unaffected' reassures about something ELSE",
+        [("        if (PRESERVED.search(sentence)\n"
+          "                and not DESTRUCTIVE.search(sentence[:hit.start()])):",
+          "        if PRESERVED.search(sentence):")],
+        # W11 is NOT here: `remaining` came off the preservation list, so
+        # that case never depended on the precedence rule. M10 owns it.
+        {"W8", "W9", "W10", "W12"},
+    ),
+    "M10_preserved_admission_test": (
+        "`remaining` and `excluded` came off the preservation list for "
+        "failing the same admission test that removed four entries from "
+        "IRREPLACEABLE -- neither independently promises the item survives",
+        [("      | survives? | survived\n    )",
+          "      | survives? | survived | remains? | remaining | excluded\n    )")],
+        # W14, not W11: W11 says "Deletes the remaining ...", so the
+        # precedence rule fires it whichever way this list reads. Only a
+        # sentence with no destructive verb before the item isolates it.
+        {"W14"},
+    ),
+    "M11_bang_and_question_end_sentences": (
+        "`?` and `!` end a sentence as surely as `.`, and without them a "
+        "reassurance in the NEXT sentence guards the previous one's item",
+        [(r'SENTENCE = re.compile(r"(?:[.;!?](?=\s|$)|\n)+")',
+          r'SENTENCE = re.compile(r"(?:[.;](?=\s|$)|\n)+")')],
+        {"W15"},
+    ),
+    "M12_label_is_its_own_sentence": (
+        "the label joins the description as a SEPARATE sentence -- run "
+        "together, a label like 'Remove temp files' puts a destructive verb "
+        "in front of every item in the first description sentence and "
+        "cancels the recreation exemption",
+        [('found.append((label, ". ".join([label] + parts)))',
+          'found.append((label, " ".join([label] + parts)))')],
+        {"S15"},
+    ),
+    "M13_guarded_hit_is_skipped_not_final": (
+        "a guarded hit is SKIPPED rather than ending the search, so an "
+        "option that reassures about one item and destroys another still "
+        "fires on the second",
+        [("        if (PRESERVED.search(sentence)\n"
+          "                and not DESTRUCTIVE.search(sentence[:hit.start()])):\n"
+          "            continue",
+          "        if (PRESERVED.search(sentence)\n"
+          "                and not DESTRUCTIVE.search(sentence[:hit.start()])):\n"
+          "            return None")],
+        {"W7"},
     ),
     "M5_tool_gate": (
         "a payload from another tool must never be evaluated",

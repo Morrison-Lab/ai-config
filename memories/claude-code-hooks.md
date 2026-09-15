@@ -328,7 +328,25 @@ grep -lE 'payload\.get\(\s*["'"'"']cwd' hooks/*.py | grep -v '/test-' | wc -l
 ```
 
 That printed **18** on `main` on 2026-09-14.
-The set spans EVENTS, so pick an exemplar by the event you care about rather than off the top of the list: `flag-cd-into-main-checkout.py`, `flag-dispatch-over-uncommitted.py` and `no-clobbering-push.py` are `PreToolUse`, while `no-unmonitored-pr.py` is registered on `Stop` and `UserPromptSubmit`, whose payloads carry no `tool_input` at all, so it is no evidence for anything about nesting.
+The set spans EVENTS, so pick an exemplar by the event you care about rather than off the top of the list: `flag-cd-into-main-checkout.py`, `flag-dispatch-over-uncommitted.py` and `no-clobbering-push.py` are `PreToolUse`, while `no-unmonitored-pr.py` and `no-unshipped-commit.py` are `Stop`, whose payloads carry no `tool_input` at all, so neither is evidence for anything about nesting.
+
+Derive a hook's events PER COMMAND, never per event group:
+
+```bash
+python3 -c 'import json
+h = json.load(open("hooks/hooks.json"))["hooks"]
+for ev, groups in h.items():
+    for g in groups:
+        for entry in g.get("hooks", []):
+            if "no-unmonitored-pr.py" in entry.get("command", ""):
+                print(ev)'
+```
+
+A first version of this paragraph said `no-unmonitored-pr.py` was also on `UserPromptSubmit`.
+It is not: the query above prints only `Stop`, and `README.md`'s hook catalog and `memories/hooks.md` both agree.
+The false claim came from a query that dumped each event GROUP to JSON and substring-matched the whole thing, so any hook sharing a group with a `UserPromptSubmit` entry inherited that event.
+The `UserPromptSubmit` poller hooks are `inject-pr-monitor-status.py` and `ensure-open-pr-monitor.py`;
+`no-unmonitored-pr.py`'s own docstring calls one of them "the companion `UserPromptSubmit` hook", which is the phrase a careless read turns into a registration.
 Two of the 18 (`no-handrolled-verdict-parse.py`, `warn-verdict-line-filter.py`) additionally fall back to `tool_input.cwd` as a defensive second read.
 
 Eighteen consumers agreeing is evidence about this repo's convention and not, by itself, evidence about the harness's schema --- they could share one wrong assumption, which is the substitution [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md) warns about.
@@ -579,15 +597,13 @@ This is the adjacent-artifact substitution [`verify-the-right-artifact`](../shar
 (Measured 2026-09-11.
 [ai-config#3577](https://github.com/Morrison-Lab/ai-config/issues/3577) was filed on the behaviour and corrected once the repo files were read.)
 
-## Mutation-testing a hook that uses `_sibling()` cross-imports needs the mutant copy IN `hooks/`, not `/tmp`
+## Mutation-testing a hook that resolves an import off its own `__file__` (a sibling hook, or a `scripts/lib` module) needs the mutant copy IN `hooks/`, not `/tmp`
 
 Every hook that imports another hook's helpers uses the `_sibling()` pattern (`flag-unmeasured-timestamp.py`, `flag-unread-commit-citation.py`, ...), which resolves the sibling's path off `HERE = os.path.dirname(os.path.realpath(__file__))` --- the mutant's OWN directory, not the original hook's.
 Copying a mutated hook file to `/tmp` for mutation-testing (`cp hook.py /tmp/mut.py`, or writing the mutant there directly) silently breaks every `_sibling()` import, because `/tmp/flag-unmeasured-timestamp.py` does not exist.
 `_sibling()` fails open (returns `None` on any exception), so the mutant does not crash --- it just runs with every imported regex/function replaced by `None` or a narrow local fallback, which changes its behaviour for reasons that have nothing to do with the mutation under test.
 
-That `HERE` spelling was `os.path.abspath(__file__)` until [#2981](https://github.com/Morrison-Lab/ai-config/issues/2981) changed every non-test hook that used it to `realpath`.
-(Three non-test hooks elsewhere in `hooks/` already used `Path(__file__).resolve()` and were not touched:
-`flag-unattributable-reviewer-request.py`, `no-misattributed-quote.py` and `no-unauthorized-merge.py`.
+That `HERE` spelling was `os.path.abspath(__file__)` until [#2981](https://github.com/Morrison-Lab/ai-config/issues/2981) changed every non-test hook that used it to `realpath`. (Three non-test hooks elsewhere in `hooks/` already used `Path(__file__).resolve()` and were not touched: `flag-unattributable-reviewer-request.py`, `no-misattributed-quote.py` and `no-unauthorized-merge.py`.
 Only the first of those uses `_sibling()`, so the other two are outside this section's population.)
 Nothing in this section changes: `abspath` and `realpath` agree for a mutant copied into a real directory, and the `/tmp` trap above is about the directory, not about how it is spelled.
 
@@ -629,12 +645,13 @@ That is [`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md): a 
 
 `PYTHONPATH` is a valid fallback, not a replacement --- use it only where the harness genuinely cannot write into `hooks/`, and point it at the directory the hook's OWN spelling needs.
 The two spellings need different roots, so one value does not serve both: a bare `import shellcmd` after joining `"scripts", "lib"` needs `<repo>/scripts/lib`, while `from scripts.lib.X import ...` needs the repo ROOT and fails with `No module named 'scripts'` given the other.
-`hooks/no-push-without-self-review.py` uses the package spelling, so the root is the safe value when in doubt:
+`hooks/no-push-without-self-review.py` uses the package spelling, so the repo ROOT is the safe value when in doubt --- which is what `HOOK_IMPORT_ROOT` below must be set to.
+Naming that placeholder `REAL_SCRIPTS_LIB`, as a first version did, made the example set exactly the path the sentence above it says fails.
 
 ```python
 env = dict(os.environ)
 env["PYTHONPATH"] = os.pathsep.join(
-    [REAL_SCRIPTS_LIB] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
+    [HOOK_IMPORT_ROOT] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
 proc = subprocess.run([sys.executable, hook_path], ..., env=env, ...)
 ```
 
@@ -666,9 +683,12 @@ The third, `hooks/warn-new-line-breaks-on-push.py`, is a real instance: its harn
 Filed as [ai-config#3648](https://github.com/Morrison-Lab/ai-config/issues/3648).
 Re-derive rather than citing these figures.
 
-Two known limits of the loop, so the next reader does not mistake it for complete.
+Three known limits of the loop, so the next reader does not mistake it for complete.
 Its exclusion test is FILE-level, so a harness with two mutant sites where only one passes `dir=` is silently dropped.
 And it only sees harnesses that materialize a `.py` file at all, which is a proxy for "runs a mutant as a subprocess" rather than the thing itself.
+The third is this section's own mistake one level down: the grep matches four SPELLINGS (`"scripts", "lib"`, `from scripts.lib.`, `_sibling(`, `_load_sibling`) while the predicate above says "any import resolved off `__file__`", so a hook using a differently-named helper is invisible to it.
+`hooks/no-underived-required-check.py` is one today, resolving a sibling through `_HERE` and `spec_from_file_location`.
+It is not exposed --- its harness loads mutants in memory rather than writing them --- so the three-file result stands, but the gap bites the moment such a hook grows a file-materializing harness.
 
 - **Do:** write a mutant into `hooks/` (`dir=os.path.dirname(HOOK)`), which covers sibling imports and `scripts/lib` imports alike.
 - **Do:** grep for how the repo already solves a harness problem before inventing a remedy for it --- three harnesses carried the answer and one carried the explanation.

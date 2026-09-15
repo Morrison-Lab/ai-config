@@ -389,7 +389,7 @@ A probe written through the same Bash-tool heredoc, reading back both the source
 
 So the collapse is one pairwise halving, applied once, and quadrupling cancels it.
 
-**Two forms are portable, and quadrupling is not.**
+**Three forms, two of them portable.**
 
 - The **Write tool** with a raw string, `r` plus triple quotes, is the cleanest: its content is JSON-encoded on the way to disk, so nothing collapses, and a raw literal keeps `\n` as two characters.
   This is the form to reach for when generating code.

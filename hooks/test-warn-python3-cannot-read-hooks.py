@@ -34,10 +34,20 @@ make the one hook that reports the outage part of it.
 """
 import os
 import re
+import shutil
 import stat
 import subprocess
 import sys
 import tempfile
+
+# Resolved from the AMBIENT PATH, once, before any case narrows PATH to a stub
+# directory. `run()` below replaces PATH wholesale so the hook's own `python3`
+# lookup finds only the stub -- and on POSIX the child executable is resolved
+# from the CHILD's PATH, so a bare "sh" is then unfindable and every case dies
+# with FileNotFoundError. Windows resolves the child from the PARENT's
+# environment instead, which is why this passed locally and failed on Ubuntu
+# CI. Handing subprocess an absolute path sidesteps the difference entirely.
+SH = shutil.which("sh") or "sh"
 
 HOOK = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
     os.path.dirname(__file__), "warn-python3-cannot-read-hooks.sh")
@@ -88,7 +98,7 @@ def run(path_dirs, hook=HOOK, py_arg_file=None):
     dest = py_arg_file or os.path.join(tempfile.mkdtemp(), "py-arg")
     env = dict(os.environ, PATH=os.pathsep.join(path_dirs),
                PY_ARG_FILE=dest.replace(os.sep, "/"))
-    p = subprocess.run(["sh", hook], capture_output=True, text=True, env=env)
+    p = subprocess.run([SH, hook], capture_output=True, text=True, env=env)
     return p.returncode, p.stdout
 
 

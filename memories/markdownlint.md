@@ -22,9 +22,9 @@ Split out of [`tools.md`](tools.md) on 2026-09-01 when that file crossed the 125
   `npx --yes markdownlint-cli2@<version>` reads `.markdownlint-cli2.jsonc` and lints the whole repo in seconds;
   take the version from the `lint-markdown` job log, which prints it as its first line.
   Note precisely what this does and does not clear.
-  `scripts/run-local-validation.py` deliberately declines to offer this as a local equivalent for the `lint-markdown` job, because gha's action runs four checks (markdownlint, code-block length, list-item splices, table splits) and a bare call reproduces one while reporting a clean zero for the other three.
-  That reasoning is about the *job*, not about the tool.
-  Running it by hand as one named check is sound, and reporting it as the job is the failure that runner exists to prevent.
+  `scripts/run-local-validation.py` offers this as a `PARTIAL` equivalent for the `lint-markdown` job: gha's action runs four checks (markdownlint, code-block length, list-item splices, table splits) and a bare call reproduces one, so the runner tags the result `PARTIAL` and names the three it does not cover in `MARKDOWNLINT_UNCOVERED`.
+  It used to refuse the partial outright, until refusing left the markdown gate absent from every markdown-only pre-push run (ai-config#3120).
+  Running the tool by hand as one named check is sound, and reporting it as the job is the failure that runner exists to prevent.
   **Do:** run it before pushing markdown, and say which of the four checks it covered.
   **Don't:** read a clean markdownlint run as the `lint-markdown` job passing.
   (Morrison-Lab/ai-config#3060, 2026-09-03.)
@@ -76,7 +76,7 @@ Split out of [`tools.md`](tools.md) on 2026-09-01 when that file crossed the 125
   **Do:** after applying one-sentence-per-line inside a list, put a blank line between every pair of items in that list, and read a splice finding as pointing at the item *after* the one you split.
   **Don't:** debug the item the error names --- check the line above it first.
   **Candidate check.**
-  Per the `markdownlint-cli2 runs locally` entry above, `scripts/run-local-validation.py` offers no local equivalent for this companion, so it reaches a session only as a red CI job.
+  `scripts/run-local-validation.py`'s `lint-markdown` equivalent is tagged `PARTIAL` and names list-item splices among the checks it does not cover (`MARKDOWNLINT_UNCOVERED`), so this checker reaches a session only as a red CI job.
   `scripts/vendor/gha-check-new-line-breaks.py` plus `scripts/sync-nlb-checker.py` is the established shape for vendoring one of gha's checkers so it can run before the push.
   The splice checker is the same kind of small, self-contained, diff-scoped script.
   (ucdavis/lbt#7, 2026-09-15: a numbered link checklist was reflowed one-sentence-per-line, `lint-markdown` went red, and `b3f3ba2` fixed it by separating the items with blank lines.)

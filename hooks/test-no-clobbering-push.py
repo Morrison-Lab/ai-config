@@ -269,6 +269,22 @@ def bare_override_mid_command_case(path, bare):
             'sh -c "git push --force origin HEAD"')
 
 
+def override_behind_a_wrapper_argument_case(path, bare):
+    """The override sits behind a WRAPPER'S OWN ARGUMENT, so bash never sets it.
+
+    `timeout 5 ALLOW_FORCE_PUSH=1 bash -c "<push>"` does not export anything:
+    `timeout` takes `5` as its duration and then execs `ALLOW_FORCE_PUSH=1` as
+    a PROGRAM, which fails. The same holds for `env x VAR=1 cmd` and for
+    `sudo -u me VAR=1 cmd` without `-E`. Only the contiguous-run requirement
+    keeps these from clearing the refusal, and it is the one shape that still
+    distinguishes that requirement now that the override is also scoped to the
+    command carrying the nested shell -- the older `grep -r` case is caught by
+    the scoping check first (ai-config#1973 review, round 4 finding 2).
+    """
+    _local_advances(path)
+    return 'timeout 5 ALLOW_FORCE_PUSH=1 bash -c "git push --force origin HEAD"'
+
+
 def mentioned_override_case(path, bare):
     """The override MENTIONED, not assigned -- the refusal must still fire.
 
@@ -966,6 +982,8 @@ SHOULD_DENY = [
      "a shell spelling outside the first SHELL_PROGRAM list"),
     ("D1973e", mentioned_override_case,
      "the override MENTIONED rather than assigned does not clear a refusal"),
+    ("D1973g", override_behind_a_wrapper_argument_case,
+     "the override behind a wrapper's own argument does not clear a refusal"),
     ("D1973f", bare_override_mid_command_case,
      "a bare override token away from the argv head does not clear a refusal"),
 ]
@@ -1344,7 +1362,14 @@ MUTATIONS = {
         "the override counts as an assignment at an argv head, not as a mention",
         [("            if not ASSIGNMENT.match(token):\n                break",
           "            if not ASSIGNMENT.match(token):\n                continue")],
-        {"D1973f"},
+        # D1973f is deliberately NOT here. It used to be the only case, and it
+        # stopped flipping once the override was scoped to the command carrying
+        # the nested shell: `grep -r ALLOW_FORCE_PUSH=1 hooks/` is a different
+        # simple command, so the scoping check refuses it before contiguity is
+        # consulted. Declaring a case that no longer discriminates is how a
+        # clause goes quietly untested, so the clause now names the one shape
+        # that does -- an override behind a wrapper's own argument.
+        {"D1973g"},
     ),
     "force_deny": (
         "a force push is refused",
@@ -1353,7 +1378,8 @@ MUTATIONS = {
           '            return "deny", DENY.format(segment=" ".join(argv))',
           "        pass")],
         {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9",
-         "D1973a", "D1973b", "D1973c", "D1973d", "D1973e", "D1973f"},
+         "D1973a", "D1973b", "D1973c", "D1973d", "D1973e", "D1973f",
+         "D1973g"},
     ),
     "force_ignores_lease": (
         "the refusal does NOT consult the lease -- `--force` disables it",

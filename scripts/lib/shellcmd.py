@@ -696,6 +696,19 @@ def command_program(argv):
             index += 1
             after_wrapper = False
             continue
+        # A shell KEYWORD is not the program. `strip_env` has skipped these
+        # since the constant was introduced, and its comment says why: the
+        # splitter breaks on `;` and `&&`, so the keyword lands at argv[0] of
+        # the segment carrying the command. Omitting the same skip here made
+        # every keyword-wrapped nesting invisible to the descent --
+        # `{ sh -c "git push --force origin main"; }`, `if true; then sh -c
+        # "..."; fi` and `for i in 1; do sh -c "..."; done` were each SILENT
+        # while their unwrapped forms denied (ai-config#1973 review, round 4
+        # finding 1, reproduced independently by the @claude review of #3645).
+        if token in SHELL_KEYWORDS:
+            index += 1
+            after_wrapper = False
+            continue
         # Basename first. The membership test used to be an exact string while
         # SHELL_PROGRAM allows a path prefix, so `/bin/sh -c` was followed and
         # `/usr/bin/env bash -c` was not -- measured silent on both guards

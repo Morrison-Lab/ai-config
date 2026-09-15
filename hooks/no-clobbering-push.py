@@ -314,12 +314,14 @@ try:
         "scripts", "lib")
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
-    from shellcmd import shell_c_expansions
+    from shellcmd import (shell_c_expansions, nested_shell_commands,
+                          COMMAND_WRAPPERS)
 except Exception as _exc:  # broken install: degrade, do not fail open further
     print(f"no-clobbering-push: cannot load scripts/lib/shellcmd.py ({_exc}); "
           f"a push wrapped in an interpreter's -c will not be seen",
           file=sys.stderr)
-    shell_c_expansions = None
+    shell_c_expansions = nested_shell_commands = None
+    COMMAND_WRAPPERS = frozenset()
 
 RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
 
@@ -1222,23 +1224,53 @@ def _override_before_wrapper(command):
     documentation disables is worthless." Two rules for one question in one
     file, and the newer, looser one won.
 
-    So the question is asked of the parsed argv, not of the text: does some
-    simple command begin with the assignment?
+    So the question is asked of the parsed argv, not of the text: does the
+    simple command that RUNS THE WRAPPER begin with the assignment?
+
+    "Some simple command" was the earlier answer and was still too loose, by
+    exactly the margin that matters. Bash scopes a prefix assignment to the one
+    command it heads, so `ALLOW_FORCE_PUSH=1 echo hi; sh -c "<push>"` never
+    sets the variable for the wrapped `git` -- verified against real bash,
+    which prints an empty `inner=[]` -- and yet it cleared the nested refusal
+    (ai-config#1973 review, round 4 finding 2, reproduced independently by the
+    @claude review of #3645). The fix is the second condition below: the same
+    argv must also be the one carrying a nested shell.
     """
     scoped = _simple_commands(command)
-    if scoped is None:
+    if scoped is None or nested_shell_commands is None:
         return False
     for entry in scoped:
+        argv = list(entry[1])
+        # `env VAR=1 bash -c "<push>"` really does set the variable for the
+        # inner `git`, and was refused with no way to comply because the
+        # assignment did not sit at the argv head (round 4 finding 8). A
+        # leading wrapper run is skipped so the assignment behind it still
+        # reads as a prefix.
+        while argv and os.path.basename(argv[0]) in COMMAND_WRAPPERS:
+            argv = argv[1:]
+        found = False
         # Only a CONTIGUOUS RUN of assignments from the argv head is a prefix.
         # Scanning a window instead found the token wherever it sat, so
         # `echo "ALLOW_FORCE_PUSH=1" && sh -c "<push>"` disabled the refusal --
         # the same mention-anywhere hole one step in from the text.
-        for token in entry[1][:_OVERRIDE_PREFIX_WINDOW]:
+        for index, token in enumerate(argv[:_OVERRIDE_PREFIX_WINDOW]):
             if not ASSIGNMENT.match(token):
                 break
             name, _, value = token.partition("=")
-            if name == OVERRIDE and value.strip("\"'") == "1":
-                return True
+            # `.strip()` and not `.strip("\"'")`, which disagreed with
+            # `_lead_prefix`'s test in BOTH directions for the same variable in
+            # the same file: shlex has already dequoted, so stripping quote
+            # CHARACTERS accepted a value bash sets to `'1'` while rejecting
+            # the ` 1 ` that `_lead_prefix` accepts (round 4 finding 12).
+            if name == OVERRIDE and value.strip() == "1":
+                found = index + 1
+                break
+        if not found:
+            continue
+        # The assignment heads THIS command; it carries onto a nested shell
+        # only if THIS command is the one that runs it.
+        if nested_shell_commands(argv[found:]):
+            return True
     return False
 
 

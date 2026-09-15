@@ -241,13 +241,24 @@ with tempfile.TemporaryDirectory() as tmp:
     # call or a clean run.
     stub_dir = Path(tmp) / "stub"
     stub_dir.mkdir()
-    if os.name == "nt":
-        stub = stub_dir / "python3blind.bat"
-        stub.write_text("@exit /b 1" + NL)
-    else:
-        stub = stub_dir / "python3blind"
-        stub.write_text("#!/bin/sh" + NL + "exit 1" + NL)
-        stub.chmod(0o755)
+
+    def make_stub(name, exit_code):
+        """An interpreter stub with a Python-shaped name and a fixed status.
+
+        The name must start with `python` or `probe_interpreter` skips it, and
+        `-c` is a Python flag so a real non-Python interpreter would be the
+        wrong subject here.
+        """
+        if os.name == "nt":
+            path = stub_dir / (name + ".bat")
+            path.write_text("@exit /b " + str(exit_code) + NL)
+        else:
+            path = stub_dir / name
+            path.write_text("#!/bin/sh" + NL + "exit " + str(exit_code) + NL)
+            path.chmod(0o755)
+        return path
+
+    stub = make_stub("python3blind", 1)
     write_settings(home, settings_with(f'"{stub}" "{present}"'))
     result = run_check(home)
     check("--check names an interpreter that reported a present file absent",
@@ -260,6 +271,25 @@ with tempfile.TemporaryDirectory() as tmp:
           "App execution aliases" in result.stdout)
     check("--check does not also print the all-clear sentence",
           "Every registered hook path resolves." not in result.stdout)
+
+    # An interpreter that exits with neither 0 nor 1 reported nothing about
+    # the file. Folding that into `blind` would make --check fail the install
+    # with the Store-alias remedy over an interpreter that merely crashed --
+    # the same "claim a cause nobody observed" error the six-verdict list
+    # exists to prevent. Pinned in both directions, because without the
+    # negative half the fold ships silently.
+    odd = make_stub("python3odd", 7)
+    check("probe_interpreter reports unknown for a status it does not model",
+          hp.probe_interpreter(str(odd), str(present)) == "unknown")
+    write_settings(home, settings_with(f'"{odd}" "{present}"'))
+    result = run_check(home)
+    check("--check names an interpreter that reached no verdict",
+          "UNKNOWN" in result.stdout)
+    check("--check does not count it as probed",
+          "probed 0 interpreter(s)" in result.stdout)
+    check("--check does not treat it as a finding",
+          result.returncode == 0 and "BLIND" not in result.stdout
+          and "App execution aliases" not in result.stdout)
 
     # A plugin-root command is `skipped` by the path check -- and it is the
     # exact registration shape #3624 was observed in, so dropping it silently
@@ -296,9 +326,39 @@ with tempfile.TemporaryDirectory() as tmp:
     check("--check does not blame the plugin loader for a scriptless command",
           "expands only in the plugin loader" not in result.stdout)
 
-    # The whole-population line: a row in no bucket is invisible otherwise.
-    check("--check accounts for every registered command",
-          "accounted for 1 of 1 registered command(s)" in result.stdout)
+    # The distribution line counts ROWS against rows. Counting per-interpreter
+    # buckets against `len(rows)` reported "3 of 10" on a healthy install,
+    # because every hook sharing one `python3` spelling collapses to one
+    # interpreter -- so a genuinely dropped row was invisible against the
+    # baseline shortfall. This case registers several rows on ONE interpreter,
+    # which is exactly what made the old line wrong.
+    write_settings(home, settings_with(f'python3 "{present}"'))
+    with open(home / "settings.json") as fh:
+        blob = json.load(fh)
+    blob["hooks"]["PreToolUse"][0]["hooks"] *= 4
+    (home / "settings.json").write_text(json.dumps(blob))
+    result = run_check(home)
+    check("the distribution line counts rows, not interpreters",
+          "4 registered command(s): 4 probeable" in result.stdout)
+    check("several rows sharing one interpreter still probe it once",
+          "probed 1 interpreter(s)" in result.stdout)
+
+    # Two skipped rows on the SAME interpreter with DIFFERENT causes: keying
+    # the bucket by interpreter alone kept the first row's reason and printed
+    # it over the second.
+    write_settings(home, settings_with(
+        'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/a.py"'))
+    with open(home / "settings.json") as fh:
+        blob = json.load(fh)
+    blob["hooks"]["PreToolUse"][0]["hooks"].append(
+        {"type": "command", "command": "python3 -c 'import sys'"})
+    (home / "settings.json").write_text(json.dumps(blob))
+    result = run_check(home)
+    check("two unprobeable rows on one interpreter each keep their own reason",
+          "expands only in the plugin loader" in result.stdout
+          and "names no script" in result.stdout)
+    check("the distribution line counts both unprobeable rows",
+          "2 registered command(s): 0 probeable, 2 unprobeable" in result.stdout)
 
 with tempfile.TemporaryDirectory() as tmp:
     present = Path(tmp) / "hook.py"

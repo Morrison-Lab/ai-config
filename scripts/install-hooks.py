@@ -253,7 +253,9 @@ def check_interpreters(rows: list[dict]) -> int:
     # from the row being explained: the question is what this interpreter can
     # see, not what it can see of one particular hook.
     representative: dict[str, str] = {}
-    unprobeable: dict[str, tuple[str, str]] = {}
+    unprobeable: dict[tuple[str, str], str] = {}
+    probeable_rows = 0
+    unprobeable_rows = 0
     direct = 0
     already_failing = 0
     for row in rows:
@@ -264,6 +266,7 @@ def check_interpreters(rows: list[dict]) -> int:
             direct += 1
             continue
         if row["status"] == "ok":
+            probeable_rows += 1
             representative.setdefault(interp, row["path"])
         elif row["status"] == "skipped":
             reason = ("its script path expands only in the plugin loader, so "
@@ -271,10 +274,16 @@ def check_interpreters(rows: list[dict]) -> int:
                       if row["path"] else
                       "this command names no script, so there is no path to "
                       "probe it against")
-            unprobeable.setdefault(interp, (row["command"], reason))
+            unprobeable_rows += 1
+            # Keyed by (interpreter, reason) rather than by interpreter alone.
+            # `skipped` has two causes, so keying on the interpreter would keep
+            # the first row's reason and silently print it over a second row
+            # that does not share it -- which is the "one cause asserted for
+            # all of them" error, moved from the string into the dict key.
+            unprobeable.setdefault((interp, reason), row["command"])
         else:
             # `missing` is already a finding, reported above with its own
-            # remedy. Counted here so the accounting stays whole.
+            # remedy. Counted here so the distribution stays whole.
             already_failing += 1
 
     verdicts = {i: hp.probe_interpreter(i, p)
@@ -288,8 +297,8 @@ def check_interpreters(rows: list[dict]) -> int:
     unanswered = {i: v for i, v in verdicts.items()
                   if v in ("unlaunchable", "timeout", "unknown")}
     not_python = sorted(i for i, v in verdicts.items() if v == "skipped")
-    still_unprobed = {i: r for i, r in unprobeable.items()
-                      if i not in representative}
+    still_unprobed = {key: command for key, command in unprobeable.items()
+                      if key[0] not in representative}
 
     print(f"  probed {answered} interpreter(s) against a hook path they are "
           "registered with")
@@ -323,7 +332,7 @@ def check_interpreters(rows: list[dict]) -> int:
         print("           it can read a file; probe it by hand if its hooks "
               "are Python")
 
-    for interp, (command, reason) in sorted(still_unprobed.items()):
+    for (interp, reason), command in sorted(still_unprobed.items()):
         print()
         print(f"  UNPROBED {interp}")
         print(f"           {command}")
@@ -342,13 +351,20 @@ def check_interpreters(rows: list[dict]) -> int:
         print("Not findings: the rows above reached no verdict, so they are")
         print("neither evidence of a working interpreter nor of a broken one.")
 
-    # The whole-population line. Without it, a row silently missing from every
-    # bucket above is invisible, and silence is what this check exists to stop.
-    accounted = (answered + len(unanswered) + len(not_python)
-                 + len(still_unprobed) + direct + already_failing)
-    print(f"  accounted for {accounted} of {len(rows)} registered command(s) "
-          f"({direct} run a script directly, {already_failing} already "
-          "reported above)")
+    # The distribution, in ROWS. An earlier version summed the per-interpreter
+    # bucket sizes against `len(rows)` and so reported "3 of 81" on a healthy
+    # install, because every hook sharing one `python3` spelling collapses to
+    # one interpreter: the shortfall a dropped row would cause was invisible
+    # against a baseline shortfall of 78. Counting rows against rows makes the
+    # line mean something, and the mismatch branch below can then only fire on
+    # a real bookkeeping bug.
+    seen_rows = probeable_rows + unprobeable_rows + direct + already_failing
+    print(f"  {len(rows)} registered command(s): {probeable_rows} probeable, "
+          f"{unprobeable_rows} unprobeable, {direct} run a script directly, "
+          f"{already_failing} already reported above")
+    if seen_rows != len(rows):
+        print(f"  WARNING: {len(rows) - seen_rows} registered command(s) fell "
+              "into no bucket; this check cannot speak for them")
     return len(blind)
 
 

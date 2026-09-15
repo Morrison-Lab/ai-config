@@ -43,10 +43,12 @@ HOOK = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
     os.path.dirname(__file__), "warn-python3-cannot-read-hooks.sh")
 
 wrong = 0
+ran = 0
 
 
 def check(desc, cond):
-    global wrong
+    global wrong, ran
+    ran += 1
     wrong += not cond
     print(f"  {'ok' if cond else 'WRONG':<6} {desc}")
 
@@ -165,6 +167,8 @@ check("hands python3 the path it was invoked with, byte for byte",
 check("does not collapse the `..` segment before probing",
       os.pardir in probed)
 
-total = 23
+# Derived, not hard-coded: a later assertion added below would otherwise
+# still print 23/23 while 24 ran, which is a passing-looking undercount.
+total = ran
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

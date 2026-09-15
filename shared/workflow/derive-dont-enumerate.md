@@ -588,7 +588,7 @@ settings, where present) before asserting anything about N+1 onward.
   complete -- it proves the run got further, not that nothing later is wrong,
   until the whole job goes green.
 
-(Morrison-Lab/ai-config#3647, 2026-09-15: a pre-push pass ran nine local
+(Morrison-Lab/ai-config#3647, 2026-09-14: a pre-push pass ran nine local
 checks chosen from a sense of which ones the diff touched, all green, then
 pushed.
 CI's `validate` job failed at `scripts/check-unpinned-git-fixtures.py`,

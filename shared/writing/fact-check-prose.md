@@ -163,9 +163,9 @@ asserting that a Windows `python3` cannot resolve a Git Bash `/c/Users/...`
 path.
 That was never run.
 An adversarial reviewer measured it and found the opposite: MSYS converts a
-POSIX-looking path passed as an *argument* to a native binary, so
-`sys.argv[1]` arrives already spelled `D:/...` --- the normalized form
-resolves fine.
+POSIX-looking path passed as an *argument* to a native binary, so that same
+`/c/Users/...` path arrives at `sys.argv[1]` already spelled `C:/Users/...`
+--- the normalized form resolves fine.
 Re-measuring confirmed the reviewer.
 The corrected justification was the **opposite risk** from the one the
 comment named: passing `$0` through unchanged isn't protection against a

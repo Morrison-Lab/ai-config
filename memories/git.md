@@ -747,7 +747,7 @@ refs/pull/3060/head` returns `f9068299`, the default refspec is
 not brought down, and the record anchors instead on commits that
 `git merge-base --is-ancestor ... origin/main` accepts.)
 
-Another occurrence, Morrison-Lab/ai-config#3650, 2026-09-15, and an earlier-stage
+Another occurrence, Morrison-Lab/ai-config#3650, 2026-09-14, and an earlier-stage
 variant of the same mistake: `shared/principles/fail-fast.md` cited two
 branch SHAs from an open, unmerged PR (#3647) as the site of a fixed bug.
 An adversarial review called both fabricated, having unshallowed the repo and

@@ -867,6 +867,16 @@ Measured 2026-09-15 on ai-config#3701.
 An `adversarial-reviewer` on `haiku` returned a genuinely clean report headed `**Verdict: APPROVED**`, and three successive pushes were refused while quoting a verdict for an earlier commit.
 Re-dispatching the identical brief with an instruction to end the report with `### Verdict: ...` followed by `Reviewed-Commit: <sha>` was accepted immediately.
 
+
+**A third way, and the reviewer is the one that slips: it can MISTYPE the sha.**
+Measured the same day on the same branch.
+A report ended with the prescribed `### Verdict: Ready for merge` and then `Reviewed-Commit: dc56659a82331ff33fd6329bfdab66637ebb2c` --- thirty-eight characters, two dropped from the real `dc6e56659a82331ff33fd6329bfdab66637ebb2c`, which its own `review-data` payload carried correctly.
+The guard read the prose line, found a sha that is not the one being pushed, and refused with the same mismatch message a genuinely stale review produces.
+
+The tell separates it from the stale case cheaply: a stale verdict names a sha you recognise as an EARLIER commit of yours, while a typo names one that matches no commit at all.
+`git cat-file -e <sha>` settles it in one command.
+The remedy is to hand the reviewer the sha in the brief and tell it to copy that string rather than to re-derive it.
+
 - **Do:** give a dispatched reviewer the exact two-line ending when a push depends on its verdict, rather than assuming it will choose the corpus's vocabulary.
 - **Do:** read the SHA in the refusal --- an earlier commit's SHA means the newest report did not parse, while no verdict at all means none was found.
 - **Don't:** read a repeated refusal after a clean report as the guard malfunctioning;

@@ -117,6 +117,16 @@ PAYLOAD_CLEAN_VERDICTS = frozenset({
 # requires a matching closing delimiter, so an UNCLOSED fence quoting the
 # reviewer prompt's own CLEAN template stays fully live (the ai-config#2482
 # class), and it does not touch inline code spans at all.
+# An HTML comment is invisible in rendered Markdown, so nothing inside one is
+# prose a reviewer wrote for a human to read. The `review-data` payload is the
+# case that matters: its raw JSON is TEXT, and `"verdict": "approved"` matches
+# `CLEAN_VERDICT_RE`'s own `approved?` alternative, so a payload reaching the
+# prose scan votes twice -- once as structured data and once as prose. That
+# defeats the rule directly above `classify_verdict_body`'s payload block: a
+# payload without `schema_version` may block but must never clear, and one
+# spelling its verdict `approved`, `approve`, or `Ready For Merge` cleared
+# anyway, flipping the gate from deny to allow (review finding, PR #3629).
+HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 PAYLOAD_FENCE_LINE_RE = re.compile(
     r"^(?P<indent> {0,3})(?P<run>`{3,}|~{3,})(?P<info>[^\r\n]*)$"
 )
@@ -590,13 +600,20 @@ def classify_verdict_body(body, head_oid):
     if shas and head_oid and not head_oid.startswith(shas[-1]):
         return "stale"
     # The reviewer's own machine-readable payload outranks the prose scan
-    # below, exactly as it does in `scripts/check-pr-fully-clean.py`
-    # (ai-config#3054, #3628): a verdict phrase matched out of a
-    # retrospective or a negated sentence must not override the verdict the
-    # reviewer actually published. `schema_version` is the contract's version
-    # marker, so a payload carrying it decides on its own; one without it can
-    # still BLOCK, but never clear -- the asymmetry keeps a half-formed
-    # payload out of the allow path of a fail-closed gate.
+    # below, as it does in `scripts/check-pr-fully-clean.py` (ai-config#3054,
+    # #3628): a verdict phrase matched out of a retrospective or a negated
+    # sentence must not override the verdict the reviewer actually published.
+    # `schema_version` is the contract's version marker, so a payload carrying
+    # it decides on its own; one without it can still BLOCK, but never clear
+    # -- the asymmetry keeps a half-formed payload out of the allow path of a
+    # fail-closed gate.
+    #
+    # Deliberately NOT identical to that sibling, which is why this does not
+    # claim to be. Its `classify_verdict` runs a second, unconditional
+    # `payload_is_clean` AFTER its prose scans, so a `schema_version`-absent
+    # payload can clear there when the prose matches nothing. A gate that
+    # refuses a merge is the wrong place to copy an extra allow path into, so
+    # the block below only ever blocks once the fast path has declined.
     structured = extract_structured_review(body)
     if isinstance(structured, dict) and "schema_version" in structured:
         if payload_is_blocking(structured):
@@ -606,6 +623,12 @@ def classify_verdict_body(body, head_oid):
     if payload_is_blocking(structured):
         return "not-clean"
 
+    # Everything below is a scan of PROSE, so the payload's own JSON must not
+    # reach it -- see `HTML_COMMENT_RE`. Stripping here rather than at the top
+    # of the function is deliberate: the payload block above needs the comment
+    # intact, and the staleness check reads a `Reviewed commit:` line that a
+    # reviewer may legitimately place inside one.
+    section = HTML_COMMENT_RE.sub(" ", section)
     # The headline (first non-empty line under the heading) outranks later
     # prose, so "Ready for merge --- the concern that this wasn't ready is
     # resolved" classifies by its headline rather than its narrative.

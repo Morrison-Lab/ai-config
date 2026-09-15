@@ -1367,9 +1367,57 @@ class StructuredReviewDataTests(unittest.TestCase):
         self.assertEqual(self.classify(c), "ambiguous")
 
     def test_payload_without_schema_version_does_not_clear(self):
-        c = verdict_comment("**Content review: no defects found**",
+        """A payload missing the contract's version marker may block, never
+        clear -- for EVERY accepted spelling of a clean verdict, not just the
+        one whose letters happen to miss `CLEAN_VERDICT_RE`.
+
+        The single-spelling version of this test passed on `"CLEAN"` alone,
+        and only because the quote character sits between `verdict` and the
+        word, so `verdict[:*\s]+...clean` failed to match. `"approved"` has no
+        such luck: it matches `approved?` outright, and the test named for the
+        never-clear invariant sat green while the invariant was false.
+        """
+        for spelling in ("CLEAN", "clean", "approved", "approve",
+                         "READY_FOR_MERGE", "Ready For Merge", "ready to merge"):
+            with self.subTest(spelling=spelling):
+                c = verdict_comment(
+                    "**Content review: inconclusive, needs a human look**",
+                    payload(spelling, [], schema=None))
+                self.assertEqual(self.classify(c), "ambiguous")
+                self.assertEqual(
+                    gate.evaluate(MERGE_CMD, pr(comments=[c]))["decision"],
+                    "deny")
+
+    def test_payload_json_is_not_prose_for_the_phrase_scan(self):
+        """The payload's raw JSON is text. Left in the body it votes twice --
+        once as structured data, once as prose -- so a malformed payload the
+        structured path correctly declines to trust could still clear through
+        `CLEAN_VERDICT_RE`.
+
+        Asserted with prose that carries no clean phrase of its own, so the
+        only possible source of a clean reading is the payload's own JSON.
+        """
+        body = ("**Claude finished review**\n\n### Verdict\n"
+                "**Content review: inconclusive, needs a human look**\n\n"
+                "Reviewed commit: " + HEAD + "\n\n"
+                "<!-- review-data: "
+                + payload("approved", [], schema=None) + " -->")
+        self.assertEqual(gate.classify_verdict_body(body, HEAD), "ambiguous")
+
+    def test_stripping_comments_does_not_hide_a_real_prose_verdict(self):
+        """The over-strip direction: a clean verdict stated in ordinary prose
+        must still read as one when a payload comment sits beside it."""
+        c = verdict_comment("**Ready for merge** --- all findings addressed.",
                             payload("CLEAN", [], schema=None))
-        self.assertEqual(self.classify(c), "ambiguous")
+        self.assertEqual(self.classify(c), "clean")
+
+    def test_comment_stripping_leaves_the_staleness_check_intact(self):
+        """`Reviewed commit:` is read before the strip, so a reviewer that
+        puts its fingerprint inside an HTML comment is still checked for
+        staleness rather than silently passing."""
+        body = ("**Claude finished review**\n\n### Verdict\n"
+                "**Ready for merge**\n\n<!-- Reviewed commit: " + "0" * 40 + " -->")
+        self.assertEqual(gate.classify_verdict_body(body, HEAD), "stale")
 
     def test_payload_without_schema_version_still_blocks(self):
         c = verdict_comment("**Ready for merge**",

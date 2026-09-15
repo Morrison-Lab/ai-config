@@ -62,9 +62,17 @@ class PullRequest:
         self._review_threads = None
         
     def _fetch_pr_data(self) -> Dict[str, Any]:
+        # `gh pr view --json` returns ONLY the fields named here, so a
+        # property reading an unrequested key gets `None` forever and its
+        # consumer silently takes the wrong branch. `isDraft` was added as a
+        # property without being added here, which made the draft-detection
+        # branch in `check-pr-fully-clean.py` dead code against every real PR
+        # while its unit test passed, because the test injected `_data`
+        # directly and never went through this call (ai-config#3651 review).
         fields = [
-            "headRefOid", "headRefName", "state", "commits", 
-            "reviewDecision", "reviews", "comments", "reviewRequests"
+            "headRefOid", "headRefName", "state", "commits",
+            "reviewDecision", "reviews", "comments", "reviewRequests",
+            "isDraft",
         ]
         cmd = ["gh", "pr", "view", self.pr_num, "--repo", self.repo, "--json", ",".join(fields)]
         stdout = self._fetcher(cmd)

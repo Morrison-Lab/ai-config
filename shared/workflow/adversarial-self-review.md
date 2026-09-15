@@ -442,7 +442,7 @@ Where you chose to background the dispatch, the guard's own message gives the fi
 Where the harness backgrounds it regardless --- #3045's two variants, below --- re-dispatching changes nothing and the `ALLOW_UNREVIEWED_PUSH=1` route below is the remedy.
 
 - **Don't:** reach for `ALLOW_UNREVIEWED_PUSH=1` on the second message from a foreground dispatch that returned a report.
-  It says the report was read and no verdict was found in it, which is a formatting fix --- not one of the cases where the guard cannot see a verdict at all (the harness-forced case above, the CLI fallback below).
+  It says the report was read and no verdict was found in it, which is a formatting fix, not a case where the guard cannot see a verdict at all.
 
 (Measured on ucdavis/lbt, 2026-09-15, with the plugin enabled: the desktop session's agent list held only `claude`, `claude-code-guide`, `Explore`, `general-purpose`, `Plan` and `statusline-setup`.
 Three foreground `general-purpose` fallback reviews returned verdicts and each push was still refused with the second message, so every push used the override --- which the Don't above rules out, and which is why this is a case record rather than a precedent.

@@ -948,16 +948,18 @@ MUTATIONS = {
     "M2_lead_words": (
         "leading assignments/lead words are skipped before matching `git "
         "reset`",
-        [('        while i < len(argv) and (ASSIGNMENT.match(argv[i])\n'
-          "                                  or argv[i] in LEAD_WORDS):\n"
-          "            i += 1",
-          "        pass")],
+        # Anchored on `_lead_index`, shared by BOTH callers since round 3, so
+        # reverting it costs `_may_change_repository` its command word too.
+        [("    while i < len(argv) and (ASSIGNMENT.match(argv[i])\n"
+          "                             or argv[i] in LEAD_WORDS):\n"
+          "        i += 1",
+          "    pass")],
         # The `GIT_*=` cases ride on this clause too: each redirection is
         # spelled as a leading assignment, so without the skip the `git` never
         # reaches the head of the argv and the piece matches nothing at all.
         # The option-spelled and `source` cases do not, since their redirect
         # sits in a sibling command rather than in the reset's own prefix.
-        {"W6", "W1973d", "W1973f", "W1973g"},
+        {"W6", "W1973d", "W1973f", "W1973g", "W1973m"},
     ),
     "M2_subcommand_gate": (
         "only `checkout`/`restore` route through the pathspec logic, not "
@@ -1061,15 +1063,6 @@ MUTATIONS = {
           "                   for t in argv):\n"
           "                return True")],
         {"W1973k"},
-    ),
-    "M5_lead_prefix_comes_off_first": (
-        "a body keyword is skipped before the command word is read, so "
-        "`then cd /other` still counts",
-        [("        while lead < len(argv) and (ASSIGNMENT.match(argv[lead])\n"
-          "                                    or argv[lead] in LEAD_WORDS):\n"
-          "            lead += 1",
-          "        pass")],
-        {"W1973m"},
     ),
     "M4_untracked_excluded": (
         "an untracked (`??`) entry does not count as a change `--hard` "

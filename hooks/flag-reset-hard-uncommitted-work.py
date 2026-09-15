@@ -327,6 +327,26 @@ def _looks_like_path(arg):
     return _resolves_as_ref(arg) is False
 
 
+def _lead_index(argv):
+    """Index of ARGV's first real word, past env assignments and lead words.
+
+    `_simple_commands` splits on operators only, so a body's keyword arrives
+    attached to the command it heads: `if [ -d w ]; then cd w; git push; fi`
+    yields the argv `["then", "cd", "w"]`. Both callers have to look past that
+    prefix before the command word means anything -- `offending_here` to find
+    the `git`, and `_may_change_repository` to find a `cd`.
+
+    One function rather than the same `while` loop written twice, which is
+    what it was until the second caller arrived (ai-config#3645 review round
+    3).
+    """
+    i = 0
+    while i < len(argv) and (ASSIGNMENT.match(argv[i])
+                             or argv[i] in LEAD_WORDS):
+        i += 1
+    return i
+
+
 def offending_here(command, lexical_only=False):
     """The matched destructive-discard invocation in `command`, or None.
 
@@ -348,11 +368,7 @@ def offending_here(command, lexical_only=False):
     if cmds is None:
         return None
     for argv in cmds:
-        i = 0
-        while i < len(argv) and (ASSIGNMENT.match(argv[i])
-                                  or argv[i] in LEAD_WORDS):
-            i += 1
-        rest = argv[i:]
+        rest = argv[_lead_index(argv):]
         if len(rest) < 2 or rest[0] != "git":
             continue
         sub = rest[1]
@@ -455,10 +471,7 @@ def _may_change_repository(text):
         # The prefix comes off first, because a body's keyword arrives
         # attached: `then cd /other` splits with `then` at the head, and
         # testing `argv[0]` alone would read that piece as stationary.
-        lead = 0
-        while lead < len(argv) and (ASSIGNMENT.match(argv[lead])
-                                    or argv[lead] in LEAD_WORDS):
-            lead += 1
+        lead = _lead_index(argv)
         if lead < len(argv):
             word = os.path.basename(argv[lead])
             if word in _CD_WORDS or word in _OPAQUE_WORDS:

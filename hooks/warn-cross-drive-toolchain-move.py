@@ -35,7 +35,9 @@ The two halves are both transcript-decidable:
      one of which names a package library, depot, or VM disk image. The
      `wsl --import`/`--move` arm is the deliberate exception: the verb itself
      supplies both facts, so it needs neither a second volume nor a
-     recognised toolchain path (see the comment at that arm);
+     recognised toolchain path -- and its SOURCE tar is exempt from the
+     backup test too, so an export landing in a backup directory does not
+     silence the import beside it (see the comment at that arm);
   2. session history -- whether any earlier tool call asked what the physical
      media are (`Get-PhysicalDisk`, `Get-Disk`, `lsblk ... ROTA`, and friends).
 

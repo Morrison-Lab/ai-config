@@ -721,9 +721,9 @@ the diff you meant to check --- which is the same reading
 [`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md) asks
 for a zero anywhere else: pair it with the count that shows the detector ran.
 
-This is at least the sixth recorded false clean from this checker, and the
+This is at least the seventh recorded false clean from this checker, and the
 first in which it **emitted no verdict at all**.
-The five already on record, each in a different shape:
+The six already on record, each in a different shape:
 ai-config#730, #732, #752 and #2381, a pre-commit run over an empty diff
 (`memories/git-diffing.md` for the first two, this file for the other two);
 ai-config#2542, the line-numbers-from-HEAD against content-from-the-tree
@@ -759,8 +759,8 @@ the incident is the occasion for taking them.)
 - **Don't:** read exit 0 from this script as a pass --- a skip and a clean run
   are indistinguishable by status.
 - **Don't:** read `No lines missing semantic breaks.` as a pass either;
-  it prints over an empty diff, which is how four of the six recorded false
-  cleans happened.
+  it prints over an empty diff, which is how four of the six already on record
+  happened.
 - **Don't:** assume supplying the variable is sufficient;
   an unfetchable ref skips with it set, and the reason string is the only place
   that difference appears.

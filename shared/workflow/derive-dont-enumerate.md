@@ -555,6 +555,50 @@ The step names above are what settled it, and they are the artifact to read:
 names the failing step, where the job log's own `FAIL:` lines include ones
 tests print deliberately.)
 
+### A red job with one named failure is not evidence about its later steps
+
+The occurrences above are all about which checks get **run**.
+This one is about what a red run, once you have it, actually **tells** you --
+and it is a derivation from how GitHub Actions executes a job, not a judgment
+call.
+A job's steps run in order, and by default a failing step stops the job: every
+step after it is skipped and never reports pass or fail at all.
+So a job that goes red on step 4 of 9 has said something about step 4, and
+said nothing whatsoever about steps 5 through 9 -- not that they passed, not
+that they failed, nothing.
+Reading a single named failure as "only that one thing is wrong" treats
+silence from the unexecuted steps as a clean bill of health, when it is not
+even a report.
+
+The same instrument this section already names, `scripts/run-local-validation.py`,
+is also the remedy here: it runs every derivable step locally regardless of
+whether an earlier one failed, so a local pass covers the steps CI's own
+fail-fast job order would have hidden behind the first red one.
+Where only CI's own run is available, treat a failure on step N as licensing a
+claim about step N alone, and re-run (or read the workflow's `continue-on-error`
+settings, where present) before asserting anything about N+1 onward.
+
+- **Do:** read a CI failure as information about the failing step only, never
+  about the steps after it in the same job.
+- **Do:** run the full derived local check list (`scripts/run-local-validation.py`)
+  rather than fixing the one named failure and re-pushing to find the next one.
+- **Don't:** report "everything else passed" from a job that never ran the
+  rest of its steps.
+- **Don't:** treat a green re-run after fixing one step as proof the fix is
+  complete -- it proves the run got further, not that nothing later is wrong,
+  until the whole job goes green.
+
+(Morrison-Lab/ai-config#3647, 2026-09-14: a pre-push pass ran nine local
+checks chosen from a sense of which ones the diff touched, all green, then
+pushed.
+CI's `validate` job failed at `scripts/check-unpinned-git-fixtures.py`,
+over a `git init -q` in a test fixture missing `-b main` -- a check on the
+list `run-local-validation.py` derives from `validate.yml`, simply not among
+the nine hand-picked ones.
+The red run named only that one step; the near-miss was reading the rest of
+the job as therefore fine, when the job's own fail-fast step order meant every
+step after the fixtures check had not run at all.)
+
 ## In review
 
 Flag a brief, a plan, or a skill step that hands an agent a hard-coded list of PR or issue numbers to work through, where the tracker could gain another before the work finishes.

@@ -1506,6 +1506,65 @@ class StructuredReviewDataTests(unittest.TestCase):
                 '"verdict": "CLEAN", "findings": [],} -->')
         self.assertEqual(gate.classify_verdict_body(body, HEAD), "ambiguous")
 
+    def test_a_quoted_payload_withholds_a_payload_stated_clean_too(self):
+        """The two clean routes must agree about a benign mention.
+
+        A mid-line NOT_CLEAN payload is not a verdict --- the line-start rule
+        says so, and that rule exists precisely so prose ABOUT the format is
+        not read as one. But while the payload route returned before the prose
+        route ran, the same quote denied a clean stated in prose and allowed a
+        clean stated in a payload. A reviewer quoting NOT_CLEAN mid-sentence
+        and publishing CLEAN therefore merged.
+        """
+        body = ("**Claude finished review**\n\n### Verdict\n"
+                "**Needs more work** --- see findings.\n\n"
+                "It looks like this: <!-- review-data: "
+                + payload("NOT_CLEAN", [{"file": "a.py"}]) + " --> for reference.\n\n"
+                "Reviewed commit: " + HEAD + "\n\n"
+                "<!-- review-data: " + payload("CLEAN", []) + " -->")
+        # not-clean rather than ambiguous, and the difference says which
+        # mechanism fired: withholding the payload's clean lets the headline
+        # reach the prose scan, where "Needs more work" states the verdict the
+        # reviewer meant. Asserting "ambiguous" here would have passed for the
+        # wrong reason and hidden that the prose was consulted at all.
+        self.assertEqual(gate.classify_verdict_body(body, HEAD), "not-clean")
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, pr(comments=[comment(body)]))["decision"],
+            "deny")
+
+        # With neutral prose there is nothing for the scan to conclude, so the
+        # withheld clean shows up on its own as ambiguous. This half isolates
+        # the flag from the headline.
+        neutral = body.replace("**Needs more work** --- see findings.",
+                               "**Content review: inconclusive.**")
+        self.assertEqual(gate.classify_verdict_body(neutral, HEAD), "ambiguous")
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, pr(comments=[comment(neutral)]))["decision"],
+            "deny")
+
+    def test_a_closed_fenced_example_still_clears(self):
+        """The mirror, and the reason the rule above is not simply "any
+        mention denies".
+
+        `evaluate_verdict` removes a CLOSED fence before the classifier sees
+        it, so a reviewer showing the format in a fenced block publishes a
+        body carrying exactly one payload. Reading that as its verdict is
+        correct, and a rule that denied it would make the commonest way of
+        documenting the format unusable.
+        """
+        body = ("**Claude finished review**\n\n### Verdict\n"
+                "**Ready for merge**\n\nFormat reference:\n\n"
+                "```\n<!-- review-data: "
+                + payload("NOT_CLEAN", [{"file": "a.py"}]) + " -->\n```\n\n"
+                "Reviewed commit: " + HEAD + "\n\n"
+                "<!-- review-data: " + payload("CLEAN", []) + " -->")
+        stripped = gate.FENCE_RE.sub("", body)
+        self.assertEqual(stripped.count("review-data"), 1)
+        self.assertEqual(gate.evaluate_verdict([comment(body)], HEAD), "clean")
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, pr(comments=[comment(body)]))["decision"],
+            "allow")
+
     def test_a_benign_payload_mention_withholds_a_clean_headline(self):
         """The chosen fail-closed cost, pinned rather than left implicit.
 

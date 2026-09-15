@@ -753,11 +753,27 @@ def classify_verdict_body(body, head_oid):
     # a payload here clears only through the one route below and never after
     # the prose scan.
     structured, payload_unreadable = read_payload_state(body)
+    # `read_payload_state` reports an opener it tried to parse and could not.
+    # It says nothing about one it never tried, which it skips for POSITION --
+    # masked as code, or not alone on its line. `blank_comment_regions` is the
+    # reader that sees those, so its flag is consulted here as well as over
+    # the prose section below.
+    #
+    # Consulting it HERE is the point. Without it the two clean routes
+    # disagreed: a benign mid-line mention denied a clean stated in prose (the
+    # cost `test_a_benign_payload_mention_withholds_a_clean_headline` pins)
+    # and did not deny a clean stated in a payload, because this block
+    # returned before the prose path ever ran. A reviewer quoting a NOT_CLEAN
+    # payload mid-sentence and publishing a CLEAN one therefore cleared, while
+    # the same quote beside a prose headline did not (review finding, #3629).
+    _, body_unreadable = blank_comment_regions(body)
+    payload_unreadable = payload_unreadable or body_unreadable
+
     # Blocking first, and once: a payload that blocks does so whether or not
     # it carries `schema_version`, so the two tests the fast path used to run
     # separately collapse into this one. Clearing then needs all three of the
     # version marker, a payload that affirmatively clears, and no sibling
-    # opener this reader could not bound.
+    # opener either reader could not bound.
     if payload_is_blocking(structured):
         return "not-clean"
     if (isinstance(structured, dict) and "schema_version" in structured

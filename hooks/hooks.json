@@ -709,6 +709,13 @@
             "timeout": 10,
             "script": "no-mutation-in-read-only-reviewer.py",
             "why": "ai-config#3612, citing #3602 and #3584: mechanically blocks mutating git commands (commit, checkout -b, switch, restore, stash, merge, reset, rebase, revert, clean, branch/tag mutation, push) and write tools when executing in a read-only reviewer persona (such as adversarial-reviewer, Explore, Plan), protecting shared checkouts and concurrent sessions from stray contamination. Clearable with ALLOW_READ_ONLY_MUTATION=1."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-partial-validation-before-push.py\"",
+            "timeout": 20,
+            "script": "warn-partial-validation-before-push.py",
+            "why": "memories/preferences.md takes the local check list from .github/workflows/validate.yml rather than from memory, and scripts/run-local-validation.py IS that derivation. The rule is read at session start and broken at push time. The observed shape is not a session that skipped checking but one that checked repeatedly with whichever checkers the first round needed, never widening the set while the diff moved on -- measured twice in one session on ai-config#3629 and #3696, the second time on a checker the session did not know existed. Warns and never blocks: the full sweep takes minutes, and there are legitimate pushes that should not wait for it."
           }
         ]
       },

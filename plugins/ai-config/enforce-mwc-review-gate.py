@@ -546,24 +546,33 @@ def iter_payload_spans(body):
 def blank_comment_regions(text):
     """Replace every HTML comment in *text* with a space.
 
-    Nothing here decides where a comment ends by searching for its closer,
-    because that search is what the naive regex got wrong, three ways and all
-    of them fail-open:
+    Returns ``(blanked, payload_unreadable)``. The flag says a `review-data`
+    opener was found that :func:`iter_payload_spans` could not bound, so some
+    of that payload's text may have survived into *blanked*. The caller uses
+    it to refuse a CLEAN reading while still honouring a not-clean one --- see
+    :func:`classify_verdict_body`.
 
-    * A WELL-FORMED payload's span comes from :func:`iter_payload_spans`, so a
-      literal `-->` inside its JSON cannot end the region early.
-    * A MALFORMED one -- unparseable JSON, trailing text before the closer, or
-      a masked position -- is swallowed to end of text, because its boundary
-      is exactly as unknowable as the next case's.
-    * An UNTERMINATED `<!--` is swallowed to end of text rather than left
-      alone.
+    A WELL-FORMED payload's span comes from :func:`iter_payload_spans`, so a
+    literal `-->` inside its JSON cannot end the region early. An UNTERMINATED
+    `<!--` is swallowed to end of text, which loses nothing a human could read
+    anyway: everything after it is inside the comment. Any other comment,
+    including a payload whose JSON will not parse, is blanked only as far as
+    its own closer.
 
-    The last two are the over-blanking direction, and it is the safe one here:
-    the worst case is a verdict this function hides, which classifies as
-    ambiguous and denies, where the alternative is quoted text read as a
-    verdict and a merge allowed. A plain comment that is neither a payload nor
-    truncated is still blanked on its own, so ordinary prose around it
-    survives.
+    THE FLAG RATHER THAN A WIDER BLANK, and the reasoning matters because the
+    first cut got it backwards. An unparseable payload was swallowed to end of
+    text on the argument that over-blanking is the safe direction, since a
+    hidden verdict classifies ambiguous and ambiguous denies. That second
+    clause is false: `evaluate` treats only `not-clean` and `stale` as vetoes,
+    so an ambiguous bot verdict beside a standing human APPROVED review
+    ALLOWS. Swallowing therefore discarded a reviewer's stated "needs more
+    work" and let the merge through --- a fail-open built out of an
+    over-cautious blank (review finding, PR #3629).
+
+    So the asymmetry lives in what the text may CONCLUDE rather than in how
+    much of it is erased. Leaked payload text can only manufacture a false
+    CLEAN, which the flag refuses; prose that states a finding is left where
+    the scan can still find it.
     """
     chars = list(text)
     for start, end, _ in iter_payload_spans(text):
@@ -572,28 +581,26 @@ def blank_comment_regions(text):
 
     out = []
     pos = 0
+    unreadable = False
     while True:
         open_idx = text.find("<!--", pos)
         if open_idx < 0:
             out.append(text[pos:])
-            return "".join(out)
+            return "".join(out), unreadable
         out.append(text[pos:open_idx])
         out.append(" ")
-        # A `review-data` opener still present here is one the pass above
-        # could NOT parse -- invalid JSON, trailing text before the closer, or
-        # a position the code mask rejected. Its boundary is exactly as
-        # unknowable as a truncated comment's, so it gets the same answer:
-        # swallow to end of text. Finding the closer with `find` instead is
-        # the bug this whole function exists to avoid, one branch further in;
-        # a malformed payload whose own text carried a `-->` truncated the
-        # blanked region there and leaked the rest into the prose scan, which
-        # turned a stated NOT_CLEAN verdict into an allow (review finding,
-        # PR #3629).
+        # A `review-data` opener surviving the pass above is one
+        # `iter_payload_spans` could not bound: invalid JSON, trailing text
+        # before the closer, or a position the code mask rejected. Its closer
+        # cannot be located by searching for `-->`, since its own text may
+        # contain that substring -- so some of it may survive the blank below,
+        # and the flag is how the caller is told not to trust a CLEAN reading
+        # of this section.
         if PAYLOAD_OPEN_RE.match(text, open_idx):
-            return "".join(out)
+            unreadable = True
         close_idx = text.find("-->", open_idx + 4)
         if close_idx < 0:
-            return "".join(out)
+            return "".join(out), unreadable
         pos = close_idx + 3
 
 
@@ -712,11 +719,11 @@ def classify_verdict_body(body, head_oid):
         return "not-clean"
 
     # Everything below is a scan of PROSE, so the payload's own JSON must not
-    # reach it -- see `HTML_COMMENT_RE`. Stripping here rather than at the top
-    # of the function is deliberate: the payload block above needs the comment
-    # intact, and the staleness check reads a `Reviewed commit:` line that a
-    # reviewer may legitimately place inside one.
-    section = blank_comment_regions(section)
+    # reach it -- see `blank_comment_regions`. Stripping here rather than at
+    # the top of the function is deliberate: the payload block above needs the
+    # comment intact, and the staleness check reads a `Reviewed commit:` line
+    # that a reviewer may legitimately place inside one.
+    section, payload_unreadable = blank_comment_regions(section)
     # The headline (first non-empty line under the heading) outranks later
     # prose, so "Ready for merge --- the concern that this wasn't ready is
     # resolved" classifies by its headline rather than its narrative.
@@ -726,7 +733,12 @@ def classify_verdict_body(body, head_oid):
         if NOT_CLEAN_VERDICT_RE.search(text):
             return "not-clean"
         if CLEAN_VERDICT_RE.search(text):
-            return "clean"
+            # An unbounded payload may have leaked its own JSON into this
+            # text, and that text can only ever manufacture a FALSE clean --
+            # so the clean reading is withheld while the not-clean one above
+            # is not. Downgrading to ambiguous rather than erasing the prose
+            # is what keeps a reviewer's stated finding readable.
+            return "ambiguous" if payload_unreadable else "clean"
     return "ambiguous"
 
 

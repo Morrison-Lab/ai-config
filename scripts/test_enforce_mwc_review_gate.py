@@ -1471,37 +1471,66 @@ class StructuredReviewDataTests(unittest.TestCase):
             gate.evaluate(MERGE_CMD, pr(comments=[comment(body)]))["decision"],
             "deny")
 
-    def test_malformed_payload_swallows_a_later_clean_phrase(self):
-        """The accepted cost of that swallow, asserted rather than assumed.
+    def test_malformed_payload_withholds_clean_but_keeps_not_clean(self):
+        """The asymmetry, in both directions, over a TERMINATED payload whose
+        JSON will not parse -- a trailing comma, the commonest slip a model
+        makes writing one.
 
-        Everything after an unparseable payload opener is blanked, so a clean
-        phrase below one is hidden and the comment classifies ambiguous. That
-        is the over-blanking direction: it denies. The alternative leaks the
-        payload's own text into the scan, which allows.
+        The first cut swallowed everything after such an opener, on the
+        argument that a hidden verdict classifies ambiguous and ambiguous
+        denies. It does not: `evaluate` vetoes only on `not-clean` and
+        `stale`, so an ambiguous verdict beside a standing human APPROVED
+        review allows. Swallowing a reviewer's stated finding therefore
+        MERGED the PR, which is why the flag replaced the wider blank.
+
+        Both halves are asserted here, and the not-clean half is the one the
+        earlier version got wrong.
         """
-        body = ("**Claude finished review**\n\n### Verdict\n"
-                "**Content review: inconclusive**\n\n"
-                '<!-- review-data: {"verdict": not-json}\n\n'
-                "**Ready for merge** after all.\n\nReviewed commit: " + HEAD)
-        self.assertEqual(gate.classify_verdict_body(body, HEAD), "ambiguous")
+        bad = '<!-- review-data: {"schema_version": "1.0", "verdict": "NOT_CLEAN",} -->'
+        finding = ("**Claude finished review**\n\n### Verdict\n"
+                   "**Content review: inconclusive**\n\n" + bad + "\n\n"
+                   "This PR needs more work: unresolved race in worker.py.\n\n"
+                   "Reviewed commit: " + HEAD)
+        self.assertEqual(gate.classify_verdict_body(finding, HEAD), "not-clean")
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, pr(reviews=[review("somehuman", "APPROVED")],
+                                        comments=[comment(finding)]))["decision"],
+            "deny")
+
+        approving = finding.replace(
+            "This PR needs more work: unresolved race in worker.py.",
+            "**Ready for merge** after all.")
+        self.assertEqual(gate.classify_verdict_body(approving, HEAD), "ambiguous")
+
+    def test_unterminated_comment_is_still_swallowed_to_end_of_text(self):
+        """The one case where erasing the rest loses nothing: everything after
+        an unterminated `<!--` is inside the comment, so no human reads it
+        either."""
+        blanked, unreadable = gate.blank_comment_regions(
+            "visible prose <!-- open forever, Ready for merge")
+        self.assertIn("visible prose", blanked)
+        self.assertNotIn("Ready for merge", blanked)
+        self.assertFalse(unreadable)
 
     def test_a_plain_malformed_comment_is_not_swallowed(self):
         """The swallow is scoped to a payload opener. An ordinary comment is
         blanked on its own, so prose after it still reads."""
-        blanked = gate.blank_comment_regions(
+        blanked, unreadable = gate.blank_comment_regions(
             "<!-- an ordinary note --> Ready for merge <!-- another --> tail prose")
         self.assertIn("Ready for merge", blanked)
         self.assertIn("tail prose", blanked)
+        self.assertFalse(unreadable)
 
     def test_two_adjacent_comments_are_blanked_independently(self):
         """The over-blanking direction: one closed comment must not swallow
         the prose between it and the next."""
-        blanked = gate.blank_comment_regions(
+        blanked, unreadable = gate.blank_comment_regions(
             "<!-- HIDDEN1 --> Ready for merge <!-- HIDDEN2 --> trailing prose")
         self.assertNotIn("HIDDEN1", blanked)
         self.assertNotIn("HIDDEN2", blanked)
         self.assertIn("Ready for merge", blanked)
         self.assertIn("trailing prose", blanked)
+        self.assertFalse(unreadable)
 
     def test_extraction_and_blanking_agree_on_where_a_payload_ends(self):
         """The two readers share `iter_payload_spans`, so the text removed is
@@ -1517,7 +1546,9 @@ class StructuredReviewDataTests(unittest.TestCase):
         start, end, parsed = spans[0]
         self.assertEqual((start, end), (0, len(body)))
         self.assertEqual(parsed, gate.extract_structured_review(body))
-        self.assertEqual(gate.blank_comment_regions(body).strip(), "")
+        blanked, unreadable = gate.blank_comment_regions(body)
+        self.assertEqual(blanked.strip(), "")
+        self.assertFalse(unreadable)
 
     def test_stripping_comments_does_not_hide_a_real_prose_verdict(self):
         """The over-strip direction: a clean verdict stated in ordinary prose
@@ -1639,15 +1670,23 @@ class StructuredReviewDataTests(unittest.TestCase):
         self.assertEqual(gate.evaluate_verdict([comment(body)], HEAD),
                          "not-clean")
 
-    def test_unclosed_fence_does_not_swallow_a_later_genuine_payload(self):
-        """The over-masking direction, stated: a payload after an unclosed
-        fence is unreachable, and must fall back to the prose scan rather than
-        silently clearing."""
+    def test_unclosed_fence_over_a_payload_withholds_a_clean_reading(self):
+        """A payload inside an unclosed fence is unreachable to the span
+        reader, which masks that position, so its boundary is unknown and its
+        text may survive into the prose scan.
+
+        The clean headline above it is therefore withheld rather than
+        honoured: `payload_unreadable` is set, and the reading drops to
+        ambiguous. It was `clean` while the flag did not exist, which is the
+        reading that trusts a headline sitting above a NOT_CLEAN payload
+        nobody could read.
+        """
         body = ("**Claude finished review**\n\n### Verdict\n"
                 "**Ready for merge**\n\n```\ntruncated\n\n"
                 "<!-- review-data: " + payload("NOT_CLEAN", []) + " -->\n\n"
                 "Reviewed commit: " + HEAD)
-        self.assertEqual(gate.evaluate_verdict([comment(body)], HEAD), "clean")
+        self.assertEqual(gate.evaluate_verdict([comment(body)], HEAD),
+                         "ambiguous")
 
     def test_backtick_opener_with_backtick_in_info_is_not_a_fence(self):
         """CommonMark forbids a backtick in a backtick fence's info string, so

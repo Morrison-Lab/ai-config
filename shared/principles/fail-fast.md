@@ -41,9 +41,6 @@ Worked-example case records for the rules below live in
   attempts feeding a single resolve-outcome step that still fails the
   job when neither attempt succeeded) --- the failure is deferred and
   handled, not ignored.
-- A CI step that `exit 0`s on a missing secret can be legitimate fork
-  protection, or it can be masking the repo's own misconfiguration; see
-  "A secret-presence guard can mean two different things" below.
 
 ## A secret-presence guard can mean two different things
 

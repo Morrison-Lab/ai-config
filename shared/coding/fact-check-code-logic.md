@@ -948,10 +948,12 @@ show up when it runs.
 
 The fix is the same instrument the section above already prescribes, aimed
 wider: extract the `run:` block's text with `yaml.safe_load` and execute it
---- under the runner's own interpreter (`bash --noprofile --norc -eo
-pipefail` for GitHub's default `run:` shell) --- against stub inputs that
-exercise the paths a review reads past, rather than reasoning about the
-block from the page.
+--- under whichever shell the step actually specifies, or the runner's own
+default when it specifies none (`bash -e {0}` with no `pipefail`; a step
+that declares `shell: bash` instead gets `bash --noprofile --norc -eo
+pipefail {0}`, a materially different interpreter) --- against stub inputs
+that exercise the paths a review reads past, rather than reasoning about
+the block from the page.
 
 - **Do:** extract a workflow `run:` block's text and execute it against
   stub scripts and stub input, rather than reviewing it only as YAML prose.
@@ -962,18 +964,23 @@ block from the page.
   `with:` keys as license to review it as configuration rather than as the
   shell program it is.
 
-(Measured 2026-09, driving `Morrison-Lab/ai-config#3673` (issue #3669),
-hardening `.github/workflows/upload-skills.yml`.
-Two adversarial review rounds, each reading the diff carefully, found four
-and then two real findings and missed three others: a fix for one round-1
-finding introduced the `PIPESTATUS`-clobbering bug recorded in
-[`errexit-is-not-uniform`](errexit-is-not-uniform.md)'s "`PIPESTATUS` is
-destroyed by the first read that is not a whole-array copy" section, and
-fixes for two round-2 findings introduced an unhandled `iconv -c` exit
-status (that file's "A command's own non-zero exit can be the normal,
-correct outcome" section) and a related `grep`-no-match miss.
-Executing the extracted shell against stub scripts caught all three,
-across three separate rounds, where reading had not.
+(Reported by the authoring session, driving `Morrison-Lab/ai-config#3673`
+(issue #3669), hardening `.github/workflows/upload-skills.yml`: two local
+adversarial review rounds, each reading the diff carefully, found four and
+then two real findings and missed three others, by that session's own
+account rather than from PR #3673's posted review history --- the PR's own
+GitHub reviews carry a single final clean verdict with no per-round
+findings listed, consistent with this corpus's own practice of running
+review rounds locally and posting only the terminal verdict.
+A fix for one round-1 finding introduced the `PIPESTATUS`-clobbering bug
+recorded in [`errexit-is-not-uniform`](errexit-is-not-uniform.md)'s
+"`PIPESTATUS` is destroyed by the first read that is not a whole-array
+copy" section, and fixes for two round-2 findings introduced an unhandled
+`iconv -c` exit status (that file's "A command's own non-zero exit can be
+the normal, correct outcome" section) and a related `grep`-no-match miss.
+Executing the extracted shell against stub scripts caught all three of
+those fix-introduced bugs, in three separate executions, where reading had
+not.
 Distinct from [`adversarial-self-review`](../workflow/adversarial-self-review.md)'s
 "Give a docs-only diff describing an instrument a full round" section, which
 covers a negative claim about a parser inside **prose** describing an

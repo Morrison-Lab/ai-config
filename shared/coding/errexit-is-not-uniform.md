@@ -416,17 +416,39 @@ stage_rc=("${PIPESTATUS[@]}")
 `stage_rc` is then a stable local copy, safe to index at any later point.
 Where the pipeline runs under `set -e` and a non-zero stage is expected,
 lift `errexit` with `set +e` / `set -e` around the pipeline rather than
-`|| true` --- the array is clobbered either way, so this only stops the
-script from aborting, and the array copy above is still required.
+`|| true`.
+`set -e` itself is a command, so it clobbers `PIPESTATUS` exactly like any
+other --- re-enabling `errexit` too early destroys the array the same way
+the bare-assignment mistake above does, just one statement later.
+The array copy has to sit strictly between the pipeline and the `set -e`
+that turns `errexit` back on:
+
+```bash
+set +e
+false | true | false
+stage_rc=("${PIPESTATUS[@]}")   # must come before the next line
+set -e
+echo "${stage_rc[@]}"
+```
+
+```
+1 0 1
+```
+
+Moving the copy after `set -e` reproduces the same empty-array failure the
+bare assignment has, confirmed on bash 5.3.15: `set -e; echo
+"${PIPESTATUS[@]}"` immediately after the pipeline reads `0`, describing
+`set -e` itself rather than the pipeline it re-enabled `errexit` after.
 
 - **Do:** copy the full array in one statement
   (`stage_rc=("${PIPESTATUS[@]}")`) immediately after the pipeline, before
-  any other command runs.
+  any other command runs --- `set -e` included.
 - **Do:** use `set +e` / `set -e` around a pipeline that must run under
   `errexit` and can produce an expected non-zero stage, rather than
-  `|| true`.
+  `|| true`, with the array copy strictly between the two `set` lines.
 - **Don't:** read `${PIPESTATUS[i]}` for `i > 0` after any intervening
-  command --- including the assignment that captured index 0, which is
+  command --- including the assignment that captured index 0, and
+  including the `set -e` that re-enables `errexit`, each of which is
   itself the command that clobbers the rest of the array.
 - **Don't:** attach `|| true` to a pipeline and expect `PIPESTATUS`
   afterward to still describe the pipeline; it describes `true`.

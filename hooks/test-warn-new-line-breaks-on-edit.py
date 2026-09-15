@@ -9,6 +9,8 @@ the vendored checker stay silent.
 
 Run: python3 hooks/test-warn-new-line-breaks-on-edit.py hooks/warn-new-line-breaks-on-edit.py
 """
+import atexit
+import importlib.util
 import json
 import os
 import shutil
@@ -25,9 +27,20 @@ BAD_CONTENT = "# Bad doc\n\nFirst sentence. Second sentence on the same line.\n"
 CLEAN_CONTENT = "# Clean doc\n\nFirst sentence.\nSecond sentence on a new line.\n"
 
 
+# The hook under test treats any path with a `tmp` segment as scratch and
+# skips it. `tempfile.mkdtemp()` returns a path under `/tmp` on Linux (and
+# under `/var/folders/...` on macOS), so fixtures placed there are scratch
+# on CI and in scope locally -- the suite scored 14/14 on macOS and 11/14
+# on Linux from the same commit, with every SHOULD_WARN case short-circuiting
+# before it reached the checker. Root the fixtures somewhere with no
+# excluded segment instead, so the suite measures the same thing everywhere.
+FIXTURE_ROOT = tempfile.mkdtemp(prefix="nlb-edit-fixtures-", dir=os.path.expanduser("~"))
+atexit.register(shutil.rmtree, FIXTURE_ROOT, ignore_errors=True)
+
+
 def make_repo(with_checker=True) -> str:
     """Create a throwaway git repository, optionally vendoring the checker."""
-    d = tempfile.mkdtemp(prefix="nlb-edit-test-")
+    d = tempfile.mkdtemp(prefix="nlb-edit-test-", dir=FIXTURE_ROOT)
     subprocess.run(["git", "init", "-q", "-b", "main", d], check=True)
     if with_checker and os.path.isfile(REAL_CHECKER):
         vendor_dir = os.path.join(d, "scripts", "vendor")
@@ -40,6 +53,22 @@ def make_repo(with_checker=True) -> str:
 
 REPO_WITH_CHECKER = make_repo(with_checker=True)
 REPO_NO_CHECKER = make_repo(with_checker=False)
+
+# Self-check, not a style assertion. If the fixture root ever lands somewhere
+# the hook classifies as scratch, every SHOULD_WARN case silently passes
+# through the skip branch and the suite reports success while measuring
+# nothing -- which is exactly how this shipped. Fail here instead, where the
+# message says what happened.
+_spec = importlib.util.spec_from_file_location("_nlb_edit_hook_under_test", HOOK)
+_HOOK_MOD = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_HOOK_MOD)
+
+if _HOOK_MOD.RX_SCRATCH_PATH.search(os.path.join(REPO_WITH_CHECKER, "docs", "x.md")):
+    raise SystemExit(
+        "fixture root is scratch-excluded by the hook under test "
+        f"({REPO_WITH_CHECKER}); the suite would pass without exercising "
+        "anything. Re-root FIXTURE_ROOT away from tmp/scratchpad/node_modules."
+    )
 
 
 def run_hook(payload, cwd=REPO_WITH_CHECKER, hook_path=HOOK):

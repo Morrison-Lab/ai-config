@@ -939,6 +939,13 @@
             "script": "no-mutation-in-read-only-reviewer.py",
             "why": "ai-config#3612: mechanically blocks file write tools (Write, Edit, NotebookEdit) in read-only personas such as adversarial-reviewer, Explore, and Plan.",
             "_note_see_bash_entry": "Design notes live on this hook's Bash entry. Repeating them per matcher guarantees sibling divergence on the next correction."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-new-line-breaks-on-edit.py\"'",
+            "timeout": 10,
+            "script": "warn-new-line-breaks-on-edit.py",
+            "why": "The Write-time counterpart of warn-new-line-breaks-on-push.py above: warns before a Write composes Markdown lines that pack more than one sentence/clause, in a repo that vendors a local new-line-breaks checker (Morrison-Lab/qbt, 2026-09-14/15). Shares the push hook's own target-repo-vendoring limitation -- a repo that only consumes Morrison-Lab/gha's reusable check-new-line-breaks workflow with no local checker copy gets no warning from either hook."
           }
         ]
       },
@@ -973,6 +980,13 @@
             "script": "no-mutation-in-read-only-reviewer.py",
             "why": "ai-config#3612: mechanically blocks file write tools (Write, Edit, NotebookEdit) in read-only personas such as adversarial-reviewer, Explore, and Plan.",
             "_note_see_bash_entry": "Design notes live on this hook's Bash entry. Repeating them per matcher guarantees sibling divergence on the next correction."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-new-line-breaks-on-edit.py\"'",
+            "timeout": 10,
+            "script": "warn-new-line-breaks-on-edit.py",
+            "why": "The Edit half of the same entry: warns before an Edit's new_string composes Markdown lines that pack more than one sentence/clause, in a repo that vendors a local new-line-breaks checker."
           }
         ]
       },

@@ -327,15 +327,18 @@ Derive the count rather than citing this one, since hooks are added often:
 grep -lE 'payload\.get\(\s*["'"'"']cwd' hooks/*.py | grep -v '/test-' | wc -l
 ```
 
-That printed **18** on `main` on 2026-09-14 (`flag-cd-into-main-checkout.py`, `flag-dispatch-over-uncommitted.py`, `no-clobbering-push.py`, `no-unmonitored-pr.py`, and others);
-two of the 18 (`no-handrolled-verdict-parse.py`, `warn-verdict-line-filter.py`) additionally fall back to `tool_input.cwd` as a defensive second read.
+That printed **18** on `main` on 2026-09-14.
+The set spans EVENTS, so pick an exemplar by the event you care about rather than off the top of the list: `flag-cd-into-main-checkout.py`, `flag-dispatch-over-uncommitted.py` and `no-clobbering-push.py` are `PreToolUse`, while `no-unmonitored-pr.py` is registered on `Stop` and `UserPromptSubmit`, whose payloads carry no `tool_input` at all, so it is no evidence for anything about nesting.
+Two of the 18 (`no-handrolled-verdict-parse.py`, `warn-verdict-line-filter.py`) additionally fall back to `tool_input.cwd` as a defensive second read.
 
 Eighteen consumers agreeing is evidence about this repo's convention and not, by itself, evidence about the harness's schema --- they could share one wrong assumption, which is the substitution [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md) warns about.
-The independent corroboration is a *producer*: `.cursor/hooks/adapt-claude-hooks.py` builds the payload Claude Code's hooks consume, and writes `"cwd"` as a top-level key beside `tool_name` and `tool_input`.
+The independent source is the published hook schema at <https://code.claude.com/docs/en/hooks>, which lists `cwd` as a top-level key beside `session_id`, `transcript_path`, `hook_event_name`, `tool_name` and `tool_input`.
+`.cursor/hooks/adapt-claude-hooks.py` agrees and is NOT independent: it lives in this repo, and its own docstring says it translates a Cursor payload "into the Claude Code payload the existing scripts expect", so it was built to match those 18 consumers and shares their assumption by construction.
+Citing it as the corroboration was the very substitution the sentence above warns about.
 `tool_input` carries the tool's own arguments (`command`, `file_path`, ...).
 `cwd` is a property of the call itself and sits beside `tool_name`/`tool_input`, not inside it.
 
-Building a hand-crafted probe payload with `cwd` nested under `tool_input` is silently wrong rather than loudly wrong: every hook above reads `payload.get("cwd")` at the top level, gets `None`, and falls through to its `os.getcwd()` (or equivalent) fallback --- so the probe runs, the hook exits 0, and a directory-sensitive guard reads as "did not fire on this input" for a reason that has nothing to do with the behaviour under test.
+Building a hand-crafted probe payload with `cwd` nested under `tool_input` is silently wrong rather than loudly wrong: every hook above reads `payload.get("cwd")` at the top level, gets `None`, and takes whatever fallback it has --- usually `os.getcwd()`, but `guard-slide-major-tag.py` tries `CLAUDE_PROJECT_DIR` first, and `no-unshipped-commit.py` has no `os.getcwd()` at all: its docstring says that without a `cwd` "repository state is unknowable", so it abandons repository state and falls back to the transcript scan --- so the probe runs, the hook exits 0, and a directory-sensitive guard reads as "did not fire on this input" for a reason that has nothing to do with the behaviour under test.
 
 - **Do:** put `cwd` at the top level of a constructed `PreToolUse` payload, beside `tool_name` and `tool_input`, never nested inside `tool_input`.
 - **Don't:** read a probe's silence as a verdict about the hook before checking the payload shape it was actually fed.
@@ -614,7 +617,7 @@ So "keep the mutant in `hooks/`" fixes a `scripts/lib` import exactly as it fixe
 Measured 2026-09-14 by copying that hook to two places and feeding each the same payload: the copy in `hooks/` evaluated normally, and the copy in a temp directory printed `cannot load scripts/lib/shellcmd.py (No module named 'shellcmd')` and declined to evaluate.
 
 **The repo already encodes this, which is the actual lesson.**
-Three committed harnesses pass `dir=os.path.dirname(HOOK)` to `mkstemp` for exactly this reason --- `hooks/test-warn-heredoc-doubled-backslash.py`, `hooks/test-warn-blanket-worktree-force-remove.py`, and `hooks/test-flag-conflict-with-base.py` --- and the first carries a comment naming the mechanism and the symptom:
+Three committed harnesses pass `dir=os.path.dirname(HOOK)` to `mkstemp` for the same file-relative resolution --- two for a `scripts/lib` import and the third for a sibling import, which is the point, since the remedy does not care which --- `hooks/test-warn-heredoc-doubled-backslash.py`, `hooks/test-warn-blanket-worktree-force-remove.py`, and `hooks/test-flag-conflict-with-base.py` --- and the first carries a comment naming the mechanism and the symptom:
 
 > The mutated copy must live NEXT TO the real hook, not in the OS temp directory.
 > The hook resolves `scripts/lib/shellcmd.py` relative to its own `__file__` (two directories up), so a mutated copy dropped elsewhere silently fails that import [...]
@@ -624,7 +627,9 @@ I hit this symptom on a branch that added a `scripts/lib` import to two hooks wh
 The first draft of this entry then recorded the shim as a *different* remedy and told future sessions **not** to relocate the mutant --- steering them away from the fix three committed harnesses already use, on a false premise the same draft contradicted two paragraphs earlier by calling the import "resolved off its own `__file__`, the same way `_sibling()` is".
 That is [`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md): a UMS pass concluded the corpus lacked coverage without querying for it, and nearly wrote a rule that inverts working practice.
 
-`PYTHONPATH` is a valid fallback, not a replacement --- use it only where the harness genuinely cannot write into `hooks/`:
+`PYTHONPATH` is a valid fallback, not a replacement --- use it only where the harness genuinely cannot write into `hooks/`, and point it at the directory the hook's OWN spelling needs.
+The two spellings need different roots, so one value does not serve both: a bare `import shellcmd` after joining `"scripts", "lib"` needs `<repo>/scripts/lib`, while `from scripts.lib.X import ...` needs the repo ROOT and fails with `No module named 'scripts'` given the other.
+`hooks/no-push-without-self-review.py` uses the package spelling, so the root is the safe value when in doubt:
 
 ```python
 env = dict(os.environ)
@@ -633,14 +638,18 @@ env["PYTHONPATH"] = os.pathsep.join(
 proc = subprocess.run([sys.executable, hook_path], ..., env=env, ...)
 ```
 
-**Derive the exposed set rather than remembering it.**
-The predicate is: a hook importing `scripts/lib`, whose own harness materializes a mutant `.py` somewhere other than `hooks/`.
-Both halves matter --- grepping a test file for `tempfile` alone matches fixtures and literal test strings, and `mktemp` appears inside the *input* of at least one suite that has no mutation harness at all.
+**Derive the exposed set rather than remembering it, and make the predicate as wide as the claim.**
+The predicate is: a hook resolving ANY import off its own `__file__` --- a sibling hook or a `scripts/lib` module --- whose own harness materializes a mutant `.py` somewhere other than `hooks/`.
+
+Getting that wrong is how a first version of this entry produced a false all-clear.
+Its loop greped only for `scripts/lib` imports while the paragraph above it had already widened the population to include `_sibling()`, so the loop could not see the half the conclusion covered, and the entry then reported that no committed harness had the bug.
+One does.
+A detector narrower than the sentence it supports is worse than no detector, because the sentence reads as measured.
 
 ```bash
 for f in hooks/*.py; do
   case "$f" in hooks/test-*) continue;; esac
-  grep -qE '"scripts", "lib"|from scripts\.lib\.' "$f" || continue
+  grep -qE '"scripts", "lib"|from scripts\.lib\.|_sibling\(|_load_sibling' "$f" || continue
   t="hooks/test-$(basename "$f" .py).py"
   [ -f "$t" ] || continue
   grep -qE 'mkstemp\(suffix="\.py"|shutil\.copy\(HOOK' "$t" || continue
@@ -649,11 +658,17 @@ for f in hooks/*.py; do
 done
 ```
 
-Both import spellings are in the first grep because neither alone covers the set: `"scripts", "lib"` matches 12 non-test hooks and `from scripts.lib.` matches 2, with `hooks/no-push-without-self-review.py` in both, for a union of 13.
+Both `scripts/lib` spellings are in the first grep because neither alone covers that half: `"scripts", "lib"` matches 12 non-test hooks and `from scripts.lib.` matches 2, with `hooks/no-push-without-self-review.py` in both, for a union of 13.
 
-Run on `main` on 2026-09-14, that loop printed **one** file, `hooks/no-push-without-self-review.py` --- and its harness is a false positive by design, since `hooks/test-no-push-without-self-review.py:38` says its orphan copy is `deliberately WITHOUT the sibling`.
-So no committed harness on `main` actually has this bug.
-Re-derive before citing any of these figures.
+Run on `main` on 2026-09-14 it printed three files.
+Two are false positives that say so themselves --- `hooks/test-no-push-without-self-review.py:1116` and `hooks/test-remind-learn-from-review.py:257` each copy the hook without its sibling on purpose, to pin the degraded path.
+The third, `hooks/warn-new-line-breaks-on-push.py`, is a real instance: its harness writes the mutant to a bare temp directory, so all three of its clauses "pass" while flipping the identical five cases.
+Filed as [ai-config#3648](https://github.com/Morrison-Lab/ai-config/issues/3648).
+Re-derive rather than citing these figures.
+
+Two known limits of the loop, so the next reader does not mistake it for complete.
+Its exclusion test is FILE-level, so a harness with two mutant sites where only one passes `dir=` is silently dropped.
+And it only sees harnesses that materialize a `.py` file at all, which is a proxy for "runs a mutant as a subprocess" rather than the thing itself.
 
 - **Do:** write a mutant into `hooks/` (`dir=os.path.dirname(HOOK)`), which covers sibling imports and `scripts/lib` imports alike.
 - **Do:** grep for how the repo already solves a harness problem before inventing a remedy for it --- three harnesses carried the answer and one carried the explanation.

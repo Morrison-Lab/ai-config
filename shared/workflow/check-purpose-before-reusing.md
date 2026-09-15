@@ -623,6 +623,6 @@ That sentence is correct for a discharge check, where the worst outcome of givin
 Read it in a GUARD and the same branch has the opposite worst outcome, because what gives up there is the thing deciding whether a destructive command is allowed.
 Nothing in the function changes; the cost of its limits does.
 
-`#1973`'s Scope section names six token-comparing hooks that would consume such a helper, and reports the bypass measured against two of them --- `hooks/no-clobbering-push.py` and `hooks/flag-reset-hard-uncommitted-work.py`.
+`#1973`'s Scope section names six token-comparing hooks that would consume such a helper, and its defect section reports the bypass measured against two of them --- `hooks/no-clobbering-push.py` and `hooks/flag-reset-hard-uncommitted-work.py`.
 Read the issue for the proposal and its measurements;
 the rule here needs only `_poller_executed` itself, since the give-up branches and their stated direction are both in front of you.)

@@ -12,11 +12,9 @@ The modern standard is native plugin installation: `Morrison-Lab/gha`'s reusable
 
 If a repository uses `ai-config` (or any other tool) as both a native plugin and a git submodule, **remove the submodule** per [`remove-redundant-plugin-submodules.md`](../shared/workflow/remove-redundant-plugin-submodules.md).
 
-**Skills, commands and hooks travel to a consumer repo --- the reviewer personas do not.**
-[`adversarial-self-review`](../shared/workflow/adversarial-self-review.md) owns this rule and the remedy, and ai-config#1921 tracks shipping the persona alongside the guard.
-What the plugin layout adds, checked at `c7201140` on 2026-09-15: the Claude Code plugin's root is the repository root (`.claude-plugin/plugin.json`), which carries `skills/`, `commands/` and `hooks/hooks.json` and **no** `agents/` directory at all.
-So the personas are not merely hard for a foreign session to resolve --- the plugin has no agent inventory to install, while `hooks/no-push-without-self-review.py` installs everywhere the plugin does.
-[`agent-builder`](../skills/agent-builder/SKILL.md)'s "there's no central agent list to update" is the same fact from the authoring side.
+**Skills, commands and hooks travel to a consumer repo --- the reviewer personas do not, though the hook that requires one does.**
+[`adversarial-self-review`](../shared/workflow/adversarial-self-review.md) owns that rule, the plugin-root derivation behind it, and the fallback to use instead.
+ai-config#1921 tracks shipping the persona alongside the guard.
 
 Historically (prior to native plugins), consumer repos vendored ai-config as a submodule with a committed `.claude/skills` symlink (e.g. `d-morrison/rme#982` and `ucdavis/epi204#360`, later migrated off the submodule in `d-morrison/rme#1074` and `ucdavis/epi204#380`):
 

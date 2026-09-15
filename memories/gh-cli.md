@@ -605,20 +605,20 @@
   Measured 2026-09-15 with `gh api graphql -f query='query { repository(owner: "<o>", name: "<r>") { suggestedActors(capabilities: [CAN_BE_ASSIGNED], first: 20) { nodes { login __typename } } } }'`:
   `ucdavis/lbt` returned exactly one `Bot`, `copilot-swe-agent`, and so did `Morrison-Lab/ai-config`, which had a `copilot-pull-request-reviewer[bot]` review on #3678 at `2026-09-15T05:32:36Z`.
   Identical answers, opposite states, so the query discriminates nothing here: `CAN_BE_ASSIGNED` is about the **coding agent** you can assign an issue to, a different product from the PR reviewer, whose login never appears in that list on either repo.
-  The GraphQL `requestReviews` mutation carrying the reviewer bot's node id behaves like the REST POST --- it returns without errors and the reviewer list stays empty.
+  A session also reported the GraphQL `requestReviews` mutation carrying the reviewer bot's node id behaving like the REST POST --- returning without errors while the reviewer list stayed empty --- but that one is narration rather than measurement here: no repo, PR, node id, or response body was kept, and re-running it would be an outward mutation.
 
   **What does bear on it is the repository's own review history**, which is re-derivable and needs no probe:
   `gh api "repos/<o>/<r>/pulls/<N>/reviews" --jq '[.[] | .user.login]'` across the PRs that exist.
   All six of `ucdavis/lbt`'s PRs (1 and 3 through 7) return no reviews at all, which is evidence about that repository rather than about the endpoint that was probed.
-  This is the per-repo, historical form of the conclusion two paragraphs below --- that only a posted review body settles whether a review is coming --- rather than a competing discriminator.
+  This is the per-repo, historical form of the "only the posted review **body** settles whether a review is actually coming" conclusion below, rather than a competing discriminator.
   Where the history comes out empty, no documented request mechanism will discharge a no-unreviewed-PR obligation there, and the obligation has to be met by another reviewer (`claude-review`, or the local adversarial self-review) instead of by more requests.
 
   - **Do:** answer "does Copilot review here at all" from the repo's existing `reviews` lists, not from a request endpoint's status code.
-  - **Don't:** read a `suggestedActors` list that names only `copilot-swe-agent` as evidence about PR code review --- ai-config returns the same list while being reviewed.
+  - **Don't:** read a `suggestedActors` list whose only bot is `copilot-swe-agent` as evidence about PR code review --- ai-config returns the same single bot while being reviewed.
   - **Don't:** escalate from REST to GraphQL when the REST call already returned success ---
     both add the same nobody, and each attempt spends quota that is often the real cause.
 
-  That disappearance is **not** explained by the `review_on_push: true` rule above, and [`shared/workflow/pr-on-claim.md`](../shared/workflow/pr-on-claim.md)'s "blocked-request test has a false positive" section owns the argument and the deriving queries.
+  That 201-then-empty disappearance is **not** explained by the `review_on_push: true` rule above, and [`shared/workflow/pr-on-claim.md`](../shared/workflow/pr-on-claim.md)'s "blocked-request test has a false positive" section owns the argument and the deriving queries.
   The short version: `Morrison-Lab/ai-config` reproduces the identical 201-then-empty signature while carrying no `copilot_code_review` rule at either scope, so an empty pending list is evidence neither that the request was blocked nor that a review is coming.
   Only the posted review **body** settles whether a review is actually coming.
   Measured on `Morrison-Lab/ai-config` on 2026-09-15: no body ever came.

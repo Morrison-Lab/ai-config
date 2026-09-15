@@ -443,7 +443,7 @@ Both produce the identical symptom --- "Async agent launched successfully" with 
 
 `read_latest_review()` in `hooks/no-push-without-self-review.py` already has a partial fix for exactly this: the "Genuine task notifications from tracked background reviewer dispatches" block, added by #2820 (closing #2544) on 2026-09-01, two days before #3045 was filed.
 It tries to recover a task id from the dispatch's own tool result, then matches a later task-notification against that id and parses its text for a verdict.
-The recovery step tries `json.loads()` first, and on failure falls back to a regex requiring the literal key `task[-_]?id` or `conversationId`.
+The recovery step tries `json.loads()` first, and on failure falls back to a regex requiring the literal key `task[-_ ]?id` or `conversationId`.
 One session's tool result read `agentId: a29a955ac15b38f72`, which matches neither alternative, so the id was never captured, the later notification never matched, and the guard refused the push on all four dispatches in that session despite each one returning a genuine, independently verified verdict.
 Reproduced directly:
 

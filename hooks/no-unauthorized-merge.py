@@ -723,10 +723,32 @@ def _body_is_simple(text: str, body_start: int, body_end: int) -> bool:
     prose mention. A `case` nested inside `$( )`, which the model does not
     handle, is covered by `$(` being listed.
 
-    Treat this exemption as load-bearing and under-proven: a fail-open found
-    anywhere in the `case` model is a fail-open in the whitelist itself, and
-    the honest alternative if a third one turns up is to list `case` and pay
-    the over-block.
+    A third one did turn up -- round 7's newline between the case word and its
+    `in` -- and a previous version of this paragraph said what to do about it:
+    "the honest alternative if a third one turns up is to list `case` and pay
+    the over-block." That instruction was WRONG, and it was measured wrong
+    rather than argued away.
+
+    Listing `case` (word-bounded, which is the cheaper of the two spellings)
+    turns 8 suite cases into over-blocks as expected, and ALSO opens three
+    fail-opens:
+
+        < <(case x in x) echo "<merge>";; esac) bash   BLOCK -> allow
+
+    The premise underneath the instruction is that extending a body to end of
+    text is uniformly the fail-closed direction. It is not. For the
+    executor-written-AFTER form, the extended body swallows the trailing
+    executor, so `live_proc_subst_spans` returns NO span at all rather than a
+    longer one -- the region stops being seen as executed, and the merge
+    inside it goes unread. Measured: `[(4, 46)]` becomes `[]`.
+
+    So the exemption stays, and stays load-bearing and under-proven: a
+    fail-open anywhere in the `case` model is a fail-open in the whitelist
+    itself. What has changed is that the escape hatch this paragraph used to
+    offer is closed, and a fourth fail-open cannot be answered by reaching for
+    it. The general property -- that extending a body is fail-closed for a
+    leading executor and fail-OPEN for a trailing one -- is ai-config#3649,
+    and any future whitelist entry has to be checked against both forms.
     """
     body = text[body_start:body_end]
     return not any(token in body for token in _APPROXIMATED)

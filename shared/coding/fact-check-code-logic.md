@@ -930,6 +930,56 @@ The draft named the rare outcome as though it were the common one, inverting its
 The first draft of *this entry* then generalized from U+201C to "a smart quote", which an adversarial review refuted by measurement: U+201C (`e2 80 9c`) decodes silently and U+201D (`e2 80 9d`) raises, `0x9D` being one of the five.
 Recording that second step because it is the same error at one remove, committed while documenting why not to.)
 
+### The claim to execute can be a whole embedded program, not just one call or one printed value
+
+Everything the section above names is a single, isolated claim: what one
+call returns, which of two forms errors, a value quoted in a comment.
+The same argument extends to a **program**, when the diff carries one and
+review is reading it rather than running it --- and it is worth stating
+separately, because a multi-line shell script embedded in a GitHub Actions
+`run:` block does not read like a program to review.
+It sits inside YAML, indented like configuration, next to `uses:` and
+`with:` keys, so the reviewing eye treats it the way it treats the
+surrounding file: something to check for shape and plausibility, not
+something to execute.
+It is a shell program regardless of where it is written, with its own
+control flow, its own exit-status handling, and its own bugs that only
+show up when it runs.
+
+The fix is the same instrument the section above already prescribes, aimed
+wider: extract the `run:` block's text with `yaml.safe_load` and execute it
+--- under the runner's own interpreter (`bash --noprofile --norc -eo
+pipefail` for GitHub's default `run:` shell) --- against stub inputs that
+exercise the paths a review reads past, rather than reasoning about the
+block from the page.
+
+- **Do:** extract a workflow `run:` block's text and execute it against
+  stub scripts and stub input, rather than reviewing it only as YAML prose.
+- **Do:** treat a fix to one finding in a `run:` block as owing the same
+  execution the original review owed, since a fix is new code with no
+  history of having been run.
+- **Don't:** read a `run:` block's indentation and neighbouring `uses:`/
+  `with:` keys as license to review it as configuration rather than as the
+  shell program it is.
+
+(Measured 2026-09, driving `Morrison-Lab/ai-config#3673` (issue #3669),
+hardening `.github/workflows/upload-skills.yml`.
+Two adversarial review rounds, each reading the diff carefully, found four
+and then two real findings and missed three others: a fix for one round-1
+finding introduced the `PIPESTATUS`-clobbering bug recorded in
+[`errexit-is-not-uniform`](errexit-is-not-uniform.md)'s "`PIPESTATUS` is
+destroyed by the first read that is not a whole-array copy" section, and
+fixes for two round-2 findings introduced an unhandled `iconv -c` exit
+status (that file's "A command's own non-zero exit can be the normal,
+correct outcome" section) and a related `grep`-no-match miss.
+Executing the extracted shell against stub scripts caught all three,
+across three separate rounds, where reading had not.
+Distinct from [`adversarial-self-review`](../workflow/adversarial-self-review.md)'s
+"Give a docs-only diff describing an instrument a full round" section, which
+covers a negative claim about a parser inside **prose** describing an
+instrument; this is the code itself, carrying no prose claim to check
+against, only behaviour.)
+
 ## A signature change's caller set is derived by grep, never from the callers you can see
 
 Adding or retyping a parameter on a shared function changes every call site at once, and the call sites are not a property of the file you are editing.

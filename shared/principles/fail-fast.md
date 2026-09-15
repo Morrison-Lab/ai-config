@@ -41,6 +41,51 @@ Worked-example case records for the rules below live in
   attempts feeding a single resolve-outcome step that still fails the
   job when neither attempt succeeded) --- the failure is deferred and
   handled, not ignored.
+- A CI step that `exit 0`s on a missing secret can be legitimate fork
+  protection, or it can be masking the repo's own misconfiguration; see
+  "A secret-presence guard can mean two different things" below.
+
+## A secret-presence guard can mean two different things
+
+A step that checks whether a secret is set and exits 0 if it is not reads as
+defensive: a workflow triggered from a fork PR has no access to repository
+secrets, so failing loudly there would break every fork contribution.
+That reasoning is sound exactly once, at the job's own trigger boundary.
+Once a job already gates on `github.repository` (or an equivalent
+same-repo-only condition), the fork case is already excluded upstream, and a
+secret-presence check placed *after* that guard cannot be distinguishing a
+fork PR from anything --- the only remaining explanation for the secret
+being absent is that the repository itself is misconfigured.
+
+The two conditions --- "this run legitimately has no secret" and "this run
+should have a secret and doesn't" --- produce the identical observable exit
+code, so nothing at the surfaces a human or a status check reads (a green
+run, a checkmark in the job list, `continue-on-error`'s own summary) tells
+them apart.
+A step guarded this way can run green indefinitely while doing nothing, and
+every consumer of its output --- a status badge, a downstream job, a human
+skimming Actions --- reads "passed" rather than "silently skipped its one
+job".
+
+- **Do:** place a secret-presence exit-0 branch only where no upstream
+  condition (`github.repository`, an environment gate, a fork check) has
+  already narrowed the run to the case the secret should be present in.
+- **Do:** fail the job loudly when a secret is absent on a run that already
+  passed a same-repo/same-environment guard --- that absence is a
+  misconfiguration to fix, not a case to skip past.
+- **Don't:** read a secret-presence guard as fork protection once another
+  guard already excludes forks; at that point it can only be catching your
+  own misconfiguration, and skipping is the wrong response to that.
+- **Don't:** trust a long streak of green runs as evidence the step is doing
+  its job --- an `exit 0` skip and a genuine success are the same color.
+
+(Driving `Morrison-Lab/ai-config#3673` (issue #3669), hardening
+`.github/workflows/upload-skills.yml`: a job already gated on
+`github.repository` carried a further secret-presence branch that `exit
+0`'d when the secret was absent. 94 consecutive runs were green and
+uploaded nothing for two weeks before the gap was noticed --- every run
+took the same silent-skip branch, and nothing about a green check
+distinguished it from a real upload.)
 
 ## Catch conditions by class, never by message text
 

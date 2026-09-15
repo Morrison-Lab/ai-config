@@ -380,6 +380,67 @@ never given a chance to print anything.
 under `set -eu` reported every branch deleted, including the ones `git` had
 refused.)
 
+### `PIPESTATUS` is destroyed by the first read that is not a whole-array copy
+
+`${PIPESTATUS[0]}` is the remedy the section above names, and it is correct
+only if nothing runs between the pipeline and the read.
+`PIPESTATUS` is not a snapshot: bash overwrites it after **every** command,
+pipeline or not.
+Assigning one element into a scalar is itself a command, so the assignment
+meant to capture index 0 clobbers the array before the next line can read
+index 1:
+
+```bash
+$ bash -c 'false | true | false
+first="${PIPESTATUS[0]}"
+echo "first=$first"
+echo "PIPESTATUS[1]=>${PIPESTATUS[1]}<"'
+first=1
+PIPESTATUS[1]=><
+```
+
+`PIPESTATUS[1]` reads empty.
+The assignment on the line before reset the array to describe itself, a
+single non-pipeline command with no index 1.
+`pipeline || true` clobbers it for the same reason: `true` is the last
+command that ran, so `PIPESTATUS` afterward describes `true`, not the
+pipeline the `|| true` was meant to guard.
+
+The fix is to copy the whole array in the one statement that reads it,
+before anything else runs:
+
+```bash
+stage_rc=("${PIPESTATUS[@]}")
+```
+
+`stage_rc` is then a stable local copy, safe to index at any later point.
+Where the pipeline runs under `set -e` and a non-zero stage is expected,
+lift `errexit` with `set +e` / `set -e` around the pipeline rather than
+`|| true` --- the array is clobbered either way, so this only stops the
+script from aborting, and the array copy above is still required.
+
+- **Do:** copy the full array in one statement
+  (`stage_rc=("${PIPESTATUS[@]}")`) immediately after the pipeline, before
+  any other command runs.
+- **Do:** use `set +e` / `set -e` around a pipeline that must run under
+  `errexit` and can produce an expected non-zero stage, rather than
+  `|| true`.
+- **Don't:** read `${PIPESTATUS[i]}` for `i > 0` after any intervening
+  command --- including the assignment that captured index 0, which is
+  itself the command that clobbers the rest of the array.
+- **Don't:** attach `|| true` to a pipeline and expect `PIPESTATUS`
+  afterward to still describe the pipeline; it describes `true`.
+
+(Measured on bash 5.3.15, Darwin, driving `Morrison-Lab/ai-config#3673`
+(issue #3669), hardening `.github/workflows/upload-skills.yml`.
+A fix for an earlier review finding read `script_rc="${PIPESTATUS[0]}"` on
+one line and `"${PIPESTATUS[1]}"` on the next, so every run --- including
+every successful one --- read an empty second status and reported failure.
+`pipeline || true` was confirmed independently to clobber the array the same
+way.
+Executing the extracted shell against stub scripts caught this; two prior
+adversarial review rounds, reading the same diff, had not.)
+
 ### An ad-hoc `&&` chain is the same defect with nowhere to put the remedy
 
 The section above assumes a script, so both its examples end in `|| fallback`
@@ -620,6 +681,53 @@ Both forms were reproduced on the same shell ---
 the naive form deletes at the substitution,
 and the guarded form survives it and then leaks,
 which is how the incomplete-remedy half above was found.)
+
+## A command's own non-zero exit can be the normal, correct outcome
+
+The sections above are about a script's own control flow losing a status it
+should have kept.
+The mirror defect is a status the script should not have trusted in the
+first place: some commands exit non-zero on an input that is not an error,
+and treating that exit as a failure under `set -e` aborts a script that was
+working correctly.
+
+`iconv -c` is one.
+Its `-c` flag drops invalid characters from the output, and exits non-zero
+anyway when the input ends mid-sequence --- a multi-byte lead byte with
+nothing after it, which happens whenever the byte stream was truncated
+rather than malformed.
+The valid prefix is still written to stdout; the exit status just reports
+that the tail could not be decoded.
+Piping a byte-truncated buffer (a `head -c N` cut, a size-capped read, a
+network chunk) into `iconv -c` therefore produces correct output and a
+non-zero status in the same call, and a bare `set -e` treats that as the
+script having failed.
+
+`head -c` is the producer half of the same shape, worth naming separately
+because it looks unrelated: it counts **bytes**, not characters, so a cut
+that lands inside a multi-byte UTF-8 sequence hands the next stage exactly
+the truncated tail `iconv -c` above is built to tolerate.
+
+- **Do:** tolerate `iconv -c`'s exit status explicitly (`|| true`, or check
+  it only where a truncated tail is not expected) when sanitizing a buffer
+  that may be byte-truncated.
+- **Do:** treat a `head -c`-truncated buffer as an expected source of a
+  trailing incomplete multi-byte sequence, not a sign of corrupt input.
+- **Don't:** let a bare `set -e` abort a pipeline on `iconv -c`'s exit
+  status without first checking whether the non-zero case is "truncated
+  input, valid prefix written" rather than "invalid input, nothing usable".
+- **Don't:** assume `head -c`'s byte count lines up with a character
+  boundary in non-ASCII text.
+
+(Measured on bash 5.3.15 / GNU/BSD iconv, driving
+`Morrison-Lab/ai-config#3673` (issue #3669), hardening
+`.github/workflows/upload-skills.yml`: a fix for an earlier review finding
+sanitized a byte-capped GitHub Actions step-summary buffer with `iconv -c`
+and no exit-status handling, so a run whose buffer happened to truncate
+mid-character aborted under `set -e` despite `iconv` having written a
+correct, valid prefix.
+Executing the extracted shell against a byte-truncated stub buffer caught
+this; reading the diff had not.)
 
 ## In review
 

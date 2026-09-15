@@ -44,7 +44,9 @@ backup or an archive copy to an HDD is exactly right.** A guard that fired on
 every `robocopy C:\\... D:\\Backup\\...` would be teaching people to ignore it
 within a day, on the very commands where the HDD is the correct destination.
 
-So the trigger is narrowed twice, and both narrowings cost real detections:
+So the trigger is narrowed four ways. The two below cost real detections and
+are the ones the cry-wolf argument turns on; the other two -- rehearsal flags
+and segment scoping -- are under WHAT IS NOT MATCHED and cost nothing:
 
   * a cross-drive relocation naming NO toolchain path is silent. Documents,
     media, game installs, ISOs, finished datasets -- the whole population for
@@ -148,8 +150,11 @@ GITBASH = re.compile(r"(?<![\w/:.])/([A-Za-z])/[^\s\"';|&,]*")
 def _segment_at(text, index):
     """The command-list segment of `text` containing character `index`.
 
-    Segments are split on `;`, `&`, `|`, a newline, and paren/brace edges --
-    the same separator class the command-position anchor accepts. This is a
+    Segments are split on `;`, `&`, `|` and a newline. Paren and brace edges
+    are deliberately NOT in this class: they were in the first spelling and
+    came out, since a paren is not a command-list separator in either shell.
+    The command-position anchor is a SUPERSET of this class, not the same one
+    -- it also accepts `(` and `{` as the preceding character. This is a
     deliberate approximation: a separator inside a quoted string splits a
     segment it should not, which can only LOSE a detection (fewer tokens in
     view), never invent one.

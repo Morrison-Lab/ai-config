@@ -732,8 +732,9 @@ def classify_verdict_body(body, head_oid, payload_stripped=False):
 
     `payload_stripped` says the caller removed a `review-data` opener from
     this body and left none behind --- see :func:`evaluate_verdict`, which
-    deletes closed fences before calling. The body cannot show that by
-    itself, because the evidence is exactly what was deleted.
+    deletes blockquoted lines and then closed fences before calling. Either
+    pass can hide a payload, and the body cannot show that by itself, because
+    the evidence is exactly what was deleted.
     """
     section = VERDICT_MARKER_RE.split(body, maxsplit=1)[1]
     # The verdict's own footer is the last "Reviewed commit:" line; earlier
@@ -773,13 +774,13 @@ def classify_verdict_body(body, head_oid, payload_stripped=False):
     # payload mid-sentence and publishing a CLEAN one therefore cleared, while
     # the same quote beside a prose headline did not (review finding, #3629).
     #
-    # `payload_stripped` covers the one position neither reader can see. A
-    # payload inside a CLOSED fence is deleted by the caller before this
-    # function runs, so a body whose ONLY payload was fenced arrives looking
-    # like a body that never had one, and a clean-reading headline then
-    # decides unopposed. That is right when an unfenced payload also exists
-    # --- the fence held a documentation example --- and wrong when it does
-    # not, because the fence may be a formatting slip around the reviewer's
+    # `payload_stripped` covers the positions neither reader can see. A
+    # payload inside a CLOSED fence, or inside a blockquote, is deleted by the
+    # caller before this function runs, so a body whose ONLY payload sat in
+    # one arrives looking like a body that never had one, and a clean-reading
+    # headline then decides unopposed. That is right when a live payload also
+    # exists --- the fence or the quote held an example --- and wrong when it
+    # does not, because either may be a formatting slip around the reviewer's
     # real verdict. Only the caller can tell those apart, so it passes the
     # answer in.
     _, body_unreadable = blank_comment_regions(body)
@@ -846,11 +847,21 @@ def evaluate_verdict(comments, head_oid):
         # verdict; fenced content (a comment showing the format) isn't either.
         unquoted = BLOCKQUOTE_LINE_RE.sub("", raw)
         blanked = FENCE_RE.sub("", unquoted)
-        # A payload the fence strip removed, with none left behind, is the
+        # A payload that EITHER strip removed, with none left behind, is the
         # reviewer's only one -- possibly its real verdict, wrapped in a stray
-        # fence. `classify_verdict_body` cannot see this: the evidence is the
-        # text just deleted.
-        stripped = (PAYLOAD_OPEN_RE.search(unquoted) is not None
+        # fence or quoted back at itself. `classify_verdict_body` cannot see
+        # this: the evidence is the text just deleted.
+        #
+        # Compared against `raw` rather than `unquoted`, because the
+        # blockquote strip runs FIRST and hides a payload from the comparison
+        # exactly as the fence strip does. Anchoring on `unquoted` measured
+        # only the second pass, so a sole blockquoted NOT_CLEAN payload was
+        # already gone before the check began (review finding, #3629).
+        #
+        # Firing only when NOTHING survives is what keeps this narrow: a
+        # reviewer quoting an earlier round's payload while publishing its own
+        # still clears, since its own payload is in `blanked`.
+        stripped = (PAYLOAD_OPEN_RE.search(raw) is not None
                     and PAYLOAD_OPEN_RE.search(blanked) is None)
         if VERDICT_MARKER_RE.search(blanked):
             if trusted:

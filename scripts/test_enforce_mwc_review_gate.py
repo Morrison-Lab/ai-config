@@ -1565,6 +1565,42 @@ class StructuredReviewDataTests(unittest.TestCase):
             gate.evaluate(MERGE_CMD, pr(comments=[comment(sole)]))["decision"],
             "deny")
 
+    def test_a_sole_blockquoted_payload_does_not_leave_the_prose_unopposed(self):
+        """The sibling strip, and the reason the check anchors on `raw`.
+
+        `evaluate_verdict` removes blockquoted lines BEFORE it removes closed
+        fences. A check comparing the post-blockquote text against the
+        post-fence text measures only the second pass, so a payload quoted
+        with `>` was already gone before the comparison began.
+        """
+        quoted = ("**Claude finished review**\n\n### Verdict\n"
+                  "**Ready for merge**\n\n"
+                  "> <!-- review-data: "
+                  + payload("NOT_CLEAN", [{"file": "x.py"}]) + "\n"
+                  "> -->\n\nReviewed commit: " + HEAD)
+        self.assertEqual(gate.evaluate_verdict([comment(quoted)], HEAD),
+                         "ambiguous")
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, pr(comments=[comment(quoted)]))["decision"],
+            "deny")
+
+    def test_quoting_an_earlier_payload_beside_a_live_one_still_clears(self):
+        """The narrowing half: the flag fires only when NOTHING survives.
+
+        A reviewer citing the previous round's payload while publishing its
+        own is the ordinary shape of an ARD round, and it must not deny.
+        """
+        body = ("**Claude finished review**\n\n### Verdict\n"
+                "**Ready for merge**\n\nLast round said:\n\n"
+                "> <!-- review-data: "
+                + payload("NOT_CLEAN", [{"file": "x.py"}]) + "\n> -->\n\n"
+                "Reviewed commit: " + HEAD + "\n\n"
+                "<!-- review-data: " + payload("CLEAN", []) + " -->")
+        self.assertEqual(gate.evaluate_verdict([comment(body)], HEAD), "clean")
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, pr(comments=[comment(body)]))["decision"],
+            "allow")
+
     def test_payload_stripped_is_the_callers_answer_not_the_bodys(self):
         """Asserted on the parameter directly: the same blanked body reads
         clean or ambiguous depending only on what the caller saw removed."""

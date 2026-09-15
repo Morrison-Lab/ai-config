@@ -1159,10 +1159,32 @@ Deleting the clause outright and mis-sizing it by one character each passed the
 whole suite.
 Reinforced beyond the suite, `pass` produced 0 verdict differences over 200,000
 targeted strings against 2 span differences over 20,000, and the off-by-one was
-wholly indistinguishable over 20,000 --- so no verdict case would have pinned
-either mutation, however the input was chosen.
+wholly indistinguishable over 20,000.
 Four cases had been written for exactly this route, and all four were verdict
 cases, so all four passed with the clause deleted.
+
+**Those zeros bound the search that produced them, and an earlier version of
+this passage read them as bounding the clause.**
+It said "no verdict case would have pinned either mutation, however the input
+was chosen", which is false.
+Re-running the same two mutants against a differently-generated alphabet found
+a verdict difference for each:
+
+```
+40,000 strings, seed 7    pass: 1 difference   body_start + 1: 0
+60,000 strings, seed 99   pass: 0              body_start + 1: 1
+```
+
+So a distinguishing verdict input exists for both, at something like one in
+fifty thousand against a generator neither search was tuned for.
+That does not restore the verdict case as the remedy --- an input nobody can
+write on purpose, and that 200,000 targeted strings failed to surface, is not
+a fixture --- but it changes what the zero licenses.
+It says the assertion reads a quantity the clause barely controls, not one it
+provably cannot control, and only the first of those is something a search can
+establish.
+The remedy is the same either way, which is why the overclaim survived: it
+changed the argument's strength and not its conclusion.
 
 The rule was already written down, in the same suite file, heading the
 scanner-level assertions a few hundred lines below those four cases
@@ -1180,8 +1202,10 @@ Each row moved from 343/343 to 345/346 with one case wrong.
 
 - **Do:** name the quantity the clause changes, and assert that quantity,
   before writing a case for it.
-- **Do:** read a flat zero from a large verdict-level search as "the assertion
-  reads the wrong quantity", not as "the fixture is weak".
+- **Do:** read a flat zero from a large verdict-level search as evidence that
+  the assertion reads the wrong quantity rather than that the fixture is weak
+  --- while stating the alphabet and the count, since a differently-generated
+  search can still turn one up.
 - **Do:** pin a clause that can be mis-sized in two directions with one probe
   per direction --- a probe that catches deletion need not catch an off-by-one.
 - **Don't:** answer a clean row by writing more cases of the same kind;
@@ -1191,6 +1215,9 @@ Each row moved from 343/343 to 345/346 with one case wrong.
   evidence the cases follow it --- here the comment was correct, sat in the
   same file, and the four cases written for the clause were verdict cases
   anyway.
+- **Don't:** promote a zero into "no input could have pinned this";
+  the search bounds itself, and the sibling entry above --- which says to
+  suspect the fixture first --- is what that promotion quietly inverts.
 
 **A ninth outcome, and the cheapest one to rule out first: the mutation
 edited the WRONG occurrence of the matched text.**

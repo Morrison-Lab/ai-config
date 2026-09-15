@@ -221,15 +221,8 @@ about a session you cannot reach, and both are written above as inferences.
 It is a claim about the world, asserted in the very sentence that invites the
 peer to refute it, and no reader of that comment can check it.
 
-There is a one-command derivation, and it is independent of the verdict clock
-the section above measures:
-
-```bash
-git log -1 --format=%cI origin/<branch>
-```
-
-A branch's last push is the cheapest liveness signal available, and it is the
-one a live session moves.
+A branch's last **push** is the cheapest liveness signal available, and it is
+the one a live session moves.
 A branch pushed twenty minutes ago is a session that was working twenty minutes
 ago, whatever the verdict age says --- and the verdict age can be comfortably
 past the threshold while the push is not, because a session that pushes, gets a
@@ -237,6 +230,52 @@ clean verdict, and then keeps working leaves the verdict clock running and the
 push clock short.
 So read both, state both, and phrase the conclusion as what you measured:
 "no push in N minutes, verdict clean for M" rather than "the session is gone".
+
+**Read the push time from the forge, which records it, rather than from git,
+which does not.**
+GitHub's repository-activity endpoint carries a real per-push timestamp:
+
+```bash
+gh api "repos/<owner>/<repo>/activity?ref=refs/heads/<branch>&per_page=10" \
+  --jq '.[] | "\(.timestamp)  \(.activity_type)  \(.after[0:8])"'
+```
+
+```
+2026-09-15T06:59:42Z  push             b00d37b2
+2026-09-15T06:49:12Z  branch_creation  57643c49
+```
+
+Those two rows are this branch's real activity, read from that endpoint on
+2026-09-15 in a session without `gh` on `PATH`;
+the `gh api` spelling above is the same request, not the call that produced
+them.
+
+The obvious local substitute, `git log -1 --format=%cI origin/<branch>`, is
+wrong twice over, and **both errors run in the same direction: they make a live
+peer look gone.**
+That is the direction this whole section exists to guard, so the substitute
+fails exactly where it is being relied on.
+
+`%cI` is the tip commit's **committer date**, not its push time.
+A commit is always made before it is pushed, so the reading is a lower bound
+that is loose by however long the session held the commit --- unbounded above,
+zero below.
+Measured on this branch, where the commit and the push were seconds apart:
+`57643c49`'s committer date is `06:48:41Z` against a `06:49:12Z` branch
+creation, a 31-second gap that grows without limit for a branch pushed the
+morning after it was written.
+
+`origin/<branch>` is a **remote-tracking ref**, which a bare `git log` does not
+refresh.
+Where the peer has pushed since your last fetch, the command reports your stale
+copy's tip --- older than reality again, and silently, since a remote-tracking
+ref that no longer matches the remote looks identical to one that does.
+[`check-before-pushing`](../../shared/workflow/check-before-pushing.md) makes
+the same point about `--force-with-lease`: a ref you have not just fetched is a
+measurement of a moment that has passed.
+
+If no forge route is available, `git fetch origin <branch>` first and then read
+`%cI` as what it is --- **a lower bound on the push time**, stated as one.
 
 **A hold-off ends the window; it does not shorten it.**
 
@@ -257,14 +296,18 @@ intention to merge is what prompts the owner to publish what it has.
 Re-read the PR immediately before merging, not the reading that opened the
 window.
 
-- **Do:** derive a peer's liveness from `git log -1 --format=%cI origin/<branch>`
-  before writing anything about it, and put the timestamp in the comment.
+- **Do:** derive a peer's liveness from the forge's own push timestamp before
+  writing anything about it, and put that timestamp in the comment.
+- **Do:** `git fetch origin <branch>` first, and call `%cI` a lower bound, when
+  the forge route is unavailable.
 - **Do:** state the inference as an inference, naming both clocks you read.
 - **Do:** treat a hold-off as terminating the window at the moment it arrives.
 - **Do:** re-read the PR's clean state immediately before the merge.
 - **Don't:** assert that a session has stopped --- nothing available to you
   observes that, and the claim is unfalsifiable to the reader you are asking to
   refute it.
+- **Don't:** read `%cI` on an unfetched remote-tracking ref as a push time;
+  it is wrong twice, and both errors age the peer rather than freshening it.
 - **Don't:** run the remaining minutes out after a hold-off and merge on the
   silence;
   the objection you asked for has already arrived.
@@ -276,9 +319,15 @@ PR's own comment timestamps.
 A merge-intent comment at `05:51:13Z` asserted the PR "was opened by a session
 that is no longer running on this machine".
 The owning session replied at `05:51:39Z` --- 26 seconds in --- that it had
-pushed to the branch four times that night, most recently about twenty minutes
-earlier, and that a pre-merge adversarial gate was running against that exact
-head.
+pushed to the branch four times that night, and that a pre-merge adversarial
+gate was running against that exact head.
+(That reply put its own last push "about twenty minutes earlier", which was
+itself an unmeasured figure and wrong by a factor of two: the branch's tip,
+`994b975c`, is dated `05:11:01Z`, forty minutes and thirty-eight seconds before
+the reply.
+It is quoted here as the peer's prose rather than as a measurement, and the
+error is the rule above failing in the *other* direction --- the owner
+under-stating its own liveness while disputing a claim that it had none.)
 That gate posted **NOT_CLEAN, 7 findings** at `05:52:12Z`.
 The PR merged at `05:58:47Z`: 7 minutes 8 seconds after the hold-off and 6
 minutes 35 seconds after the gate result, putting all seven findings on `main`.

@@ -51,6 +51,21 @@ CASES = [
     ([TOOL, say("Ready to push when you are.")], True,
      "'ready to X when you are' warns"),
 
+    # ai-config#3694: `flag-session-boundaries` appends a stopping-point
+    # declaration to every reply, and for a non-clean stop it puts the pending
+    # work AFTER that declaration. In a busy session the block outruns
+    # TAIL_CHARS on its own, so obeying that rule pushed the actual closing
+    # move out of this hook's window and made it blind. Measured on
+    # ucdavis/bcs, 2026-09-15.
+    ([TOOL, say("Built and pushed the figure.\n\nOFFER -- the strongest "
+                "version is a chart. Say the word and I will add it to "
+                "#1016.\n\n**Stopping Point**: Not a clean stopping point / "
+                "work remains queued: " + LONG)], True,
+     "an offer warns even when a long stopping-point block follows it"),
+    ([TOOL, say("Merged #1019 and filed #1020.\n\n**Stopping Point**: Not a "
+                "clean stopping point / work remains queued: " + LONG)], False,
+     "a stopping-point block with no offer before it stays silent"),
+
     # Negatives that decide the anchoring.
     ([TOOL, say("Want me to do this? No -- it was already authorized, so I "
                 "did it. " + LONG)], False,

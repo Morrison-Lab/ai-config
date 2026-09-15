@@ -95,9 +95,29 @@ def last_assistant_text(path):
     return last
 
 
+# `flag-session-boundaries` requires every reply to end with a stopping-point
+# declaration, and for a non-clean stop it requires the pending work to follow
+# that declaration. In a session with several open PRs that block routinely
+# runs longer than TAIL_CHARS on its own, which pushed the actual closing move
+# out of the window entirely -- so obeying one rule made this hook blind to
+# violations of another (ai-config#3694). Cut the declaration off before
+# taking the tail, rather than widening the window, which would re-admit the
+# mid-message asides the short window exists to exclude.
+STOPPING_POINT_RX = re.compile(r"\*\*Stopping Point\*\*", re.I)
+
+
+def strip_stopping_point(text):
+    """Drop a trailing stopping-point declaration and anything after it."""
+    matches = list(STOPPING_POINT_RX.finditer(text))
+    if not matches:
+        return text
+    return text[: matches[-1].start()]
+
+
 def find_offer(text):
     """Return the matched offer phrase when the reply CLOSES on one."""
-    tail = text.strip()[-TAIL_CHARS:]
+    body = strip_stopping_point(text.strip()).strip()
+    tail = body[-TAIL_CHARS:]
     m = RX.search(tail)
     return m.group(0) if m else None
 

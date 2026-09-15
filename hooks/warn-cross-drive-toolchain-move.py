@@ -77,7 +77,7 @@ WHAT IS NOT MATCHED
   * A relocator inside a heredoc body or a `#` comment, and inside a quoted
     argument that contains no command separator. Quoting alone does not
     protect: the command-position class is blind to quotes, so
-    `echo "step one; robocopy C:\... D:\..."` DOES warn, where the same
+    `echo "step one; robocopy C:\\... D:\\..."` DOES warn, where the same
     string without the `;` does not (case S11 pins only the latter).
     The verb must sit at a command position (start of string, or after `;`,
     `&&`, `||`, `|`, a newline, or an opening paren/brace), which is what keeps
@@ -360,8 +360,12 @@ def find_risky_move(command):
     verb at a command position, path tokens spanning at least two drive
     letters, at least one toolchain path or toolchain env var, and no
     backup/archive path token. The `wsl --import`/`--move` arm is exempt from
-    the middle two -- the verb names the operation and the subject, so one
-    volume and no recognised toolchain token still warn (case W4).
+    the last three, not the middle two: the verb names the operation and the
+    subject, so one volume and no recognised toolchain token still warn (W4),
+    and its SOURCE tar is excluded from the backup test too, so an export
+    landing in `D:\\Backup` does not silence the import beside it (W24).
+    A `--move` INTO a backup-named path is still exempt, that token being
+    live rather than an archive (S27).
     """
     if not isinstance(command, str) or not command.strip():
         return None

@@ -265,7 +265,7 @@ EXPECTED = {cid: cid.startswith("W") for cid in CASES}
 
 WHY = {
     "S1": "an ordinary backup -- the HDD is the correct destination",
-    "W24": "the export tar living under D:\Backup must not silence the "
+    "W24": r"the export tar living under D:\Backup must not silence the "
            "import of the live image beside it",
     "S27": "--move INTO a backup path is a backup: the destination is "
            "live, so the backup test still applies to it",

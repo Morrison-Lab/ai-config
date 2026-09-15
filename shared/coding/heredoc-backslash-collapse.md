@@ -91,8 +91,8 @@ Second instance: a Python-heredoc edit writing `"\\n"` escapes into a test fixtu
 `hooks/warn-heredoc-doubled-backslash.py` is the mechanism this recurrence produced: a warn-only `PreToolUse` guard on the `Bash` tool matcher that scans a command's heredoc bodies for a doubled backslash and names the offending line, so the rule fires at composition time instead of relying on having read this file. (Tracked as [ai-config#3362](https://github.com/Morrison-Lab/ai-config/issues/3362).)
 
 **The rule has an inverse, and knowing the rule is what produces it.**
-Everything above argues one direction: a doubled `\\` typed into a heredoc body can
-arrive as a single `\`.
+Everything above argues one direction:
+a doubled `\\` typed into a heredoc body can arrive as a single `\`.
 Every **Don't** here is about under-escaping.
 So the natural compensation, for a reader who has absorbed all of it, is to
 double the escapes on purpose --- which is wrong on every transport that does
@@ -110,8 +110,9 @@ Building the character with `chr(92)` is transport-agnostic and correct either
 way; doubling is a different move, wrong on exactly the transports where the
 documented hazard is absent.
 That asymmetry is why the compensation instinct has to be named rather than
-left to follow from the remedy --- the remedy does not imply it, and the
-argument above makes it feel implied.
+left to follow from the remedy.
+Building the character does not imply doubling it,
+and the argument above is what makes doubling feel implied.
 
 **The failure mode is quieter than the collapse case, because the corrupted
 literals were anchors rather than output.**

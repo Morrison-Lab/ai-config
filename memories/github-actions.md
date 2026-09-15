@@ -525,6 +525,28 @@ Write one small reader and share it between the unit tests and the workflow, rat
 - **Don't:** decide by whether the value looks multi-line --- the dangerous ones look single-line.
 - **Don't:** read the existing multiline-heredoc rule as permission to use `key=value` for everything else.
 
+**A fixed Markdown fence character is a second, unrelated injection point when the value written into `$GITHUB_STEP_SUMMARY` is wrapped in a code fence for readability.**
+The delimiter-injection hazard above is about the file format `$GITHUB_STEP_SUMMARY` shares with `$GITHUB_OUTPUT`.
+This one is about the Markdown that gets rendered from it.
+Wrapping untrusted output (a tool's own stdout, a log tail) in a triple-backtick fence so it renders as a code block breaks the moment that output itself contains a line of three or more backticks --- CommonMark closes a fence on the first later line whose run of the **same character** is at least as long as the opener's, so a line inside the wrapped content ends the block early and everything after it renders as loose Markdown.
+Switching the opener to tildes only moves the trigger to a `~~~` line in the content.
+Neither character is safe merely by being the less-common choice, because "less common" is not "absent".
+The general fix is to size the opener from the content: scan for the longest run of backticks (or tildes) already present, and open with one character more than that --- ` ```` ` around content whose longest run is three backticks, and so on.
+This generalizes past step summaries to any surface where untrusted text is wrapped in a fence for display --- a PR comment, an issue body, a rendered log excerpt.
+
+- **Do:** measure the content's longest same-character fence-length run before choosing the opener, and use one longer.
+- **Do:** treat this as a property of the **content**, not of which fence character was chosen --- neither backtick nor tilde is safe by default.
+- **Don't:** assume switching from backtick to tilde (or vice versa) fixes the hazard.
+  It only relocates the trigger line.
+- **Don't:** hard-code a fixed-length fence (` ``` ` or `~~~~`) around any text the workflow does not fully control.
+
+(`scripts/lib/fences.py`'s own docstring states the CommonMark rule this
+exploits from the parsing side: "A closer is up to 3 spaces of indent, the
+same character, length >= opener length" --- confirmed against this repo's
+own fence parser rather than assumed.
+Arose 2026-09, driving `Morrison-Lab/ai-config#3673` (issue #3669),
+hardening `.github/workflows/upload-skills.yml`'s step-summary output.)
+
 ## Changelog section ordering in Morrison-Lab/gha
 
 - **The established order in `CHANGELOG.md` is: Added → Changed → Fixed → Security.**

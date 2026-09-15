@@ -618,21 +618,30 @@ narrower than "does it do the same thing": a procedure with a "cannot tell,
 give up" branch carries a *fixed polarity* at every such branch, and polarity
 is not the same thing as purpose.
 
-The reference implementation was written for a check that discharges a
-promise at `Stop` time: when it cannot see through a shell function, an
-`eval`, or a variable-assembled command, it gives up --- and for that caller,
-giving up means treating the promise as *not yet discharged*, the safe
-direction when the worst case is one extra nag.
-Extracted into a shared module and wired into two `PreToolUse` guards over a
-destructive action, the identical give-up points, running the identical code,
-now mean the guard never looked inside that shell function, `eval`, or
-variable at all --- which is a silent ALLOW of whatever the command actually
-ran.
-The new module's docstring said its limits were "unchanged from the reference
-implementation."
-That was true, and it was the wrong thing to verify: the limits are a
+The worked case below is a **proposal**, not an incident: the reuse it
+describes has not happened, and the code it reuses is on `main` and readable
+today.
+That is what makes it worth writing down before rather than after ---
+[`Morrison-Lab/ai-config#1973`](https://github.com/Morrison-Lab/ai-config/issues/1973)
+proposes the extraction, so the question is live, and its answer is decidable
+from artifacts you can open right now.
+
+`hooks/no-empty-promise.py`'s `_poller_executed` was written for a check that
+discharges a promise at `Stop` time: when it cannot see through a shell
+function, an `eval`, or a variable-assembled command, it returns False --- and
+for that caller, giving up means treating the promise as *not yet
+discharged*, the safe direction when the worst case is one extra nag.
+Extract that descent into a shared module and wire it into a `PreToolUse`
+guard over a destructive action, and the identical give-up points, running the
+identical code, would instead mean the guard never looked inside that shell
+function, `eval`, or variable at all --- a silent ALLOW of whatever the
+command actually ran.
+
+The check such an extraction invites is whether the limits are unchanged from
+the original.
+They would be, and that is the wrong thing to verify: the limits are a
 property of the CODE, while whether they are safe to ship is a property of
-the CALLER, and the true, unchanged-limits claim answers nothing about the
+the CALLER, and a true unchanged-limits claim answers nothing about the
 second question.
 
 - **Do:** for every "cannot tell, give up" branch in code you are reusing,
@@ -646,25 +655,22 @@ second question.
   that produces it does; the direction a give-up branch takes is fixed, and
   what that direction *costs* is decided anew by every caller.
 
-(The case that prompts this rule is `hooks/no-empty-promise.py`'s
-`_poller_executed`, which is on `main` and readable today.
-Its own comments name it the reference implementation, record THREE review
-rounds spent on its class -- `hooks/no-empty-promise.py` says so at three
-separate lines, including the one quoted just below -- and state the direction
-its give-up branches take:
+(What makes `_poller_executed` the case is that it states its own direction in
+a comment, so nothing here has to be inferred:
+
 "a missed arming is visible to its author and one plainer command from
 clearing, whereas a false discharge defeats the guard silently".
 
-That sentence is what makes it the case.
-It is correct for a discharge check, where the worst outcome of giving up is a
-promise that does not clear.
+That sentence is correct for a discharge check, where the worst outcome of
+giving up is a promise that does not clear.
 Read it in a GUARD and the same branch has the opposite worst outcome, because
 what gives up there is the thing deciding whether a destructive command is
 allowed.
 Nothing in the function changes; the cost of its limits does.
 
-Morrison-Lab/ai-config#1973 proposes extracting exactly this descent into a
-shared helper for two `PreToolUse` guards, which is what makes the question
-live rather than hypothetical.
-Read the issue for the proposal; the rule here needs only the reference, since
-the give-up branches and their stated direction are both in front of you.)
+`#1973`'s Scope section names six token-comparing hooks that would consume
+such a helper, and reports the bypass measured against two of them ---
+`hooks/no-clobbering-push.py` and `hooks/flag-reset-hard-uncommitted-work.py`.
+Read the issue for the proposal and its measurements; the rule here needs only
+`_poller_executed` itself, since the give-up branches and their stated
+direction are both in front of you.)

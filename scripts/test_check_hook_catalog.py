@@ -626,7 +626,10 @@ with tempfile.TemporaryDirectory() as td:
     root = Path(td)
     (root / "hooks").mkdir()
     (root / "hooks" / "x.sh").write_text("#!/bin/sh" + chr(10), encoding="utf-8")
-    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    # `-b main` pins the fixture's initial branch: without it the repo inherits
+    # the machine's `init.defaultBranch`, which makes the suite's behaviour a
+    # property of the host's git config rather than of the subject.
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=root, check=True)
     subprocess.run(["git", "add", "hooks/x.sh"], cwd=root, check=True)
 
     with patch.object(_catalog, "ROOT", str(root)):

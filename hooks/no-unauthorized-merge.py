@@ -577,8 +577,20 @@ def _paren_scan(text: str, quote_aware: bool):
                     # Measured rather than argued alone: reverting the
                     # conjunct failed 0 of 343 cases, reverting its assignment
                     # failed 0, and an instrumented build recorded 0 hits at
-                    # the read site across 300,000 random token strings, while
-                    # a sanity mutant on the same harness failed 2. The file
+                    # the read site across 300,000 random token strings --
+                    # against 4,640 reads of that site, which is the negative
+                    # control making the 0 a measurement rather than a
+                    # detector that never ran.
+                    #
+                    # A sanity mutant for THAT harness -- dropping the
+                    # `separated = False` reset in the `case` push, the only
+                    # edit that can make the flag True at the read -- records
+                    # 621 hits. An earlier version of this comment said "a
+                    # sanity mutant on the same harness failed 2", which
+                    # attached a SUITE-failure count to a harness that reports
+                    # hits, and named no mutant, so the figure could not be
+                    # reproduced by anyone but its author (ai-config#3681,
+                    # finding 4). The file
                     # annotates its other measured-dead clauses (`EXEC_WRAP`,
                     # the ANSI-C `$'` branch) rather than leaving them to read
                     # as load-bearing; this one was removed instead, because
@@ -760,8 +772,16 @@ def _body_is_simple(text: str, body_start: int, body_end: int) -> bool:
     an argument word `esac` disarmed a live one. Round 6 was therefore a
     REGRESSION against rounds 4 and 5, which both blocked those strings.
 
-    Both holes are closed in `_paren_scan` (see its `del pending_case[:]` and
-    `at_cmd_pos` handling), and the six regression cases are in the suite. The
+    Both holes are closed in `_paren_scan`: the first because the `in` arm is
+    now unconditional, the second by its `at_cmd_pos` handling. The six
+    regression cases are in the suite.
+
+    `del pending_case[:]` was named here for the first of them and does not do
+    that work. Reverting it fails exactly one case and that case is an ALLOW:
+    it prevents the round-5-finding-9 over-block and closes no fail-open
+    (ai-config#3681, finding 5). Round 6's hole is closed by the ABSENCE of
+    the `separated` gate, which is a consequence of removing it rather than of
+    any line added. The
     exemption stays because listing `case` extends every body merely MENTIONING
     the word to end of text, re-creating the over-block the `in` requirement
     was added to remove -- `bash <(grep -c case f); echo "<prose>"` blocking a
@@ -775,8 +795,24 @@ def _body_is_simple(text: str, body_start: int, body_end: int) -> bool:
     rather than argued away.
 
     Listing `case` (word-bounded, which is the cheaper of the two spellings)
-    moves 6 suite cases, and every one of them is an OVER-BLOCK. Re-derived at
-    this commit rather than carried forward: the span for
+    moves 5 suite cases -- four verdict-level over-blocks and one scanner-level
+    span change. The figure 6 stood here briefly and belonged to the PLAIN
+    SUBSTRING spelling, which is the one a `_APPROXIMATED` entry gets for free
+    and which this sentence does not name: the parenthetical calls
+    word-bounded the cheaper of the two, and cheaper means fewer, so the
+    sentence contradicted its own number (ai-config#3681, finding 1). Both
+    re-derived here:
+
+        word-bounded  `re.search(r"\bcase\b", body)`   338/343   moves 5
+        substring     `"case" in body`                  337/343   moves 6
+
+    The four over-blocks are `source <(...)`, a bare argument word `case`, a
+    loop variable named `case`, and an `in` in a later simple command; the
+    fifth is the span check `a case pattern's `)` is not the closer`, whose
+    verdict does not change. The paragraph this replaced drew that
+    distinction and the rewrite collapsed it.
+
+    The span for
 
         < <(case x in x) echo "<merge>";; esac) bash
 
@@ -829,7 +865,7 @@ def _body_is_simple(text: str, body_start: int, body_end: int) -> bool:
 
 
 def _proc_subst_regions(text: str) -> list:
-    """`(lt_idx, body_start, body_end, depth, parent)` for each expandable `<(`.
+    """`(lt_idx, body_start, close_idx, depth, parent, real_end, closed)` per `<(`.
 
     Ordered by position, so siblings at one depth are disjoint and a child
     always follows its parent. `parent` indexes back into this same list, or is
@@ -997,7 +1033,7 @@ def _depth_view(text: str, regions: list, depth: int) -> str:
                     view[body_start - 1] = " "
                 if body_end < len(view):
                     view[body_end] = " "
-    for (lt_idx, _body_start, body_end, region_depth, _parent, real_end,
+    for (lt_idx, body_start, _body_end, region_depth, _parent, real_end,
             closed) in regions:
         if region_depth != depth:
             continue
@@ -1012,7 +1048,7 @@ def _depth_view(text: str, regions: list, depth: int) -> str:
             # enclosing simple command in two. Everything after it stays
             # legible, which is the over-detecting direction and the one this
             # file takes everywhere else.
-            _blank(view, lt_idx, _body_start)
+            _blank(view, lt_idx, body_start)
     return "".join(view)
 
 

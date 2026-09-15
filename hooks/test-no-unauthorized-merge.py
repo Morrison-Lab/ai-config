@@ -512,6 +512,14 @@ BLOCK = [
      "trailing executor, an apostrophe in an executing heredoc pops the closer"),
     ('bash <<EOF\ndon\'t\nEOF\nbash <(echo "gh pr merge 411")',
      "leading executor, the same popped closer"),
+    # `_paren_matches`' docstring names "an apostrophe OR A LONE BACKTICK" as
+    # what makes the quote-blind pass run, and only the apostrophe was
+    # covered. The backtick is a different quote-state variable reaching the
+    # same no-recorded-closer route, and it executes: `bash -n` exits 0, bash
+    # reports `bad substitution` and runs the merge anyway (ai-config#3681,
+    # finding 6).
+    ('bash <<EOF\n`\nEOF\n< <(echo "gh pr merge 411") bash',
+     "trailing executor, a lone backtick in an executing heredoc pops the closer"),
 ]
 
 ALLOW = [
@@ -1210,6 +1218,25 @@ print(("  ok    " if _guard.offending(_DEEP) else "  WRONG ")
 # rather than to the `)`, because the two passes do not agree on a closer.
 _span_check("an unbalanced quote merges a quote-blind scan, failing closed",
             "don't\nbash <(echo hi)", [(13, 21)])
+
+# The EXTENT of the delimiter-only blanking, which the four verdict cases for
+# the no-recorded-closer route cannot reach: all four pass with the clause
+# deleted outright, and `pass` shows 0 verdict differences over 200,000
+# targeted strings (ai-config#3681, finding 2). A span is what the clause
+# changes, which is the reason this block exists at all.
+#
+# Two probes, because no single one separates both mis-sizings. Deleting the
+# blanking loses the earlier region entirely; blanking one character too many
+# eats the body's first character and loses the region that starts with it.
+# Each was found by differential search over 120,000 random token strings
+# rather than constructed, so neither is a shape someone talked themselves
+# into.
+_span_check("an unclosed region's delimiter is blanked, so an earlier "
+            "sibling survives",
+            "<( )   <( ${ } source ( \n  ", [(2, 3), (9, 27)])
+_span_check("the blanking stops AT the body, so the body's first character "
+            "is still legible",
+            "<(bash<", [(2, 7)])
 
 total = checks
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))

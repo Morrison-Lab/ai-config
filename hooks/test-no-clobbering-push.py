@@ -428,6 +428,34 @@ def prefix_assignment_does_not_retire_case(path, bare):
             'sh -c "git push --force origin HEAD"')
 
 
+def override_does_not_reach_a_sibling_wrapper_case(path, bare):
+    """A prefix override authorizing ONE wrapped push, beside an unauthorized one.
+
+    bash scopes a prefix assignment to the command it heads, so the second
+    `sh -c` sees nothing -- measured `inner=[]`, and the push runs. Passing one
+    override for the whole compound command silently authorized it
+    (ai-config#3645 review round 4). The first push is genuinely exempt; the
+    refusal has to fire on the second regardless.
+    """
+    _local_advances(path)
+    return ('ALLOW_FORCE_PUSH=1 sh -c "git push --force origin scratch"; '
+            'sh -c "git push --force origin HEAD"')
+
+
+def exported_override_reaches_a_sibling_wrapper_case(path, bare):
+    """The other direction: an `export` really does reach a later wrapper.
+
+    Verified: `bash -c 'export ALLOW_FORCE_PUSH=1; bash -c "true";
+    sh -c "echo inner=[$ALLOW_FORCE_PUSH]"'` prints `inner=[1]`. Without this
+    case, scoping every override to its own argv would be a silent
+    over-tightening -- the escape hatch would stop working in the spelling
+    that is supposed to propagate.
+    """
+    _local_advances(path)
+    return ('export ALLOW_FORCE_PUSH=1; sh -c "true"; '
+            'sh -c "git push --force origin HEAD"')
+
+
 def bare_override_mid_command_case(path, bare):
     """A BARE `ALLOW_FORCE_PUSH=1` token that is not a command prefix.
 
@@ -1174,6 +1202,8 @@ SHOULD_DENY = [
      "an override set back to `0` before the push is retired"),
     ("D1973p", unset_override_bare_case,
      "an `unset` retires the override for an unwrapped push too"),
+    ("D1973q", override_does_not_reach_a_sibling_wrapper_case,
+     "a prefix override authorizes only its own wrapper, not a sibling one"),
     ("D1973f", bare_override_mid_command_case,
      "a bare override token away from the argv head does not clear a refusal"),
 ]
@@ -1243,6 +1273,8 @@ SHOULD_STAY_SILENT = [
     ("S1973i", prefix_assignment_does_not_retire_case,
      "a PREFIX assignment does not change the shell's own variable, so it "
      "retires nothing"),
+    ("S1973j", exported_override_reaches_a_sibling_wrapper_case,
+     "an `export` really does reach a later wrapper, unlike a prefix"),
     ("S1973f", exported_override_case,
      "an `export` in an earlier simple command carries onto the wrapper"),
     ("S1", leased_fast_forward_case,
@@ -1555,14 +1587,27 @@ MUTATIONS = {
     ),
     "override_carried_onto_nested_piece": (
         "a real override before the wrapper reaches the nested piece",
-        [("    override = _override_before_wrapper(command)",
-          "    override = False")],
-        {"S1973e", "S1973f", "S1973g", "S1973i"},
+        [("    overrides = _override_by_piece(command)",
+          "    overrides = {}")],
+        {"S1973e", "S1973f", "S1973g", "S1973i", "S1973j"},
+    ),
+    # `export_needs_a_nested_shell` was declared here and is gone. The
+    # guarantee it pinned -- an override reaches only a command that really
+    # runs a nested shell -- is now STRUCTURAL: `_override_by_piece` records a
+    # piece only inside `for piece in nested_shell_commands(raw)`, so a
+    # command with no nested shell contributes none and there is no conjunct
+    # left to revert. D1973l still covers the behaviour.
+    "override_is_scoped_to_its_own_piece": (
+        "a prefix override authorizes only the pieces of the argv it heads, "
+        "not every piece in the compound command",
+        [("                           assume_override=overrides.get(piece, False))",
+          "                           assume_override=any(overrides.values()))")],
+        {"D1973q"},
     ),
     "override_must_head_a_simple_command": (
         "the override counts as an assignment at an argv head, not as a mention",
-        [("            if not ASSIGNMENT.match(token):\n                break",
-          "            if not ASSIGNMENT.match(token):\n                continue")],
+        [("        if not ASSIGNMENT.match(token):\n            return False",
+          "        if not ASSIGNMENT.match(token):\n            continue")],
         # D1973f is deliberately NOT here. It used to be the only case, and it
         # stopped flipping once the override was scoped to the command carrying
         # the nested shell: `grep -r ALLOW_FORCE_PUSH=1 hooks/` is a different
@@ -1591,14 +1636,6 @@ MUTATIONS = {
         [("    return any(scope[:len(done)] == done for done in exported)",
           "    return bool(exported)")],
         {"D1973i"},
-    ),
-    "export_needs_a_nested_shell": (
-        "an exported override is carried only onto a command that really "
-        "runs a nested shell",
-        [("        if _scope_exported(scope, exported) "
-          "and nested_shell_commands(argv):",
-          "        if _scope_exported(scope, exported):")],
-        {"D1973l", "D1973o"},
     ),
     # `_env_split_string`'s wrapper window is NOT declared here, and cannot
     # be: `verdict` puts the real `scripts/lib` on PYTHONPATH so a one-file
@@ -1643,8 +1680,8 @@ MUTATIONS = {
         "a transparent wrapper before the assignment leaves it a prefix",
         [("        while argv and os.path.basename(argv[0]) in "
           "COMMAND_WRAPPERS:\n            argv = argv[1:]\n"
-          "        found = False",
-          "        found = False")],
+          "        reaches = _prefix_override(argv)",
+          "        reaches = _prefix_override(argv)")],
         {"S1973g"},
     ),
     "exported_override_reaches_a_bare_push": (
@@ -1662,7 +1699,7 @@ MUTATIONS = {
         {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9",
          "D1973a", "D1973b", "D1973c", "D1973d", "D1973e", "D1973f",
          "D1973g", "D1973h", "D1973i", "D1973j", "D1973k", "D1973l",
-         "D1973m", "D1973n", "D1973o", "D1973p"},
+         "D1973m", "D1973n", "D1973o", "D1973p", "D1973q"},
     ),
     "force_ignores_lease": (
         "the refusal does NOT consult the lease -- `--force` disables it",

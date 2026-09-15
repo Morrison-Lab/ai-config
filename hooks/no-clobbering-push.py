@@ -1232,94 +1232,95 @@ def evaluate(command, base_cwd=None, deny_only=False,
     return None
 
 
-def _override_before_wrapper(command):
-    """True when a real `ALLOW_FORCE_PUSH=1` assignment HEADS a simple command.
+def _override_by_piece(command, _depth=0):
+    """Each nested command line in COMMAND, mapped to whether the override reaches it.
 
-    The first version searched the raw text for the assignment anywhere, with a
-    comment claiming it "only ever decides whether to carry the author's own
+    WHY A MAP AND NOT A BOOL
+    -----------------------
+    This used to be `_override_before_wrapper(command) -> bool`, and
+    `evaluate_every_shell` passed that one answer as `assume_override` for
+    EVERY nested piece. A prefix assignment is scoped by bash to the single
+    command it heads, so one legitimately-authorized wrapped push silently
+    authorized an unrelated one in the same compound command:
+
+        ALLOW_FORCE_PUSH=1 sh -c "git push --force origin scratch"
+        sh -c "git push --force origin main"                    <- silent
+
+    Real bash sets nothing for the second (`inner=[]`), and the push ran
+    unexempted. `shell_c_expansions` returns a flat, deduplicated list with no
+    back-reference to the simple command that produced each piece, so the
+    caller could not have scoped it (ai-config#3645 review round 4).
+
+    The two arms differ exactly here, which is why flattening them was wrong.
+    A PREFIX assignment reaches only the pieces of its own argv. An `export`
+    reaches every later command in the same shell, so it reaches their pieces
+    too -- verified: `bash -c 'export ALLOW_FORCE_PUSH=1; bash -c "true";
+    sh -c "echo inner=[$ALLOW_FORCE_PUSH]"'` prints `inner=[1]`.
+
+    A repeated piece takes the AND of its producers. Two simple commands can
+    yield the same text with only one of them authorized, and the refusal is
+    the answer that costs a re-spelling rather than a force push.
+
+    WHAT THE PREFIX ARM IS FOR
+    --------------------------
+    The first version searched the raw text for the assignment anywhere, with
+    a comment claiming it "only ever decides whether to carry the author's own
     escape hatch onto a nested piece they wrapped". It decided it for a
     MENTION: a commit message, a shell comment, a heredoc body, a `grep`
-    argument. This repository documents the variable by name in `CLAUDE.md` and
-    `hooks/README.md`, so quoting it is the ordinary case, and each of those
-    silenced the nested refusal on a command that really force-pushes
+    argument. This repository documents the variable by name in `CLAUDE.md`
+    and `hooks/README.md`, so quoting it is the ordinary case, and each of
+    those silenced the nested refusal on a command that really force-pushes
     (ai-config#1973 review, round 3 finding 3).
 
     This module already ruled that out 800 lines above, at `OVERRIDE`: "counts
     only as a real env assignment at the start of the same simple command,
     never as a mention of the string elsewhere ... a guard that its own
-    documentation disables is worthless." Two rules for one question in one
-    file, and the newer, looser one won.
+    documentation disables is worthless."
 
-    So the question is asked of the parsed argv, not of the text: does the
-    simple command that RUNS THE WRAPPER begin with the assignment?
-
-    "Some simple command" was the earlier answer and was still too loose, by
-    exactly the margin that matters. Bash scopes a prefix assignment to the one
-    command it heads, so `ALLOW_FORCE_PUSH=1 echo hi; sh -c "<push>"` never
-    sets the variable for the wrapped `git` -- verified against real bash,
-    which prints an empty `inner=[]` -- and yet it cleared the nested refusal
-    (ai-config#1973 review, round 4 finding 2, reproduced independently by the
-    @claude review of #3645). The fix is the second condition below: the same
-    argv must also be the one carrying a nested shell.
+    So the question is asked of the parsed argv, not of the text. "Some simple
+    command" was the earlier answer and was still too loose, by exactly the
+    margin that matters: bash scopes a prefix assignment to the one command it
+    heads, so `ALLOW_FORCE_PUSH=1 echo hi; sh -c "<push>"` never sets the
+    variable for the wrapped `git` -- verified against real bash, which prints
+    an empty `inner=[]` -- and yet it cleared the nested refusal
+    (ai-config#1973 review, round 4 finding 2). Scoping the map by argv is the
+    same fix carried one step further.
     """
+    out = {}
+    if nested_shell_commands is None or _depth >= _OVERRIDE_PIECE_DEPTH:
+        return out
     scoped = _simple_commands(command)
-    if scoped is None or nested_shell_commands is None:
-        return False
-    for entry in scoped:
-        argv = list(entry[1])
-        # `env VAR=1 bash -c "<push>"` really does set the variable for the
-        # inner `git`, and was refused with no way to comply because the
-        # assignment did not sit at the argv head (round 4 finding 8). A
-        # leading wrapper run is skipped so the assignment behind it still
-        # reads as a prefix.
-        while argv and os.path.basename(argv[0]) in COMMAND_WRAPPERS:
-            argv = argv[1:]
-        found = False
-        # Only a CONTIGUOUS RUN of assignments from the argv head is a prefix.
-        # Scanning a window instead found the token wherever it sat, so
-        # `echo "ALLOW_FORCE_PUSH=1" && sh -c "<push>"` disabled the refusal --
-        # the same mention-anywhere hole one step in from the text.
-        for index, token in enumerate(argv[:_OVERRIDE_PREFIX_WINDOW]):
-            if not ASSIGNMENT.match(token):
-                break
-            name, _, value = token.partition("=")
-            # `.strip()` and not `.strip("\"'")`, which disagreed with
-            # `_lead_prefix`'s test in BOTH directions for the same variable in
-            # the same file: shlex has already dequoted, so stripping quote
-            # CHARACTERS accepted a value bash sets to `'1'` while rejecting
-            # the ` 1 ` that `_lead_prefix` accepts (round 4 finding 12).
-            if name == OVERRIDE and value.strip() == "1":
-                found = index + 1
-                break
-        if not found:
-            continue
-        # The assignment heads THIS command; it carries onto a nested shell
-        # only if THIS command is the one that runs it.
-        if nested_shell_commands(argv[found:]):
-            return True
-    # An `export` is a different simple command from the one that wraps the
-    # push, so the loop above cannot see it. `_record_export` says when one
-    # counts and `_scope_exported` says which commands it reaches; the two are
-    # interleaved in ONE pass because order matters as much as scope -- an
-    # export written after the push has not run when the push executes, and
-    # collecting every export first would have cleared it.
+    if scoped is None:
+        return out
     exported = []
-    # The compound-statement REGION is counted here for the same reason
-    # `evaluate` counts it: an `export` inside an `if`/`while`/`for`/`case`
-    # body may never run. Leaving it out relied on the body's keyword still
-    # heading the argv, which holds only while the export is the body's FIRST
-    # command -- one `echo` in front detaches it, and
-    # `if false; then echo a; export ALLOW_FORCE_PUSH=1; fi; sh -c "<push>"`
-    # then cleared the refusal while bash left the variable unset and ran the
-    # push (ai-config#3645 self-review, finding 1). The bare-push sibling was
-    # already correct, because `evaluate` passed the region it tracks.
+    # The compound-statement REGION, counted for the same reason `evaluate`
+    # counts it: an `export` inside an `if`/`while`/`for`/`case` body may never
+    # run. Leaving it out relied on the body's keyword still heading the argv,
+    # which holds only while the export is the body's FIRST command -- one
+    # `echo` in front detaches it (ai-config#3645 self-review, finding 1).
     region = 0
     for scope, raw, sep, after in scoped:
         argv = list(raw)
+        # `env VAR=1 bash -c "<push>"` really does set the variable for the
+        # inner `git`, and was refused with no way to comply (round 4 finding
+        # 8). A leading wrapper run is skipped so the assignment behind it
+        # still reads as a prefix.
         while argv and os.path.basename(argv[0]) in COMMAND_WRAPPERS:
             argv = argv[1:]
-        if _scope_exported(scope, exported) and nested_shell_commands(argv):
-            return True
+        reaches = _prefix_override(argv) or _scope_exported(scope, exported)
+        # The pieces come from the UNSTRIPPED argv, because
+        # `nested_shell_commands` resolves the program through
+        # `command_program`, whose bounded look-ahead handles a wrapper with
+        # its own arguments -- `timeout 5 bash -c ...` -- that the `while`
+        # strip above cannot. Walking the stripped argv instead made this map
+        # disagree with `shell_c_expansions`' own walk, and a piece the map
+        # never saw defaulted to no override: deny-preserving, but it meant a
+        # verdict reached by accident rather than by the prefix rule, and the
+        # clause pinning that rule stopped discriminating.
+        for piece in nested_shell_commands(raw):
+            out[piece] = out.get(piece, True) and reaches
+            for sub, sub_reaches in _override_by_piece(piece, _depth + 1).items():
+                out[sub] = out.get(sub, True) and (reaches or sub_reaches)
         lead, _o, _r = _lead_prefix(raw)
         head = raw[lead:]
         if head and head[0] in BLOCK_OPEN:
@@ -1327,6 +1328,34 @@ def _override_before_wrapper(command):
         elif head and head[0] in BLOCK_CLOSE:
             region = max(region - 1, 0)
         _record_export(exported, scope, raw, sep, after, region)
+    return out
+
+
+# Matches `shell_c_expansions`' own `max_depth`, since the two walks have to
+# reach the same set of pieces -- a piece the map never sees defaults to NO
+# override, which is deny-preserving but would refuse a legitimate hatch.
+_OVERRIDE_PIECE_DEPTH = 3
+
+
+def _prefix_override(argv):
+    """True when a real `ALLOW_FORCE_PUSH=1` heads ARGV as a prefix assignment.
+
+    Only a CONTIGUOUS RUN of assignments from the argv head is a prefix.
+    Scanning a window instead found the token wherever it sat, so
+    `echo "ALLOW_FORCE_PUSH=1" && sh -c "<push>"` disabled the refusal -- the
+    same mention-anywhere hole one step in from the text.
+    """
+    for index, token in enumerate(argv[:_OVERRIDE_PREFIX_WINDOW]):
+        if not ASSIGNMENT.match(token):
+            return False
+        name, _, value = token.partition("=")
+        # `.strip()` and not `.strip("\"'")`, which disagreed with
+        # `_lead_prefix`'s test in BOTH directions for the same variable in the
+        # same file: shlex has already dequoted, so stripping quote CHARACTERS
+        # accepted a value bash sets to `'1'` while rejecting the ` 1 ` that
+        # `_lead_prefix` accepts (round 4 finding 12).
+        if name == OVERRIDE and value.strip() == "1":
+            return True
     return False
 
 
@@ -1539,7 +1568,7 @@ def evaluate_every_shell(command, base_cwd=None):
     # Carrying the outer override onto each piece restores it. The reading is
     # deliberately loose, matching this module's existing choice on the same
     # question: "a refused override sends the author looking for a bypass".
-    override = _override_before_wrapper(command)
+    overrides = _override_by_piece(command)
     # The OUTER command is deliberately not in this loop. It used to be, with
     # a `piece is not command` guard keeping the carried override off it --
     # and that guard was unobservable, because the unconditional
@@ -1561,7 +1590,7 @@ def evaluate_every_shell(command, base_cwd=None):
         # prefix each simple command means re-serializing a parse, which is the
         # kind of round trip that loses a `&&`.
         refusal = evaluate(piece, base_cwd, deny_only=True,
-                           assume_override=override)
+                           assume_override=overrides.get(piece, False))
         if refusal is not None:
             return refusal
 

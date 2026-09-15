@@ -525,13 +525,48 @@ def _paren_scan(text: str, quote_aware: bool):
                         case_depths.pop()
                     elif pending_case and pending_case[-1] == len(stack):
                         pending_case.pop()
-                if c in ";&|\n":
+                # A NEWLINE is a command separator everywhere EXCEPT between
+                # a `case` and its `in`, where bash permits one:
+                #
+                #     case b
+                #     in b) echo hi;; esac
+                #
+                # Counting it left a real `case` unarmed, its first arm's `)`
+                # popping the `proc` frame, and the truncated body passing
+                # `_body_is_simple` -- the THIRD executing fail-open in this
+                # model, blocked by rounds 4 and 5 and allowed by 6 and 7. A
+                # grammar enumeration of 103,680 valid `case` shapes found
+                # 28,350 executing strings, every one carrying a newline in
+                # this window and none carrying a plain space (round 7
+                # finding 1).
+                #
+                # The cost is that a newline-separated prose mention
+                # (`grep -c case f` then `grep -c in f` on the next line) now
+                # arms pattern mode and extends the body. That is the
+                # fail-closed direction, and it is narrower than the `;`-
+                # separated shape round 5 finding 9 was about, which the
+                # separator test still catches.
+                if c in ";&|" or (c == "\n" and not pending_case):
                     separated = True
                 elif word == "" and c not in " \t":
                     separated = False
-                # A command position is the start of the region, or anything
-                # just past a separator or an opening `(`. Flushing a real
-                # word consumes it: the NEXT word is an argument.
+                # A command position is the start of the TEXT, or anything
+                # just past a separator or a bare `(`. Flushing a real word
+                # consumes it: the NEXT word is an argument.
+                #
+                # Two things this deliberately is NOT, both checked rather
+                # than assumed (round 7 finding 4 corrected the earlier
+                # wording, which claimed both):
+                #   - not the start of a REGION. The flag is initialized once
+                #     per `_paren_scan` pass and never reset at a `<(`, so a
+                #     body's first word reads as an argument.
+                #   - not the `(` of `$(`, `${` or `<(`. Each of those
+                #     branches runs AFTER this block and skips its `(` with
+                #     `i += 2; continue`, so only a bare subshell `(` arrives
+                #     here.
+                # Both divergences leave a `case` armed for longer than
+                # strictly necessary, which extends the body -- the
+                # fail-closed direction.
                 if c in ";&|\n(":
                     at_cmd_pos = True
                 elif word:

@@ -372,18 +372,48 @@ BLOCK = [
      "an argument word `esac` does not disarm a live case"),
     ('bash <(case b in a) grep esac f;; b) echo "gh pr merge 411";; esac)',
      "the same with grep rather than echo"),
-    # The DEPTH half of that same guard, asserted separately because nothing
-    # else in this file reaches it. Both strings below are bash SYNTAX ERRORS
-    # -- `esac` is valid only as a case terminator, so it can never sit at a
-    # command position at a different stack depth from its own `case`, and no
-    # EXECUTABLE input distinguishes the depth test. It is kept as a
-    # fail-closed guard against the scanner desynchronizing, and these cases
-    # exist so that removing it stops being a silent no-op: with
-    # `case_depths[-1] == len(stack)` dropped, both revert to allow.
-    ('bash <(case b in a) (esac);; b) echo "gh pr merge 411";; esac)',
-     "SYNTAX ERROR, span guard: a deeper `esac` does not pop the outer case"),
-    ('bash <(case b in a) cat <(echo hi; esac);; b) echo "gh pr merge 411";; esac)',
-     "SYNTAX ERROR, span guard: the same one substitution deeper"),
+    # Round 7. A newline between the case WORD and its `in` is legal bash:
+    #
+    #     case b
+    #     in b) echo hi;; esac
+    #
+    # Counting it as a command separator left the `case` unarmed and truncated
+    # the body at the first arm's `)` -- the THIRD executing fail-open in this
+    # model. A grammar enumeration of 103,680 valid `case` shapes found 28,350
+    # executing strings, every one carrying a newline in this window and none
+    # carrying a plain space.
+    ('bash <(case b\nin b) echo "gh pr merge 411";; esac)',
+     "a newline between the case word and its `in`"),
+    ('source <(case b \nin b) echo "gh pr merge 411";; esac)',
+     "the same under source, with a space before the newline"),
+    ('bash <(case b \nin b) echo "gh pr merge 411";;\nesac)',
+     "the same with a newline before `esac` as well"),
+    # The DEPTH half of the `esac` guard. An earlier version of this comment
+    # claimed `esac` is valid only as a case TERMINATOR, so that no executable
+    # input could distinguish the depth test. That was false and was asserted
+    # rather than measured: `esac` is also valid as a PATTERN, and a leading
+    # `(` on a pattern (POSIX-optional, bash-accepted) puts it at a command
+    # position one stack level deeper than its own `case`:
+    #
+    #     $ bash -c 'case z in (esac) echo M;; z) echo RAN;; esac'
+    #     RAN
+    #
+    # These three are valid bash and each reverts to allow with
+    # `case_depths[-1] == len(stack)` dropped (round 7 finding 2).
+    ('bash <(case b in (esac) echo hi;; b) echo "gh pr merge 411";; esac)',
+     "a leading-paren `esac` PATTERN does not pop its own case"),
+    ('source <(case b in (esac|b) echo hi;; b) echo "gh pr merge 411";; esac)',
+     "the same as the first alternative of a pattern list"),
+    ('bash <(case b in (b|esac) echo hi;; b) echo "gh pr merge 411";; esac)',
+     "the same as the last alternative of a pattern list"),
+    # The SIBLING guard, on `pending_case`, is the one for which the
+    # syntax-error claim actually holds -- measured over the same shapes, not
+    # assumed. A `case` still awaiting its `in` cannot have a command-position
+    # `esac` at another depth in any string bash accepts. Kept as fail-closed
+    # defense against scanner desync, and pinned so that dropping
+    # `pending_case[-1] == len(stack)` stops being a silent no-op.
+    ('bash <(case b (esac) in b) echo "gh pr merge 411";; esac)',
+     "SYNTAX ERROR, span guard: a deeper `esac` does not pop a PENDING case"),
     # The COST of `_APPROXIMATED`, asserted rather than left undocumented.
     # A body containing any listed token runs to end of TEXT (not end of line),
     # so a later merge-shaped mention anywhere in the command goes live. Round

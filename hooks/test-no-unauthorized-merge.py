@@ -290,6 +290,228 @@ BLOCK = [
     ("gh api graphql -X POST repos/Morrison-Lab/ai-config/pulls/1/merge"
      " -f query='mutation { mergePullRequest(input: {...}) }'",
      "a PR merge that also matches the GraphQL pattern is ambiguous"),
+    # ai-config#1308: `<(...)` runs its body and hands the caller a /dev/fd path
+    # whose contents are that body's OUTPUT. When the caller runs what it is
+    # given, the output is a script.
+    #
+    # In MOST of these the merge text never reaches a command position at all,
+    # which is why neither a wider command-position anchor nor the live-operand
+    # rule reached them. Two are different and are marked: the merge sits at a
+    # command position inside the body, so they already blocked before this
+    # scanner existed. They are kept as regression guards for the masking, not
+    # as evidence of what it fixed.
+    ('bash <(echo "gh pr merge 411")', "a process substitution fed to bash"),
+    ("sh <(printf %s 'gh pr merge 411')", "printf building the script body"),
+    ('zsh <(echo "gh pr merge 411")', "a non-bash shell reading the substitution"),
+    ('source <(echo "gh pr merge 411")', "source runs the contents it is handed"),
+    ('. <(echo "gh pr merge 411")', "the dot form of source"),
+    ('bash < <(echo "gh pr merge 411")', "a redirection from a process substitution"),
+    ('timeout 30 bash <(echo "gh pr merge 411")', "a wrapper with an argument before the executor"),
+    ('sudo -u x bash <(echo "gh pr merge 411")', "a wrapper carrying its own flag"),
+    ('FOO=1 bash <(echo "gh pr merge 411")', "an env assignment before the executor"),
+    ('bash <(echo a; echo "gh pr merge 411")', "a separator inside the body does not reset the command position"),
+    ('bash <(cat <(echo "gh pr merge 411"))', "a nested substitution inside an executed body"),
+    ("bash <(gh pr merge 411)", "REGRESSION GUARD (blocked before this scanner): the merge at a command position inside the body"),
+    ('echo x > >(bash -c "gh pr merge 411")', "REGRESSION GUARD (blocked before this scanner): an output process substitution running an executor"),
+    # Round 2 of ai-config#1308's adversarial review. Each of the four below
+    # really executed the merge under bash against a `gh` stub, and each was
+    # ALLOWED by round 1's own fix.
+    #
+    # A redirection may be written BEFORE the command name, so the test is
+    # co-occurrence rather than order. This file already recorded that lesson
+    # for heredocs and the first draft of the substitution scanner reproduced
+    # it anyway -- a backwards-only scan never saw the trailing `bash`.
+    ('< <(echo "gh pr merge 411") bash', "an executor written after the substitution"),
+    ('0< <(echo "gh pr merge 411") bash', "the same with an explicit fd"),
+    # `_paren_matches` is quote-STATEFUL, unlike every other scanner here, so
+    # one apostrophe in a comment used to set `in_single` for the rest of the
+    # string and silently suppress every later `<(`.
+    ("echo hi # don't\nbash <(echo \"gh pr merge 411\")", "an apostrophe in a comment does not desync the paren scan"),
+    ('echo hi # ok\nbash <(echo "gh pr merge 411")', "the same line with no apostrophe"),
+    # `source`/`.` execute their input, so a heredoc fed to one is a script.
+    # Round 1 taught that to the substitution scanner and not to the heredoc
+    # masker, which is the enumerate-one-consumer-and-stop failure.
+    ("source /dev/stdin <<'EOF'\ngh pr merge 411\nEOF", "a heredoc fed to source"),
+    (". /dev/stdin <<EOF\ngh pr merge 411\nEOF", "a heredoc fed to the dot form"),
+    # A bare `.` pathspec DOES read as the source builtin, because
+    # PERMISSIVE_LEAD makes any whitespace a command position. Recorded as the
+    # accepted over-block it is, rather than asserted away in an ALLOW case
+    # whose stated reason the code contradicts.
+    ('rsync -a . <(echo "gh pr merge 411")', "ACCEPTED OVER-BLOCK: a bare dot pathspec reads as the source builtin"),
+    # Round 3 of ai-config#1308's review. The first two are fail-opens that
+    # really executed a merge under bash; the last three cover clauses that
+    # reverted to ZERO failing cases, which is this file's own definition of
+    # an untested clause.
+    #
+    # A `case` pattern's `)` opened nothing, so pairing it with the nearest
+    # open paren truncated the recorded body and left the merge outside every
+    # live span. One character defeated the whole scanner.
+    ('bash <(case x in x) echo "gh pr merge 411";; esac)', "a case pattern's `)` is not a paren closer"),
+    ('< <(case x in x) echo "gh pr merge 411";; esac) bash', "the same with the executor written after"),
+    # Round 6 of ai-config#1308's review, and the sharpest finding the guard
+    # has had: round 6 was a REGRESSION against rounds 4 and 5. Exempting
+    # `case` from `_APPROXIMATED` on the ground that "this scanner does model
+    # it" was an assertion, not a proof, and the model failed in two shapes
+    # that both execute real merges under bash. Each string below is valid
+    # under `bash -n` and prints a merge against a `gh` stub.
+    #
+    # 1. `separated` was never cleared when a new `case` was pushed, so any
+    #    `case` that was not the body's FIRST command failed to arm pattern
+    #    mode, and the arm's `)` truncated the body.
+    ('bash <(true; case b in b) echo "gh pr merge 411";; esac)',
+     "a case after a separator inside a substitution body"),
+    ('bash <(echo hi && case b in b) echo "gh pr merge 411";; esac)',
+     "the same after `&&` rather than `;`"),
+    ('source <(x=1; case b in b) echo "gh pr merge 411";; esac)',
+     "the same under source with an assignment first"),
+    ('< <(true; case b in b) echo "gh pr merge 411";; esac) bash',
+     "the same with the executor written after"),
+    # 2. The `esac` pop had no command-position or depth test, so an ordinary
+    #    ARGUMENT word `esac` disarmed a live `case` mid-construct.
+    ('bash <(case b in a) echo esac;; b) echo "gh pr merge 411";; esac)',
+     "an argument word `esac` does not disarm a live case"),
+    ('bash <(case b in a) grep esac f;; b) echo "gh pr merge 411";; esac)',
+     "the same with grep rather than echo"),
+    # Round 7. A newline between the case WORD and its `in` is legal bash:
+    #
+    #     case b
+    #     in b) echo hi;; esac
+    #
+    # Counting it as a command separator left the `case` unarmed and truncated
+    # the body at the first arm's `)` -- the THIRD executing fail-open in this
+    # model. A grammar enumeration of 103,680 valid `case` shapes found 28,350
+    # executing strings, every one carrying a newline in this window and none
+    # carrying a plain space.
+    ('bash <(case b\nin b) echo "gh pr merge 411";; esac)',
+     "a newline between the case word and its `in`"),
+    ('source <(case b \nin b) echo "gh pr merge 411";; esac)',
+     "the same under source, with a space before the newline"),
+    ('bash <(case b \nin b) echo "gh pr merge 411";;\nesac)',
+     "the same with a newline before `esac` as well"),
+    # The DEPTH half of the `esac` guard. An earlier version of this comment
+    # claimed `esac` is valid only as a case TERMINATOR, so that no executable
+    # input could distinguish the depth test. That was false and was asserted
+    # rather than measured: `esac` is also valid as a PATTERN, and a leading
+    # `(` on a pattern (POSIX-optional, bash-accepted) puts it at a command
+    # position one stack level deeper than its own `case`:
+    #
+    #     $ bash -c 'case z in (esac) echo M;; z) echo RAN;; esac'
+    #     RAN
+    #
+    # These three are valid bash and each reverts to allow with
+    # `case_depths[-1] == len(stack)` dropped (round 7 finding 2).
+    ('bash <(case b in (esac) echo hi;; b) echo "gh pr merge 411";; esac)',
+     "a leading-paren `esac` PATTERN does not pop its own case"),
+    ('source <(case b in (esac|b) echo hi;; b) echo "gh pr merge 411";; esac)',
+     "the same as the first alternative of a pattern list"),
+    ('bash <(case b in (b|esac) echo hi;; b) echo "gh pr merge 411";; esac)',
+     "the same as the last alternative of a pattern list"),
+    # The SIBLING guard, on `pending_case`, is the one for which the
+    # syntax-error claim actually holds -- measured over the same shapes, not
+    # assumed. A `case` still awaiting its `in` cannot have a command-position
+    # `esac` at another depth in any string bash accepts. Kept as fail-closed
+    # defense against scanner desync, and pinned so that dropping
+    # `pending_case[-1] == len(stack)` stops being a silent no-op.
+    ('bash <(case b (esac) in b) echo "gh pr merge 411";; esac)',
+     "SYNTAX ERROR, span guard: a deeper `esac` does not pop a PENDING case"),
+    # THE TRAILING-EXECUTOR FORM, one case per `_APPROXIMATED` member.
+    #
+    # This intersection had ZERO coverage, which is why 331/331 was green over
+    # five executing fail-opens. The suite's six trailing-executor cases all
+    # used bodies the whitelist already trusts, so they exercised exactly the
+    # complement of where the bug lived.
+    #
+    # `bash <(...)` puts the executor BEFORE the region; `< <(...) bash` puts
+    # it AFTER, where blanking an extended body erased the `bash` itself and
+    # the span list came back EMPTY. Each of these is `bash -n` clean and ran
+    # a real merge against a `gh` stub, on every revision from the whitelist
+    # commit onward (ai-config#3649).
+    ('< <(v=q; x=${v}; echo "gh pr merge 411") bash',
+     "trailing executor, `${` in the body"),
+    ('< <(x=$(printf q); echo "gh pr merge 411") bash',
+     "trailing executor, `$(` in the body"),
+    ('< <(x=`printf q`; echo "gh pr merge 411") bash',
+     "trailing executor, a backtick in the body"),
+    ('< <(cat <<EOF >/dev/null\nq\nEOF\necho "gh pr merge 411") bash',
+     "trailing executor, a heredoc in the body"),
+    ("< <(echo $'gh pr merge 411 --squash') bash",
+     "trailing executor, `$'` in the body"),
+    ('< <(echo hi # q\necho "gh pr merge 411") bash',
+     "trailing executor, a comment in the body"),
+    # The fourth `case`-model fail-open. Its body carries NO `_APPROXIMATED`
+    # token, so the per-member cases above would not have caught it. Both
+    # decoys are load-bearing: remove either and it blocks.
+    ('< <(: case; case x in x) : in; echo "gh pr merge 411";; esac) bash',
+     "a stale pending `case` is not popped by a later argument word `in`"),
+    # The COST of `_APPROXIMATED`, asserted rather than left undocumented.
+    # A body containing any listed token runs to end of TEXT (not end of line),
+    # so a later merge-shaped mention anywhere in the command goes live. Round
+    # 6 finding 9 found seven plausible commands newly blocked; two are pinned
+    # here so that widening this cost stops being invisible.
+    ('bash <(echo "${SCRIPT}"); echo "never gh pr merge here"',
+     "ACCEPTED OVER-BLOCK: a `${` in the body extends it over a later mention"),
+    ('bash <(echo "${X}")\nls -l\necho "policy: never gh pr merge"',
+     "ACCEPTED OVER-BLOCK: the extended body reaches the whole text, not the line"),
+    # One level past MAX_PROC_SUBST_DEPTH: the region at the cap was skipped
+    # without being marked covered, so its child re-recorded a span INSIDE an
+    # already-recorded one and the bisect then read the quote as dead.
+    ('cat <(cat <(cat <(cat <(cat <(cat <(bash <(cat <(cat <(echo hi)) ; echo "gh pr merge 411")))))))',
+     "a nest one level past the depth cap still fails closed"),
+    # Covers `_depth_view`'s boundary spaces: the executor is at depth 1 and
+    # the outer command is not one.
+    ('cat <(bash <(echo "gh pr merge 411"))', "an executor nested inside a non-executor's substitution"),
+    # Covers the `covered` array specifically: the merge is a sibling of an
+    # inner substitution, inside an outer body that does run.
+    ('bash <(cat <(bash <(echo hi)); echo "gh pr merge 411")', "a grandchild region does not escape its covered ancestor"),
+    # Round 4. A candidate this scanner cannot balance now FAILS CLOSED rather
+    # than being dropped. It was an ALLOW case, justified as "bash would reject
+    # it anyway" -- true of a genuinely unbalanced command, and the condition
+    # is a claim about the SCANNER, so dropping made every paren-model bug an
+    # allow. Over-blocking a command bash rejects costs nothing.
+    ("bash <(echo 'gh pr merge 411'", "an opener this scanner cannot balance fails closed"),
+    # A word ENDS at a shell metacharacter. Matching `case` on letters alone
+    # gave it no left boundary, so `use_case` pushed a spurious case depth, the
+    # substitution's own `)` was skipped as a pattern terminator, and the merge
+    # escaped. One appended token was the whole bypass.
+    ('bash <(use_case=1; echo "gh pr merge 411")', "a word merely ENDING in case is not a case construct"),
+    ('source <(test_case=1; echo "gh pr merge 411")', "the same through source"),
+    ('< <(echo "gh pr merge 411"; lower-case=1) bash', "the same with the executor written after"),
+    # An odd quote in an EXECUTING heredoc body reaches the paren scan
+    # unmasked, because mask_heredocs deliberately leaves such a body live.
+    ("bash <<EOF\ndon't\nEOF\nbash <(echo \"gh pr merge 411\")",
+     "an apostrophe in an executing heredoc body does not suppress a later substitution"),
+    ("ssh h <<EOF\ndon't\nEOF\nsource <(echo \"gh pr merge 411\")",
+     "the same through ssh and source"),
+    # Round 5. Six more `)`-misread fail-opens, each verified executing a real
+    # merge under bash. Every one left the QUOTE state balanced, so the
+    # quote-blind merge -- the whole fail-closed mechanism at the time -- never
+    # fired. That is what moved the design from enumerating what BREAKS the
+    # paren model to enumerating what it provably HANDLES.
+    ('sh <(#)\necho "gh pr merge 411")', "a `)` inside a shell comment"),
+    ('source <(v=$(case $k in a) echo 1;; esac); echo "gh pr merge 411")',
+     "a case pattern inside $( ), whose terminator popped the substitution"),
+    ('bash <(: $(case x in x) :;; esac); echo "gh pr merge 411")',
+     "the same shape without an assignment"),
+    ('bash <(: "$(: "a)")"; echo "gh pr merge 411")',
+     "$( ) nested inside double quotes, where bash restarts quoting"),
+    ('bash <(: "${x:-"a)"}"; echo "gh pr merge 411")', "${ } nested inside double quotes"),
+    ('bash <(: "`: "a)"`"; echo "gh pr merge 411")', "a backtick nested inside double quotes"),
+    ('bash <(bash <<EOF\n)\nEOF\necho "gh pr merge 411")',
+     "a `)` inside an executing heredoc body, which mask_heredocs leaves live"),
+    # TRAILING EXECUTOR x NO RECORDED CLOSER -- the crossing that had zero
+    # coverage, which is why 339/339 was green over two executing bypasses
+    # (ai-config#3635 pre-merge gate). Both run a real merge against a `gh`
+    # stub and both are `bash -n` clean. Each is paired with its
+    # leading-executor twin, which blocked throughout: the PAIR is the test,
+    # since the defect was that the two forms disagreed on the same command.
+    ('< <(: case\ncase x in x) : in\necho "gh pr merge 411";; esac) bash',
+     "trailing executor, a case pattern eats the closer"),
+    ('bash <(: case\ncase x in x) : in\necho "gh pr merge 411";; esac)',
+     "leading executor, the same missing closer"),
+    ('bash <<EOF\ndon\'t\nEOF\n< <(echo "gh pr merge 411") bash',
+     "trailing executor, an apostrophe in an executing heredoc pops the closer"),
+    ('bash <<EOF\ndon\'t\nEOF\nbash <(echo "gh pr merge 411")',
+     "leading executor, the same popped closer"),
 ]
 
 ALLOW = [
@@ -386,6 +608,49 @@ ALLOW = [
      "a second repo named only inside a masked payload does not create ambiguity"),
     ("cd /repo && gh pr merge 1352 -R Morrison-Lab/ai-config --squash",
      "the granted target survives a cd && segment split"),
+    # The other half of ai-config#1308. `cat` consumes its input as data, so a
+    # process substitution handed to one merges nothing -- and a `<(` inside
+    # quotes is literal to bash, so describing the construct in a comment body
+    # is prose. Refusing either is the documentation-blocking failure defect 2
+    # (ai-config#1279) fixed once already.
+    ('cat <(echo "gh pr merge 411")', "a process substitution fed to a non-executor"),
+    ('grep -q x <(echo "gh pr merge 411")', "grep reads the substitution as data"),
+    ('echo "bash <(echo \'gh pr merge 411\')"', "the construct quoted as prose"),
+    ('gh pr comment 1 --body "repro: bash <(echo \'gh pr merge 411\')"', "the construct inside a comment body"),
+    ('ALLOW_MERGE=1 bash <(echo "gh pr merge 411")', "an explicit override on the substitution form"),
+    ("bash <(echo hello)", "a process substitution with no merge in it"),
+    # The executor is in the PREVIOUS segment, which a `bisect_left` on
+    # separator ends reached into by returning the index OF the separator
+    # ending at the `<(` rather than past it.
+    ('bash -c y;<(echo "gh pr merge 411")', "an executor before the separator does not introduce this substitution"),
+    ('cat f;<(echo "gh pr merge 411")', "the same with no executor anywhere"),
+    # The `case` tracking must not turn a non-executor into one. Load-bearing
+    # in the ALLOW direction: `cat` reads its input, and no paren-model change
+    # may make it execute.
+    ('cat <(case x in x) echo "gh pr merge 411";; esac)', "a case pattern inside a substitution cat merely reads"),
+    # Restored. This was deleted in round 3 as vacuous-by-verdict, which was
+    # the wrong test to apply: it is the only guard in the suite against the
+    # PROSE direction of the `case` machinery, and EXEC_WRAP's own comment in
+    # the guard makes the argument for keeping a measured-dead path -- removing
+    # one on suite evidence alone fails OPEN if the suite is what is
+    # incomplete. Deleting it applied the opposite rule to the same evidence in
+    # the same commit (round 4 finding 8).
+    ('echo "case x in x) gh pr merge 411;; esac"', "a whole case construct quoted as prose"),
+    # Round 5. `case` now requires its `in` before a `)` is read as a pattern
+    # terminator. Without that, a bare word `case` used as an ARGUMENT armed
+    # pattern mode, the substitution's own closer was skipped, the fail-closed
+    # default ran the body to end-of-text, and every later quoted merge mention
+    # on the line became live -- the documentation-blocking failure this file
+    # cites as its own bar (round 4 finding 7).
+    ('bash <(grep -c case f) ; echo "you cannot gh pr merge 411 here"', "a bare word case is an argument, not a construct"),
+    ('source <(grep -v case ~/.bashrc) ; echo "gh pr merge 411"', "the same through source"),
+    # Round 5. `case` armed pattern mode from any later unquoted `in`, which
+    # need not belong to it -- so a loop variable named `case`, or two
+    # unrelated greps, ran the body to end of text and blocked a prose mention.
+    ('bash <(for case in a b; do :; done); echo "never gh pr merge 411"',
+     "a loop variable named case is not a case construct"),
+    ('bash <(grep -c case f; grep -c in f); echo "never gh pr merge 411"',
+     "an `in` in a later simple command does not belong to an earlier case"),
 ]
 
 
@@ -862,6 +1127,89 @@ for tool_name, tool_input, desc in MCP_ALLOW:
     v = verdict_mcp(tool_name, tool_input)
     check(v == "allow")
     print(f"  {v:<6} {desc}")
+
+# ------------------------------------------------ scanner-level assertions
+#
+# These assert the SPAN rather than a verdict, because a span is what the
+# clause changes and a verdict can be reached by a different route.
+#
+# An earlier version of this comment said the clauses were "NOT reachable
+# through a verdict", and then a later one gave per-clause counts that were
+# wrong for the code shipped beside them (round 5 finding 7). Both errors have
+# the same cause: a mutation count measured against one revision and copied
+# forward into the next.
+#
+# So no counts are quoted here. Re-measure them -- revert the clause, run this
+# file, read the number -- rather than trusting a figure written down when the
+# surrounding code was different. The span checks below are a sharper
+# instrument than a verdict case for these clauses, which is the reason to have
+# both, and is true independently of any count.
+import importlib.util as _ilu
+
+_spec = _ilu.spec_from_file_location("_guard", HOOK)
+_guard = _ilu.module_from_spec(_spec)
+_spec.loader.exec_module(_guard)
+
+print("\nscanner-level:")
+
+
+def _span_check(label, command, want):
+    global checks, wrong
+    checks += 1
+    got = _guard.live_proc_subst_spans(command)
+    ok = got == want
+    if not ok:
+        wrong += 1
+    print(f"  {'ok' if ok else 'WRONG':<6} {label}")
+    if not ok:
+        print(f"         got {got}, want {want}")
+
+
+# `use_case` must not be read as a `case`, so the `)` closes the `<(` and the
+# body is the real one. With the letters-only word match the region vanished.
+# `_FILL` must not be whitespace, asserted structurally rather than by timing.
+#
+# Reverting it to a space failed 0 suite cases -- including the ratio-based
+# performance cases, which bound GROWTH and not this shape -- while costing a
+# measured 57x on a 400-deep nest (23ms at HEAD, 1311ms reverted). The
+# documented invariant had no test at all, so a future edit restoring a space
+# would have gone green (ai-config#1308 review, round 8 finding 7).
+#
+# A timing assertion is the obvious test and the wrong one: CI timings are
+# noisy, and the property that matters is not "fast" but "not whitespace",
+# because EXEC_AT_CMD_POS is quadratic on whitespace runs.
+_fill_ok = len(_guard._FILL) == 1 and not _guard._FILL.isspace()
+checks += 1
+if not _fill_ok:
+    wrong += 1
+    print(f"  WRONG  the blank fill character must not be whitespace, "
+          f"got {_guard._FILL!r}")
+else:
+    print("  ok     the blank fill character is not whitespace")
+
+_span_check("a word ending in case leaves the closer intact",
+            'bash <(use_case=1; echo hi)', [(7, 26)])
+# The `case` pattern's `)` is skipped, so the body runs to the real closer.
+_span_check("a case pattern's `)` is not the closer",
+            'bash <(case x in x) echo hi;; esac)',
+            [(7, 34)])
+# The depth cap was described in a commit message as "a performance bound with
+# no reachable behavioural test". That was wrong: past the cap the analysis
+# stops and the body is assumed executed, so a nest one level past it blocks
+# WITH the cap and is allowed without it (round 4 finding 6). A `cat`-only nest
+# isolates the cap, since no executor appears anywhere in it.
+_DEEP = "cat " + "<(cat " * 7 + '<(echo "gh pr merge 411")' + ")" * 7
+checks += 1
+if not _guard.offending(_DEEP):
+    wrong += 1
+print(("  ok    " if _guard.offending(_DEEP) else "  WRONG ")
+      + " a nest past the depth cap fails closed")
+
+# An odd quote makes the quote-aware read unreliable by its own account, so a
+# quote-blind pass is merged in. The body then runs to the end of the text
+# rather than to the `)`, because the two passes do not agree on a closer.
+_span_check("an unbalanced quote merges a quote-blind scan, failing closed",
+            "don't\nbash <(echo hi)", [(13, 21)])
 
 total = checks
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))

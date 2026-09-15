@@ -154,8 +154,15 @@ CASES = {
     "W10": ask(("Clear caches",
                 "Wipes docker volumes, but the images are kept for the "
                 "rebuild.")),
-    # R-10: `remaining` and `keeps` are ordinary English in a destructive
-    # sentence, and neither independently promises the item survives.
+    # R-10: both are ordinary English in a destructive sentence rather than
+    # a promise the item survives. They are caught by different mechanisms,
+    # which is worth stating because the two look alike here. `remaining`
+    # FAILED the PRESERVED admission test and was removed from the list, so
+    # W11 has nothing to disarm it. `keeps` was NOT removed -- in the common
+    # form 'the ext4.vhdx is kept' it does independently promise survival --
+    # so W12 fires on the destructive-verb precedence rule instead, because
+    # 'Deletes' precedes the item. The residual gap that leaves is recorded
+    # in KNOWN_LIMITS.
     "W11": ask(("Clear caches", "Deletes the remaining ext4.vhdx images.")),
     "W12": ask(("Clear caches",
                 "Deletes everything the VM keeps, including its ext4.vhdx.")),
@@ -206,6 +213,11 @@ KNOWN_LIMITS = {
     "'home directory' qualify",
     "an irreplaceable item named only by a product name the list does not "
     "carry (a Proxmox .raw volume, an LVM logical volume) is missed",
+    "`kept`/`keeps` stay on PRESERVED because 'the ext4.vhdx is kept' does promise survival, so a possessive use with NO destructive verb before it "
+    "disarms a real hit: 'Includes the ext4.vhdx the VM keeps.' under a cache label is silent, where the same sentence with 'stores' warns. "
+    "Measured 2026-09-15. The two readings are not separable by a word "
+    "list, and a false positive on a genuine reassurance is the worse "
+    "misfire (finding FP-4), so the miss is accepted deliberately",
 }
 
 

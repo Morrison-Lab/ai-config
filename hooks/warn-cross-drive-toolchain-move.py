@@ -45,8 +45,9 @@ every `robocopy C:\\... D:\\Backup\\...` would be teaching people to ignore it
 within a day, on the very commands where the HDD is the correct destination.
 
 So the trigger is narrowed four ways. The two below cost real detections and
-are the ones the cry-wolf argument turns on; the other two -- rehearsal flags
-and segment scoping -- are under WHAT IS NOT MATCHED and cost nothing:
+are the ones the cry-wolf argument turns on. The other two are under WHAT IS
+NOT MATCHED: a rehearsal flag costs nothing, while segment scoping can lose a
+detection, as `_segment_at` and the suite's KNOWN_LIMITS both record:
 
   * a cross-drive relocation naming NO toolchain path is silent. Documents,
     media, game installs, ISOs, finished datasets -- the whole population for

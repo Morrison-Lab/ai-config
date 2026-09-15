@@ -19,7 +19,7 @@ Round-1 review built the false positives the corpus lacks -- a Dockerfile
 `RUN` line, a Make recipe, a git alias, a CI step, a session prompted
 `user@host:~$`, a URL whose mask ate a closing quote, a heredoc merely named
 in a comment -- and every one of them fired against the first implementation.
-They are `S16`-`S29`, and they carry more weight than any count.
+They are `S16`-`S30`, and they carry more weight than any count.
 
 What does hold up from the original reasoning is the negative result: the
 discriminator that suggests itself (suppress when the surrounding prose is
@@ -418,18 +418,15 @@ MUTATIONS = {
         "used ONLY to exclude -- never to include",
         [("        if tag in NON_SHELL_TAGS:\n            continue",
           "        if False:\n            continue")],
-        # Only S14 depends on the tag exclusion ALONE. The other three
-        # non-shell negatives turn out to be protected twice over, which is
-        # worth stating rather than assuming: S2b also carries a `$ ` prompt,
-        # and S4's and S12's offending text both sit inside string literals
-        # that the quote mask blanks. Defence in depth is fine; believing all
-        # four rested on this clause would have been wrong.
-        # S14 plus the four formats whose bodies are bash by design; the
-        # other non-shell negatives are protected twice over (S2b by its
-        # prompt, S4/S12/S28 by the quote mask or the tag normaliser)
-        # S28 and S30 join once their tags are normalised: both are
-        # `dockerfile` bodies, differing only in case and in an info-string
-        # attribute, so they depend on this exclusion too.
+        # SEVEN cases rest on the tag exclusion alone: S14, the four formats
+        # whose bodies are bash by design (S16-S19), and S28/S30, which are
+        # `dockerfile` bodies reached only once the tag is normalised for
+        # case and for an info-string attribute. The other non-shell
+        # negatives are protected twice over and deliberately are NOT here:
+        # S2b also carries a `$ ` prompt, and S4's and S12's offending text
+        # sits inside string literals the quote mask blanks. Defence in
+        # depth is fine; believing those rested on this clause would be
+        # wrong, and so would believing only S14 does.
         {"S14", "S16", "S17", "S18", "S19", "S28", "S30"},
     ),
     "M5_quote_and_url_masking": (

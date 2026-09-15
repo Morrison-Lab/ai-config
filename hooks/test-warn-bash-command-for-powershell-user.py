@@ -31,9 +31,9 @@ all of that load -- `S2`, `S3`, `S21`-`S25`.
 `HARNESS NOTE`: the hook fires once per (transcript, reply) via a /tmp
 sentinel. The mutation section runs every case many times, so `verdict()`
 gives each subprocess a FRESH temp directory. Without it the suite goes RED at
-0/8 clauses rather than vacuously green -- every mutation reports NOTHING
+0/18 clauses rather than vacuously green -- every mutation reports NOTHING
 FLIPPED, because the sentinel suppresses the second run of each case while the
-22 case tests still pass on their unique paths. (Corrected after round-1
+41 case tests still pass on their unique paths. (Corrected after round-1
 review, which measured the failure mode; the earlier note called it a vacuous
 pass.) `fires the first time` / `fire-once sentinel suppresses the repeat`
 assert the sentinel still works.

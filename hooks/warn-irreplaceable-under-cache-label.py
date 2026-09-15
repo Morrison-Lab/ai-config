@@ -51,6 +51,19 @@ Two things make that acceptable rather than disqualifying:
   * both word lists are chosen so each entry INDEPENDENTLY carries its meaning.
     Every REVERSIBLE entry means "this rebuilds itself"; every IRREPLACEABLE
     entry names a live filesystem or volume, not a thing that re-downloads.
+    Adversarial review of a331d675 found four entries that failed that test
+    and they were removed rather than defended; the comment beside the regex
+    names each and why it went.
+
+POLARITY
+--------
+Naming an item is not destroying it, and the well-formed option this hook
+exists to PRODUCE is the one that says so: "npm and pip caches. Your WSL2
+ext4.vhdx and home directory are untouched." So each sentence of the
+description is checked for a preservation or recreation marker first, and a
+sentence carrying one supplies no hit. A guarded hit is skipped rather than
+ending the search, so an option that reassures about one item and destroys
+another still fires on the second.
 
 THE FALSE POSITIVE THAT WOULD SINK IT
 -------------------------------------
@@ -104,12 +117,10 @@ REVERSIBLE = re.compile(
 # Docker build cache" is a correct sentence and firing on it is what gets a
 # guard ignored.
 IRREPLACEABLE = re.compile(
-    r"""\.(?:vhdx?|avhdx|vmdk|vdi|qcow2|qed|hdd)\b
+    r"""\.(?:vhdx?|avhdx|vmdk|vdi|qcow2|qed)\b
   | \bext[234]\b
-  | \bbtrfs\b | \bzfs\b | \bxfs\b
   | \bdocker\s+volumes?\b | \bnamed\s+volumes?\b | \bvolume\s+data\b
-  | \boverlay2\b
-  | \bdata\s+director(?:y|ies)\b | \bdatadir\b | \bpgdata\b
+  | \bpgdata\b
   | \bhome\s+director(?:y|ies)\b
   | \buncommitted\b
   | \bwsl\d?\s+(?:distro|distribution|install(?:ation)?|filesystem|file\s?system)\b
@@ -119,6 +130,49 @@ IRREPLACEABLE = re.compile(
     re.I | re.X,
 )
 
+
+# Entries removed after adversarial review of a331d675, each because it failed
+# the list's own admission test -- it did not INDEPENDENTLY mean irreplaceable:
+#
+#   overlay2                 `docker builder prune` genuinely reclaims overlay2
+#                            layers, so "frees dangling overlay2 layers" is a
+#                            correct sentence in a correct cache option (FP-5).
+#   btrfs / zfs / xfs        a bare filesystem name appears in cache contexts
+#                            ("the zfs ARC cache stats dump") (FP-6).
+#   data directory / datadir a fixture's recreated data directory is
+#                            disposable; `pgdata` is specific enough to keep.
+#   .hdd                     a Parallels image, but too close to ordinary words
+#                            to be worth the risk.
+
+# A sentence that PRESERVES or RECREATES the thing it names is not a sentence
+# putting it at risk. Without this the well-formed option the hook exists to
+# PRODUCE was the one that warned: "npm and pip caches. Your WSL2 ext4.vhdx and
+# home directory are untouched." fired on `ext4` (finding FP-4). Punishing the
+# honest disclosure is the worst available misfire, so polarity is checked per
+# sentence.
+PRESERVED = re.compile(
+    r"""\b(?:
+        untouched | unaffected | unchanged | intact | spared | excluded
+      | preserve[sd]? | preserving | retain(?:s|ed|ing)? | kept | keeps
+      | recreated | re-?created | regenerated | rebuilt | restored
+      | survives? | survived | remains? | remaining
+    )\b
+  | \bnot\s+(?:be\s+)?(?:affected|touched|removed|deleted|cleared|wiped)\b
+  | \bnever\s+(?:affected|touched|removed|deleted)\b
+  | \bno\s+\w+(?:\s+\w+)?\s+(?:is|are|will\s+be)\s+
+        (?:affected|touched|removed|deleted|lost)\b
+  | \bleft\s+alone\b""",
+    re.I | re.X,
+)
+
+# Sentence-ish boundaries. A description is one or two sentences, so this only
+# has to separate a risk clause from a reassurance clause.
+# The lookahead is not cosmetic: a bare `[.;]` split `ext4.vhdx` and
+# `scratch.vmdk` down the middle, which hid the extension from
+# IRREPLACEABLE and stranded a reassurance in a different fragment from
+# the item it reassures about. A sentence break is a period followed by
+# space or end of string; a period inside a filename is not one.
+SENTENCE = re.compile(r"(?:[.;](?=\s|$)|\n)+")
 
 def _strings(node, keys, out):
     """Collect strings stored under any of `keys`, at any depth."""
@@ -167,6 +221,23 @@ def options(tool_input):
     return found
 
 
+def _at_risk(body):
+    """The first irreplaceable item named in a sentence that does NOT preserve
+    or recreate it, or None.
+
+    A guarded hit is skipped rather than ending the search, so an option that
+    reassures about one item and quietly destroys another still fires on the
+    second.
+    """
+    for sentence in SENTENCE.split(body):
+        if PRESERVED.search(sentence):
+            continue
+        hit = IRREPLACEABLE.search(sentence)
+        if hit:
+            return hit.group(0)
+    return None
+
+
 def find_mislabelled(tool_input):
     """[(label, reversible_word, irreplaceable_item)] for each bad option."""
     hits = []
@@ -175,10 +246,10 @@ def find_mislabelled(tool_input):
         word = REVERSIBLE.search(label)
         if not word:
             continue
-        item = IRREPLACEABLE.search(body)
+        item = _at_risk(body)
         if not item:
             continue
-        key = (label, word.group(0), item.group(0))
+        key = (label, word.group(0), item)
         if key in seen:
             continue
         seen.add(key)

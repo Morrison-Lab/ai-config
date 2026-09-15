@@ -71,9 +71,12 @@ CASES = {
     # the promise made without the word "cache"
     "W4": ask(("Regenerable bulk",
                "Package downloads plus the Ubuntu ext4 filesystem.")),
-    # a database's data directory
+    # a database's live volume. The first spelling said "Postgres data
+    # directory", and `data directory` came off the list in review because a
+    # fixture's recreated one is disposable (finding FP-6); `pgdata` is
+    # specific enough to keep.
     "W5": ask(("Disposable state",
-               "The Postgres data directory and the test fixtures.")),
+               "The pgdata volume and the test fixtures.")),
     # the bad option sits second, after a well-formed one
     "W6": ask(("Nothing", "Leave everything alone."),
               ("Clear caches", "npm cache and the .vhdx for the dev VM.")),
@@ -108,6 +111,37 @@ CASES = {
     # a payload with no options at all
     "S9": {"tool_name": "AskUserQuestion",
            "tool_input": {"questions": [{"question": "Proceed?"}]}},
+
+    # -- cases added from the adversarial review of a331d675 ---------------
+    # FP-4: the reassurance the hook exists to PRODUCE. Naming an item in
+    # order to say it is safe is the opposite of putting it at risk, and
+    # warning here would punish the honest disclosure.
+    "S10": ask(("Clear caches only",
+                "npm and pip caches. Your WSL2 ext4.vhdx and home directory "
+                "are untouched.")),
+    "S11": ask(("Safe to delete",
+                "Docker build cache and dangling images. Named docker "
+                "volumes are preserved.")),
+    "S12": ask(("Clear caches",
+                "Removes ~/.cache only; no uncommitted work is affected.")),
+    # FP-5: `docker builder prune` really does reclaim overlay2 layers, so
+    # saying so is a correct sentence in a correct option.
+    "S13": ask(("Clear the Docker build cache",
+                "Prunes build cache; frees overlay2 layers that are "
+                "dangling.")),
+    # FP-6: a bare filesystem name shows up in cache contexts.
+    "S14": ask(("Clear caches",
+                "Removes the zfs ARC cache stats dump and the npm cache.")),
+    # FP-6: an item the description says is recreated is disposable.
+    "S15": ask(("Remove temp files",
+                r"D:\vm\scratch.vmdk, recreated by the packer build.")),
+
+    # -- must warn, added in the same pass ---------------------------------
+    # reassurance about ONE item must not silence a second item that really
+    # is at risk, so a guarded hit is skipped rather than ending the search
+    "W7": ask(("Clear caches",
+               "Your home directory is untouched. Also deletes the dev VM's "
+               "ext4.vhdx.")),
 }
 
 EXPECTED = {cid: cid.startswith("W") for cid in CASES}
@@ -122,9 +156,18 @@ WHY = {
     "S7": "nothing irreplaceable is named",
     "S8": "not an AskUserQuestion call",
     "S9": "no options to evaluate",
+    "S10": "naming an item to say it is SAFE is not putting it at risk",
+    "S11": "the volumes are explicitly preserved",
+    "S12": "the sentence says no uncommitted work is affected",
+    "S13": "`docker builder prune` genuinely reclaims overlay2 layers",
+    "S14": "a bare filesystem name appears in cache contexts",
+    "S15": "an item the description says is recreated is disposable",
 }
 
 KNOWN_LIMITS = {
+    "the polarity check is per SENTENCE, so a reassurance separated from its "
+    "item by a full stop ('...and the ext4.vhdx. None of that is touched.') "
+    "does not reach it",
     "a mislabelling that avoids every listed reversible word ('tidy up the "
     "leftovers') is invisible -- this is a vocabulary matcher and the hook's "
     "own docstring says so",
@@ -196,7 +239,9 @@ MUTATIONS = {
         "'clear the Docker build cache' warns every time and the guard "
         "gets switched off",
         [(r"\bdocker\s+volumes?\b", r"\bdocker\b")],
-        {"S1"},
+        # every option that merely MENTIONS Docker starts warning, which is
+        # the point: three of the suite's negatives say the word innocently
+        {"S1", "S11", "S13"},
     ),
     "M3_reversible_list_is_closed": (
         "only words that INDEPENDENTLY promise the action rebuilds itself "
@@ -213,7 +258,33 @@ MUTATIONS = {
           '"details", "body",\n'
           '                                "explanation", "summary"}, parts)',
           "                parts = []")],
-        {"W1", "W2", "W3", "W4", "W5", "W6"},
+        {"W1", "W2", "W3", "W4", "W5", "W6", "W7"},
+    ),
+    "M6_preservation_guard": (
+        "naming an item in order to say it is SAFE is the opposite of "
+        "putting it at risk -- without this the well-formed option the hook "
+        "exists to produce was the one that warned (finding FP-4)",
+        [("        if PRESERVED.search(sentence):\n            continue",
+          "        if False:\n            continue")],
+        {"S10", "S11", "S12", "S15"},
+    ),
+    "M7_overlay2_is_not_a_trigger": (
+        "`overlay2` came off the irreplaceable list because a build-cache "
+        "prune legitimately reclaims those layers -- the same admission "
+        "test `docker` alone fails",
+        [(r"  | \bpgdata\b", r"  | \bpgdata\b | \boverlay2\b")],
+        {"S13"},
+    ),
+    "M8_sentence_split_keeps_filenames_whole": (
+        "a sentence break is a period followed by space or end of string; a "
+        "period inside `ext4.vhdx` is not one, and splitting there both hid "
+        "the extension and stranded the reassurance in another fragment",
+        [(r'SENTENCE = re.compile(r"(?:[.;](?=\s|$)|\n)+")',
+          r'SENTENCE = re.compile(r"[.;\n]+")')],
+        # S10's reassurance is stranded from `ext4`; W2's `.vmdk` and W6's
+        # `.vhdx` are each cut in half, so the only irreplaceable item in
+        # those options disappears
+        {"S10", "W2", "W6"},
     ),
     "M5_tool_gate": (
         "a payload from another tool must never be evaluated",
@@ -237,7 +308,12 @@ for clause, (statement, edits, expected_flips) in MUTATIONS.items():
                      "---")
         mutated = mutated.replace(find, replace)
 
-    fd, path = tempfile.mkstemp(suffix=".py", dir=HERE)
+    # NOT `dir=HERE`: `scripts/test_hooks.py` globs `hooks/*.py` for subjects
+    # and requires a `test-<stem>.py` for each, so a mutant left behind by an
+    # interrupted run reads as a hook with no test and fails CI (adversarial
+    # review of a331d675, finding 3d). This hook imports nothing relative to
+    # its own location.
+    fd, path = tempfile.mkstemp(suffix=".py")
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         handle.write(mutated)
     try:

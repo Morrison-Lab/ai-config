@@ -43,7 +43,10 @@ The subject is not "how much space is free" but **what the destination is made o
   It is not a refinement, an optimization, or something to confirm while the transfer runs.
   Preconditions are checked before the first irreversible step, and deleting a source directory is an irreversible step.
 
-  - **Do:** run `Get-PhysicalDisk` (or `lsblk -d -o NAME,ROTA`, or `Get-Disk`) before the first byte moves, and record which drive is which in the plan.
+  - **Do:** run the check before the first byte moves, and record which drive is which in the plan.
+    `Get-PhysicalDisk` alone prints **no drive letters**, so it cannot answer "is `D:` the slow one?" unaided --- join it through the partition: `Get-Partition -DriveLetter C,D | Get-Disk | Get-PhysicalDisk | Format-Table DeviceId, FriendlyName, MediaType, Size`.
+    On Linux the equivalent is `lsblk -o NAME,ROTA,MOUNTPOINT`;
+    `lsblk -d` suppresses partitions and so prints `ROTA` with nothing to attach it to. (Caught in adversarial review: the first draft of this entry, and of the hook's own note, gave the unjoined command --- the one command the entry exists to make people run.)
   - **Do:** ask, for any fact you are about to defer, whether learning it late would make already-done work wrong.
     If yes it is a precondition, whatever it costs to obtain.
   - **Don't:** begin with the largest item because it is the largest, intending to check the destination's suitability once something feels off.
@@ -69,5 +72,6 @@ The subject is not "how much space is free" but **what the destination is made o
 ## Mechanism
 
 [`hooks/warn-cross-drive-toolchain-move.py`](../hooks/warn-cross-drive-toolchain-move.py) is this entry's guard.
-It warns, never blocks, on a `PreToolUse` `Bash`/`PowerShell` relocation command (`robocopy`, `xcopy`, `Move-Item`, `Copy-Item`, `cp -r`, `mv`, `rsync`, `wsl --import`/`--move`) whose path arguments span two drive letters **and** name a toolchain path, when no media-type query appears earlier in the transcript.
+It warns, never blocks, on a `PreToolUse` `Bash`/`PowerShell` relocation command (`robocopy`, `xcopy`, `Move-Item`, `Copy-Item`, `cp -r`, `mv`, `rsync`, `wsl --import`/`--move`) whose **own command segment's** path arguments span two drive letters **and** name a toolchain path, when no media-type query appears earlier in the transcript.
+Scoping the tokens to one segment is what keeps a size survey chained to an unrelated move from warning about the directory it merely measured.
 It is deliberately narrow in two directions the incident makes necessary: a cross-drive copy with no toolchain path (the ordinary backup, the media move) is silent, and so is one whose paths name a backup or archive location, because an HDD is the *correct* destination for both and a guard that cried wolf there would be worked around within a day.

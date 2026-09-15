@@ -92,10 +92,12 @@ CASES = {
     "W6": bash(r"mv /mnt/c/Users/Work/.gradle /mnt/d/gradle"),
     "W7": bash(r"Move-Item D:\images\ext4.vhdx C:\vm\ext4.vhdx"),
     "W8": bash(r"Copy-Item C:\a\node_modules D:\b -Recurse"),
-    # the destination is unrecognisable as a depot, but the env var says what
-    # it is
+    # NEITHER path is recognisable as a depot; only the env var says what
+    # this is. The first spelling used `.julia` as the source, which TOOLCHAIN
+    # matched directly, so TOOLCHAIN_ENV was never reached and the whole
+    # 14-name regex was untested (adversarial review of a331d675, finding 3a).
     "W9": bash(r"$env:JULIA_DEPOT_PATH='D:\depot'; "
-               rf"robocopy {J} D:\depot /E", tool="PowerShell"),
+               r"robocopy C:\Users\Work\stuff D:\depot /E", tool="PowerShell"),
     # xcopy and rsync are the same verb class
     "W10": bash(r"xcopy C:\Users\Work\.nuget D:\nuget /E /I"),
 
@@ -133,6 +135,38 @@ CASES = {
     # a non-shell tool must never be evaluated at all
     "S16": {"tool_name": "Edit", "transcript_path": UNCHECKED,
             "tool_input": {"command": rf"robocopy {J} D:\julia /E"}},
+
+    # -- cases added from the adversarial review of a331d675 ---------------
+    # FP-2: a size survey chained to an unrelated media move. Pooling tokens
+    # over the whole command warned, and named `.julia` -- a directory this
+    # command does not move.
+    "S17": bash(rf"Get-ChildItem {J} -Recurse | Measure-Object Length -Sum; "
+                r"robocopy C:\Users\Work\Videos D:\Media\Videos /E"),
+    # FP-1: `/mnt/backup` truncated to `/mnt/b`, inventing drive B: and
+    # putting the word `backup` out of the exemption's reach.
+    "S18": bash(r"rsync -a /mnt/c/Users/work/.julia/ /mnt/backup/julia/"),
+    # FP-3: real backup directories carry affixes.
+    "S19": bash(rf"robocopy {J} D:\MyBackups\julia /E"),
+    # FP-7: `/L` lists and copies nothing.
+    "S20": bash(rf"robocopy {J} D:\julia /L"),
+    # a `#` comment carrying a separator, which would otherwise put the verb
+    # at a command position -- the half of `strip_noise` no case reached
+    # before (finding 3b).
+    "S21": bash(rf"ls {J}  # ; robocopy {J} D:\julia /E"),
+    # FN-1: `wsl --import` carries BOTH the destination and a source tar. It
+    # must warn, and the unit assertion below pins WHICH path it names.
+    "W11": bash(r"wsl --import Ubuntu D:\WSL\Ubuntu "
+                r"C:\downloads\ubuntu-22.04.tar"),
+    # FN-2: the `#` strip truncated a real argument, losing the second drive.
+    "W12": bash(rf"robocopy {J} /LOG:C:\l#1.txt D:\julia /E"),
+    # `--export` without a `.tar` suffix: still a cold archive, still silent.
+    # This is what makes the `--export` exclusion independently testable now
+    # that the archive filter also protects the suffixed spelling.
+    "S22": bash(r"wsl --export Ubuntu D:\exports\ubuntu"),
+    # `--import` into the current directory: the only volume-bearing token is
+    # the source tar, and an HDD is right for that, so there is nothing to
+    # warn about.
+    "S23": bash(r"wsl --import Ubuntu . C:\downloads\ubuntu-22.04.tar"),
 }
 
 EXPECTED = {cid: cid.startswith("W") for cid in CASES}
@@ -154,6 +188,13 @@ WHY = {
     "S14": "an https scheme is not a drive letter",
     "S15": "cross-drive but names nothing toolchain-shaped",
     "S16": "not a shell tool",
+    "S17": "the tokens belong to a neighbouring command, not this one",
+    "S18": "`/mnt/backup` is a backup, not drive B:",
+    "S19": "`MyBackups` is a backup directory like any other",
+    "S20": "`/L` lists and copies nothing",
+    "S21": "the separator sits inside a `#` comment",
+    "S22": "`wsl --export` writes a cold archive whatever it is named",
+    "S23": "the only drive-bearing token is the source tar",
 }
 
 # Detections this design deliberately gives up. Each is a gap, not an
@@ -167,6 +208,11 @@ KNOWN_LIMITS = {
     "move made from inside WSL is invisible",
     "a path built from a variable (robocopy $src $dst) exposes no path "
     "token at all",
+    "a shell-within-a-shell (powershell -Command 'robocopy ...') hides the "
+    "verb inside a quoted argument, so the command-position anchor -- which "
+    "is what keeps this corpus's own prose out -- also silences it",
+    "a separator inside a quoted string splits a segment it should not, which "
+    "narrows the token pool and can only lose a detection, never invent one",
     "a backup written to a destination NOT named backup/archive/snapshot "
     "(D:\\2026-09-15\\julia) warns, and is a true false positive",
 }
@@ -217,6 +263,21 @@ check("names the offending path",
       hook.find_risky_move(rf"robocopy {J} D:\julia /E")[2], J)
 check("names both volumes",
       hook.find_risky_move(rf"robocopy {J} D:\julia /E")[1], ["C", "D"])
+# FN-1: `wsl --import <Distro> <InstallLocation> <FileName>`. The note must
+# name the live image's location, never the source tar -- the archive is the
+# one argument in that command an HDD is unambiguously right for.
+check("wsl --import names the install location, not the tar",
+      hook.find_risky_move(
+          r"wsl --import Ubuntu D:\WSL\Ubuntu C:\downloads\ubuntu-22.04.tar"
+      )[2], r"D:\WSL\Ubuntu")
+# FP-1: the MOUNT lookahead. `/mnt/backup` is a directory, not drive B:.
+check("/mnt/backup is not drive B",
+      hook.paths("rsync -a /mnt/c/x/ /mnt/backup/y/"),
+      [("C", "/mnt/c/x/")])
+# FP-2: tokens come from the relocator's own segment only.
+check("tokens are scoped to the relocator's segment",
+      hook.find_risky_move(
+          rf"Get-ChildItem {J} -Recurse; robocopy C:\a D:\b /E"), None)
 
 # ---------------------------------------------------------------------------
 # MUTATION section. Break one load-bearing clause at a time and assert exactly
@@ -244,7 +305,9 @@ MUTATIONS = {
         "stay silent",
         [("if not volumes or (len(volumes) < 2 and not is_wsl):",
           "if not volumes or (len(volumes) < 1 and not is_wsl):")],
-        {"S6"},
+        # S18 joins S6 once the two-volume test is gone: `/mnt/c/...` is a
+        # single volume, and `.julia` supplies the toolchain path.
+        {"S6", "S18"},
     ),
     "M3_toolchain_path_required": (
         "the narrowing that makes this defensible: a cross-drive copy "
@@ -252,8 +315,10 @@ MUTATIONS = {
         "because that is the population the HDD is RIGHT for",
         [("    if toolchain is None:\n        return None",
           "    if toolchain is None:\n        toolchain = tokens[0][1]")],
-        # every ordinary cross-drive copy starts warning
-        {"S2", "S3", "S15"},
+        # every ordinary cross-drive copy starts warning, including S17's
+        # media move (whose tokens the segment scoping already isolates) and
+        # S23, whose only token is a cold tar
+        {"S2", "S3", "S15", "S17", "S23"},
     ),
     "M4_backup_exemption": (
         "a copy to a backup/archive/snapshot location is a backup, and an "
@@ -266,12 +331,14 @@ MUTATIONS = {
         # toolchain path either, so M3's clause already holds it silent. Only
         # the two backups OF a depot depend on this exemption, which is
         # exactly the overlap a per-clause expectation is meant to expose.
-        {"S4", "S5"},
+        {"S4", "S5", "S19"},
     ),
     "M5_heredoc_and_comment_strip": (
-        "a heredoc body is content being written, not a command being run",
+        "a heredoc body is content being written, not a command being run, "
+        "and a `#` comment is prose -- both halves now have a case, after "
+        "review found the comment half exercised by nothing (finding 3b)",
         [("    text = strip_noise(command)", "    text = command")],
-        {"S12"},
+        {"S12", "S21"},
     ),
     "M6_transcript_discharge": (
         "a session that already asked what the media are must not be "
@@ -291,7 +358,60 @@ MUTATIONS = {
         "`wsl --export` writes a cold tar and must not be treated as "
         "placing a live image, unlike `--import`/`--move`",
         [(r"--(?:import|move)\b", r"--(?:import|move|export)\b")],
-        {"S13"},
+        # S13 is now protected TWICE -- by this exclusion and by the archive
+        # filter M15 covers -- so only S22, whose destination carries no
+        # archive suffix, isolates this clause.
+        {"S22"},
+    ),
+    "M10_mount_terminator": (
+        "a `/mnt/<word>` path is a directory, not a drive letter -- the "
+        "greedy spelling invented drive B: for `/mnt/backup` AND put the "
+        "word `backup` beyond the exemption's reach",
+        [(r"/(?:mnt|cygdrive)/([A-Za-z])(?=[/\s\"';|&,]|$)(?:/[^\s\"';|&,]*)?",
+          r"/(?:mnt|cygdrive)/([A-Za-z])(?:/[^\s\"';|&,]*)?")],
+        {"S18"},
+    ),
+    "M11_segment_scoping": (
+        "path tokens come from the relocator's OWN segment; pooling them "
+        "over the whole command makes a survey chained to an unrelated move "
+        "warn, and names a directory the command does not touch",
+        [("    segment = _segment_at(text, at)", "    segment = text")],
+        {"S17"},
+    ),
+    "M12_toolchain_env_fallback": (
+        "an env var naming a depot identifies the directory when neither "
+        "path is recognisable on its own",
+        [("    if toolchain is None and TOOLCHAIN_ENV.search(text):",
+          "    if False:")],
+        {"W9"},
+    ),
+    "M13_comment_needs_whitespace": (
+        "a `#` only opens a comment at the start of a word -- the "
+        "unanchored spelling truncated `/LOG:C:\\l#1.txt` and lost the "
+        "second drive letter with it",
+        [(r'COMMENT = re.compile(r"(?m)(?:^|(?<=[ \t]))(?<![\\$])#[^\n]*$")',
+          r'COMMENT = re.compile(r"(?m)(?<![\\$])#[^\n]*$")')],
+        {"W12"},
+    ),
+    "M14_rehearsal_flags": (
+        "`robocopy /L`, `-WhatIf` and `rsync -n` move nothing, so warning "
+        "about one is pure noise",
+        [("    if REHEARSAL.search(text):\n        return None",
+          "    if False:\n        return None")],
+        {"S20"},
+    ),
+    "M15_archive_is_not_the_live_image": (
+        "the `.tar` in a `wsl --import` is the SOURCE an HDD is right for; "
+        "naming it instead of the install location inverts the advice",
+        [("        live = [raw for _, raw in tokens "
+          "if not ARCHIVE_FILE.search(raw)]",
+          "        live = [raw for _, raw in tokens]")],
+        # W11 still warns either way -- only the NAMED token changes there,
+        # which `verdict()` cannot see, so the unit assertion above is what
+        # pins that half. S23 is the boolean half: its only drive-bearing
+        # token IS the archive, so losing the filter turns a silent command
+        # into a warning about a cold tar.
+        {"S23"},
     ),
     "M9_shell_tool_gate": (
         "a non-shell tool carrying a `command` key must never be evaluated",
@@ -318,7 +438,13 @@ for clause, (statement, edits, expected_flips) in MUTATIONS.items():
                      "---")
         mutated = mutated.replace(find, replace)
 
-    fd, path = tempfile.mkstemp(suffix=".py", dir=HERE)
+    # NOT `dir=HERE`: `scripts/test_hooks.py` globs `hooks/*.py` for subjects
+    # and requires a `test-<stem>.py` for each, so a mutant left behind by an
+    # interrupted run -- or merely present during a concurrent one -- reads as
+    # a hook with no test and fails CI. This hook imports nothing relative to
+    # its own location, so the system temp directory is safe for it
+    # (adversarial review of a331d675, finding 3d).
+    fd, path = tempfile.mkstemp(suffix=".py")
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         handle.write(mutated)
     try:

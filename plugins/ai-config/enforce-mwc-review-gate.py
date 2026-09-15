@@ -144,10 +144,12 @@ PAYLOAD_CLEAN_VERDICTS = frozenset({
 #
 # Sharing the span reader covers a payload that PARSES, and a third route ran
 # under it: a payload `iter_payload_spans` declines -- invalid JSON is the
-# likely spelling, since a model writes these -- was yielded by nobody and so
-# fell to a closer search after all. `blank_comment_regions` therefore treats
-# an unparseable payload opener the way it treats a truncated comment, and its
-# docstring states which guarantee covers which case.
+# likely spelling, since a model writes these -- reached the closer search
+# after all, because the reader yielded only its successes and so said nothing
+# about it. It now reports the failure as `(start, None, None)`, and both
+# readers act on that: `read_payload_state` refuses to clear on a sibling
+# payload, and `blank_comment_regions` records that some of that payload's
+# text may have survived its blank.
 PAYLOAD_FENCE_LINE_RE = re.compile(
     r"^(?P<indent> {0,3})(?P<run>`{3,}|~{3,})(?P<info>[^\r\n]*)$"
 )
@@ -605,12 +607,23 @@ def blank_comment_regions(text):
         out.append(text[pos:open_idx])
         out.append(" ")
         # A `review-data` opener surviving the pass above is one
-        # `iter_payload_spans` could not bound: invalid JSON, trailing text
-        # before the closer, or a position the code mask rejected. Its closer
+        # `iter_payload_spans` could not bound. Four reasons reach here:
+        # invalid JSON, trailing text before the closer, a position the code
+        # mask rejected, and one the line-start rule rejected. Its closer
         # cannot be located by searching for `-->`, since its own text may
         # contain that substring -- so some of it may survive the blank below,
         # and the flag is how the caller is told not to trust a CLEAN reading
         # of this section.
+        #
+        # The last two reasons carry a cost that is CHOSEN rather than
+        # overlooked. A fenced example, or a sentence naming the format
+        # mid-line, is benign, and flagging it denies an unrelated clean
+        # headline elsewhere in the same section. Telling those apart means
+        # asking whether the blank below actually fell short, which is the
+        # terminator question this function exists not to answer -- so the
+        # answer is the same one it gives everywhere else, and the reviewer
+        # re-runs. `test_a_benign_payload_mention_withholds_a_clean_headline`
+        # pins it so the cost stays visible, and refining it is ai-config#3691.
         if PAYLOAD_OPEN_RE.match(text, open_idx):
             unreadable = True
         close_idx = text.find("-->", open_idx + 4)
@@ -737,7 +750,8 @@ def classify_verdict_body(body, head_oid):
     # `payload_is_clean` AFTER its prose scans, so a `schema_version`-absent
     # payload can clear there when the prose matches nothing. A gate that
     # refuses a merge is the wrong place to copy an extra allow path into, so
-    # the block below only ever blocks once the fast path has declined.
+    # a payload here clears only through the one route below and never after
+    # the prose scan.
     structured, payload_unreadable = read_payload_state(body)
     # Blocking first, and once: a payload that blocks does so whether or not
     # it carries `schema_version`, so the two tests the fast path used to run

@@ -1506,6 +1506,40 @@ class StructuredReviewDataTests(unittest.TestCase):
                 '"verdict": "CLEAN", "findings": [],} -->')
         self.assertEqual(gate.classify_verdict_body(body, HEAD), "ambiguous")
 
+    def test_a_benign_payload_mention_withholds_a_clean_headline(self):
+        """The chosen fail-closed cost, pinned rather than left implicit.
+
+        A payload opener the span reader declined for POSITION rather than for
+        content -- inside a code region, or mid-sentence -- is harmless, and
+        flagging it denies a genuine clean headline that has nothing to do
+        with it. It is flagged anyway, because separating the harmless case
+        from the leaking one means deciding where the comment really ends,
+        which is the question that produced four fail-opens in a row here.
+
+        A reviewer whose comment does this re-runs. Refining it is #3691; if
+        that lands, this test changes rather than disappears.
+        """
+        fenced = ("**Claude finished review**\n\n### Verdict\n"
+                  "**Ready for merge** --- all findings addressed.\n\n"
+                  "For reference the format is:\n\n```\n<!-- review-data: "
+                  + payload("CLEAN", []) + " -->\n\n"
+                  "Reviewed commit: " + HEAD)
+        mid_line = ("**Claude finished review**\n\n### Verdict\n"
+                    "**Ready for merge** --- all findings addressed.\n\n"
+                    "Reviewers end with <!-- review-data: "
+                    + payload("CLEAN", []) + " --> as shown.\n\n"
+                    "Reviewed commit: " + HEAD)
+        for label, body in (("fenced", fenced), ("mid-line", mid_line)):
+            with self.subTest(case=label):
+                self.assertEqual(gate.classify_verdict_body(body, HEAD),
+                                 "ambiguous")
+        # The same headline with no payload mention at all still clears, so
+        # the case above is about the mention rather than about the headline.
+        plain = ("**Claude finished review**\n\n### Verdict\n"
+                 "**Ready for merge** --- all findings addressed.\n\n"
+                 "Reviewed commit: " + HEAD)
+        self.assertEqual(gate.classify_verdict_body(plain, HEAD), "clean")
+
     def test_read_payload_state_reports_the_failure_beside_the_payload(self):
         """Asserted on the reader directly, because a verdict cannot say
         whether the flag or the prose produced it."""

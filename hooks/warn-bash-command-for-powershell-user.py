@@ -23,42 +23,56 @@ fenced block in a reply is addressed to the USER'S shell, which is a different
 program. Two shells coexist here and the target is decided by WHERE the command
 goes, not by which one was last used.
 
-WHY THIS ALMOST WAS NOT BUILT, AND WHAT DECIDED IT
---------------------------------------------------
-The obvious trigger -- "a fenced block containing `&&` while the user runs
-PowerShell" -- is unusable, and measurement rather than argument settled it.
-Over the 118 transcripts under `~/.claude/projects` (1252 assistant text
-messages, 42 carrying a fenced block), that trigger fires 13 times: ONE true
-positive and twelve explanations, reviews, and corpus edits that merely quote
-shell syntax.
+WHAT THE CORPUS ESTABLISHES, AND WHAT IT DOES NOT
+-------------------------------------------------
+Stated carefully, because the first version of this section published a figure
+that did not reproduce and round-1 review caught it. The claim was that the
+naive `&&` trigger "fires 13 times for one true positive". Re-derived: 13 was
+the count for a much BROADER trigger (all six constructs, unmasked, ungated,
+plus backtick substitution) measured over every assistant message on disk,
+including the ~61% that live in `subagents/agent-*.jsonl` and that this hook,
+bound to `Stop` in the main session, can never read.
 
-The discriminator that suggests itself -- suppress when the surrounding prose
-is retrospective ("failed", "the error was", "I handed you") -- is worse than
-useless here, and this is the finding that matters. It marks all thirteen
-messages identically, the true positive included: the offending message also
-said "the agent stopped at the classifier denial" and "genuinely doesn't
-exist", because a message can hand over a command AND discuss a failure at the
-same time. Suppressing on it would remove the only true positive and keep
-nothing. Firing on it is `remind-ums-after-error.py`'s ai-config#2997 pattern:
-a guard that fires on the explanation of the very mistake it polices.
+The in-scope figures, re-derived 2026-09-15 over the 120 transcripts under
+`~/.claude/projects` (1297 assistant text messages, of which **500** are not
+sidechain and so readable here, 16 of those carrying a fenced block):
 
-What separates the two classes is not the prose around the block but the SHAPE
-of the block itself. A command handed over to be pasted is short, carries no
-prompt, and shows no output. A quotation of a failure shows the prompt, or the
-error beneath it, or sits inside a longer listing. Measured over the same
-corpus:
+    all six constructs, no masking, no shape gate :  4 firings
+    the shipped matcher                           :  3 firings, all the same
+                                                       true positive, 0 false
+    fenced block merely containing `&&`           :  4 firings (3 true, 1 a
+                                                       `$ `-prompted quotation)
 
-    <=3 non-blank lines, no prompt marker, PS-invalid construct :  3 firings
-    <=5                                                         :  3
-    <=8                                                         :  3
-    <=12                                                        :  4  <- first
-    unbounded                                                   :  4     miss
+So the honest summary is that **the corpus is too small to validate this
+design**. It contains one genuine incident, re-issued three times, and one
+near-miss. What the numbers establish is narrow: the shipped matcher is silent
+on everything else in it, including the corrected PowerShell form of that very
+command. What they do NOT establish is the false-positive rate, and it would be
+wrong to quote 3/0 as if they did.
 
-All three firings at the <=8 bound are the same genuine directive, re-issued
-across one session. Nothing else in 118 transcripts matches. `MAX_LINES = 8` is
-therefore the measured ceiling, not a guess -- one line below where the first
-false positive appears. The corrected PowerShell form of that very command,
-which also appears in the corpus, is correctly silent.
+The real evidence is the suite's CONSTRUCTED negatives. Round-1 review built
+the false positives the corpus lacks -- a Dockerfile `RUN` line, a CI `run:`
+step, a Make recipe, a git alias, a remote-host command, a quoted session
+prompted `user@host:~$` -- and every one of them fired. Those are fixed and
+pinned as cases. A reader weighing this guard should weigh those, not the
+corpus counts.
+
+WHY THE PROSE AROUND THE BLOCK IS NOT THE DISCRIMINATOR
+-------------------------------------------------------
+This part does hold up, and it is the reason the guard is shaped the way it is.
+Suppressing when the surrounding prose is retrospective ("failed", "the error
+was", "I handed you") marks the true positive and the false ones identically:
+the offending message also said "the agent stopped at the classifier denial"
+and "genuinely doesn't exist", because a message can hand over a command AND
+discuss a failure at the same time. Suppressing on it removes the true positive
+and keeps nothing; firing on it is `remind-ums-after-error.py`'s ai-config#2997
+pattern, a guard that fires on the explanation of the very mistake it polices.
+
+So the separation is done on the SHAPE of the block. A command handed over is
+short, carries no prompt, and shows no output; a quotation shows its prompt, or
+the error beneath it, or runs long. `PROMPT` carries almost all of that load --
+`MAX_LINES` is defence in depth rather than a measured ceiling, and the comment
+beside it says so.
 
 WHAT IT DOES NOT KEY ON
 -----------------------
@@ -69,12 +83,13 @@ WHAT IT DOES NOT KEY ON
     shell commands (`json`, `python`, `diff`, `console`, ...), which can only
     remove false positives. `powershell` is deliberately NOT excluded: a block
     tagged for PowerShell that contains `&&` is the bug, not an exception.
-  * Backtick command substitution, which the spec proposed and measurement
-    rejected. It produced 17 block-level hits in the corpus, every one ordinary
+  * Backtick command substitution, which the spec proposed and which is left
+    out. It produced 18 block-level hits across the corpus, every one ordinary
     markdown inline code rather than shell substitution, and contributed
-    nothing to the true positive. Including it is the likeliest single way to
-    reintroduce the false positives this design exists to avoid. Recorded in
-    the suite's KNOWN_LIMITS rather than silently dropped.
+    nothing to the true positive. In scope it adds nothing either way, so the
+    exclusion rests on the out-of-scope evidence plus the shape of the risk
+    rather than on an in-scope measurement. Recorded in the suite's
+    KNOWN_LIMITS rather than silently dropped.
   * A block in a session whose shell is unknown. Absent positive evidence that
     the user's shell is PowerShell, this stays silent -- the safe direction.
 
@@ -101,7 +116,15 @@ SHELL_IS_PS = re.compile(r"Shell:\s*PowerShell", re.I)
 
 # ---------------------------------------------------------------------------
 # Gate 2/3: which fenced blocks are a command handed over to be pasted.
-FENCE = re.compile(r"^[ \t]*```([^\n`]*)\n(.*?)^[ \t]*```[ \t]*$", re.S | re.M)
+#
+# Three OR MORE backticks: the harness emits a four-backtick fence whenever the
+# block body itself contains a triple backtick, which is exactly when a reply is
+# showing markdown that contains a command. A fixed-three pattern missed those
+# outright (round-1 review of 8b504813, finding 3.5). The closing run is a
+# backreference, so a four-backtick fence is not closed by a three-backtick line
+# inside it.
+FENCE = re.compile(r"^[ \t]*(`{3,})([^\n`]*)\n(.*?)^[ \t]*\1[ \t]*$",
+                   re.S | re.M)
 
 # Tags that mark the block as plainly not a shell command. EXCLUSION only --
 # see the docstring on why an inclusion test on the tag would invert the check.
@@ -110,14 +133,50 @@ NON_SHELL_TAGS = frozenset({
     "python", "py", "r", "sql", "diff", "patch", "markdown", "md", "rst",
     "console", "text", "txt", "log", "output", "csv", "tsv", "ini",
     "javascript", "js", "typescript", "ts", "c", "cpp", "java", "go", "rust",
+    # Formats whose bodies are bash BY DESIGN and are never pasted into the
+    # user's terminal: a container build step, a CI step, a Make recipe, a git
+    # alias. Round-1 review of 8b504813 (finding 2.1) found every one of these
+    # firing. Tagging only helps the tagged spelling -- the untagged one is a
+    # named limit in the suite rather than a silent gap.
+    "dockerfile", "docker", "containerfile", "makefile", "make", "mk",
+    "gitconfig", "conf", "config", "editorconfig", "properties", "env",
+    "dotenv", "gitignore", "hcl", "tf", "terraform", "nginx", "apache",
+    "systemd", "service", "cron", "crontab",
 })
 
-# A quoted session shows its prompt; a command handed over does not. `C:\...>`
-# is the cmd/PowerShell prompt, `$ ` the POSIX one, `>>>` the Python REPL.
+# A quoted session shows its prompt; a command handed over does not. This
+# carries the whole load of the directive-versus-citation split, so it has to
+# recognise the prompts people actually paste.
+#
+# The first spelling knew only a bare `$ ` at column 0, `PS ...>`, `>>>` and
+# `C:\...>`. Round-1 review of 8b504813 (finding 2.5) found it missing
+# `user@host:~$` -- the DEFAULT Git Bash and Linux prompt, and so the commonest
+# way a failing session gets quoted -- along with `[user@host ~]$`, `bash-5.1$`
+# and any `(venv) PS C:\...>`. Each is added below; a leading prefix is now
+# allowed before `PS ...>` for the venv/conda case.
 PROMPT = re.compile(
-    r"^\s*(?:\$\s|PS[^>\n]*>|>>>|[A-Za-z]:\\[^>\n]*>)", re.M)
+    r"""^[ \t]*(?:
+        \$[ \t]                             # bare POSIX prompt
+      | \S*@\S*[:~][^\n]*[$#][ \t]          # user@host:~$   root@box:/#
+      | \[[^\]\n]*\][ \t]*[$#][ \t]         # [user@host ~]$
+      | [A-Za-z][\w.-]*-[\d.]+[$#][ \t]     # bash-5.1$
+      | [^\n>]{0,24}?PS[^>\n]*>             # PS C:\> and (venv) PS C:\>
+      | >>>
+      | [A-Za-z]:\\[^>\n]*>                 # C:\Users\Work>
+    )""",
+    re.M | re.X,
+)
 
-# The measured ceiling: one line below where the first false positive appears.
+# Defence in depth against a script LISTING being read as a command to paste.
+#
+# Honest status, corrected after round-1 review (finding 1b): this is NOT
+# currently load-bearing on the measured corpus. The docstring once claimed the
+# first false positive appears at a bound of 12; that table was measured before
+# quote/comment masking existed, and after masking the firing count is flat at
+# three for every bound including unbounded. The bound is kept because a long
+# listing is the shape it excludes and the corpus is small, not because a
+# measurement currently separates it. It counts NON-BLANK lines, so a padded
+# block of eight commands is admitted -- named in the suite's KNOWN_LIMITS.
 MAX_LINES = 8
 
 # ---------------------------------------------------------------------------
@@ -135,8 +194,17 @@ CONSTRUCTS = (
      "`;` (or `; if ($?) { ... }` to keep the conditional)", False),
     ("`||`", re.compile(r"(?<![&|])\|\|(?![&|])"),
      "`; if (-not $?) { ... }`", False),
+    # `2>/dev/null` is listed BEFORE the path construct so the more specific
+    # name is the one reported; the path pattern below also matches `/dev/`.
+    ("`2>/dev/null`", re.compile(r"\d?>\s*/dev/null"),
+     "`2>$null`", False),
+    # `/mnt/c/` (the WSL spelling, which this corpus uses constantly), an
+    # uppercase drive letter (`/D/GitHub`, which Git Bash accepts), and the
+    # remaining FHS roots were all missing from the first spelling (round-1
+    # review of 8b504813, finding 3.4).
     ("an MSYS/Unix absolute path", re.compile(
-        r"(?<![\w.])/(?:[a-z]/[A-Za-z0-9_.-]|(?:tmp|usr|etc|var|home|opt)/)"),
+        r"(?<![\w.])/(?:mnt/[A-Za-z]/|[A-Za-z]/[A-Za-z0-9_.-]"
+        r"|(?:tmp|usr|etc|var|home|opt|root|bin|sbin|proc|dev|srv|lib|Users)/)"),
      "a Windows path (`D:\\GitHub\\...`)", False),
     # UPPERCASE only, and anchored to a command position. The first spelling
     # accepted any identifier and matched `ok=1 msg=...` in a test's output and
@@ -147,8 +215,6 @@ CONSTRUCTS = (
     ("an inline `VAR=value command` prefix", re.compile(
         r"(?:^|[;&|\n])[ \t]*[A-Z_][A-Z0-9_]*=[^\s;&|]*[ \t]+[A-Za-z]"),
      "`$env:VAR='value'; command` (and `Remove-Item Env:\\VAR` after)", False),
-    ("`2>/dev/null`", re.compile(r"\d?>\s*/dev/null"),
-     "`2>$null`", False),
     ("a bash heredoc or here-string", re.compile(r"<<-?<?\s*['\"]?[A-Za-z_]"),
      "a single-quoted here-string, `@'` ... `'@` at column 0", True),
 )
@@ -166,9 +232,18 @@ COMMENT = re.compile(r"(?m)(?:^|(?<=[ \t]))#[^\n]*$")
 
 
 def _mask(body):
-    """Blank quoted spans, URLs and comments, preserving length and lines."""
+    """Blank quoted spans, URLs and comments, preserving length and lines.
+
+    QUOTED runs FIRST, and the order is load-bearing. `URL` is greedy to
+    whitespace, so running it first ate the closing quote of
+    `echo 'https://x/a' 'b && c'`, orphaned the opening one, and left the `&&`
+    inside the second quoted span exposed -- the URL mask manufacturing the
+    false positive it exists to prevent (round-1 review of 8b504813, finding
+    2.2). With QUOTED first, a quoted URL is already blank and `URL` only has
+    to cover the bare form.
+    """
     out = body
-    for rx in (URL, QUOTED, COMMENT):
+    for rx in (QUOTED, URL, COMMENT):
         out = rx.sub(lambda m: " " * len(m.group(0)), out)
     return out
 
@@ -178,7 +253,18 @@ def ps_invalid(body):
     masked = _mask(body)
     found = []
     for name, rx, fix, use_raw in CONSTRUCTS:
-        hit = rx.search(body if use_raw else masked)
+        if use_raw:
+            # Matched on the RAW body because the quote mask would blank a
+            # heredoc's own quoted delimiter (`<<'EOF'`) and hide the opener.
+            # The position is then checked against the mask, so an opener
+            # MENTIONED inside a comment or a string is still excluded --
+            # without that check a comment reading "use <<EOF for a heredoc"
+            # fired, which is the exact class the COMMENT mask exists to stop
+            # (round-1 review of 8b504813, finding 3.1).
+            hit = next((m for m in rx.finditer(body)
+                        if masked[m.start():m.end()].strip()), None)
+        else:
+            hit = rx.search(masked)
         if not hit:
             continue
         line = body[:hit.end()].splitlines()[-1] if body[:hit.end()] else ""
@@ -195,7 +281,10 @@ def runnable_blocks(text):
     out = []
     if not isinstance(text, str):
         return out
-    for tag, body in FENCE.findall(text):
+    for _ticks, tag, body in FENCE.findall(text):
+        # `.lower()` so ```JSON is excluded like ```json, and `.split()[0]` so
+        # an info string carrying attributes (```bash title="run me") is read
+        # by its language alone.
         tag = tag.strip().lower().split()[0] if tag.strip() else ""
         if tag in NON_SHELL_TAGS:
             continue
@@ -278,29 +367,42 @@ def user_shell_is_powershell(transcript_path):
 
 
 def last_assistant_text(transcript_path):
-    """The text of the last assistant message in the transcript."""
-    latest = ""
+    """All assistant text of the CURRENT turn -- everything since the last
+    user record.
+
+    Not just the last non-empty message. A turn that hands over a command and
+    then makes one more tool call ends with a short "Done." record, and taking
+    only the last one made the directive invisible (round-1 review of
+    8b504813, finding 3.6). Accumulating the turn keeps the whole reply in
+    view, which is what the user actually reads.
+
+    `isSidechain` records are skipped: in a subagent transcript every
+    assistant record carries it, and this hook is bound to `Stop` in the main
+    session only.
+    """
+    turn = []
     for entry in _records(transcript_path):
+        etype = entry.get("type") or entry.get("role")
+        if etype == "user" and not entry.get("isSidechain"):
+            turn = []
+            continue
         if entry.get("isSidechain"):
             continue
-        is_asst = (entry.get("type") == "assistant"
-                   or entry.get("role") == "assistant")
-        if not is_asst:
+        if etype != "assistant":
             continue
         message = entry.get("message")
         content = (message.get("content") if isinstance(message, dict)
                    else entry.get("content"))
-        parts = []
         if isinstance(content, str):
-            parts.append(content)
+            if content.strip():
+                turn.append(content)
         elif isinstance(content, list):
             for block in content:
                 if isinstance(block, dict) and block.get("type") == "text":
-                    parts.append(block.get("text") or "")
-        joined = "\n".join(p for p in parts if p)
-        if joined.strip():
-            latest = joined
-    return latest
+                    piece = block.get("text") or ""
+                    if piece.strip():
+                        turn.append(piece)
+    return "\n".join(turn)
 
 
 def main() -> int:

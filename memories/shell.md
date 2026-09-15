@@ -391,7 +391,7 @@ Which one a command has to satisfy is decided by **where the command goes**, not
 
 [`hooks/warn-bash-command-for-powershell-user.py`](../hooks/warn-bash-command-for-powershell-user.py) is this entry's guard, and what it is *not* keyed on is the interesting part.
 
-The obvious trigger --- a fenced block containing `&&` while the user runs PowerShell --- was measured against the 118 transcripts under `~/.claude/projects` and fires **13 times for one true positive**.
+The obvious trigger --- a fenced block containing `&&` while the user runs PowerShell --- fires four times over the 120 transcripts under `~/.claude/projects` for three true positives (all one incident, re-issued) and one quoted session.
 The discriminator that suggests itself, suppressing when the surrounding prose is retrospective ("failed", "the error was", "I handed you"), marks **all thirteen identically, the true positive included**, because the offending message also discussed a failure at length.
 Suppressing on it would have removed the only real hit and kept nothing;
 firing on it is the [ai-config#2997](https://github.com/Morrison-Lab/ai-config/issues/2997) pattern, a guard that fires on the explanation of the mistake it polices.
@@ -400,7 +400,14 @@ What separates the two classes is the **shape of the block**, not the prose arou
 A command handed over to be pasted is short, carries no prompt, and shows no output;
 a quotation of a failure shows its prompt, or the error beneath it, or runs long.
 At a bound of eight non-blank lines the corpus yields three firings, all the same genuine directive, and no false positives --- and the corrected PowerShell form of that very command, which also appears in the corpus, is silent.
-Twelve lines is where the first false positive appears, so the bound is measured rather than chosen.
+
+Say plainly what that does and does not establish, because the first draft of this entry overstated it and adversarial review caught the figure.
+The corpus holds **one** incident across 500 readable assistant messages, so it shows the matcher is quiet on the other fifteen fenced messages in it and nothing about the false-positive rate.
+The real evidence is the constructed negatives in the hook's suite --- a Dockerfile `RUN` line, a Make recipe, a git alias, a CI step, a session prompted `user@host:~$`, a heredoc merely named in a comment --- every one of which fired against the first implementation and is now pinned as a case.
+The line bound is defence in depth rather than a measured ceiling: after quote and comment masking were added the firing count is flat at three for every bound, including unbounded.
+
+The same PowerShell 5.1 limitation is recorded for two other consumers, from their own angles: [`opencode-bash-windows.md`](opencode-bash-windows.md) for OpenCode's shell and [`delegation.md`](delegation.md) for agy's.
+What is new here is *which* consumer a fenced block in a reply is addressed to.
 
 - **Do:** when a prose-context discriminator looks necessary, check whether a structural one exists first --- prose framing marked a directive and a post-mortem identically here.
 - **Don't:** quote a failing command in a bare short block;

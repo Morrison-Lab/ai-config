@@ -1,26 +1,42 @@
 #!/usr/bin/env python3
 """Tests for warn-bash-command-for-powershell-user.py.
 
-The negatives are the whole design. The naive version of this trigger -- "a
-fenced block containing `&&` while the user runs PowerShell" -- fires 13 times
-over the 118 transcripts under `~/.claude/projects`, of which ONE is a real
-directive and twelve are explanations, reviews and corpus edits that merely
-quote shell syntax. Worse, the discriminator that suggests itself (suppress
-when the surrounding prose is retrospective) marks all thirteen identically,
-the true positive included, because a message can hand over a command AND
-discuss a failure in the same breath.
+The negatives are the whole design, and they are CONSTRUCTED rather than
+harvested -- which is the honest thing to say about the evidence here.
 
-So the separation is done on the SHAPE of the block rather than the prose
-around it, and `S2`/`S3`/`S5` are the cases that carry it: a quotation shows
-its prompt, or its output, or runs long. Each negative names the shape it
-protects.
+The corpus under `~/.claude/projects` holds exactly one genuine incident
+(re-issued three times in one session). Re-derived 2026-09-15 over 120
+transcripts: 1297 assistant text messages, of which 500 are not sidechain and
+so readable by a `Stop` hook, 16 of those carrying a fenced block. The shipped
+matcher fires 3 times, all on that one directive. An earlier revision of this
+docstring published "13 firings for one true positive" as the cost of the
+naive `&&` trigger; round-1 adversarial review re-derived it as 4 and showed
+the 13 belonged to a much broader trigger measured over messages this hook
+cannot read. The corrected figures are in the hook's own docstring.
+
+So the corpus cannot validate the design, and the cases below are what does.
+Round-1 review built the false positives the corpus lacks -- a Dockerfile
+`RUN` line, a Make recipe, a git alias, a CI step, a session prompted
+`user@host:~$`, a URL whose mask ate a closing quote, a heredoc merely named
+in a comment -- and every one of them fired against the first implementation.
+They are `S16`-`S29`, and they carry more weight than any count.
+
+What does hold up from the original reasoning is the negative result: the
+discriminator that suggests itself (suppress when the surrounding prose is
+retrospective) marks the true positive and the false ones identically, because
+a message can hand over a command AND discuss a failure in the same breath. So
+the separation is done on the SHAPE of the block, and `PROMPT` carries almost
+all of that load -- `S2`, `S3`, `S21`-`S25`.
 
 `HARNESS NOTE`: the hook fires once per (transcript, reply) via a /tmp
 sentinel. The mutation section runs every case many times, so `verdict()`
-gives each subprocess a FRESH temp directory -- without that, every case after
-the first run would be silently suppressed and the whole suite would go
-vacuously green, which is the failure `shared/workflow/fixtures-are-not-evidence.md`
-names. `test_fires_once_per_session` asserts the sentinel still works.
+gives each subprocess a FRESH temp directory. Without it the suite goes RED at
+0/8 clauses rather than vacuously green -- every mutation reports NOTHING
+FLIPPED, because the sentinel suppresses the second run of each case while the
+22 case tests still pass on their unique paths. (Corrected after round-1
+review, which measured the failure mode; the earlier note called it a vacuous
+pass.) `fires the first time` / `fire-once sentinel suppresses the repeat`
+assert the sentinel still works.
 """
 import importlib.util
 import json
@@ -145,6 +161,58 @@ CASES = {
                    + BAD + "\n```"),
     # test output that looks like an env prefix but is not one
     "S15": payload("It printed:\n\n```\nok=1 msg=done\n```"),
+
+    # -- cases from round 1 of the adversarial review (8b504813) -----------
+    # 2.1: formats whose bodies are bash BY DESIGN and are never pasted into
+    # the user's terminal. Every one of these fired before the review.
+    "S16": payload("The image builds with:\n\n```dockerfile\n"
+                   "RUN apt-get update && apt-get install -y git\n```"),
+    "S17": payload("The recipe is:\n\n```makefile\ntest:\n"
+                   "\tcd src && pytest -q\n```"),
+    "S18": payload("Add the alias:\n\n```gitconfig\n[alias]\n"
+                   "  ca = !git add -A && git commit\n```"),
+    "S19": payload("The step reads:\n\n```yaml\nrun: npm ci && npm test\n```"),
+    # 2.2: URL masking ran first, ate the closing quote of the URL, orphaned
+    # the opening one and exposed a `&&` that is inside the SECOND quoted
+    # span -- the mask manufacturing the false positive it exists to prevent.
+    "S20": payload("Run:\n\n```bash\necho 'https://x.test/a' 'b && c'\n```"),
+    # 2.5: the prompts a quoted session actually carries. `user@host:~$` is
+    # the DEFAULT Git Bash prompt and so the commonest way a failure is
+    # pasted; the first PROMPT spelling knew none of these four.
+    "S21": payload("You saw:\n\n```\nuser@host:~$ cd /tmp && ls\n```"),
+    "S22": payload("It printed:\n\n```\nroot@box:/# cd /tmp && ls\n```"),
+    "S23": payload("From the log:\n\n```\n[user@host ~]$ cd /tmp && ls\n```"),
+    "S24": payload("Earlier:\n\n```\nbash-5.1$ cd /tmp && ls\n```"),
+    "S25": payload("Your terminal showed:\n\n```\n"
+                   "(venv) PS C:\\Work> cd /d/x && git push\n```"),
+    # 3.1: the heredoc construct is matched on the RAW body, so a heredoc
+    # merely NAMED in a comment or a string fired -- the exact class the
+    # comment mask exists to stop.
+    "S26": payload("Note:\n\n```bash\n"
+                   "git status  # a heredoc looks like <<EOF\n```"),
+    "S27": payload("Print it:\n\n```powershell\n"
+                   'Write-Output "use <<EOF for a heredoc"\n```'),
+    # the tag is normalised before the exclusion test
+    "S28": payload("The image builds with:\n\n```DOCKERFILE\n"
+                   "RUN apt-get update && apt-get install -y git\n```"),
+    # ... and the info string may carry attributes after the language
+    "S30": payload('Recipe:\n\n```dockerfile title="build step"\n'
+                   "RUN apt-get update && apt-get install -y git\n```"),
+    # the MSYS lookbehind: `/c/` inside a relative path is not a drive
+    "S29": payload("Copy it:\n\n```bash\ncp src/c/file dst/\n```"),
+
+    # -- must warn, added in the same pass ---------------------------------
+    # 3.4: the WSL spelling, which this corpus uses constantly
+    "W7": payload("Then:\n\n```bash\ncp /mnt/c/Users/Work/.julia /tmp/x\n```"),
+    # 3.4: Git Bash accepts an uppercase drive letter
+    "W8": payload("Go there:\n\n```bash\ncd /D/GitHub/x\n```"),
+    # 3.5: the harness emits a four-backtick fence when the body itself
+    # contains a triple backtick -- the fixed-three pattern missed it
+    "W9": payload("Run:\n\n````bash\ncd /d/x && git push\n```\n````"),
+    # 3.6: a turn that hands over a command and then makes one more tool call
+    # ends with a short record; taking only the LAST one hid the directive
+    "W10": payload("Done.", extra_replies=(
+        "Run this:\n\n```bash\ncd /d/x && git push\n```",)),
 }
 
 EXPECTED = {cid: cid.startswith("W") for cid in CASES}
@@ -166,6 +234,21 @@ WHY = {
     "S13": "the path is quoted in a comment, not run",
     "S14": "a markdown block documenting the rule",
     "S15": "`ok=1 msg=done` is output, not an env prefix",
+    "S16": "a Dockerfile RUN line is bash by design, never pasted",
+    "S17": "a Make recipe is bash by design",
+    "S18": "a git alias body is bash by design",
+    "S19": "a CI `run:` step is bash by design",
+    "S20": "the URL mask must not eat a closing quote and expose a `&&`",
+    "S21": "`user@host:~$` is the default Git Bash prompt",
+    "S22": "`root@box:/#` is a root prompt",
+    "S23": "`[user@host ~]$` is a bracketed prompt",
+    "S24": "`bash-5.1$` is a version-stamped prompt",
+    "S25": "`(venv) PS C:\\Work>` is a prefixed PowerShell prompt",
+    "S26": "a heredoc NAMED in a comment is not a heredoc being used",
+    "S27": "a heredoc named inside a string is not one either",
+    "S28": "the language tag is lowercased before the exclusion test",
+    "S30": "an info string's attributes are dropped before the tag test",
+    "S29": "`src/c/file` is a relative path, not drive C",
 }
 
 KNOWN_LIMITS = {
@@ -183,11 +266,26 @@ KNOWN_LIMITS = {
     "no signal separates it from one aimed at PowerShell, and the message "
     "says so rather than the hook guessing",
     "a reply that QUOTES a short corpus bash example would warn. Measured "
-    "zero occurrences across 1252 real assistant messages, but running the "
-    "matcher over memories/shell.md itself finds four such blocks (the "
+    "zero occurrences across the 500 in-scope assistant messages, but running "
+    "the matcher over memories/shell.md itself finds four such blocks (the "
     "`pgrep -f` and heredoc sections), so the residual risk is named rather "
     "than assumed absent -- the new section added for THIS hook does not "
     "fire, because it shows its failing command with a prompt and its error",
+    "an UNTAGGED Dockerfile/Make/CI/gitconfig body still warns. The tag "
+    "exclusion covers only the tagged spelling, and nothing in an untagged "
+    "`RUN apt-get update && ...` says it is a build step rather than a "
+    "command to paste",
+    "a command for a REMOTE host or a container shell warns, and correctly "
+    "cannot be distinguished: `cd /var/www/app && systemctl restart app` is "
+    "bash the user really should run, just not in the terminal in front of "
+    "them. This is the largest false-positive class and there is no signal "
+    "for it",
+    "MAX_LINES counts NON-BLANK lines, so a release sequence of eight "
+    "commands padded with blank lines (18 raw lines) is admitted",
+    "the corpus holds ONE genuine incident, so it establishes that the "
+    "matcher is quiet on the other 15 in-scope fenced messages and nothing "
+    "about the true false-positive rate. The constructed negatives above are "
+    "the real evidence",
 }
 
 
@@ -233,10 +331,13 @@ check("shell gate is negative for bash",
       hook.user_shell_is_powershell(transcript("x", brief=BRIEF_BASH)), False)
 check("a missing transcript is not evidence",
       hook.user_shell_is_powershell(os.path.join(TMP, "nope.jsonl")), False)
-# The LAST reply is the one being checked, not an earlier clean one.
-check("the last assistant message wins",
+# The whole TURN is checked, not just its last record: a turn that hands over
+# a command and then makes one more tool call ends with a short "Done." record,
+# and taking only that one hid the directive (round-1 review, finding 3.6).
+check("the turn is accumulated, not just its last record",
       hook.last_assistant_text(
-          transcript("second", extra_replies=("first",))).strip(), "second")
+          transcript("second", extra_replies=("first",))).split(),
+      ["first", "second"])
 # The diagnostic must name the real construct and the real line.
 hits = hook.find_wrong_shell_blocks("```bash\n" + BAD + "\n```")
 check("names the construct", hits[0][0], "`&&`")
@@ -264,6 +365,20 @@ def _run(p):
 once = CASES["W1"]
 check("fires the first time", _run(once), True)
 check("fire-once sentinel suppresses the repeat", _run(once), False)
+# The sentinel is keyed on the transcript path AS WELL as the reply. Without
+# that, two sessions emitting the identical short command share one sentinel
+# and the second session's genuine warning is silently swallowed -- the bug
+# `remind-ums-after-error.py` documents fixing, cited in the hook's own
+# comment and, until round-1 review, tested by nothing.
+twin = payload("To make them durable:\n\n```bash\n" + BAD + "\n```")
+check("a second session with the identical reply still fires",
+      _run(twin), True)
+# `seen` de-duplicates (construct, line) pairs so one command repeated in two
+# blocks is reported once, not twice. Also untested until round-1 review.
+two_blocks = ("```bash\n" + BAD + "\n```\n\ntext\n\n```bash\n" + BAD + "\n```")
+check("identical hits in two blocks are reported once",
+      len(hook.find_wrong_shell_blocks(two_blocks)),
+      len(hook.find_wrong_shell_blocks("```bash\n" + BAD + "\n```")))
 
 # ---------------------------------------------------------------------------
 MUTATIONS = {
@@ -279,10 +394,8 @@ MUTATIONS = {
         "one line below where the corpus's first false positive appears",
         # anchored with its comment: the bare assignment also appears in the
         # module docstring, where the measurement is recorded
-        [("# The measured ceiling: one line below where the first false "
-          "positive appears.\nMAX_LINES = 8",
-          "# The measured ceiling: one line below where the first false "
-          "positive appears.\nMAX_LINES = 999")],
+        [("named in the suite's KNOWN_LIMITS.\nMAX_LINES = 8",
+          "named in the suite's KNOWN_LIMITS.\nMAX_LINES = 999")],
         {"S5"},
     ),
     "M3_prompt_marks_a_quotation": (
@@ -291,7 +404,9 @@ MUTATIONS = {
         "the guard fire on its own post-mortem",
         [("        if PROMPT.search(body):\n            continue",
           "        if False:\n            continue")],
-        {"S2", "S3"},
+        # every quoted-session form, old and new -- this clause is where the
+        # directive/citation split actually lives
+        {"S2", "S3", "S21", "S22", "S23", "S24", "S25"},
     ),
     "M4_non_shell_tags_excluded": (
         "a json/python/markdown block is not a shell command, and the tag is "
@@ -304,20 +419,30 @@ MUTATIONS = {
         # and S4's and S12's offending text both sit inside string literals
         # that the quote mask blanks. Defence in depth is fine; believing all
         # four rested on this clause would have been wrong.
-        {"S14"},
+        # S14 plus the four formats whose bodies are bash by design; the
+        # other non-shell negatives are protected twice over (S2b by its
+        # prompt, S4/S12/S28 by the quote mask or the tag normaliser)
+        # S28 and S30 join once their tags are normalised: both are
+        # `dockerfile` bodies, differing only in case and in an info-string
+        # attribute, so they depend on this exclusion too.
+        {"S14", "S16", "S17", "S18", "S19", "S28", "S30"},
     ),
     "M5_quote_and_url_masking": (
         "`&&` inside a quoted argument or a URL is data, not a separator",
-        [("    for rx in (URL, QUOTED, COMMENT):", "    for rx in ():")],
-        # S13's comment masking rides on the same loop, so it flips too; M6
-        # isolates that half by removing only COMMENT.
-        {"S6", "S7", "S13"},
+        [("    for rx in (QUOTED, URL, COMMENT):", "    for rx in ():")],
+        # Removing every mask flips each negative that depends on one: the
+        # quoted and URL cases, the comment case (M6 isolates that half), and
+        # both heredoc-mentioned-not-used cases, whose position check reads
+        # the mask (M12 isolates those).
+        {"S6", "S7", "S13", "S20", "S26", "S27"},
     ),
     "M6_comment_masking": (
         "a `#` comment is prose inside a command block, and it is where a "
         "path gets QUOTED rather than run",
-        [("    for rx in (URL, QUOTED, COMMENT):", "    for rx in (URL, QUOTED):")],
-        {"S13"},
+        [("    for rx in (QUOTED, URL, COMMENT):", "    for rx in (QUOTED, URL):")],
+        # S26's heredoc-in-a-comment rides on the comment mask too: its
+        # position check reads the masked copy.
+        {"S13", "S26"},
     ),
     "M7_env_prefix_is_uppercase_only": (
         "an env-var prefix is uppercase by convention; accepting any "
@@ -326,6 +451,92 @@ MUTATIONS = {
         [(r'r"(?:^|[;&|\n])[ \t]*[A-Z_][A-Z0-9_]*=[^\s;&|]*[ \t]+[A-Za-z]"',
           r'r"(?:^|[;&|\n])[ \t]*[A-Za-z_][A-Za-z0-9_]*=[^\s;&|]*[ \t]+[A-Za-z]"')],
         {"S15"},
+    ),
+    # -- clauses added after round-1 review, which broke fourteen clauses the
+    # suite asserted in prose and exercised with nothing.
+    "M9_prompt_knows_real_prompts": (
+        "`user@host:~$` is the DEFAULT Git Bash prompt and the commonest way "
+        "a failing session is pasted; the first spelling knew only a bare "
+        "`$ ` at column 0, so the shape gate leaked exactly where it is "
+        "load-bearing",
+        [(r"      | \S*@\S*[:~][^\n]*[$#][ \t]          # user@host:~$   root@box:/#",
+          r"      | (?!x)x                              # disabled")],
+        {"S21", "S22"},
+    ),
+    "M10_prompt_allows_a_venv_prefix": (
+        "`(venv) PS C:\\Work>` is any virtualenv or conda PowerShell, and "
+        "anchoring `PS` to column 0 missed all of them",
+        [(r"      | [^\n>]{0,24}?PS[^>\n]*>             # PS C:\> and (venv) PS C:\>",
+          r"      | PS[^>\n]*>                          # PS only")],
+        {"S25"},
+    ),
+    "M11_quoted_is_masked_before_urls": (
+        "`URL` is greedy to whitespace, so masking it FIRST eats the closing "
+        "quote of a quoted URL, orphans the opening one, and exposes a `&&` "
+        "that is inside the next quoted span -- the mask manufacturing the "
+        "false positive it exists to prevent",
+        [("    for rx in (QUOTED, URL, COMMENT):",
+          "    for rx in (URL, QUOTED, COMMENT):")],
+        {"S20"},
+    ),
+    "M12_raw_heredoc_match_is_position_checked": (
+        "the heredoc opener is matched on the RAW body so the quote mask "
+        "cannot hide its own delimiter -- but the match position must then "
+        "be checked against the mask, or a heredoc merely NAMED in a comment "
+        "or a string fires",
+        [("            hit = next((m for m in rx.finditer(body)\n"
+          "                        if masked[m.start():m.end()].strip()), None)",
+          "            hit = rx.search(body)")],
+        {"S26", "S27"},
+    ),
+    "M13_tag_is_normalised": (
+        "the language tag is lowercased before the exclusion test, so ```JSON "
+        "is excluded like ```json",
+        [("        tag = tag.strip().lower().split()[0] if tag.strip() else \"\"",
+          "        tag = tag.strip().split()[0] if tag.strip() else \"\"")],
+        {"S28"},
+    ),
+    "M18_tag_info_string_is_split": (
+        "a fenced info string may carry attributes after the language, and "
+        "the exclusion test reads the language alone",
+        [("        tag = tag.strip().lower().split()[0] if tag.strip() else \"\"",
+          "        tag = tag.strip().lower() if tag.strip() else \"\"")],
+        {"S30"},
+    ),
+    "M14_fence_accepts_more_than_three_ticks": (
+        "the harness emits a four-backtick fence whenever the body itself "
+        "contains a triple backtick -- exactly when a reply is showing "
+        "markdown that contains a command",
+        [(r'FENCE = re.compile(r"^[ \t]*(`{3,})([^\n`]*)\n(.*?)^[ \t]*\1[ \t]*$",',
+          r'FENCE = re.compile(r"^[ \t]*(`{3})([^\n`]*)\n(.*?)^[ \t]*\1[ \t]*$",')],
+        {"W9"},
+    ),
+    "M15_msys_path_lookbehind": (
+        "`/c/` inside a relative path (`src/c/file`) is not a drive letter",
+        [(r'r"(?<![\w.])/(?:mnt/[A-Za-z]/|[A-Za-z]/[A-Za-z0-9_.-]"',
+          r'r"/(?:mnt/[A-Za-z]/|[A-Za-z]/[A-Za-z0-9_.-]"')],
+        {"S29"},
+    ),
+    "M16_turn_is_accumulated_not_last_message": (
+        "a turn that hands over a command and then makes one more tool call "
+        "ends with a short record, so taking only the LAST assistant message "
+        "made the directive invisible",
+        [("    turn = []\n    for entry in _records(transcript_path):",
+          "    turn = []\n    for entry in list(_records(transcript_path))[-1:]:")],
+        {"W10"},
+    ),
+    "M17_attachment_list_of_dicts": (
+        "the environment brief arrives as `rendered: [{'content': ...}]` in "
+        "every real transcript measured, so losing that branch blinds the "
+        "shell gate entirely and the hook can never fire",
+        [("                elif isinstance(item, dict):\n"
+          "                    value = item.get(\"content\")\n"
+          "                    if isinstance(value, str):\n"
+          "                        yield value",
+          "                elif isinstance(item, dict):\n"
+          "                    pass")],
+        # every positive goes silent: with no shell evidence the gate closes
+        {"W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10"},
     ),
     "M8_tag_is_not_an_inclusion_test": (
         "the harness tells you to tag runnable blocks ```bash for the Run "

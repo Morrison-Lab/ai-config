@@ -834,35 +834,44 @@ check, and it is the one a `MUTATIONS` table cannot perform for you.
 - **Don't:** read an all-clauses-pass run as covering the imported code; the
   imported code was never the mutant.
 
-## A reviewer whose verdict is formatted differently also leaves the guard on the old verdict
+## A verdict the pre-push guard cannot parse leaves an EARLIER report's verdict standing
 
 The sibling section below covers a report the guard never sees.
-This is a report it sees and cannot parse, which produces the same symptom from a different cause, and the refusal text does not distinguish them.
+This covers one it sees and cannot read, which produces the same refusal from a different cause, and the refusal text does not tell them apart.
 
-`hooks/no-push-without-self-review.py` takes the verdict from the last line that IS a verdict and then searches FORWARD for the `Reviewed-Commit:` line that binds it to a commit.
-A reviewer that opens with a bolded summary verdict and puts the commit line far below satisfies neither half reliably.
+`VERDICT_LINE` in `hooks/no-push-without-self-review.py` matches a CLOSED SET of two phrases, `Ready for merge` and `Needs (more) work`, and nothing else.
+A report that concludes in any other vocabulary contributes no verdict at all: `parse_report` returns `(None, None)`.
+
+What then produces the confusing refusal is `read_latest_review`, which reassigns `verdict` and `reviewed_commit` only when a report parses.
+An unparseable report therefore leaves whatever an EARLIER report set --- typically a previous round, on a previous commit --- still standing.
+So the guard refuses while quoting a verdict for a commit you are not pushing, which reads like the newest review having been rejected rather than never having been read.
+
+Derived against the shipped pattern rather than inferred from the symptom:
+
+| line | result |
+| --- | --- |
+| `### Verdict: Ready for merge` | parses |
+| `Verdict: Ready for merge` | parses |
+| `Verdict: **Ready for merge**` | parses |
+| `**Verdict: Ready for merge**` | IGNORED |
+| `**Verdict: APPROVED**` | IGNORED |
+| `Verdict: Clean` | IGNORED |
+| `### Verdict` then `Ready for merge` on the next line | IGNORED |
+
+Two independent ways to fail, and the second is the surprising one.
+The vocabulary must be exact, so `APPROVED` and `Clean` contribute nothing.
+And the emphasis must not wrap the whole line: `(?:\*\*)?` sits AFTER the colon, so `Verdict: **Ready for merge**` is fine while `**Verdict: Ready for merge**` is not.
+The phrase must also share the line with the `Verdict:` label rather than sitting under a heading.
 
 Measured 2026-09-15 on ai-config#3701.
-An `adversarial-reviewer` dispatched on `haiku` returned a genuinely clean report whose first line was `**Verdict: APPROVED**`, with `Reviewed-Commit:` near the end.
-The guard kept refusing, quoting a verdict for an EARLIER commit, across three successive push attempts.
-Re-dispatching the identical brief with an explicit instruction to end the report with
+An `adversarial-reviewer` on `haiku` returned a genuinely clean report headed `**Verdict: APPROVED**`, and three successive pushes were refused while quoting a verdict for an earlier commit.
+Re-dispatching the identical brief with an instruction to end the report with `### Verdict: ...` followed by `Reviewed-Commit: <sha>` was accepted immediately.
 
-```
-### Verdict: Ready for merge
-
-Reviewed-Commit: <full sha>
-```
-
-as its last two lines was accepted immediately, and the push went through.
-
-The refusal is the same text in both cases, so the cheap discriminator is the SHA it names: a verdict quoted for an earlier commit means the newest report was not parsed, whereas no verdict at all means none was seen.
-Neither is a reason to override.
-
-- **Do:** tell a dispatched reviewer the exact ending format when the push depends on its verdict, especially on a cheaper tier that formats more freely.
-- **Do:** read the SHA in the refusal --- an earlier commit's SHA points at a parse failure rather than a missing review.
+- **Do:** give a dispatched reviewer the exact two-line ending when a push depends on its verdict, rather than assuming it will choose the corpus's vocabulary.
+- **Do:** read the SHA in the refusal --- an earlier commit's SHA means the newest report did not parse, while no verdict at all means none was found.
 - **Don't:** read a repeated refusal after a clean report as the guard malfunctioning;
-  it is reporting what it could parse.
-- **Don't:** reach for `ALLOW_UNREVIEWED_PUSH=1` here --- a verdict exists and the fix is to restate it in the shape the guard reads.
+  it is reporting the most recent verdict it could parse, which is the point.
+- **Don't:** override on this --- a verdict exists, and restating it in the guard's own vocabulary costs one re-dispatch.
 
 ## A reviewer resumed with `SendMessage` leaves the pre-push guard on the old verdict
 

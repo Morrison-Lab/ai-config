@@ -231,60 +231,93 @@ The original was filed in `rme` precisely because that session's write access
 was scoped there, with the body opening "Filed here for transfer to
 `Morrison-Lab/ai-config`" --- a transfer that was never available.)
 
-## A private fork takes its features from the ROOT OWNER's plan, so Pages is unavailable and no setting unlocks it
+## GitHub Pages was unavailable on a private fork, and the mechanism is NOT what it looked like
 
 Measured 2026-09-15 on `Morrison-Lab/machine_learning_lecture_materials`, a
 private fork of a personal-account repository.
+This entry separates what was observed from what was inferred, because the
+first draft of it asserted a mechanism that GitHub's own documentation does not
+describe.
 
-A private fork draws its available features from the **root owner's** plan
-rather than from the organization holding the fork.
-So a private fork sitting in a paid org can lack a feature every other repo in
-that org has, and GitHub Pages is one of them.
+**Observed.**
+The repository offered no **Settings -> Pages** at all, while a sibling
+*non-fork* private repo in the same organization offered private Pages
+normally.
+The site rendered clean, the publish workflow deployed successfully, and
+`gh-pages` ended up carrying a complete site --- 36 HTML pages, 21 PDFs, every
+asset directory --- with every check green.
+Nothing in the API, a workflow run, or a branch inspection reports the absence
+of that UI.
 
-**Both obvious escapes are closed.**
-GitHub permits neither detaching a private fork from its parent nor changing
-its visibility.
-There is no setting that fixes this, so the only remedy is to recreate the
-repository standalone and push the history across.
+**Documented.**
+Two facts are in GitHub's docs and settle part of it:
 
-**The failure is invisible from every angle an agent can check**, which is what
-makes it worth recording rather than rediscovering.
-In this case the site rendered clean, the publish workflow deployed
-successfully, and `gh-pages` ended up carrying a complete site --- 36 HTML
-pages, 21 PDFs, every `site_libs` directory.
-Every check was green.
-The **Settings -> Pages** UI is simply absent, and no API call, workflow run,
-or branch inspection reports its absence.
-The session reported the site as published and named the Pages setting as a
-routine last step; it did not exist, and the maintainer had to say so.
+- *"A fork's visibility is tied to the upstream repository's repository
+  network."*
+  *"You cannot change the visibility of a fork by itself"*
+  (`content/pull-requests/reference/forks.md`).
+- Publishing a Pages site privately requires the **organization** to be on
+  GitHub Enterprise Cloud
+  (`data/reusables/pages/privately-publish-ghec-only.md`).
 
-**The discriminator is fork-versus-standalone, not private-versus-public.**
-A sibling private repo in the same org offered private Pages normally, so
-"private repos here cannot do Pages" is the wrong conclusion and sends you
-toward a plan upgrade that changes nothing.
-Check whether the repo is a fork first.
+**Inferred, and NOT documented.**
+That a fork's feature availability derives from the *upstream* owner's plan
+rather than from the account hosting it.
+GitHub's documentation never says this: "root owner" appears nowhere in the
+docs, `content/pages/` does not mention forks at all, and the general billing
+model runs the other way, billing each account separately for what it owns.
+The sibling-repo contrast is real evidence that *something* fork-specific is
+involved --- an org-plan explanation alone would have disabled Pages on the
+sibling too --- but the specific causal story is the repository owner's
+account of it and remains unverified here.
+Treat it as a hypothesis worth re-deriving rather than a rule, and note that
+nobody tried upgrading the plan, so "an upgrade would change nothing" is
+untested.
 
-**What a recreate-standalone migration carries, and what it does not:**
+**Detaching is possible, contrary to how this reads from the UI.**
+`content/pull-requests/how-tos/work-with-forks/detaching-a-fork.md` documents
+two routes.
+The one-click **Leave fork network** button is gated on the fork being public,
+under 1GB, and free of child forks --- so a *private* fork cannot use it, which
+is what makes detaching look impossible.
+The **manual** procedure has no visibility restriction: bare-clone the fork,
+delete it, create a fresh repository, mirror-push.
+There is also a support-request path.
+So the remedy below is not a workaround around GitHub's process;
+it *is* GitHub's documented process, minus reusing the old name.
 
-- **Commit history** transfers by a plain push, so anything reachable in the
-  old history stays reachable --- worth confirming with
-  `git rev-parse --is-shallow-repository` first, since a shallow clone would
-  silently truncate it.
-- **Issues** transfer only within one owner, per this file's own section on
-  that, so a same-org recreate can move them and a cross-owner one cannot.
-- **Pull request threads never transfer at all.**
-  Review discussion, diagnoses written in PR bodies, and the reasoning behind
-  merged changes are lost unless copied by hand.
-  Archive the predecessor rather than deleting it, so fully-qualified links
-  into those threads keep resolving.
+**What a recreate carries, and what it does not.**
+GitHub's own warning on that page is the authority: the new repository *"will
+not retain any of its issues, pull requests, wikis, stars, watchers, comments,
+child forks, or other metadata"*, while *"all git commit metadata will be
+preserved"*.
+So commit history transfers by a plain push --- check
+`git rev-parse --is-shallow-repository` first, since a shallow clone would
+silently truncate it --- and issues transfer only within one owner, per this
+file's own section on that.
+**Pull request threads cannot move at all**, so archive the predecessor rather
+than deleting it, or every link into those threads dies.
 
-- **Do:** check `fork` on the repo object before promising any plan-gated
-  feature, and recreate standalone when a private fork needs one.
-- **Do:** treat a green deploy to `gh-pages` as evidence about the *branch*
-  and never about whether Pages serves it.
-- **Don't:** read a sibling private repo's working Pages as proof the org's
-  plan covers this repo.
+- **Do:** check whether a repo is a fork before promising any plan-gated
+  feature, and read a missing Settings pane as a question rather than an
+  answer.
+- **Do:** report the observation and the inference separately when the
+  mechanism comes from someone's account of it rather than from documentation.
+- **Do:** reach for the documented manual detach, which is the same work as a
+  recreate and keeps the original name.
+- **Don't:** state "detaching is impossible" --- only the automated button is
+  gated on visibility.
+- **Don't:** read a sibling private repo's working Pages as proof the org plan
+  covers this repo, or as proof it does not.
 - **Don't:** delete the predecessor once the recreate lands --- its PR threads
   cannot be moved and every link into them dies with it.
 
-(Tracked as [ai-config#3720](https://github.com/Morrison-Lab/ai-config/issues/3720).)
+(Tracked as [ai-config#3720](https://github.com/Morrison-Lab/ai-config/issues/3720).
+The first draft asserted the root-owner mechanism as fact and claimed detaching
+was impossible;
+an adversarial review checked both against a clone of `github/docs` and found
+the second plainly wrong and the first undocumented.
+Worth recording that the draft violated the rule its own companion entry states
+in [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)
+--- state the claim at the confidence the reachable evidence supports --- which
+is how hard that rule is to apply to a claim you have just been handed.)

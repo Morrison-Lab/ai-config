@@ -326,7 +326,7 @@ It is a bug in the gate, and the two look identical in a summary line that only 
 - **Don't:** trust a "probed N, N clean" line without first reading what the routing step in front of the probe excludes and why.
 - **Don't:** assume a precondition for running a check is neutral --- the precondition can select for the very rows already known to pass.
 
-(Morrison-Lab/ai-config#3624, PR #3647 --- open, not yet on `main` as of this writing, so cited by issue/PR number only, per `memories/git.md`'s "Citing evidence that lives in a PR's own superseded commits" section: a hook install-check built its probe set only from rows whose registered path already resolved, and a plugin-root command whose path is unexpanded carried a different status instead --- so it never entered the probe set, never appeared in the reported count, and the run declared success having probed nothing.
+(Morrison-Lab/ai-config#3624, closed by PR #3647, merged 2026-09-14 --- cited by issue and PR number rather than by branch SHA, per `memories/git.md`'s "Citing evidence that lives in a PR's own superseded commits" section, which is the durable reason and not a consequence of the PR having been open: a hook install-check built its probe set only from rows whose registered path already resolved, and a plugin-root command whose path is unexpanded carried a different status instead --- so it never entered the probe set, never appeared in the reported count, and the run declared success having probed nothing.
 That is the exact registration shape #3624 was filed about.
 An adversarial review caught it during PR #3647's own review round.
 The proposed fix gives the excluded rows their own reported status, so a row the check cannot reach is visible rather than silently absent from the count.)
@@ -1068,6 +1068,35 @@ reminder guard is the cheap direction.
 - **Don't:** read the release rule above as forbidding a narrowed fire
   condition; it governs discharging on weak evidence, not triggering on
   strong.
+
+## An aggregate failure count must never go NEGATIVE
+
+A check that folds its own shortfall into a script's running total by
+subtraction --- `failures += len(wanted) - examined` --- assumes `examined`
+never exceeds `len(wanted)`.
+When it can, the subtraction goes negative, and the addition then
+**subtracts** from the total: it cancels genuine findings from unrelated
+checks in the same script and lets the whole gate exit 0 over them.
+A guard that can silently suppress other guards is worse than no guard,
+because the other guards read as having run and passed.
+
+- **Do:** derive a shortfall as a set difference (`len(wanted - seen)`),
+  which cannot go negative however many rows the underlying query returns.
+- **Do:** treat any `failures += <count>`-shaped line feeding a shared total
+  as a candidate for this class whenever the count is not already bounded
+  to be non-negative by construction.
+- **Don't:** derive a shortfall by subtracting two counts collected from
+  different code paths and add the (possibly negative) result to a total
+  shared with other checks.
+- **Don't:** assume a query answering "how many rows describe this set of
+  paths" returns one row per path; a query whose row count depends on
+  repository *state* --- an index read mid-conflict, a paginated API, a scan
+  that revisits an item --- can return more rows than paths requested.
+
+(Morrison-Lab/ai-config#3647, which closed #3624, merged 2026-09-14: `check_executable_bits` in `scripts/check-hook-catalog.py`
+derived its shortfall this way, and a conflicted-merge index pushed the row
+count above the requested set, found in the PR's second adversarial review
+round.)
 
 ## An empty substitution changes what the command operates on
 

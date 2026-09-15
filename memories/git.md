@@ -405,6 +405,35 @@ its committed mode explicitly (`git ls-tree HEAD -- <path>`, compare against
 an existing sibling script) rather than trusting the code review alone to
 catch it.
 
+## `git ls-files -s` emits one row per STAGE during a conflict, not one row per path
+
+`git ls-files -s <paths>` normally emits one row per path (stage `0`, the
+ordinary merged entry).
+During an unmerged (conflicted) state, a single conflicted path instead
+emits up to three rows -- stages `1` (common ancestor), `2` (ours), and `3`
+(theirs) -- and no stage-0 row at all.
+A script that parses this output as one line per requested path is wrong
+the moment the repo is mid-conflict: the row count for a set of N paths can
+read anywhere from 0 to 3N, not N.
+
+- **Do:** filter on the stage field and keep only stage `0` when the goal is
+  "what would other machines receive", since that is the only stage
+  describing the merged content.
+- **Do:** pass `-z` (`git ls-files -s -z -- <paths>`, NUL-separated records)
+  when a path might contain non-ASCII characters -- `core.quotepath`
+  otherwise C-quotes such a path into a different string than the one on
+  disk, so a plain string comparison against the requested path silently
+  fails.
+- **Don't:** assume `git ls-files -s` returns exactly one row per path you
+  asked for; the row count is a function of repository *state*
+  (conflicted vs. clean), not only of how many paths you named.
+
+(Morrison-Lab/ai-config#3647, which closed #3624, merged 2026-09-14: `check_executable_bits` in `scripts/check-hook-catalog.py`
+read `git ls-files -s` output as one row per path, and a conflicted index
+produced three rows for one path -- see the aggregate-count entry this same
+PR taught, in `shared/principles/fail-fast.md`'s "An aggregate failure count
+must never go NEGATIVE".)
+
 ## Windows Git Bash: MSYS path conversion mangles a colon-refspec that contains a slash
 
 Git Bash's MSYS layer auto-converts POSIX-looking arguments into Windows paths,
@@ -756,13 +785,21 @@ local-only and unpushed when the review ran.
 Pushing the branch made the SHAs resolve, but that only proves the citation
 was reachable *today*; this repo squash-merges (`git log origin/main
 --first-parent -30 --format='%h %p'` returns 30 commits with exactly one
-parent each), so once #3647 lands neither SHA becomes an ancestor of `main`
-and the citation goes dead anyway, on the same schedule this section already
-describes.
-The fix was the one this section already prescribes -- drop the SHAs, cite
-`#3624`/`#3647` by number, and hedge the incident as proposed-and-open rather
-than settled fact, the same way `memories/claude-code-hooks.md`'s sibling
-"third route" entry already did.
+parent each), so when #3647 merged on 2026-09-14 neither SHA became an
+ancestor of `main` and the citation went dead, on the same schedule this
+section already describes.
+The fix was the one this section already prescribes -- drop the SHAs and cite
+`#3624`/`#3647` by number, which survives the squash.
+The incident was additionally hedged as proposed-and-open, and that hedge was
+false the moment it landed: #3647 merged at `2026-09-15T02:47:27Z` and the
+sibling PR carrying the hedge merged at `02:53:45Z`, six minutes LATER.
+The direction matters, because the weaker reading -- a hedge that was right
+when written and expired later -- suggests a sweep at write time would have
+caught it, and no sweep of that PR's own additions ever could.
+What catches it is `skills/ardi/SKILL.md`'s scoping of the sweep to the PR's
+touched FILES rather than to its own added lines, run again at push time:
+the expiring line is usually one somebody else wrote, arriving through a
+`main` merge, and it can be false before you ever see it.
 The durable point is not that citing an unpushed branch SHA is a new failure
 mode; it is that the very entry stating this rule did not stop a same-day
 session from writing one anyway, which is what the count is for.

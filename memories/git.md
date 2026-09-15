@@ -428,8 +428,7 @@ read anywhere from 0 to 3N, not N.
   asked for; the row count is a function of repository *state*
   (conflicted vs. clean), not only of how many paths you named.
 
-(Proposed on Morrison-Lab/ai-config#3647, closes #3624, not yet merged at
-this writing: `check_executable_bits` in `scripts/check-hook-catalog.py`
+(Morrison-Lab/ai-config#3647, which closed #3624, merged 2026-09-14: `check_executable_bits` in `scripts/check-hook-catalog.py`
 read `git ls-files -s` output as one row per path, and a conflicted index
 produced three rows for one path -- see the aggregate-count entry this same
 PR taught, in `shared/principles/fail-fast.md`'s "An aggregate failure count

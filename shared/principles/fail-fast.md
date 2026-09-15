@@ -1093,8 +1093,7 @@ because the other guards read as having run and passed.
   repository *state* --- an index read mid-conflict, a paginated API, a scan
   that revisits an item --- can return more rows than paths requested.
 
-(Proposed on Morrison-Lab/ai-config#3647, closes #3624, not yet merged at
-this writing: `check_executable_bits` in `scripts/check-hook-catalog.py`
+(Morrison-Lab/ai-config#3647, which closed #3624, merged 2026-09-14: `check_executable_bits` in `scripts/check-hook-catalog.py`
 derived its shortfall this way, and a conflicted-merge index pushed the row
 count above the requested set, found in the PR's second adversarial review
 round.)

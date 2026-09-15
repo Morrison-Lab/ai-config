@@ -373,8 +373,7 @@ case list is.
 - **Don't:** read a green hook-test suite as evidence a `.sh` hook is
   correctly installed --- it proves the script's logic, not its mode bit.
 
-(Proposed on Morrison-Lab/ai-config#3647, closes #3624, not yet merged at
-this writing: a `.sh` hook shipped at mode `100644` in its first commit,
+(Morrison-Lab/ai-config#3647, which closed #3624, merged 2026-09-14: a `.sh` hook shipped at mode `100644` in its first commit,
 undetected by the suite for exactly this reason, and caught only by
 adversarial review rather than by anything in the repo.
 The mechanism now exists as `check_executable_bits` in

@@ -2384,8 +2384,8 @@ you ask what each side actually counts.
   fraction --- confirm the fraction can actually move when a real row goes
   missing, not just that it renders.
 
-(Proposed on Morrison-Lab/ai-config#3647, closes #3624, not yet merged at
-this writing, found by round 3 of its adversarial review: an accounting
+(Morrison-Lab/ai-config#3647, which closed #3624, merged 2026-09-14,
+found by round 3 of its adversarial review: an accounting
 line in `scripts/install-hooks.py` summed per-interpreter bucket sizes
 against a per-row total, so a healthy install reported "accounted for 3 of
 10" on a small fixture, and would have read roughly "3 of 81" on this repo's

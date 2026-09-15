@@ -1179,6 +1179,35 @@ still running minutes later with fuller output.
 command without the trailing `&` ran to a real completion minutes
 later with the full ~45-suite output.)
 
+## A backgrounded compound command's reported "exit code" is the LAST command's, not the target's
+
+`run_in_background: true` on `<script> > log 2>&1; echo "EXIT=$?"` reports
+the notification's own "exit code" as the status of the whole compound
+command --- which for a `;`-chain is the status of the LAST command, `echo`,
+and `echo` always succeeds.
+This is not the pipe-masking bug `hooks/warn-status-read-after-pipe.py`
+guards against: there is no `|` here, and the in-shell `$?` read is correct
+at every point --- the log's own `EXIT=2` line is right.
+The mask is at the harness/notification layer: trusting the tool's own
+reported exit code for a *compound* command instead of reading what the
+command itself wrote to the log.
+
+- **Do:** parse the log's own status line (`grep '^EXIT=' log`) for a
+  chained background command, never the notification's "exit code" field.
+- **Do:** run a single command with no trailing `; echo ...` under
+  `run_in_background: true` when only that command's own exit status
+  matters --- the tool then reports its exit code directly.
+- **Don't:** trust a background-task notification's "exit code" for any
+  compound (`;`-joined) command --- it reports the LAST command's status,
+  same as a foreground shell would.
+
+(2026-09-14: `script.py > log 2>&1; echo "EXIT=$?"` run under
+`run_in_background: true` notified "exit code 0" while the script had
+exited 2 on a missing PyYAML; the log's own `EXIT=2` line was correct and
+unread.
+Nearly led to filing a fail-open bug against a script that had failed
+correctly.)
+
 ## The worktree-isolation sandbox guard text-matches `git`, not intent --- a string LITERAL containing it can refuse too
 
 A worktree-isolated session's Bash tool refuses any command it "cannot verify" stays inside the worktree.

@@ -412,6 +412,17 @@ The test is mechanical rather than tonal: an `Agent` call was made, or it was no
 A background dispatch returns an agent id rather than a report, so the verdict is not the call's result and the work you are gating cannot wait on it.
 This is the Agent tool's own criterion for `run_in_background: false` --- the very next action depends on the answer.
 
+**Some harnesses' `Agent` tool has no `run_in_background` parameter at all, and every dispatch is asynchronous regardless of what the guard's own message asks for.**
+This is [`memories/antigravity.md`](../../memories/antigravity.md)'s "Asynchronous subagent dispatch and pre-push self-review" case, generalized: it is not unique to Antigravity's `invoke_subagent`.
+A Claude Agent SDK session's `Agent` tool carries no `run_in_background` field in its own schema, so every call returns "Async agent launched successfully" with an agent id and a report that arrives later via a task-notification, never as the call's own synchronous `tool_result` --- confirmed directly, not inferred, across repeated dispatches in one session.
+`no-push-without-self-review.py` cannot see that notification, so the push is refused on every attempt regardless of how many genuine, independent review rounds actually ran.
+The remedy is the CLI-fallback one already given above for "no reviewer registered here": run the review (the async dispatch still produces a real report, just not as the call's result), confirm the reported `Reviewed-Commit` matches what the push will actually ship, and use `ALLOW_UNREVIEWED_PUSH=1` on the push itself, stating in the same reply which review produced the verdict and that the harness's `Agent` tool has no synchronous route.
+Re-dispatching the same reviewer again on the theory that a different phrasing of `run_in_background` will change the outcome does not.
+The parameter is absent from the tool, not merely unset.
+
+(Measured 2026-09-15, `Morrison-Lab/ai-config#3684`: four `Agent` dispatches to `adversarial-reviewer`, each with `isolation: "worktree"` and no `run_in_background` field available to set, all returned "Async agent launched successfully".
+Each review's full report arrived only via a later task-notification, and each push attempt was refused by the guard until `ALLOW_UNREVIEWED_PUSH=1` was used on a push whose `Reviewed-Commit` matched the final CLEAN verdict's head.)
+
 **Read-only.**
 The reviewer reports; the author disposes.
 A reviewer that can edit turns a finding into a silent fix, which loses the finding and the disposition together.

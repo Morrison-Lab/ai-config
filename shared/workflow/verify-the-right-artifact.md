@@ -1658,6 +1658,57 @@ The clone I tested in had never fetched a pull ref, so it would have answered id
 The defect is real and is a stale-reference one;
 the fabrication reading was mine, and it pointed at the wrong fix.)
 
+**Third occurrence, 2026-09-15, on ai-config#3635 --- and it supplies the one
+check that needs no fetch at all.**
+
+The prior two are the 2026-09-10 case just above and, earlier,
+`memories/github-actions.md`'s "Detached HEAD on `pull_request` events" entry,
+where a review's ancestry claim and merge SHA were read against the PR branch
+on ai-config#2529 and were one edit from being published as a correction.
+Here `git cat-file -t 341873f9` returned `Not a valid object name` and an
+all-refs `git log` grep returned nothing, and a user-facing reply said the SHA
+"does not exist in the repo at all".
+`mcp__github__get_commit` resolved it at once:
+`Merge d7169012 into 518ccc81`, committer `web-flow` --- the pull merge ref
+this section already names as the common generator.
+
+Two things the earlier records do not carry.
+
+**The two local queries were one measurement.**
+`git cat-file -t` and an all-refs `git log` grep both ask "is this object in
+*this* clone", so their agreement is what
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s
+"count a sibling command that reads the same field as a second opinion" rules
+out.
+The clone was also shallow, which `git rev-parse --is-shallow-repository`
+answers in one command --- `memories/git.md` already prescribes that pre-check
+for ancestry and count queries, and it applies unchanged to an existence
+query.
+
+**The review carried the right SHA in its own body.**
+Its structured `review-data` payload named the merge commit while its prose
+trailer read `Reviewed commit: d7169012`, so the contradiction was visible in
+the artifact already in hand and needed no lookup of any kind.
+Read both fields before concluding anything about either.
+On the producing side, a `pull_request`-triggered job wanting the head must
+use `github.event.pull_request.head.sha`;
+`github.sha` and a bare `git rev-parse HEAD` both give the merge commit.
+Filed as [ai-config#3662](https://github.com/Morrison-Lab/ai-config/issues/3662).
+
+Three occurrences of a rule written down in two places is the
+[`deterministic-tools`](../principles/deterministic-tools.md) third-occurrence
+bar, so the instrument is proposed rather than the sentence sharpened:
+[ai-config#3666](https://github.com/Morrison-Lab/ai-config/issues/3666) is a
+warn-only `Stop` guard for a reply calling a SHA nonexistent with no
+forge-side lookup behind it.
+
+- **Do:** read every SHA a review reports --- the structured payload and the
+  prose trailer --- before treating either as the commit it reviewed.
+- **Do:** run `git rev-parse --is-shallow-repository` before reading any
+  local absence, existence queries included.
+- **Don't:** count a second local query as corroboration; both answer for the
+  clone, which was never the question.
+
 ## The invoking process is itself a member of the population a filter scopes, and reading the filter's prose does not check that
 
 Every shape above substitutes one artifact for another.

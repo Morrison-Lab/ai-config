@@ -705,7 +705,15 @@ It is not exposed --- its harness loads mutants in memory rather than writing th
 
 The retired one is worth recording, because it was the same defect a third time and in the same loop.
 The materialization grep matched two spellings, `mkstemp(suffix=".py"` and `shutil.copy(HOOK`, and five committed harnesses write their mutant as `mutant-{clause}.py` instead --- among them `test-no-clobbering-push.py`, `test-flag-reset-hard-uncommitted-work.py`, `test-flag-add-a-outside-pathspec.py`, `test-flag-stale-branch-mutation.py` and `test-flag-unchained-branch-switch.py`.
-Four of those five belong to hooks [ai-config#1973](https://github.com/Morrison-Lab/ai-config/issues/1973)'s Scope section proposes giving a `scripts/lib` import, so the loop would have returned a false all-clear for them the moment that extraction landed --- which is verbatim the failure this section already narrates about its own first version.
+Four of those five belong to hooks [ai-config#1973](https://github.com/Morrison-Lab/ai-config/issues/1973)'s Scope section lists as token-comparing, and which its Suggested direction would route through a shared descent helper, so the loop would have returned a false all-clear for them the moment that extraction landed --- which is verbatim the failure this section already narrates about its own first version.
+
+Which directory the helper lands in does not change that, and saying it does was this entry's own fifth citation slip.
+A first version of this sentence said #1973 proposes giving those hooks a `scripts/lib` import.
+The issue says no such thing --- `grep` it and `scripts/lib` appears nowhere;
+its Suggested direction reads "a shared helper under `hooks/`".
+`scripts/lib` is where [ai-config#3645](https://github.com/Morrison-Lab/ai-config/pull/3645) actually put it, which is a true fact about that PR attached to the wrong source.
+That shape is worth naming because it is not fabrication and does not feel like one: every noun in the sentence was real, and only the attribution was invented.
+Either directory resolves off the hook's own `__file__`, which is the predicate that matters here.
 The third alternative is in the grep now, and adding it changed nothing today: the loop still prints the same three files.
 
 - **Do:** write a mutant into `hooks/` (`dir=os.path.dirname(HOOK)`), which covers sibling imports and `scripts/lib` imports alike.

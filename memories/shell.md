@@ -287,12 +287,18 @@ stdin-reading child ran.
   `scripts/run-local-validation.py` has neither this bug nor the
   hand-picking one it documents.
 
-(2026-09-14: a hand-built `grep ... .github/workflows/validate.yml | while
-read job; do gh run ...; done` loop to run CI checks locally silently ran
-27 of 104 jobs --- a `gh` call inside the loop body read from the loop's own
-redirected stdin and consumed the remaining lines.
-`run-local-validation.py`, the maintained instrument for exactly this
-task, was available the whole time and has neither bug.)
+(2026-09-14: a hand-built `while read -r cmd; do $cmd > "$log" 2>&1; done <
+steps.txt` loop, run over the 104 distinct `python3 scripts/...` commands
+grepped out of `.github/workflows/validate.yml`, silently executed 27 of them
+--- a child command read from the loop's own redirected stdin and consumed
+the remaining lines.
+Count the unit carefully: 104 is the number of *commands*, not of jobs.
+`validate.yml` defines four jobs and no matrix, so a reader checking "104
+jobs" against the workflow finds four and has grounds to distrust the whole
+record.
+`run-local-validation.py`, the maintained instrument for exactly this task,
+was available the whole time, derives its own list the same way, and has
+neither bug.)
 
 ## Git Bash process substitution fails for a native-Windows consumer
 

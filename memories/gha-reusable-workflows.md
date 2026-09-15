@@ -319,3 +319,46 @@ There is no changelog-fragment exemption in either job's globs or paths-ignore.
   - **Do:** test multi-heading interactions in the same block when blanking rules operate per paragraph.
   - **Don't:** assert that losing a rejection heading always defaults to fail-closed when preceding blocks in the same body can state an approving verdict.
   (Measured 2026-09-12 on [Morrison-Lab/gha#873](https://github.com/Morrison-Lab/gha/pull/873).)
+
+## `formats` means the OPPOSITE thing in `preview.yml` and `quarto-publish.yml`
+
+Two consumer-facing traps in the Quarto pair, both measured 2026-09-15 on
+`Morrison-Lab/machine_learning_lecture_materials` against `@v2`.
+
+**The `formats` input.**
+An empty `formats` is the bare, all-formats-at-once `quarto render` in
+`quarto-publish.yml`, and is **not** that in `preview.yml`:
+
+- `quarto-publish/action.yml`: empty `formats` → `FORMAT_LIST` empty → a single
+  `quarto render`.
+- `preview/action.yml`: empty `formats` → a legacy branch that renders `pdf`
+  (when `tinytex: true`) and then `html` as **separate invocations**, and renders
+  `revealjs` only when the PR carries a `preview:revealjs` label.
+The bare render there is spelled `formats: default`.
+
+`preview/action.yml`'s own input description says so ("Set to 'default' to run a
+single bare `quarto render` letting `_quarto.yml` decide formats (note: unlike
+`quarto-publish` where empty string defaults to bare render)") --- which is easy
+to miss precisely because a consumer copying a working `quarto-publish.yml` call
+into a `preview.yml` call reads "empty" as meaning the same thing.
+
+Getting it wrong **does not fail the build**.
+It deploys a preview whose pages have no CSS, because per-format renders prune
+each other's `site_libs` (see `quarto-sites.md`).
+
+**`tinytex: true` on `preview.yml` needs the R `tinytex` package.**
+The composite installs its extra TeX packages by shelling out to
+`Rscript -e "tinytex::tlmgr_install(c('luacolor', 'lua-ul'))"`.
+With `use-renv: false` and an empty `r-packages`, nothing puts that package on
+the runner and the build dies at that step with
+`Error in loadNamespace(x) : there is no package called 'tinytex'`.
+Pass `r-packages: any::tinytex`.
+`quarto-publish.yml` has no such step and needs no R at all --- which leaves a
+latent asymmetry worth knowing: `preview` prefetches `luacolor` and `lua-ul` and
+`publish` cannot, so a handout needing either goes green on the PR and red on
+the push to `main`.
+
+- **Do:** write `formats: default` on a `preview.yml` call that wants all formats.
+- **Do:** pair `tinytex: true` with `r-packages: any::tinytex` on `preview.yml`.
+- **Don't:** copy an empty `formats` across from a working `quarto-publish.yml` call.
+- **Don't:** read a green preview build as evidence the PDF path works on `main`.

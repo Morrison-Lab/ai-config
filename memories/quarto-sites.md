@@ -368,3 +368,53 @@ Working set for a typical
 - Diagnostic order matters: the TinyTeX 403 masks the renv gap — fixing the first
   failure surfaces the second on the next run, so read each new failed run's log
   fresh instead of assuming the prior diagnosis still applies.
+
+## Rendering one format at a time prunes the OTHER formats' supporting files, `--no-clean` or not
+
+A multi-format Quarto site (`html` + `revealjs` + `pdf`) can be rendered either as
+one `quarto render` or as a sequence of `quarto render --to <fmt>`.
+They are not equivalent, and the difference is silent.
+
+`--no-clean` preserves other formats' **pages**, which is what its name suggests
+and what makes the sequence look safe.
+It does **not** preserve their **supporting files**: each render rewrites
+`_site/site_libs/` for the format it is producing and removes the directories it
+does not need.
+So the last render wins, and every other format is served with no CSS and no
+JavaScript while its pages sit there intact.
+
+Measured 2026-09-15 on `Morrison-Lab/machine_learning_lecture_materials`
+(Quarto 1.10.18), in both directions:
+
+- `--to html` then `--to revealjs --no-clean` leaves `site_libs/bootstrap`,
+  `quarto-nav`, `quarto-search` gone.
+The website pages render as unstyled bullet lists.
+- `--to revealjs` then `--to html --no-clean` leaves `site_libs/revealjs` gone.
+All 21 slide decks are still written and every one fails with
+  `ReferenceError: Reveal is not defined`.
+
+**`--output-dir` does not change this**, which matters because that is the form
+`Morrison-Lab/gha`'s composites use --- the second measurement above was taken
+with `--output-dir _site` specifically to check.
+
+**The fix is one bare `quarto render`**, which emits every declared format and
+keeps all of their assets.
+Splitting per format exists to reset the Deno heap between formats on a large
+book (see the `QUARTO_DENO_V8_OPTIONS` note above); a site small enough not to
+need that should not pay this cost.
+
+**What makes it hard to catch:** the render exits 0, the pages exist, the page
+count is right, and a source diff shows nothing.
+Only a check over the rendered `_site/` that resolves `<link>` and `<script>`
+hrefs finds it.
+A page-existence check does not, and neither does opening the format that
+happened to render last.
+
+- **Do:** render every format in one `quarto render`.
+- **Do:** check rendered `<link>`/`<script>` targets resolve, not just that pages exist.
+- **Don't:** read `--no-clean` as preserving anything beyond pages.
+- **Don't:** assume `d-morrison/rme` is affected because it splits per format ---
+  its published `gh-pages` carries `site_libs/revealjs/dist/reveal.js` at 107 KB
+  (checked 2026-09-15), so something about that setup escapes this.
+Check a
+  specific site before claiming it has the bug.

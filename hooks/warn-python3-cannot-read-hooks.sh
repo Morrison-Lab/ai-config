@@ -29,10 +29,18 @@
 # The probe is `$0`: the hook asks whether `python3` can read the script file
 # the harness just told the shell to run. That is the same directory every
 # Python hook lives in, so it answers exactly the question that matters, and it
-# needs no path manipulation at all. Deriving the directory instead would be
-# the bug: under Git Bash `pwd -P` answers `/c/Users/...`, which a Windows
-# `python3` cannot resolve, so a hook that "helpfully" normalised the path
-# would report this outage on every healthy Windows machine.
+# needs no path manipulation at all.
+#
+# Passing `$0` through unchanged is load-bearing rather than merely tidy. The
+# question is whether the interpreter can see the path the HARNESS names, so
+# rewriting that path asks a different question -- and one that can come back
+# reassuring when the real answer is not. Resolving a symlink, in particular,
+# can land the probe in a directory the interpreter CAN read while the
+# registered path stays invisible, which would report an all-clear over a total
+# outage. (A normalised path does not, on measurement, false-alarm: MSYS
+# converts a `/d/...` argument to `D:/...` before a native interpreter sees it,
+# so `pwd -P` output resolves fine under Git Bash. Masking is the risk here,
+# not false alarms.)
 #
 # Silent when the interpreter is fine. This runs on every prompt, and a
 # reassurance nobody asked for would cost context on every turn forever.

@@ -72,6 +72,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -607,6 +608,63 @@ def check(reg, doc):
     return failures
 
 
+def check_executable_bits(reg):
+    """Every registered `.sh` hook must be executable in the index.
+
+    A `.py` hook is registered as `python3 "<path>"`, so the interpreter opens
+    it and the mode never matters. A `.sh` hook is registered as a bare quoted
+    path, so the harness execs it directly: mode 100644 means `EACCES` on
+    macOS and Linux, and the hook is permanently dead while looking perfectly
+    installed. Nothing else catches it. The catalog row is present, the
+    binding is correct, and a test suite that invokes the hook as
+    `sh <path>` -- which is how every hook suite here runs a shell subject --
+    never needs the exec bit at all.
+
+    Read from the index (`git ls-files -s`) rather than from the filesystem,
+    because `core.filemode` is false on Windows checkouts: the working-tree
+    mode there says nothing, while the recorded mode is what other machines
+    receive.
+
+    Returns (failures, examined). The count is reported because zero failures
+    over zero files reads exactly like zero failures over all of them.
+    """
+    shell_hooks = sorted(s for s in reg if s.endswith(".sh"))
+    if not shell_hooks:
+        return 0, 0
+    try:
+        out = subprocess.run(
+            ["git", "ls-files", "-s", "--"] + [f"hooks/{s}" for s in shell_hooks],
+            cwd=ROOT, capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError) as exc:
+        # Not a finding: an unavailable git says nothing about the modes.
+        print(f"SKIP: could not read index modes ({exc})")
+        return 0, 0
+    if out.returncode != 0:
+        print(f"SKIP: could not read index modes ({out.stderr.strip()})")
+        return 0, 0
+
+    failures = 0
+    examined = 0
+    for line in out.stdout.splitlines():
+        if not line.strip():
+            continue
+        mode, _, rest = line.partition(" ")
+        path = rest.split("\t", 1)[-1]
+        examined += 1
+        if mode != "100755":
+            print(f"FAIL: {path} is registered as a directly-executed path "
+                  f"but is mode {mode} in the index; the harness cannot exec "
+                  "it on macOS or Linux. Run: git update-index --chmod=+x "
+                  f"{path}")
+            failures += 1
+    missing = len(shell_hooks) - examined
+    if missing:
+        print(f"FAIL: {missing} registered .sh hook(s) are not tracked in git, "
+              "so their mode cannot be recorded")
+        failures += missing
+    return failures, examined
+
+
 def main() -> int:
     binds = bindings()
     reg = registered(binds)
@@ -615,12 +673,15 @@ def main() -> int:
     double_failures, examined, undecidable = check_double_bindings(binds)
     failures += double_failures
     failures += check_tracker_states()
+    mode_failures, modes_examined = check_executable_bits(reg)
+    failures += mode_failures
 
     print(f"\n{len(reg)} hooks registered in hooks.json; {len(doc)} documented "
           f"in README ({len(KNOWN_UNREGISTERED)} known unregistered); "
           f"{len(set(reg) & set(doc))} compared for event and matcher; "
           f"{examined} matcher pair(s) compared for a double binding, "
-          f"{undecidable} undecidable (both matchers are regexes)")
+          f"{undecidable} undecidable (both matchers are regexes); "
+          f"{modes_examined} shell hook(s) checked for the exec bit")
     return 1 if failures else 0
 
 

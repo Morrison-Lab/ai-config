@@ -11,6 +11,7 @@ catch gets a case here that exits non-zero, and the "vacuous parse" pair covers
 the way this particular check could silently pass forever -- a README whose
 table shape changed would otherwise make every set comparison compare nothing.
 """
+import contextlib
 import importlib.util
 import io
 import json
@@ -598,6 +599,70 @@ if ALLOWLISTED:
 else:
     skip("the real repo's trackers are open",
          "KNOWN_UNREGISTERED is empty")
+
+# --- the exec bit on a directly-executed hook (ai-config#3624) ------------
+#
+# A `.py` hook is registered as `python3 "<path>"`, so the interpreter opens it
+# and the mode never matters. A `.sh` hook is registered as a bare quoted path
+# and is exec'd, so mode 100644 is EACCES on macOS and Linux -- a permanently
+# dead hook that looks perfectly installed. Nothing else here catches it: the
+# row is present, the binding is right, and hook suites run a shell subject as
+# `sh <path>`, which never needs the bit.
+#
+# Known-positive first, per this file's own convention. The mode is read from
+# the git INDEX rather than the filesystem, because `core.filemode` is false on
+# Windows checkouts, so a check reading the working tree would pass there
+# whatever the recorded mode said.
+
+
+def modes(reg):
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        result = _catalog.check_executable_bits(reg)
+    return result, buf.getvalue()
+
+
+with tempfile.TemporaryDirectory() as td:
+    root = Path(td)
+    (root / "hooks").mkdir()
+    (root / "hooks" / "x.sh").write_text("#!/bin/sh" + chr(10), encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    subprocess.run(["git", "add", "hooks/x.sh"], cwd=root, check=True)
+
+    with patch.object(_catalog, "ROOT", str(root)):
+        subprocess.run(["git", "update-index", "--chmod=-x", "hooks/x.sh"],
+                       cwd=root, check=True)
+        (fails, examined), out = modes({"x.sh": ("Stop", "")})
+        check("a registered .sh hook that is not executable fails",
+              fails == 1 and examined == 1)
+        check("the failure names the repair command",
+              "git update-index --chmod=+x hooks/x.sh" in out)
+
+        subprocess.run(["git", "update-index", "--chmod=+x", "hooks/x.sh"],
+                       cwd=root, check=True)
+        (fails, examined), _ = modes({"x.sh": ("Stop", "")})
+        check("a registered .sh hook that is executable passes",
+              fails == 0 and examined == 1)
+
+        # Not merely "does not fail": it must not be counted as examined
+        # either, or the reported count would overstate the coverage.
+        (fails, examined), _ = modes({"a.py": ("Stop", "")})
+        check("a .py hook is not checked for the exec bit",
+              (fails, examined) == (0, 0))
+
+        # A registered .sh hook git does not track has no recorded mode at
+        # all, which is a finding rather than a silent pass.
+        (fails, examined), out = modes({"untracked.sh": ("Stop", "")})
+        check("a registered .sh hook missing from the index fails",
+              fails == 1 and "not tracked in git" in out)
+
+# Outside a git repository the modes are unreadable, which says nothing about
+# them -- so it skips rather than failing the whole catalog check.
+with tempfile.TemporaryDirectory() as td:
+    with patch.object(_catalog, "ROOT", str(Path(td) / "nope")):
+        (fails, examined), out = modes({"x.sh": ("Stop", "")})
+        check("unreadable index modes skip rather than fail",
+              fails == 0 and examined == 0 and "SKIP" in out)
 
 print(f"\n{passes} passed, {failures} failed, {skipped} skipped "
       f"({len(ALLOWLISTED)} hook(s) in KNOWN_UNREGISTERED)")

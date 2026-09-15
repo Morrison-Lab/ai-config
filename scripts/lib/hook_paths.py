@@ -37,6 +37,9 @@ PLUGIN_ROOT_VAR = "CLAUDE_PLUGIN_ROOT"
 # a backslash unless it precedes a quote, a backslash, a dollar sign or a
 # backtick, so a quoted Windows path needs no help.
 RX_BARE_DRIVE_PATH = re.compile(r"(?:^|(?<=[\s=]))[A-Za-z]:[/\\]\S*")
+# A leading `NAME=value` environment assignment, which precedes the command
+# rather than being it. Anchored whole, so a path containing `=` is untouched.
+RX_ENV_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z_0-9]*=")
 
 
 def script_token(command: str) -> str | None:
@@ -105,6 +108,12 @@ def interpreter_token(command: str) -> str | None:
         tokens = shlex.split(protected, posix=True)
     except ValueError:
         tokens = command.split()
+    # `VAR=value python3 script.py` is one command with a leading assignment,
+    # not a command named `VAR=value`. Dropping the prefix keeps the row
+    # probeable; keeping it would make the row silently contribute nothing,
+    # which is the failure mode this whole check exists to remove.
+    while tokens and RX_ENV_ASSIGNMENT.match(tokens[0]):
+        tokens = tokens[1:]
     if not tokens or tokens[0].endswith(SCRIPT_SUFFIXES):
         return None
     return tokens[0]
@@ -132,17 +141,26 @@ def probe_interpreter(interpreter: str, script: str, timeout: float = 15) -> str
     probed: `-c` is a Python flag, and handing it to `sh` or `node` would test
     the prober rather than the hook.
 
-    `blind` is the finding this exists for -- the interpreter ran and reported
-    a file that is right there as absent. `unknown` is deliberately not folded
-    into it: a status this function did not model is not evidence of the
-    Store-alias condition, and claiming a cause it did not observe is what
-    sent #3624 looking at the plugin cache for hours.
+    Five verdicts, and only two of them are observations. `ok` and `blind` mean
+    the interpreter ran and answered; `blind` is the finding this exists for --
+    it reported a file that is right there as absent. `unlaunchable`,
+    `timeout` and `unknown` each mean the probe reached no answer, and they are
+    kept apart rather than folded together because each licenses a different
+    next step. None of them is evidence of the Store-alias condition: claiming
+    a cause nobody observed is what sent #3624 looking at the plugin cache for
+    hours.
     """
     if not Path(interpreter).name.lower().startswith("python"):
         return "skipped"
     try:
         done = subprocess.run([interpreter, "-c", _PROBE, script],
                               capture_output=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        # Caught ahead of the clause below because TimeoutExpired IS a
+        # SubprocessError, so folding the two would report an interpreter that
+        # launched fine and then hung as one that never launched -- a false
+        # statement about the more alarming of the two observations.
+        return "timeout"
     except (OSError, subprocess.SubprocessError):
         return "unlaunchable"
     return {0: "ok", 1: "blind"}.get(done.returncode, "unknown")

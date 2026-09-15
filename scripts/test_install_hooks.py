@@ -230,7 +230,65 @@ with tempfile.TemporaryDirectory() as tmp:
     check("--check names an interpreter it could not launch",
           "NO EXEC" in result.stdout)
     check("--check does not fail the install over an unlaunchable name",
-          result.returncode == 0 and "Not a finding" in result.stdout)
+          result.returncode == 0 and "Not findings" in result.stdout)
+    # The count is the whole reason that line exists, so it must not credit a
+    # probe that reached no answer.
+    check("--check does not count an unlaunchable name as probed",
+          "probed 0 interpreter(s)" in result.stdout)
+
+    # The END-TO-END known positive. Without it, deleting the escalation
+    # entirely leaves the suite green: every other case here is either a unit
+    # call or a clean run.
+    stub_dir = Path(tmp) / "stub"
+    stub_dir.mkdir()
+    if os.name == "nt":
+        stub = stub_dir / "python3blind.bat"
+        stub.write_text("@exit /b 1" + NL)
+    else:
+        stub = stub_dir / "python3blind"
+        stub.write_text("#!/bin/sh" + NL + "exit 1" + NL)
+        stub.chmod(0o755)
+    write_settings(home, settings_with(f'"{stub}" "{present}"'))
+    result = run_check(home)
+    check("--check names an interpreter that reported a present file absent",
+          "BLIND" in result.stdout)
+    check("--check counts the blind interpreter as probed",
+          "probed 1 interpreter(s)" in result.stdout)
+    check("--check fails the install on a blind interpreter",
+          result.returncode == 1)
+    check("--check gives the blind interpreter's remedy",
+          "App execution aliases" in result.stdout)
+    check("--check does not also print the all-clear sentence",
+          "Every registered hook path resolves." not in result.stdout)
+
+    # A plugin-root command is `skipped` by the path check -- and it is the
+    # exact registration shape #3624 was observed in, so dropping it silently
+    # would end this check on an all-clear for the one case it is written for.
+    write_settings(home, settings_with(
+        'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/a.py"'))
+    result = run_check(home)
+    check("--check reports a plugin-root command as unprobed, not as clean",
+          "UNPROBED" in result.stdout)
+    check("--check says why the plugin-root command could not be probed",
+          "expands only in the plugin loader" in result.stdout)
+    check("--check does not claim to have probed it",
+          "probed 0 interpreter(s)" in result.stdout)
+
+with tempfile.TemporaryDirectory() as tmp:
+    present = Path(tmp) / "hook.py"
+    present.write_text("")
+    # A leading assignment is part of the command, not the name of it.
+    check("interpreter_token skips a leading environment assignment",
+          hp.interpreter_token('PYTHONPATH=/x python3 "/y/a.py"') == "python3")
+    check("interpreter_token skips several leading assignments",
+          hp.interpreter_token('A=1 B=2 python3 "/y/a.py"') == "python3")
+    check("interpreter_token does not mistake a path containing = for one",
+          hp.interpreter_token('/opt/a=b/python3 "/y/a.py"') == "/opt/a=b/python3")
+    # TimeoutExpired IS a SubprocessError, so folding them would report an
+    # interpreter that launched and hung as one that never launched.
+    check("probe_interpreter separates a hang from a failure to launch",
+          hp.probe_interpreter(sys.executable,
+                               str(present), timeout=0.0) == "timeout")
 
 print(NL + f"{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

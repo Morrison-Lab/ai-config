@@ -21,11 +21,12 @@ on Ubuntu CI -- none of which reproduces the Store-alias condition:
   4. Broken: the stub exits 2 -- neither "fine" nor "blind", so the hook
      reports the status rather than asserting a cause it did not observe.
   5. Path fidelity: the hook must hand `python3` the path the harness gave
-     it, byte for byte. Normalising it would be the bug, not a nicety: under
-     Git Bash `pwd -P` answers `/c/Users/...`, which a Windows `python3`
-     cannot resolve, so a "helpful" hook would report this outage on every
-     healthy Windows machine. The case invokes the hook through a path
-     carrying a `..` segment and requires that segment to survive.
+     it, byte for byte. The risk a rewritten path carries is MASKING, not a
+     false alarm -- resolving a symlink can land the probe in a directory the
+     interpreter can read while the registered path stays invisible, which
+     reports an all-clear over a total outage. The case invokes the hook
+     through a path carrying a `..` segment and requires that segment to
+     survive.
 
 Every case also requires exit 0. This is a `UserPromptSubmit` hook whose
 diagnosis reaches the session through plain stdout; exiting non-zero would

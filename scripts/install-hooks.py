@@ -227,57 +227,90 @@ def check_interpreters(rows: list[dict]) -> int:
     above reports `ok` while every hook denies every tool call
     ([#3624](https://github.com/Morrison-Lab/ai-config/issues/3624)).
 
-    Probes only rows whose path already resolved, so a `blind` verdict cannot
+    Probes against a path that already resolved, so a `blind` verdict cannot
     be a missing file wearing a different label. One probe per distinct
     interpreter spelling rather than per hook: the answer is a property of the
     interpreter, and a hundred identical subprocesses would only be slower.
 
-    Returns the number of interpreters observed **blind** -- and only those.
-    A `blind` verdict is something this function watched happen: the
-    interpreter ran, and reported a file that is right there as absent. The
-    other two are inferences about an environment this process does not
-    share. `unlaunchable` in particular says only that the name did not
-    resolve *here*; the harness spawns hooks through its own shell, which is
-    exactly the mismatch #3624 is about, so reading it backwards and failing
-    the install would be the same error in the other direction. Both are
-    printed, neither is a finding.
-    """
-    representative: dict[str, str] = {}
-    for row in rows:
-        if row["status"] != "ok":
-            continue
-        interp = hp.interpreter_token(row["command"])
-        if interp:
-            representative.setdefault(interp, row["path"])
+    A row this check cannot probe is REPORTED, never dropped. That is the
+    whole point of the bucket: a plugin-root command carries `${CLAUDE_PLUGIN_
+    ROOT}`, which only the plugin loader expands, so its path is `skipped`
+    above and there is no resolvable target to probe the interpreter against
+    -- and that is precisely the registration shape #3624 was observed in.
+    Silently skipping it would end this check on an all-clear for the one case
+    it was written for.
 
-    verdicts = {i: hp.probe_interpreter(i, p) for i, p in representative.items()}
-    bad = {i: v for i, v in verdicts.items()
-           if v in ("blind", "unlaunchable", "unknown")}
-    probed = sum(1 for v in verdicts.values() if v != "skipped")
-    # The count, not just the findings: a probe that examined nothing and a
-    # probe that found nothing print the same absence otherwise.
-    print(f"  probed {probed} interpreter(s) against a hook path they are "
+    Returns the number of interpreters observed **blind** -- and only those.
+    `blind` is something this function watched happen: the interpreter ran,
+    and reported a file that is right there as absent. Every other non-ok
+    verdict means the probe reached no answer at all, and an absent answer is
+    not a finding: `unlaunchable` in particular says only that the name did
+    not resolve *here*, while the harness spawns hooks through its own shell
+    -- which is exactly the mismatch #3624 is about, so reading it backwards
+    and failing the install would be the same error pointed the other way.
+    """
+    # A probe target must be a path that already resolved, and it need not
+    # come from the row being explained: the question is what this interpreter
+    # can see, not what it can see of one particular hook.
+    representative: dict[str, str] = {}
+    unprobeable: dict[str, str] = {}
+    for row in rows:
+        interp = hp.interpreter_token(row["command"])
+        if not interp:
+            continue
+        if row["status"] == "ok":
+            representative.setdefault(interp, row["path"])
+        elif row["status"] == "skipped":
+            unprobeable.setdefault(interp, row["command"])
+
+    verdicts = {i: hp.probe_interpreter(i, p)
+                for i, p in representative.items()}
+    # Counts only the interpreters that actually answered. `unlaunchable`,
+    # `timeout` and `unknown` produced no observation, and counting them would
+    # defeat the reason this line exists -- a check that examined nothing and a
+    # check that found nothing print the same absence otherwise.
+    answered = sum(1 for v in verdicts.values() if v in ("ok", "blind"))
+    unanswered = {i: v for i, v in verdicts.items()
+                  if v in ("unlaunchable", "timeout", "unknown")}
+    still_unprobed = {i: c for i, c in unprobeable.items()
+                      if i not in representative}
+
+    print(f"  probed {answered} interpreter(s) against a hook path they are "
           "registered with")
-    if probed and not bad:
+    if answered and not any(v == "blind" for v in verdicts.values()):
         print("  every one of them could read it")
 
-    for interp, verdict in sorted(bad.items()):
-        script = representative[interp]
-        if verdict == "blind":
-            print()
-            print(f"  BLIND    {interp}")
-            print(f"           ran, and reported {script} absent")
-            print("           -- that file exists; the interpreter cannot "
-                  "see it.")
-        elif verdict == "unlaunchable":
-            print()
-            print(f"  NO EXEC  {interp}")
-            print("           could not be launched at all")
-        else:
-            print()
-            print(f"  UNKNOWN  {interp}")
-            print(f"           probe against {script} neither succeeded nor "
-                  "reported absence")
+    for interp, verdict in sorted(verdicts.items()):
+        if verdict != "blind":
+            continue
+        print()
+        print(f"  BLIND    {interp}")
+        print(f"           ran, and reported {representative[interp]} absent")
+        print("           -- that file exists; the interpreter cannot see it.")
+
+    for interp, verdict in sorted(unanswered.items()):
+        label = {"unlaunchable": "NO EXEC", "timeout": "TIMEOUT",
+                 "unknown": "UNKNOWN"}[verdict]
+        detail = {
+            "unlaunchable": "could not be launched from this process",
+            "timeout": "launched, then did not answer before the deadline",
+            "unknown": ("neither reported the file present nor reported it "
+                        "absent"),
+        }[verdict]
+        print()
+        print(f"  {label:<8} {interp}")
+        print(f"           {detail}")
+
+    for interp, command in sorted(still_unprobed.items()):
+        print()
+        print(f"  UNPROBED {interp}")
+        print(f"           {command}")
+        print("           no resolvable path to probe it against: this "
+              "command's")
+        print("           script path expands only in the plugin loader, so "
+              "the")
+        print("           interpreter check #3624 is about could not be run "
+              "here.")
 
     blind = [i for i, v in verdicts.items() if v == "blind"]
     if blind:
@@ -288,10 +321,10 @@ def check_interpreters(rows: list[dict]) -> int:
         print("`python3` App Execution Alias -- turn it off under Settings >")
         print("Apps > Advanced app settings > App execution aliases, or put a")
         print("real Python ahead of WindowsApps on PATH. See ai-config#3624.")
-    elif bad:
+    elif unanswered or still_unprobed:
         print()
-        print("Not a finding: the probe could not reach a verdict, which says")
-        print("nothing about the shell the harness spawns hooks through.")
+        print("Not findings: the rows above reached no verdict, so they are")
+        print("neither evidence of a working interpreter nor of a broken one.")
     return len(blind)
 
 

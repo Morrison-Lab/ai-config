@@ -279,7 +279,14 @@ Two unrelated platform failures of one construct is the argument for suspecting 
 ## An argv split on operators alone leaves a compound body's keyword at `argv[0]`
 
 `scripts/lib/shellcmd.py`'s `simple_commands` --- and the hand-rolled copies under `hooks/`, whose bodies its module docstring records as identical --- cuts a command line at the characters in `_SHELL_OPS = set("();|&")`.
-Derive the population rather than reading a number off that docstring, which states 8 and 7 for two commands that both return 9 (`grep -rlF '_SHELL_OPS = set("();|&")' hooks/`, 9 as of 2026-09-15; the stale docstring is [ai-config#3680](https://github.com/Morrison-Lab/ai-config/issues/3680), and it means [ai-config#3178](https://github.com/Morrison-Lab/ai-config/issues/3178)'s migration inventory is short).
+Derive the population rather than reading a number off that docstring.
+It states 8 and 7 for two commands that both return 9, measured 2026-09-15:
+`grep -rlF '_SHELL_OPS = set("();|&")' hooks/` and
+`grep -rl "def _simple_commands" hooks/`.
+The stale docstring is
+[ai-config#3680](https://github.com/Morrison-Lab/ai-config/issues/3680), and
+it means [ai-config#3178](https://github.com/Morrison-Lab/ai-config/issues/3178)'s
+migration inventory is short.
 That models operators, not compound commands, so a body's keyword stays attached to the command it heads.
 Measured on this branch:
 

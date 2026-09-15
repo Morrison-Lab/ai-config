@@ -140,8 +140,14 @@ PAYLOAD_CLEAN_VERDICTS = frozenset({
 # refuses to have, by reading the object with `raw_decode` instead of matching
 # a closing delimiter (ai-config#3054). Stripping by regex reintroduced in one
 # half of the function the hazard the other half was hardened against, so the
-# two halves now share `iter_payload_spans` and neither guesses where a
-# payload ends.
+# two halves now share `iter_payload_spans`.
+#
+# Sharing the span reader covers a payload that PARSES, and a third route ran
+# under it: a payload `iter_payload_spans` declines -- invalid JSON is the
+# likely spelling, since a model writes these -- was yielded by nobody and so
+# fell to a closer search after all. `blank_comment_regions` therefore treats
+# an unparseable payload opener the way it treats a truncated comment, and its
+# docstring states which guarantee covers which case.
 PAYLOAD_FENCE_LINE_RE = re.compile(
     r"^(?P<indent> {0,3})(?P<run>`{3,}|~{3,})(?P<info>[^\r\n]*)$"
 )
@@ -540,15 +546,24 @@ def iter_payload_spans(body):
 def blank_comment_regions(text):
     """Replace every HTML comment in *text* with a space.
 
-    Two rules the naive regex got wrong, both in the fail-open direction:
+    Nothing here decides where a comment ends by searching for its closer,
+    because that search is what the naive regex got wrong, three ways and all
+    of them fail-open:
 
-    * A payload's span comes from :func:`iter_payload_spans`, so a literal
-      `-->` inside its JSON cannot end the region early.
+    * A WELL-FORMED payload's span comes from :func:`iter_payload_spans`, so a
+      literal `-->` inside its JSON cannot end the region early.
+    * A MALFORMED one -- unparseable JSON, trailing text before the closer, or
+      a masked position -- is swallowed to end of text, because its boundary
+      is exactly as unknowable as the next case's.
     * An UNTERMINATED `<!--` is swallowed to end of text rather than left
-      alone. That is the over-blanking direction, and it is the safe one here:
-      the worst case is a verdict this function hides, which classifies as
-      ambiguous and denies, where the alternative is quoted text read as a
-      verdict and a merge allowed.
+      alone.
+
+    The last two are the over-blanking direction, and it is the safe one here:
+    the worst case is a verdict this function hides, which classifies as
+    ambiguous and denies, where the alternative is quoted text read as a
+    verdict and a merge allowed. A plain comment that is neither a payload nor
+    truncated is still blanked on its own, so ordinary prose around it
+    survives.
     """
     chars = list(text)
     for start, end, _ in iter_payload_spans(text):
@@ -564,6 +579,18 @@ def blank_comment_regions(text):
             return "".join(out)
         out.append(text[pos:open_idx])
         out.append(" ")
+        # A `review-data` opener still present here is one the pass above
+        # could NOT parse -- invalid JSON, trailing text before the closer, or
+        # a position the code mask rejected. Its boundary is exactly as
+        # unknowable as a truncated comment's, so it gets the same answer:
+        # swallow to end of text. Finding the closer with `find` instead is
+        # the bug this whole function exists to avoid, one branch further in;
+        # a malformed payload whose own text carried a `-->` truncated the
+        # blanked region there and leaked the rest into the prose scan, which
+        # turned a stated NOT_CLEAN verdict into an allow (review finding,
+        # PR #3629).
+        if PAYLOAD_OPEN_RE.match(text, open_idx):
+            return "".join(out)
         close_idx = text.find("-->", open_idx + 4)
         if close_idx < 0:
             return "".join(out)

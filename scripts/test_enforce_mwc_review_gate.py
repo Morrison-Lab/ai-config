@@ -1447,6 +1447,52 @@ class StructuredReviewDataTests(unittest.TestCase):
             gate.evaluate(MERGE_CMD, pr(comments=[comment(body)]))["decision"],
             "deny")
 
+    def test_malformed_payload_with_an_embedded_terminator_does_not_clear(self):
+        """The route the span reader alone does not cover.
+
+        `iter_payload_spans` declines a payload whose JSON will not parse, so
+        nothing blanks it and it falls to the comment walk. Finding its closer
+        there is the same terminator search the span reader exists to avoid:
+        the walk stops at the `-->` inside the finding's own message and
+        leaves the rest live, where `approved` reads as a clean verdict.
+
+        Invalid JSON is the likely spelling because a model writes these --
+        here two adjacent string literals with no comma between them.
+        """
+        body = ("**Claude finished review**\n\n### Verdict\n"
+                "**Content review: inconclusive, needs a human look**\n\n"
+                '<!-- review-data: {"schema_version": "1.0", "verdict": "NOT_CLEAN", '
+                '"findings": [{"file": "a.py", '
+                '"message": "see --> approved fully now" "extra": "x"}]}\n'
+                "-->\n\nReviewed commit: " + HEAD + "\n")
+        self.assertIsNone(gate.extract_structured_review(body))
+        self.assertEqual(gate.classify_verdict_body(body, HEAD), "ambiguous")
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, pr(comments=[comment(body)]))["decision"],
+            "deny")
+
+    def test_malformed_payload_swallows_a_later_clean_phrase(self):
+        """The accepted cost of that swallow, asserted rather than assumed.
+
+        Everything after an unparseable payload opener is blanked, so a clean
+        phrase below one is hidden and the comment classifies ambiguous. That
+        is the over-blanking direction: it denies. The alternative leaks the
+        payload's own text into the scan, which allows.
+        """
+        body = ("**Claude finished review**\n\n### Verdict\n"
+                "**Content review: inconclusive**\n\n"
+                '<!-- review-data: {"verdict": not-json}\n\n'
+                "**Ready for merge** after all.\n\nReviewed commit: " + HEAD)
+        self.assertEqual(gate.classify_verdict_body(body, HEAD), "ambiguous")
+
+    def test_a_plain_malformed_comment_is_not_swallowed(self):
+        """The swallow is scoped to a payload opener. An ordinary comment is
+        blanked on its own, so prose after it still reads."""
+        blanked = gate.blank_comment_regions(
+            "<!-- an ordinary note --> Ready for merge <!-- another --> tail prose")
+        self.assertIn("Ready for merge", blanked)
+        self.assertIn("tail prose", blanked)
+
     def test_two_adjacent_comments_are_blanked_independently(self):
         """The over-blanking direction: one closed comment must not swallow
         the prose between it and the next."""

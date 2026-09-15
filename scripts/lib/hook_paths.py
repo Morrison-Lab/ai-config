@@ -23,6 +23,7 @@ from __future__ import annotations
 import os
 import re
 import shlex
+import subprocess
 from pathlib import Path
 from typing import Iterator
 
@@ -88,6 +89,63 @@ def classify_command(command: str) -> tuple[str, str | None]:
         # uncheckable.
         return "missing", path
     return ("ok" if Path(path).expanduser().is_file() else "missing"), path
+
+
+def interpreter_token(command: str) -> str | None:
+    """The interpreter `command` invokes, or None when it runs a script directly.
+
+    `"<path>/foo.sh"` runs itself and has no interpreter; `python3 "<path>"`
+    has one. Returns the token as written, because the *spelling* is the whole
+    question: a bare name is resolved through PATH at fire time by whatever
+    process the harness spawns, which is not this one.
+    """
+    protected = RX_BARE_DRIVE_PATH.sub(
+        lambda m: m.group(0).replace('\\', '\\' + '\\'), command)
+    try:
+        tokens = shlex.split(protected, posix=True)
+    except ValueError:
+        tokens = command.split()
+    if not tokens or tokens[0].endswith(SCRIPT_SUFFIXES):
+        return None
+    return tokens[0]
+
+
+# Asks the interpreter itself whether it can see a path, which is the question
+# `Path.is_file()` in THIS process cannot answer for it -- see probe_interpreter.
+_PROBE = "import os, sys; sys.exit(0 if os.path.exists(sys.argv[1]) else 1)"
+
+
+def probe_interpreter(interpreter: str, script: str, timeout: float = 15) -> str:
+    """Can `interpreter` actually read `script`? One of ok/blind/unlaunchable/unknown.
+
+    `classify_command` above answers "does this path exist", asked by this
+    process. That is a different question from "can the interpreter the hook
+    command names open this file", and on Windows the two disagree: bare
+    `python3` commonly resolves to the Microsoft Store App Execution Alias,
+    which runs a real interpreter inside a packaged-app filesystem view with no
+    access to `%APPDATA%\\Claude`. Every hook then dies on a file `Path.is_file`
+    reports as plainly there, `--check` reports `ok` for all of them, and the
+    session is fully blocked with nothing pointing at the interpreter
+    ([#3624](https://github.com/Morrison-Lab/ai-config/issues/3624)).
+
+    So the probe is executed, not reasoned about. Only Python interpreters are
+    probed: `-c` is a Python flag, and handing it to `sh` or `node` would test
+    the prober rather than the hook.
+
+    `blind` is the finding this exists for -- the interpreter ran and reported
+    a file that is right there as absent. `unknown` is deliberately not folded
+    into it: a status this function did not model is not evidence of the
+    Store-alias condition, and claiming a cause it did not observe is what
+    sent #3624 looking at the plugin cache for hours.
+    """
+    if not Path(interpreter).name.lower().startswith("python"):
+        return "skipped"
+    try:
+        done = subprocess.run([interpreter, "-c", _PROBE, script],
+                              capture_output=True, timeout=timeout)
+    except (OSError, subprocess.SubprocessError):
+        return "unlaunchable"
+    return {0: "ok", 1: "blind"}.get(done.returncode, "unknown")
 
 
 def _iter_hooks(settings: dict) -> Iterator[tuple[str, str, dict]]:

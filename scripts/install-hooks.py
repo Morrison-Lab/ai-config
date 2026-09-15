@@ -72,6 +72,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from plugin_overlap import enabled_ai_config_plugins  # noqa: E402
+import hook_paths as hp  # noqa: E402
 from hook_paths import check_settings  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
@@ -215,6 +216,85 @@ def settings_files(cdir: Path) -> list[Path]:
             if p.is_file()]
 
 
+def check_interpreters(rows: list[dict]) -> int:
+    """Run each distinct interpreter against a path it is registered with.
+
+    Every check above this one is this process asking the filesystem a
+    question. That is the wrong process: the harness spawns the hook command,
+    and the interpreter *it* resolves may not see the same filesystem we do.
+    On Windows a bare `python3` commonly resolves to the Microsoft Store App
+    Execution Alias, which cannot read `%APPDATA%\\Claude` -- so every path
+    above reports `ok` while every hook denies every tool call
+    ([#3624](https://github.com/Morrison-Lab/ai-config/issues/3624)).
+
+    Probes only rows whose path already resolved, so a `blind` verdict cannot
+    be a missing file wearing a different label. One probe per distinct
+    interpreter spelling rather than per hook: the answer is a property of the
+    interpreter, and a hundred identical subprocesses would only be slower.
+
+    Returns the number of interpreters observed **blind** -- and only those.
+    A `blind` verdict is something this function watched happen: the
+    interpreter ran, and reported a file that is right there as absent. The
+    other two are inferences about an environment this process does not
+    share. `unlaunchable` in particular says only that the name did not
+    resolve *here*; the harness spawns hooks through its own shell, which is
+    exactly the mismatch #3624 is about, so reading it backwards and failing
+    the install would be the same error in the other direction. Both are
+    printed, neither is a finding.
+    """
+    representative: dict[str, str] = {}
+    for row in rows:
+        if row["status"] != "ok":
+            continue
+        interp = hp.interpreter_token(row["command"])
+        if interp:
+            representative.setdefault(interp, row["path"])
+
+    verdicts = {i: hp.probe_interpreter(i, p) for i, p in representative.items()}
+    bad = {i: v for i, v in verdicts.items()
+           if v in ("blind", "unlaunchable", "unknown")}
+    probed = sum(1 for v in verdicts.values() if v != "skipped")
+    # The count, not just the findings: a probe that examined nothing and a
+    # probe that found nothing print the same absence otherwise.
+    print(f"  probed {probed} interpreter(s) against a hook path they are "
+          "registered with")
+    if probed and not bad:
+        print("  every one of them could read it")
+
+    for interp, verdict in sorted(bad.items()):
+        script = representative[interp]
+        if verdict == "blind":
+            print()
+            print(f"  BLIND    {interp}")
+            print(f"           ran, and reported {script} absent")
+            print("           -- that file exists; the interpreter cannot "
+                  "see it.")
+        elif verdict == "unlaunchable":
+            print()
+            print(f"  NO EXEC  {interp}")
+            print("           could not be launched at all")
+        else:
+            print()
+            print(f"  UNKNOWN  {interp}")
+            print(f"           probe against {script} neither succeeded nor "
+                  "reported absence")
+
+    blind = [i for i, v in verdicts.items() if v == "blind"]
+    if blind:
+        print()
+        print("An interpreter that cannot read its own hook scripts is the")
+        print("same outage as a missing path, and harder to see: every path")
+        print("above resolves. On Windows this is the Microsoft Store")
+        print("`python3` App Execution Alias -- turn it off under Settings >")
+        print("Apps > Advanced app settings > App execution aliases, or put a")
+        print("real Python ahead of WindowsApps on PATH. See ai-config#3624.")
+    elif bad:
+        print()
+        print("Not a finding: the probe could not reach a verdict, which says")
+        print("nothing about the shell the harness spawns hooks through.")
+    return len(blind)
+
+
 def check_registered_paths() -> int:
     """Report every registered hook whose script path does not resolve.
 
@@ -255,10 +335,15 @@ def check_registered_paths() -> int:
           + ", ".join(str(p) for p in files))
     print(f"  ok={counts['ok']} missing={counts['missing']} "
           f"skipped={counts['skipped']}")
-    if not counts["missing"]:
+
+    blind = check_interpreters(rows)
+
+    if not counts["missing"] and not blind:
         print()
         print("Every registered hook path resolves.")
         return 0
+    if not counts["missing"]:
+        return 1
     print()
     print("A registered path that does not resolve is not an inert guard:")
     print("python3 exits 2 on a file it cannot open, and exit 2 is the")

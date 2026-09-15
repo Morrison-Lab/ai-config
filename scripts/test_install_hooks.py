@@ -174,5 +174,63 @@ with tempfile.TemporaryDirectory() as tmp:
     check("--check exits 0 for skipped alone",
           result.returncode == 0)
 
+# --- interpreter probe (ai-config#3624) -------------------------------------
+#
+# Every check above asks THIS process whether a path exists. That is the wrong
+# process: the harness spawns the hook command, and the interpreter it resolves
+# may not see the same filesystem. On Windows bare `python3` commonly resolves
+# to the Store App Execution Alias, which cannot read %APPDATA%\Claude -- so
+# every path above reports ok while every hook denies every tool call.
+#
+# Known-positive first, per this file's own negative-control rule: a probe that
+# never returns "blind" is indistinguishable from one that never runs.
+
+check("interpreter_token reads the interpreter out of a hook command",
+      hp.interpreter_token('python3 "/x/y.py"') == "python3")
+check("interpreter_token returns None for a script that runs itself",
+      hp.interpreter_token('"/x/y.sh"') is None)
+check("interpreter_token returns None for an empty command",
+      hp.interpreter_token("") is None)
+
+with tempfile.TemporaryDirectory() as tmp:
+    present = Path(tmp) / "hook.py"
+    present.write_text("")
+    absent = Path(tmp) / "no-such-hook.py"
+
+    check("probe_interpreter reports ok when the interpreter can read the file",
+          hp.probe_interpreter(sys.executable, str(present)) == "ok")
+    # The known-positive. A real interpreter pointed at a file that is really
+    # absent produces the same observation the Store alias produces for a file
+    # that is present -- which is what makes the verdict meaningful.
+    check("probe_interpreter reports blind when the interpreter cannot see it",
+          hp.probe_interpreter(sys.executable, str(absent)) == "blind")
+    check("probe_interpreter reports unlaunchable for a name that will not run",
+          hp.probe_interpreter("python3-no-such-interpreter-xyz",
+                               str(present)) == "unlaunchable")
+    # `-c` is a Python flag. Handing it to sh or node would test the prober.
+    check("probe_interpreter skips a non-Python interpreter",
+          hp.probe_interpreter("node", str(present)) == "skipped")
+
+    # End to end: --check runs the probe and says how many it probed, so a
+    # silent pass cannot be mistaken for a clean one.
+    home = Path(tmp) / "claude"
+    write_settings(home, settings_with(f'"{sys.executable}" "{present}"'))
+    result = run_check(home)
+    check("--check reports how many interpreters it probed",
+          "probed 1 interpreter(s)" in result.stdout)
+    check("--check stays green when the interpreter can read its hook",
+          result.returncode == 0)
+
+    # An interpreter that did not resolve HERE is not a finding: the harness
+    # spawns hooks through its own shell, and reading our PATH backwards would
+    # be the same mistake #3624 is about, pointed the other way.
+    write_settings(home, settings_with(
+        f'python3-no-such-interpreter-xyz "{present}"'))
+    result = run_check(home)
+    check("--check names an interpreter it could not launch",
+          "NO EXEC" in result.stdout)
+    check("--check does not fail the install over an unlaunchable name",
+          result.returncode == 0 and "Not a finding" in result.stdout)
+
 print(NL + f"{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

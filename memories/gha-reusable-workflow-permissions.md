@@ -164,6 +164,14 @@ workflow's own `deploy` job holding the same group:
 - `created_at`, `started_at` and `completed_at` are all the same second.
 - The job object carries **zero steps**.
 - The logs endpoint returns **HTTP 404** --- there is nothing to read at all.
+- The job object carries **no `runner_id` or `runner_name` field**, where a
+  sibling job that actually ran carries both.
+
+That last one is the cleanest discriminator, because it is a positive fact
+rather than an absence you have to interpret: no runner was ever assigned, so
+the job did not fail, it never started.
+Compare the failing job against a sibling in the same run rather than reading
+it alone.
 
 **That combination defeats the entry above rather than merely differing from
 it.**

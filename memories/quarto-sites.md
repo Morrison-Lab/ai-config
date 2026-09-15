@@ -448,7 +448,14 @@ plausible Markdown while dropping content outright.
 Measured 2026-09-15 converting `Morrison-Lab/machine_learning_lecture_materials`
 (19 chapters), each of these on real sources:
 
-- **`\begin{tikzpicture}` is dropped entirely**, leaving an empty `<div>`.
+- **`\begin{tikzpicture}` is dropped entirely**, emitting nothing whatever.
+  Any empty element left behind is the surviving **wrapper**, not a
+  placeholder for the diagram.
+  Measured on pandoc 3.1.3: a bare `tikzpicture` produces no output at all, one
+  inside `\begin{center}` leaves an empty `<div class="center">`, and one
+  inside a `figure` leaves an empty `<figure>` **still carrying its caption**.
+  That last case is the dangerous one, because a caption describing a diagram
+  that is not there reads as a rendering glitch rather than as lost content.
   That was all 25 diagrams in the notes.
   Pre-render them to SVG instead (`pdflatex` with the `standalone` class, then
   `pdftocairo -svg`), which also frees the website build from needing a LaTeX

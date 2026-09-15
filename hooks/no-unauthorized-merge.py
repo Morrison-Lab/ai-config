@@ -449,7 +449,16 @@ def _paren_scan(text: str, quote_aware: bool):
         if escaped:
             escaped = False
         # `$'...'` is ANSI-C quoting, where a backslash DOES escape -- unlike a
-        # plain `'...'`, where it does not. Reading `$'a\')'` under plain
+        # plain `'...'`, where it does not.
+        #
+        # MEASURED DEAD AT VERDICT LEVEL AND KEPT, like `EXEC_WRAP` and the
+        # comment masking below: reverting this branch fails 0 suite cases and
+        # produces 0 verdict differences across 30,000 random inputs, because
+        # `$'` is in `_APPROXIMATED` and short-circuits the region either way.
+        # It stays live at SCANNER level (quote balance differs), and it is
+        # kept because the whitelist's coverage of `$'` is itself the thing
+        # under review. The fail-open below is stated in the PAST tense for
+        # that reason (ai-config#1308 review, round 8 finding 6). Reading `$'a\')'` under plain
         # single-quote rules ended the string one quote early, closed the
         # substitution at the `)` that followed, and truncated the body past
         # the merge (ai-config#1308 review, round 4 finding 2).
@@ -548,6 +557,28 @@ def _paren_scan(text: str, quote_aware: bool):
                 # separator test still catches.
                 if c in ";&|" or (c == "\n" and not pending_case):
                     separated = True
+                if c in ";&|":
+                    # A real separator proves every PENDING `case` was not a
+                    # construct: bash allows only whitespace and newlines
+                    # between `case WORD` and its `in`, so `: case; ...` is an
+                    # argument word, not a keyword.
+                    #
+                    # Leaving the entry on the stack let a later argument word
+                    # `in` pop it and arm a SECOND `case_depths` entry that the
+                    # construct's single `esac` never disarmed. The
+                    # substitution's own `)` was then consumed as a pattern
+                    # terminator, `closes` came back empty, and
+                    # `< <(: case; case x in x) : in; echo "<merge>";; esac) bash`
+                    # ran a real merge -- the fourth fail-open in this model,
+                    # present on every revision of this branch, and one whose
+                    # body carries no `_APPROXIMATED` token at all
+                    # (ai-config#3649). Both decoys are load-bearing: remove
+                    # either `: case;` or `: in;` and it blocks.
+                    #
+                    # A newline deliberately does NOT clear it, because
+                    # `case b` / `in b)` across two lines is legal bash and is
+                    # the round-7 fail-open.
+                    del pending_case[:]
                 elif word == "" and c not in " \t":
                     separated = False
                 # A command position is the start of the TEXT, or anything
@@ -730,8 +761,13 @@ def _body_is_simple(text: str, body_start: int, body_end: int) -> bool:
     rather than argued away.
 
     Listing `case` (word-bounded, which is the cheaper of the two spellings)
-    turns 8 suite cases into over-blocks as expected, and ALSO opens three
-    fail-opens:
+    moves 8 suite cases. An earlier version of this paragraph read that as
+    "8 over-blocks and ALSO three fail-opens", which double-counts: the 8 is
+    the TOTAL, and it decomposes into 3 fail-opens, 4 over-blocks and 1
+    scanner-level span change. The substantive claim was right and the
+    arithmetic beside it was not.
+
+    The three fail-opens:
 
         < <(case x in x) echo "<merge>";; esac) bash   BLOCK -> allow
 
@@ -746,9 +782,22 @@ def _body_is_simple(text: str, body_start: int, body_end: int) -> bool:
     fail-open anywhere in the `case` model is a fail-open in the whitelist
     itself. What has changed is that the escape hatch this paragraph used to
     offer is closed, and a fourth fail-open cannot be answered by reaching for
-    it. The general property -- that extending a body is fail-closed for a
-    leading executor and fail-OPEN for a trailing one -- is ai-config#3649,
-    and any future whitelist entry has to be checked against both forms.
+    it -- one duly turned up, a stale `pending_case` popped by an argument
+    word `in`, and `_paren_scan` now discards pending entries at a separator.
+
+    The general property -- that extending a body is fail-closed for a leading
+    executor and fail-OPEN for a trailing one -- is ai-config#3649, and it is
+    NOT a constraint on future entries only. That is how a previous version of
+    this paragraph and of #3649 both put it, and it was the more damaging
+    error: five of the six entries ALREADY shipped an executing bypass, each
+    blocked by four earlier revisions of this branch. `_proc_subst_regions`
+    now blanks to the real closer, which restores the premise the whitelist
+    rests on, and the suite carries one trailing-executor case per member.
+
+    Finding a mechanism that invalidates a design premise and then scoping it
+    to future work reads as diligence -- a rule written, an issue filed --
+    while the live instances go unexamined. The check cost one loop over six
+    strings.
     """
     body = text[body_start:body_end]
     return not any(token in body for token in _APPROXIMATED)
@@ -776,13 +825,34 @@ def _proc_subst_regions(text: str) -> list:
     closes, candidates = _paren_matches(text)
     regions, stack = [], []
     for lt_idx, open_idx in candidates:
-        close_idx = closes.get(open_idx, len(text))
+        real_end = closes.get(open_idx, len(text))
+        close_idx = real_end
         if not _body_is_simple(text, open_idx + 1, close_idx):
             close_idx = len(text)
         while stack and lt_idx > regions[stack[-1]][2]:
             stack.pop()
+        # Both ends are kept, and the difference is load-bearing.
+        #
+        # `close_idx` is what the SPAN uses: an unmodelled body is assumed to
+        # run to end of text, so everything after it is live. `real_end` is
+        # what BLANKING uses, and blanking to the extended end was an
+        # executing fail-open.
+        #
+        # `bash <(...)` puts the executor BEFORE the region, where a longer
+        # body cannot hide it. `< <(...) bash` puts it AFTER, so blanking to
+        # end of text erased the `bash` itself; `executes_its_input_ends`
+        # then found no executor, the region was never classified as
+        # executed, and the span list came back EMPTY rather than longer.
+        # Five of the six `_APPROXIMATED` entries had a `bash -n` clean
+        # proof of concept that ran a real merge, each blocked by four
+        # earlier revisions of this branch and allowed from the whitelist
+        # commit onward (ai-config#3649).
+        #
+        # The premise the whitelist rests on -- "extending a body is the
+        # fail-closed direction" -- is therefore true only once blanking
+        # stops at the real closer.
         regions.append((lt_idx, open_idx + 1, close_idx,
-                        len(stack), stack[-1] if stack else -1))
+                        len(stack), stack[-1] if stack else -1, real_end))
         stack.append(len(regions) - 1)
     return regions
 
@@ -873,7 +943,7 @@ def _depth_view(text: str, regions: list, depth: int) -> str:
         view = list(text)
     else:
         view = [_FILL] * len(text)
-        for _lt, body_start, body_end, region_depth, _parent in regions:
+        for _lt, body_start, body_end, region_depth, _parent, _real in regions:
             if region_depth == depth - 1:
                 view[body_start:body_end] = list(text[body_start:body_end])
                 # The `(` and `)` just outside the body become the command
@@ -882,9 +952,10 @@ def _depth_view(text: str, regions: list, depth: int) -> str:
                     view[body_start - 1] = " "
                 if body_end < len(view):
                     view[body_end] = " "
-    for lt_idx, _body_start, body_end, region_depth, _parent in regions:
+    for lt_idx, _body_start, _body_end, region_depth, _parent, real_end in regions:
         if region_depth == depth:
-            _blank(view, lt_idx, body_end + 1)
+            # `real_end`, never the extended end -- see `_proc_subst_regions`.
+            _blank(view, lt_idx, real_end + 1)
     return "".join(view)
 
 
@@ -998,7 +1069,7 @@ def live_proc_subst_spans(text: str) -> list:
         sep_starts = [m.start() for m in separators]
         exec_ends = executes_its_input_ends(view)
         for index in at_depth:
-            lt_idx, body_start, body_end, _depth, parent = regions[index]
+            lt_idx, body_start, body_end, _depth, parent, _real = regions[index]
             if parent >= 0 and covered[parent]:
                 covered[index] = True
                 continue  # already covered by an enclosing executed body

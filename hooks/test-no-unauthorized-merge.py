@@ -414,6 +414,35 @@ BLOCK = [
     # `pending_case[-1] == len(stack)` stops being a silent no-op.
     ('bash <(case b (esac) in b) echo "gh pr merge 411";; esac)',
      "SYNTAX ERROR, span guard: a deeper `esac` does not pop a PENDING case"),
+    # THE TRAILING-EXECUTOR FORM, one case per `_APPROXIMATED` member.
+    #
+    # This intersection had ZERO coverage, which is why 331/331 was green over
+    # five executing fail-opens. The suite's six trailing-executor cases all
+    # used bodies the whitelist already trusts, so they exercised exactly the
+    # complement of where the bug lived.
+    #
+    # `bash <(...)` puts the executor BEFORE the region; `< <(...) bash` puts
+    # it AFTER, where blanking an extended body erased the `bash` itself and
+    # the span list came back EMPTY. Each of these is `bash -n` clean and ran
+    # a real merge against a `gh` stub, on every revision from the whitelist
+    # commit onward (ai-config#3649).
+    ('< <(v=q; x=${v}; echo "gh pr merge 411") bash',
+     "trailing executor, `${` in the body"),
+    ('< <(x=$(printf q); echo "gh pr merge 411") bash',
+     "trailing executor, `$(` in the body"),
+    ('< <(x=`printf q`; echo "gh pr merge 411") bash',
+     "trailing executor, a backtick in the body"),
+    ('< <(cat <<EOF >/dev/null\nq\nEOF\necho "gh pr merge 411") bash',
+     "trailing executor, a heredoc in the body"),
+    ("< <(echo $'gh pr merge 411 --squash') bash",
+     "trailing executor, `$'` in the body"),
+    ('< <(echo hi # q\necho "gh pr merge 411") bash',
+     "trailing executor, a comment in the body"),
+    # The fourth `case`-model fail-open. Its body carries NO `_APPROXIMATED`
+    # token, so the per-member cases above would not have caught it. Both
+    # decoys are load-bearing: remove either and it blocks.
+    ('< <(: case; case x in x) : in; echo "gh pr merge 411";; esac) bash',
+     "a stale pending `case` is not popped by a later argument word `in`"),
     # The COST of `_APPROXIMATED`, asserted rather than left undocumented.
     # A body containing any listed token runs to end of TEXT (not end of line),
     # so a later merge-shaped mention anywhere in the command goes live. Round
@@ -1124,6 +1153,26 @@ def _span_check(label, command, want):
 
 # `use_case` must not be read as a `case`, so the `)` closes the `<(` and the
 # body is the real one. With the letters-only word match the region vanished.
+# `_FILL` must not be whitespace, asserted structurally rather than by timing.
+#
+# Reverting it to a space failed 0 suite cases -- including the ratio-based
+# performance cases, which bound GROWTH and not this shape -- while costing a
+# measured 57x on a 400-deep nest (23ms at HEAD, 1311ms reverted). The
+# documented invariant had no test at all, so a future edit restoring a space
+# would have gone green (ai-config#1308 review, round 8 finding 7).
+#
+# A timing assertion is the obvious test and the wrong one: CI timings are
+# noisy, and the property that matters is not "fast" but "not whitespace",
+# because EXEC_AT_CMD_POS is quadratic on whitespace runs.
+_fill_ok = len(_guard._FILL) == 1 and not _guard._FILL.isspace()
+checks += 1
+if not _fill_ok:
+    wrong += 1
+    print(f"  WRONG  the blank fill character must not be whitespace, "
+          f"got {_guard._FILL!r}")
+else:
+    print("  ok     the blank fill character is not whitespace")
+
 _span_check("a word ending in case leaves the closer intact",
             'bash <(use_case=1; echo hi)', [(7, 26)])
 # The `case` pattern's `)` is skipped, so the body runs to the real closer.

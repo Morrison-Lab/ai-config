@@ -834,6 +834,59 @@ check, and it is the one a `MUTATIONS` table cannot perform for you.
 - **Don't:** read an all-clauses-pass run as covering the imported code; the
   imported code was never the mutant.
 
+## A verdict the pre-push guard cannot parse leaves an EARLIER report's verdict standing
+
+The sibling section below covers a report the guard never sees.
+This covers one it sees and cannot read, which produces the same refusal from a different cause, and the refusal text does not tell them apart.
+
+`VERDICT_LINE` in `hooks/no-push-without-self-review.py` matches a CLOSED SET of two phrases, `Ready for merge` and `Needs (more) work`, and nothing else.
+A report that concludes in any other vocabulary contributes no verdict at all: `parse_report` returns `(None, None)`.
+
+What then produces the confusing refusal is `read_latest_review`, which reassigns `verdict` and `reviewed_commit` only when a report parses.
+An unparseable report therefore leaves whatever an EARLIER report set --- typically a previous round, on a previous commit --- still standing.
+So the guard refuses while quoting a verdict for a commit you are not pushing, which reads like the newest review having been rejected rather than never having been read.
+
+Derived against the shipped pattern rather than inferred from the symptom:
+
+| line | result |
+| --- | --- |
+| `### Verdict: Ready for merge` | parses |
+| `Verdict: Ready for merge` | parses |
+| `Verdict: **Ready for merge**` | parses |
+| `**Verdict: Ready for merge**` | IGNORED |
+| `**Verdict: APPROVED**` | IGNORED |
+| `Verdict: Clean` | IGNORED |
+| `### Verdict` then `Ready for merge` on the next line | IGNORED |
+
+Two independent ways to fail, and the second is the surprising one.
+The vocabulary must be exact, so `APPROVED` and `Clean` contribute nothing.
+And the emphasis must not wrap the whole line: `(?:\*\*)?` sits AFTER the colon, so `Verdict: **Ready for merge**` is fine while `**Verdict: Ready for merge**` is not.
+The phrase must also share the line with the `Verdict:` label rather than sitting under a heading.
+
+Measured 2026-09-15 on ai-config#3701.
+An `adversarial-reviewer` on `haiku` returned a genuinely clean report headed `**Verdict: APPROVED**`, and three successive pushes were refused while quoting a verdict for an earlier commit.
+Re-dispatching the identical brief with an instruction to end the report with `### Verdict: ...` followed by `Reviewed-Commit: <sha>` was accepted immediately.
+
+**A third way, and the reviewer is the one that slips: it can MISTYPE the sha.**
+Measured the same day on the same branch.
+A report ended with the prescribed `### Verdict: Ready for merge` and then `Reviewed-Commit: dc56659a82331ff33fd6329bfdab66637ebb2c` --- thirty-eight characters, two dropped from the real `dc6e56659a82331ff33fd6329bfdab66637ebb2c`, which its own `review-data` payload carried correctly.
+The guard refused, quoting that sha against the one being pushed.
+**The message it gave is not the one the code predicts, and that is unexplained.**
+`git cat-file -e` rejects the typo'd sha, and the hook checks `resolved_commit is None` BEFORE the stale comparison, returning a distinct refusal that says in terms "a fabricated or corrupted fingerprint, not a stale verdict for a different commit".
+The refusal actually received was the stale one, naming both shas.
+Reported as observed rather than reconciled, and filed as [ai-config#3702](https://github.com/Morrison-Lab/ai-config/issues/3702) --- the observation and the code reading are both evidenced, and inventing a mechanism to join them is the thing `fact-check-code-logic` forbids.
+
+The tell separates it from the stale case cheaply: a stale verdict names a sha you recognise as an EARLIER commit of yours, while a typo names one that matches no commit at all.
+`git cat-file -e <sha>` settles it in one command.
+The remedy is to hand the reviewer the sha in the brief and tell it to copy that string rather than to re-derive it.
+
+- **Do:** give a dispatched reviewer the exact two-line ending when a push depends on its verdict, rather than assuming it will choose the corpus's vocabulary.
+- **Do:** read the SHA in the refusal, which now has three readings --- one you recognise as an earlier commit means the newest report did not parse, one matching NO commit means the reviewer mistyped it, and no verdict at all means none was found.
+- **Do:** run `git cat-file -e <sha>` on the sha the refusal names before deciding which of those it is.
+- **Don't:** read a repeated refusal after a clean report as the guard malfunctioning;
+  it is reporting the most recent verdict it could parse, which is the point.
+- **Don't:** override on this --- a verdict exists, and restating it in the guard's own vocabulary costs one re-dispatch.
+
 ## A reviewer resumed with `SendMessage` leaves the pre-push guard on the old verdict
 
 `hooks/no-push-without-self-review.py` takes the verdict from the `tool_result` of an **`Agent` call**.

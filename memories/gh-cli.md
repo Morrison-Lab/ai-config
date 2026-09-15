@@ -928,7 +928,10 @@ The suite built its `PullRequest` with `__new__` and injected `_data` with `isDr
 A fixture that supplies a field the real command would have withheld cannot fail on a missing field, whatever else it checks.
 The fix is a fetcher that MIMICS the filtering --- parse the `--json` argument, return only those keys --- so a property whose key is not requested fails in the suite instead of in production.
 
-Two adjacent traps in the same area, both already recorded above: a field name `gh --json` rejects outright (`merged`) errors loudly and is therefore the easy case, and the `--from-json` payload path does not filter at all, so a defect in the `gh` field list can be invisible from a remote session that only exercises payloads.
+Two adjacent traps in the same area.
+The first is recorded above: a field name `gh --json` rejects outright (`merged`) errors loudly, which makes it the easy case.
+The second is new here --- the `--from-json` payload path does not filter at all (`PayloadFetcher._pr()` returns the whole `pr` object), so a defect in the `gh` field list is invisible from a remote session that only exercises payloads.
+That is how this one survived a manual check: the verification ran through `--from-json`, where the field really does arrive.
 
 - **Do:** add the field to the `--json` list in the same change that adds the property reading it.
 - **Do:** make a fetch fixture filter by the requested field list, so it is never more generous than `gh`.

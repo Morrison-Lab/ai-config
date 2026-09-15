@@ -92,6 +92,38 @@ NOT_CLEAN_VERDICT_RE = re.compile(
     r"(?:approv\w*|ready)|unapproved|disapprov\w*)\b",
     re.IGNORECASE,
 )
+# The reviewer's machine-readable `review-data` payload, restated here.
+# `scripts/check-pr-fully-clean.py` reads it through
+# `scripts/lib/review_payload.py`; this gate must stay import-free (see
+# `extract_request_names` below), so the semantics are duplicated rather than
+# shared, and `scripts/test_enforce_mwc_review_gate.py` pins them against that
+# module so the two cannot drift apart silently (ai-config#3628).
+PAYLOAD_OPEN_RE = re.compile(r"<!--\s*review-data\s*:\s*", re.IGNORECASE)
+# Verdict strings that block / clear, normalized to upper case with `-` and
+# spaces folded to `_`, so `Not clean`, `NOT-CLEAN` and `NOT_CLEAN` are one key.
+PAYLOAD_NOT_CLEAN_VERDICTS = frozenset({
+    "NOT_CLEAN", "NEEDS_WORK", "NEEDS_MORE_WORK", "CHANGES_REQUESTED",
+    "BLOCK", "BLOCKED", "REJECTED",
+})
+PAYLOAD_CLEAN_VERDICTS = frozenset({
+    "CLEAN", "READY_FOR_MERGE", "APPROVED", "APPROVE",
+})
+# Code-region masking, transcribed from `scripts/lib/fences.py` for the same
+# reason the payload reader is: this file takes no imports. Over-masking is the
+# safe direction and under-masking is not -- a payload this mask hides falls
+# back to the prose scan, which is the behaviour that predates structured
+# review data, whereas a payload read out of quoted example text inverts a
+# verdict. `evaluate_verdict`'s own `FENCE_RE.sub` is NOT a substitute: it
+# requires a matching closing delimiter, so an UNCLOSED fence quoting the
+# reviewer prompt's own CLEAN template stays fully live (the ai-config#2482
+# class), and it does not touch inline code spans at all.
+PAYLOAD_FENCE_LINE_RE = re.compile(
+    r"^(?P<indent> {0,3})(?P<run>`{3,}|~{3,})(?P<info>[^\r\n]*)$"
+)
+PAYLOAD_CODE_SPAN_RE = re.compile(
+    r"(?<!`)(`+)(?!`)(?:[^\n\r]|\r?\n(?![ \t]*\r?\n))*?(?<!`)\1(?!`)"
+)
+
 REVIEWED_COMMIT_RE = re.compile(
     r"Reviewed[-\s]commit[:\s]+`?([0-9a-f]{7,40})`?", re.IGNORECASE
 )
@@ -389,6 +421,165 @@ def latest_bot_review_states(reviews, head_oid=""):
     return states
 
 
+def payload_code_mask(body):
+    """Byte-per-character mask: 1 where *body* is inside a code region.
+
+    Covers fenced blocks (including an UNCLOSED fence, swallowed to end of
+    text), CommonMark indented code blocks, and inline code spans -- the same
+    three regions `scripts/lib/review_payload.py`'s `code_region_mask` covers,
+    because the two must score the same artifact the same way. The
+    indented-block test is correspondingly crude (it also catches indented
+    list continuations) for the over-masking reason above.
+    """
+    lines = body.split("\n")
+    fenced_lines = set()
+    in_fence = False
+    fence_char = ""
+    fence_len = 0
+    start_idx = 0
+    for idx, line in enumerate(lines):
+        m = PAYLOAD_FENCE_LINE_RE.match(line.rstrip("\r"))
+        if not in_fence:
+            if m:
+                run, info = m.group("run"), m.group("info")
+                # A backtick opener's info string may not contain a backtick.
+                if run[0] == "`" and "`" in info:
+                    continue
+                in_fence, fence_char, fence_len, start_idx = True, run[0], len(run), idx
+        elif m:
+            run, info = m.group("run"), m.group("info")
+            if run[0] == fence_char and len(run) >= fence_len and not info.strip():
+                fenced_lines.update(range(start_idx, idx + 1))
+                in_fence = False
+    if in_fence:
+        # Swallow an unclosed fence to end of text. Recording only its opener
+        # line leaves the interior live, which fails in both directions: a
+        # truncated review's quoted CLEAN template counts as a real verdict,
+        # and a quoted NOT_CLEAN payload mints a finding no ARD round can
+        # discharge.
+        fenced_lines.update(range(start_idx, len(lines)))
+
+    mask = bytearray(len(body))
+    offset = 0
+    for idx, line in enumerate(lines):
+        end = offset + len(line)
+        if idx in fenced_lines or line.startswith("    ") or line.startswith("\t"):
+            mask[offset:end] = b"\x01" * (end - offset)
+        offset = end + 1
+    for m in PAYLOAD_CODE_SPAN_RE.finditer(body):
+        mask[m.start():m.end()] = b"\x01" * (m.end() - m.start())
+    return mask
+
+
+def normalize_payload_verdict(raw):
+    """Fold a payload `verdict` value to the form the frozensets above use."""
+    return str(raw or "").strip().upper().replace("-", "_").replace(" ", "_")
+
+
+def extract_structured_review(body):
+    """Return the LAST well-formed `review-data` payload in *body*, or None.
+
+    Two properties are load-bearing, and both are the shared module's:
+
+    * **The last valid payload wins.** The contract puts the authoritative
+      payload after the verdict, and the reviewer persona template it is
+      copied from hardcodes a CLEAN verdict -- so first-match-wins let a
+      reviewer who quoted the template above their own payload publish a
+      NOT_CLEAN review that scored clean.
+    * **The opener must start its own line, outside every code region.**
+      `payload_code_mask` decides the second half, because the caller's own
+      blanking decides only part of the first: `evaluate_verdict` removes
+      blockquote lines and CLOSED fences, and leaves an unclosed fence and
+      every inline code span live. The line-start rule is what the mask
+      cannot supply -- a payload written mid-sentence in ordinary prose
+      ("reviewers must end with <!-- review-data: ... -->") sits in no code
+      region at all. One to three spaces of indent stays readable, since four
+      is a CommonMark indented code block the mask already covers: the review
+      prompt once rendered the payload indented, and rejecting that spelling
+      failed open by dropping a NOT_CLEAN payload.
+
+    The JSON object is read with `raw_decode` rather than a non-greedy regex,
+    so a finding's own text containing a literal close-brace-then-arrow
+    substring cannot terminate the object early (ai-config#3054).
+    """
+    if not body or not isinstance(body, str):
+        return None
+    found = None
+    mask = payload_code_mask(body)
+    for m in PAYLOAD_OPEN_RE.finditer(body):
+        if mask[m.start()]:
+            continue
+        line_start = body.rfind("\n", 0, m.start()) + 1
+        if body[line_start:m.start()].strip():
+            continue
+        json_start = m.end()
+        while json_start < len(body) and body[json_start] in " \t\r\n":
+            json_start += 1
+        if json_start >= len(body) or body[json_start] != "{":
+            continue
+        try:
+            data, end_idx = json.JSONDecoder().raw_decode(body, json_start)
+        except ValueError:
+            continue
+        tail = end_idx
+        while tail < len(body) and body[tail] in " \t\r\n":
+            tail += 1
+        if body[tail:tail + 3] != "-->":
+            continue
+        if isinstance(data, dict) and "verdict" in data:
+            found = data
+    return found
+
+
+def payload_findings_malformed(payload):
+    """True when `findings` is PRESENT but is not a list.
+
+    A present-but-malformed field must never clear, only block: folding it to
+    an empty list makes a type deviation do what an empty array does, which is
+    the fail-open direction in a fail-closed gate.
+    """
+    if not payload:
+        return False
+    return "findings" in payload and not isinstance(payload["findings"], list)
+
+
+def payload_is_blocking(payload):
+    """True when the payload blocks: not-clean verdict, any finding, or a
+    malformed `findings` field.
+
+    Findings block regardless of the stated verdict: a reviewer that
+    enumerates findings and then labels itself clean is contradicting itself,
+    and the safe reading of a contradiction is the blocking one.
+    """
+    if not payload:
+        return False
+    if payload_findings_malformed(payload):
+        return True
+    findings = payload.get("findings")
+    if isinstance(findings, list) and findings:
+        return True
+    verdict = normalize_payload_verdict(payload.get("verdict"))
+    return verdict in PAYLOAD_NOT_CLEAN_VERDICTS
+
+
+def payload_is_clean(payload):
+    """True when the payload affirmatively clears.
+
+    Requires all three: a clean verdict, a `findings` key that is present and
+    a list, and that list empty. Requiring presence is the point -- the
+    reviewer prompt says a CLEAN payload requires an empty findings array, and
+    a payload that simply omits the key must not clear.
+    """
+    if not payload:
+        return False
+    if not isinstance(payload.get("findings"), list):
+        return False
+    if payload["findings"]:
+        return False
+    verdict = normalize_payload_verdict(payload.get("verdict"))
+    return verdict in PAYLOAD_CLEAN_VERDICTS
+
+
 def classify_verdict_body(body, head_oid):
     """Classify one blanked, marker-bearing verdict body."""
     section = VERDICT_MARKER_RE.split(body, maxsplit=1)[1]
@@ -398,6 +589,23 @@ def classify_verdict_body(body, head_oid):
     shas = REVIEWED_COMMIT_RE.findall(section) or REVIEWED_COMMIT_RE.findall(body)
     if shas and head_oid and not head_oid.startswith(shas[-1]):
         return "stale"
+    # The reviewer's own machine-readable payload outranks the prose scan
+    # below, exactly as it does in `scripts/check-pr-fully-clean.py`
+    # (ai-config#3054, #3628): a verdict phrase matched out of a
+    # retrospective or a negated sentence must not override the verdict the
+    # reviewer actually published. `schema_version` is the contract's version
+    # marker, so a payload carrying it decides on its own; one without it can
+    # still BLOCK, but never clear -- the asymmetry keeps a half-formed
+    # payload out of the allow path of a fail-closed gate.
+    structured = extract_structured_review(body)
+    if isinstance(structured, dict) and "schema_version" in structured:
+        if payload_is_blocking(structured):
+            return "not-clean"
+        if payload_is_clean(structured):
+            return "clean"
+    if payload_is_blocking(structured):
+        return "not-clean"
+
     # The headline (first non-empty line under the heading) outranks later
     # prose, so "Ready for merge --- the concern that this wasn't ready is
     # resolved" classifies by its headline rather than its narrative.

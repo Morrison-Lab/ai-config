@@ -1288,5 +1288,310 @@ class TestMain(unittest.TestCase):
         self.assertEqual(decision["decision"], "allow")
 
 
+def verdict_comment(prose, payload_json=None, commit=HEAD, login="github-actions"):
+    """A reviewer comment carrying a `### Verdict` heading.
+
+    `payload_json` is appended verbatim as the structured `review-data`
+    trailer, flush left, the way the reviewer prompt renders it.
+    """
+    body = "**Claude finished review**\n\n### Verdict\n" + prose
+    if commit:
+        body += "\n\nReviewed commit: " + commit
+    if payload_json is not None:
+        body += "\n\n<!-- review-data: " + payload_json + " -->"
+    return comment(body, login=login)
+
+
+def payload(verdict="CLEAN", findings=(), schema="1.0"):
+    """Serialize a `review-data` payload body.
+
+    `findings` and `schema` accept the sentinel `None` to OMIT the key, which
+    is the case both `payload_is_clean` and the `schema_version` fast path
+    turn on -- an omitted required key is a commoner model failure than a
+    wrong-typed one.
+    """
+    data = {}
+    if schema is not None:
+        data["schema_version"] = schema
+    if verdict is not None:
+        data["verdict"] = verdict
+    if findings is not None:
+        data["findings"] = list(findings) if isinstance(findings, tuple) else findings
+    return json.dumps(data)
+
+
+class StructuredReviewDataTests(unittest.TestCase):
+    """`review-data` parity with scripts/lib/review_payload.py (#3628).
+
+    The gate is deliberately import-free (see `extract_request_names`), so it
+    carries its own copy of the payload reader. These cases pin the copy's
+    behaviour, and `ReviewPayloadParityTests` below pins it against the shared
+    module so the duplication cannot drift silently.
+    """
+
+    def classify(self, c):
+        return gate.classify_verdict_body(c["body"], HEAD)
+
+    def test_clean_payload_beside_unrecognized_prose_is_clean(self):
+        """The reported symptom: prose the phrase scan cannot read, plus a
+        payload that says CLEAN. Was `ambiguous`, is now `clean`."""
+        c = verdict_comment("**Content review: no defects found**",
+                            payload("CLEAN", []))
+        self.assertEqual(self.classify(c), "clean")
+
+    def test_clean_payload_end_to_end_allows(self):
+        state = pr(comments=[verdict_comment(
+            "**Content review: no defects found**", payload("CLEAN", []))])
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
+
+    def test_not_clean_payload_outranks_clean_prose(self):
+        c = verdict_comment("**Ready for merge** --- nothing left.",
+                            payload("NOT_CLEAN", []))
+        self.assertEqual(self.classify(c), "not-clean")
+
+    def test_findings_block_despite_clean_verdict(self):
+        c = verdict_comment("**Ready for merge**",
+                            payload("CLEAN", [{"title": "boom"}]))
+        self.assertEqual(self.classify(c), "not-clean")
+
+    def test_malformed_findings_block(self):
+        c = verdict_comment("**Ready for merge**",
+                            payload("CLEAN", "3 defects listed above"))
+        self.assertEqual(self.classify(c), "not-clean")
+
+    def test_clean_payload_without_findings_key_does_not_clear(self):
+        """No `findings` key means the payload cannot clear on its own, so the
+        prose scan decides and unreadable prose stays ambiguous."""
+        c = verdict_comment("**Content review: no defects found**",
+                            payload("CLEAN", None))
+        self.assertEqual(self.classify(c), "ambiguous")
+
+    def test_payload_without_schema_version_does_not_clear(self):
+        c = verdict_comment("**Content review: no defects found**",
+                            payload("CLEAN", [], schema=None))
+        self.assertEqual(self.classify(c), "ambiguous")
+
+    def test_payload_without_schema_version_still_blocks(self):
+        c = verdict_comment("**Ready for merge**",
+                            payload("NOT_CLEAN", [], schema=None))
+        self.assertEqual(self.classify(c), "not-clean")
+
+    def test_clean_verdict_synonyms_normalize(self):
+        for spelling in ("ready-for-merge", "Ready For Merge", "approved"):
+            with self.subTest(spelling=spelling):
+                c = verdict_comment("**Content review: no defects found**",
+                                    payload(spelling, []))
+                self.assertEqual(self.classify(c), "clean")
+
+    def test_not_clean_verdict_synonyms_normalize(self):
+        for spelling in ("needs work", "Needs-Work", "BLOCKED"):
+            with self.subTest(spelling=spelling):
+                c = verdict_comment("**Ready for merge**", payload(spelling, []))
+                self.assertEqual(self.classify(c), "not-clean")
+
+    def test_last_payload_wins(self):
+        """A reviewer quoting the CLEAN template above its own NOT_CLEAN
+        payload must not score clean."""
+        body = ("**Claude finished review**\n\n### Verdict\n"
+                "**Content review: no defects found**\n\n"
+                "<!-- review-data: " + payload("CLEAN", []) + " -->\n\n"
+                "<!-- review-data: " + payload("NOT_CLEAN", []) + " -->\n\n"
+                "Reviewed commit: " + HEAD)
+        self.assertEqual(gate.classify_verdict_body(body, HEAD), "not-clean")
+
+    def test_payload_mid_sentence_is_not_a_verdict(self):
+        """An opener that does not start its own line is prose about the
+        format, not a verdict."""
+        c = verdict_comment(
+            "**Content review: no defects found**\n\nReviewers must end with "
+            "<!-- review-data: " + payload("CLEAN", []) + " --> as shown.")
+        self.assertEqual(self.classify(c), "ambiguous")
+
+    def test_payload_in_indented_code_block_is_not_a_verdict(self):
+        c = verdict_comment(
+            "**Content review: no defects found**\n\n    "
+            "<!-- review-data: " + payload("CLEAN", []) + " -->")
+        self.assertEqual(self.classify(c), "ambiguous")
+
+    def test_payload_indented_up_to_three_spaces_still_reads(self):
+        c = verdict_comment(
+            "**Content review: no defects found**\n\n   "
+            "<!-- review-data: " + payload("CLEAN", []) + " -->")
+        self.assertEqual(self.classify(c), "clean")
+
+    def test_payload_in_fence_is_stripped_before_classification(self):
+        """`evaluate_verdict` blanks fences, so a fenced template never
+        reaches the classifier."""
+        body = ("**Claude finished review**\n\n### Verdict\n"
+                "**Content review: no defects found**\n\n"
+                "```\n<!-- review-data: " + payload("CLEAN", []) + " -->\n```\n\n"
+                "Reviewed commit: " + HEAD)
+        self.assertEqual(gate.evaluate_verdict([comment(body)], HEAD), "ambiguous")
+
+    def test_payload_in_blockquote_is_stripped_before_classification(self):
+        body = ("**Claude finished review**\n\n### Verdict\n"
+                "**Content review: no defects found**\n\n"
+                "> <!-- review-data: " + payload("CLEAN", []) + " -->\n\n"
+                "Reviewed commit: " + HEAD)
+        self.assertEqual(gate.evaluate_verdict([comment(body)], HEAD), "ambiguous")
+
+    def test_finding_text_containing_terminator_does_not_truncate(self):
+        """`raw_decode` respects JSON string contents, so a finding quoting the
+        payload terminator cannot end the object early (#3054)."""
+        c = verdict_comment("**Ready for merge**",
+                            payload("CLEAN", [{"title": "quotes } --> here"}]))
+        self.assertEqual(self.classify(c), "not-clean")
+
+    def test_trailing_garbage_after_json_is_not_a_payload(self):
+        body = ("**Claude finished review**\n\n### Verdict\n"
+                "**Content review: no defects found**\n\n"
+                "<!-- review-data: " + payload("CLEAN", []) + " oops -->\n\n"
+                "Reviewed commit: " + HEAD)
+        self.assertEqual(gate.classify_verdict_body(body, HEAD), "ambiguous")
+
+    def test_payload_in_unclosed_fence_does_not_override_a_finding(self):
+        """`evaluate_verdict`'s FENCE_RE needs a matching closer, so an
+        unclosed fence quoting the reviewer prompt's own CLEAN template stays
+        live for it. `payload_code_mask` swallows it to end of text."""
+        body = ("**Claude finished review**\n\n### Verdict\n"
+                "**Needs more work** --- max_frames is out of sync.\n\n"
+                "```\nExample of the payload reviewers append:\n"
+                "<!-- review-data: " + payload("CLEAN", []) + " -->\n"
+                "(no closing fence follows, e.g. truncated output)\n\n"
+                "Reviewed commit: " + HEAD)
+        self.assertEqual(gate.evaluate_verdict([comment(body)], HEAD),
+                         "not-clean")
+        self.assertEqual(
+            gate.evaluate(MERGE_CMD, pr(comments=[comment(body)]))["decision"],
+            "deny")
+
+    def test_payload_in_multiline_code_span_does_not_override_a_finding(self):
+        """A backtick span opened on an earlier line puts the payload on its
+        own line, so the line-start rule alone cannot reject it."""
+        body = ("**Claude finished review**\n\n### Verdict\n"
+                "**Needs more work** --- see findings.\n\n"
+                "Quoted for reference: `\n"
+                "<!-- review-data: " + payload("CLEAN", []) + " -->\n"
+                "`\n\nReviewed commit: " + HEAD)
+        self.assertEqual(gate.evaluate_verdict([comment(body)], HEAD),
+                         "not-clean")
+
+    def test_unclosed_fence_does_not_swallow_a_later_genuine_payload(self):
+        """The over-masking direction, stated: a payload after an unclosed
+        fence is unreachable, and must fall back to the prose scan rather than
+        silently clearing."""
+        body = ("**Claude finished review**\n\n### Verdict\n"
+                "**Ready for merge**\n\n```\ntruncated\n\n"
+                "<!-- review-data: " + payload("NOT_CLEAN", []) + " -->\n\n"
+                "Reviewed commit: " + HEAD)
+        self.assertEqual(gate.evaluate_verdict([comment(body)], HEAD), "clean")
+
+    def test_stale_commit_outranks_a_clean_payload(self):
+        c = verdict_comment("**Content review: no defects found**",
+                            payload("CLEAN", []), commit="0" * 40)
+        self.assertEqual(self.classify(c), "stale")
+
+
+class ReviewPayloadParityTests(unittest.TestCase):
+    """The gate's copy must agree with scripts/lib/review_payload.py.
+
+    The duplication is deliberate (the gate takes no imports), which makes
+    drift the standing risk rather than a hypothetical one. This compares the
+    two implementations directly over a matrix of payloads instead of
+    restating either one's expected answers by hand.
+    """
+
+    MATRIX = [
+        {"schema_version": "1.0", "verdict": "CLEAN", "findings": []},
+        {"schema_version": "1.0", "verdict": "clean", "findings": []},
+        {"schema_version": "1.0", "verdict": "READY_FOR_MERGE", "findings": []},
+        {"schema_version": "1.0", "verdict": "Ready-For-Merge", "findings": []},
+        {"schema_version": "1.0", "verdict": "APPROVED", "findings": []},
+        {"schema_version": "1.0", "verdict": "CLEAN"},
+        {"schema_version": "1.0", "verdict": "CLEAN", "findings": {}},
+        {"schema_version": "1.0", "verdict": "CLEAN", "findings": "two"},
+        {"schema_version": "1.0", "verdict": "CLEAN", "findings": [{"t": "x"}]},
+        {"schema_version": "1.0", "verdict": "NOT_CLEAN", "findings": []},
+        {"schema_version": "1.0", "verdict": "Needs work", "findings": []},
+        {"schema_version": "1.0", "verdict": "BLOCKED", "findings": []},
+        {"schema_version": "1.0", "verdict": ""},
+        {"verdict": "CLEAN", "findings": []},
+        {},
+        None,
+    ]
+
+    # The last four templates are the code-region dimension. Without them the
+    # parity claim is vacuous exactly where the two implementations could
+    # diverge, since neither the line-start rule nor the JSON reader has
+    # anything to say about a fence or a span (review finding, PR #3629).
+    BODIES = [
+        "### Verdict\nfine\n\n<!-- review-data: {json} -->",
+        "### Verdict\nfine\n\n   <!-- review-data: {json} -->",
+        "### Verdict\nfine\n\n    <!-- review-data: {json} -->",
+        "### Verdict\nfine\n\n\t<!-- review-data: {json} -->",
+        "### Verdict\nfine, see <!-- review-data: {json} --> above",
+        "### Verdict\nfine\n\n<!-- review-data: {json} oops -->",
+        ("### Verdict\nfine\n\n<!-- review-data: "
+         '{{"schema_version": "1.0", "verdict": "CLEAN", "findings": []}} -->'
+         "\n\n<!-- review-data: {json} -->"),
+        "### Verdict\nfine\n\n```\n<!-- review-data: {json} -->\n```",
+        "### Verdict\nfine\n\n~~~\n<!-- review-data: {json} -->\n~~~",
+        "### Verdict\nfine\n\n```\ntruncated\n<!-- review-data: {json} -->",
+        "### Verdict\nfine\n\nquoted: `\n<!-- review-data: {json} -->\n`",
+    ]
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, os.path.join(ROOT, "scripts", "lib"))
+        import review_payload
+        cls.shared = review_payload
+
+    def test_predicates_agree(self):
+        for data in self.MATRIX:
+            with self.subTest(payload=data):
+                self.assertEqual(gate.payload_is_blocking(data),
+                                 self.shared.payload_is_blocking(data))
+                self.assertEqual(gate.payload_is_clean(data),
+                                 self.shared.payload_is_clean(data))
+                self.assertEqual(gate.payload_findings_malformed(data),
+                                 self.shared.payload_findings_malformed(data))
+                raw = (data or {}).get("verdict")
+                self.assertEqual(gate.normalize_payload_verdict(raw),
+                                 self.shared.normalize_verdict(raw))
+
+    def test_extraction_agrees(self):
+        for template in self.BODIES:
+            for data in self.MATRIX:
+                if data is None:
+                    continue
+                body = template.format(json=json.dumps(data))
+                with self.subTest(template=template, payload=data):
+                    self.assertEqual(gate.extract_structured_review(body),
+                                     self.shared.extract_structured_review(body))
+
+    def test_matrix_exercises_both_outcomes(self):
+        """Negative control: a matrix that only ever produced one answer would
+        agree with any implementation at all, and a body list that never
+        extracted anything would too."""
+        blocking = [self.shared.payload_is_blocking(d) for d in self.MATRIX]
+        clean = [self.shared.payload_is_clean(d) for d in self.MATRIX]
+        self.assertTrue(any(blocking))
+        self.assertFalse(all(blocking))
+        self.assertTrue(any(clean))
+        self.assertFalse(all(clean))
+        sample = json.dumps({"schema_version": "1.0", "verdict": "CLEAN",
+                             "findings": []})
+        extracted = [gate.extract_structured_review(t.format(json=sample))
+                     for t in self.BODIES]
+        self.assertTrue(any(e is None for e in extracted))
+        self.assertTrue(any(e is not None for e in extracted))
+        # A mask that masked nothing, or everything, would also agree with the
+        # shared module on every body above without testing anything.
+        mask = gate.payload_code_mask(
+            "plain\n\n```\nfenced\n```\n\nspan `here` and plain again\n")
+        self.assertIn(1, mask)
+        self.assertIn(0, mask)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

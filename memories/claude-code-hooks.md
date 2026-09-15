@@ -346,7 +346,7 @@ A first version of this paragraph said `no-unmonitored-pr.py` was also on `UserP
 It is not: the query above prints only `Stop`, and `README.md`'s hook catalog and `memories/hooks.md` both agree.
 The false claim came from a query that dumped each event GROUP to JSON and substring-matched the whole thing, so any hook sharing a group with a `UserPromptSubmit` entry inherited that event.
 The `UserPromptSubmit` poller hooks are `inject-pr-monitor-status.py` and `ensure-open-pr-monitor.py`;
-`no-unmonitored-pr.py`'s own docstring calls one of them "the companion `UserPromptSubmit` hook", which is the phrase a careless read turns into a registration.
+`no-unmonitored-pr.py`'s module docstring calls one of them "the companion UserPromptSubmit hook", which is the phrase a careless read turns into a registration.
 Two of the 18 (`no-handrolled-verdict-parse.py`, `warn-verdict-line-filter.py`) additionally fall back to `tool_input.cwd` as a defensive second read.
 
 Eighteen consumers agreeing is evidence about this repo's convention and not, by itself, evidence about the harness's schema --- they could share one wrong assumption, which is the substitution [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md) warns about.
@@ -645,8 +645,19 @@ That is [`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md): a 
 
 `PYTHONPATH` is a valid fallback, not a replacement --- use it only where the harness genuinely cannot write into `hooks/`, and point it at the directory the hook's OWN spelling needs.
 The two spellings need different roots, so one value does not serve both: a bare `import shellcmd` after joining `"scripts", "lib"` needs `<repo>/scripts/lib`, while `from scripts.lib.X import ...` needs the repo ROOT and fails with `No module named 'scripts'` given the other.
-`hooks/no-push-without-self-review.py` uses the package spelling, so the repo ROOT is the safe value when in doubt --- which is what `HOOK_IMPORT_ROOT` below must be set to.
-Naming that placeholder `REAL_SCRIPTS_LIB`, as a first version did, made the example set exactly the path the sentence above it says fails.
+There is no safe default, so READ THE HOOK'S OWN IMPORT LINE and set `HOOK_IMPORT_ROOT` from it: `<repo>/scripts/lib` for the bare spelling, the repo ROOT for the package spelling.
+Measured on `main`, 2026-09-14: 11 of the 13 importers use the bare spelling ONLY (`comm -23` of the two greps), 1 uses the package spelling only (`flag-unread-commit-citation.py`), and 1 uses both (`no-push-without-self-review.py`, which also falls back to inserting both roots off its own `__file__`, so it is the worst exemplar to reason from).
+
+A first version of this paragraph named the placeholder `REAL_SCRIPTS_LIB`, and a "fix" then renamed it and declared the repo ROOT "the safe value when in doubt".
+That is wrong for 11 of the 13, and it blamed the name that carried the right value for the majority --- the same shape as the mistake this section already narrates two paragraphs up, where a first draft told future sessions NOT to relocate the mutant.
+Twice in one file, a self-correction inverted a working default.
+The lesson is not to correct more carefully;
+it is that a prescription is a claim, so it needs the query beside it rather than a confident adverb:
+
+```bash
+comm -23 <(grep -lE '"scripts", "lib"' hooks/*.py | grep -v '/test-' | sort) \
+         <(grep -lE 'from scripts\.lib\.' hooks/*.py | grep -v '/test-' | sort) | wc -l
+```
 
 ```python
 env = dict(os.environ)

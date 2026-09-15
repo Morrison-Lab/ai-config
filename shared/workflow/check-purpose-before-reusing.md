@@ -610,6 +610,10 @@ Extract that descent into a shared module and wire it into a `PreToolUse` guard 
 The check such an extraction invites is whether the limits are unchanged from the original.
 They would be, and that is the wrong thing to verify: the limits are a property of the CODE, while whether they are safe to ship is a property of the CALLER, and a true unchanged-limits claim answers nothing about the second question.
 
+Distinct from the general-form test earlier in this file, which asks whether a default's GROUND matches the condition its branch tests.
+This one takes the default as given and asks what its direction COSTS the new caller.
+A default can be correctly grounded and still be unaffordable one consumer over, which is the whole of this section.
+
 - **Do:** for every "cannot tell, give up" branch in code you are reusing, name the ORIGINAL caller's worst case on that branch, then ask the same question of the NEW caller --- the branch is identical, and the two answers can differ.
 - **Do:** treat "the limits are unchanged from the reference" as a claim about the code, not a clearance --- it says nothing about whether the new consumer can afford those limits.
 - **Don't:** assume a fail direction survives extraction because the logic that produces it does;

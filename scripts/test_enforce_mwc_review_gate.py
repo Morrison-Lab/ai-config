@@ -1486,6 +1486,28 @@ class StructuredReviewDataTests(unittest.TestCase):
                 "Reviewed commit: " + HEAD)
         self.assertEqual(gate.evaluate_verdict([comment(body)], HEAD), "clean")
 
+    def test_backtick_opener_with_backtick_in_info_is_not_a_fence(self):
+        """CommonMark forbids a backtick in a backtick fence's info string, so
+        the line does not open a fence and the payload under it stays live.
+        The tilde twin carries no such restriction, opens a fence, and (being
+        unclosed) swallows the payload to end of text.
+
+        Neither body carries a CLOSING fence, and that is the whole point. Add
+        one and the opener's backtick run pairs with the closer's as a
+        multi-line code span, which masks the payload for a reason that has
+        nothing to do with the info-string rule -- so the closed form passes
+        whether the rule is present or absent.
+        """
+        live = ("**Claude finished review**\n\n### Verdict\n"
+                "**Content review: no defects found**\n\n"
+                "```js`bt`\n<!-- review-data: " + payload("CLEAN", []) + " -->\n\n"
+                "Reviewed commit: " + HEAD)
+        masked = live.replace("```js", "~~~js")
+        self.assertEqual(gate.classify_verdict_body(live, HEAD), "clean")
+        self.assertEqual(gate.classify_verdict_body(masked, HEAD), "ambiguous")
+        self.assertIsNotNone(gate.extract_structured_review(live))
+        self.assertIsNone(gate.extract_structured_review(masked))
+
     def test_stale_commit_outranks_a_clean_payload(self):
         c = verdict_comment("**Content review: no defects found**",
                             payload("CLEAN", []), commit="0" * 40)
@@ -1536,6 +1558,16 @@ class ReviewPayloadParityTests(unittest.TestCase):
          "\n\n<!-- review-data: {json} -->"),
         "### Verdict\nfine\n\n```\n<!-- review-data: {json} -->\n```",
         "### Verdict\nfine\n\n~~~\n<!-- review-data: {json} -->\n~~~",
+        # A BACKTICK opener whose info string contains a backtick is not an
+        # opener at all under CommonMark, so the payload below it stays live;
+        # its tilde twin has no such restriction and does open a fence. Both
+        # are written WITHOUT a closing fence on purpose. With one, the two
+        # backtick runs pair up as a multi-line code span and mask the payload
+        # anyway, so the closed form cannot tell the info-string rule from the
+        # span rule -- and a suite that cannot tell them apart stayed green
+        # with the rule deleted (review finding, PR #3629).
+        "### Verdict\nfine\n\n```js`bt`\n<!-- review-data: {json} -->",
+        "### Verdict\nfine\n\n~~~js`bt`\n<!-- review-data: {json} -->",
         "### Verdict\nfine\n\n```\ntruncated\n<!-- review-data: {json} -->",
         "### Verdict\nfine\n\nquoted: `\n<!-- review-data: {json} -->\n`",
     ]

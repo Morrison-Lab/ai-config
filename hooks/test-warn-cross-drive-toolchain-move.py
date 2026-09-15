@@ -250,12 +250,25 @@ CASES = {
     # This is the canonical WSL move -- stage the tar, then import it.
     "W23": bash(r"cp ubuntu.tar D:\ubuntu.tar; "
                 r"wsl --import Ubuntu D:\WSL\Ubuntu D:\ubuntu.tar"),
+    # R-3 family again (round-10): the SOURCE tar of a `wsl --import`
+    # is excluded from the BACKUP test as well as from the named token.
+    # A `wsl --export` tar idiomatically lands in a backup directory, so
+    # testing it there silenced the canonical export-then-import recipe.
+    "W24": bash(r"wsl --export Ubuntu D:\Backup\ubuntu.tar; "
+                r"wsl --import Ubuntu D:\WSL\Ubuntu D:\Backup\ubuntu.tar"),
+    # ...but --move INTO a backup-named path is still exempt: that
+    # token is LIVE, not an archive, so the backup test still sees it.
+    "S27": bash(r"wsl --manage Ubuntu --move D:\Backup\WSL\Ubuntu"),
 }
 
 EXPECTED = {cid: cid.startswith("W") for cid in CASES}
 
 WHY = {
     "S1": "an ordinary backup -- the HDD is the correct destination",
+    "W24": "the export tar living under D:\Backup must not silence the "
+           "import of the live image beside it",
+    "S27": "--move INTO a backup path is a backup: the destination is "
+           "live, so the backup test still applies to it",
     "W23": "an unrelated `cp` earlier in the command must not suppress the "
            "wsl arm -- staging the tar first is the canonical recipe",
     "S2": "a game library: large, cold, sequentially read",
@@ -441,14 +454,18 @@ MUTATIONS = {
         "a copy to a backup/archive/snapshot location is a backup, and an "
         "HDD is the correct destination for one even when the source is a "
         "depot",
-        [("        if any(BACKUP.search(raw) for _, raw in tokens):\n"
+        [("        if any(BACKUP.search(raw) for raw in backup_scope):\n"
           "            continue",
           "        if False:\n            continue")],
         # S1 does not flip: `Documents` -> `D:\Backup\Documents` names no
         # toolchain path either, so M3's clause already holds it silent. Only
         # the two backups OF a depot depend on this exemption, which is
         # exactly the overlap a per-clause expectation is meant to expose.
-        {"S4", "S5", "S19"},
+        # S27 joins them: `--move` INTO a backup-named path is exempt
+        # because that destination is LIVE, so the backup test still
+        # sees it -- which is what keeps the round-10 archive carve-out
+        # from swallowing the whole exemption on the wsl arm.
+        {"S4", "S5", "S19", "S27"},
     ),
     "M5_heredoc_and_comment_strip": (
         "a heredoc body is content being written, not a command being run, "
@@ -585,7 +602,7 @@ MUTATIONS = {
         # W23 joins them once the wsl arm stopped being an `if not
         # candidates` fallback: it is an import whose tokens the generic
         # TOOLCHAIN scan does not recognise either.
-        {"W4", "W11", "W23"},
+        {"W4", "W11", "W23", "W24"},
     ),
     "M21_backup_list_admission_test": (
         "`vault` and `restore` came off the exemption list for failing the "

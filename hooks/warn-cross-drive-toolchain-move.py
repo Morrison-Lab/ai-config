@@ -412,7 +412,16 @@ def find_risky_move(command):
         if not volumes or (len(volumes) < 2 and not is_wsl):
             continue
 
-        if any(BACKUP.search(raw) for _, raw in tokens):
+        # On the wsl arm the SOURCE tar is excluded from the backup test as
+        # well as from the named token. A `wsl --export` tar idiomatically
+        # lands under a backup or archive directory, and testing it here made
+        # the canonical export-then-import recipe silent -- the same shape as
+        # the R-3 fallback: an incidental token elsewhere in the command
+        # suppressing the arm (round-10 review). `--move`ing an install INTO
+        # a backup-named path is still exempt, because that token is live.
+        backup_scope = ([raw for _, raw in tokens if not ARCHIVE_FILE.search(raw)]
+                        if is_wsl else [raw for _, raw in tokens])
+        if any(BACKUP.search(raw) for raw in backup_scope):
             continue
 
         if is_wsl:

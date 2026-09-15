@@ -200,6 +200,46 @@ registered-but-absent state the 2026-08-05 incident produced.
 The order in the Do bullet above is the recovery as well as the
 prevention.
 
+### A third route: the file exists and `python3` still cannot see it (Windows App Execution Alias)
+
+The two routes above both leave the registered path genuinely absent from disk.
+This route leaves the file exactly where the registration says it is, and the interpreter still cannot open it --- so `Test-Path`/`ls` on the named file answers True, which makes the corrupt-cache or stale-registration diagnosis above look confirmed when it is refuted.
+
+On Windows, bare `python3` on `PATH` commonly resolves to the Microsoft Store App Execution Alias, a stub that forwards to a real interpreter.
+That stub runs it inside a packaged-app filesystem view with no access to `%APPDATA%\Claude` --- exactly where the plugin, and therefore every hook file, lives.
+Every Python hook is registered as `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/<name>.py"`, so every one of them dies the same way, each denial naming a different hook and never the interpreter:
+
+```
+PreToolUse:Bash hook error: [python3 "...\hooks\flag-unmeasured-timestamp.py"]:
+...python.exe: can't open file '...': [Errno 2] No such file or directory
+```
+
+A `PreToolUse` hook that fails to launch DENIES the call (exit 2, per the section above), so the outage is total: Bash, Edit, Write and Agent all stop working at once, each error naming a hook rather than the shared cause.
+
+`hooks/warn-python3-cannot-read-hooks.sh`
+(proposed in [#3647](https://github.com/Morrison-Lab/ai-config/pull/3647), not yet on `main` as of this writing)
+is the detector: a `UserPromptSubmit` shell hook (Python cannot run to diagnose a Python-interpreter failure, so this one is deliberately POSIX `sh`) that probes whether `python3` can read `$0` --- the hook's own script file, in the same directory every Python hook lives in --- and names the interpreter on the first turn when it cannot.
+
+**Two remedies, and only one worked on a machine actually tried:**
+
+- Turn OFF the alias (Windows Settings > Apps > Advanced app settings > App execution aliases > "python3") so a real Python wins on `PATH`.
+- Put a real `python3` ahead of `WindowsApps` on `PATH`.
+  The obvious move --- copy `python.exe` to `python3.exe` inside the existing Python install directory --- can fail.
+  A system-wide install under `C:\Python313` is admin-owned, and copying into it is denied even though it precedes `WindowsApps` on `PATH`.
+  A user-local install (`C:\Users\<user>\AppData\Local\Programs\Python\Python3xx`) is both writable and, on a per-user install, ahead of `WindowsApps` on `PATH` --- the copy succeeds there.
+  Confirm precedence before assuming a location works: a writable directory that sits *after* `WindowsApps` on `PATH` fixes nothing.
+
+Restart the session after either remedy.
+Hooks load at session start, so `command -v python3` inside the current shell can still be stale.
+
+- **Do:** read every hook-denial error naming a missing file as this bug first, on Windows, when the named file demonstrably exists.
+- **Do:** check `PATH` order before picking a directory to place `python3.exe` in --- writable and ahead of `WindowsApps` are both required, and a system-wide Python install directory is commonly writable-but-behind or ahead-but-not-writable.
+- **Don't:** conclude the plugin cache is corrupt because the named file exists --- that check passes in exactly this failure.
+- **Don't:** assume disabling the alias is available --- a managed/locked-down machine may refuse the settings change, which is why the PATH-order remedy exists as an alternative.
+
+(Morrison-Lab/ai-config#3624: filed and fixed via the detector hook above (PR #3647).
+The per-machine remedy that actually worked is recorded here because the first location tried did not: `C:\Python313\python3.exe` failed with Access Denied, while `C:\Users\<user>\AppData\Local\Programs\Python\Python311\python3.exe` succeeded, being both writable and ahead of `WindowsApps` on that machine's `PATH`.)
+
 ## A hook's deny rejects the WHOLE call, so a compound command's setup segments never run either
 
 The two sections above are about *which calls* a hook blocks.

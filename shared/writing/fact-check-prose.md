@@ -148,6 +148,42 @@ gap: the code didn't implement what the prose claimed. Re-reading the claim
 against the actual `if` conditions before posting would have caught it
 without needing a review round.)
 
+**A design-choice comment can also assert a fact about the platform or
+runtime rather than about the code beside it, and that variant is checkable
+by running it, not by rereading the diff.**
+The gha#201 case above is checked against the code you just wrote --- the
+claim and its refutation live in the same file.
+A platform claim's refutation lives outside the diff entirely, in whatever
+the OS or interpreter actually does, so "reread the `if` conditions" finds
+nothing wrong and the false claim ships looking exactly as checked as a true
+one.
+
+(ai-config#3624: a hook comment justified passing `$0` through unchanged by
+asserting that a Windows `python3` cannot resolve a Git Bash `/c/Users/...`
+path.
+That was never run.
+An adversarial reviewer measured it and found the opposite: MSYS converts a
+POSIX-looking path passed as an *argument* to a native binary, so
+`sys.argv[1]` arrives already spelled `D:/...` --- the normalized form
+resolves fine.
+Re-measuring confirmed the reviewer.
+The corrected justification was the **opposite risk** from the one the
+comment named: passing `$0` through unchanged isn't protection against a
+false alarm, it's protection against a rewritten path *masking* a real
+outage by landing the probe somewhere the interpreter can read while the
+registered path stays invisible --- so the wrong reason had been guarding
+the right design by accident.)
+
+- **Do:** before shipping a comment that justifies a design choice with a
+  claim about what the OS, shell, or interpreter does, run the claim on the
+  target platform rather than reasoning about it from memory.
+- **Do:** when a platform claim turns out false, check whether the design it
+  justified is still correct for a *different* reason --- a wrong
+  justification does not imply a wrong choice.
+- **Don't:** treat "I reread the code and the claim still looks right" as
+  having checked a platform-behavior claim --- the code has nothing to say
+  about what the platform does.
+
 ## Prose that distills code is a code claim, checked like code
 
 When prose restates a code formula, invariant, or gate condition -- a UMS pass

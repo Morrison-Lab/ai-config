@@ -28,10 +28,13 @@ sections below repeat only what changes the setup steps.
 
 ## Why this is a shell-out, not a subagent
 
-Claude Code's `Agent` tool only reaches the Anthropic API, Amazon Bedrock, or
-Google Vertex --- its `model` parameter is a fixed enum of Claude aliases with
-no `base_url` override, so a Databricks-hosted endpoint is unreachable from
-that tool directly.
+Claude Code's `Agent` tool has no generic `base_url` override for an
+arbitrary custom endpoint --- its `model` parameter selects among Claude's
+own supported deployment routes (the Anthropic API and enterprise-cloud
+options such as Amazon Bedrock, Google Vertex, or Microsoft Foundry, per
+Claude Code's own current documentation), none of which is a mechanism for
+pointing it at a third-party model-serving endpoint. A Databricks-hosted
+endpoint is therefore unreachable from that tool directly.
 This is the same constraint
 [`delegate-to-codex`](../delegate-to-codex/SKILL.md) works around with a
 Bash shell-out to the Codex CLI binary.
@@ -86,6 +89,12 @@ For a model confirmed Chat-Completions-only on the target workspace (Claude
 is the one family this skill can confirm), reach it through a
 Chat-Completions client instead --- `opencode`'s custom provider, or a raw
 HTTP client --- not through this Codex-CLI route.
+Note the same auth tradeoff "Why Codex CLI" raises above still applies
+there: `opencode`'s custom-provider config wants a static API key, so this
+route is a good fit only where a durable PAT is actually available for the
+workspace; where only short-lived OAuth tokens are available, a raw HTTP
+client with its own token-refresh wrapper carries the same staleness problem
+Codex's `auth.command` solves, unsolved.
 
 ## When this fires
 
@@ -257,10 +266,11 @@ choice, not as a general Codex-availability fallback.
 
 [`delegate-to-opencode`](../delegate-to-opencode/SKILL.md) is a **separate**
 CLI shell-out (the `opencode` binary, not Codex) and does not route through
-this mechanism at all; it remains the route for a Chat-Completions-only
-Databricks model (see "Which models are actually reachable this way" above),
-via its own custom-provider config rather than this skill's command-backed
-auth.
+this mechanism at all; it is *a* route for a Chat-Completions-only
+Databricks model (see "Which models are actually reachable this way" above)
+via its own custom-provider config, subject to that section's own caveat ---
+it needs a durable PAT, since its config wants a static key rather than
+this skill's command-backed OAuth refresh.
 
 - **Do:** verify `databricks auth profiles` reports the target profile as
   `Valid: YES` before dispatching --- a stale or missing profile fails the

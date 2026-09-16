@@ -34,8 +34,11 @@ no `base_url` override, so a Databricks-hosted endpoint is unreachable from
 that tool directly.
 This is the same constraint
 [`delegate-to-codex`](../delegate-to-codex/SKILL.md) works around with a
-Bash shell-out to the Codex CLI; this skill reuses that same shell-out,
-pointed at a different `model_providers` entry.
+Bash shell-out to the Codex CLI binary.
+This skill shells out to that same binary, but configures it with a custom
+`model_providers` entry instead of `delegate-to-codex`'s default OpenAI
+provider (a ChatGPT-account login, no `model_providers` block involved) ---
+same mechanism, different provider underneath it.
 
 ## Why Codex CLI, not a raw HTTP wrapper or an `opencode` custom provider
 
@@ -212,8 +215,13 @@ codex exec --profile <profile-name> --sandbox read-only \
 
 **Verified working 2026-09-15**: `codex exec --profile databricks --sandbox
 read-only --skip-git-repo-check "Reply with exactly: OK" < /dev/null` against
-`databricks-gpt-5-6-sol` (a Responses-capable model), configured per the
-steps above, returned `OK`.
+`databricks-gpt-5-6-sol` (a Responses-capable model) returned `OK`.
+This ran against an already-configured, found-in-the-wild instance of the
+same `model_providers`/profile-layer pattern Setup documents above, not a
+fresh setup built step-by-step in this verification --- so the *dispatch
+command and response shape* are confirmed working, while the Setup section's
+exact file contents are the documented pattern rather than something
+separately re-verified from a blank slate.
 
 ## Caveats
 

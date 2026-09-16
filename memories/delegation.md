@@ -44,6 +44,7 @@ Claude's: `codex`, `agy`, and OpenCode's `opencode-go/*` tier.
 | CLI / Provider | plan | skill |
 |---|---|---|
 | `codex` | ChatGPT | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
+| `codex --profile <databricks-profile>` | institution-hosted Databricks Model Serving, when configured | [`delegate-to-databricks`](../skills/delegate-to-databricks/SKILL.md) |
 | `agy` (Google Antigravity) | API retired, **CLI available** (2026-08-25) | none --- invoke `agy --print` directly |
 | `opencode` | OpenCode Go (`opencode-go/*`, $10/mo windowed) + free hosted (`opencode/*`, opencode Zen) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 | `openrouter` | prepaid credit balance, reached through OpenCode's `openrouter` provider | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)'s "A third destination" section |
@@ -240,6 +241,30 @@ reaffirmed 2026-07-06 ("always use codex first
 (until we hit the 5-hour limits) before using up claude quota"),
 and widened 2026-08-15 ("in addition to codex, we have agy quota to use;
 try using both of those as subagents before exhausting claude quota").
+
+## Databricks-hosted models are now an operationalized delegation destination, via Codex CLI
+
+[`memories/databricks-hosted-llms.md`](databricks-hosted-llms.md) already
+carried the underlying facts (the `auth.command` mechanism, the hard
+`wire_api = "responses"` requirement, which models qualify) from a
+2026-08-29 investigation.
+What's new on 2026-09-15 is operationalizing that into a delegation-ladder
+skill --- [`delegate-to-databricks`](../skills/delegate-to-databricks/SKILL.md),
+linked from this file's ladder table above --- and a live end-to-end
+verification: a found-in-the-wild `model_providers.databricks` config plus
+per-model profile-layer files on the user's own machine, dispatched with
+`codex exec --profile databricks --sandbox read-only --skip-git-repo-check
+"Reply with exactly: OK" < /dev/null`, round-tripped correctly against a
+Databricks-hosted GPT-5.6-family model at a measured ~49,000-token Codex-side
+agent-mode overhead for that single turn.
+Tracked as [ai-config#3726](https://github.com/Morrison-Lab/ai-config/issues/3726).
+
+- **Do:** read `databricks-hosted-llms.md` before `delegate-to-databricks` ---
+  it carries the facts (which models qualify, the hard `wire_api` requirement,
+  the auth-storage mechanics) the skill's dispatch steps assume.
+- **Don't:** duplicate those facts here; this entry exists to record that the
+  route is now verified end-to-end and has a skill, not to restate the
+  underlying facts a second time.
 
 ## agy on Windows
 

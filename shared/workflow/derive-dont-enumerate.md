@@ -611,7 +611,7 @@ Thirteen of its fourteen reported failures were phantom.
 Filed as [ai-config#3724](https://github.com/Morrison-Lab/ai-config/issues/3724).
 So the sections above are satisfied in form --- the instrument exists, it was known, it was pointed at --- and the derived run still did not get used, because its output was not trustworthy enough on this machine to read closely.
 A documented instrument that misreports on your platform is worse than no instrument, because it trains the reader to discount the one artifact that would have shown the red check, and a genuine failure then arrives dressed as the phantoms.
-Note where that leaves the remedy the seventh occurrence reaches for: making the derived run the default pre-push action does not help while the default is wrong here, so the platform defect outranks the habit defect and has to be fixed first.
+Note where that leaves the remedy the fourth and fifth occurrences reach for: making the derived run the default pre-push action does not help while the default is wrong here, so the platform defect outranks the habit defect and has to be fixed first.
 
 **The tell that let the red check hide is worth naming on its own, because it survives every fix above.**
 `check-hook-output-shape.py` had been printing the escape warnings ABOVE its own `OK:` line the whole time, and exiting 0.

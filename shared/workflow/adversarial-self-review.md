@@ -1414,7 +1414,9 @@ A reviewer handed a change re-reads where the last finding landed.
 So round N+1's search space is set by round N's result, and the severity curve across rounds is a record of **where attention went**, not of what remains.
 A surface no round has opened contributes nothing to the curve however bad it is, and its absence from the findings is indistinguishable from its being clean.
 
-Measured 2026-09-15 on `Morrison-Lab/ai-config`, fourteen adversarial rounds on one branch.
+Observed 2026-09-15 on `Morrison-Lab/ai-config`, fourteen adversarial rounds on one branch, and recorded as an unverified session account rather than as a measurement: no issue, PR or SHA anchors it, and neither named defect is greppable in the corpus today.
+Read the round-by-round detail below as illustration of the mechanism, not as evidence for it --- the argument stands on why a reviewer's search space is set by the previous round's result, which is checkable from any review series, including this fragment's own.
+One episode, not three: the same session's fourteen review rounds, eleven checker runs and thirteen refused pushes are also recorded in [`derive-dont-enumerate`](derive-dont-enumerate.md)'s eighth occurrence and [`get-under-the-hood`](../principles/get-under-the-hood.md)'s third refusal shape, so the differing counts there are different things being counted rather than separate sessions.
 Rounds 1 through 5 each found one stale-count defect, each less severe than the last, and read as convergent.
 Round 6 was pointed deliberately at the files no earlier round had opened and immediately returned two defects that had been wrong for three rounds --- among them a function contract docstring naming the wrong regex.
 Its own verdict named the mechanism: every round after the first had re-read the file round 1 landed in, so the apparent convergence was sampling bias.

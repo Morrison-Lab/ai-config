@@ -186,16 +186,25 @@ Measured 2026-09-15 on `Morrison-Lab/ai-config`.
 Its message says no verdict came back as that call's own result, and instructs dispatching a reviewer in the foreground.
 That instruction was followed thirteen times, each dispatch returned a verdict, and every one was discarded --- because `VERDICT_LINE` accepts a closed set of two phrases and the reviewers all concluded `Verdict: CLEAN` or `Verdict: NOT CLEAN`.
 Unparseable, so the guard held no verdict at all, whatever the review had concluded.
-The vocabulary the regex requires is stated in the hook and in [`claude-code-hooks.md`](../../memories/claude-code-hooks.md)'s derived truth table;
+The vocabulary the regex requires is stated in the hook, in [`claude-code-hooks.md`](../../memories/claude-code-hooks.md)'s derived truth table, and in [`review-verdict-pitfalls`](../workflow/review-verdict-pitfalls.md)'s "Two verdict vocabularies coexist in this corpus";
 it is not stated in the refusal.
+
+**This was a RE-BREAK, not a discovery, and the honest framing matters more than the lesson.**
+`review-verdict-pitfalls.md` recorded the same trap on 2026-09-06, nine days earlier, on ai-config#3018 --- including a reviewer returning `### Verdict: CLEAN`, and the observation that the refusal then "prescribed a foreground dispatch --- advice already followed, so it named no remedy that could work", which is this section's own point in that file's words.
+Its Don't already says to check which vocabulary the guard's regex accepts before concluding a review never reached a verdict.
+So the cost here was not an unsearched corpus.
+A dupe-check for this session did `grep` the corpus and the matching lines of that file were in its output;
+they were read as output and the file was not opened, which is the failure [`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md) names.
+What this section adds is therefore not the trap, which is recorded, but the correction it forces on the two shapes above --- and the reason to site it here rather than there is that those shapes are what made the re-break survivable.
 
 **The message states the OBLIGATION and the matcher states the GRAMMAR.**
 Those are two different specifications of the same gate, and only the second is enforced.
 A message can be complete about what you owe and silent about what form discharges it, and a reader who complies with everything it says will then read the next identical refusal as a malfunction --- correctly ruling out the one cause the section above offers, and having no other.
 
 The trigger is cheap to state and does not require guessing which shape you are in: **a gate that refuses a second time after you did what its message said.**
-At that point read the matcher.
-One grep bounded it here; not reading it cost thirteen rounds.
+At that point read the matcher --- and, since the trap may already be written down, the fragment as well as the source.
+Opening either would have bounded this in one step;
+doing neither cost thirteen rounds.
 
 Generalise this carefully, because the neighbouring over-correction is worse than the error.
 It is not "distrust refusal messages" --- the two shapes above are cases where the message was right and went unread, and a reader who discounts messages inherits both.

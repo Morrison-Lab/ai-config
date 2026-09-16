@@ -175,6 +175,63 @@ rather than trusting that knowing the rule will change what you type.
   the qualifier between them is what the guard actually parses.
 - **Don't:** read having explained the mechanism as having adopted it.
 
+### A third shape: the predicate that refuses you is not in the message at all
+
+Both shapes above share an assumption this one breaks.
+In each of them the qualifier **was** in the message and was read past ---
+which is why the section's own remedy is to read the remedy clause word by
+word, and why its Don't reads a repeated refusal as evidence the message has
+not been read to the end.
+That diagnosis is wrong for the case where the message was read to the end,
+complied with exactly, and the thing that actually refused you appears nowhere
+in it.
+
+Measured 2026-09-15 on `Morrison-Lab/ai-config`.
+[`no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py)
+blocked thirteen consecutive pushes.
+Its message says no verdict came back as that call's own result, and instructs
+dispatching a reviewer in the foreground.
+That instruction was followed thirteen times, each dispatch returned a verdict,
+and every one was discarded --- because `VERDICT_LINE` accepts a closed set of
+two phrases and the reviewers all concluded `Verdict: CLEAN` or
+`Verdict: NOT CLEAN`.
+Unparseable, so the guard held no verdict at all, whatever the review had
+concluded.
+The vocabulary the regex requires is stated in the hook and in
+[`claude-code-hooks.md`](../../memories/claude-code-hooks.md)'s derived truth
+table; it is not stated in the refusal.
+
+**The message states the OBLIGATION and the matcher states the GRAMMAR.**
+Those are two different specifications of the same gate, and only the second is
+enforced.
+A message can be complete about what you owe and silent about what form
+discharges it, and a reader who complies with everything it says will then read
+the next identical refusal as a malfunction --- correctly ruling out the one
+cause the section above offers, and having no other.
+
+The trigger is cheap to state and does not require guessing which shape you are
+in: **a gate that refuses a second time after you did what its message said.**
+At that point read the matcher.
+One grep bounded it here; not reading it cost thirteen rounds.
+
+Generalise this carefully, because the neighbouring over-correction is worse
+than the error.
+It is not "distrust refusal messages" --- the two shapes above are cases where
+the message was right and went unread, and a reader who discounts messages
+inherits both.
+It is that a refusal message is a **summary of a predicate**, written by
+someone who knew the predicate;
+when compliance-as-described fails, the predicate is the authority and the
+summary is not.
+
+- **Do:** read the matcher after the second refusal, once doing what the message
+  said has already failed once --- not after the first, which the shapes above
+  already cover.
+- **Do:** treat "I complied exactly and it refused identically" as pointing at an
+  unstated clause in the predicate, rather than at a broken guard.
+- **Don't:** generalise this into distrusting refusal messages;
+  the failure here is a message that was incomplete, not one that was wrong.
+
 ## In review
 
 Apply this principle during code review and adversarial self-review:

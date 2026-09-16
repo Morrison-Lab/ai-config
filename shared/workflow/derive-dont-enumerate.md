@@ -599,6 +599,60 @@ The red run named only that one step; the near-miss was reading the rest of
 the job as therefore fine, when the job's own fail-fast step order meant every
 step after the fixtures check had not run at all.)
 
+Eighth, 2026-09-15, across eleven rounds of one review cycle, and it is
+recorded for two mechanisms rather than for the rule --- which by this point
+has been written, instrumented, and re-broken seven times, so an eighth
+statement of it would add nothing.
+Each round ran an ad-hoc list of about eight checkers;
+`scripts/` holds twenty-five that take no arguments.
+`scripts/check-python-escapes.py`, a step in `validate.yml`, was RED for four
+rounds without being noticed.
+
+**The documented instrument existed and was unusable on this platform, which
+is a different failure from not reaching for it.**
+`run-local-validation.py`'s `run_step` spawns a bare `"bash"`;
+on Windows `CreateProcess` finds `System32\bash.exe`, the WSL launcher, before
+`PATH`, so all 105 derived steps ran inside WSL, where `git` against a Windows
+worktree returns 128.
+Thirteen of its fourteen reported failures were phantom.
+Filed as
+[ai-config#3724](https://github.com/Morrison-Lab/ai-config/issues/3724).
+So the sections above are satisfied in form --- the instrument exists, it was
+known, it was pointed at --- and the derived run still did not get used,
+because its output was not trustworthy enough on this machine to read closely.
+A documented instrument that misreports on your platform is worse than no
+instrument, because it trains the reader to discount the one artifact that
+would have shown the red check, and a genuine failure then arrives dressed as
+the phantoms.
+Note where that leaves the remedy the seventh occurrence reaches for: making
+the derived run the default pre-push action does not help while the default is
+wrong here, so the platform defect outranks the habit defect and has to be
+fixed first.
+
+**The tell that let the red check hide is worth naming on its own, because it
+survives every fix above.**
+`check-hook-output-shape.py` had been printing the escape warnings ABOVE its
+own `OK:` line the whole time, and exiting 0.
+The exit status was read;
+the lines above it were not.
+A success line is a summary of a predicate in exactly the sense
+[`get-under-the-hood`](../principles/get-under-the-hood.md)'s third refusal
+shape describes, and an interpreter warning riding above it is outside what
+that summary covers.
+It compounds with a settings gap in the same direction: CI runs under
+`PYTHONWARNINGS="error::SyntaxWarning,error:invalid escape sequence::"`, where
+that same warning is a SyntaxError and the suite raising it never executes ---
+so every "51/51 green" in those rounds was measured under laxer settings than
+the ones that gate the merge.
+
+- **Do:** read a checker's full stdout, not only its exit status --- a warning
+  printed above a success line is invisible to `rc` by construction.
+- **Do:** match the environment CI sets (`PYTHONWARNINGS` among it) before
+  reading a local green as predictive, since a suite that never ran reports no
+  failures.
+- **Don't:** count an instrument as used because it exists and was named;
+  the question is whether its output was trusted enough to act on.
+
 ## In review
 
 Flag a brief, a plan, or a skill step that hands an agent a hard-coded list of PR or issue numbers to work through, where the tracker could gain another before the work finishes.

@@ -153,3 +153,53 @@ It fires on the doubled form either way, which is the right behaviour here ---
 the doubled form is what is wrong, not the collapse.
 
 (Tracked as [ai-config#3710](https://github.com/Morrison-Lab/ai-config/issues/3710).)
+
+## A collapse into a VALID escape is invisible to every check this file prescribes
+
+The remedies above converge on a parser: parse-check the file, print `repr()`,
+run `ast.parse`.
+That works because the collapses measured so far produced something broken ---
+a `SyntaxError`, a string literal spanning lines, an anchor matching nothing.
+It does not work when the surviving single backslash forms an escape Python
+accepts.
+
+`\b` is the case in hand.
+A doubled `\\b` arriving single is read as BACKSPACE, `0x08`, and written into
+the file as that byte.
+Nothing raises.
+`ast.parse` succeeds, `scripts/check-python-escapes.py` has nothing to report
+because the escape is valid, and a diff renders the byte as nothing at all ---
+so the line looks right in review and reads wrong to the interpreter.
+The existing "parse-check or read back" Do is satisfied and still returns green.
+
+Measured 2026-09-15, three collapses in one session, while editing the branch
+that documents this file:
+twice writing literal `0x08` bytes into comments where `\b` was meant as text,
+and once writing an invalid escape that took CI red.
+Only `chr(92)` survived, which is what this file already prescribes.
+The first two were caught by a control-character scan over the changed files;
+the third by the escapes checker.
+Neither instrument would have caught the other's case.
+
+**So the post-edit scan is two instruments, not one, because the two failure
+modes are different bytes.**
+An invalid escape is a parser question and a valid-but-unintended escape is a
+byte question, and only the parser question shows up in any of the checks above.
+
+```bash
+grep -nP '[\x00-\x08\x0b\x0c\x0e-\x1f]' <changed files>   # the valid-escape direction
+python3 scripts/check-python-escapes.py                    # the invalid-escape direction
+```
+
+- **Do:** run both a control-character scan and the escapes checker after any
+  scripted edit that touches a backslash, rather than either alone.
+- **Do:** treat a comment as needing the same care as a string literal --- the
+  bytes land wherever the escape was typed, and a comment is where nothing will
+  ever raise about them.
+- **Don't:** read a clean `ast.parse` as evidence a heredoc'd backslash edit
+  landed correctly;
+  it answers only the direction that happens to be broken.
+
+This is the same displacement the file's own "having read this rule is not the
+check" note records, one level in: having a check is not the check either,
+when the check is blind to the half you hit.

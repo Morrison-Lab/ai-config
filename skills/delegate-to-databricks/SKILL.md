@@ -28,13 +28,15 @@ sections below repeat only what changes the setup steps.
 
 ## Why this is a shell-out, not a subagent
 
-Claude Code's `Agent` tool has no generic `base_url` override for an
-arbitrary custom endpoint --- its `model` parameter selects among Claude's
-own supported deployment routes (the Anthropic API and enterprise-cloud
-options such as Amazon Bedrock, Google Vertex, or Microsoft Foundry, per
-Claude Code's own current documentation), none of which is a mechanism for
-pointing it at a third-party model-serving endpoint. A Databricks-hosted
-endpoint is therefore unreachable from that tool directly.
+Claude Code's `Agent` tool takes no generic `base_url` override for an
+arbitrary custom endpoint --- its `model` parameter selects among Claude
+model tiers (e.g. `sonnet`, `opus`, `haiku`), not among backends, and which
+deployment route Claude Code itself talks to (the Anthropic API, or an
+enterprise-cloud option such as Amazon Bedrock, Google Vertex, or Microsoft
+Foundry) is a separate, session-level configuration that a per-call `model`
+value cannot redirect. Neither surface offers a way to point a dispatched
+call at a third-party model-serving endpoint, so a Databricks-hosted
+endpoint is unreachable from that tool directly.
 This is the same constraint
 [`delegate-to-codex`](../delegate-to-codex/SKILL.md) works around with a
 Bash shell-out to the Codex CLI binary.

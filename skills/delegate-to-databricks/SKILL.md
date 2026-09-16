@@ -216,8 +216,12 @@ codex exec --profile <profile-name> --sandbox read-only \
 
 - `--sandbox read-only` for a review/analysis sidecar; `workspace-write` if
   the sidecar needs to edit files in its own scope.
-- `--skip-git-repo-check` when dispatching from a directory Codex has not
-  been told to trust.
+- `--skip-git-repo-check` when dispatching from a directory that is not a
+  git repository --- Codex refuses to run outside one by default, and this
+  flag bypasses that specific check. It is unrelated to Codex's separate
+  project-trust mechanism (`trust_level` entries under `[projects."<path>"]`
+  in `config.toml`); a directory-trust prompt needs that mechanism, not this
+  flag.
 - `< /dev/null` (or otherwise close stdin) --- without it, Codex reads
   additional input from stdin before running, which hangs a non-interactive
   dispatch that supplies no piped input.

@@ -880,31 +880,6 @@ The tell separates it from the stale case cheaply: a stale verdict names a sha y
 `git cat-file -e <sha>` settles it in one command.
 The remedy is to hand the reviewer the sha in the brief and tell it to copy that string rather than to re-derive it.
 
-**A fourth way, and the reviewer does nothing wrong: the HARNESS corrupts the sha by appending to the report's last line.**
-Measured 2026-09-15 on `ums/verdict-grammar-and-attribution`.
-A `general-purpose` fallback reviewer was briefed with the exact two-line ending and emitted it correctly.
-The `Agent` tool result then arrived with its continuation hint concatenated onto the final line, with no separator:
-
-```
-Reviewed-Commit: f678c3ceagentId: a79c59067e744c713 (use SendMessage with to: ...)
-```
-
-`REVIEWED_COMMIT` captures `([0-9a-fA-F]{7,40})`, and `a` is a hex digit, so it read the sha as `f678c3cea` --- nine characters, the real eight plus the leading `a` of `agentId`.
-`git cat-file -e f678c3cea` fails, the verdict was discarded, and five consecutive clean and not-clean reports in one session were all invisible to the guard, which went on quoting a verdict for an unrelated branch's commit from earlier in the transcript.
-
-The tell is specific and cheap: the refusal names a sha you do not recognise **and** that sha is one to three characters longer than the short sha you handed the reviewer.
-Both readings already recorded above --- a stale verdict naming an earlier commit of yours, and a reviewer mistyping the sha --- name a sha of plausible length;
-this one names a sha whose prefix is exactly right and whose tail is harness text.
-
-The remedy is to stop the sha being the last thing on the last line.
-Brief the reviewer to end with the two-line ending **followed by a sentinel line**, so the appended hint lands on the sentinel rather than on the sha.
-
-- **Do:** require a trailing line after `Reviewed-Commit:` --- `(end of report)` is enough --- whenever a push depends on the verdict.
-- **Do:** run `git cat-file -e` on the refusal's sha, and compare its LENGTH against the sha you briefed, before concluding the reviewer mistyped it.
-- **Don't:** read this as the reviewer's error;
-  the report was correct when written, and the corruption happened in transport.
-- **Don't:** reach for `ALLOW_UNREVIEWED_PUSH=1` here --- a genuine verdict exists and one re-dispatch in the corrected format is accepted.
-
 - **Do:** give a dispatched reviewer the exact two-line ending when a push depends on its verdict, rather than assuming it will choose the corpus's vocabulary.
 - **Do:** read the SHA in the refusal, which now has three readings --- one you recognise as an earlier commit means the newest report did not parse, one matching NO commit means the reviewer mistyped it, and no verdict at all means none was found.
 - **Do:** run `git cat-file -e <sha>` on the sha the refusal names before deciding which of those it is.

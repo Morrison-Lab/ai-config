@@ -1,7 +1,8 @@
 # Databricks-hosted LLMs: CLI and agent client configuration
 
 Facts learned wiring Databricks-hosted models (Claude, GPT-5.x, Llama, and others) up as a provider for third-party CLI/agent clients (Codex CLI, opencode) and the ChatGPT desktop app.
-[`delegate-to-databricks`](../skills/delegate-to-databricks/SKILL.md) operationalizes the Codex CLI route these facts describe into a delegation-ladder skill --- read that file for the dispatch mechanics; this file stays the record of the underlying facts.
+[`delegate-to-databricks`](../skills/delegate-to-databricks/SKILL.md) operationalizes the Codex CLI route these facts describe into a delegation-ladder skill --- read that file for the dispatch mechanics;
+this file stays the record of the underlying facts.
 
 ## Homebrew 6.x refuses the `databricks/tap` formula even right after `brew tap`
 

@@ -169,11 +169,13 @@ Nothing raises: `ast.parse` succeeds and the escapes checker has nothing to repo
 What it does not reach is a backslash that landed in a **comment**, which is where two of the three instances below landed: no literal is constructed, so there is nothing to `repr()`, and the byte sits in the file with every parser check green.
 That is the gap --- not that the prescribed checks are weak, but that the one strong enough is scoped to emitted literals.
 
-Observed 2026-09-15 on `Morrison-Lab/ai-config`, three collapses in one session, and recorded as an unverified session account rather than as a measurement for the first two:
-they were repaired before any commit, so no `0x08` byte is greppable in the corpus today and nothing anchors them.
+Observed 2026-09-15 on `Morrison-Lab/ai-config`, three collapses in one session, and recorded as an unverified session account rather than as a measurement for the first two: they were repaired before any commit, so no `0x08` byte is greppable in the corpus today and nothing anchors them.
 All three occurred while editing the branches carrying this file's own subject matter.
 Twice a `\b` meant as text became a literal `0x08` inside a comment.
-The third is anchored, and landed on a different branch: an invalid escape reached `ums/cross-drive-media-type-guard`, took `scripts/check-python-escapes.py` red, and under `test_hooks.py`'s unconditional `PYTHONWARNINGS` made one suite raise `SyntaxError` and not execute at all --- so that suite's green runs had been measured under laxer settings than the gate applies.
+The third is anchored, and landed on a different branch: an invalid escape reached `ums/cross-drive-media-type-guard` and took `scripts/check-python-escapes.py` red.
+Under `test_hooks.py`'s `PYTHONWARNINGS` the affected suite raised `SyntaxError` and did not execute --- reported as a failure by the runner, not silently dropped.
+The green runs recorded for it came from invoking the suite file DIRECTLY, without the environment the runner sets;
+that is an omission at the call site, not a laxer local setting, per the retraction in [`derive-dont-enumerate`](../workflow/derive-dont-enumerate.md).
 Fixed in `335861fc` (PR #3728).
 Only `chr(92)` survived, which is what this file already prescribes.
 The first two were caught by a control-character scan over the changed files;

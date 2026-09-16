@@ -181,7 +181,9 @@ Both shapes above share an assumption this one breaks.
 In each of them the qualifier **was** in the message and was read past --- which is why the section's own remedy is to read the remedy clause word by word, and why its Don't reads a repeated refusal as evidence the message has not been read to the end.
 That diagnosis is wrong for the case where the message was read to the end, complied with exactly, and the thing that actually refused you appears nowhere in it.
 
-Measured 2026-09-15 on `Morrison-Lab/ai-config`, driving PR #3728 --- the regex below is checkable in the tree today; the round count is an unverified session account.
+Measured 2026-09-15 on `Morrison-Lab/ai-config`, driving PR #3728.
+The regex below is checkable in the tree today;
+the round count is an unverified session account.
 [`no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) blocked thirteen consecutive pushes.
 Its message says no verdict came back as that call's own result, and instructs dispatching a reviewer in the foreground.
 That instruction was followed thirteen times, each dispatch returned a verdict, and every one was discarded --- because `VERDICT_LINE` accepts a closed set of two phrases and the reviewers all concluded `Verdict: CLEAN` or `Verdict: NOT CLEAN`.

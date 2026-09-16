@@ -97,9 +97,15 @@ Then a density verdict, e.g.: *“Pervasive — antithesis + triads in most para
 ## Anti-patterns
 
 - **Don’t** treat any single tell as proof of AI authorship — it’s a heuristic; weigh clustering, not isolated hits.
+
 - **Don’t** robotically purge correct words (`delve`, `robust`) or correct em-dashes when they’re well-used in context.
+
 - **Don’t** rewrite until the text is flat and voiceless — de-slopping removes filler, it doesn’t sand off a real human style.
+
 - **Don’t** flag code, identifiers, or quoted source material as prose tells.
+
 - **Don’t** skip the self-check on my own draft, then ship prose full of the very tells this skill exists to catch.
+
+- **Don’t** replace a figure of speech without first asking what it was hedging. [`plain-prose`](../../shared/writing/plain-prose.md) already says never to trade an honest hedge for false confidence, and the metaphor case evades that rule because no hedge *word* is deleted: a simile or an as-though construction hedges through its form, so the “precise equivalent” that replaces it states as mechanism what the original only likened. The tell is a replacement that names a process the source, or the surrounding argument, treats as contested. Keep the comparison, or restate the hedge explicitly (“read as though X”, “on one account X”) — do not let concision decide a live question. (ucdavis/lbt#7, 2026-09-15: a course page’s “read like Hebrew wearing Greek clothes” was replaced with “put Greek words into Hebrew sentence patterns”, asserting the Semitic-interference mechanism that the next class in the same course exists to contest. Caught in adversarial review, and the shipped wording restores the hedge as “read as though Greek words had been fitted to Hebrew sentence patterns”.)
 
 Back to top

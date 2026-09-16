@@ -156,9 +156,9 @@ the doubled form is what is wrong, not the collapse.
 
 ## A collapse into a VALID escape gets past the PARSER checks this file prescribes
 
-Two of the remedies above are parser checks: `ast.parse` the file, and let `scripts/check-python-escapes.py` scan it.
-Both work because the collapses measured so far produced something broken --- a `SyntaxError`, a string literal spanning lines, an anchor matching nothing.
-Neither fires when the surviving single backslash forms an escape Python accepts.
+One of the remedies above is a parser check --- `ast.parse` the file, prescribed as "parse-check (or read back) a file a heredoc just wrote with escapes in it".
+It works because the collapses measured so far produced something broken --- a `SyntaxError`, a string literal spanning lines, an anchor matching nothing.
+It does not fire when the surviving single backslash forms an escape Python accepts, and neither does `scripts/check-python-escapes.py`, the repo-wide instrument for the same question, which this section reaches for below.
 
 `\b` is the case in hand.
 A doubled `\\b` arriving single is read as BACKSPACE, `0x08`, and written into the file as that byte.
@@ -183,7 +183,8 @@ python3 -c "import re,sys;[print(f'{f}:{i}') for f in sys.argv[1:] for i,l in en
 python3 scripts/check-python-escapes.py   # the invalid-escape direction
 ```
 
-The byte scan is written in Python rather than as `grep -nP '[\x00-\x08...]'` deliberately, even though that character class is correct and does match.
+The byte scan reports on stdout and exits 0 either way, so read its output rather than chaining it behind `&&` --- the same caution [`derive-dont-enumerate`](../workflow/derive-dont-enumerate.md)'s eighth occurrence states for a checker whose warning rides above its success line.
+It is written in Python rather than as `grep -nP '[\x00-\x08...]'` deliberately, even though that character class is correct and does match.
 `-P` is a GNU extension: on a BSD `grep` it exits non-zero with empty stdout and `grep: invalid option -- P`, which is indistinguishable from a clean scan if only the output is read.
 [`hooks/flag-indirect-gnu-grep-flag.py`](../../hooks/flag-indirect-gnu-grep-flag.py) records that exact failure being written into a commit message as "no tracked file contains an em dash" when five did.
 Prescribing a portability-dependent flag inside a section about checks that return green while missing the defect would reproduce this file's own subject.

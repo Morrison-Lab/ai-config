@@ -204,7 +204,7 @@ A message can be complete about what you owe and silent about what form discharg
 The trigger is cheap to state and does not require guessing which shape you are in: **a gate that refuses a second time after you did what its message said.**
 At that point read the matcher --- and, since the trap may already be written down, the fragment as well as the source.
 Opening either would have bounded this in one step;
-doing neither cost thirteen rounds.
+doing neither cost thirteen refused pushes.
 
 Generalise this carefully, because the neighbouring over-correction is worse than the error.
 It is not "distrust refusal messages" --- the two shapes above are cases where the message was right and went unread, and a reader who discounts messages inherits both.

@@ -599,7 +599,7 @@ The red run named only that one step; the near-miss was reading the rest of
 the job as therefore fine, when the job's own fail-fast step order meant every
 step after the fixtures check had not run at all.)
 
-Eighth, 2026-09-15, across eleven rounds of one review cycle, and it is recorded for two mechanisms rather than for the rule --- which by this point has been written, instrumented, and re-broken seven times, so an eighth statement of it would add nothing.
+Eighth, 2026-09-15, across the eleven rounds that ran checkers within one fourteen-round review cycle, and it is recorded for two mechanisms rather than for the rule --- which by this point has been written, instrumented, and re-broken seven times, so an eighth statement of it would add nothing.
 Each round ran an ad-hoc list of about eight checkers;
 `ls scripts/check*.py` returns thirty-four, and `validate.yml` carries 104 `run:` steps.
 `scripts/check-python-escapes.py`, a step in `validate.yml`, was RED for four rounds without being noticed.

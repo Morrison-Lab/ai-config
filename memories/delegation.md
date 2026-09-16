@@ -242,47 +242,29 @@ reaffirmed 2026-07-06 ("always use codex first
 and widened 2026-08-15 ("in addition to codex, we have agy quota to use;
 try using both of those as subagents before exhausting claude quota").
 
-## Codex can be pointed at an institution's Databricks-hosted models, via a command-backed auth provider
+## Databricks-hosted models are now an operationalized delegation destination, via Codex CLI
 
-Discovered and verified 2026-09-15.
-Codex's `model_providers.<name>` config table takes an `auth.command` --- an
-external command Codex re-runs on a `refresh_interval_ms` cadence to mint a
-fresh bearer token --- as an alternative to a static `env_key`.
-That solves a problem `opencode`'s custom-provider config cannot: Databricks'
-recommended OAuth U2M auth (`databricks auth login`) issues short-lived
-tokens by design, so any mechanism wanting a long-lived static key either
-needs a PAT that may not exist on a given workspace, or goes stale mid-session.
-A found-in-the-wild setup on the user's machine already wired this up ---
-`[model_providers.databricks]` in `~/.codex/config.toml`, `auth.command`
-pointing at a tiny script that shells out to `databricks auth token`, and one
-`~/.codex/<profile>.config.toml` layering file per selectable model --- and a
-live smoke test (`codex exec --profile databricks --sandbox read-only
---skip-git-repo-check "Reply with exactly: OK" < /dev/null`) round-tripped
-correctly against a Databricks-hosted GPT-5.6-family model, at a measured
-~49,000-token Codex-side agent-mode overhead for that single turn.
-[`delegate-to-databricks`](../skills/delegate-to-databricks/SKILL.md) is the
-mechanism; this file's ladder table above points to it.
+[`memories/databricks-hosted-llms.md`](databricks-hosted-llms.md) already
+carried the underlying facts (the `auth.command` mechanism, the hard
+`wire_api = "responses"` requirement, which models qualify) from a
+2026-08-29 investigation.
+What's new on 2026-09-15 is operationalizing that into a delegation-ladder
+skill --- [`delegate-to-databricks`](../skills/delegate-to-databricks/SKILL.md),
+linked from this file's ladder table above --- and a live end-to-end
+verification: a found-in-the-wild `model_providers.databricks` config plus
+per-model profile-layer files on the user's own machine, dispatched with
+`codex exec --profile databricks --sandbox read-only --skip-git-repo-check
+"Reply with exactly: OK" < /dev/null`, round-tripped correctly against a
+Databricks-hosted GPT-5.6-family model at a measured ~49,000-token Codex-side
+agent-mode overhead for that single turn.
 Tracked as [ai-config#3726](https://github.com/Morrison-Lab/ai-config/issues/3726).
 
-Two benign warnings observed during that smoke test are worth recording so a
-later session does not misdiagnose them as failures: Codex's own periodic
-`<base_url>/models` list-refresh call 404s against Databricks
-(`ENDPOINT_NOT_FOUND`, since Databricks has no such endpoint), and Codex logs
-"Model metadata ... not found. Defaulting to fallback metadata" for any
-`databricks-<model-id>` name it has no built-in profile for --- meaning its
-own context-window budgeting for that model is a guess, not the vendor's real
-figure.
-
-- **Do:** use `auth.command` (not a static `env_key`) for any custom Codex
-  `model_providers` entry whose upstream issues short-lived or rotating
-  credentials --- this generalizes past Databricks to any OAuth-only
-  OpenAI-compatible provider.
-- **Do:** treat the two warnings above as expected noise for a
-  Databricks-hosted `model_providers` entry, not as dispatch failures.
-- **Don't:** assume `opencode`'s custom-provider mechanism is the only way to
-  reach a custom OpenAI-compatible endpoint from a delegation-ladder CLI ---
-  Codex's command-backed auth covers a case opencode's static-key config
-  cannot.
+- **Do:** read `databricks-hosted-llms.md` before `delegate-to-databricks` ---
+  it carries the facts (which models qualify, the hard `wire_api` requirement,
+  the auth-storage mechanics) the skill's dispatch steps assume.
+- **Don't:** duplicate those facts here; this entry exists to record that the
+  route is now verified end-to-end and has a skill, not to restate the
+  underlying facts a second time.
 
 ## agy on Windows
 

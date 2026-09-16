@@ -12,7 +12,8 @@ review" below).
 
 ## Where to look
 
-- **Our own repos**: the lab packages (e.g. `{bcs}`, `{ettbc}`), the shared reusable workflows and actions in `Morrison-Lab/gha`, and this `ai-config` corpus's skills **and `memories/`** --- a fact-gathering investigation recorded in a memory file is exactly as much prior art as a skill is, and is easier to miss because nothing indexes it the way `skills/` gets listed in `SKILL.md` frontmatter.
+- **Our own repos**: the lab packages (e.g. `{bcs}`, `{ettbc}`), the shared reusable workflows and actions in `Morrison-Lab/gha`, and this `ai-config` corpus's skills **and `memories/`** --- a fact-gathering investigation recorded in a memory file is exactly as much prior art as a skill is.
+  `memories/MEMORY.md` indexes it, but that index is easy to skip past when the search you actually run is an issue/PR duplicate search rather than a grep of `memories/` itself (see the case below).
   Packages can depend on each other, so reuse across our repos is fine.
 - **Trustworthy external sources**: base R; the
   [r-lib](https://github.com/r-lib) and
@@ -505,7 +506,7 @@ of unreferenced packages.
 
 A DRW pass that searches for an existing *issue* or *PR* on a topic is not the same search as one for existing *facts* on that topic, and passing the first gives no signal about the second.
 Building `delegate-to-databricks` ([ai-config#3727](https://github.com/Morrison-Lab/ai-config/pull/3727), 2026-09-15), the issue-filing search (`gh issue list --search`, several phrasings) came back empty, which was read as license to write the skill's technical content from scratch --- reasoning through Codex CLI's config semantics live, including guessing at `wire_api`'s default behavior and which model families would be reachable.
-An adversarial-reviewer round then surfaced `memories/databricks-hosted-llms.md`, a file from an investigation three weeks earlier that had already established the exact facts being guessed at (Codex CLI 0.151.0+ hard-rejects `wire_api = "chat"`, and Claude on Databricks is Chat-Completions-only and therefore unreachable from Codex regardless of `wire_api`) --- and the skill's first-draft prose contradicted both.
+An adversarial-reviewer round then surfaced `memories/databricks-hosted-llms.md`, a file from a 2026-08-29 investigation --- 17 days earlier, and already listed in `memories/MEMORY.md`'s own index --- that had already established the exact facts being guessed at (Codex CLI 0.151.0+ hard-rejects `wire_api = "chat"`, and Claude on Databricks is Chat-Completions-only and therefore unreachable from Codex regardless of `wire_api`) --- and the skill's first-draft prose contradicted both.
 
 The tell, in hindsight: the issue-search step ran and returned empty, which *felt* like the DRW check having been done, when it had only ruled out a duplicate task, not a duplicate (or contradicting) body of facts.
 `grep -ril databricks memories/` would have surfaced the file directly and costs one command.

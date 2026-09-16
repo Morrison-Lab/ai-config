@@ -427,6 +427,41 @@ specify a target directly (`--engine <name>`)
 or pass `--exclude-engine cursor` in alternate mode
 until headless cursor dispatch is enabled.
 The `adversarial-reviewer` persona also lives at `.claude/agents/` and `.opencode/agents/`, which are project agents: a session rooted in another repo may not be able to resolve it at all ([ai-config#1921](https://github.com/Morrison-Lab/ai-config/issues/1921) tracks shipping it alongside the guard).
+The plugin does not close that gap either: its root is the ai-config repository root, which ships `skills/`, `commands/` and `hooks/hooks.json` and no `agents/` directory (checked at `c7201140`, 2026-09-15), so a consumer repo installs the guard and none of the personas it names.
+
+**In that repo, use the fallback the guard already admits, and get its two conditions right.**
+`no-push-without-self-review.py`'s `FALLBACK_AGENT_NAME` accepts `general-purpose`, `general`, `reviewer`, `code-reviewer`, `research` and `self` (with an optional `-`, `_` or space inside the two-word spellings), but only when the dispatch's own prompt matches `REVIEW_PROMPT_RE` --- `adversarial review`, `adversarial self-review`, `pre-push review`, or `self-review`, again with an optional separator.
+"Review this adversarially" satisfies a reader and not the regex.
+The report then has to meet the verdict-line contract, which "A verdict phrase separated from its heading by a line break is no verdict" and "Structured review data (JSON payload)" state below between them.
+
+**Read which denial you got: the two messages fail at different stages, and the second has three causes.**
+"No `adversarial-reviewer` subagent or recognized external reviewer ... was dispatched" means the dispatch was not recognized --- wrong persona name, or a prompt the regex missed.
+"An `adversarial-reviewer` subagent was dispatched, but no verdict came back as that call's own result" means it *was* recognized and no verdict was extracted: a background dispatch, an errored result, or a verdict line that does not match that contract.
+A missing `Reviewed-Commit:` is not one of them --- that has its own message, about a clean verdict that does not say which commit it read.
+Where you chose to background the dispatch, the guard's own message gives the fix and it is a foreground re-dispatch.
+Where the harness backgrounds it regardless --- #3045's two variants, below --- re-dispatching changes nothing and the `ALLOW_UNREVIEWED_PUSH=1` route below is the remedy.
+
+- **Don't:** reach for `ALLOW_UNREVIEWED_PUSH=1` on the second message from a foreground dispatch that returned a report.
+  It says the report was read and no verdict was found in it, which is a formatting fix, not a case where the guard cannot see a verdict at all.
+
+(Measured on ucdavis/lbt, 2026-09-15, with the plugin enabled.
+Dispatching `adversarial-reviewer` returns an errored result reading "Agent type 'adversarial-reviewer' not found.
+Available agents: claude, claude-code-guide, Explore, general-purpose, Plan, statusline-setup".
+The session's `general-purpose` fallbacks were refused anyway, on both messages, and pushed under the override.
+Diagnosed in the same session by the step this file prescribes below.
+One prompt opened "You are an adversarial reviewer" and nothing else in it named the review, which `REVIEW_PROMPT_RE` misses because the word does not end at `review`, so that dispatch was never recognized at all.
+The prompts that were recognized produced reports with no `Verdict:` line in them: `read_latest_review` over that session's JSONL returns `(None, None, True)`, and `grep -c Reviewed-Commit` on the same file returns 0.
+Both are the brief rather than the guard, which refused correctly each time.
+A fallback dispatch has to name the review in words the regex matches, and has to *ask* for the verdict and fingerprint lines, because a persona file supplies them and a `general-purpose` prompt does not.)
+
+**A subagent cannot discharge this guard at all, and the reason is where the transcript lives.**
+Measured 2026-09-15 in the Claude Code desktop harness: an `Agent` dispatched *by a subagent* writes both the call and its report to `<session>/subagents/agent-<id>.jsonl`, while the guard reads the session JSONL at the top level.
+Every conforming review of one branch, the clean one included, was reachable only through those per-subagent files, with `grep -c Reviewed-Commit` on the session transcript returning 0.
+So the clean verdict exists, is about the right commit, and is unreadable to the guard by construction.
+This is not #3045, whose dispatch never returns synchronously.
+Here it returns synchronously to the subagent, which is not who the guard is reading, so it joins the cases below where the guard cannot see a verdict rather than the formatting case.
+Note which denial that produces: with no top-level dispatch, `saw_reviewer_call` is false, so it is the **first** message, and the Don't above does not bite.
+A subagent that reviews before pushing takes the override, and says in its report which reviews produced which verdicts and where they live.
 
 Note what that CLI fallback does to the pre-push guard, since the two rules meet here and pull opposite ways.
 A CLI's verdict never becomes an `Agent` call's `tool_result`, so the guard cannot see it however real the review was.
@@ -434,7 +469,7 @@ Prefix the push itself with `ALLOW_UNREVIEWED_PUSH=1` there, and say in the same
 The same applies to a session whose reviewer is registered from a stale definition, which is the case on any rollout of a change to the persona itself.
 Where no second context is reachable at all, say so in the review itself rather than letting an inline pass be reported as a dispatched one.
 
-**A harness that always backgrounds the `Agent` tool is a third case where the guard cannot see a verdict it should, alongside no reviewer being registered and a stale reviewer definition above --- and the guard's partial fix for this one has a specific extraction bug.**
+**A harness that always backgrounds the `Agent` tool is a fourth case where the guard cannot see a verdict it should, alongside no reviewer being registered, a stale reviewer definition, and a subagent's own transcript above --- and the guard's partial fix for this one has a specific extraction bug.**
 [`ai-config#3045`](https://github.com/Morrison-Lab/ai-config/issues/3045) tracks the general case: a harness whose `Agent` dispatch never returns synchronously, so the guard's own "dispatch in the foreground" remedy is unfollowable.
 That issue's own report is one manifestation --- `run_in_background: false` explicitly set, and the dispatch still backgrounded.
 A second, distinct manifestation is a harness whose `Agent` tool carries no `run_in_background` field in its schema at all, so there is nothing to set.

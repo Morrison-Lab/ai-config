@@ -30,6 +30,10 @@ When PSW and this guidance disagree, PSW wins.
 This is a default, not an absolute rule. Keep a clause or a technical term when
 removing it would lose meaning or precision. Never trade an honest hedge for
 false confidence.
+A simile or an as-though construction is a hedge too, so swapping one for its
+"precise equivalent" can assert a mechanism the original only likened, with no
+hedge word deleted
+(see [`find-ai-tells`](../../skills/find-ai-tells/SKILL.md)'s anti-patterns).
 
 Writing agents do not need to enforce all style guidelines on first draft.
 Work iteratively: write a substantively-correct but stylistically loose first draft,

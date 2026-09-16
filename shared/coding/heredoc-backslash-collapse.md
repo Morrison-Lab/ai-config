@@ -194,4 +194,4 @@ Prescribing a portability-dependent flag inside a section about checks that retu
 - **Don't:** read a clean `ast.parse` as evidence a heredoc'd backslash edit landed correctly;
   it answers only the direction that happens to be broken.
 
-This is the same displacement this file's own **Don't:** treat having read this file as the check records, one level in: having a check is not the check either, when the check is blind to the half you hit.
+This is the same displacement this file's own "treat having read this file as the check" records, one level in: having a check is not the check either, when the check is blind to the half you hit.

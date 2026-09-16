@@ -66,18 +66,23 @@ not a per-model choice or a "safer default," it is a hard requirement for
 **every** custom `model_providers` entry, Databricks-backed or otherwise.
 That means only Databricks endpoints that actually implement the Responses
 route (`/serving-endpoints/responses`) are reachable from Codex at all.
-As of that same memory entry, the Responses-capable set on a typical
-workspace is GPT-5.5 Pro, GPT-5.5, GPT-5.3 Codex, and the GPT-5.6 family
-(Sol/Terra/Luna) --- **not** Claude, Gemini, Llama, or GPT OSS, which serve
-Chat Completions only on Databricks and so are currently unreachable from
-Codex regardless of `wire_api`.
-Check the current supported-models/Responses-capability documentation for
-the specific workspace before assuming a given model qualifies; this list is
-a vendor catalog fact that changes over time.
+That same memory entry names GPT-5.5 Pro, GPT-5.5, GPT-5.3 Codex, and the
+GPT-5.6 family as Responses-capable, and Claude on Databricks as
+Chat-Completions-only and therefore currently unreachable from Codex
+regardless of `wire_api` --- the one model family this skill can positively
+rule out. (This skill's own verification run, below, confirms one specific
+GPT-5.6-family id, `databricks-gpt-5-6-sol`, actually works end to end ---
+that specific id is this skill's own finding, not the cited memory's.)
+The memory entry does not enumerate every other family's capability, and
+Responses support is a vendor-catalog fact that changes over time, so
+**check the current supported-models/Responses-capability documentation for
+the specific workspace before writing a profile-layer file for any model**,
+rather than assuming a name not listed here is either reachable or not.
 
-For a Chat-Completions-only model (Claude, Gemini, Llama on Databricks),
-reach it through a Chat-Completions client instead --- `opencode`'s custom
-provider, or a raw HTTP client --- not through this Codex-CLI route.
+For a model confirmed Chat-Completions-only on the target workspace (Claude
+is the one family this skill can confirm), reach it through a
+Chat-Completions client instead --- `opencode`'s custom provider, or a raw
+HTTP client --- not through this Codex-CLI route.
 
 ## When this fires
 
@@ -96,9 +101,10 @@ provider, or a raw HTTP client --- not through this Codex-CLI route.
   the same reason: a wrong answer from a sidecar model costs more to detect
   than the quota it saves.
 - The critical-path edit the rest of the work waits on --- do it inline.
-- The target model is Chat-Completions-only on Databricks (Claude, Gemini,
-  Llama, GPT OSS as of the current catalog) --- this route cannot reach it;
-  see "Which models are actually reachable" above.
+- The target model is Chat-Completions-only on Databricks (Claude is the one
+  family confirmed so here) --- this route cannot reach it; see "Which
+  models are actually reachable" above, and check the current catalog for
+  any other model not confirmed either way.
 - No `model_providers.databricks` entry is configured yet on this machine, and
   setting one up is itself the task (see Setup below) --- that is setup work,
   not a dispatch.
@@ -109,7 +115,7 @@ provider, or a raw HTTP client --- not through this Codex-CLI route.
 
 ## Setup (one-time, per machine)
 
-Three pieces, none of which stores a long-lived secret in a config file.
+Four pieces, none of which stores a long-lived secret in a config file.
 Placeholders (`<WORKSPACE_HOST>`, `<PROFILE>`) stand for the specific
 workspace hostname and CLI profile name in use --- this skill documents the
 pattern, not any one institution's values.
@@ -142,7 +148,7 @@ credential store on every call, so nothing static is cached:
 # Usage: databricks-token [profile]
 set -euo pipefail
 profile="${1:-<PROFILE>}"
-databricks auth token --profile "$profile" | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])'
+databricks auth token --profile "$profile" -o json | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])'
 ```
 
 Save as `~/.local/bin/databricks-token`, `chmod +x`.

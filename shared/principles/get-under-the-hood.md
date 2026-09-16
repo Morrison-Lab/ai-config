@@ -202,7 +202,7 @@ It is not "distrust refusal messages" --- the two shapes above are cases where t
 It is that a refusal message is a **summary of a predicate**, written by someone who knew the predicate;
 when compliance-as-described fails, the predicate is the authority and the summary is not.
 
-- **Do:** read the matcher after the second refusal, once doing what the message said has already failed once --- not after the first, which the shapes above already cover.
+- **Do:** read the matcher once compliance-as-described has itself failed --- the trigger is "I did what it said and got the same refusal", which is a different signal from this section's "the message did not resolve it", and both point at the source.
 - **Do:** treat "I complied exactly and it refused identically" as pointing at an unstated clause in the predicate, rather than at a broken guard.
 - **Don't:** generalise this into distrusting refusal messages;
   the failure here is a message that was incomplete, not one that was wrong.

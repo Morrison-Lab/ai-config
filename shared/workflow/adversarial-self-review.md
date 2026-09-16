@@ -1407,8 +1407,8 @@ Neither was a round happening to come back empty --- which, per the convergence 
 ### Narrowing severity is evidence about COVERAGE, not about the defect population
 
 The two sections above give reasons a shrinking series might not mean what it looks like: the work may be unjustified, or the fixes may be feeding the findings.
-Both concede the trend itself is real and argue about its cause.
-This one denies the trend measures the population at all.
+The second already names the narrowing search space, in "a converging series narrows its own search space", and says an empty round is the least informative one.
+This section takes that from a caution about the series' END to a rule about its STEERING: if the space narrows because each round returns to the last finding, the narrowing is steerable, and the dispatcher is the only party positioned to steer it.
 
 A reviewer handed a change re-reads where the last finding landed.
 So round N+1's search space is set by round N's result, and the severity curve across rounds is a record of **where attention went**, not of what remains.
@@ -1423,15 +1423,12 @@ Confirmed again at round 9, after three rounds returning only prose defects: ste
 The remedy is bookkeeping rather than judgement, which is what makes it survivable across rounds: **track which files each round actually opened, and point the next round at the complement.**
 That is a set the dispatcher can derive and the reviewer cannot.
 
-**Round 9's reviewer also named the discriminator between the two kinds of finding, and it predicts which ones survive.**
-Findings derived by EXECUTING a prediction taken from the prose survive scrutiny;
-findings produced by re-reading prose against other prose do not.
-Every real defect in rounds 9 through 11 came from execution.
-This is the same instrument-over-inspection point [`fixtures-are-not-evidence`](fixtures-are-not-evidence.md) makes about tests, arriving one level up: a round that only reads is sampling, and a round that runs something is measuring.
+Rounds 9 through 11 corroborated this from the other direction: every real defect in them came from executing a prediction taken from the prose rather than from re-reading prose against prose.
+That half is already this file's, in "Tell it to RUN the repo's validation, not only to read the diff" and in "Give a docs-only diff describing an instrument a full round" --- the first of which closes on this section's own population point, that a set of rounds "covered the changed lines, which is a different population".
+What is added here is only the steering rule, which neither of those gives.
 
 - **Do:** record the files each round opened, and brief the next round at the ones no round has.
 - **Do:** read a run of shrinking findings as "this surface is exhausted" rather than "this change is nearly clean" --- the two are the same observation about different populations.
-- **Do:** prefer a round briefed to execute a prediction from the prose over one briefed to re-read it.
 - **Don't:** let a reviewer choose its own scope on a series of rounds;
   left alone it returns to the last finding, which is the one place already swept.
 - **Don't:** count the severity trend as a stopping signal at all, separately from whether an empty round is one --- the trend and the empty round fail for the same reason, that the series narrows its own search space.

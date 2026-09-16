@@ -601,12 +601,12 @@ step after the fixtures check had not run at all.)
 
 Eighth, 2026-09-15, across eleven rounds of one review cycle, and it is recorded for two mechanisms rather than for the rule --- which by this point has been written, instrumented, and re-broken seven times, so an eighth statement of it would add nothing.
 Each round ran an ad-hoc list of about eight checkers;
-`scripts/` holds twenty-five that take no arguments.
+`ls scripts/check*.py` returns thirty-four, and `validate.yml` carries 104 `run:` steps.
 `scripts/check-python-escapes.py`, a step in `validate.yml`, was RED for four rounds without being noticed.
 
 **The documented instrument existed and was unusable on this platform, which is a different failure from not reaching for it.**
 `run-local-validation.py`'s `run_step` spawns a bare `"bash"`;
-on Windows `CreateProcess` finds `System32\bash.exe`, the WSL launcher, before `PATH`, so all 105 derived steps ran inside WSL, where `git` against a Windows worktree returns 128.
+on Windows `CreateProcess` finds `System32\bash.exe`, the WSL launcher, before `PATH`, so every derived step ran inside WSL, where `git` against a Windows worktree returns 128.
 Thirteen of its fourteen reported failures were phantom.
 Filed as [ai-config#3724](https://github.com/Morrison-Lab/ai-config/issues/3724).
 So the sections above are satisfied in form --- the instrument exists, it was known, it was pointed at --- and the derived run still did not get used, because its output was not trustworthy enough on this machine to read closely.
@@ -617,10 +617,16 @@ Note where that leaves the remedy the seventh occurrence reaches for: making the
 `check-hook-output-shape.py` had been printing the escape warnings ABOVE its own `OK:` line the whole time, and exiting 0.
 The exit status was read; the lines above it were not.
 A success line is a summary of a predicate in exactly the sense [`get-under-the-hood`](../principles/get-under-the-hood.md)'s third refusal shape describes, and an interpreter warning riding above it is outside what that summary covers.
-It compounds with a settings gap in the same direction: CI runs under `PYTHONWARNINGS="error::SyntaxWarning,error:invalid escape sequence::"`, where that same warning is a SyntaxError and the suite raising it never executes --- so every "51/51 green" in those rounds was measured under laxer settings than the ones that gate the merge.
+
+**A local-versus-CI settings divergence was the first explanation reached for here, and it is wrong --- recorded because it is the plausible one.**
+The strict filter `PYTHONWARNINGS="error::SyntaxWarning,error:invalid escape sequence::"` is set by `scripts/test_hooks.py`, not by any workflow file, and it is set unconditionally in `run_one_suite`'s environment --- so it applies the same way locally as in CI, and there is no laxer local setting to blame.
+Nor does a suite raising `SyntaxError` under it vanish from the count: `run_one_suite` returns 1 on a non-zero exit, and the runner's `N/N ... passed` line is computed as `n_suites - suite_failures`, so such a suite is reported as a failure rather than silently dropped.
+The escape hid by being a warning above a success line, which is the whole of the mechanism;
+attributing it additionally to an environment gap would have been a second cause invented to explain what the first already covers.
 
 - **Do:** read a checker's full stdout, not only its exit status --- a warning printed above a success line is invisible to `rc` by construction.
-- **Do:** match the environment CI sets (`PYTHONWARNINGS` among it) before reading a local green as predictive, since a suite that never ran reports no failures.
+- **Don't:** reach for a local-versus-CI environment divergence before checking where the setting is actually set;
+  a runner script can impose the same strictness on both, and this one does.
 - **Don't:** count an instrument as used because it exists and was named;
   the question is whether its output was trusted enough to act on.
 

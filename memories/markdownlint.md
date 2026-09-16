@@ -77,7 +77,9 @@ Split out of [`tools.md`](tools.md) on 2026-09-01 when that file crossed the 125
   **Don't:** debug the item the error names --- check the line above it first.
   **Candidate check.**
   `scripts/run-local-validation.py`'s `lint-markdown` equivalent is tagged `PARTIAL` and names list-item splices among the checks it does not cover (`MARKDOWNLINT_UNCOVERED`), so no derived pre-push run covers this checker.
-  Running it means a `Morrison-Lab/gha` checkout and `MARKDOWNLINT_GLOBS='*.md' LIST_ITEM_SPLICE_BASE_REF=origin/main node lint-markdown/check_list_item_splices.mjs` by hand, as `530ac580` did on this branch; otherwise it arrives as a red CI job.
+  Running it means a `Morrison-Lab/gha` checkout and, from the repo you are about to push, `MARKDOWNLINT_GLOBS='*.md' LIST_ITEM_SPLICE_BASE_REF=origin/main node <gha-checkout>/lint-markdown/check_list_item_splices.mjs`.
+  Its `git ls-files` and `git diff` run in the process cwd, so running it from the gha checkout checks gha and prints the same clean line.
+  Otherwise the checker arrives as a red CI job.
   `scripts/vendor/gha-check-new-line-breaks.py` plus `scripts/sync-nlb-checker.py` is the established shape for vendoring one of gha's checkers so it can run before the push.
   The splice checker is the same kind of small, self-contained, diff-scoped script.
   (ucdavis/lbt#7, 2026-09-15: a numbered link checklist was reflowed one-sentence-per-line, `lint-markdown` went red, and `b3f3ba2` fixed it by separating the items with blank lines.)

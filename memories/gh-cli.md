@@ -608,7 +608,8 @@
   A session also reported the GraphQL `requestReviews` mutation carrying the reviewer bot's node id behaving like the REST POST --- returning without errors while the reviewer list stayed empty --- but that one is narration rather than measurement here: no repo, PR, node id, or response body was kept, and re-running it would be an outward mutation.
 
   The repository's own history is the closest thing to an answer, and it is weaker than it looks.
-  As of 2026-09-15, `gh api "repos/<o>/<r>/pulls/<N>/reviews"` over all six PRs `ucdavis/lbt` then had (1 and 3 through 7; #3 was closed unmerged) returns no reviews at all.
+  As of 2026-09-15, `gh api "repos/<o>/<r>/pulls/<N>/reviews"` over every PR `ucdavis/lbt` had that day returns no reviews at all.
+  That is 1 and 3 through 8, with #3 closed unmerged and #8 still open.
   That is a fact about the repository, not about the endpoint that was probed, and it is still not a provisioning verdict: nobody controlled for whether a review was ever requested on those PRs, which is the confound the "both candidate directions are unconfirmed" passage below already states for this file.
   Where a per-head answer is what you need, [`memories/copilot-reviews.md`](copilot-reviews.md)'s check-run query separates "never ran" from "ran and posted nothing".
   This file's standing Do, to read the posted review body, is unchanged.

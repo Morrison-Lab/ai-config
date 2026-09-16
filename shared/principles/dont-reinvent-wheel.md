@@ -12,7 +12,7 @@ review" below).
 
 ## Where to look
 
-- **Our own repos**: the lab packages (e.g. `{bcs}`, `{ettbc}`), the shared reusable workflows and actions in `Morrison-Lab/gha`, and this `ai-config` corpus's skills **and `memories/`** --- a fact-gathering investigation recorded in a memory file is exactly as much prior art as a skill is.
+- **Our own repos**: the lab packages (e.g. `{bcs}`, `{ettbc}`), the shared reusable workflows and actions in `Morrison-Lab/gha`, and this `ai-config` corpus's skills, fragments, **and `memories/`** --- a fact-gathering investigation recorded in a memory file is exactly as much prior art as a skill or fragment is.
   `memories/MEMORY.md` indexes it, but that index is easy to skip past when the search you actually run is an issue/PR duplicate search rather than a grep of `memories/` itself (see the case below).
   Packages can depend on each other, so reuse across our repos is fine.
 - **Trustworthy external sources**: base R; the

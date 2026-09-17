@@ -2632,6 +2632,40 @@ def codex_cases() -> tuple[int, int]:
         check(f"a dispatch result announcing its task under `{result_key}` authorizes",
               rc == 0 and not blocked)
 
+    # 21. `verify_review` DENIES a non-`str` transcript path rather than
+    #     raising. Called directly, because `main` always passes
+    #     `payload.get("transcript_path") or ""` and no transcript this suite
+    #     can write reaches the function with anything else -- so the guard
+    #     under test is unreachable through the hook binary, and a case that
+    #     went through it would assert nothing.
+    #
+    #     This pins the one conjunct in the function that reads inert and is
+    #     not. Two identical `transcript_path and` operands were removed from
+    #     the conditions below it, correctly: a preceding `return` had already
+    #     proven them. This one is the only thing standing between a `None` and
+    #     `os.path.exists`, which raises -- and `main`'s deliberate
+    #     `except Exception: return 0` turns a raise into an ALLOW. So the
+    #     operand is inert for every `str` and load-bearing for the failure it
+    #     is placed against, and mutation cannot tell those apart on its own:
+    #     without this case, deleting it passes the whole suite while moving
+    #     the guard from fail-closed to fail-open.
+    spec = importlib.util.spec_from_file_location("npwsr_none_arg", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    #     `None` is the discriminating input and the only one asserted. An
+    #     int was tried first and is not: `os.path.exists(0)` tests FILE
+    #     DESCRIPTOR zero, which exists, so the mutant reads stdin and then
+    #     denies for a different reason -- a row that passes either way, and
+    #     touches stdin to do it.
+    try:
+        is_clean, reason = mod.verify_review(None, None, ["git", "push"], [])
+        ok = (not is_clean) and "No transcript available" in reason
+    except Exception as exc:
+        ok = False
+        reason = f"raised {type(exc).__name__}"
+    check(f"verify_review(None) denies rather than raising into the fail-open "
+          f"[got: {reason}]", ok)
+
     return failures, ran
 
 

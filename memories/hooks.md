@@ -326,6 +326,47 @@ The natural reading was contamination from the several worktrees active at once,
 Every run was `flag-unassigned-worktree.py` correctly returning `deny` against a fixture that only ever constructed the `warn` case.
 The quiet-tree run is what makes that distinguishable: without a control run on a committed, unedited tree, "several worktrees were active" explains a real defect exactly as comfortably as a contaminated one.)
 
+**CI structurally cannot see this failure, which is why it survives being
+diagnosed.**
+The section above establishes what the failure is and how to tell it from
+contamination.
+What it leaves implicit is where it can occur, and that turns out to be one
+place only.
+`flag-unassigned-worktree.py` reaches its deny path solely on a non-default
+branch carrying uncommitted tracked changes or unpushed commits, and its own
+docstring records that every read on that path fails toward *not* denying ---
+a non-repository working directory, a detached `HEAD`, an unresolved default
+branch, or any error.
+A pull-request checkout satisfies the branch half and never the pending-work
+half, because `actions/checkout` leaves no uncommitted tracked changes, so the
+deny path is unreachable there and the warn assertion holds.
+
+That makes the red a local-only event, appearing in a pre-push sweep and
+nowhere else --- which is exactly the setting in which a red is cheapest to
+attribute to the several worktrees running at once and re-run away.
+The section above gives the quiet-tree control that settles it; this says why
+nothing else will.
+Read a test that can only fail locally as under-covered rather than as flaky,
+and note that a green CI run is not evidence about it in either direction.
+
+- **Do:** ask where a hook test's deny path can be reached before reading a
+  green CI run as covering it.
+- **Don't:** treat CI green on a hook that branches on live repository state as
+  evidence the branch the test misses is fine --- a PR checkout can reach only
+  one of the branches.
+
+Tracked as [ai-config#3431](https://github.com/Morrison-Lab/ai-config/issues/3431)
+(2026-09-09) and again as
+[ai-config#3744](https://github.com/Morrison-Lab/ai-config/issues/3744)
+(2026-09-17, filed by a session that hit the identical failure on
+`test_flag_unassigned_worktree` and reached the same root cause and the same
+proposed fixes; read as a probable duplicate of #3431, and confirm before
+working either).
+#3744 carries the two-tree measurement this paragraph rests on: the same
+commit and the same suite give `Ran 17 tests ... OK` from a clean checkout of
+`aa32a3c1` and `FAILED (failures=1)` from #3690's dirty `work/3690` worktree,
+while `validate` on that PR's own head passed the suite in CI.
+
 ## 5.6 A hot-path guard's own correctness suite does not exercise its performance envelope --- test adversarial-length input separately
 
 A guard's test suite proves each case classifies correctly.

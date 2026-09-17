@@ -103,6 +103,26 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   So a `GET /user` probe answers nothing about what a write will look like, which is the trap:
   it reports the friendly answer, and the write then lands under a different actor.
   Read the artifact the write produced --- the comment's `user`, or the run's `actor` --- rather than the token's self-description.
+
+  **The push row has since been measured the other way, so read the table as
+  one session's reading rather than as the harness's contract.**
+  On 2026-09-17, in a remote session on this same repository, pushes to two PR
+  branches were sent as `claude[bot]` and every `review /` job skipped:
+  [#3692](https://github.com/Morrison-Lab/ai-config/pull/3692) run 35265853275
+  and [#3690](https://github.com/Morrison-Lab/ai-config/pull/3690) run
+  35267111533, against a `d-morrison` control on the same branch
+  (run 34943644439) that ran the review normally.
+  [`claude-bot-workflows`](claude-bot-workflows.md)'s bot-sender-push entry
+  carries that measurement and what the skip costs downstream.
+  The consequence is narrow and worth stating where the table is read: the
+  next bullet's remedy of re-triggering a review by pushing is conditional on
+  this row rather than guaranteed by it, and the row's own instruction --- read
+  the artifact the write produced --- is what settles it each time.
+  - **Do:** read the resulting run's `actor` after re-triggering a review by
+    pushing, and fall back to a dispatch when it reports a bot.
+  - **Don't:** treat the push row above as settling how a later session's
+    pushes will be attributed; it was measured once, and the opposite has
+    since been measured on the same repository.
 - **Two consequences follow, and both bite where a workflow gates on who acted.**
   A REST write produces a **bot-authored** event, so any workflow gated on `github.event.sender.type != 'Bot'` skips for it;
   `git push` produces a User-authored event and does not.

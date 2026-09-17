@@ -669,6 +669,74 @@ an added-lines scan for the same shape found it immediately.
 - **Do:** write a diff-scoped scan for the property when the rule is disabled, rather than re-enabling it.
 - **Don't:** re-enable a repo-wide disable to close the gap --- that reflags the drift the disable exists to tolerate.
 
+## A control that borrows its near-copy from content the test does not own
+
+The three sections above audit whether a control fires, whether it fires for
+the right reason, and whether the instrument it cites can ever disagree.
+This audits where the control's own *material* came from.
+
+A negative control needs a near-copy: something that resembles the thing under
+test closely enough that its survival proves the check was specific rather than
+lucky.
+The cheapest near-copy is usually already lying around, elsewhere in the very
+file the check scans, and reaching for it feels like reuse rather than like
+coupling --- the corpus supplied it, so nobody wrote it, so there is nothing
+that looks like a fixture to review.
+
+Two costs follow, and only the first announces itself.
+
+**The test becomes hostage to edits it has no relationship with.**
+The borrowed passage belongs to whoever wrote it, for their own reasons, and
+they may move it, reword it, or split the file it lives in without ever opening
+the test.
+The suite then goes red with the checker unchanged and the property under test
+untouched, which is the most expensive failure shape there is: it reads as a
+regression in the thing being guarded.
+
+**The control may also never have discriminated**, and that half is silent.
+A borrowed passage sits wherever its own author put it, which is usually
+outside whatever scope the checker actually applies --- so the mutation the
+control exists to catch was always going to be caught by the scoping, and the
+control was measuring nothing.
+Nothing distinguishes the two cases from a green run, which is why the
+mutation-testing sections above are the instrument here rather than a
+re-reading.
+
+The remedy is that a test constructs its own near-copy.
+A literal written in the test file is owned by the test, reviewed with it, and
+moves only when someone editing the test moves it.
+
+- **Do:** write a control's near-copy as a literal in the test file, so the
+  test owns every string its verdict depends on.
+- **Do:** when a control must reference live corpus content, assert on the
+  property the check is scoped to rather than on a passage the check never
+  reads.
+- **Do:** treat a control going red after an unrelated edit as a finding about
+  the control's provenance, not only as a merge conflict to patch.
+- **Don't:** reach for an existing mention elsewhere in the scanned file as a
+  near-copy --- its author owes your test nothing.
+- **Don't:** read a control's green run as evidence it discriminates; mutate
+  the checker and confirm the control goes red.
+
+(Measured 2026-09-17 in `Morrison-Lab/ai-config`.
+`scripts/test_check_github_actions_step_if.py` replaces one required sentence
+in `memories/github-actions.md` with a variant, then asserts that a bare
+`GitHub auto-applies` still appears in the mutated text --- a mention it
+borrows from a different bullet several hundred lines further down the same
+file, which the test never wrote.
+The first cost was reported by the session that hit it: splitting that file at
+the 1250-line cap moved the borrowed bullet out and turned the assertion red
+with `scripts/check-github-actions-step-if.py` unchanged.
+That split is not in this tree, where the borrowed mention is still present, so
+it is recorded as that session's account rather than as a measurement.
+The second cost was measured directly and is reproducible here: loosening the
+checker's own required needle to a bare `GitHub auto-applies` leaves the suite
+at 31 passed, 0 failed.
+The mutation survives because `required_findings()` is scoped by
+`extract_section()` to the step-if bullet, and the borrowed mention sits
+outside that bullet --- so the specificity the control is written to
+demonstrate is supplied by the scoping, and the control never tested it.)
+
 ## Widening an instrument invalidates every figure it produced, not only the one that exposed it
 
 The section above ends where the control finally catches something.

@@ -189,6 +189,24 @@ AGENT_TOOLS = {
     "spawn_agent", "collaboration.spawn_agent",
 }
 
+# The subset of AGENT_TOOLS that RETRIEVES a dispatch's output rather than
+# making one. The distinction decides provenance, so it cannot be left implicit.
+#
+# For a dispatching tool the persona names who will run. For one of these the
+# persona field is decorative -- `task_id` names whose output is coming back --
+# so admitting one on its label alone severs the WHO-said-it chain this module
+# is built on. Measured: a background `Agent` dispatch of `doc-writer` returning
+# `{"task_id": "T7"}`, followed by `taskoutput({"task_id": "T7", "persona":
+# "adversarial-reviewer"})` whose result is a well-formed clean report, yielded
+# a clean verdict with no reviewer having run.
+#
+# That hole PRE-DATES the persona-key widening -- `name` was already read, and
+# reproduces it on origin/main -- so this is not a regression introduced here;
+# ai-config#3742 tracks the pre-existing variant. It is closed here because the
+# widening turned one spelling into three, and because a diff asserting that
+# nothing downstream is relaxed owes the check.
+TASK_OUTPUT_TOOLS = {"taskoutput", "task_output", "manage_task"}
+
 # A cross-family reviewer invoked as a CLI, whose print-mode output IS its
 # review. Each value lists the flags putting that program in non-interactive
 # print mode, so an interactive session -- whose transcript carries no
@@ -1581,7 +1599,8 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                     call_id = f"omo-{_OMO_SEQ[0]}"
                     pending_omo_uses.setdefault(name, []).append(call_id)
                     inp = record.get("tool_input")
-                    if name in AGENT_TOOLS and isinstance(inp, dict):
+                    if (name in AGENT_TOOLS and name not in TASK_OUTPUT_TOOLS
+                            and isinstance(inp, dict)):
                         if _is_reviewer_dispatch(inp):
                             saw_reviewer_call = True
                             reviewer_call_ids.add(call_id)
@@ -1675,16 +1694,19 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                     call_id = b.get("id")
                     inp = b.get("input") or {}
 
-                    if tool_name in AGENT_TOOLS:
+                    # Task-output tools are tested FIRST so a persona label on
+                    # one can never short-circuit the task-id gate below, which
+                    # is their only sound provenance (see TASK_OUTPUT_TOOLS).
+                    if tool_name in TASK_OUTPUT_TOOLS:
+                        task_id = str(inp.get("task_id") or inp.get("TaskId") or inp.get("id") or "")
+                        if task_id and task_id in reviewer_task_ids:
+                            if isinstance(call_id, str) and call_id:
+                                reviewer_call_ids.add(call_id)
+                    elif tool_name in AGENT_TOOLS:
                         if _is_reviewer_dispatch(inp):
                             saw_reviewer_call = True
                             if isinstance(call_id, str) and call_id:
                                 reviewer_call_ids.add(call_id)
-                        elif tool_name in ("taskoutput", "task_output", "manage_task"):
-                            task_id = str(inp.get("task_id") or inp.get("TaskId") or inp.get("id") or "")
-                            if task_id and task_id in reviewer_task_ids:
-                                if isinstance(call_id, str) and call_id:
-                                    reviewer_call_ids.add(call_id)
                     elif tool_name == "bash" and external_reviewer_command(
                             str(inp.get("command") or "")):
                         saw_reviewer_call = True
@@ -1777,13 +1799,15 @@ def verify_review(transcript_path: str, directory: str | None,
         except Exception as e:
             return False, f"Failed reading transcript: {e}"
 
-    if not transcript_path and not saw_reviewer_call:
+    # Neither this condition nor the one below carries `and not
+    # saw_reviewer_call`. That conjunct cannot be False on either path:
+    # `saw_reviewer_call` is assigned only inside the `os.path.exists` branch
+    # above, which both of these conditions exclude, so it is still False here.
+    # Dropped from both rather than one, so the two read alike
+    # (`dead-code-is-tech-debt`).
+    if not transcript_path:
         return False, "No transcript available to verify the adversarial self-review."
 
-    # No `and not saw_reviewer_call` here: it cannot be False on this path, since
-    # `saw_reviewer_call` is assigned only inside the `os.path.exists` branch
-    # above, which this condition excludes. Stating that beats carrying an inert
-    # conjunct a later reader has to re-derive (`dead-code-is-tech-debt`).
     if transcript_path and not os.path.exists(transcript_path):
         # Distinguished from the denial below because the two have different
         # remedies and only one of them is the pusher's to apply. Reporting a

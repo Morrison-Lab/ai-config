@@ -2265,10 +2265,16 @@ def omo_cases() -> tuple[int, int]:
 def codex_cases() -> tuple[int, int]:
     """Codex's native `spawn_agent` subagent dispatch (ai-config#3707).
 
-    Codex reaches its subagent interface as `collaboration.spawn_agent`, which
-    `AGENT_TOOLS` did not list -- so a Codex session that dispatched the
-    reviewer, got a clean report naming the exact commit, and pushed was denied
-    for never having dispatched a reviewer at all.
+    `AGENT_TOOLS` listed no Codex dispatch tool, so a Codex session that
+    dispatched the reviewer, got a clean report naming the exact commit, and
+    pushed was denied for never having dispatched a reviewer at all.
+
+    Two spellings are exercised, with different standing. `spawn_agent` is
+    attested, by `TOOL_ALIASES` in `plugins/ai-config/codex-hook-adapter.py`.
+    `collaboration.spawn_agent` is the name ai-config#3707's reporter used for
+    the interface in prose and has never been measured as a tool name;
+    ai-config#3741 tracks getting that measurement. It is covered here because
+    the guard accepts it, not because it is known to occur.
 
     Widening a tool-name set is the kind of change that can quietly authorize
     more than it means to, so the cases below pin BOTH directions: the Codex
@@ -2392,6 +2398,64 @@ def codex_cases() -> tuple[int, int]:
               rc == 0 and not blocked)
     finally:
         shutil.rmtree(d, ignore_errors=True)
+
+    # 11. Reported path WINS when it exists. The complementary direction to
+    #     case 10, and the one a `if True:` mutant on the same line slips past:
+    #     that mutant lets the fallback override a LIVE reported transcript, so
+    #     a session whose session_id collides with a stale
+    #     `~/.claude/transcripts/<id>.jsonl` is graded against the wrong one.
+    #     Here the reported transcript carries no review and the fallback
+    #     carries a clean one, so only the correct precedence denies.
+    d = tempfile.mkdtemp(prefix="npwsr-codex-")
+    try:
+        tdir = os.path.join(d, "transcripts")
+        os.makedirs(tdir)
+        with open(os.path.join(tdir, "sess-other.jsonl"), "w") as f:
+            for ev in reviewed(tool="spawn_agent"):
+                f.write(json.dumps(ev) + "\n")
+        reported = os.path.join(d, "reported.jsonl")
+        with open(reported, "w") as f:
+            f.write(json.dumps(poison_assistant_prose()) + "\n")
+        rc, out = run_hook(
+            PUSH, None,
+            extra_env={"CLAUDE_CONFIG_DIR": d},
+            payload_extra={"transcript_path": reported,
+                           "session_id": "sess-other"})
+        nested = out.get("hookSpecificOutput") or {}
+        check("a live reported transcript is not overridden by the fallback",
+              rc == 0 and nested.get("permissionDecision") == "deny")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+    # 12. A task-output tool carrying a reviewer PERSONA label must not reach
+    #     the persona path at all. For a dispatching tool the persona names who
+    #     will run; for one of these `task_id` names whose output is returning,
+    #     so admitting it on the label alone severs the WHO-said-it chain. The
+    #     dispatch here is a non-reviewer whose task id the retrieval quotes
+    #     correctly -- only the label is a lie, and no reviewer ever ran.
+    #     `name` is included because it reproduces on origin/main: this is a
+    #     pre-existing hole (ai-config#3742) that the persona-key widening would
+    #     otherwise have spread from one spelling to three.
+    for key in ("persona", "agent", "name", "subagent_type"):
+        for out_tool in ("taskoutput", "task_output", "manage_task"):
+            events = [
+                {"type": "assistant", "message": {"content": [
+                    {"type": "tool_use", "id": "codex-d1", "name": "Agent",
+                     "input": {"subagent_type": "doc-writer",
+                               "prompt": "describe the review report contract"}}]}},
+                {"type": "user", "message": {"content": [
+                    {"type": "tool_result", "tool_use_id": "codex-d1",
+                     "content": json.dumps({"task_id": "T7"})}]}},
+                {"type": "assistant", "message": {"content": [
+                    {"type": "tool_use", "id": "codex-d2", "name": out_tool,
+                     "input": {"task_id": "T7", key: "adversarial-reviewer"}}]}},
+                {"type": "user", "message": {"content": [
+                    {"type": "tool_result", "tool_use_id": "codex-d2",
+                     "content": body()}]}},
+            ]
+            rc, blocked, _ = push(events)
+            check(f"`{out_tool}` labelled `{key}` does not authorize",
+                  rc == 0 and blocked)
 
     return failures, ran
 

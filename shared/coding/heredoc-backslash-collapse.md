@@ -145,6 +145,10 @@ it is equally the check for a literal you believe is correct.
   default;
   it is the failing form in both directions, which is why the hook flags it
   regardless of transport.
+  (One bounded exception: a heredoc writing SOURCE CODE on a non-collapsing
+  transport, where the doubled form is arithmetic rather than error --- see the
+  two-parse-layer section below, which bounds this claim rather than
+  contradicting it.)
 
 `hooks/warn-heredoc-doubled-backslash.py` needs nothing for this direction: it
 says the transport *can* collapse and prescribes building the character, both
@@ -160,10 +164,23 @@ Everything above is about content that must survive verbatim, where one layer
 sits between what you type and what the interpreter sees.
 A generator adds a second: the heredoc feeds Python, and the string Python
 writes is itself Python source that will be parsed again.
-`"\\n"` in the generator is then exactly right, because it puts `\n` in the
-generated file, which that file parses as a newline.
-Neither the collapse rule nor its inverse applies, and both of them read as
-though they do.
+On a transport that does not collapse, `"\\n"` in the generator is then
+exactly right: it puts `\n` in the generated file, which that file parses as a
+newline.
+Neither the collapse rule nor its inverse applies there, and both of them read
+as though they do.
+
+**On a collapsing transport the same two layers want three backslashes, and the
+doubled form fails exactly as the sections above say.**
+The first layer eats one before Python ever sees it, so `"\\n"` hands the
+generator a real newline and the generated file gets a literal line break inside
+a string literal.
+That is the 2026-09-08 recurrence recorded above, which was a generator case:
+a Python-heredoc edit writing `"\\n"` into a test fixture produced literal
+newlines and a `SyntaxError` that reached a PR.
+So layer counting says how many doublings the *parsers* need, and the transport
+says how many survive --- and `chr(92)` is correct on both, which is why it
+stays the prescription rather than any arithmetic.
 
 The danger is diagnostic rather than mechanical, which is why it needs saying
 after everything above rather than being derivable from it.
@@ -180,7 +197,8 @@ moment the question arises.
 
 Counting the layers first settles it and costs nothing.
 Ask how many times the text will be parsed between the keyboard and the
-behaviour, and expect one doubling per layer beyond the first.
+behaviour, and expect one doubling per layer beyond the first --- then one
+more if the transport collapses, or sidestep the count with `chr(92)`.
 Then confirm the outcome rather than the theory, by exercising the generated
 code --- here, the denial message printed with a real line break, which no
 amount of reasoning about backslashes establishes.

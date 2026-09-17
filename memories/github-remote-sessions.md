@@ -114,6 +114,10 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   (run 34943644439) that ran the review normally.
   [`claude-bot-workflows`](claude-bot-workflows.md)'s bot-sender-push entry
   carries that measurement and what the skip costs downstream.
+  The MCP-write row is implicated too, by the same day's
+  [#3745](https://github.com/Morrison-Lab/ai-config/pull/3745): its review run
+  35270553450 is `actor: claude[bot]`, on a pull request opened through
+  `mcp__github__create_pull_request`.
   The consequence is narrow and worth stating where the table is read: the
   next bullet's remedy of re-triggering a review by pushing is conditional on
   this row rather than guaranteed by it, and the row's own instruction --- read

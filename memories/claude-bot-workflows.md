@@ -338,6 +338,12 @@ Triggering a review, and what becomes of the reply it writes, live in
     command line.
     That row records one session rather than the class, so derive the
     sender from the run and not from the table.
+    The PR recording this entry reproduced it on itself within minutes:
+    [#3745](https://github.com/Morrison-Lab/ai-config/pull/3745)'s own review
+    run 35270553450 is `actor: claude[bot]` with all six `review /` jobs
+    `skipped`, on a branch pushed from the command line and opened through
+    `mcp__github__create_pull_request` --- so the same reading extends to that
+    table's MCP-write row, which also reads `d-morrison` (User).
   - **The skip reaches the merge gate, so the PR reads `clean` rather than
     blocked.**
     Three facts this corpus already holds compose into one that none of them

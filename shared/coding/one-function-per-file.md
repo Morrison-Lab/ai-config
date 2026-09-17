@@ -29,6 +29,13 @@ obligated to split every pre-existing function out --- that's a separate,
 larger refactor with its own cost/benefit call. Do put the **new** function
 in its own file, so at least new code follows the convention going forward.
 
+**When splitting an existing multi-function file**, move each function's
+complete leading documentation block with the function and remove that block
+from the original file.
+After the split, search the original files for stray documentation and run
+the language's documentation generator;
+account for every generated change before committing.
+
 (Corrected on `d-morrison/altdoc#21`, 2026-07-09: two new functions --
 `.rewrite_self_links()` and its helper `.rewrite_self_links_one()` -- were
 initially added inline to an existing multi-function file,

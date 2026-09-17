@@ -39,19 +39,25 @@ A duplicate **issue** closes natively via
 `gh issue close <N> --reason duplicate --duplicate-of <target>`
 (shipped December 2024; confirm with `gh help issue close` since an older CLI may lack it),
 or via the `issue_write` MCP tool with `state_reason: duplicate` / `duplicate_of: <N>`.
-But `issue_write` and `gh issue close` both resolve issue numbers only server-side
-("Could not resolve to an Issue with the number of N" on a PR) ---
-a duplicate **PR** needs `update_pull_request` / `gh pr close` instead,
-which has no duplicate-reason concept at all.
+The two tools behave differently on a PR number, though, so treat them separately rather than as one rule.
+`issue_write`'s `state: closed` path resolves via GraphQL's `Repository.issue(number:)` field,
+which only exists for true issues and fails ("Could not resolve to an Issue with the number of N") on a PR number.
+`gh issue close <PR-N>` resolves via REST instead (which treats a PR as an issue) and **succeeds**,
+falling back to `PullRequestClose` --- it just can't attach a duplicate reason to a PR
+(`--duplicate-of` on a PR number fails its own client-side check: "`--duplicate-of` is only supported for issues").
+Either way, a duplicate PR still needs `update_pull_request` / `gh pr close` for a close that carries duplicate semantics,
+since neither tool's PR-close path has a duplicate-reason concept.
 
 - **Do:** query the referenced PR's state after a merge that used a closing
   keyword on it, rather than assuming the keyword closed it.
-- **Do:** close a duplicate/superseded PR explicitly via the PR-close path,
-  not the issue-close path.
+- **Do:** use `update_pull_request` / `gh pr close` for a duplicate PR close
+  that needs to carry duplicate semantics --- neither `issue_write` nor
+  `gh issue close` can attach one to a PR.
 - **Don't:** claim or plan around "merging this will auto-close that PR" for
   any `#N` that names a pull request rather than an issue.
-- **Don't:** reach for `issue_write` (or `gh issue close`) to close a PR ---
-  it resolves issue numbers only and errors on a PR number.
+- **Don't:** assume `issue_write` and `gh issue close` behave the same on a
+  PR number --- `issue_write` errors (GraphQL is issue-typed);
+  `gh issue close` silently succeeds as a plain close (REST resolves PRs too).
 
 ## Measured case
 

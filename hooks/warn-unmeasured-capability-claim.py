@@ -54,48 +54,138 @@ retraction -- so the forge write is the moment worth interrupting.
 
 SCOPE
 -----
-Two factors must BOTH appear within one window, which is what keeps this quiet:
-an absolute negative-capability idiom, and a tooling/environment noun near it.
-"The fix is not in this PR" has no absolute marker. "There is no way to know
-what the user meant" has no tooling noun. Requiring both is what separates a
-claim about the SYSTEM from ordinary hedged prose, and the system claims are
-the ones a reader acts on.
+Two factors must BOTH appear within one window: an absolute negative-capability
+idiom, and a tooling/environment noun near it. "The fix is not in this PR" has
+no absolute marker. "There is no way to know what the user meant" has no
+tooling noun.
+
+Requiring both narrows the field; it does not separate system claims from
+ordinary prose, and an earlier draft of this paragraph claimed it did. Measured
+2026-09-17 against this corpus's own `shared/**/*.md` in comment-sized
+2000-character chunks: 81 of 1992 fire, 4.1%, down from 5.7% before the
+branches below were trimmed. Sentences like "No changes will be needed to the
+CI workflow" carry both factors while asserting nothing about a capability.
+
+Three branches were narrowed for that reason, each measured as a top noise
+source: `regardless of` (a scope qualifier) and bare `unreachable` (a
+code-quality term in "unreachable branches") were dropped outright, and the
+loose "no X can Y" branch no longer matches a following "be", which is what
+"will be needed" and "will be required" turn on. The negated and prefixed
+forms are also kept apart, so "is possible" cannot match through an optional
+`un`.
+
+4.1% is the honest figure for an advisory reminder rather than a verdict, and
+it is the whole reason this warns rather than blocks.
 """
 import hashlib
+import importlib.util
 import json
 import os
 import re
 import sys
 import tempfile
 
+HERE = os.path.dirname(os.path.realpath(__file__))
+
+
+def _sibling(name, key):
+    """Import a hyphenated sibling module, or None if unavailable.
+
+    The pattern `flag-unmeasured-timestamp.py` and `no-empty-promise.py` use.
+    Fails open, per the file-wide contract.
+    """
+    try:
+        spec = importlib.util.spec_from_file_location(
+            key, os.path.join(HERE, name))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    except Exception:
+        return None
+
+
+_disclosure = _sibling("require-agent-disclosure.py", "_sib_capability_disclosure")
+_rebuttal = _sibling("flag-uncited-rebuttal.py", "_sib_capability_rebuttal")
+
 # Forge-write surfaces. A chat reply is deliberately out of scope (see the
 # docstring): the cost this guards against is durability, not wrongness.
-MCP_POST_TOOLS = (
+#
+# The canonical tuple lives in `require-agent-disclosure.py` and is taken as
+# the BASE rather than copied, because a fourth hand-maintained copy is how a
+# surface goes missing: the first revision of this file wrote its own list and
+# silently dropped `discussion_comment_write`, which meets every durability
+# criterion the docstring uses (ai-config#3737 round 8). Widening the shared
+# tuple itself is ruled out at `flag-unread-commit-citation.py` -- a sibling
+# imports it and the meaning of that import would change -- so the extras this
+# hook needs are added here, where they affect nothing else.
+_CANONICAL_POST_TOOLS = getattr(_disclosure, "MCP_POST_TOOLS", (
     "mcp__github__add_issue_comment",
+    "mcp__github__add_comment_to_pending_review",
     "mcp__github__add_reply_to_pull_request_comment",
+    "mcp__github__pull_request_review_write",
+    "mcp__github__discussion_comment_write",
+))
+MCP_POST_TOOLS = tuple(dict.fromkeys(_CANONICAL_POST_TOOLS + (
     "mcp__github__issue_write",
     "mcp__github__update_pull_request",
     "mcp__github__create_pull_request",
-    "mcp__github__pull_request_review_write",
-    "mcp__github__add_comment_to_pending_review",
-)
+)))
 BASH_TOOL_NAMES = ("Bash", "bash", "run_command", "execute_command", "terminal", "shell")
+
+# The `gh` command shapes that post a durable body. Taken from the siblings
+# that already parse them rather than written afresh: the first revision here
+# reimplemented the test in two lines and reached none of `gh api
+# .../comments`, `gh api .../replies` or `gh pr review --body`, all of which
+# this corpus documents and uses (ai-config#3737 round 8).
+_NEVER = re.compile(r"(?!)")
+RX_COMMENT_POST = getattr(_rebuttal, "RX_COMMENT_POST", _NEVER)
+RX_REVIEW_POST = re.compile(
+    r"(?:^|[;&|\n])\s*"
+    r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
+    r"gh\s+pr\s+review\b",
+    re.I | re.M,
+)
+
+# `glab`'s note forms, which no sibling carries. `skills/gi/SKILL.md` uses
+# `glab issue note <N> --message`, `skills/ard/SKILL.md` uses `glab mr note
+# <N> -F`, and `skills/claim-pr/SKILL.md` uses `glab mr note create <N>`.
+# Position-anchored like the sibling, so prose quoting the command does not
+# fire.
+RX_GLAB_POST = re.compile(
+    r"(?:^|[;&|\n])\s*"
+    r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
+    r"glab\s+(?:issue|mr)\s+(?:note|comment)\b",
+    re.I | re.M,
+)
+
+# `gh issue|pr create|edit`, which the sibling does not cover because a PR body
+# is not a comment. Kept separate so each shape is readable.
+RX_GH_CREATE_EDIT = re.compile(
+    r"(?:^|[;&|\n])\s*"
+    r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
+    r"gh\s+(?:issue|pr)\s+(?:create|edit)\b",
+    re.I | re.M,
+)
 
 # Factor 1: the claim is ABSOLUTE. Each idiom asserts that no instance exists,
 # which no single observation can establish. Hedged forms ("appears to",
 # "I could not get it to") are deliberately absent -- they invite the check
 # already, which is the behaviour this exists to produce.
+# The negated and the prefixed forms are SEPARATE branches on purpose. Folding
+# them into one optional-`un` alternative matches the affirmative "is possible"
+# as readily as "is impossible", which would fire on prose asserting that
+# something CAN be done -- the exact opposite of this hook's subject.
 RX_ABSOLUTE = re.compile(
     r"\b(?:"
-    r"is (?:not available|unavailable)"
-    r"|are (?:not available|unavailable)"
-    r"|unbuildable|unreachable|impossible"
-    r"|there is no way to"
-    r"|cannot be (?:built|made|done|fixed|reached|achieved|used|recognized)"
-    r"|regardless of"
+    r"(?:is|are|was|were)(?:n't| not) (?:available|possible|supported)"
+    r"|(?:is|are|was|were) (?:unavailable|unsupported|unreachable)"
+    r"|unbuildable|impossible"
+    r"|there(?:'s| is| was) no way (?:to|of)"
+    r"|cannot be (?:built|made|done|fixed|reached|achieved|used|recognized"
+    r"|parsed|read|detected|measured|observed|recovered)"
     r"|no matter (?:what|how)"
     r"|never (?:works|fires|runs|returns)"
-    r"|no (?:\w+ ){0,3}(?:can|will|could) (?:ever )?\w+"
+    r"|no (?:\w+ ){0,3}(?:can|will|could) (?:ever )?(?!be\b)\w+"
     r")\b",
     re.I,
 )
@@ -103,10 +193,16 @@ RX_ABSOLUTE = re.compile(
 # Factor 2: the claim is about the SYSTEM rather than about the work. These are
 # the nouns whose behaviour is measurable, so a claim attached to one of them
 # is a claim somebody can and should check.
+# Every noun is pluralizable. The first revision inflected exactly one entry
+# (`dispatch`) and left the rest bare between word boundaries, so "No hooks can
+# see this payload, and no agents will ever receive it" -- an absolute claim
+# about the system, matching the other factor twice -- was silently discarded.
+# The single inflected entry is what made the list read as stem-matched
+# (ai-config#3737 round 8). `MCP` and `CI` take no plural and are spelled out.
 RX_TOOLING = re.compile(
-    r"\b(?:harness|hook|guard|runner|dispatch(?:er|es|ed)?|subagent|agent|"
-    r"transcript|classifier|permission|API|CLI|MCP|workflow|CI|tool|session|"
-    r"provenance|chain)\b",
+    r"\b(?:(?:harness(?:es)?|hooks?|guards?|runners?|dispatch(?:er|ers|es|ed)?"
+    r"|subagents?|agents?|transcripts?|classifiers?|permissions?|APIs?|CLIs?"
+    r"|workflows?|tools?|sessions?|provenance|chains?)|MCP|CI)\b",
     re.I,
 )
 
@@ -158,9 +254,12 @@ def _extract_body(tool_name, tool_input):
         if not isinstance(command, str):
             return None, None
         # Only a forge write; a local `git commit -m` is not this surface.
-        if not re.search(r"\b(?:gh|glab)\s+(?:issue|pr|mr)\b", command):
-            return None, None
-        if not re.search(r"\b(?:comment|create|edit)\b", command):
+        # Each shape is position-anchored, so prose or a heredoc quoting the
+        # command does not count as issuing it.
+        if not (RX_COMMENT_POST.search(command)
+                or RX_REVIEW_POST.search(command)
+                or RX_GLAB_POST.search(command)
+                or RX_GH_CREATE_EDIT.search(command)):
             return None, None
         return command, "forge command"
     return None, None
@@ -176,12 +275,25 @@ def _findings(body):
     return None
 
 
+# A sentence ends at `.`/`!`/`?` followed by whitespace and then something that
+# can OPEN a sentence. A bare `.` is not enough: `16.3` has no space after it,
+# `verify-the-right-artifact.md for` is followed by a lowercase word, and a URL
+# is both -- so the first version of `_quote` cut the reminder mid-token and
+# produced quotes opening `md for context;` and `3 seconds so` (ai-config#3737
+# round 8). The quote IS the hook's product, so a mangled one degrades the only
+# thing it delivers.
+RX_SENTENCE_END = re.compile(r"[.!?][\"'`)\]]*\s+(?=[A-Z\"'`*(\[])")
+
+
 def _quote(body, hit):
     """The sentence the hit sits in, trimmed for the reminder."""
-    start = body.rfind(".", 0, hit.start())
-    start = 0 if start == -1 else start + 1
-    end = body.find(".", hit.end())
-    end = len(body) if end == -1 else end + 1
+    start = 0
+    for m in RX_SENTENCE_END.finditer(body, 0, hit.start()):
+        start = m.end()
+    end = len(body)
+    tail = RX_SENTENCE_END.search(body, hit.end())
+    if tail:
+        end = tail.start() + 1
     quote = " ".join(body[start:end].split())
     return quote[:300] + ("..." if len(quote) > 300 else "")
 
@@ -208,9 +320,12 @@ def main() -> int:
         if hit is None:
             return 0
 
-        # Fire once per distinct (surface, body), so an edit-and-retry of the
-        # same text on the same surface is not re-flagged. The TOOL is in the
-        # key deliberately: the measured incident published one claim to an
+        # Fire once per distinct (tool, body), so an edit-and-retry of the same
+        # text through the same tool is not re-flagged. The first version of
+        # this comment said `(surface, body)`, which is strictly coarser --
+        # `surface` takes two values across seven MCP tools -- and the sentence
+        # after it already said the right thing (ai-config#3737 round 8). The
+        # TOOL is in the key deliberately: the measured incident published one claim to an
         # issue comment and then the same claim into a PR body, and those are
         # two publications, each worth its own question. Keying on the body
         # alone silently suppressed the second -- caught by a test, not by

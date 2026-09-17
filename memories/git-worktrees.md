@@ -402,6 +402,46 @@ the discretionary premise check
 [`challenge-the-assignment`](../shared/workflow/challenge-the-assignment.md) says
 not to leave as the only detector.)
 
+## Same repo, still the wrong commit: `isolation: "worktree"` cuts from the DEFAULT branch, not the dispatching session's own HEAD
+
+The section above is the cross-repo case: isolation gives a worktree of the
+wrong repository entirely.
+This is the narrower, same-repo case, and it is easy to assume away precisely
+because the repo is right --- the worktree is a checkout of the session's own
+repo, and its commit is still not where the session actually is.
+
+Measured 2026-09-17: a session checked out on `claude/project-thread-6oaft0`
+at `d25ea1e` dispatched an `Agent` call with `isolation: "worktree"`.
+The resulting worktree landed on `origin/main` at `49f0109` --- a different
+branch and a different commit from the dispatching session's own HEAD.
+A brief that told the agent to review `git diff 8772ee1..HEAD` was
+unfollowable as written, because `8772ee1` was not an ancestor of that
+worktree's `HEAD`: the diff it actually produced was a 1066-line deletion of
+files unrelated to the intended review.
+The agent recovered by reading the named commits out of the shared object
+store (a linked worktree shares objects with the main checkout) and
+extracting the tree with `git archive` rather than diffing against its own
+HEAD.
+
+This is [`challenge-the-assignment`](../shared/workflow/challenge-the-assignment.md)'s
+"don't assert anything about the recipient's environment that your own
+session cannot query" one level narrower than its own worked case (#1268,
+above): there the wrong assumption was which REPO the worktree lands in,
+here it is which COMMIT within the right repo --- `isolation` resolves to
+the repo's default-branch tip, not to whatever the dispatching session
+happens to have checked out.
+
+- **Do:** name a brief's diff-range commits by full SHA, and say they live in
+  the shared object store rather than assuming either is an ancestor of the
+  recipient's HEAD.
+- **Do:** have the agent create its own worktree off the exact named commit
+  when a range matters, rather than relying on the one `isolation` handed it.
+- **Don't:** write a commit range into a brief on the assumption that the
+  recipient's HEAD is the dispatching session's HEAD, even within one repo.
+- **Don't:** read "not an ancestor" as "unreachable" --- the commit is
+  present in the shared object store even when it is not an ancestor of the
+  worktree's own HEAD.
+
 ## In a session rooted in a worktree, `cd <repo-root>` lands in the MAIN checkout
 
 The section at the top of this file covers `git worktree add` leaving the shell

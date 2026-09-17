@@ -299,8 +299,20 @@ one per end, each holding the opposite end at `task_id` ---
 a spelling both ends had always read.
 Both loops ran green under exactly the defect,
 and had done so through a full review round.
-The 25-cell product fails on four cells;
-the two marginal loops fail on none.)
+The 25-cell product fails on nine cells;
+the two marginal loops fail on none.
+Nine rather than four, which is what the first version of this paragraph said:
+five rows where the retrieval names `conversationId`,
+which the consumer's list omitted,
+plus four more where the result announces `TaskId`,
+which the producer's list omitted.
+The count was written from the shape of the defect rather than from the run,
+inside the one passage arguing that the check is arithmetic rather than judgment ---
+so the example asserted a product it had not multiplied.
+A later round re-ran it: post-fix suite against the pre-fix hook,
+with the post-fix pair as a negative control first,
+giving `All 416 cases passed` and then `15/416 cases failed`,
+nine of them cross-product rows.)
 
 (Measured on [ai-config#1947](https://github.com/Morrison-Lab/ai-config/pull/1947),
 merged 2026-08-22 after six review rounds.

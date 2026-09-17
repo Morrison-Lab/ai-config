@@ -1225,3 +1225,23 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
 - **Don't:** trust that a fix which resolves the reported false positive is safe merely because it does;
   test what it newly permits, separately from what it correctly stopped denying.
 - **Don't:** stop at the review's own named finding --- the fix for a comparison bug in one branch can leave the identical bug shape live in a sibling branch nobody pointed at.
+
+## Pattern 56: Pronouncing a Two-Part Fix Dangerous From Its Combined Effect, With Neither Half Tested Alone
+
+- **Mistake**: judging a fix self-authorizing (or otherwise dangerous) from
+  what the whole change would do, when only the CONJUNCTION of its two
+  halves carries the risk and one half is safe by itself.
+- **Example**: 2026-09-17, `Morrison-Lab/ai-config` project memory.
+  A note said a two-part guard fix "authorizes the editing session's own
+  push" and must not be made unprompted.
+  Applying only one half in a scratch copy and re-running the guard against
+  the real transcript showed it still denied on the same branch --- the risk
+  lived in the other half alone.
+- **Fix**: decompose a multi-part fix into its independently-applicable
+  halves and mutation-test each one against real input before ruling on the
+  combination.
+- **Do:** apply each half of a multi-part fix separately, in a scratch copy,
+  and re-run the check against real input before pronouncing the whole
+  dangerous.
+- **Don't:** let a true claim about the conjunction stand for both halves ---
+  it can block a half that measurement shows is safe.

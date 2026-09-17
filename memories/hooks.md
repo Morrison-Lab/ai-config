@@ -382,6 +382,21 @@ The mechanism now exists as `check_executable_bits` in
 `shared/principles/fail-fast.md`'s aggregate-count entry for how that check
 itself needed two more rounds to land soundly.)
 
+## 5.8 A denial message's remedy should name the condition, not prescribe an action the harness may not support
+
+Section 4.5 above asks whether a warning "already names the concrete remedy" before treating a recurrence as an escalation signal.
+Concreteness is not the whole test: a remedy can be perfectly concrete and still be wrong for the session reading it, when it prescribes one specific action ("dispatch it in the foreground") that assumes a capability the current harness does not actually offer.
+
+A harness whose subagent dispatch never returns synchronously -- no `run_in_background` field to set, or the field set and ignored -- cannot follow "dispatch in the foreground" at all.
+The message then reads as a mistake the author must have made (they must have backgrounded it) rather than as a gap in what the harness reports, and it leaves no next step: the one action named is unavailable, and nothing else is offered.
+
+`shared/workflow/adversarial-self-review.md`'s "A harness that always backgrounds the `Agent` tool" section (ai-config#3045) is the concrete instance and its concrete escape hatch (`ALLOW_UNREVIEWED_PUSH=1`, stated plainly, with the reason recorded).
+This entry is the general authoring lesson it implies for any future guard: prefer describing the **condition** the guard needs satisfied ("a synchronous reviewer verdict for this commit exists") over prescribing the **action** most sessions would take to satisfy it, and pair a prescribed action with a stated fallback whenever the harness might not support it.
+
+- **Do:** phrase a guard's remedy around the condition it is checking for, naming the usual action as one way to satisfy it rather than the only way.
+- **Do:** when a specific action is genuinely required (an env var, a specific flag), still name the fallback that applies when the harness cannot perform the usual action.
+- **Don't:** write a remedy that assumes every harness can perform the same action synchronously -- a dispatch, a foreground run, a specific tool call -- without naming what to do when it cannot.
+
 ## 6. A guard that keeps firing after you satisfied it: stop, and read the copy that runs
 
 [`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md) already carries this defect in full --- the fail-open direction of a dated constant, why the newest cache directory is not a valid proxy for the loaded copy, and the `ps -eo args` capture that resolved it.

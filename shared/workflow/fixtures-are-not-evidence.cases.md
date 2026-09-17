@@ -84,6 +84,14 @@ age terms, and the test asserts
 `expect_gt(max(abs(cif$cum_incidence - at_mean$cum_incidence)), 0.05)` against
 `ab507bs_gcomp_cif_at_mean_age()`, the retired computation kept as a helper.)
 
+## "What does the fixture supply for free" --- a persona key riding along with every varied tool name
+
+(`Morrison-Lab/ai-config#3707`, commit `dd10dca4`, 2026-09-17: `hooks/no-push-without-self-review.py`'s test suite varied the dispatch tool name (`Agent`, `Task`, Codex's `spawn_agent`) across a dozen rows meant to pin that a Codex dispatch authorizes a push the same way a Claude one does.
+The shared `reviewed()` fixture builder defaulted its persona-carrying field to `key="subagent_type"`, the one key the guard already read for every tool, so every row -- whichever tool name it named -- supplied a persona under a key the guard could already see.
+The rows discriminated on the wrong dimension: `tool` varied while `key` stayed pinned at the value that already worked, so a dozen "Codex" rows were a Claude-shaped dispatch wearing a Codex tool name, and none of them could exercise a persona keyed on `agent` or `persona` -- two keys a sibling predicate in the same file read that the one under test did not.
+The fix, in the commit's own words: "the finding was real precisely because every earlier Codex row supplied Claude's `subagent_type` for free, which is `fixtures-are-not-evidence`'s own question."
+The remedy was to vary `key` as its own dimension rather than only `tool`.)
+
 ## "A fourth direction" --- an unreachable `moved == 4` target
 
 (`Lacaedemon/sparta` PR #1282, 2026-08-16: a review found that

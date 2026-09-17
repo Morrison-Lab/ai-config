@@ -67,6 +67,33 @@ To verify the branching site:
   Verify that the test suite fails when the branching site is in the half-fixed state.
   If the test passes when the branching site is untouched, the test is not verifying behaviour.
 
+## A predicate shared by several branches: widening it can steal a case from a stricter sibling
+
+The two-site frame above assumes one admission gate feeding one execution path.
+A related but distinct shape recurs in authorization code with several branches in one `if`/`elif` chain, each meant to be authoritative for a different kind of input, where the same downstream predicate (a persona-name lookup, a type matcher) is consulted from more than one arm.
+Widening that predicate to admit a new case for the arm you are fixing can make an **earlier** arm match inputs it was never meant to see, silently routing them away from a **later**, stricter arm that was the actual authority for them.
+The widened arm is not wrong about the case it was built for;
+it now also wins ties it should have lost.
+
+Nothing about this shows up in a diff review of the arm you touched, because that branch continues to behave correctly on its own inputs.
+What breaks is a sibling branch elsewhere in the chain, and the failure is silence rather than an error: the sibling's stricter check simply never runs for the stolen input.
+
+(`Morrison-Lab/ai-config#3707` / `#3742`, commits `dd10dca4` and `6ed58075`, 2026-09-17.
+`hooks/no-push-without-self-review.py` widened the persona-key set a lookup function reads, to recognize a Codex reviewer dispatch keyed on `agent` or `persona`.
+That same lookup is consulted from a branch that ran before the branch carrying the guard's real, stricter provenance check for task-output-tool calls -- a `task_id`-membership test against IDs the guard itself recorded as reviewer dispatches.
+Because the persona check now matched more inputs, a task-output call merely *labelled* with a reviewer persona was parsed as a genuine reviewer report: dispatch an unrelated persona in the background, capture its task id, then call the task-output tool with that id plus a `persona` key naming the reviewer and a well-formed clean report -- authorized, with no review having happened.
+The hole pre-dated the widening (it reproduced on `origin/main` via a persona key already in the narrower set);
+the widening spread it to two more keys.
+The fix reorders the chain so the stricter, task-id-gated branch is tested first and is exhaustive for its own input class, so a persona label on that call can never reach the looser branch at all.
+Twelve regression cases pin the ordering; reverting it fails all twelve.)
+
+- **Do:** before widening a predicate, list every branch that consults it, not only the one the finding named -- a persona/name/type matcher reused across an `if`/`elif` chain gates more than the arm you are editing.
+- **Do:** where two branches can both match the same input, make the stricter, more-authoritative branch's condition run first and exhaustive for its own input class, so a looser sibling can never reach it.
+- **Do:** mutation-test a branch ordering the same way any other guard condition is tested -- revert the order and confirm the regression case fails.
+- **Don't:** reason about a widened predicate's safety from the arm it was written for;
+  ask what else in the same chain reads it.
+- **Don't:** assume a hole that appeared alongside a widening was caused by it -- check whether the base branch already reproduces it, since the fix differs (reorder vs. narrow) depending on which is true.
+
 ## Related rules
 
 - [`fail-fast.md`](fail-fast.md):
@@ -75,6 +102,7 @@ To verify the branching site:
   Extract execution scripts into testable units rather than embedding untestable multi-line shell blocks in CI templates.
 - Pattern 35 in [`mistake-patterns.md`](../../memories/mistake-patterns.md):
   The recurring failure record for admitting-vs-branching half-fixes.
+- [`fixtures-are-not-evidence.md`](../workflow/fixtures-are-not-evidence.md): Every row testing the widened predicate supplied its old key for free and so could not exercise the new ones.
 
 ## Do / Don't
 

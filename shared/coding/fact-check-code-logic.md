@@ -1217,7 +1217,7 @@ The mechanism here is contrast: the disclosed neighbour is what manufactures the
 (Morrison-Lab/ai-config#3707, commit `0a125ec`, 2026-09-17: a hook's dispatch-tool-name set carried two comments about names added on incomplete evidence.
 One explicitly said "`collaboration.spawn_agent` is the name a reporter used for the interface in prose;
 nothing here has measured it as the name a transcript carries" --- a disclosed, cited gap.
-Three entries later, `manage_task` was classified retrieval-only with no such hedge, stated as settled fact, though the repository's only evidence for it (three files, all showing `Action='status'`) never covers the creation case the classification also assumes.
+Three entries later, `manage_task` was classified retrieval-only with no such hedge, stated as settled fact, though the repository's only evidence for it (three files, two showing `Action='status'` and the third naming the tool with no `Action` at all) never covers the creation case the classification also assumes.
 A review round found it by asking whether every classification in the group met the same bar the disclosed one had already set, not by doubting the `manage_task` line on its own.)
 
 ## A comment asserting the state of ANOTHER artifact is a claim with an expiry across commits

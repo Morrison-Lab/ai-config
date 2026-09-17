@@ -245,7 +245,16 @@ TASK_OUTPUT_TOOLS = {"taskoutput", "task_output", "manage_task"}
 # they did not, and stating an invariant is not enforcing one (ai-config#3737
 # round 6). Widening the producer cannot admit anything, since the set is built
 # only from reviewer dispatch results.
-TASK_ID_KEYS = ("task_id", "taskId", "TaskId", "conversationId", "id")
+#
+# `agentId` is in the tuple because it is the ONE spelling this repository
+# has actually observed in a live session: `shared/workflow/adversarial-self-review.md`
+# records a Claude Code CLI result reading `agentId: a29a955ac15b38f72`, four
+# genuine reviews refused on the strength of it, and a one-line widening
+# proposed on ai-config#3045. The first revision of this constant rewrote both
+# ends of that exact chain and still omitted the spelling the measurement named
+# -- the tuple was assembled from what the code already read rather than from
+# what the corpus had already recorded (ai-config#3737 round 7).
+TASK_ID_KEYS = ("task_id", "taskId", "TaskId", "conversationId", "agentId", "id")
 
 # The task-notification `origin` envelope gets a NARROWER list, deliberately.
 # `origin` identifies a notification, so its `id` is the notification's own id
@@ -256,15 +265,38 @@ TASK_ID_KEYS = ("task_id", "taskId", "TaskId", "conversationId", "id")
 TASK_ID_KEYS_ORIGIN = ("task_id", "taskId", "TaskId", "conversationId")
 
 
-def _first_task_id(source, keys=TASK_ID_KEYS) -> str:
-    """The first task-id spelling present in `source`, as a `str`, else ""."""
+def _task_ids(source, keys=TASK_ID_KEYS):
+    """Every task-id spelling present in `source`, as `str`, in `keys` order.
+
+    Returning only the FIRST spelling is the gap the shared tuple above could
+    not close on its own, and the comment there used to imply it had. A real
+    harness result carries several id keys at once, so a producer registering
+    one of them and a retrieval naming another miss each other -- the same
+    denial the shared tuple exists to prevent, reached by a different route,
+    and one the suite could not see because its fixture built single-key dicts
+    on both ends (ai-config#3737 round 7).
+
+    Neither guard below is decorative. A malformed `tool_input` yields a list
+    or a string here, and `.get` on it would raise `AttributeError` out into a
+    generic handler reporting "Failed reading transcript" rather than
+    evaluating the session. The `str()` coercion is equally load-bearing: a
+    harness reporting an id as a JSON number on one end and quoting it as text
+    on the other must still match.
+    """
     if not isinstance(source, dict):
-        return ""
+        return []
+    out = []
     for k in keys:
         v = source.get(k)
         if v:
-            return str(v)
-    return ""
+            out.append(str(v))
+    return out
+
+
+def _first_task_id(source, keys=TASK_ID_KEYS) -> str:
+    """The first task-id spelling present in `source`, as a `str`, else ""."""
+    ids = _task_ids(source, keys)
+    return ids[0] if ids else ""
 
 # A cross-family reviewer invoked as a CLI, whose print-mode output IS its
 # review. Each value lists the flags putting that program in non-interactive
@@ -1786,8 +1818,8 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                         # the producer read `conversationId` and the consumer did
                         # not. A comment cannot hold an invariant that a shared
                         # constant can (ai-config#3737 round 6).
-                        task_id = _first_task_id(inp)
-                        if task_id and task_id in reviewer_task_ids:
+                        if any(t in reviewer_task_ids
+                               for t in _task_ids(inp)):
                             if isinstance(call_id, str) and call_id:
                                 reviewer_call_ids.add(call_id)
                     elif tool_name in AGENT_TOOLS:
@@ -1815,11 +1847,10 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                         try:
                             res_data = json.loads(res_text)
                             if isinstance(res_data, dict):
-                                tid = _first_task_id(res_data)
-                                if tid:
+                                for tid in _task_ids(res_data):
                                     reviewer_task_ids.add(tid)
                         except Exception:
-                            tid_match = re.search(r"\b(?:task[-_ ]?id|conversationId)[:=]\s*[`\"']?([\w-]+)", res_text, re.I)
+                            tid_match = re.search(r"\b(?:task[-_ ]?id|conversationId|agentId)[:=]\s*[`\"']?([\w-]+)", res_text, re.I)
                             if tid_match:
                                 reviewer_task_ids.add(tid_match.group(1))
 
@@ -1836,10 +1867,10 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                     and origin.get("kind") in ("task-notification", "task_notification")
                 )
                 if is_task_notification and not is_assistant and not b.get("is_error"):
-                    origin_task_id = _first_task_id(origin, TASK_ID_KEYS_ORIGIN)
+                    origin_ids = _task_ids(origin, TASK_ID_KEYS_ORIGIN)
                     sender_id = str(record.get("sender") or "")
                     if (
-                        (origin_task_id and origin_task_id in reviewer_task_ids)
+                        any(t in reviewer_task_ids for t in origin_ids)
                         or (sender_id and sender_id in reviewer_task_ids)
                     ):
                         text = str(b.get("text") or b.get("content") or "")
@@ -2133,10 +2164,21 @@ def main() -> int:
             # an authorized push. Measured on this branch AND on `main`, so the
             # bypass predates the branch; filed as ai-config#3752.
             #
-            # `True` allows by a second route worth naming, since a fix aimed
-            # only at the raise would miss it: `os.path.exists(True)` tests FILE
-            # DESCRIPTOR 1, which exists, so nothing raises and the bool is
-            # carried into `verify_review` instead. `isinstance` covers both.
+            # `True` allows by a SECOND and worse route, and the first account of
+            # it here was wrong in a way worth keeping: it said the bool was
+            # "carried into `verify_review`". Measured, it never gets there.
+            # `os.path.exists(True)` is indeed `True` (fd 1 exists), so the
+            # value survives the check above -- but `read_latest_review` then
+            # calls `open(True)`, which opens FILE DESCRIPTOR 1, raises
+            # `OSError: [Errno 9]` on read, and CLOSES STDOUT leaving the
+            # `with`. The guard does reach a denial; it cannot EMIT one,
+            # because every `print` after that raises into the deliberate
+            # `except Exception: return 0`. Measured on `main`: all three
+            # non-`str` values produce zero bytes on stdout AND on stderr.
+            #
+            # `isinstance` closes this instance and NOT the class. Any failure
+            # inside `deny()` is a silent allow by the same route, a residue
+            # this line does not address -- ai-config#3756.
             _tp = payload.get("transcript_path")
             transcript_path = _tp if isinstance(_tp, str) else ""
             if not os.path.exists(transcript_path):

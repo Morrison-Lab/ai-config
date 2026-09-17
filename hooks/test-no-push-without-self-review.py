@@ -2590,7 +2590,8 @@ def codex_cases() -> tuple[int, int]:
     # The spellings `TASK_ID_KEYS` carries in the hook. Kept as a literal rather
     # than imported, so a spelling silently dropped from the hook's tuple fails
     # a case here instead of shrinking the matrix to match itself.
-    TASK_ID_SPELLINGS = ("task_id", "taskId", "TaskId", "conversationId", "id")
+    TASK_ID_SPELLINGS = ("task_id", "taskId", "TaskId", "conversationId",
+                         "agentId", "id")
 
     def background_flow(result_key, retrieve_key, raw_result=None):
         """A genuine background reviewer: dispatch, task id, retrieve, report.
@@ -2761,7 +2762,8 @@ def codex_cases() -> tuple[int, int]:
                 'Started background task. TaskId: T9',
                 'Started background task. task-id: T9',
                 'Started background task. task id: T9',
-                'Started background task. conversationId: T9'):
+                'Started background task. conversationId: T9',
+                'Started background task. agentId: T9'):
         rc, blocked, _ = push(background_flow(None, "task_id", raw_result=raw))
         spelling = raw.split(".")[1].split(":")[0].strip()
         check(f"a text-shaped dispatch result announcing `{spelling}` authorizes",
@@ -2775,6 +2777,119 @@ def codex_cases() -> tuple[int, int]:
                                           raw_result="Started background task. ref: T9"))
     check("a text-shaped result with no task-id spelling does not authorize",
           rc == 0 and blocked)
+
+    # 24. A dispatch result carrying MORE THAN ONE id spelling. Every row above
+    #     varies WHICH spelling each end uses and none varies HOW MANY, because
+    #     `background_flow` builds single-key dicts on both ends -- so a
+    #     producer that registered only the first spelling present passed the
+    #     whole 36-cell cross-product while denying the ordinary real shape,
+    #     which is a harness response carrying several id keys at once.
+    #
+    #     That is the same denial the shared tuple exists to prevent, reached by
+    #     a route the tuple cannot address: agreeing on the VOCABULARY does not
+    #     make the two ends agree on the VALUE when the vocabulary has several
+    #     words in it (ai-config#3737 round 7).
+    def multi_key_flow(result_keys, retrieve_key, retrieve_extra=None,
+                       retrieve_value="T9"):
+        """A dispatch result announcing several spellings of one task id."""
+        announce = json.dumps({k: v for k, v in result_keys})
+        inp = dict(retrieve_extra or {})
+        inp[retrieve_key] = retrieve_value
+        return [
+            {"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "id": "codex-mk", "name": "Agent",
+                 "input": {"subagent_type": "adversarial-reviewer",
+                           "prompt": "Review the diff"}}]}},
+            {"type": "user", "message": {"content": [
+                {"type": "tool_result", "tool_use_id": "codex-mk",
+                 "content": announce}]}},
+            {"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "id": "codex-mk2", "name": "taskoutput",
+                 "input": inp}]}},
+            {"type": "user", "message": {"content": [
+                {"type": "tool_result", "tool_use_id": "codex-mk2",
+                 "content": body()}]}},
+        ]
+
+    #     The two spellings carry DIFFERENT values, which is what makes these
+    #     rows discriminate. The first version gave both keys `T9`, and a
+    #     first-wins producer then registered `T9` anyway -- membership tests
+    #     the VALUE, so every row passed against the very code it was written
+    #     to catch, and the mutant survived the whole suite. The same
+    #     key-for-value slip appears in the negative control below; both were
+    #     found by mutation rather than by reading (ai-config#3737 round 7).
+    #
+    #     Distinct values are also the real shape: `taskId` and `conversationId`
+    #     name different identifier spaces, so a harness carrying both is
+    #     carrying two ids, not one id twice.
+    for (first, fval), (second, sval) in ((("taskId", "T9"), ("conversationId", "C4")),
+                                          (("task_id", "T9"), ("id", "I7")),
+                                          (("conversationId", "C4"), ("agentId", "A2"))):
+        rc, blocked, _ = push(multi_key_flow(
+            ((first, fval), (second, sval)), second, retrieve_value=sval))
+        check(f"a result announcing `{first}`={fval} and `{second}`={sval}, "
+              f"retrieved as `{second}`, authorizes", rc == 0 and not blocked)
+
+    #     The mirror, on the consuming end: the retrieval call carries an
+    #     unrelated id under an earlier spelling and the reviewer's own id under
+    #     a later one. A first-wins consumer reads the decoy and denies.
+    rc, blocked, _ = push(multi_key_flow(
+        (("task_id", "T9"),), "conversationId",
+        retrieve_extra={"task_id": "SOMETHING-ELSE"}))
+    check("a retrieval naming an unrelated id first and the reviewer's second "
+          "authorizes", rc == 0 and not blocked)
+
+    #     The negative control both rows need. Without it, "authorizes" above is
+    #     indistinguishable from a fixture that authorizes for some other
+    #     reason: if NO spelling in the retrieval names a registered id, the
+    #     push must still be denied.
+    #
+    #     The VALUE is what varies here, and the first version of this row got
+    #     that wrong: it changed only the key and kept `T9`, which is exactly
+    #     what membership tests, so the row failed as a false alarm against
+    #     correct code. Naming a different spelling of a registered id is not
+    #     an unregistered id.
+    rc, blocked, _ = push(multi_key_flow(
+        (("task_id", "T9"), ("conversationId", "T9")), "taskId",
+        retrieve_extra={"task_id": "SOMETHING-ELSE"},
+        retrieve_value="NOT-REGISTERED"))
+    check("a retrieval naming no registered id does not authorize",
+          rc == 0 and blocked)
+
+    # 25. The two conjuncts inside `_task_ids`, asserted directly. Both survived
+    #     out-of-tree mutation against all 416 cases in round 7 -- `isinstance`
+    #     relaxed to `is None`, and `str(v)` dropped -- so neither was pinned by
+    #     anything, in the same commit whose case 21 argues at length that a
+    #     conjunct mutation cannot see still needs a direct case.
+    #
+    #     Neither is decorative. `str()` is what lets a producer reporting an id
+    #     as a JSON number match a consumer quoting it as text; the `isinstance`
+    #     guard is what keeps a malformed `tool_input` from raising
+    #     `AttributeError` into a handler that reports "Failed reading
+    #     transcript" rather than evaluating the session.
+    spec_ids = importlib.util.spec_from_file_location("npwsr_task_ids", HOOK)
+    mod_ids = importlib.util.module_from_spec(spec_ids)
+    spec_ids.loader.exec_module(mod_ids)
+
+    for label, source in (("a list", ["task_id", "T9"]),
+                          ("a string", "task_id=T9"),
+                          ("None", None)):
+        try:
+            got = mod_ids._task_ids(source)
+            ok = got == []
+        except Exception as exc:
+            got = f"raised {type(exc).__name__}"
+            ok = False
+        check(f"`_task_ids` returns [] for {label}, rather than raising "
+              f"(got {got!r})", ok)
+
+    try:
+        got = mod_ids._task_ids({"task_id": 9})
+        ok = got == ["9"]
+    except Exception as exc:
+        got = f"raised {type(exc).__name__}"
+        ok = False
+    check(f"`_task_ids` coerces a numeric id to `str` (got {got!r})", ok)
 
     return failures, ran
 

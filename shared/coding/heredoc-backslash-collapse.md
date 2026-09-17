@@ -152,4 +152,48 @@ direction-neutral.
 It fires on the doubled form either way, which is the right behaviour here ---
 the doubled form is what is wrong, not the collapse.
 
+**A heredoc that writes SOURCE CODE has two parse layers, and there the doubled
+form is not the failing form --- it is the arithmetic.**
+Everything above is about content that must survive verbatim, where one layer
+sits between what you type and what the interpreter sees.
+A generator adds a second: the heredoc feeds Python, and the string Python
+writes is itself Python source that will be parsed again.
+`"\\n"` in the generator is then exactly right, because it puts `\n` in the
+generated file, which that file parses as a newline.
+Neither the collapse rule nor its inverse applies, and both of them read as
+though they do.
+
+The danger is diagnostic rather than mechanical, which is why it needs saying
+after everything above rather than being derivable from it.
+Measured 2026-09-17, in a Linux remote Claude Code container: a generator
+heredoc carrying `"\\n"` produced a file containing `"\n"`, and that was read
+as the transport having collapsed it --- a conclusion that would have contradicted
+the 2026-09-01 and 2026-09-15 measurements recorded above, both of which are
+correct.
+The canonical interpreter-free reproducer, run in the same session, left
+`a\\nb` intact.
+So the wrong artifact was consulted: a two-layer edit cannot measure a
+one-layer transport, and it is the artifact nearest to hand at exactly the
+moment the question arises.
+
+Counting the layers first settles it and costs nothing.
+Ask how many times the text will be parsed between the keyboard and the
+behaviour, and expect one doubling per layer beyond the first.
+Then confirm the outcome rather than the theory, by exercising the generated
+code --- here, the denial message printed with a real line break, which no
+amount of reasoning about backslashes establishes.
+
+- **Do:** count the parse layers before judging whether a doubled escape is
+  wrong.
+- **Do:** measure a transport with the interpreter-free reproducer above, never
+  with a generator edit that happens to be in front of you.
+- **Do:** confirm the generated code behaves, rather than confirming the
+  literal looks right.
+- **Don't:** read a correct two-layer escape as evidence about the transport
+  --- that is how a true measurement gets overturned by a wrong one.
+- **Don't:** read the hook's warning on a generator heredoc as a defect;
+  it cannot count layers, and flagging the form regardless is the behaviour
+  the section above asks for.
+
+
 (Tracked as [ai-config#3710](https://github.com/Morrison-Lab/ai-config/issues/3710).)

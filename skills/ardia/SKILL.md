@@ -120,7 +120,7 @@ mutates a PR stays serial.
    any of them.**
    An autonomous coding agent (Jules, a scheduled bot, a
    repeated workflow trigger) can open several open PRs that all attempt
-   the same broad task against overlapping parts of the same repo — not
+   the same broad task against overlapping parts of the same repo --- not
    stacked on each other's branches, all based on the same commit, but
    colliding hard on file sets and even on the exact same lines.
    This is a
@@ -130,7 +130,7 @@ mutates a PR stays serial.
    pair.
    The tell is several open PRs from the same non-human author (or a small
    family of related bot accounts) with near-identical titles and a `git
-   diff --name-only` overlap across most of the set — check file lists
+   diff --name-only` overlap across most of the set --- check file lists
    (`gh pr diff <N> --name-only` per PR, or `pull_request_read` with
    `get_files` in a remote session) before assuming independence, per
    `CLAUDE.md`'s "Surface merge-order constraints" collision check.

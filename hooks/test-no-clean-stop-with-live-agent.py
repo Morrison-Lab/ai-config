@@ -90,6 +90,13 @@ def liveness(tool="ListAgents", command=None):
     )
 
 
+def stamped(line, when):
+    """Re-emit a helper's record carrying an explicit ISO-8601 timestamp."""
+    record = json.loads(line)
+    record["timestamp"] = when
+    return json.dumps(record)
+
+
 def run(lines):
     tmpdir = tempfile.mkdtemp()
     fd, path = tempfile.mkstemp()
@@ -149,6 +156,64 @@ cases = [
         "Task tool counts as a dispatch",
         [dispatch("Task"), notification(), assistant(CLEAN)],
         True,
+    ),
+    (
+        "Workflow tool counts as a dispatch",
+        [dispatch("Workflow"), notification(), assistant(CLEAN)],
+        True,
+    ),
+    (
+        "Workflow dispatch, checked after the notification",
+        [dispatch("Workflow"), notification(), liveness(), assistant(CLEAN)],
+        False,
+    ),
+    (
+        "invoke_subagent counts as a dispatch",
+        [dispatch("invoke_subagent"), notification(), assistant(CLEAN)],
+        True,
+    ),
+    (
+        "a worktree query through run_command counts as a liveness check",
+        [
+            dispatch(),
+            notification(),
+            liveness("run_command", "git worktree list --porcelain"),
+            assistant(CLEAN),
+        ],
+        False,
+    ),
+    (
+        "a replayed liveness check does not discharge by file position alone",
+        # A compaction appends an OLDER record below a newer one. By file
+        # order the check follows the notification and would discharge the
+        # guard; by its own timestamp it precedes the dispatch entirely.
+        [
+            stamped(dispatch(), "2026-09-17T10:00:00Z"),
+            stamped(notification(), "2026-09-17T10:05:00Z"),
+            stamped(liveness(), "2026-09-17T09:59:00Z"),
+            assistant(CLEAN),
+        ],
+        True,
+    ),
+    (
+        "a genuinely later liveness check still discharges when stamped",
+        [
+            stamped(dispatch(), "2026-09-17T10:00:00Z"),
+            stamped(notification(), "2026-09-17T10:05:00Z"),
+            stamped(liveness(), "2026-09-17T10:06:00Z"),
+            assistant(CLEAN),
+        ],
+        False,
+    ),
+    (
+        "a partly-stamped transcript falls back to file order rather than guessing",
+        [
+            stamped(dispatch(), "2026-09-17T10:00:00Z"),
+            notification(),
+            stamped(liveness(), "2026-09-17T09:59:00Z"),
+            assistant(CLEAN),
+        ],
+        False,
     ),
     (
         "bash worktree query counts as a liveness check",

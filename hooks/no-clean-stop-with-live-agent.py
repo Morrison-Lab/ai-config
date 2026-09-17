@@ -44,6 +44,7 @@ paid by whoever acts on it. The remedy costs one tool call.
 
 Fails OPEN on any parse trouble, and fires at most once per distinct message.
 """
+import datetime
 import hashlib
 import json
 import os
@@ -69,12 +70,30 @@ RX_CLEAN = re.compile(
     re.IGNORECASE,
 )
 
-# Tools that dispatch a subagent whose work outlives the call.
-DISPATCH_TOOLS = {"agent", "task"}
+# Tools that dispatch background work whose execution outlives the call.
+# `Workflow` belongs here for the same reason `Agent` and `Task` do: its own
+# tool definition says it "returns immediately with a task ID, and a
+# <task-notification> arrives when the workflow completes", which is exactly
+# the async shape this guard exists to catch.
+#
+# `invoke_subagent` is Antigravity's name for the same thing, and it reaches
+# this hook unrewritten: plugins/ai-config/claude-hook-adapter.py translates
+# tool names on the LIVE PreToolUse payload, but forwards `transcriptPath`
+# untouched, so a Stop hook reading the transcript itself sees the native
+# name. Ten sibling hooks in this directory already match it for that reason.
+# Omitting a name does not weaken the guard, it disables it: `main()` returns
+# 0 outright when no dispatch was seen.
+DISPATCH_TOOLS = {"agent", "task", "workflow", "invoke_subagent"}
 
 # Tools that answer "is it still running?". ListAgents is the direct one; a
 # worktree lock query is the indirect one the measured case had in hand.
 LIVENESS_TOOLS = {"listagents"}
+
+# Shell tools, whose command text is parsed for a worktree query. Same reason
+# as above: the transcript carries each harness's native name, so matching
+# only "bash" would ignore a real liveness check run anywhere else. The set
+# matches hooks/no-unshipped-commit.py's and remind-both-sides-from-git.py's.
+SHELL_TOOLS = {"bash", "run_command", "execute_command", "terminal", "shell"}
 
 try:
     # `globals().get` rather than a bare `__file__`: the suite may exec this
@@ -172,24 +191,59 @@ def is_task_notification(record):
     )
 
 
+def timestamp_key(record):
+    """A record's own timestamp, or None when it carries none that parses.
+
+    Copied in shape from hooks/no-unshipped-commit.py's `_timestamp_key`,
+    which solves the same ordering problem for the same reason.
+    """
+    stamp = record.get("timestamp")
+    if not isinstance(stamp, str) or not stamp:
+        return None
+    try:
+        return datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
 def scan(path):
     """Return (last_text, dispatch_idx, notification_idx, liveness_idx).
 
-    Indices are line numbers in the transcript, or -1 when absent.
+    The three indices are ORDINALS INTO CHRONOLOGICAL ORDER, not line numbers,
+    and -1 when absent. Only their relative order is ever compared.
+
+    File order is not time order. A context compaction replays earlier records,
+    appending them below newer ones while they keep their original timestamps
+    -- the "last X in the transcript" unsoundness
+    `memories/claude-code-transcripts.md` names, and the one
+    `hooks/no-unshipped-commit.py` already fixes this way. It matters here
+    specifically: a replayed liveness check from BEFORE the dispatch would land
+    below a genuine notification in file order and discharge the guard, which
+    fails silently because every record parses and the reader simply holds the
+    wrong one.
+
+    Records are sorted by their own timestamps, stably, and ONLY when every
+    record carrying an event of interest has one that parses and compares. A
+    mix of stamped and unstamped records has no total order to impose, and
+    neither do aware and naive stamps together, so file order stands in both
+    cases rather than a guessed one.
+
+    `last_text` is deliberately NOT reordered. This is a `Stop` hook, so the
+    message under judgement is the one just appended, which is the last in FILE
+    order whatever the timestamps say.
     """
     last_text = ""
-    dispatch = -1
-    notification = -1
-    liveness = -1
-    i = 0
+    events = []  # (timestamp_key, file_position, kind)
+    position = 0
     with open(path, errors="ignore") as fh:
         for line in fh:
-            i += 1
+            position += 1
             try:
                 event = json.loads(line)
             except Exception:
                 continue
 
+            stamp = timestamp_key(event)
             role = event.get("type") or event.get("role")
             blocks = (event.get("message") or {}).get("content") or event.get(
                 "content"
@@ -198,7 +252,7 @@ def scan(path):
             # Decided once per RECORD, from structured metadata, so no block's
             # text can manufacture one.
             if is_task_notification(event) and role != "assistant":
-                notification = i
+                events.append((stamp, position, "notification"))
 
             if isinstance(blocks, str):
                 if role == "assistant" and blocks.strip():
@@ -216,17 +270,35 @@ def scan(path):
                 if kind == "tool_use":
                     name = (b.get("name") or "").lower()
                     if name in DISPATCH_TOOLS:
-                        dispatch = i
+                        events.append((stamp, position, "dispatch"))
                     elif name in LIVENESS_TOOLS:
-                        liveness = i
-                    elif name == "bash":
+                        events.append((stamp, position, "liveness"))
+                    elif name in SHELL_TOOLS:
                         cmd = (b.get("input") or {}).get("command") or ""
                         if is_liveness_command(cmd):
-                            liveness = i
+                            events.append((stamp, position, "liveness"))
 
                 elif kind == "text":
                     if role == "assistant" and b.get("text", "").strip():
                         last_text = b["text"]
+
+    if events and all(e[0] is not None for e in events):
+        try:
+            events.sort(key=lambda e: (e[0], e[1]))
+        except TypeError:
+            # Aware and naive stamps together do not compare; keep file order.
+            events.sort(key=lambda e: e[1])
+    else:
+        events.sort(key=lambda e: e[1])
+
+    dispatch = notification = liveness = -1
+    for ordinal, (_stamp, _position, kind) in enumerate(events):
+        if kind == "dispatch":
+            dispatch = ordinal
+        elif kind == "notification":
+            notification = ordinal
+        else:
+            liveness = ordinal
 
     return last_text, dispatch, notification, liveness
 

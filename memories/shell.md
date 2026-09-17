@@ -356,3 +356,116 @@ The landed form calls `_lead_index(argv)` --- skip assignments and lead words, t
 - **Don't:** read `argv[0]` as the command word --- the splitter never removed the keyword heading a compound command's body.
 - **Don't:** answer an over-detection with the first narrowing that removes it;
   a narrowing moves a check toward silence, which is the direction a guard cannot afford.
+
+## A command in a fenced block is addressed to the USER's shell, not your Bash tool's
+
+Two shells coexist on this machine and they are different programs.
+The `Bash` tool runs Git Bash;
+the user's terminal, per the session's own environment brief, is **Windows PowerShell 5.1**.
+Which one a command has to satisfy is decided by **where the command goes**, not by which one you last used.
+
+- **Measured 2026-09-15, Windows 11 Pro 26200.**
+  The environment brief for that session said `Shell: PowerShell (primary)`, and listed the relevant constructs as errors in as many words: `&&` is a parser error, inline `VAR=value cmd` prefixes do not exist, Unix paths do not resolve.
+  The reply nonetheless handed the user this, in a fenced block, to paste into their terminal:
+
+  ```console
+  $ cd /d/GitHub/ai-config/.claude/worktrees/ums-media-type-guard && ALLOW_UNREVIEWED_PUSH=1 git push -u origin ums/cross-drive-media-type-guard
+  The token '&&' is not a valid statement separator in this version.
+  ```
+
+  Three incompatibilities in one line --- `&&`, the MSYS `/d/...` path, and the env-var prefix --- each of them separately named in a document that was in context the whole time.
+  The correct form is `Set-Location D:\GitHub\...; $env:ALLOW_UNREVIEWED_PUSH='1'; git push ...`.
+
+  The belief that produced it was "I am composing a shell command", where the shell in mind was simply the one the tool calls had been using all session.
+  Nothing in the act of writing a fenced block prompts the question "whose shell is this for?", which is why the rule was available and not consulted: the brief is read at session start and the command is composed hours later.
+  This is the same family as [`shared/writing/examples-are-scanned.md`](../shared/writing/examples-are-scanned.md) --- a fenced block has a consumer you did not picture --- reached from the shell side rather than the scanner side.
+
+  - **Do:** ask "whose shell runs this?" before writing any fenced command in a reply, and write it in the **user's** shell dialect.
+  - **Do:** translate at the boundary --- `;` for `&&`, `$env:VAR='v'; cmd` for the prefix, `D:\...` for `/d/...`, `2>$null` for `2>/dev/null`, `@'...'@` for a heredoc.
+  - **Do:** say which shell a block is for when it is deliberately Git Bash, since nothing else in the block says so.
+  - **Don't:** carry the dialect of your own `Bash` tool calls into a block the user will paste --- the tool you used is not evidence about the terminal they are sitting in.
+  - **Don't:** treat the environment brief as read-once orientation.
+    It states the target shell, and that fact is needed at composition time, not at session start.
+
+## Mechanism
+
+[`hooks/warn-bash-command-for-powershell-user.py`](../hooks/warn-bash-command-for-powershell-user.py) is this entry's guard, and what it is *not* keyed on is the interesting part.
+
+The obvious trigger --- a fenced block containing `&&` while the user runs PowerShell --- fires four times over the 120 transcripts under `~/.claude/projects` for three true positives (all one incident, re-issued) and one quoted session.
+The discriminator that suggests itself, suppressing when the surrounding prose is retrospective ("failed", "the error was", "I handed you"), marks **all four identically, the true positives included**, because the offending message also discussed a failure at length.
+Suppressing on it would have removed the only real incident and kept nothing;
+firing on it is the [ai-config#2997](https://github.com/Morrison-Lab/ai-config/issues/2997) pattern, a guard that fires on the explanation of the mistake it polices.
+
+What separates the two classes is the **shape of the block**, not the prose around it.
+A command handed over to be pasted is short, carries no prompt, and shows no output;
+a quotation of a failure shows its prompt, or the error beneath it, or runs long.
+At a bound of eight non-blank lines the corpus yields three firings, all the same genuine directive, and no false positives --- and the corrected PowerShell form of that very command, which also appears in the corpus, is silent.
+
+Say plainly what that does and does not establish, because the first draft of this entry overstated it and adversarial review caught the figure.
+The corpus holds **one** incident across 500 readable assistant messages, so it shows the matcher is quiet on the other thirteen fenced messages in it and nothing about the false-positive rate.
+The real evidence is the constructed negatives in the hook's suite --- a Dockerfile `RUN` line, a Make recipe, a git alias, a CI step, a session prompted `user@host:~$`, a heredoc merely named in a comment --- every one of which fired against the first implementation and is now pinned as a case.
+The line bound is defence in depth rather than a measured ceiling: after quote and comment masking were added the firing count is flat at three for every bound, including unbounded.
+
+The same PowerShell 5.1 limitation is recorded for two other consumers, from their own angles: [`opencode-bash-windows.md`](opencode-bash-windows.md) for OpenCode's shell and [`delegation.md`](delegation.md) for agy's.
+What is new here is *which* consumer a fenced block in a reply is addressed to.
+
+- **Do:** when a prose-context discriminator looks necessary, check whether a structural one exists first --- prose framing marked a directive and a post-mortem identically here.
+- **Don't:** quote a failing command in a bare short block;
+  show it with its prompt and its error, which is both the honest presentation and the one the guard reads as a citation.
+
+## The heredoc backslash collapse has a second stage when the heredoc writes code
+
+[`heredoc-backslash-collapse`](../shared/coding/heredoc-backslash-collapse.md) records the collapse itself: a doubled `\\` inside a Bash-tool heredoc body can arrive as a single `\`, even with a quoted delimiter.
+Its worked cases are regexes, where the damage is a pattern that still compiles and matches the wrong thing.
+
+A heredoc that writes a **Python generator script** adds a second stage, and the two compose in a way neither one predicts.
+The script is itself Python, so a `\n` that survives the collapse is then read by Python's own string literal:
+
+```console
+$ cat > /tmp/gen.py <<'EOF'
+block = """    line_start = body.rfind("\\n", 0, m.start()) + 1"""
+EOF
+```
+
+The transport collapses `\\n` to `\n`, and the non-raw `"""..."""` turns that into a REAL NEWLINE.
+The generated file gets a line break where the source was meant to say backslash-n, and the result is a syntax error or, worse, a string literal that silently spans lines.
+
+Measured 2026-09-14 on Windows MINGW64 while generating `plugins/ai-config/enforce-mwc-review-gate.py`.
+`grep` on the written file showed `line_start = body.rfind("` with the rest of the line gone.
+It happened a second time the same session, in a heredoc patching a test file, after the rule had already been read once --- which is the fragment's own "having read this rule is not the check" point, measured twice in one session.
+
+**How much of a doubled escape survives, measured.**
+A probe written through the same Bash-tool heredoc, reading back both the source line and the value:
+
+| typed | backslashes in the source | Python value |
+| --- | --- | --- |
+| `a\nb` | 1 | a real newline |
+| `a\\nb` | 1 | a real newline |
+| `a\\\\nb` | 2 | backslash then `n` --- the intended one |
+
+So the collapse is one pairwise halving, applied once, and quadrupling cancels it.
+
+**Three forms, two of them portable.**
+
+- The **Write tool** with a raw string, `r` plus triple quotes, is the cleanest: its content is JSON-encoded on the way to disk, so nothing collapses, and a raw literal keeps `\n` as two characters.
+  This is the form to reach for when generating code.
+- A **placeholder** in a heredoc: write `@BS@n`, and end the literal with `.replace("@BS@", chr(92))`.
+  No escape sequence is ever typed, so there is nothing to collapse.
+- Quadrupling produces the right literal in the table above, and is still the wrong remedy.
+  It encodes the collapse into the source, and the fragment above records that collapse as a property of the ENVIRONMENT, absent on a GitHub Actions Linux runner and in a Linux remote container.
+  So it is correct exactly where the collapse happens and wrong everywhere else: on a transport that does not collapse, the same four backslashes arrive as four and Python reads two.
+
+**`repr()` doubles a backslash, so the readback needs halving before it is a count.**
+This is how the table above was first published with the wrong numbers, and it is worth more than the numbers are.
+`repr()` is the right instrument --- it is the only thing that separates a real newline from a backslash and an `n` --- and its output is itself escaped, so a source line holding ONE backslash prints as two.
+Reading the printed count as the actual count reports no collapse at every level at once, which is internally inconsistent in a way the surrounding prose can state and the table cannot.
+Count the characters in the file instead, with `cat -A` or a `.count(chr(92))`, and use `repr()` for the question it actually answers.
+
+**Print `repr()` of the written line, not the line.**
+A terminal renders a real newline as a line break and a backslash-n as `\n`, and at a glance in a diff the two look like ordinary formatting.
+`repr()` is what separates them.
+
+- **Do:** generate code with the Write tool and a raw string, or with a placeholder substituted via `chr(92)`.
+- **Do:** read back the written line with `repr()` before trusting it.
+- **Don't:** type a doubled backslash in a heredoc that writes a Python string literal --- two interpreters get a turn at it, not one.
+- **Don't:** answer a collapse by adding more backslashes.

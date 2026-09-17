@@ -44,6 +44,7 @@ Claude's: `codex`, `agy`, and OpenCode's `opencode-go/*` tier.
 | CLI / Provider | plan | skill |
 |---|---|---|
 | `codex` | ChatGPT | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
+| `codex --profile <databricks-profile>` | institution-hosted Databricks Model Serving, when configured | [`delegate-to-databricks`](../skills/delegate-to-databricks/SKILL.md) |
 | `agy` (Google Antigravity) | API retired, **CLI available** (2026-08-25) | none --- invoke `agy --print` directly |
 | `opencode` | OpenCode Go (`opencode-go/*`, $10/mo windowed) + free hosted (`opencode/*`, opencode Zen) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 | `openrouter` | prepaid credit balance, reached through OpenCode's `openrouter` provider | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)'s "A third destination" section |
@@ -241,6 +242,30 @@ reaffirmed 2026-07-06 ("always use codex first
 and widened 2026-08-15 ("in addition to codex, we have agy quota to use;
 try using both of those as subagents before exhausting claude quota").
 
+## Databricks-hosted models are now an operationalized delegation destination, via Codex CLI
+
+[`memories/databricks-hosted-llms.md`](databricks-hosted-llms.md) already
+carried the underlying facts (the `auth.command` mechanism, the hard
+`wire_api = "responses"` requirement, which models qualify) from a
+2026-08-29 investigation.
+What's new on 2026-09-15 is operationalizing that into a delegation-ladder
+skill --- [`delegate-to-databricks`](../skills/delegate-to-databricks/SKILL.md),
+linked from this file's ladder table above --- and a live end-to-end
+verification: a found-in-the-wild `model_providers.databricks` config plus
+per-model profile-layer files on the user's own machine, dispatched with
+`codex exec --profile databricks --sandbox read-only --skip-git-repo-check
+"Reply with exactly: OK" < /dev/null`, round-tripped correctly against a
+Databricks-hosted GPT-5.6-family model at a measured ~49,000-token Codex-side
+agent-mode overhead for that single turn.
+Tracked as [ai-config#3726](https://github.com/Morrison-Lab/ai-config/issues/3726).
+
+- **Do:** read `databricks-hosted-llms.md` before `delegate-to-databricks` ---
+  it carries the facts (which models qualify, the hard `wire_api` requirement,
+  the auth-storage mechanics) the skill's dispatch steps assume.
+- **Don't:** duplicate those facts here; this entry exists to record that the
+  route is now verified end-to-end and has a skill, not to restate the
+  underlying facts a second time.
+
 ## agy on Windows
 
 Measured 2026-09-02 on the user's Windows 11 machine.
@@ -255,7 +280,23 @@ gh release download 1.1.24 -R google-antigravity/antigravity-cli \
 ```
 
 It authenticated with no extra step, reusing the Antigravity IDE's own login.
+
 `agy --version` reports `1.1.24`.
+
+**The binary is not necessarily on `PATH`, and that is how a session silently stops using it.**
+Measured 2026-09-15 on the same machine.
+`command -v agy` fails in the Bash tool, and `Get-Command agy` fails in PowerShell.
+`agy.exe` is nonetheless installed and working at `$env:LOCALAPPDATA/agy/bin/agy.exe`, not the `~/.local/bin/agy.exe` the install steps above place it at --- so an install done another way lands elsewhere.
+It reported version `1.2.3` there, against the `1.1.24` those steps record.
+
+The failure this produces is silent by construction.
+A session that probes `command -v agy`, or that simply never probes, concludes the CLI is unavailable and routes every dispatch to a Claude subagent instead --- which costs this account's quota and looks exactly like a session with no delegation budget.
+Nothing reports the substitution, and the whole session can run that way, as one did before this was measured.
+
+- **Do:** search for the binary before concluding it is absent --- `Get-ChildItem $env:LOCALAPPDATA -Filter "agy*" -Recurse -Depth 3` found it in seconds.
+- **Do:** invoke it by absolute path when it is off `PATH`, rather than treating an unresolved name as an unavailable tool.
+- **Don't:** read a failed `command -v` as a delegation budget being unavailable;
+  that is the degrade-silently-to-a-worse-fallback shape [`use-mcp-servers`](../shared/workflow/use-mcp-servers.md) names.
 
 **`agy models` lists a real roster**, unquoted here since a model roster is exactly the kind of fact a vendor changes without notice --- run the command rather than trusting a pasted list.
 As of 2026-09-02 it included `gemini-3.8-flash-{high,medium,low}`, `gemini-3.7-flash-{high,medium,low}`, `gemini-3.6-flash-{high,medium,low}`, `gemini-3.1-pro-{high,low}`, `claude-sonnet-4-6`, `claude-opus-4-6-thinking`, and `gpt-oss-120b-medium`.

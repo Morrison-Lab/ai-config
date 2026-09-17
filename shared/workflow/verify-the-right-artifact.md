@@ -359,6 +359,70 @@ It has no fetch-based discharge on purpose: [`keep-checkouts-fresh`](keep-checko
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale local base that nearly quadrupled a review diff's file count".
 
+**A base that is fresh, correct, and current can still be one the comparison is incapable of failing against.**
+
+The error above is staleness, and every remedy it names is a freshness remedy.
+This one survives all of them.
+The ref is right, the fetch is current, the detector runs on every input, and the comparison still returns zero --- because the base has no behaviour of the kind being counted.
+
+**The mechanism is already written down**, in
+[`fixtures-are-not-evidence`](fixtures-are-not-evidence.md)'s
+"Which ref to restore from, not only which file":
+a base branch that lacks the structure under test cannot reproduce the
+behaviour, so it returns a plausible result rather than an error, and the
+remedy is to baseline against the previous round's head and to prefer a
+three-way comparison over a two-way one.
+Read that subsection for the argument;
+this one adds two things to it, both about the **zero** rather than about the
+baseline.
+
+**A large case count weakens a zero rather than strengthening it.**
+A differential run counts *transitions* between what two revisions decide, so
+where the base classifies the whole family one way by default, the transition
+has nothing to transition from.
+Scaling that up multiplies the comparison's reach and not its capability:
+60,000 cases returning zero reads as thorough while carrying exactly as much
+information as one case would.
+The count is the most reassuring number the run can print and the one least
+entitled to reassure.
+
+**So report a zero with the negative control's hit count beside it.**
+A detector that never reached its read site and a detector that reached it
+60,000 times and found nothing print the same zero.
+Only an instrumented count of reads at the site separates them, and it is the
+half that turns a zero into a measurement.
+
+The section on baseline verdicts in
+[`algorithmatize-checks`](algorithmatize-checks.md)
+covers the opposite direction --- a baseline flag earned by coincidence and read as a regression the branch introduced.
+That one produces a finding somebody argues with.
+This one produces a clean run nobody questions, which is why it can repeat.
+
+Measured on [ai-config#3635](https://github.com/Morrison-Lab/ai-config/pull/3635), whose own merged body records it:
+
+> A 60,000-case differential fuzz claimed "zero BLOCK-to-allow against `main`".
+> True and nearly vacuous --- `main` has no substitution scanner, so it already allows this whole family and no regression can appear in that comparison.
+> **The baseline that can fail is the previous round.**
+
+The consequence is in the same body's table.
+`bash <(true; case b in b) echo "<m>";; esac)` reads `allow` on `main`, `BLOCK` at rounds 4 and 5, `allow` at round 6, and `BLOCK` at the head that merged.
+Round 6 was a regression against its own two predecessors, and a comparison against `main` cannot see it by construction: the regressed revision and `main` both return `allow`, so the transition count is zero on precisely the input that shipped the defect.
+
+The pre-merge gate on that PR did both, and **named the revisions rather than counting back from a moving head**:
+29,813 strings scored at `994b975c` and its four predecessors --- `6449c317`, `d7169012`, `c8482025`, `73e95727` --- found 0 transitions, and a separate 240,000-scan comparison reported 0 diffs alongside an instrumented count of 4,640 reads at the site.
+An earlier draft of this paragraph wrote that set as ``HEAD`` and ``HEAD~1``..``HEAD~4``, which names nothing once the branch merges and `HEAD` is somebody else's.
+That is this fragment's own subject applied to a citation: a relative ref is a claim about the reader's checkout, and it resolves to a different artifact in every one.
+
+The falsifying question in "The test" above settles it in one reading: ask what the base does with the family under test.
+If the answer is that it has no opinion, the base cannot testify.
+
+- **Do:** name what the baseline revision does with the construct under test, in the same sentence as the zero.
+- **Do:** baseline a hardening branch against its own previous rounds, and say which ones **by SHA** --- a relative ref names a different commit in every checkout that reads it.
+- **Do:** report the negative control's hit count beside a zero, so the zero distinguishes itself from a detector that never ran.
+- **Don't:** read a large case count as strengthening a zero --- it multiplies the comparison's reach, not its capability.
+- **Don't:** baseline against the default branch for a feature the default branch does not have;
+  that arm agrees with every revision, including the regressed one.
+
 ## A measurement of the right artifact can still be scoped narrower than the claim made from it
 
 Every shape above is a *substitution*: the thing read is not the thing the claim is about.
@@ -1754,3 +1818,53 @@ The remedy is to read the file an unresolved thread names on the default branch 
 
 - **Do:** read the file an unresolved thread names on the default branch (e.g., with `git show origin/main:<path>`), and file only what is still true there.
 - **Don't:** treat an unresolved review thread on a merged pull request as evidence of an open defect in the code.
+
+## When the check that would refute the claim is unavailable, the claim is unverified --- not merely caveated
+
+The four shapes above all describe verifying the *wrong* artifact.
+This one describes the case where the right artifact is identified correctly
+and simply **cannot be reached** --- a blocked egress proxy, a missing
+credential, a UI with no API behind it.
+
+The failure is not that the check is skipped.
+It is what happens to the claim afterwards.
+The unreachable check gets demoted to a parenthetical, the claim is stated at
+full confidence, and the caveat reads as thoroughness rather than as the
+warning it is.
+Nobody is deceived about the blocked check, because it is disclosed --- they
+are deceived about the claim, which was never downgraded to match.
+
+Measured 2026-09-15.
+A Quarto site was rendered, deployed to `gh-pages`, and the branch confirmed to
+hold 36 HTML pages, 21 PDFs and every asset directory.
+Every one of those is a fact about the **branch**.
+The claim made was that the site was *published*, with one routine settings
+step left --- a fact about **serving**, which the session could not check
+because its proxy blocked `github.io`, and which it noted in passing while
+stating the claim anyway.
+The setting did not exist: the repository was a private fork, and GitHub Pages
+was unavailable to it entirely (see
+[`github-repo-transfers`](../../memories/github-repo-transfers.md)).
+The maintainer had to supply what the blocked check would have shown.
+
+**The asymmetry to notice is that a blocked check removes evidence against the
+claim while leaving every piece of evidence for it intact.**
+So the remaining evidence looks unanimous, and confidence goes *up* exactly
+when it should go down.
+That inverts the usual relationship between missing information and certainty,
+which is why disclosing the gap does not correct for it.
+
+The test is the one this fragment already states, applied to reachability
+rather than to identity: ask what would have to be true for the claim to be
+false, then ask whether the artifact that would show it is one you can
+actually reach.
+When it is not, say the claim is unverified and name what would settle it.
+
+- **Do:** state the claim at the confidence the reachable evidence supports,
+  and say plainly which part is unverified.
+- **Do:** name the specific check that would settle it, so whoever can run it
+  knows what to run.
+- **Don't:** disclose the blocked check and then assert the claim anyway --- a
+  caveat beside a confident claim is read as rigour, not as doubt.
+- **Don't:** treat unanimous surviving evidence as strong when the blocked
+  check was the only thing that could have disagreed.

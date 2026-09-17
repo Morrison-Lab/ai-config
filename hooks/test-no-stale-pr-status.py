@@ -56,6 +56,19 @@ CASES = [
      "counts quoted from a pre-push reading"),
     ([QUERY, PUSH, say("All checks green at this head.")], True,
      "'all green' after a push"),
+
+    # ai-config#2016: `0 fail` was unanchored, so it matched the participle
+    # every test runner prints for a green suite. Its sibling
+    # `\b\d+\s+pass\b` requires a boundary after `pass` and therefore
+    # ignores `14 passed` -- so the two patterns matched disjoint things, and
+    # the only one firing on a local mutation check was the fail rule. Fired
+    # on four consecutive turns of a bcs session, each reporting a hook's own
+    # test tally, none asserting anything about a pull request.
+    ([QUERY, PUSH, say("Mutation check on the hook's own suite: 15 passed, "
+                       "0 failed. Pushed the fix.")], False,
+     "a local test-runner tally is not a PR status claim"),
+    ([QUERY, PUSH, say("PR checks: 11 pass, 0 failures.")], True,
+     "the CI phrasing '0 failures' still asserts"),
     ([QUERY, MCP_PUSH, say("All checks green, ready to merge.")], True,
      "an MCP push_files is a push -- the reading predates it"),
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT, say("PR #1167 is fully clean.")], True,

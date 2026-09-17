@@ -427,12 +427,75 @@ specify a target directly (`--engine <name>`)
 or pass `--exclude-engine cursor` in alternate mode
 until headless cursor dispatch is enabled.
 The `adversarial-reviewer` persona also lives at `.claude/agents/` and `.opencode/agents/`, which are project agents: a session rooted in another repo may not be able to resolve it at all ([ai-config#1921](https://github.com/Morrison-Lab/ai-config/issues/1921) tracks shipping it alongside the guard).
+The plugin does not close that gap either: its root is the ai-config repository root, which ships `skills/`, `commands/` and `hooks/hooks.json` and no `agents/` directory (checked at `c7201140`, 2026-09-15), so a consumer repo installs the guard and none of the personas it names.
+
+**In that repo, use the fallback the guard already admits, and get its two conditions right.**
+`no-push-without-self-review.py`'s `FALLBACK_AGENT_NAME` accepts `general-purpose`, `general`, `reviewer`, `code-reviewer`, `research` and `self` (with an optional `-`, `_` or space inside the two-word spellings), but only when the dispatch's own prompt matches `REVIEW_PROMPT_RE` --- `adversarial review`, `adversarial self-review`, `pre-push review`, or `self-review`, again with an optional separator.
+"Review this adversarially" satisfies a reader and not the regex.
+The report then has to meet the verdict-line contract, which "A verdict phrase separated from its heading by a line break is no verdict" and "Structured review data (JSON payload)" state below between them.
+
+**Read which denial you got: the two messages fail at different stages, and the second has three causes.**
+"No `adversarial-reviewer` subagent or recognized external reviewer ... was dispatched" means the dispatch was not recognized --- wrong persona name, or a prompt the regex missed.
+"An `adversarial-reviewer` subagent was dispatched, but no verdict came back as that call's own result" means it *was* recognized and no verdict was extracted: a background dispatch, an errored result, or a verdict line that does not match that contract.
+A missing `Reviewed-Commit:` is not one of them --- that has its own message, about a clean verdict that does not say which commit it read.
+Where you chose to background the dispatch, the guard's own message gives the fix and it is a foreground re-dispatch.
+Where the harness backgrounds it regardless --- #3045's two variants, below --- re-dispatching changes nothing and the `ALLOW_UNREVIEWED_PUSH=1` route below is the remedy.
+
+- **Don't:** reach for `ALLOW_UNREVIEWED_PUSH=1` on the second message from a foreground dispatch that returned a report.
+  It says the report was read and no verdict was found in it, which is a formatting fix, not a case where the guard cannot see a verdict at all.
+
+(Measured on ucdavis/lbt, 2026-09-15, with the plugin enabled.
+Dispatching `adversarial-reviewer` returns an errored result reading "Agent type 'adversarial-reviewer' not found.
+Available agents: claude, claude-code-guide, Explore, general-purpose, Plan, statusline-setup".
+The session's `general-purpose` fallbacks were refused anyway, on both messages, and pushed under the override.
+Diagnosed in the same session by the step this file prescribes below.
+One prompt opened "You are an adversarial reviewer" and nothing else in it named the review, which `REVIEW_PROMPT_RE` misses because the word does not end at `review`, so that dispatch was never recognized at all.
+The prompts that were recognized produced reports with no `Verdict:` line in them: `read_latest_review` over that session's JSONL returns `(None, None, True)`, and `grep -c Reviewed-Commit` on the same file returns 0.
+Both are the brief rather than the guard, which refused correctly each time.
+A fallback dispatch has to name the review in words the regex matches, and has to *ask* for the verdict and fingerprint lines, because a persona file supplies them and a `general-purpose` prompt does not.)
+
+**A subagent cannot discharge this guard at all, and the reason is where the transcript lives.**
+Measured 2026-09-15 in the Claude Code desktop harness: an `Agent` dispatched *by a subagent* writes both the call and its report to `<session>/subagents/agent-<id>.jsonl`, while the guard reads the session JSONL at the top level.
+Every conforming review of one branch, the clean one included, was reachable only through those per-subagent files, with `grep -c Reviewed-Commit` on the session transcript returning 0.
+So the clean verdict exists, is about the right commit, and is unreadable to the guard by construction.
+This is not #3045, whose dispatch never returns synchronously.
+Here it returns synchronously to the subagent, which is not who the guard is reading, so it joins the cases below where the guard cannot see a verdict rather than the formatting case.
+Note which denial that produces: with no top-level dispatch, `saw_reviewer_call` is false, so it is the **first** message, and the Don't above does not bite.
+A subagent that reviews before pushing takes the override, and says in its report which reviews produced which verdicts and where they live.
 
 Note what that CLI fallback does to the pre-push guard, since the two rules meet here and pull opposite ways.
 A CLI's verdict never becomes an `Agent` call's `tool_result`, so the guard cannot see it however real the review was.
 Prefix the push itself with `ALLOW_UNREVIEWED_PUSH=1` there, and say in the same reply which reviewer produced the verdict and why the subagent route was unavailable --- the override covers a push whose verdict the guard cannot check, not only a push with nothing to check.
 The same applies to a session whose reviewer is registered from a stale definition, which is the case on any rollout of a change to the persona itself.
 Where no second context is reachable at all, say so in the review itself rather than letting an inline pass be reported as a dispatched one.
+
+**A harness that always backgrounds the `Agent` tool is a fourth case where the guard cannot see a verdict it should, alongside no reviewer being registered, a stale reviewer definition, and a subagent's own transcript above --- and the guard's partial fix for this one has a specific extraction bug.**
+[`ai-config#3045`](https://github.com/Morrison-Lab/ai-config/issues/3045) tracks the general case: a harness whose `Agent` dispatch never returns synchronously, so the guard's own "dispatch in the foreground" remedy is unfollowable.
+That issue's own report is one manifestation --- `run_in_background: false` explicitly set, and the dispatch still backgrounded.
+A second, distinct manifestation is a harness whose `Agent` tool carries no `run_in_background` field in its schema at all, so there is nothing to set.
+Confirmed directly for one Claude Code CLI session, not asserted as true of "Claude Agent SDK sessions" generally, since #3045's own report came from a session where the field did exist.
+Both produce the identical symptom --- "Async agent launched successfully" with an agent id, and the verdict arriving later as a task-notification --- from different causes, and both are the same shape as [`memories/antigravity.md`](../../memories/antigravity.md)'s "Asynchronous subagent dispatch and pre-push self-review (`invoke_subagent`)" entry for Gemini CLI's `invoke_subagent`, which predates and independently confirms this is a cross-harness pattern rather than one build's quirk.
+
+`read_latest_review()` in `hooks/no-push-without-self-review.py` already has a partial fix for exactly this: the "Genuine task notifications from tracked background reviewer dispatches" block, added by #2820 (closing #2544) on 2026-09-01, two days before #3045 was filed.
+It tries to recover a task id from the dispatch's own tool result, then matches a later task-notification against that id and parses its text for a verdict.
+The recovery step tries `json.loads()` first, and on failure falls back to a regex requiring the literal key `task[-_ ]?id` or `conversationId`.
+One session's tool result read `agentId: a29a955ac15b38f72`, which matches neither alternative, so the id was never captured, the later notification never matched, and the guard refused the push on all four dispatches in that session despite each one returning a genuine, independently verified verdict.
+Reproduced directly:
+
+```python
+re.search(r"\b(?:task[-_ ]?id|conversationId)[:=]\s*[`\"']?([\w-]+)",
+           "agentId: a29a955ac15b38f72", re.I)
+# -> None
+```
+
+Posted to #3045 with a proposed one-line fix: widen the key alternation to include `agentId`.
+
+Until that lands, the remedy is the CLI-fallback one given above: run the review (the async dispatch still produces a real report, just not as the call's own synchronous result, and the guard's automatic matching cannot yet recover it either), confirm the reported `Reviewed-Commit` matches what the push will actually ship, and use `ALLOW_UNREVIEWED_PUSH=1` on the push itself, stating in the same reply which review produced the verdict and that the harness's dispatch could not satisfy the guard's own foreground check.
+Re-dispatching the same reviewer again on the theory that a different `run_in_background` phrasing will change the outcome does not.
+On the field-absent variant there is no field to change, and on #3045's own variant the harness ignored the field once already.
+
+(Diagnosed 2026-09-14, driving `Morrison-Lab/ai-config#3684`: four `Agent` dispatches to `adversarial-reviewer` in that session, each with `isolation: "worktree"`, all returned "Async agent launched successfully" with no `run_in_background` field available on the call to begin with.
+Each review's full report arrived only via a later task-notification, and each push attempt was refused until `ALLOW_UNREVIEWED_PUSH=1` was used on a push whose `Reviewed-Commit` matched the final CLEAN verdict's head.)
 
 **Cursor Cloud has a subagent dispatch.**
 On Cursor Cloud, when the session's `Task` tool lists
@@ -1375,6 +1438,42 @@ Neither was a round happening to come back empty --- which, per the convergence 
   "Should this exist" and "should this iterate further" have different right answers, and a change worth shipping is the usual situation in which the continue-or-stop question arises at all.
 - **Don't:** treat an empty round as the answer to either question;
   a converging series narrows its own search space, so the empty round is the least informative one.
+
+### Narrowing severity is evidence about COVERAGE, not about the defect population
+
+The two sections above give reasons a shrinking series might not mean what it looks like: the work may be unjustified, or the fixes may be feeding the findings.
+The second already names the narrowing search space, in "a converging series narrows its own search space", and says an empty round is the least informative one.
+This section takes that from a caution about the series' END to a rule about its STEERING: if the space narrows because each round returns to the last finding, the narrowing is steerable, and the dispatcher is the only party positioned to steer it.
+
+A reviewer handed a change re-reads where the last finding landed.
+So round N+1's search space is set by round N's result, and the severity curve across rounds is a record of **where attention went**, not of what remains.
+A surface no round has opened contributes nothing to the curve however bad it is, and its absence from the findings is indistinguishable from its being clean.
+
+Observed 2026-09-15 on `Morrison-Lab/ai-config`, fourteen adversarial rounds on one branch, and recorded as an unverified session account rather than as a measurement: no issue, PR or SHA anchors it, and neither named defect is greppable in the corpus today.
+Read the round-by-round detail below as illustration of the mechanism, not as evidence for it --- the argument stands on why a reviewer's search space is set by the previous round's result, which is checkable from any review series, including this fragment's own.
+One episode, not three.
+The series ran fourteen rounds;
+eleven of them ran checkers, which is the subset [`derive-dont-enumerate`](derive-dont-enumerate.md)'s eighth occurrence counts;
+and thirteen pushes were refused across it, which is what [`get-under-the-hood`](../principles/get-under-the-hood.md)'s third refusal shape counts.
+Fourteen is the figure in the round unit;
+the other two are a subset of those rounds and a count of pushes, not competing totals.
+Rounds 1 through 5 each found one stale-count defect, each less severe than the last, and read as convergent.
+Round 6 was pointed deliberately at the files no earlier round had opened and immediately returned two defects that had been wrong for three rounds --- among them a function contract docstring naming the wrong regex.
+Its own verdict named the mechanism: every round after the first had re-read the file round 1 landed in, so the apparent convergence was sampling bias.
+Confirmed again at round 9, after three rounds returning only prose defects: steering at unswept surface found a real behavioural defect, a guard arm suppressed by any unrelated relocator in the command.
+
+The remedy is bookkeeping rather than judgement, which is what makes it survivable across rounds: **track which files each round actually opened, and point the next round at the complement.**
+That is a set the dispatcher can derive and the reviewer cannot.
+
+Rounds 9 through 11 corroborated this from the other direction: every real defect in them came from executing a prediction taken from the prose rather than from re-reading prose against prose.
+That half is already this file's, in "Tell it to RUN the repo's validation, not only to read the diff" and in "Give a docs-only diff describing an instrument a full round" --- the first of which closes on this section's own population point, that a set of rounds "covered the changed lines, which is a different population".
+What is added here is only the steering rule, which neither of those gives.
+
+- **Do:** record the files each round opened, and brief the next round at the ones no round has.
+- **Do:** read a run of shrinking findings as "this surface is exhausted" rather than "this change is nearly clean" --- the two are the same observation about different populations.
+- **Don't:** let a reviewer choose its own scope on a series of rounds;
+  left alone it returns to the last finding, which is the one place already swept.
+- **Don't:** count the severity trend as a stopping signal at all, separately from whether an empty round is one --- the trend and the empty round fail for the same reason, that the series narrows its own search space.
 
 ### Do not write to the tree a dispatched reviewer is reading
 

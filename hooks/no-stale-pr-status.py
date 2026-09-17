@@ -59,8 +59,16 @@ ASSERT = [
     r"\bchecks? (are |is )?(all )?green\b",
     r"\b(is|are|now) green\b",
     r"\bgreen,\s",
-    r"\b0 fail",
-    r"\bzero fail",
+    # Anchored to the CI vocabulary, not the test-runner's. `0 failed` is how
+    # every test harness reports a green suite, and a local run's tally says
+    # nothing about a PR -- so an unanchored `0 fail` fires on a mutation
+    # check of a hook's own tests while its sibling `\b\d+\s+pass\b`, which
+    # requires a boundary after `pass`, deliberately ignores the same line.
+    # The two patterns matched disjoint things: `14 passed, 0 failed` tripped
+    # only the fail rule, and `25 pass, 2 pending` only the pass rule
+    # (ai-config#2016). Keep the CI phrasings and drop the participle.
+    r"\b0 fail(s|ures)?\b",
+    r"\bzero fail(s|ures)?\b",
     r"\bready to merge\b",
     r"\bfully clean\b",
     r"\bno failures\b",

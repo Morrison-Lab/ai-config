@@ -365,3 +365,55 @@ The reformat rewrote that line's neighbours and never engaged it.
 - **Do:** re-read a whole paragraph you reformat, and check it against any open finding on that file.
 - **Do:** treat a re-raised finding as evidence that the previous round's brief was too narrow, not that the reviewer is repeating itself.
 - **Don't:** count a mechanical edit as coverage of the lines it touched.
+
+## Retracting a claim means sweeping every surface it reached, not just the source
+
+The section above covers a defect found in the **fix**.
+This one covers a fix that is correct and simply does not go far enough,
+because the claim it withdraws was never in only one place.
+
+Writing a claim is naturally repetitive.
+You state it in the entry, restate it in the commit message, summarize it in
+the PR body, compress it into the title, and quite possibly paste it into
+whatever other document prompted the work.
+Retracting one feels like a single edit to a single source --- so the
+retraction under-propagates by construction, and every surviving copy then
+reads as independent corroboration of exactly the thing you withdrew.
+
+Nothing catches it.
+No check fails, no link breaks, and the copies are prose rather than
+references, so no tooling connects them to the source you fixed.
+
+Measured 2026-09-15 on
+[ai-config#3721](https://github.com/Morrison-Lab/ai-config/pull/3721), where a
+fact-check retracted two claims and the same prose turned out to live in four
+places: the memory entry, the PR body, the PR **title** --- the most-read line
+of a squash merge, and the last thing a reader sees before believing it ---
+and a **different repository's** `CLAUDE.md`, where it had been written into a
+provenance note during unrelated work.
+The first three were found by rereading what had been written.
+The fourth was found by accident, when the harness happened to re-read that
+instruction file;
+nothing about fixing the entry would have led there, and the copy would
+otherwise have shipped the retracted claim into a second corpus.
+
+So enumerate the surfaces **before** editing, and grep for a distinctive
+phrase from the retracted claim rather than recalling where it was written ---
+recall covers the places you were thinking about the claim, which is not the
+same set.
+The cross-repo copy is the one no local search finds, so ask specifically
+whether this claim was ever explained anywhere outside this repository.
+
+- **Do:** list every surface that describes the change --- entry, commit
+  message, PR body, PR title, adjacent docs --- and check each one.
+- **Do:** grep a distinctive phrase from the claim, in every checkout the
+  session touches, not only the one holding the fix.
+- **Don't:** treat the source edit as the retraction; it is the first of
+  several.
+- **Don't:** leave the PR title carrying a claim the body retracts, since the
+  title is what the merge commit keeps.
+
+(Tracked as [ai-config#3722](https://github.com/Morrison-Lab/ai-config/issues/3722).
+Distinct from `algorithmatize-checks.cases.md`'s "a retraction can land the
+OPPOSITE overclaim", which is about a retraction being *wrong*;
+this is about one that is right and incomplete.)

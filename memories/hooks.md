@@ -177,6 +177,58 @@ fail-fast.
   fail-loudly instruction --- a raise into a blanket `except Exception` is a
   silent fail-open wearing a safeguard's shape.
 
+**The same handler erases a whole SCAN when the exception is incidental
+rather than deliberate.**
+The case above is a `raise` written on purpose and swallowed.
+The commoner one carries no intent at all: a loop under that same blanket
+`except Exception: return 0` meets one record of an unexpected shape --- a
+string-valued `message`, a bare JSON list, a `tool_use` whose `input` is a
+string, a null `text` --- and the exception unwinds past every record still
+unread.
+The guard then returns 0 with empty stdout, which is the ALLOW outcome, for
+the rest of the session.
+
+Note the difference in blast radius, which is what makes this the worse half.
+A swallowed `raise` loses the one check it guarded.
+A swallowed parse error loses **everything the loop had not reached yet**, so
+a single malformed record early in a transcript disables the guard entirely
+--- silently, since the fail-open path prints nothing by design.
+
+The remedy is a per-item guard inside the loop, not a narrower handler at the
+top.
+Skipping one record loses at most one event;
+aborting loses the guard.
+Where the top-level fail-open is deliberate --- and in a `Stop` or
+`PreToolUse` hook it usually is, because a crashing guard must not break the
+session --- every loop beneath it owes its own `try` / `except ...: continue`.
+
+- **Do:** wrap each iteration of a guard's scan loop in its own handler, so a
+  malformed item is skipped rather than terminal.
+- **Do:** ask, of every blanket fail-open you keep, what the largest thing an
+  inner exception could cancel is --- the answer is rarely the one statement
+  that raised.
+- **Don't:** read a top-level `except Exception: return 0` as covering a loop
+  beneath it; it converts one parse error into a whole-session no-op.
+- **Don't:** narrow the top-level handler instead --- a guard that crashes on
+  an unexpected payload obstructs correct work, which is the shape section 4.5
+  below records getting switched off, taking its true positives with it.
+
+(Measured 2026-09-17 on
+[ai-config#3692](https://github.com/Morrison-Lab/ai-config/pull/3692),
+`hooks/no-clean-stop-with-live-agent.py`.
+An `adversarial-reviewer` dispatch against `79363d7a` found the whole reader
+loop of `scan()` sitting under `main()`'s `except Exception: return 0` with no
+per-record guard;
+`f947dc94` accepted the finding and wrapped each record's body in
+`try` / `except Exception: continue`.
+Its comment names the reachable input rather than a hypothetical one: the
+Antigravity adapter already handles a subagent argument arriving as a JSON
+string.
+Both `Do`s and the first `Don't` are derived from reading those two revisions
+of the file directly.
+The second `Don't` is inferred --- nothing measured here shows a narrowed
+handler causing a guard to be switched off.)
+
 ---
 
 ## 4. Detached Timers & Monitoring Services

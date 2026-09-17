@@ -1083,10 +1083,10 @@ Measured: `npx --no-install markdownlint-cli2` failed in this session's
 container with `npm error npx canceled due to missing packages and no YES
 option`, and `npx --yes markdownlint-cli2@0.23.2` installed and ran cleanly
 moments later in the same container.
-The first result was written into a commit message as "markdownlint is not
-installable in this container", which generalizes from the flag's refusal to
-the package's availability --- two different claims the command cannot
-distinguish between.
+The first result was written into a commit message (`c40259f8`, since amended
+away) as "markdownlint itself is not installable in this container", which
+generalizes from the flag's refusal to the package's availability --- two
+different claims the command cannot distinguish between.
 
 - **Do:** before reporting a package or tool unavailable, try the
   install-permitting form (`--yes`, no flag, or the documented equivalent),

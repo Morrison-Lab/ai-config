@@ -41,7 +41,10 @@ Split out of [`tools.md`](tools.md) on 2026-09-01 when that file crossed the 125
   **The two flags this bullet already names diverge on a cold cache, and reading the wrong one's failure as "not installable" is a distinct, measured mistake.**
   `--yes` (line above) installs on demand.
   `--no-install` (the `run-local-validation.py` equivalent) refuses instead, by design, whenever the package is not already cached --- that is the whole point of the flag, not a defect in it.
-  Measured 2026-09-17 in a remote session's container: `npx --no-install markdownlint-cli2 --version` failed with `npm error npx canceled due to missing packages and no YES option`, and a commit message reported "markdownlint is not installable in this container and was not run".
+  Measured 2026-09-17 in a remote session's container: `npx --no-install markdownlint-cli2 --version` failed with `npm error npx canceled due to missing packages and no YES option`, and a commit message reported "markdownlint itself is not installable in this container and was not run".
+  That commit was `c40259f8` and it was **amended away** once the tool did run, so the quoted wording is no longer reachable from any ref --- a later `git log --all` search finds only the replacement, which says "not installed" rather than "not installable".
+  An adversarial review of this entry duly reported the quote as a misquote on exactly that evidence.
+  Cite the superseded SHA whenever quoting a commit message you then amended, or the quote is uncheckable by anyone without that repository's dangling objects.
   `npx --yes markdownlint-cli2@0.23.2` then installed and ran cleanly in the same container, reporting 772 files linted and 0 issues.
   **Do:** on a `--no-install` refusal, retry with `--yes` (or a plain install) before concluding the tool is unavailable --- a cold cache and a genuinely missing tool produce the identical error text.
   **Don't:** read `run-local-validation.py`'s own `--no-install` "missing tool" SKIP as a verdict on the tool's availability.

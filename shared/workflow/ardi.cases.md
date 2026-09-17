@@ -165,8 +165,9 @@ working form.)
 (Second instance, 2026-09-17, `Morrison-Lab/ai-config`, mirrored rather than
 repeated: `npx --no-install markdownlint-cli2 --version` failed in a remote
 session's container with `npm error npx canceled due to missing packages and
-no YES option`, and a commit message asserted "markdownlint is not
-installable in this container and was not run".
+no YES option`, and a commit message asserted "markdownlint itself is not
+installable in this container and was not run" --- `c40259f8`, amended away
+once the tool did run, so the wording survives only as a dangling object.
 The untried variant here was not an added flag but a dropped one:
 `npx --yes markdownlint-cli2@0.23.2` installed through the session's agent
 proxy and ran in the same container moments later, reporting 772 files

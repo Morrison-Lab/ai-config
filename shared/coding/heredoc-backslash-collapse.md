@@ -153,3 +153,52 @@ It fires on the doubled form either way, which is the right behaviour here ---
 the doubled form is what is wrong, not the collapse.
 
 (Tracked as [ai-config#3710](https://github.com/Morrison-Lab/ai-config/issues/3710).)
+
+## A collapse into a VALID escape gets past the PARSER checks this file prescribes
+
+One of the remedies above is a parser check --- `ast.parse` the file, prescribed as "parse-check (or read back) a file a heredoc just wrote with escapes in it".
+It works because the collapses measured so far produced something broken --- a `SyntaxError`, a string literal spanning lines, an anchor matching nothing.
+It does not fire when the surviving single backslash forms an escape Python accepts, and neither does `scripts/check-python-escapes.py`, the repo-wide instrument for the same question, which this section reaches for below.
+
+`\b` is the case in hand.
+A doubled `\\b` arriving single is read as BACKSPACE, `0x08`, and written into the file as that byte.
+Nothing raises: `ast.parse` succeeds and the escapes checker has nothing to report, because the escape is valid.
+
+**`repr()` is the exception, and it is this file's most emphasised Do for a reason --- but only where there is a literal to print.**
+`repr('a\b')` renders `'a\x08'`, unmissably, so a round-tripped string literal gives the byte up immediately.
+What it does not reach is a backslash that landed in a **comment**, which is where two of the three instances below landed: no literal is constructed, so there is nothing to `repr()`, and the byte sits in the file with every parser check green.
+That is the gap --- not that the prescribed checks are weak, but that the one strong enough is scoped to emitted literals.
+
+Observed 2026-09-15 on `Morrison-Lab/ai-config`, three collapses in one session, and recorded as an unverified session account rather than as a measurement for the first two: they were repaired before any commit, so no `0x08` byte is greppable in the corpus today and nothing anchors them.
+All three occurred while editing the branches carrying this file's own subject matter.
+Twice a `\b` meant as text became a literal `0x08` inside a comment.
+The third is anchored, and landed on a different branch: an invalid escape reached `ums/cross-drive-media-type-guard` and took `scripts/check-python-escapes.py` red.
+Under `test_hooks.py`'s `PYTHONWARNINGS` the affected suite raised `SyntaxError` and did not execute --- reported as a failure by the runner, not silently dropped.
+The green runs recorded for it came from invoking the suite file DIRECTLY, without the environment the runner sets;
+that is an omission at the call site, not a laxer local setting, per the retraction in [`derive-dont-enumerate`](../workflow/derive-dont-enumerate.md).
+Fixed in `335861fc` (PR #3728).
+Only `chr(92)` survived, which is what this file already prescribes.
+The first two were caught by a control-character scan over the changed files;
+the third by the escapes checker.
+Neither instrument would have caught the other's case.
+
+**So the post-edit scan is two instruments, not one, because the two failure modes are different bytes.**
+An invalid escape is a parser question and a valid-but-unintended escape is a byte question, and outside an emitted literal only the parser question shows up in the checks above.
+
+```bash
+python3 -c "import re,sys;[print(f'{f}:{i}') for f in sys.argv[1:] for i,l in enumerate(open(f,'rb'),1) if re.search(rb'[\x00-\x08\x0b\x0c\x0e-\x1f]',l)]" <changed files>
+python3 scripts/check-python-escapes.py   # the invalid-escape direction
+```
+
+The byte scan reports on stdout and exits 0 either way, so read its output rather than chaining it behind `&&` --- the same caution [`derive-dont-enumerate`](../workflow/derive-dont-enumerate.md)'s eighth occurrence states for a checker whose warning rides above its success line.
+It is written in Python rather than as `grep -nP '[\x00-\x08...]'` deliberately, even though that character class is correct and does match.
+`-P` is a GNU extension: on a BSD `grep` it exits non-zero with empty stdout and `grep: invalid option -- P`, which is indistinguishable from a clean scan if only the output is read.
+[`hooks/flag-indirect-gnu-grep-flag.py`](../../hooks/flag-indirect-gnu-grep-flag.py) records that exact failure being written into a commit message as "no tracked file contains an em dash" when five did.
+Prescribing a portability-dependent flag inside a section about checks that return green while missing the defect would reproduce this file's own subject.
+
+- **Do:** run both a control-character scan and the escapes checker after any scripted edit that touches a backslash, rather than either alone.
+- **Do:** treat a comment as needing the same care as a string literal --- the bytes land wherever the escape was typed, and a comment is where nothing will ever raise about them.
+- **Don't:** read a clean `ast.parse` as evidence a heredoc'd backslash edit landed correctly;
+  it answers only the direction that happens to be broken.
+
+This is the same displacement this file's own "treat having read this file as the check" records, one level in: having a check is not the check either, when the check is blind to the half you hit.

@@ -1439,6 +1439,42 @@ Neither was a round happening to come back empty --- which, per the convergence 
 - **Don't:** treat an empty round as the answer to either question;
   a converging series narrows its own search space, so the empty round is the least informative one.
 
+### Narrowing severity is evidence about COVERAGE, not about the defect population
+
+The two sections above give reasons a shrinking series might not mean what it looks like: the work may be unjustified, or the fixes may be feeding the findings.
+The second already names the narrowing search space, in "a converging series narrows its own search space", and says an empty round is the least informative one.
+This section takes that from a caution about the series' END to a rule about its STEERING: if the space narrows because each round returns to the last finding, the narrowing is steerable, and the dispatcher is the only party positioned to steer it.
+
+A reviewer handed a change re-reads where the last finding landed.
+So round N+1's search space is set by round N's result, and the severity curve across rounds is a record of **where attention went**, not of what remains.
+A surface no round has opened contributes nothing to the curve however bad it is, and its absence from the findings is indistinguishable from its being clean.
+
+Observed 2026-09-15 on `Morrison-Lab/ai-config`, fourteen adversarial rounds on one branch, and recorded as an unverified session account rather than as a measurement: no issue, PR or SHA anchors it, and neither named defect is greppable in the corpus today.
+Read the round-by-round detail below as illustration of the mechanism, not as evidence for it --- the argument stands on why a reviewer's search space is set by the previous round's result, which is checkable from any review series, including this fragment's own.
+One episode, not three.
+The series ran fourteen rounds;
+eleven of them ran checkers, which is the subset [`derive-dont-enumerate`](derive-dont-enumerate.md)'s eighth occurrence counts;
+and thirteen pushes were refused across it, which is what [`get-under-the-hood`](../principles/get-under-the-hood.md)'s third refusal shape counts.
+Fourteen is the figure in the round unit;
+the other two are a subset of those rounds and a count of pushes, not competing totals.
+Rounds 1 through 5 each found one stale-count defect, each less severe than the last, and read as convergent.
+Round 6 was pointed deliberately at the files no earlier round had opened and immediately returned two defects that had been wrong for three rounds --- among them a function contract docstring naming the wrong regex.
+Its own verdict named the mechanism: every round after the first had re-read the file round 1 landed in, so the apparent convergence was sampling bias.
+Confirmed again at round 9, after three rounds returning only prose defects: steering at unswept surface found a real behavioural defect, a guard arm suppressed by any unrelated relocator in the command.
+
+The remedy is bookkeeping rather than judgement, which is what makes it survivable across rounds: **track which files each round actually opened, and point the next round at the complement.**
+That is a set the dispatcher can derive and the reviewer cannot.
+
+Rounds 9 through 11 corroborated this from the other direction: every real defect in them came from executing a prediction taken from the prose rather than from re-reading prose against prose.
+That half is already this file's, in "Tell it to RUN the repo's validation, not only to read the diff" and in "Give a docs-only diff describing an instrument a full round" --- the first of which closes on this section's own population point, that a set of rounds "covered the changed lines, which is a different population".
+What is added here is only the steering rule, which neither of those gives.
+
+- **Do:** record the files each round opened, and brief the next round at the ones no round has.
+- **Do:** read a run of shrinking findings as "this surface is exhausted" rather than "this change is nearly clean" --- the two are the same observation about different populations.
+- **Don't:** let a reviewer choose its own scope on a series of rounds;
+  left alone it returns to the last finding, which is the one place already swept.
+- **Don't:** count the severity trend as a stopping signal at all, separately from whether an empty round is one --- the trend and the empty round fail for the same reason, that the series narrows its own search space.
+
 ### Do not write to the tree a dispatched reviewer is reading
 
 The reviewer reads the working tree, so any write to it moves the ground under a read already in progress.

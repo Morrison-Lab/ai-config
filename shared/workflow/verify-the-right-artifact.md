@@ -207,7 +207,8 @@ See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), 
 ## A different endpoint is another shape, and the two names read as synonyms
 
 Two APIs can describe overlapping but distinct populations under names that read as synonyms.
-GitHub's `pages/builds` and its `deployments?environment=github-pages` each answer "how many times has this site deployed," and they do not count the same events.
+GitHub's `GET /repos/{owner}/{repo}/pages/builds` documents itself as listing *builds* of a Pages site ([REST API docs](https://docs.github.com/en/rest/pages/pages), read 2026-09-17), while `GET /repos/{owner}/{repo}/deployments?environment=github-pages` lists *deployments* to an environment.
+Both answer to "how many times has this site deployed" in English, and they enumerate different objects, so a count taken from one is not comparable to a count taken from the other.
 
 What distinguishes it is not that the substitution is silent --- [`A working-directory checkout is another shape, and it stays silent`](#a-working-directory-checkout-is-another-shape-and-it-stays-silent) says the same of a stale read, and says it first.
 It is that there is no authoritative store to go to.
@@ -216,7 +217,7 @@ Here both endpoints are authoritative, each for its own population, and neither 
 So the usual move, go and check against the real thing, does not terminate: whichever endpoint you reach for is a real thing.
 
 Re-measuring a prior claim through the *other* endpoint and getting a different number is therefore evidence that the two endpoints disagree, not evidence that the original figure decayed.
-A drift claim needs both readings taken the same way, which is [`A drift claim is relational, so one read cannot settle it`](#a-drift-claim-is-relational-so-one-read-cannot-settle-it)'s requirement arriving through a second route.
+A drift claim needs both readings taken the same way, and the endpoint is part of "the same way".
 
 - **Do:** use the endpoint the original measurement named, and say which one it was.
 - **Do:** use the other party's endpoint when checking someone else's number, before concluding drift.

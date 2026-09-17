@@ -117,11 +117,13 @@ mutates a PR stays serial.
    never overrides the stacking order above.
 
    **Detect a swarm of near-duplicate automated-agent PRs before driving
-   any of them.** An autonomous coding agent (Jules, a scheduled bot, a
+   any of them.**
+   An autonomous coding agent (Jules, a scheduled bot, a
    repeated workflow trigger) can open several open PRs that all attempt
    the same broad task against overlapping parts of the same repo — not
    stacked on each other's branches, all based on the same commit, but
-   colliding hard on file sets and even on the exact same lines. This is a
+   colliding hard on file sets and even on the exact same lines.
+   This is a
    different shape than the `Superseded` terminal state in step 3, which
    fires *after* one sibling has already merged; here, none have merged
    yet and the PRs are competing candidates rather than a landed-vs-stale

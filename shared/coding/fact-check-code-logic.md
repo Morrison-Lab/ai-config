@@ -544,6 +544,11 @@ for eight of the nine;
 against a source outside the diff instead, since there is no correct fix yet
 to mutate away from.
 
+A tenth failure mode lives at the SUITE level rather than in any one test.
+When a fix is applied identically to two parallel code paths --- two transcript shapes, two harness formats, any pair of branches implementing one logical rule --- a single combined pass/fail total is not evidence about either path on its own.
+A suite whose cases concentrate on one shape can report every case passing with the other shape's half of the fix fully reverted, simply because nothing in the suite ever exercises that shape's branch.
+The total reads as coverage of "the fix" when it is coverage of one of its two copies.
+
 - **Do:** mutate the exact fix and watch the new test fail before trusting it.
 - **Do:** route the fixture through the real entry point
   and confirm it reaches the branch whose behaviour the test names.
@@ -553,6 +558,9 @@ to mutate away from.
 - **Do:** give a mapping or ordering bug a fixture whose order differs
   from the implementation's,
   since the two paths agree on every fixture that shares it.
+- **Do:** when a fix touches two parallel code paths, mutate (revert) each path's own copy separately and confirm a case fails for that specific reversion --- run the mutation once per path, not once for the suite.
+- **Don't:** read a single aggregate PASS total as having pinned every path a fix touches;
+  a suite concentrated on one shape can stay green with the other shape's half of the fix reverted out entirely.
 - **Don't:** accept a test because it mentions the helper that changed,
   or because a coverage report marks the line covered.
 - **Don't:** trust a test label as evidence of what the assertion checks.
@@ -1190,6 +1198,27 @@ Confirming it is deliberately historical discharges the warning.
 The four comment lines directly above went untouched, so they still said 6, their stated 192G total was now wrong by more than a factor of three, and they still recorded the incident that had motivated the cap --- an unbounded array previously drained a node with an unkillable process stuck on network I/O.
 Only the directive line was ever read.
 An AI reviewer returned "Needs more work" on the contradiction.)
+
+## A disclosed gap next to an undisclosed one makes the second read as checked
+
+When two adjacent comments each classify or assert something about the code, and only one of them labels its own uncertainty, the labelled one does not just describe itself --- it changes how the unlabelled one reads.
+A reader (including the author, on a later pass) sees the careful hedging on the first claim and infers the same diligence was applied to its neighbour, precisely because the neighbour offers no hedge to notice.
+Disclosure discipline applied unevenly within one change is worse than applied nowhere: an undisclosed guess sitting alone reads as a guess, while the same guess sitting beside a disclosed one reads as verified.
+
+This is a distinct failure from stating a claim confidently in isolation.
+The mechanism here is contrast: the disclosed neighbour is what manufactures the undisclosed claim's appearance of having been checked, so the tell is "does this comment have a sibling that hedges, right where this one doesn't."
+
+- **Do:** when one classification in a group carries a disclosed gap (unmeasured, inferred, unattested), audit every sibling classification in the same comment or block for the same standard, not just the one already flagged.
+- **Do:** state the actual evidence for a classification next to the classification itself --- "the repo's only evidence is X, which does not cover Y" --- rather than a bare assertion, so a reader can tell it apart from a measured fact without needing a neighbour's hedge as a contrast.
+- **Don't:** leave one classification in a group stated as flat fact while a sibling in the same group is explicitly labelled as inference or unmeasured --- fix the labelling in the same pass that adds the disclosed one, not in a later round.
+- **Don't:** treat "I disclosed the other gap" as having discharged scrutiny on the whole group;
+  disclosure of one item says nothing about a different item's evidence.
+
+(Morrison-Lab/ai-config#3707, commit `0a125ec`, 2026-09-17: a hook's dispatch-tool-name set carried two comments about names added on incomplete evidence.
+One explicitly said "`collaboration.spawn_agent` is the name a reporter used for the interface in prose;
+nothing here has measured it as the name a transcript carries" --- a disclosed, cited gap.
+Three entries later, `manage_task` was classified retrieval-only with no such hedge, stated as settled fact, though the repository's only evidence for it (three files, all showing `Action='status'`) never covers the creation case the classification also assumes.
+A review round found it by asking whether every classification in the group met the same bar the disclosed one had already set, not by doubting the `manage_task` line on its own.)
 
 ## A comment asserting the state of ANOTHER artifact is a claim with an expiry across commits
 

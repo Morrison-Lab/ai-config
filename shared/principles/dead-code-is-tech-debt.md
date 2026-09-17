@@ -34,7 +34,7 @@ Unused code and orphaned assets impose substantial, ongoing operational costs:
 
 ## Categories of dead artifacts
 
-When auditing or reviewing a codebase, identify and prune these four categories:
+When auditing or reviewing a codebase, identify and prune these five categories:
 
 ### 1. Obsolete and uncalled functions, modules, and exports
 
@@ -58,6 +58,22 @@ When auditing or reviewing a codebase, identify and prune these four categories:
 
 - Blocks of code commented out with `#`, `//`, `/* ... */`, or HTML comments in active source files.
 - Disabled test cases left without an explicit tracking issue or active skip annotation.
+
+### 5. Inert conjuncts in live, executing conditions
+
+A boolean operand that can never resolve differently from a constant, given the control flow around it, is dead code that still runs on every call.
+It costs a reader's attention each time the line is read, and it is invisible to line coverage and to a mutation run alike: removing an always-true conjunct changes no observable behaviour, so no test can fail against its removal.
+
+- A conjunct guaranteed by an earlier `return`/`raise` in the same function (e.g. `if x and not y:` right after a prior branch that already returned whenever `y` was true).
+- A conjunct guaranteed by a sibling condition a few lines above, once *that* condition has been simplified --- the guarantee can shift onto a line the edit never touched.
+
+**A cleanup's own justification does not inoculate the rest of the diff against the same defect, and the code nearest a stated principle is where it is checked least.**
+Citing a principle while removing two instances of a pattern reads as having swept the diff for it, but a third, structurally identical instance a few lines away is exactly as likely to remain --- more so, because a reader's guard drops immediately after a comment that says "this is now proven redundant."
+
+(Morrison-Lab/ai-config#3707, commits `6ed5807` and `0a125ec`, 2026-09-17: a hook's provenance check removed an `and not saw_reviewer_call` conjunct from two conditions, with a comment proving both could never be false and citing this principle by name.
+Three lines later, in an adjacent condition the same commit left untouched, `transcript_path and not os.path.exists(transcript_path)` carried an equally inert `transcript_path and` --- the immediately preceding statement, `if not transcript_path: return ...`, already guaranteed `transcript_path` truthy by that point.
+No mutation run ever flagged it, for the reason given above: removing `transcript_path and` changes nothing a test can observe.
+A later review round found it only by re-deriving what the code immediately above the condition actually guarantees.)
 
 ## Systematic elimination workflow
 
@@ -103,14 +119,18 @@ This principle complements rather than contradicts [`prefer-optionality-over-rem
 - **Do:** remove associated tests, documentation, and manifest registrations when removing dead symbols.
 - **Do:** use deterministic static analysis tools to verify zero callers before deletion.
 - **Don't:** comment out code blocks "in case we need them later" --- git history preserves them.
+- **Do:** when a comment proves one conjunct redundant, grep the same file for the identical operand and check whether a nearby condition carries it too --- the removal you just made can be exactly the fact that makes a sibling conjunct provably dead as well.
 - **Don't:** keep obsolete functions or orphaned configs as harmless clutter;
   they actively degrade agent context and developer focus.
 - **Don't:** leave deprecated symbols without a formal deprecation schedule and warning mechanism.
+- **Don't:** treat a passing mutation run as evidence a conjunct isn't inert;
+  an always-true operand produces no observable difference when removed, so no test can fail against its removal.
 
 ## In review
 
 Flag dead code and commented-out blocks in every review:
 - Ask the author to remove commented-out code blocks and rely on git history.
+- Check a condition's conjuncts against what the code immediately above it guarantees, especially right after a comment that just proved a sibling conjunct redundant --- the same reasoning often applies a few lines further than the diff addressed.
 - Check whether new changes leave orphaned helper functions, unused variables, or dead config files behind.
 - Verify that refactors clean up superseded functions and their test fixtures completely.
 

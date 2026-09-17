@@ -679,3 +679,33 @@ They belong with the rest of this file: the first says the parent session is a c
   `worktree add --detach <path> origin/main` returns
   `fatal: invalid reference: origin/main`, while both succeed against
   `origin/develop`.)
+
+## A deliberately unisolated sidecar still needs its VERIFICATION routed out of the tree
+
+The file's other sections treat non-isolation as the lapse, and the remedy they prescribe is the `isolation` parameter.
+Some sidecars are correctly unisolated, though, and for those the parameter is the wrong answer rather than the forgotten one.
+A UMS pass is the clearest case: its whole product is edits that must land in the parent's working tree so the parent can review and commit them, and a worktree would strand exactly what it was dispatched to produce.
+
+The hazard does not go away with the isolation, so it has to be closed some other way.
+Measured 2026-09-17, during PR [#3737](https://github.com/Morrison-Lab/ai-config/pull/3737): a UMS sidecar was briefed with an explicit list of three files not to touch, because the parent was editing them.
+It respected the list for its *writing* and broke it for its *checking* -- to verify a mutation-testing claim in the brief, it removed a conjunct from one of those three files in place.
+Nothing about that felt like editing the file: it was a temporary probe it intended to revert, which is a different act from authoring, and the brief's prohibition reads as being about authorship.
+
+So say where the checking goes, not only what the writing may not touch.
+The two need separate sentences because a "do not edit X" line is heard as a constraint on the deliverable.
+
+- **Do:** brief a deliberately unisolated sidecar to copy anything it wants to mutate, run, or break into the scratchpad first, and name that as a separate instruction from the do-not-touch list.
+- **Do:** say in the launch why isolation was declined, so the decision reads as made rather than forgotten (`flag-unassigned-worktree.py` asks for exactly this).
+- **Don't:** read a do-not-touch list as covering a temporary probe -- the agent that wrote the probe did not, and it was not being careless.
+- **Don't:** reach for `isolation: "worktree"` on a sidecar whose deliverable is edits to the parent's tree;
+  that strands the deliverable to close a hazard a scratch copy closes for free.
+
+**The same probe produced a second lesson, and it is the more expensive one.**
+Having been stopped from mutating in place, the sidecar re-ran its check against a copy of the hook placed outside the checkout -- and reported a baseline of six pre-existing failures that do not exist.
+This suite resolves paths relative to the hook it is handed, so a copy outside the tree fails cases that have nothing to do with the mutation.
+Re-run in the checkout, `origin/main` passes 310 of 310.
+The number was plausible, it was reported as repository state, and it would have become a filed issue had it not been re-derived.
+A scratch copy is the right instrument only when it is a copy of the *tree*, not of the one file under test --- see [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md).
+
+- **Do:** re-derive a sidecar's headline measurement in the checkout before acting on it, especially a baseline it reports in passing.
+- **Don't:** accept a count of pre-existing failures from a run whose working directory you did not establish.

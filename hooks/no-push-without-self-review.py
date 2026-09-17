@@ -16,8 +16,10 @@ the transcript as the blocked call's result, so one blocked push authorized
 every retry after it, and `Read`ing any of this repo's prose did the same. So a
 verdict is admitted from the `tool_result` of a subagent-dispatch call whose
 named persona IS the reviewer, and only when that result is not an error.
-Which tool names count as a dispatch is `AGENT_TOOLS`, which spans harnesses --
-Claude's `Agent`/`Task` and Codex's `spawn_agent` among them. A review that
+Which tool names count as a dispatch is `AGENT_TOOLS` MINUS `TASK_OUTPUT_TOOLS`,
+spanning harnesses -- Claude's `Agent`/`Task` and Codex's `spawn_agent` among
+them. The subtracted names retrieve a dispatch's output instead of making one,
+so they reach a task-id gate rather than a persona check; see `TASK_OUTPUT_TOOLS`. A review that
 never happened must block a push; a harness whose dispatch records this guard
 cannot read must be taught to it, not left to present as the first. The two are
 indistinguishable from inside this function, which is why the remedy is the
@@ -205,6 +207,22 @@ AGENT_TOOLS = {
 # ai-config#3742 tracks the pre-existing variant. It is closed here because the
 # widening turned one spelling into three, and because a diff asserting that
 # nothing downstream is relaxed owes the check.
+#
+# `manage_task` is here on INFERENCE, not measurement, and it is the one entry
+# whose standing differs from its neighbours -- said plainly because the
+# `collaboration.spawn_agent` note above discloses its own gap, and a disclosed
+# neighbour makes an undisclosed one read as checked. The repository's only
+# evidence is `memories/antigravity.md`, `memories/preferences.md` and
+# `plugins/ai-config/rules/ai-config.md`, all of which show `Action='status'`
+# and none of which covers creation -- while the name and that `Action`
+# parameter both suggest the tool also creates. Listing it here therefore
+# CHANGES behaviour for a `manage_task` reviewer dispatch, from admitted to
+# denied. That direction is the safe one for an authorization guard, and it is
+# not free: the denial such a session gets is #3707's own misleading one. It is
+# listed anyway because discriminating on the payload would readmit the bypass
+# (a retrieval call can carry a decorative `prompt` as easily as a decorative
+# persona). ai-config#3746 tracks measuring it and giving that case its own
+# denial; `codex_cases` pins the current behaviour either way.
 TASK_OUTPUT_TOOLS = {"taskoutput", "task_output", "manage_task"}
 
 # A cross-family reviewer invoked as a CLI, whose print-mode output IS its
@@ -1808,7 +1826,7 @@ def verify_review(transcript_path: str, directory: str | None,
     if not transcript_path:
         return False, "No transcript available to verify the adversarial self-review."
 
-    if transcript_path and not os.path.exists(transcript_path):
+    if not os.path.exists(transcript_path):
         # Distinguished from the denial below because the two have different
         # remedies and only one of them is the pusher's to apply. Reporting a
         # harness integration gap as "you did not dispatch a reviewer" sends

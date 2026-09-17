@@ -2457,6 +2457,84 @@ def codex_cases() -> tuple[int, int]:
             check(f"`{out_tool}` labelled `{key}` does not authorize",
                   rc == 0 and blocked)
 
+    # 13. The OMO-shaped counterpart of case 12, and the reason it exists: the
+    #     provenance fix landed on BOTH transcript shapes, and case 12 pinned
+    #     only one. Case 12 builds nested `message.content` blocks, so its
+    #     twelve rows cannot reach the flat-record branch at all -- removing
+    #     that branch's `name not in TASK_OUTPUT_TOOLS` conjunct restored the
+    #     bypass verbatim while the whole suite still passed.
+    #
+    #     The transferable point, recorded because the aggregate pass count is
+    #     what hid it: when one fix touches two parallel paths, the mutation
+    #     check has to be run per path. A suite that exercises one shape cannot
+    #     fail on the other, so a single green total is evidence about neither.
+    #
+    #     OMO never populates `reviewer_task_ids` -- its result handler reads
+    #     no task ids -- so the exclusion is absolute there rather than a
+    #     reordering. That costs no real capability: a genuine OMO
+    #     dispatch-then-retrieve returns no verdict on origin/main either.
+    for key in ("persona", "agent", "name", "subagentType"):
+        for out_tool in ("taskoutput", "task_output", "manage_task"):
+            rc, out = run_hook(PUSH, [
+                {"type": "tool_use", "timestamp": "2026-09-17T00:00:00Z",
+                 "tool_name": out_tool,
+                 "tool_input": {"task_id": "T7", key: "adversarial-reviewer"}},
+                {"type": "tool_result", "timestamp": "2026-09-17T00:00:01Z",
+                 "tool_name": out_tool, "tool_input": {},
+                 "tool_output": body(commit=HEAD)},
+            ])
+            nested = out.get("hookSpecificOutput") or {}
+            check(f"OMO `{out_tool}` labelled `{key}` does not authorize",
+                  rc == 0 and nested.get("permissionDecision") == "deny")
+
+    # 14. When the reported path is missing AND the fallback is missing too,
+    #     the denial must name the path the HARNESS reported. Cases 10 and 11
+    #     pin which transcript is read; neither pins what the message says when
+    #     neither exists, so dropping the `os.path.exists(fallback)` conjunct
+    #     passed the whole suite while silently sending the pusher to inspect
+    #     `~/.claude/transcripts/<id>.jsonl` -- a file their harness never
+    #     claimed to write. Both branches deny, so this is message quality
+    #     rather than authorization, and it is the whole point of the branch
+    #     the same change added: a remedy naming the wrong artifact is what
+    #     made ai-config#3707 read as a reviewer problem.
+    d = tempfile.mkdtemp(prefix="npwsr-codex-")
+    try:
+        reported = os.path.join(d, "reported-but-absent.jsonl")
+        rc, out = run_hook(
+            PUSH, None,
+            extra_env={"CLAUDE_CONFIG_DIR": d},
+            payload_extra={"transcript_path": reported,
+                           "session_id": "sess-no-fallback"})
+        nested = out.get("hookSpecificOutput") or {}
+        reason = nested.get("permissionDecisionReason", "")
+        check("a denial names the reported path, not a fallback that is also absent",
+              rc == 0 and nested.get("permissionDecision") == "deny"
+              and reported in reason)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+    # 15. `manage_task` used as a DISPATCHER is denied. Pinned rather than
+    #     argued: the repository has never measured whether Antigravity's
+    #     `manage_task` creates tasks as well as reporting on them, and
+    #     `TASK_OUTPUT_TOOLS` classifies it as retrieval-only on that
+    #     unmeasured inference. Listing it changed behaviour here from admitted
+    #     to denied, which is the safe direction for an authorization guard and
+    #     is not free -- this session gets ai-config#3707's own misleading
+    #     denial. ai-config#3746 tracks measuring it. This case exists so that
+    #     whichever answer arrives, the change is visible rather than silent.
+    rc, blocked, _ = push([
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "codex-mt", "name": "manage_task",
+             "input": {"Action": "create",
+                       "subagent_type": "adversarial-reviewer",
+                       "prompt": "Review the diff"}}]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": "codex-mt",
+             "content": body()}]}},
+    ])
+    check("`manage_task` used as a dispatcher does not authorize (unmeasured, ai-config#3746)",
+          rc == 0 and blocked)
+
     return failures, ran
 
 

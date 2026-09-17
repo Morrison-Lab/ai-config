@@ -90,6 +90,23 @@ def liveness(tool="ListAgents", command=None):
     )
 
 
+def raw(record):
+    """A record emitted verbatim, for shapes the helpers cannot express."""
+    return json.dumps(record)
+
+
+def multi_text(texts):
+    """One assistant record carrying several text blocks."""
+    return json.dumps(
+        {
+            "type": "assistant",
+            "message": {
+                "content": [{"type": "text", "text": x} for x in texts]
+            },
+        }
+    )
+
+
 def stamped(line, when):
     """Re-emit a helper's record carrying an explicit ISO-8601 timestamp."""
     record = json.loads(line)
@@ -113,6 +130,28 @@ def run(lines):
     os.unlink(path)
     assert res.returncode == 0, f"exited {res.returncode}: {res.stderr}"
     return '"decision": "block"' in res.stdout
+
+
+def run_twice(lines):
+    """Run the hook twice over one transcript, sharing a TMPDIR."""
+    tmpdir = tempfile.mkdtemp()
+    fd, path = tempfile.mkstemp()
+    with os.fdopen(fd, "w") as f:
+        for line in lines:
+            f.write(line + "\n")
+    out = []
+    for _ in range(2):
+        res = subprocess.run(
+            [sys.executable, HOOK],
+            input=json.dumps({"transcript_path": path}),
+            text=True,
+            capture_output=True,
+            env=dict(os.environ, TMPDIR=tmpdir),
+        )
+        assert res.returncode == 0, f"exited {res.returncode}: {res.stderr}"
+        out.append('"decision": "block"' in res.stdout)
+    os.unlink(path)
+    return out
 
 
 cases = [
@@ -206,14 +245,196 @@ cases = [
         False,
     ),
     (
-        "a partly-stamped transcript falls back to file order rather than guessing",
+        "a partly-stamped transcript is ambiguous, so it arms rather than "
+        "trusting file order",
         [
             stamped(dispatch(), "2026-09-17T10:00:00Z"),
             notification(),
             stamped(liveness(), "2026-09-17T09:59:00Z"),
             assistant(CLEAN),
         ],
+        True,
+    ),
+    (
+        "an unstamped transcript still reads in file order",
+        [dispatch(), notification(), liveness(), assistant(CLEAN)],
         False,
+    ),
+    (
+        "mixed aware and naive stamps are ambiguous, so they arm",
+        [
+            stamped(dispatch(), "2026-09-17T10:00:00Z"),
+            stamped(notification(), "2026-09-17T10:05:00"),
+            stamped(liveness(), "2026-09-17T10:06:00Z"),
+            assistant(CLEAN),
+        ],
+        True,
+    ),
+    (
+        "an unparseable stamp is treated as unstamped, not as an error",
+        [
+            stamped(dispatch(), "not-a-time"),
+            stamped(notification(), "not-a-time"),
+            stamped(liveness(), "not-a-time"),
+            assistant(CLEAN),
+        ],
+        False,
+    ),
+    # --- a dispatch AFTER the last liveness check re-arms (round 3) ----------
+    (
+        "a sidecar dispatched after the liveness check re-arms the guard",
+        [
+            dispatch(),
+            notification(),
+            liveness(),
+            dispatch(),
+            assistant(CLEAN),
+        ],
+        True,
+    ),
+    (
+        "that sidecar's own notification does not discharge it either",
+        [
+            dispatch(),
+            notification(),
+            liveness(),
+            dispatch(),
+            notification(),
+            assistant(CLEAN),
+        ],
+        True,
+    ),
+    (
+        "a liveness check after the sidecar dispatch does discharge it",
+        [
+            dispatch(),
+            notification(),
+            liveness(),
+            dispatch(),
+            liveness(),
+            assistant(CLEAN),
+        ],
+        False,
+    ),
+    # --- a declaration is not lost to a trailing text block (round 3) --------
+    (
+        "a text block after the declaration does not hide it",
+        [
+            dispatch(),
+            notification(),
+            multi_text([CLEAN, "Let me know if anything else comes up."]),
+        ],
+        True,
+    ),
+    (
+        "a declaration in the first of several blocks still counts",
+        [
+            dispatch(),
+            notification(),
+            multi_text(["Working through it.", CLEAN, "Done."]),
+        ],
+        True,
+    ),
+    # --- one malformed record must not disable the guard (round 3) ----------
+    (
+        "a record whose message is a string does not disable the scan",
+        [dispatch(), notification(), raw({"type": "user", "message": "hi"}),
+         assistant(CLEAN)],
+        True,
+    ),
+    (
+        "a record that is a bare JSON list does not disable the scan",
+        [dispatch(), notification(), json.dumps([1, 2, 3]), assistant(CLEAN)],
+        True,
+    ),
+    (
+        "a tool_use whose input is a string does not disable the scan",
+        [
+            dispatch(),
+            notification(),
+            raw({
+                "type": "assistant",
+                "message": {"content": [
+                    {"type": "tool_use", "name": "Bash", "input": "ls"}
+                ]},
+            }),
+            assistant(CLEAN),
+        ],
+        True,
+    ),
+    (
+        "a string-valued tool_use input does not cost the REST of its record",
+        [
+            dispatch(),
+            notification(),
+            raw({
+                "type": "assistant",
+                "message": {"content": [
+                    {"type": "tool_use", "name": "Bash", "input": "ls"},
+                    {"type": "tool_use", "name": "ListAgents", "input": {}},
+                ]},
+            }),
+            assistant(CLEAN),
+        ],
+        False,
+    ),
+    (
+        "a text block whose text is null does not disable the scan",
+        [
+            dispatch(),
+            notification(),
+            raw({
+                "type": "assistant",
+                "message": {"content": [{"type": "text", "text": None}]},
+            }),
+            assistant(CLEAN),
+        ],
+        True,
+    ),
+    # --- fence handling comes from scripts/lib/fences.py (round 3) -----------
+    (
+        "an UNCLOSED fence does not swallow the declaration below it",
+        [
+            dispatch(),
+            notification(),
+            assistant("Example:\n\n```\nsome output\n\n" + CLEAN),
+        ],
+        True,
+    ),
+    # --- previously unpinned behaviours (round 3) ---------------------------
+    (
+        "an assistant-role record carrying origin.kind is not a notification",
+        [
+            dispatch(),
+            liveness(),
+            raw({
+                "type": "assistant",
+                "origin": {"kind": "task-notification", "taskId": "t9"},
+                "message": {"content": [{"type": "tool_result",
+                                         "content": "done"}]},
+            }),
+            assistant(CLEAN),
+        ],
+        False,
+    ),
+    (
+        "git worktree remove is not a liveness check",
+        [
+            dispatch(),
+            notification(),
+            liveness(tool="Bash", command="git worktree remove /tmp/wt"),
+            assistant(CLEAN),
+        ],
+        True,
+    ),
+    (
+        "a string-form content assistant record still supplies the declaration",
+        [
+            dispatch(),
+            notification(),
+            raw({"type": "assistant", "message": {"content": CLEAN}}),
+        ],
+        True,
     ),
     (
         "bash worktree query counts as a liveness check",
@@ -362,7 +583,22 @@ if res.returncode != 0 or '"decision": "block"' in res.stdout:
 else:
     print("  [ok] missing transcript fails open")
 
+# The sentinel lives in the temp directory, so run()'s fresh TMPDIR per case
+# hides "fires at most once per distinct message" entirely. Sharing one TMPDIR
+# across two invocations is the only way to observe it.
+first, second = run_twice([dispatch(), notification(), assistant(CLEAN)])
+if first is not True:
+    failures.append("the guard must block the first time it sees a message")
+    print("  [FAIL] blocks the first time it sees a message")
+else:
+    print("  [ok] blocks the first time it sees a message")
+if second is not False:
+    failures.append("the same message must not be blocked twice")
+    print("  [FAIL] the same message is not blocked twice")
+else:
+    print("  [ok] the same message is not blocked twice")
+
 if failures:
     print("\n".join(failures))
     raise SystemExit(1)
-print(f"\nAll {len(cases) + 2} assertions passed.")
+print(f"\nAll {len(cases) + 4} assertions passed.")

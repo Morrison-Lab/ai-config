@@ -27,11 +27,20 @@ housekeeping rather than as live state.
 
 So a count of outstanding notifications cannot decide this: at declaration time
 every launched agent HAD notified. What was missing was a liveness check taken
-AFTER the last notification. That is the decidable condition:
+after everything that could have put an agent in flight. That is the decidable
+condition:
 
     the final message declares a CLEAN stopping point
     AND a subagent was dispatched in this session
-    AND no liveness check appears after the last task-notification
+    AND no liveness check appears after BOTH the last task-notification
+        and the last dispatch
+
+The second half of that last line is not redundant with the first. Keying only
+on the notification left the guard silent in the corpus's own standard shape --
+dispatch, read the result, check liveness, dispatch a sidecar, declare clean --
+because the sidecar is running at declaration time and has never notified. It
+would then fire only once that agent FINISHED, which inverts the guard against
+the very incident below.
 
 Monitors are deliberately out of scope. A monitor watching an already-merged PR
 is not outstanding work, and blocking on one would fire on nearly every session
@@ -52,9 +61,6 @@ import re
 import sys
 import tempfile
 
-FENCE_OPEN_RX = re.compile(r"^\s{0,3}(`{3,}|~{3,})(?:[a-zA-Z0-9_-]+)?\s*$")
-FENCE_CLOSE_RX = re.compile(r"^\s{0,3}(`{3,}|~{3,})\s*$")
-INLINE_CODE_RX = re.compile(r"`[^`\n]+`")
 
 # Only the CLEAN arm. "Not a clean stopping point" is the honest declaration
 # this guard exists to steer toward, so it must never fire on it. That needs no
@@ -111,6 +117,14 @@ except Exception as _exc:  # broken install
           file=sys.stderr)
     git_subcommand = simple_commands = None
 
+try:
+    from fences import strip_fences
+except Exception as _exc:  # broken install
+    print("no-clean-stop-with-live-agent: cannot load scripts/lib/fences.py "
+          "({0}); fenced examples will be read as prose".format(_exc),
+          file=sys.stderr)
+    strip_fences = None
+
 
 def is_liveness_command(command):
     """True when `command` actually RUNS a worktree-liveness query.
@@ -146,26 +160,35 @@ def is_liveness_command(command):
 
 
 def declares_clean(text):
-    """True when a CLEAN stopping-point declaration appears outside code."""
+    """True when a CLEAN stopping-point declaration appears outside a fence.
+
+    Fences are stripped with `scripts/lib/fences.py`, the repo's shared
+    CommonMark implementation, rather than re-derived here. The hand-rolled
+    pair that stood here first missed a multi-backtick span and, worse, let an
+    UNCLOSED fence swallow every following line -- so a declaration written
+    below an unterminated example block was invisible and the guard silently
+    discharged. `swallow_unclosed=False` is deliberate for the same asymmetry
+    the module docstring states: an unterminated fence is ambiguous, and the
+    arming reading costs one tool call while the discharging one costs the
+    incident.
+
+    Inline code spans are NOT stripped. A strip was written here first and
+    removed as dead code: RX_CLEAN is line-anchored and its optional prefixes
+    are a list bullet, an ordered marker, a heading marker and `**`, so a
+    backtick can never precede `Stopping Point` in a matching line. Stripping
+    could therefore only ever CREATE a match (`` `x`Stopping Point: Clean ``),
+    which is the false-arm direction. Mutation testing confirmed it: deleting
+    the call left every assertion green, which is the signal this file already
+    records for the removed lookahead.
+    """
     if not text:
         return False
-    in_fence = False
-    fence_char = ""
-    fence_len = 0
-    for line in text.splitlines():
-        if not in_fence:
-            m = FENCE_OPEN_RX.match(line)
-            if m:
-                in_fence = True
-                fence_char = m.group(1)[0]
-                fence_len = len(m.group(1))
-                continue
-            if RX_CLEAN.search(INLINE_CODE_RX.sub("", line)):
-                return True
-        else:
-            m = FENCE_CLOSE_RX.match(line)
-            if m and m.group(1)[0] == fence_char and len(m.group(1)) >= fence_len:
-                in_fence = False
+    if strip_fences is None:
+        # Broken install: scan the raw text. Arms more often, never less.
+        return bool(RX_CLEAN.search(text))
+    for line in strip_fences(text).splitlines():
+        if RX_CLEAN.search(line):
+            return True
     return False
 
 
@@ -243,52 +266,103 @@ def scan(path):
             except Exception:
                 continue
 
-            stamp = timestamp_key(event)
-            role = event.get("type") or event.get("role")
-            blocks = (event.get("message") or {}).get("content") or event.get(
-                "content"
-            ) or []
+            # Each RECORD is walked under its own guard. `main()` fails open on
+            # any exception, so without this a single record of an unexpected
+            # shape -- a string-valued `message`, a bare JSON list, a tool_use
+            # whose `input` is a string, a null `text` -- would abort the scan
+            # and silently disable the guard for the WHOLE session, with no
+            # output. That is the discharging direction, reached by exactly the
+            # malformed input this hook is most likely to meet: the Antigravity
+            # adapter already handles a subagent argument arriving as a JSON
+            # string (plugins/ai-config/claude-hook-adapter.py). Skipping one
+            # record loses at most one event; aborting loses the guard.
+            try:
+                stamp = timestamp_key(event)
+                role = event.get("type") or event.get("role")
+                blocks = (event.get("message") or {}).get("content") or event.get(
+                    "content"
+                ) or []
 
-            # Decided once per RECORD, from structured metadata, so no block's
-            # text can manufacture one.
-            if is_task_notification(event) and role != "assistant":
-                events.append((stamp, position, "notification"))
+                # Decided once per RECORD, from structured metadata, so no
+                # block's text can manufacture one.
+                if is_task_notification(event) and role != "assistant":
+                    events.append((stamp, position, "notification"))
 
-            if isinstance(blocks, str):
-                if role == "assistant" and blocks.strip():
-                    last_text = blocks
-                continue
-
-            if not isinstance(blocks, list):
-                continue
-
-            for b in blocks:
-                if not isinstance(b, dict):
+                if isinstance(blocks, str):
+                    if role == "assistant" and blocks.strip():
+                        last_text = blocks
                     continue
-                kind = b.get("type")
 
-                if kind == "tool_use":
-                    name = (b.get("name") or "").lower()
-                    if name in DISPATCH_TOOLS:
-                        events.append((stamp, position, "dispatch"))
-                    elif name in LIVENESS_TOOLS:
-                        events.append((stamp, position, "liveness"))
-                    elif name in SHELL_TOOLS:
-                        cmd = (b.get("input") or {}).get("command") or ""
-                        if is_liveness_command(cmd):
+                if not isinstance(blocks, list):
+                    continue
+
+                # Collected per record, then joined. Keeping only the LAST
+                # non-empty block dropped a declaration followed by any further
+                # text in the same message ("... Clean stopping point reached",
+                # then "Let me know if anything else"), which discharged the
+                # guard on a message that plainly declared.
+                texts = []
+                for b in blocks:
+                    if not isinstance(b, dict):
+                        continue
+                    kind = b.get("type")
+
+                    if kind == "tool_use":
+                        name = (b.get("name") or "").lower()
+                        if name in DISPATCH_TOOLS:
+                            events.append((stamp, position, "dispatch"))
+                        elif name in LIVENESS_TOOLS:
                             events.append((stamp, position, "liveness"))
+                        elif name in SHELL_TOOLS:
+                            raw = b.get("input")
+                            cmd = raw.get("command") or "" if isinstance(
+                                raw, dict
+                            ) else ""
+                            if is_liveness_command(cmd):
+                                events.append((stamp, position, "liveness"))
 
-                elif kind == "text":
-                    if role == "assistant" and b.get("text", "").strip():
-                        last_text = b["text"]
+                    elif kind == "text":
+                        piece = b.get("text") or ""
+                        if piece.strip():
+                            texts.append(piece)
 
-    if events and all(e[0] is not None for e in events):
-        try:
-            events.sort(key=lambda e: (e[0], e[1]))
-        except TypeError:
-            # Aware and naive stamps together do not compare; keep file order.
-            events.sort(key=lambda e: e[1])
-    else:
+                if role == "assistant" and texts:
+                    last_text = "\n".join(texts)
+            except Exception:
+                continue
+
+    # `ordered` records whether chronology was actually ESTABLISHED. Three
+    # cases, and only the third is ambiguous:
+    #
+    #   every event stamped  -> sort by stamp. Authoritative, and the point of
+    #                           stamping: memories/claude-code-transcripts.md
+    #                           documents a compaction replaying earlier
+    #                           records BELOW newer ones while they keep their
+    #                           original stamps, so file order lies here and
+    #                           the stamps do not.
+    #   no event stamped     -> file order, and nothing contradicts it. A
+    #                           transcript with no stamps at all is read in the
+    #                           order it was written, which is the ordinary
+    #                           reading and must stay sound.
+    #   some stamped         -> neither signal covers the set, and a partial
+    #                           sort would interleave measured times with
+    #                           guessed ones. Same for aware and naive stamps
+    #                           together, which do not compare. Ambiguous.
+    #
+    # An ambiguous order ARMS rather than discharges, per the asymmetry this
+    # module states: a wrongly-armed guard costs one tool call, a wrongly-
+    # discharged one costs the incident.
+    stamps = [e[0] for e in events]
+    ordered = True
+    if events and any(s is not None for s in stamps):
+        if all(s is not None for s in stamps):
+            try:
+                events.sort(key=lambda e: (e[0], e[1]))
+            except TypeError:
+                ordered = False
+        else:
+            ordered = False
+    if not ordered:
         events.sort(key=lambda e: e[1])
 
     dispatch = notification = liveness = -1
@@ -300,14 +374,14 @@ def scan(path):
         else:
             liveness = ordinal
 
-    return last_text, dispatch, notification, liveness
+    return last_text, dispatch, notification, liveness, ordered
 
 
 def main():
     try:
         payload = json.load(sys.stdin)
         path = payload.get("transcript_path") or ""
-        last_text, dispatch, notification, liveness = scan(path)
+        last_text, dispatch, notification, liveness, ordered = scan(path)
     except Exception:
         return 0  # fail open
 
@@ -316,10 +390,21 @@ def main():
     if dispatch < 0:
         return 0  # no subagent was ever dispatched
 
-    # A liveness check taken after the most recent notification discharges it.
-    # When no notification ever arrived, a check after the dispatch counts.
-    baseline = notification if notification >= 0 else dispatch
-    if liveness > baseline:
+    # A liveness check discharges the guard only if it comes after EVERY event
+    # that could have put an agent in flight -- the most recent notification
+    # AND the most recent dispatch.
+    #
+    # Taking the notification alone was wrong in the discharging direction, and
+    # wrong on the corpus's own standard shape: dispatch, read the result,
+    # check liveness, dispatch a sidecar, declare clean. There the second agent
+    # is running at declaration time and has never notified, so pinning the
+    # baseline to the last notification left the guard silent exactly while an
+    # agent was live -- and firing only once that agent had FINISHED, which
+    # inverts it against the incident it was built for (ai-config#3689).
+    baseline = max(notification, dispatch)
+
+    # An order that was never established cannot show a check came later.
+    if ordered and liveness > baseline:
         return 0
 
     key = hashlib.sha256(last_text.encode()).hexdigest()[:16]
@@ -353,7 +438,8 @@ def main():
                     "`**Stopping Point**: Not a clean stopping point / work remains "
                     "queued: <agent> still running`. Never `--force` a worktree "
                     "removal to make the signal go away -- see "
-                    "memories/subagent-worktrees.md."
+                    "skills/clean-worktrees/SKILL.md; read the lock itself per "
+                      "memories/subagent-worktrees.md."
                 ),
             }
         )

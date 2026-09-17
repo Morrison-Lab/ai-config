@@ -94,8 +94,36 @@ Twelve regression cases pin the ordering; reverting it fails all twelve.)
   ask what else in the same chain reads it.
 - **Don't:** assume a hole that appeared alongside a widening was caused by it -- check whether the base branch already reproduces it, since the fix differs (reorder vs. narrow) depending on which is true.
 
+## Closing a bypass promotes the survivor's completeness from harmless to decisive
+
+The section above is about a predicate you *widen* stealing a case from a stricter sibling.
+This is about a predicate you never touch, once a later fix removes its sibling path outright rather than reordering around it.
+
+When two paths admit the same case and one is a bypass, closing the bypass does not only remove a hole.
+It also promotes the surviving path from *one of two ways in* to *the only way in*, and every gap the surviving path already had changes status at that same moment, with none of its own code touched.
+What used to be a near-miss -- caught by the path that just closed -- is now a hard denial that reads exactly like the check having genuinely run and failed.
+
+Nothing about this shows up in a diff review of the closing fix, for the same reason the widening case above is invisible: the code whose completeness now matters is the code that diff never touches.
+The check is to ask, for each path removed, what the survivor now decides *alone*, and to derive its coverage rather than assume the completeness it had while something else backed it up.
+
+(`Morrison-Lab/ai-config#3707` / `#3746`, commits `dd10dca4`/`6ed58075` then `24baa1489`, 2026-09-17.
+The reorder described above closed the persona-label bypass for retrieval-shaped tool calls, so a `task_id`-membership gate's own key list became those calls' sole provenance.
+`taskId` was missing from that list, while a different branch fifty lines below already read `origin.get("taskId")` -- the module knew the spelling;
+the gate that had just become decisive did not.
+Before the reorder this was harmless: the persona path admitted the call anyway.
+After it, a retrieval call spelling its task id that one way was wrongly denied, with the guard's own message describing it as a review that never ran.
+The fix was wider than the review that found it: the same spelling was also missing on the *producing* side, where the dispatch result that registers a task id read `task_id`, `conversationId`, and `id`, but not `taskId` either.
+A chain closed at one end and left incomplete at the other is no stronger than before the reorder -- fixing only the end the review named would have left the identical class of denial reachable from the other side.)
+
+- **Do:** after removing one of two paths that reach the same outcome, ask what the surviving path now decides *alone*, and re-derive its completeness rather than assuming the coverage it had while something else backed it up.
+- **Do:** when a review finds an incompleteness on one side of a producer/consumer chain, check the matching site on the other side before calling the fix done -- a chain is no stronger for being fixed at only one end.
+- **Don't:** review only the diff that closes the bypass;
+  the code whose risk just changed is the code that diff leaves untouched.
+
 ## Related rules
 
+- [`dead-code-is-tech-debt.md`](dead-code-is-tech-debt.md) section 5:
+  A structurally identical conjunct nearby is not automatically the same class of dead code --- the companion finding from the same review round on the same file.
 - [`fail-fast.md`](fail-fast.md):
   A guard keyed on an empty variable should fail loudly rather than silently taking an invalid fallback.
 - [`algorithmatize-checks.md`](../workflow/algorithmatize-checks.md):

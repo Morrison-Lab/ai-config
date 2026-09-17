@@ -75,6 +75,17 @@ Three lines later, in an adjacent condition the same commit left untouched, `tra
 No mutation run ever flagged it, for the reason given above: removing `transcript_path and` changes nothing a test can observe.
 A later review round found it only by re-deriving what the code immediately above the condition actually guarantees.)
 
+**"Inert" is a property of an operand against the inputs its call site can actually receive, not a property its text carries by itself --- and the grep the Do bullet below recommends finds text, not provenance.**
+Running that grep once a comment proves one conjunct dead is the right first step, and it is not the last one: every match it turns up still needs the same control-flow proof re-run against it, because a structurally identical conjunct can be the sole guard against a completely different failure.
+
+(Same file, same issue, commit `24baa14`, 2026-09-17: a later round re-ran exactly this Do bullet's grep against the fix above and found a third instance of the same operand, five lines away, in the guard `if transcript_path and os.path.exists(transcript_path):`.
+It looks like the two already removed --- same operand, same function, a few lines apart --- and it is not the same class.
+The parameter's `str` annotation is never enforced at runtime, `os.path.exists(None)` raises `TypeError`, and the caller's own `except Exception: return 0` turns that raise into a silent ALLOW: the opposite of what a self-review gate exists to do.
+Removing the two genuinely dead conjuncts changed nothing a test could observe, exactly as the mutation-invisibility point above predicts.
+Removing this one changes behaviour on a `None` input, but the existing suite had no test that called the function with `None`, so a clean mutation run over that suite could not have told the two cases apart --- it would have reported both as safe to remove, for opposite reasons.
+The finding was Rebutted on its remedy (keep, don't delete) and Addressed on its point (state the reason): the actual fix was to test the `None` case directly, measuring the guard with and without the conjunct, rather than to trust either the grep's shape-match or a mutation run that had nothing exercising the input the conjunct is there for.
+This is a distinct lesson from [`admitting-vs-branching-site.md`](admitting-vs-branching-site.md)'s case on the same commit chain, which is about a gate's *completeness* once a redundant path is removed --- this one is about a single conjunct's *reason for existing*, and the two happen to share a PR because both surfaced in the same round of review on the same file.)
+
 ## Systematic elimination workflow
 
 Eliminate dead code systematically using a four-stage process:
@@ -119,12 +130,14 @@ This principle complements rather than contradicts [`prefer-optionality-over-rem
 - **Do:** remove associated tests, documentation, and manifest registrations when removing dead symbols.
 - **Do:** use deterministic static analysis tools to verify zero callers before deletion.
 - **Do:** when a comment proves one conjunct redundant, grep the same file for the identical operand and check whether a nearby condition carries it too --- the removal you just made can be exactly the fact that makes a sibling conjunct provably dead as well.
+- **Do:** treat every match that grep turns up as a question, not an answer --- re-run the same control-flow proof against it, and if the proof doesn't go through, ask what failure mode the operand might be the sole guard against before removing it.
 - **Don't:** comment out code blocks "in case we need them later" --- git history preserves them.
 - **Don't:** keep obsolete functions or orphaned configs as harmless clutter;
   they actively degrade agent context and developer focus.
 - **Don't:** leave deprecated symbols without a formal deprecation schedule and warning mechanism.
 - **Don't:** treat a passing mutation run as evidence a conjunct isn't inert;
   an always-true operand produces no observable difference when removed, so no test can fail against its removal.
+- **Don't:** remove a conjunct on the strength of a grep match alone --- a structurally identical operand a few lines away can be the sole guard against a different failure than the one that made its sibling dead.
 
 ## In review
 

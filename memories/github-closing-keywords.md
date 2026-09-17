@@ -23,7 +23,7 @@ reads identically either way.
 Measured 2026-09-17 on `d-morrison/rme`:
 PR [#1173](https://github.com/d-morrison/rme/pull/1173)'s body read "Fixes issue #1169",
 where #1169 was itself an open PR (a near-duplicate CI fix).
-#1173 was squash-merged (`681ecbc9`, 08:19:28Z).
+That PR was squash-merged (`681ecbc9`, 08:19:28Z).
 A query against #1169 immediately after showed `state: open`, `merged: false`
 --- the keyword did not close it.
 It had to be closed by hand

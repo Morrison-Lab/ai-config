@@ -1731,7 +1731,17 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                     # one can never short-circuit the task-id gate below, which
                     # is their only sound provenance (see TASK_OUTPUT_TOOLS).
                     if tool_name in TASK_OUTPUT_TOOLS:
-                        task_id = str(inp.get("task_id") or inp.get("TaskId") or inp.get("id") or "")
+                        # Every spelling this module knows must appear here AND in
+                        # the producer below. Since the reorder above, this gate is
+                        # the ONLY provenance a retrieval tool has -- the persona
+                        # path it used to fall back on is exactly the bypass that was
+                        # closed -- so a spelling missing from either end is no longer
+                        # a near-miss that something else catches. It denies a review
+                        # that genuinely ran, with #3707's own misleading message.
+                        # `taskId` was missing from both while `origin.get("taskId")`
+                        # below read it, so the module already knew the spelling.
+                        task_id = str(inp.get("task_id") or inp.get("taskId")
+                                      or inp.get("TaskId") or inp.get("id") or "")
                         if task_id and task_id in reviewer_task_ids:
                             if isinstance(call_id, str) and call_id:
                                 reviewer_call_ids.add(call_id)
@@ -1760,7 +1770,10 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                         try:
                             res_data = json.loads(res_text)
                             if isinstance(res_data, dict):
-                                tid = res_data.get("task_id") or res_data.get("conversationId") or res_data.get("id")
+                                tid = (res_data.get("task_id")
+                                       or res_data.get("taskId")
+                                       or res_data.get("conversationId")
+                                       or res_data.get("id"))
                                 if tid:
                                     reviewer_task_ids.add(str(tid))
                         except Exception:
@@ -1826,6 +1839,16 @@ def verify_review(transcript_path: str, directory: str | None,
     verdict: str | None = None
     reviewed_commit: str | None = None
 
+    # `transcript_path and` stays here, unlike the two conjuncts removed below,
+    # and the difference is not cosmetic. Those two restated a fact a preceding
+    # `return` had already proven, so removing them changed nothing. This one is
+    # the function's only guard against a non-`str` argument: the annotation is
+    # not enforced, and `os.path.exists(None)` raises, which `main`'s deliberate
+    # `except Exception: return 0` would swallow into an ALLOW. With the conjunct
+    # a `None` falls through to the denial below instead. Measured both ways.
+    # Inert for every `str`, load-bearing for the failure it is placed against,
+    # which is why a same-file grep for the operand is the start of the question
+    # rather than the end of it.
     if transcript_path and os.path.exists(transcript_path):
         try:
             verdict, reviewed_commit, saw_reviewer_call = read_latest_review(transcript_path)

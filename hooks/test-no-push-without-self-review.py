@@ -2587,6 +2587,51 @@ def codex_cases() -> tuple[int, int]:
         check(f"OMO `{out_tool}` dispatching the reviewer does not authorize (ai-config#3746)",
               rc == 0 and nested.get("permissionDecision") == "deny")
 
+    def background_flow(result_key, retrieve_key):
+        """A genuine background reviewer: dispatch, task id, retrieve, report."""
+        return [
+            {"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "id": "codex-bg", "name": "Agent",
+                 "input": {"subagent_type": "adversarial-reviewer",
+                           "prompt": "Review the diff"}}]}},
+            {"type": "user", "message": {"content": [
+                {"type": "tool_result", "tool_use_id": "codex-bg",
+                 "content": json.dumps({result_key: "T9"})}]}},
+            {"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "id": "codex-bg2", "name": "taskoutput",
+                 "input": {retrieve_key: "T9"}}]}},
+            {"type": "user", "message": {"content": [
+                {"type": "tool_result", "tool_use_id": "codex-bg2",
+                 "content": body()}]}},
+        ]
+
+    # 19. Every task-id spelling the retrieval side reads authorizes, and this
+    #     is now load-bearing rather than tidy. Before the reorder a retrieval
+    #     call had a second way through -- the persona path -- so a spelling
+    #     this list missed was caught by something else. That path was the
+    #     bypass, and closing it made this key list the ONLY provenance these
+    #     tools have, which converts every missing spelling into a denial of a
+    #     review that genuinely ran.
+    #
+    #     `taskId` was missing from both ends while `origin.get("taskId")` in
+    #     the task-notification branch read it, so the module knew the spelling
+    #     and the two gates carrying the weight did not. Case 12's own lesson
+    #     was that the fixture must vary the key under test; these rows carry
+    #     it to the id key, which the earlier rounds left pinned at `task_id`.
+    for retrieve_key in ("task_id", "taskId", "TaskId", "id"):
+        rc, blocked, _ = push(background_flow("task_id", retrieve_key))
+        check(f"a background review retrieved under `{retrieve_key}` authorizes",
+              rc == 0 and not blocked)
+
+    # 20. The producing half of the same chain. A task id is only in
+    #     `reviewer_task_ids` because the dispatch's own result registered it,
+    #     so a spelling missing HERE denies just as surely, one step earlier
+    #     and with nothing in the retrieval call to suggest why.
+    for result_key in ("task_id", "taskId", "conversationId", "id"):
+        rc, blocked, _ = push(background_flow(result_key, "task_id"))
+        check(f"a dispatch result announcing its task under `{result_key}` authorizes",
+              rc == 0 and not blocked)
+
     return failures, ran
 
 

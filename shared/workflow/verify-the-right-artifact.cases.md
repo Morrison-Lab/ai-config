@@ -393,3 +393,57 @@ The round-4 fix ran it: moving the bullet before all `Don't` bullets, verified b
 - **Don't:** anchor a structural fix on the nearest instance the finding quoted;
   the invariant is over the whole list, not over that instance's immediate neighbours.
 - **Don't:** treat a second read of your own edit as a check --- it inherits every assumption the edit was written under, which is exactly what a structural-property check needs to be independent of.
+
+## A rebuttal that named a real mechanism and attached it to the wrong site
+
+A review asked for an operand to be deleted as inert.
+The rebuttal was that the operand guards a `None` reaching `os.path.exists`, which raises, and that the caller's blanket `except Exception: return 0` would turn that raise into a silent ALLOW in an authorization guard.
+Every clause of that is true.
+The mechanism is real, the raise is real, the fail-open is real, and it was measured both ways before the rebuttal was written.
+
+The operand still was not what stood between the repository and that fail-open.
+The function's sole caller reads `payload.get("transcript_path") or ""`, so a `None` became `""` one frame earlier and never arrived.
+Meanwhile the live bypass sat in that same caller, one line above the call, on the values `or ""` does **not** rescue: a truthy `list` or `dict` reached `os.path.exists` directly and raised into the fail-open, and a `True` reached it without raising at all, because `os.path.exists(True)` tests file descriptor 1 and finds it.
+
+This is the four-shapes substitution at the level of a *guard* rather than a file: the artifact verified was the callee, and the claim was about the **call site**.
+Measuring the callee in isolation can confirm the mechanism forever and can never show the claim false, because reachability is a property of the caller.
+It is a worse trap than a missing measurement, since the rebuttal arrived carrying real numbers and a demonstrated failure mode, and both survive scrutiny --- the defect is entirely in which site they were attached to.
+
+The refuting question is the fragment's own: what would have to be true for the claim to be **false**?
+Here, that some caller passes a value the operand catches.
+Answering it means reading every caller, which is one grep, and the grep returns exactly one --- whose coercion forecloses the case.
+
+- **Do:** enumerate the callers before claiming an operand guards a reachable failure, and read what each one passes.
+- **Do:** keep such an operand as defence in depth when the callers foreclose it, and say that is what it is rather than crediting it with closing a live hole.
+- **Don't:** read a measured, reproducible failure mode as evidence the guard in front of you is what prevents it --- the measurement establishes the mechanism, never the site.
+
+(Morrison-Lab/ai-config#3707 round 5, corrected in round 6, 2026-09-17.
+The fail-open was real and reachable and is filed as [ai-config#3752](https://github.com/Morrison-Lab/ai-config/issues/3752);
+it reproduces identically on `main`, so the rebuttal's error was not in believing a bypass existed but in believing the operand it was defending is where the bypass was.
+The fix belongs at the call site, as an `isinstance` coercion.)
+
+## A revision measured from a lone out-of-tree copy, which denied for an unrelated reason
+
+Asking whether a defect predated the branch is a two-revision measurement, and the obvious way to take it is to write the other revision's file somewhere and run it.
+That is the wrong artifact whenever the file resolves anything relative to itself.
+
+The hook under test resolves a sibling module and a library fallback from `os.path.realpath(__file__)`.
+A copy sitting alone in a scratch directory finds neither, enters a documented degraded mode, and **denies every push** with a message about a missing detector.
+The probe duly reported that the older revision denied all six inputs while the branch allowed three, which reads exactly like "the branch introduced this bypass" --- a conclusion about provenance, drawn from an artifact that never evaluated the code path in question.
+
+Nothing about the output looks wrong.
+A denial is the expected result for most rows, the row count matches, and the differing rows differ in the direction the hypothesis predicted.
+The error surfaced only because the *mechanism* was inspectable: the older revision's source plainly evaluated the same raising call, so it could not have denied for the reason claimed, and reading the denial text settled it in one command.
+
+The general form: a measurement that confirms a hypothesis is not thereby a measurement of what the hypothesis is about.
+A **negative control** is what separates them, and it has to run first --- copy the *unmodified* current revision the same way, and confirm it reproduces the in-checkout behaviour before trusting any comparison row.
+Copying the file's dependencies alongside it (`cp -rL hooks scripts`) is what makes that control pass.
+
+- **Do:** run an unmodified copy through the same harness first, and confirm it matches the in-tree result, before reading any cross-revision row.
+- **Do:** read the denial or error *text*, not just the decision, when a row agrees with your hypothesis.
+- **Don't:** run a self-resolving script from a directory that lacks what it resolves, and attribute the resulting behaviour to the revision.
+- **Don't:** treat a row that matches the prediction as needing less scrutiny than one that contradicts it --- it needs more, because nothing else will question it.
+
+(Morrison-Lab/ai-config#3707, 2026-09-17.
+The same path sensitivity had already produced a spurious "6 pre-existing failures on `origin/main`" earlier in the same branch's work, and was written up then.
+It recurred anyway, in a session that had read the write-up, which is the argument for the control rather than for the knowledge: the control is a step you run, and the knowledge is something you have to remember to apply at a moment that does not announce itself.)

@@ -599,9 +599,34 @@
   Neither surface therefore answers "was Copilot asked to review this", in either direction.
   (Probed on `ucdavis/bcs#479`, 2026-07-30.)
 
-  That disappearance is **not** explained by the `review_on_push: true` rule above, and [`shared/workflow/pr-on-claim.md`](../shared/workflow/pr-on-claim.md)'s "blocked-request test has a false positive" section owns the argument and the deriving queries.
+  **A GraphQL `requestReviews` mutation is a third way to add nobody, and `suggestedActors` is not the provisioning test it looks like.**
+  The reviewer-request POST returning 201 and adding nobody invites the next hypothesis, that Copilot code review is simply not enabled for the repository --- and `suggestedActors` looks like the query that would settle it.
+  It does not.
+  Measured 2026-09-15 with `gh api graphql -f query='query { repository(owner: "<o>", name: "<r>") { suggestedActors(capabilities: [CAN_BE_ASSIGNED], first: 20) { nodes { login __typename } } } }'`:
+  `ucdavis/lbt` returned exactly one `Bot`, `copilot-swe-agent`, and so did `Morrison-Lab/ai-config`, which had a `copilot-pull-request-reviewer[bot]` review on #3678 at `2026-09-15T05:32:36Z`.
+  Identical answers, opposite states, so the query discriminates nothing here: `CAN_BE_ASSIGNED` is about the **coding agent** you can assign an issue to, a different product from the PR reviewer, whose login never appears in that list on either repo.
+  A session also reported the GraphQL `requestReviews` mutation carrying the reviewer bot's node id behaving like the REST POST --- returning without errors while the reviewer list stayed empty --- but that one is narration rather than measurement here: no repo, PR, node id, or response body was kept, and re-running it would be an outward mutation.
+
+  The repository's own history is the closest thing to an answer, and it is weaker than it looks.
+  As of 2026-09-15, `gh api "repos/<o>/<r>/pulls/<N>/reviews"` over every PR `ucdavis/lbt` had that day returns no reviews at all.
+  That is 1 and 3 through 8, with #3 closed unmerged and #8 still open.
+  That is a fact about the repository, not about the endpoint that was probed, and it is still not a provisioning verdict: nobody controlled for whether a review was ever requested on those PRs, which is the confound the "both candidate directions are unconfirmed" passage below already states for this file.
+  Where a per-head answer is what you need, [`memories/copilot-reviews.md`](copilot-reviews.md)'s check-run query separates "never ran" from "ran and posted nothing".
+  This file's standing Do, to read the posted review body, is unchanged.
+
+  - **Don't:** read a `suggestedActors` list whose only bot is `copilot-swe-agent` as evidence about PR code review --- ai-config returns the same single bot while being reviewed.
+  - **Don't:** escalate from REST to GraphQL when the REST call already returned success ---
+    the mutation was reported to add the same nobody, and each attempt spends quota that is often the real cause.
+
+  That 201-then-empty disappearance is **not** explained by the `review_on_push: true` rule above, and [`shared/workflow/pr-on-claim.md`](../shared/workflow/pr-on-claim.md)'s "blocked-request test has a false positive" section owns the argument and the deriving queries.
   The short version: `Morrison-Lab/ai-config` reproduces the identical 201-then-empty signature while carrying no `copilot_code_review` rule at either scope, so an empty pending list is evidence neither that the request was blocked nor that a review is coming.
   Only the posted review **body** settles whether a review is actually coming.
+  Measured on `Morrison-Lab/ai-config` on 2026-09-15, across the eight POSTs below: no body came for any of them, though #3678 took a `copilot-pull-request-reviewer[bot]` review the same day at `05:32:36Z`.
+  Across roughly three hours and eight POSTs spread over three PRs (#3629, #3696, #3699), every request returned 200 with an empty `requested_reviewers`, and `gh pr view --json reviews` counted zero Copilot reviews at every head throughout.
+  So for those requests the open question above resolves to "no review is coming", and no further: the review on #3678 is what stops this being a fact about the repository.
+  What that does NOT affect is `hooks/no-unreviewed-pr.py`: its `_argv_request` discharges on a successful mutating POST to the endpoint, never on a review arriving, so the obligation is satisfiable here whatever Copilot does.
+  What it does affect is [`copilot-review-before-human`](../shared/vendored/copilot-review-before-human.md), whose point is an AI review BEFORE a human one --- which those three PRs did not get from Copilot, so the adversarial self-review was the only AI reader they had.
+  That is a claim about a repository setting and can change, so re-measure rather than carrying it forward.
   The timeline event described next settles the strictly narrower question of whether the request was *accepted*, which those three surfaces also cannot answer --- so the two conclusions divide the question rather than competing for it.
 
   **The issue timeline's `review_requested` event is a fourth surface, and it is the one that does discriminate whether the request landed.**
@@ -1002,3 +1027,25 @@ gh pr view <N> --json state,mergedAt,mergeCommit
 
 - **Do:** confirm a merge from a state query rather than from the merge command's own output.
 - **Don't:** read empty output from `gh pr merge` as failure, and don't retry on it.
+
+## `gh pr merge` needs `-R` for the standing-grant repo check to fire
+
+`CLAUDE.md` gives PRs targeting `Morrison-Lab/ai-config` a standing `mwc` grant, and `hooks/no-unauthorized-merge.py` implements it by reading the merge's **target repo off the command**.
+
+So the grant is not resolved from the checkout.
+Run this from an ai-config worktree, on an ai-config PR, and it is refused:
+
+```console
+$ gh pr merge 3635 --squash --delete-branch
+MECHANISTIC PROHIBITION: `gh pr merge` is strictly blocked without explicit permission.
+```
+
+Add `-R Morrison-Lab/ai-config` and the identical merge succeeds.
+Nothing in the refusal says the repo could not be determined --- it reads as a policy denial, which invites the wrong remedy (asking for permission, or reaching for an override) when the fix is one flag.
+
+The same reasoning covers the `gh api .../pulls/N/merge` form, which names the repo in the URL and so always resolves.
+
+- **Do:** pass `-R <owner>/<repo>` on every `gh pr merge`, including from a checkout of that same repo.
+- **Don't:** read the refusal as a missing grant --- check first whether the command names the repo the grant is scoped to.
+
+(Measured 2026-09-14 merging ai-config#3635.)

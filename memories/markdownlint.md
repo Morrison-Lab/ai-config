@@ -22,9 +22,9 @@ Split out of [`tools.md`](tools.md) on 2026-09-01 when that file crossed the 125
   `npx --yes markdownlint-cli2@<version>` reads `.markdownlint-cli2.jsonc` and lints the whole repo in seconds;
   take the version from the `lint-markdown` job log, which prints it as its first line.
   Note precisely what this does and does not clear.
-  `scripts/run-local-validation.py` deliberately declines to offer this as a local equivalent for the `lint-markdown` job, because gha's action runs four checks (markdownlint, code-block length, list-item splices, table splits) and a bare call reproduces one while reporting a clean zero for the other three.
-  That reasoning is about the *job*, not about the tool.
-  Running it by hand as one named check is sound, and reporting it as the job is the failure that runner exists to prevent.
+  `scripts/run-local-validation.py` offers the tool, unpinned via `npx --no-install`, as a `PARTIAL` equivalent for the `lint-markdown` job: gha's action runs four checks (markdownlint, code-block length, list-item splices, table splits) and a bare call reproduces one, so the runner tags the result `PARTIAL` and names the three it does not cover in `MARKDOWNLINT_UNCOVERED`.
+  It used to refuse the partial outright, until refusing left the markdown gate absent from every markdown-only pre-push run (ai-config#3120).
+  Running the tool by hand as one named check is sound, and reporting it as the job is the failure that runner exists to prevent.
   **Do:** run it before pushing markdown, and say which of the four checks it covered.
   **Don't:** read a clean markdownlint run as the `lint-markdown` job passing.
   (Morrison-Lab/ai-config#3060, 2026-09-03.)
@@ -61,6 +61,29 @@ Split out of [`tools.md`](tools.md) on 2026-09-01 when that file crossed the 125
   itself for an empty-match signal, which direct reproduction disproved, and
   a review round then caught the entry substantially duplicating the
   already-on-main sections cited above.)
+
+- **One sentence per line and gha's list-item-splice check collide inside a list, and the check names the item you did not touch.**
+  The two rules are individually reasonable and jointly mean a multi-sentence list item cannot be split in place.
+  `lint-markdown`'s `check_list_item_splices.mjs` (Morrison-Lab/gha, read 2026-09-15) walks the file and, for every line that is a list marker, looks at the line *before* it: a finding is raised when that previous line is non-blank and is not itself a list item, heading, blockquote, table row, or horizontal rule.
+  Splitting item K across two source lines makes item K's second sentence a bare continuation line, so item **K+1** becomes a marker following a continuation line and is what the error names.
+  Diff-scoping does not save you: the check reports the finding when either the flagged line or the previous line is in the added set, and the continuation line you added is the previous line.
+  So the reported line number and quoted text belong to an item the commit never edited, which sends the fix to the wrong place.
+  The remedy is a blank line between the items.
+  The alternative is to leave that item on one line.
+  Markdownlint itself has no rule for this gap --- MD032 governs a list's outer boundaries, not the space between items, and is disabled here (`.markdownlint-cli2.jsonc`) --- which is why gha ships a separate checker for it.
+  [`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md) enumerates that checker among `lint-markdown`'s four, and [`batch-merge-and-resolve`](../shared/workflow/batch-merge-and-resolve.md) owns the splice's other direction: a *merge* that deletes a blank line adds neither line, so the added-lines scoping is blind to it.
+  The split case is the opposite --- you add the continuation line, and that is the `prevLineNo` the check tests.
+  **Do:** after applying one-sentence-per-line inside a list, put a blank line between every pair of items in that list, and read a splice finding as pointing at the item *after* the one you split.
+  **Don't:** debug the item the error names --- check the line above it first.
+  **Candidate check.**
+  `scripts/run-local-validation.py`'s `lint-markdown` equivalent is tagged `PARTIAL` and names list-item splices among the checks it does not cover (`MARKDOWNLINT_UNCOVERED`), so no derived pre-push run covers this checker.
+  Running it means a `Morrison-Lab/gha` checkout and, from the repo you are about to push, `MARKDOWNLINT_GLOBS='*.md' LIST_ITEM_SPLICE_BASE_REF=origin/main node <gha-checkout>/lint-markdown/check_list_item_splices.mjs`.
+  Its `git ls-files` and `git diff` run in the process cwd, so running it from the gha checkout checks gha and prints the same clean line.
+  Otherwise the checker arrives as a red CI job.
+  `scripts/vendor/gha-check-new-line-breaks.py` plus `scripts/sync-nlb-checker.py` is the established shape for vendoring one of gha's checkers so it can run before the push.
+  The splice checker is the same kind of small, self-contained, diff-scoped script.
+  (ucdavis/lbt#7, 2026-09-15: a numbered link checklist was reflowed one-sentence-per-line, `lint-markdown` went red, and `b3f3ba2` fixed it by separating the items with blank lines.)
+
 - **Don't tag a non-shell CLI block `bash`/`sh` (MD040).**
   MD040 wants a language on every fence, which invites tagging anything command-shaped as `bash`.
   Claude slash commands (`/ums`, `/plugin`, `/also`) and other application-level directives are not shell-executable, so `bash` implies a reader can run them and they fail when someone tries.

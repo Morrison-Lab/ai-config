@@ -1125,6 +1125,100 @@ The same sweep showed a pre-existing `github_pat_` pattern --- a second regex,
 distinct from the `gh[pousr]_` one above --- that no fixture reached at all:
 deleting it turned nothing red, and it had been shipped that way.)
 
+**The remedy above is a different INPUT, and there is a sibling case where no
+input exists: the clause changes an intermediate value the assertion never
+reads.**
+
+There, deleting the clause leaves the observable unchanged because a sibling
+clause produces the same observable for that input, so a fixture only one
+clause can match repairs it.
+Here the clause does not decide the observable at all.
+It sets a span, an index, an extent --- something a later step consumes ---
+and the final verdict is reachable by a path that does not depend on it.
+No fixture separates the two, because the separation the assertion looks for
+does not exist in the quantity the assertion reads.
+
+The two are indistinguishable from one clean row, and one reading separates
+them: search for a differing input over the **verdict**, at scale, and see
+whether the search finds any.
+A handful of differences is the case above, and a better fixture fixes it.
+A flat zero over a large search means the clause does not control the verdict,
+and the fix is to change what the assertion reads rather than what it is fed.
+
+Measured on [ai-config#3635](https://github.com/Morrison-Lab/ai-config/pull/3635)'s
+pre-merge gate and closed by
+[#3682](https://github.com/Morrison-Lab/ai-config/pull/3682), over the
+delimiter-only blanking in `hooks/no-unauthorized-merge.py`'s `_depth_view`:
+
+```
+else -> pass                                   343/343   (0 WRONG)
+else -> _blank(view, lt_idx, body_start + 1)   343/343   (0 WRONG)
+```
+
+Deleting the clause outright and mis-sizing it by one character each passed the
+whole suite.
+Reinforced beyond the suite, `pass` produced 0 verdict differences over 200,000
+targeted strings against 2 span differences over 20,000, and the off-by-one was
+wholly indistinguishable over 20,000.
+Four cases had been written for exactly this route, and all four were verdict
+cases, so all four passed with the clause deleted.
+
+**Those zeros bound the search that produced them, and an earlier version of
+this passage read them as bounding the clause.**
+It said "no verdict case would have pinned either mutation, however the input
+was chosen", which is false.
+Re-running the same two mutants against a differently-generated alphabet found
+a verdict difference for each:
+
+```
+40,000 strings, seed 7    pass: 1 difference   body_start + 1: 0
+60,000 strings, seed 99   pass: 0              body_start + 1: 1
+```
+
+So a distinguishing verdict input exists for both, at something like one in
+fifty thousand against a generator neither search was tuned for.
+That does not restore the verdict case as the remedy --- an input nobody can
+write on purpose, and that 200,000 targeted strings failed to surface, is not
+a fixture --- but it changes what the zero licenses.
+It says the assertion reads a quantity the clause barely controls, not one it
+provably cannot control, and only the first of those is something a search can
+establish.
+The remedy is the same either way, which is why the overclaim survived: it
+changed the argument's strength and not its conclusion.
+
+The rule was already written down, in the same suite file, heading the
+scanner-level assertions a few hundred lines below those four cases
+(`hooks/test-no-unauthorized-merge.py`, the comment at the
+`scanner-level assertions` banner), which is why it is worth quoting rather
+than paraphrasing:
+
+> These assert the SPAN rather than a verdict, because a span is what the
+> clause changes and a verdict can be reached by a different route.
+
+The fix took two span checks rather than one, because no single probe separates
+both mis-sizings, and both probes came out of a differential search over 120,000
+random token strings rather than from construction.
+Each row moved from 343/343 to 345/346 with one case wrong.
+
+- **Do:** name the quantity the clause changes, and assert that quantity,
+  before writing a case for it.
+- **Do:** read a flat zero from a large verdict-level search as evidence that
+  the assertion reads the wrong quantity rather than that the fixture is weak
+  --- while stating the alphabet and the count, since a differently-generated
+  search can still turn one up.
+- **Do:** pin a clause that can be mis-sized in two directions with one probe
+  per direction --- a probe that catches deletion need not catch an off-by-one.
+- **Don't:** answer a clean row by writing more cases of the same kind;
+  four verdict cases pass exactly as one does when the clause controls no
+  verdict.
+- **Don't:** read a comment in the suite naming the right assertion target as
+  evidence the cases follow it --- here the comment was correct, sat in the
+  same file, and the four cases written for the clause were verdict cases
+  anyway.
+- **Don't:** promote a zero into "no input could have pinned this";
+  the search bounds itself, and the sibling entry above --- which says to
+  suspect the fixture first --- is what that promotion quietly inverts.
+
 **A ninth outcome, and the cheapest one to rule out first: the mutation
 edited the WRONG occurrence of the matched text.**
 

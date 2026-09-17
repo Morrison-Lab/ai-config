@@ -95,11 +95,56 @@ def last_assistant_text(path):
     return last
 
 
+# `flag-session-boundaries` requires every reply to end with a stopping-point
+# declaration, and for a non-clean stop it requires the pending work to follow
+# that declaration. In a session with several open PRs that block routinely
+# runs longer than TAIL_CHARS on its own, which pushed the actual closing move
+# out of the window entirely -- so obeying one rule made this hook blind to
+# violations of another (ai-config#3694). Cut the declaration off before
+# taking the tail, rather than widening the window, which would re-admit the
+# mid-message asides the short window exists to exclude.
+STOPPING_POINT_RX = re.compile(r"\*\*Stopping Point\*\*", re.I)
+
+
+def offer_windows(text):
+    """The regions of a reply where a closing move can appear.
+
+    Without a stopping-point declaration there is one: the tail.
+
+    With one there are two, and dropping either loses real offers.
+    `flag-session-boundaries` puts the pending work AFTER the declaration and
+    calls it "the final and most visible element of the reply", so an offer
+    can sit there -- and cutting everything from the marker onward would make
+    that position permanently safe, which is a worse blind spot than the one
+    this fix set out to close. But the declaration itself is long enough to
+    push a preceding offer out of a fixed tail, so the pre-marker region
+    cannot simply be ignored either.
+
+    So: the tail of the whole reply, which is the ordinary closing move and
+    covers an offer sitting at the end of the pending-work section; plus the
+    tail of the text BEFORE the declaration, which is the region the
+    declaration displaced.
+
+    Both are tails. Handing back the post-marker region whole would let an
+    aside buried mid-block fire with paragraphs of unrelated status after it,
+    which is the very thing TAIL_CHARS exists to prevent -- the first attempt
+    at this did that, and it was caught in review on ai-config#3695.
+    """
+    body = text.strip()
+    matches = list(STOPPING_POINT_RX.finditer(body))
+    if not matches:
+        return [body[-TAIL_CHARS:]]
+    cut = matches[-1].start()
+    return [body[-TAIL_CHARS:], body[:cut].strip()[-TAIL_CHARS:]]
+
+
 def find_offer(text):
     """Return the matched offer phrase when the reply CLOSES on one."""
-    tail = text.strip()[-TAIL_CHARS:]
-    m = RX.search(tail)
-    return m.group(0) if m else None
+    for window in offer_windows(text):
+        m = RX.search(window)
+        if m:
+            return m.group(0)
+    return None
 
 
 def main() -> int:

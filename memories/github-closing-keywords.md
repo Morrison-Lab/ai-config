@@ -10,6 +10,61 @@ keyword sits next to the number.
 Split out of [`github.md`](github.md) because that file sits at the 1250-line
 gate (`scripts/check-memory-file-size.py` fires strictly above 1250, enforced with `--strict` in CI per ai-config#2970).
 
+## A closing keyword does not auto-close a referenced pull request, only an issue
+
+Every case in this file assumes `#N` names an **issue**.
+GitHub's own docs for the feature are titled "Linking a pull request to an
+issue" and describe only that direction: a PR's closing keyword closes an
+**issue** it references, on merge to the default branch.
+Nothing in that surface closes a second **pull request** referenced the same
+way, even though issues and PRs share one number space in a repo and `#N`
+reads identically either way.
+
+Measured 2026-09-17 on `d-morrison/rme`:
+PR [#1173](https://github.com/d-morrison/rme/pull/1173)'s body read "Fixes issue #1169",
+where #1169 was itself an open PR (a near-duplicate CI fix).
+That PR was squash-merged (`681ecbc9`, 08:19:28Z).
+A query against #1169 immediately after showed `state: open`, `merged: false`
+--- the keyword did not close it.
+It had to be closed by hand
+(`update_pull_request` with `state: closed`, or `gh pr close`).
+
+This inverts the assumption this file's other sections make by omission:
+they warn that a keyword closes an issue even when unwanted,
+never that it can silently fail to close a PR when wanted.
+Don't write "merging PR A will auto-close PR B" from a keyword in A's body
+--- verify by querying B's state after the merge,
+and close it explicitly if that's the intent.
+A duplicate **issue** closes natively via
+`gh issue close <N> --reason duplicate --duplicate-of <target>`
+(shipped December 2024; confirm with `gh help issue close` since an older CLI may lack it),
+or via the `issue_write` MCP tool with `state_reason: duplicate` / `duplicate_of: <N>`.
+The two tools behave differently on a PR number, though, so treat them separately rather than as one rule.
+Both use GraphQL, and the axis that matters is which *field* each one queries, not the transport.
+`issue_write`'s `state: closed` path resolves via GraphQL's type-specific `Repository.issue(number:)` field,
+which only exists for true issues and fails ("Could not resolve to an Issue with the number of N") on a PR number.
+`gh issue close <PR-N>` resolves instead via `FindIssueOrPR`'s polymorphic `issueOrPullRequest(number:)` field
+(inline-fragmented on `...on Issue` and `...on PullRequest`, so it matches either type) and **succeeds**,
+closing the PR through a separate GraphQL `closePullRequest` mutation
+(`PullRequestClose` in `api/queries_pr.go`) --- it just can't attach a duplicate reason to a PR
+(`--duplicate-of` on a PR number fails its own client-side check: "`--duplicate-of` is only supported for issues").
+Either way, a duplicate PR still needs `update_pull_request` / `gh pr close` for a close that carries duplicate semantics,
+since neither tool's PR-close path has a duplicate-reason concept.
+
+- **Do:** query the referenced PR's state after a merge that used a closing
+  keyword on it, rather than assuming the keyword closed it.
+- **Do:** use `update_pull_request` / `gh pr close` for a duplicate PR close
+  that needs to carry duplicate semantics --- neither `issue_write` nor
+  `gh issue close` can attach one to a PR.
+- **Don't:** claim or plan around "merging this will auto-close that PR" for
+  any `#N` that names a pull request rather than an issue.
+- **Don't:** assume `issue_write` and `gh issue close` behave the same on a
+  PR number --- `issue_write` queries a GraphQL field typed for issues only
+  and errors; `gh issue close` queries a polymorphic GraphQL field that
+  matches PRs too and silently succeeds as a plain close.
+- **Don't:** attribute the difference to REST vs. GraphQL --- both tools use
+  GraphQL; only the queried field's type differs.
+
 ## Measured case
 
 The squash commit of [ai-config#1718](https://github.com/Morrison-Lab/ai-config/pull/1718)

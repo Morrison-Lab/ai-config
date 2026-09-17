@@ -1733,3 +1733,47 @@ The remedy is the same one this file gives for code: run the thing before descri
 
 (A session working in `Morrison-Lab/gha` recorded the incident that produced this section in its own local `prose-about-my-own-tests-overclaims.md` --- project-local Claude Code auto-memory, not a file committed to any repository, so there is no link to give here: roughly eleven adversarial review rounds on one PR, where the code was correct by round two and every one of the remaining rounds found a claim of exactly the shapes listed above.)
 
+### A parity fixture that omits the dimension where the two sides differ
+
+A parity test compares two implementations that must agree, and its value is entirely in the **inputs it feeds them**.
+When the body list omits the one dimension on which they actually diverge, the suite reports agreement forever, and reports it in the vocabulary of a cross-check --- which is stronger-sounding than an ordinary test, and so displaces the scrutiny an ordinary test would have drawn.
+
+It is not a weak test.
+It is a test of the wrong population, and the population is invisible in the result: "parity holds over the matrix" and "parity holds" differ by a clause nobody reads.
+
+Measured 2026-09-14/15 on `plugins/ai-config/enforce-mwc-review-gate.py` (ai-config#3629).
+The gate transcribes `scripts/lib/review_payload.py` because it must stay import-free, and `ReviewPayloadParityTests` compared the copy against the original over a matrix of payloads and body shapes.
+Every body in that list was unfenced.
+The copy had no code-region masking at all --- the single dimension on which the two implementations differed --- so the parity suite agreed on every input while an unclosed fence quoting the reviewer prompt's own CLEAN template overrode a genuine NOT_CLEAN verdict and flipped the merge gate to allow.
+137 tests passed throughout.
+
+The check is one question asked of the fixture rather than of the code: **name the dimension on which these two could differ, and point at the input that exercises it.**
+Where the answer is a shrug, the parity claim is about the matrix and not about the implementations.
+A negative control does not rescue it either --- a control proves the detector fires somewhere, and this fails by never reaching the axis at all, which is [`derive-dont-enumerate`](../workflow/derive-dont-enumerate.md)'s coverage gap wearing a test's clothes.
+
+- **Do:** enumerate the axes on which two implementations could diverge, then show the fixture entry for each.
+- **Do:** delete one side's distinguishing mechanism and confirm the parity suite reddens --- the mutation that matters is on the axis, not on the code in general.
+- **Don't:** read "the parity suite passes" as "the implementations agree" until the matrix has been checked against the axes.
+- **Don't:** trust a cross-check more than a unit test merely because it names two artifacts;
+  a cross-check over the wrong inputs is weaker than either.
+
+### "Over-X is the safe direction" is a claim about the CONSUMER
+
+A guard that cannot decide a case has two ways to be cautious, and choosing between them feels local: blank more text, or conclude less from it.
+The argument for the first is usually stated as a one-liner --- over-masking is safe, the worst case is a verdict we hide --- and that sentence is not about the code writing it.
+It is about what the caller does with the result.
+
+Measured on the same PR, twice, in opposite directions.
+`blank_comment_regions` swallowed everything after an unparseable payload on the argument that a hidden verdict classifies `ambiguous` and `ambiguous` denies.
+`evaluate` vetoes only on `not-clean` and `stale`, so an ambiguous verdict beside a standing human APPROVED review **allows** --- and the blank added for caution discarded a reviewer's stated "needs more work" and merged the PR.
+The repair was to move the asymmetry: withhold what the text may CONCLUDE (a clean reading) rather than erase the text, since leaked payload text can only ever manufacture a false clean while prose stating a finding must stay readable.
+
+The generalization is worth more than the instance.
+Before writing "the safe direction is X", name the consumer of this value and the branch it takes for each outcome.
+Where an outcome has two consumers that disagree --- as `ambiguous` did --- the blanket claim is false for one of them, and the safe move is the one that is safe in every branch rather than in the one that came to mind.
+
+- **Do:** trace the value into its caller and state what each outcome does there, before calling any direction safe.
+- **Do:** prefer narrowing the conclusion to destroying the evidence;
+  the first is reversible by a later reader and the second is not.
+- **Don't:** assert a safety property of a return value from inside the function that produces it.
+- **Don't:** treat a fix in the cautious direction as exempt from the review a fix in the permissive direction would get --- two of this PR's seven fail-opens were introduced by the fix for the previous one.

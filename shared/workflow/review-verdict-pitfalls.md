@@ -1555,6 +1555,10 @@ reproduces the failure described here.
   message says so --- check which vocabulary the guard's own regex accepts
   before concluding the review never reached a verdict.
 
+(Re-broken 2026-09-15, thirteen consecutive refused pushes on the same hook with reviewers concluding `Verdict: CLEAN`, by a session whose dupe-check grepped this file and read the hits without opening it.
+[`get-under-the-hood`](../principles/get-under-the-hood.md)'s "A third shape: the predicate that refuses you is not in the message at all" generalizes the mechanism and records that recurrence;
+the two are the same trap seen from the verdict side and the guard side.)
+
 **A tenth case: the review's own required check run can read green over a `NOT_CLEAN` verdict.**
 The check-shaped cases above include gates that never fail, gates that only report a dispatch,
 and a green check with no review posted at all.

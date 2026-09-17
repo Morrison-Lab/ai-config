@@ -1315,7 +1315,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-clean-stop-with-live-agent.py\"",
             "timeout": 10,
             "script": "no-clean-stop-with-live-agent.py",
-            "why": "flag-session-boundaries -- blocks a CLEAN stopping-point declaration when a subagent was dispatched and no liveness check followed the last task-notification (ai-config#3689)."
+            "why": "flag-session-boundaries -- blocks a CLEAN stopping-point declaration when a subagent was dispatched and no liveness check followed the last task-notification or the last dispatch, whichever came later (ai-config#3689)."
           }
         ]
       }

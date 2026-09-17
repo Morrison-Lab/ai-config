@@ -156,6 +156,116 @@ def run_twice(lines):
 
 cases = [
     # name, transcript, expect_block
+    # --- ai-config#3692 round-2 review ---
+    (
+        "a raising text block does not cost the dispatches after it",
+        [
+            raw({
+                "type": "assistant",
+                "message": {"content": [
+                    {"type": "text", "text": 42},
+                    {"type": "tool_use", "name": "Agent", "input": {}},
+                    {"type": "tool_use", "name": "Task", "input": {}},
+                ]},
+            }),
+            assistant(CLEAN),
+        ],
+        True,
+    ),
+    (
+        "an argv-array shell command does not cost the dispatch after it",
+        [
+            raw({
+                "type": "assistant",
+                "message": {"content": [
+                    {"type": "tool_use", "name": "Bash",
+                     "input": {"command": ["git", "worktree", "list"]}},
+                    {"type": "tool_use", "name": "Agent", "input": {}},
+                ]},
+            }),
+            assistant(CLEAN),
+        ],
+        True,
+    ),
+    (
+        "an argv-array shell command is not read as a liveness check",
+        [
+            dispatch(),
+            raw({
+                "type": "assistant",
+                "message": {"content": [
+                    {"type": "tool_use", "name": "Bash",
+                     "input": {"command": ["git", "worktree", "list"]}},
+                ]},
+            }),
+            assistant(CLEAN),
+        ],
+        True,
+    ),
+    (
+        "a declaration in an indented code block is an example, not a claim",
+        [
+            dispatch(),
+            assistant(
+                "Write it like this:\n\n"
+                "    **Stopping Point**: Clean stopping point reached\n\n"
+                "Still working."
+            ),
+        ],
+        False,
+    ),
+    (
+        "a fence indented inside a list item does not expose its example",
+        [
+            dispatch(),
+            assistant(
+                "- Example:\n\n"
+                "    ```\n"
+                "    **Stopping Point**: Clean stopping point reached\n"
+                "    ```\n\n"
+                "Still working."
+            ),
+        ],
+        False,
+    ),
+    (
+        "an unindented declaration still arms after an indented example",
+        [
+            dispatch(),
+            assistant(
+                "Write it like this:\n\n"
+                "    **Stopping Point**: Clean stopping point reached\n\n"
+                "**Stopping Point**: Clean stopping point reached"
+            ),
+        ],
+        True,
+    ),
+    (
+        # Pins the "\n" separator in the direction it was chosen. With "" the
+        # blocks concatenate as rendered, the declaration is no longer
+        # line-initial, and this does not arm -- so the separator is a real
+        # choice, and this is the arming side of its cost.
+        "a newline join can arm on a prohibition that renders as one line",
+        [
+            dispatch(),
+            multi_text([
+                "Do not write ",
+                "**Stopping Point**: Clean stopping point reached, ever.",
+            ]),
+        ],
+        True,
+    ),
+    (
+        # The other side of the same choice: a declaration split MID-LINE
+        # across two blocks renders as a declaration and is not seen. The ""
+        # separator would catch this and lose the case above.
+        "a declaration split mid-line across blocks is not seen",
+        [
+            dispatch(),
+            multi_text(["**Stopping Point**:", " Clean stopping point reached"]),
+        ],
+        False,
+    ),
     (
         "measured case: notified, then clean with no liveness check",
         [dispatch(), notification(), assistant(CLEAN)],

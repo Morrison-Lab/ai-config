@@ -35,6 +35,15 @@ condition:
     AND no liveness check appears after BOTH the last task-notification
         and the last dispatch
 
+A liveness check is trusted INDEFINITELY once it clears that bar: nothing
+relates it to the declaration in time. So `dispatch, notification, check,
+[twenty unrelated turns], declare clean` discharges, even with an agent that
+was live when the check ran and is live still. Bounding the check to the
+declaring turn would close that, and would also widen the arm, which is the
+wrong default for a blocking guard (see the note below) without a measurement
+of how often a legitimate session checks in one turn and declares in the next.
+Tracked as ai-config#3749.
+
 The second half of that last line is not redundant with the first. Keying only
 on the notification left the guard silent in the corpus's own standard shape --
 dispatch, read the result, check liveness, dispatch a sidecar, declare clean --
@@ -50,6 +59,26 @@ real cases with it (`shared/principles/deterministic-tools.md`).
 Blocks rather than warns, because the claim is wrong to SEND: a clean
 declaration is what tells a reader the session may be closed, so its cost is
 paid by whoever acts on it. The remedy costs one tool call.
+
+That last sentence is load-bearing wherever this file breaks an ambiguity
+toward arming, and it is NOT the generic blocking-guard case.
+`shared/workflow/algorithmatize-checks.md` says a blocking guard's false
+positive costs "a stalled turn and a workaround search", so a blocking guard
+gets no default lean and wants the narrowest matcher that still catches the
+real cases. That reasoning is about a guard that STOPS AN ACTION: the author
+wanted to do a thing, cannot, and has to find another way. A `Stop` guard
+stops nothing. It declines to end the turn, and the author always has another
+tool call available -- run `ListAgents`, then say the same sentence again. No
+action is blocked and there is nothing to work around, which is why the cost
+here really is one tool call rather than a stalled turn.
+
+The corpus's caution still binds on the OTHER axis, though: a matcher that
+arms on prose it should not read as a declaration produces a refusal the
+author cannot discharge by checking anything, because nothing was ever live.
+So the lean toward arming is taken only where the ambiguity is about EVIDENCE
+(an unparseable command, an unterminated fence, an order that was never
+established), and never to widen what counts as a declaration -- which is why
+an indented code block is excluded below rather than read as prose.
 
 Fails OPEN on any parse trouble, and fires at most once per distinct message.
 """
@@ -75,6 +104,11 @@ RX_CLEAN = re.compile(
     r"Clean\b",
     re.IGNORECASE,
 )
+
+# CommonMark's indented code block, which `scripts/lib/fences.py` does not
+# model. RX_CLEAN opens with `^\s*`, so without this an example declaration
+# written as an indented block matches.
+RX_INDENTED_CODE = re.compile(r"^(?: {4,}|\t)")
 
 # Tools that dispatch background work whose execution outlives the call.
 # `Workflow` belongs here for the same reason `Agent` and `Task` do: its own
@@ -167,10 +201,24 @@ def declares_clean(text):
     pair that stood here first missed a multi-backtick span and, worse, let an
     UNCLOSED fence swallow every following line -- so a declaration written
     below an unterminated example block was invisible and the guard silently
-    discharged. `swallow_unclosed=False` is deliberate for the same asymmetry
-    the module docstring states: an unterminated fence is ambiguous, and the
-    arming reading costs one tool call while the discharging one costs the
-    incident.
+    discharged. That pair is still live in `require-stopping-point.py`, the
+    sibling it was copied from, where the consequence runs the other way (it
+    asks for a declaration that is present); filed as ai-config#3748 rather
+    than fixed here, since it is a different hook's behavior. `swallow_unclosed=False` is passed EXPLICITLY rather than
+    taken from `fences.py`'s default: it is an evidence ambiguity resolved
+    toward arming, per the module docstring, and a later change to that
+    default would otherwise flip this hook to the discharging direction with
+    nothing in this file's suite pointing at the cause.
+
+    Lines indented four or more spaces are skipped. `fences.py` recognises a
+    fence at indent 0-3 and has no handling for CommonMark's indented code
+    blocks, so an example declaration written as an indented block -- or
+    inside a fence nested in a list item, which indents the fence itself --
+    was read as prose and armed the guard. That is the widening direction the
+    module docstring rules out: the author cannot discharge it by checking
+    anything, because nothing was live. This hook's own block message tells
+    the author to write a declaration, which is exactly when they are most
+    likely to indent one.
 
     Inline code spans are NOT stripped. A strip was written here first and
     removed as dead code: RX_CLEAN is line-anchored and its optional prefixes
@@ -186,7 +234,9 @@ def declares_clean(text):
     if strip_fences is None:
         # Broken install: scan the raw text. Arms more often, never less.
         return bool(RX_CLEAN.search(text))
-    for line in strip_fences(text).splitlines():
+    for line in strip_fences(text, swallow_unclosed=False).splitlines():
+        if RX_INDENTED_CODE.match(line):
+            continue
         if RX_CLEAN.search(line):
             return True
     return False
@@ -230,10 +280,14 @@ def timestamp_key(record):
 
 
 def scan(path):
-    """Return (last_text, dispatch_idx, notification_idx, liveness_idx).
+    """Return (last_text, dispatch_idx, notification_idx, liveness_idx, ordered).
 
     The three indices are ORDINALS INTO CHRONOLOGICAL ORDER, not line numbers,
-    and -1 when absent. Only their relative order is ever compared.
+    and -1 when absent. Only their relative order is ever compared, and only
+    when `ordered` is True -- that flag is part of the contract, not a
+    diagnostic: it says whether chronology was ESTABLISHED at all, and a
+    caller that compares the ordinals without consulting it is reading an
+    order the transcript never supplied.
 
     File order is not time order. A context compaction replays earlier records,
     appending them below newer ones while they keep their original timestamps
@@ -274,8 +328,17 @@ def scan(path):
             # output. That is the discharging direction, reached by exactly the
             # malformed input this hook is most likely to meet: the Antigravity
             # adapter already handles a subagent argument arriving as a JSON
-            # string (plugins/ai-config/claude-hook-adapter.py). Skipping one
-            # record loses at most one event; aborting loses the guard.
+            # string (plugins/ai-config/claude-hook-adapter.py). Aborting the
+            # scan loses the guard.
+            #
+            # The per-block work has its OWN guard below, so a raising block
+            # costs that block alone. A single record-level try wrapping the
+            # block loop was measurably worse than it reads: a record holding
+            # a malformed text block followed by two dispatches lost BOTH
+            # dispatches, so "at most one event" was false. An argv-array
+            # `command` is an ordinary schema for the foreign shell tools
+            # SHELL_TOOLS deliberately covers, so this is not a contrived
+            # shape (ai-config#3692 review).
             try:
                 stamp = timestamp_key(event)
                 role = event.get("type") or event.get("role")
@@ -296,35 +359,50 @@ def scan(path):
                 if not isinstance(blocks, list):
                     continue
 
-                # Collected per record, then joined. Keeping only the LAST
-                # non-empty block dropped a declaration followed by any further
-                # text in the same message ("... Clean stopping point reached",
-                # then "Let me know if anything else"), which discharged the
-                # guard on a message that plainly declared.
+                # Collected per record, then joined with a NEWLINE. Keeping
+                # only the LAST non-empty block dropped a declaration followed
+                # by any further text in the same message ("... Clean stopping
+                # point reached", then "Let me know if anything else"), which
+                # discharged the guard on a message that plainly declared.
+                #
+                # The separator is a deliberate choice with a cost on each
+                # side, not a free one, and a test pins it either way. `""`
+                # would concatenate as rendered and miss a declaration split
+                # across two blocks. `"\n"` introduces a line boundary the
+                # rendered message does not have, so two blocks reading
+                # "Do not write " / "**Stopping Point**: Clean ..., ever."
+                # arm the guard although the sentence is a prohibition. That
+                # is the arming direction on a `Stop` guard, discharged by one
+                # tool call, whereas the `""` miss is the incident itself.
                 texts = []
                 for b in blocks:
-                    if not isinstance(b, dict):
-                        continue
-                    kind = b.get("type")
+                    try:
+                        if not isinstance(b, dict):
+                            continue
+                        kind = b.get("type")
 
-                    if kind == "tool_use":
-                        name = (b.get("name") or "").lower()
-                        if name in DISPATCH_TOOLS:
-                            events.append((stamp, position, "dispatch"))
-                        elif name in LIVENESS_TOOLS:
-                            events.append((stamp, position, "liveness"))
-                        elif name in SHELL_TOOLS:
-                            raw = b.get("input")
-                            cmd = raw.get("command") or "" if isinstance(
-                                raw, dict
-                            ) else ""
-                            if is_liveness_command(cmd):
+                        if kind == "tool_use":
+                            name = (b.get("name") or "").lower()
+                            if name in DISPATCH_TOOLS:
+                                events.append((stamp, position, "dispatch"))
+                            elif name in LIVENESS_TOOLS:
                                 events.append((stamp, position, "liveness"))
+                            elif name in SHELL_TOOLS:
+                                raw = b.get("input")
+                                cmd = raw.get("command") if isinstance(
+                                    raw, dict
+                                ) else None
+                                if isinstance(cmd, str) and is_liveness_command(
+                                    cmd
+                                ):
+                                    events.append((stamp, position, "liveness"))
 
-                    elif kind == "text":
-                        piece = b.get("text") or ""
-                        if piece.strip():
-                            texts.append(piece)
+                        elif kind == "text":
+                            piece = b.get("text")
+                            if isinstance(piece, str) and piece.strip():
+                                texts.append(piece)
+                    except Exception:
+                        continue
 
                 if role == "assistant" and texts:
                     last_text = "\n".join(texts)
@@ -362,8 +440,12 @@ def scan(path):
                 ordered = False
         else:
             ordered = False
-    if not ordered:
-        events.sort(key=lambda e: e[1])
+    # No fallback re-sort here. When `ordered` is False the only uses of the
+    # ordinals are a presence test (`dispatch < 0`) and a comparison the
+    # caller short-circuits on `ordered`, so a re-sort by file position is
+    # unobservable -- it survived its own deletion under mutation, which is
+    # the signal this file already records for the removed lookahead and the
+    # removed inline-code strip.
 
     dispatch = notification = liveness = -1
     for ordinal, (_stamp, _position, kind) in enumerate(events):
@@ -423,7 +505,8 @@ def main():
                 "reason": (
                     "This message declares a CLEAN stopping point, a subagent was "
                     "dispatched in this session, and no liveness check was run "
-                    "after the last task-notification.\n\n"
+                    "after the last task-notification OR the last dispatch, "
+                    "whichever came later.\n\n"
                     "A completion notification is NOT terminal. The harness says so "
                     "in the notification itself: it fires each time the agent stops "
                     "with no live children, and the same task-id may notify more "

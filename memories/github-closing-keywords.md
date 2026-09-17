@@ -35,12 +35,14 @@ never that it can silently fail to close a PR when wanted.
 Don't write "merging PR A will auto-close PR B" from a keyword in A's body
 --- verify by querying B's state after the merge,
 and close it explicitly if that's the intent.
-A duplicate PR found via this pattern is closable with `state_reason: duplicate` and
-`duplicate_of: <N>` through `gh issue close --reason "not planned"`
-(GitHub's CLI has no native `duplicate` reason) or the `issue_write` MCP tool ---
-but note `issue_write` itself only resolves **issue** numbers server-side
-("Could not resolve to an Issue with the number of N" on a PR),
-so a duplicate PR still needs `update_pull_request` / `gh pr close`, not the issue-shaped tool.
+A duplicate **issue** closes natively via
+`gh issue close <N> --reason duplicate --duplicate-of <target>`
+(shipped December 2024; confirm with `gh help issue close` since an older CLI may lack it),
+or via the `issue_write` MCP tool with `state_reason: duplicate` / `duplicate_of: <N>`.
+But `issue_write` and `gh issue close` both resolve issue numbers only server-side
+("Could not resolve to an Issue with the number of N" on a PR) ---
+a duplicate **PR** needs `update_pull_request` / `gh pr close` instead,
+which has no duplicate-reason concept at all.
 
 - **Do:** query the referenced PR's state after a merge that used a closing
   keyword on it, rather than assuming the keyword closed it.

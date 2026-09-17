@@ -2587,8 +2587,20 @@ def codex_cases() -> tuple[int, int]:
         check(f"OMO `{out_tool}` dispatching the reviewer does not authorize (ai-config#3746)",
               rc == 0 and nested.get("permissionDecision") == "deny")
 
-    def background_flow(result_key, retrieve_key):
-        """A genuine background reviewer: dispatch, task id, retrieve, report."""
+    # The spellings `TASK_ID_KEYS` carries in the hook. Kept as a literal rather
+    # than imported, so a spelling silently dropped from the hook's tuple fails
+    # a case here instead of shrinking the matrix to match itself.
+    TASK_ID_SPELLINGS = ("task_id", "taskId", "TaskId", "conversationId", "id")
+
+    def background_flow(result_key, retrieve_key, raw_result=None):
+        """A genuine background reviewer: dispatch, task id, retrieve, report.
+
+        `raw_result` replaces the JSON dispatch result with literal text, which
+        is the only way to reach the regex registrar -- a result that parses as
+        a dict never gets there.
+        """
+        announce = (raw_result if raw_result is not None
+                    else json.dumps({result_key: "T9"}))
         return [
             {"type": "assistant", "message": {"content": [
                 {"type": "tool_use", "id": "codex-bg", "name": "Agent",
@@ -2596,7 +2608,7 @@ def codex_cases() -> tuple[int, int]:
                            "prompt": "Review the diff"}}]}},
             {"type": "user", "message": {"content": [
                 {"type": "tool_result", "tool_use_id": "codex-bg",
-                 "content": json.dumps({result_key: "T9"})}]}},
+                 "content": announce}]}},
             {"type": "assistant", "message": {"content": [
                 {"type": "tool_use", "id": "codex-bg2", "name": "taskoutput",
                  "input": {retrieve_key: "T9"}}]}},
@@ -2618,7 +2630,14 @@ def codex_cases() -> tuple[int, int]:
     #     and the two gates carrying the weight did not. Case 12's own lesson
     #     was that the fixture must vary the key under test; these rows carry
     #     it to the id key, which the earlier rounds left pinned at `task_id`.
-    for retrieve_key in ("task_id", "taskId", "TaskId", "id"):
+    #     Round 6 widened both loops to the same tuple. They used to enumerate
+    #     the two ends' key lists SEPARATELY, which pinned the asymmetry in
+    #     place instead of catching it: `TaskId` was tested on the retrieval
+    #     side only and `conversationId` on the result side only, so each ran
+    #     green against the one end that read it while the other end did not.
+    #     A cross-product over one shared tuple is what makes a missing
+    #     spelling fail somewhere.
+    for retrieve_key in TASK_ID_SPELLINGS:
         rc, blocked, _ = push(background_flow("task_id", retrieve_key))
         check(f"a background review retrieved under `{retrieve_key}` authorizes",
               rc == 0 and not blocked)
@@ -2627,10 +2646,20 @@ def codex_cases() -> tuple[int, int]:
     #     `reviewer_task_ids` because the dispatch's own result registered it,
     #     so a spelling missing HERE denies just as surely, one step earlier
     #     and with nothing in the retrieval call to suggest why.
-    for result_key in ("task_id", "taskId", "conversationId", "id"):
+    for result_key in TASK_ID_SPELLINGS:
         rc, blocked, _ = push(background_flow(result_key, "task_id"))
         check(f"a dispatch result announcing its task under `{result_key}` authorizes",
               rc == 0 and not blocked)
+
+    #     And the cross-product, which is the only shape that can fail when the
+    #     two ends disagree. Either loop above holds one end at `task_id`, a
+    #     spelling both ends have always read, so both stay green under exactly
+    #     the defect round 6 found.
+    for result_key in TASK_ID_SPELLINGS:
+        for retrieve_key in TASK_ID_SPELLINGS:
+            rc, blocked, _ = push(background_flow(result_key, retrieve_key))
+            check(f"announced as `{result_key}`, retrieved as `{retrieve_key}`, authorizes",
+                  rc == 0 and not blocked)
 
     # 21. `verify_review` DENIES a non-`str` transcript path rather than
     #     raising. Called directly, because `main` always passes
@@ -2642,13 +2671,19 @@ def codex_cases() -> tuple[int, int]:
     #     This pins the one conjunct in the function that reads inert and is
     #     not. Two identical `transcript_path and` operands were removed from
     #     the conditions below it, correctly: a preceding `return` had already
-    #     proven them. This one is the only thing standing between a `None` and
-    #     `os.path.exists`, which raises -- and `main`'s deliberate
-    #     `except Exception: return 0` turns a raise into an ALLOW. So the
-    #     operand is inert for every `str` and load-bearing for the failure it
-    #     is placed against, and mutation cannot tell those apart on its own:
-    #     without this case, deleting it passes the whole suite while moving
-    #     the guard from fail-closed to fail-open.
+    #     proven them. This one stands between a `None` and `os.path.exists`,
+    #     which raises. Mutation alone cannot tell the two situations apart --
+    #     without this case, deleting the operand passes the whole suite.
+    #
+    #     What this case does NOT do, contrary to what its first version said,
+    #     is close a fail-open. That claim was checked in round 6 and was
+    #     wrong: the sole caller's `or ""` already turned `None` into `""`
+    #     before it could arrive, so the `None` asserted here is a value the
+    #     binary could not produce. The real fail-open was one line earlier in
+    #     that caller, on the `list`/`dict`/`True` values `or ""` does NOT
+    #     rescue -- see case 22, which reaches it through the binary. Keeping
+    #     both cases, and this note: a test that pins a hypothetical caller is
+    #     worth having, and is not evidence about the reachable one.
     spec = importlib.util.spec_from_file_location("npwsr_none_arg", HOOK)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
@@ -2665,6 +2700,81 @@ def codex_cases() -> tuple[int, int]:
         reason = f"raised {type(exc).__name__}"
     check(f"verify_review(None) denies rather than raising into the fail-open "
           f"[got: {reason}]", ok)
+
+    # 22. A non-`str` `transcript_path` in the PAYLOAD denies, through the hook
+    #     binary. This is the reachable counterpart of case 21, and the one
+    #     that was actually failing open: `payload.get(...) or ""` rescues only
+    #     the FALSY non-`str` values, so a truthy `list` or `dict` reached
+    #     `os.path.exists`, which raises `TypeError` -- and that raise landed in
+    #     `main`'s deliberate `except Exception: return 0`. No denial, no
+    #     message, nothing in the transcript telling it apart from an
+    #     authorized push. Measured on `main` too, so it predates this branch
+    #     (ai-config#3752).
+    #
+    #     `True` is in the matrix for a reason a narrower fix would miss: it
+    #     never raised. `os.path.exists(True)` tests FILE DESCRIPTOR 1, which
+    #     exists, so the bool sailed past the check and into `verify_review`.
+    #     A fix aimed only at the `TypeError` would leave that row allowing.
+    for label, value in (("a null", None), ("an int", 123), ("a bool", True),
+                         ("a list", ["/tmp/x"]), ("a dict", {"p": 1}),
+                         ("an empty string", "")):
+        rc, blocked, reason = push(None, payload_extra={"transcript_path": value})
+        check(f"{label} `transcript_path` denies rather than failing open",
+              rc == 0 and blocked and "No transcript available" in reason)
+
+    # 22b. The task-notification `origin` envelope reads a NARROWER tuple, and
+    #      this is the case that keeps it narrow. `origin` identifies a
+    #      notification, so its `id` is the notification's own -- a different
+    #      identifier space from a task id, and matching it would test
+    #      membership for a value that never was one. Nothing else in the suite
+    #      distinguishes a deliberately-narrower list from a list somebody
+    #      forgot to widen, so a later round tidying the four sites into one
+    #      tuple would look like a cleanup and would silently widen this gate.
+    notif = [
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "codex-n1", "name": "Agent",
+             "input": {"subagent_type": "adversarial-reviewer",
+                       "prompt": "Review the diff"}}]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": "codex-n1",
+             "content": json.dumps({"task_id": "T9"})}]}},
+        {"type": "user", "origin": {"kind": "task-notification", "id": "T9"},
+         "message": {"content": [{"type": "text", "text": body()}]}},
+    ]
+    rc, blocked, _ = push(notif)
+    check("a task notification identifying its task only as `id` does not authorize",
+          rc == 0 and blocked)
+
+    # 23. The non-JSON registration path. A dispatch result that does not parse
+    #     as a dict never reaches the JSON branch, so this regex is the SOLE
+    #     registrar for a text-shaped announcement -- and deleting it left all
+    #     375 cases passing, which is how round 6 found it. An entire admitting
+    #     path with no case on it.
+    #
+    #     The regex is case-insensitive and tolerates the separator, so it
+    #     accepts spellings the JSON branch's tuple lists individually. A bare
+    #     `id:` is deliberately NOT among them: in free text that is far too
+    #     loose to be provenance, and unlike the JSON branch there is no key
+    #     structure to make it unambiguous.
+    for raw in ('Started background task. task_id: T9',
+                'Started background task. taskId: T9',
+                'Started background task. TaskId: T9',
+                'Started background task. task-id: T9',
+                'Started background task. task id: T9',
+                'Started background task. conversationId: T9'):
+        rc, blocked, _ = push(background_flow(None, "task_id", raw_result=raw))
+        spelling = raw.split(".")[1].split(":")[0].strip()
+        check(f"a text-shaped dispatch result announcing `{spelling}` authorizes",
+              rc == 0 and not blocked)
+
+    #     And the negative: free text carrying no recognizable task-id spelling
+    #     registers nothing, so the retrieval that follows has no provenance.
+    #     Without this row the case above cannot distinguish "the regex matched"
+    #     from "something else admitted the push".
+    rc, blocked, _ = push(background_flow(None, "task_id",
+                                          raw_result="Started background task. ref: T9"))
+    check("a text-shaped result with no task-id spelling does not authorize",
+          rc == 0 and blocked)
 
     return failures, ran
 

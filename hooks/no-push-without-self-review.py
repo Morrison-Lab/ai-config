@@ -214,10 +214,17 @@ AGENT_TOOLS = {
 # whose standing differs from its neighbours -- said plainly because the
 # `collaboration.spawn_agent` note above discloses its own gap, and a disclosed
 # neighbour makes an undisclosed one read as checked. The repository's only
-# evidence is `memories/antigravity.md`, `memories/preferences.md` and
-# `plugins/ai-config/rules/ai-config.md`, all of which show `Action='status'`
-# and none of which covers creation -- while the name and that `Action`
-# parameter both suggest the tool also creates. Listing it here therefore
+# evidence is `memories/antigravity.md:151`, `plugins/ai-config/rules/ai-config.md:28`
+# and `memories/preferences.md:118`. The first two show `Action='status'`; the
+# third names the tool with no `Action` at all ("lists harness-managed background
+# tasks"). So all three describe retrieval and none covers creation, which is the
+# conclusion -- but "all of which show `Action='status'`" was how this comment put
+# it, and that was false for one of the three (ai-config#3737 round 6). A comment
+# whose whole purpose is to state its evidence has to state it exactly, or it
+# reads as checked while resting on a file that says something else.
+#
+# The name and that `Action` parameter both suggest the tool also creates,
+# which is the risk this listing forecloses. Listing it here therefore
 # CHANGES behaviour for a `manage_task` reviewer dispatch, from admitted to
 # denied. That direction is the safe one for an authorization guard, and it is
 # not free: the denial such a session gets is #3707's own misleading one. It is
@@ -226,6 +233,38 @@ AGENT_TOOLS = {
 # persona). ai-config#3746 tracks measuring it and giving that case its own
 # denial; `codex_cases` pins the current behaviour either way.
 TASK_OUTPUT_TOOLS = {"taskoutput", "task_output", "manage_task"}
+
+# Spellings a harness may use for a background task's id, read by BOTH ends of
+# the dispatch chain: the result that announces a task (the producer, which puts
+# the id into `reviewer_task_ids`) and the retrieval call that names one (the
+# consumer, which tests membership). They share one tuple because they are two
+# ends of a single chain -- a spelling present at one end and missing at the
+# other denies a review that genuinely ran, with #3707's own misleading message,
+# and that is exactly how `taskId` was missed: the consumer read it, the
+# producer did not. An earlier comment here asserted the two already agreed;
+# they did not, and stating an invariant is not enforcing one (ai-config#3737
+# round 6). Widening the producer cannot admit anything, since the set is built
+# only from reviewer dispatch results.
+TASK_ID_KEYS = ("task_id", "taskId", "TaskId", "conversationId", "id")
+
+# The task-notification `origin` envelope gets a NARROWER list, deliberately.
+# `origin` identifies a notification, so its `id` is the notification's own id
+# rather than the task's -- a different identifier space, and admitting it would
+# test membership for a value that was never a task id. The other four mean the
+# same thing here as above. This is the one site where the sets legitimately
+# differ, and the reason is the payload's meaning rather than an oversight.
+TASK_ID_KEYS_ORIGIN = ("task_id", "taskId", "TaskId", "conversationId")
+
+
+def _first_task_id(source, keys=TASK_ID_KEYS) -> str:
+    """The first task-id spelling present in `source`, as a `str`, else ""."""
+    if not isinstance(source, dict):
+        return ""
+    for k in keys:
+        v = source.get(k)
+        if v:
+            return str(v)
+    return ""
 
 # A cross-family reviewer invoked as a CLI, whose print-mode output IS its
 # review. Each value lists the flags putting that program in non-interactive
@@ -1731,17 +1770,23 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                     # one can never short-circuit the task-id gate below, which
                     # is their only sound provenance (see TASK_OUTPUT_TOOLS).
                     if tool_name in TASK_OUTPUT_TOOLS:
-                        # Every spelling this module knows must appear here AND in
-                        # the producer below. Since the reorder above, this gate is
-                        # the ONLY provenance a retrieval tool has -- the persona
-                        # path it used to fall back on is exactly the bypass that was
-                        # closed -- so a spelling missing from either end is no longer
-                        # a near-miss that something else catches. It denies a review
-                        # that genuinely ran, with #3707's own misleading message.
-                        # `taskId` was missing from both while `origin.get("taskId")`
-                        # below read it, so the module already knew the spelling.
-                        task_id = str(inp.get("task_id") or inp.get("taskId")
-                                      or inp.get("TaskId") or inp.get("id") or "")
+                        # Since the reorder above, this gate is the ONLY
+                        # provenance a retrieval tool has -- the persona path it
+                        # used to fall back on is exactly the bypass that was
+                        # closed -- so a spelling missing from either end of the
+                        # chain is no longer a near-miss that something else
+                        # catches. It denies a review that genuinely ran, with
+                        # #3707's own misleading message.
+                        #
+                        # Both ends now read `TASK_ID_KEYS`, which is why this
+                        # site no longer carries a key list of its own. An
+                        # earlier revision of this comment INSTRUCTED the two to
+                        # agree, and they did not agree at the moment it said so:
+                        # the consumer read `TaskId` and the producer did not,
+                        # the producer read `conversationId` and the consumer did
+                        # not. A comment cannot hold an invariant that a shared
+                        # constant can (ai-config#3737 round 6).
+                        task_id = _first_task_id(inp)
                         if task_id and task_id in reviewer_task_ids:
                             if isinstance(call_id, str) and call_id:
                                 reviewer_call_ids.add(call_id)
@@ -1770,12 +1815,9 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                         try:
                             res_data = json.loads(res_text)
                             if isinstance(res_data, dict):
-                                tid = (res_data.get("task_id")
-                                       or res_data.get("taskId")
-                                       or res_data.get("conversationId")
-                                       or res_data.get("id"))
+                                tid = _first_task_id(res_data)
                                 if tid:
-                                    reviewer_task_ids.add(str(tid))
+                                    reviewer_task_ids.add(tid)
                         except Exception:
                             tid_match = re.search(r"\b(?:task[-_ ]?id|conversationId)[:=]\s*[`\"']?([\w-]+)", res_text, re.I)
                             if tid_match:
@@ -1794,7 +1836,7 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                     and origin.get("kind") in ("task-notification", "task_notification")
                 )
                 if is_task_notification and not is_assistant and not b.get("is_error"):
-                    origin_task_id = str(origin.get("taskId") or origin.get("task_id") or "")
+                    origin_task_id = _first_task_id(origin, TASK_ID_KEYS_ORIGIN)
                     sender_id = str(record.get("sender") or "")
                     if (
                         (origin_task_id and origin_task_id in reviewer_task_ids)
@@ -1841,14 +1883,22 @@ def verify_review(transcript_path: str, directory: str | None,
 
     # `transcript_path and` stays here, unlike the two conjuncts removed below,
     # and the difference is not cosmetic. Those two restated a fact a preceding
-    # `return` had already proven, so removing them changed nothing. This one is
-    # the function's only guard against a non-`str` argument: the annotation is
-    # not enforced, and `os.path.exists(None)` raises, which `main`'s deliberate
-    # `except Exception: return 0` would swallow into an ALLOW. With the conjunct
-    # a `None` falls through to the denial below instead. Measured both ways.
-    # Inert for every `str`, load-bearing for the failure it is placed against,
-    # which is why a same-file grep for the operand is the start of the question
-    # rather than the end of it.
+    # `return` had already proven, so removing them changed nothing. This one
+    # guards a non-`str` argument: the annotation is not enforced, and
+    # `os.path.exists(None)` raises. With the conjunct a `None` falls through to
+    # the denial below instead. Measured both ways, and pinned by a case that
+    # calls this function directly.
+    #
+    # It is defence in depth for a hypothetical second caller, NOT the thing
+    # standing between this repository and a fail-open. An earlier version of
+    # this comment claimed the latter, and that was wrong in a way worth keeping
+    # on the record: the sole caller's `or ""` already foreclosed the `None` this
+    # conjunct catches, while the live bypass sat one line EARLIER in that
+    # caller, on the `list`/`dict`/`True` values `or ""` does not rescue. The
+    # comment named a real mechanism, attached it to the wrong site, and so read
+    # as a fail-open having been closed while it was open (ai-config#3752). The
+    # caller now coerces, which is where the fix belongs; this stays because a
+    # future caller need not.
     if transcript_path and os.path.exists(transcript_path):
         try:
             verdict, reviewed_commit, saw_reviewer_call = read_latest_review(transcript_path)
@@ -2074,7 +2124,21 @@ def main() -> int:
                      "(`--git-dir`/`--work-tree`/`GIT_DIR`/`GIT_WORK_TREE`), "
                      "so a verdict naming a commit in this one cannot cover it")
                 return 0
-            transcript_path = payload.get("transcript_path") or ""
+            # Coerce before `os.path.exists` rather than after. `or ""` rescues
+            # only the FALSY non-`str` values: a truthy `list` or `dict` reaches
+            # `os.path.exists`, which raises `TypeError` (it catches `OSError`
+            # and `ValueError` and not that), and the raise lands in this
+            # function's deliberate `except Exception: return 0` -- a silent
+            # ALLOW, no denial emitted, indistinguishable in the transcript from
+            # an authorized push. Measured on this branch AND on `main`, so the
+            # bypass predates the branch; filed as ai-config#3752.
+            #
+            # `True` allows by a second route worth naming, since a fix aimed
+            # only at the raise would miss it: `os.path.exists(True)` tests FILE
+            # DESCRIPTOR 1, which exists, so nothing raises and the bool is
+            # carried into `verify_review` instead. `isinstance` covers both.
+            _tp = payload.get("transcript_path")
+            transcript_path = _tp if isinstance(_tp, str) else ""
             if not os.path.exists(transcript_path):
                 # Adopt the fallback only when it resolves to a real file.
                 # Overwriting unconditionally erased a reported-but-missing

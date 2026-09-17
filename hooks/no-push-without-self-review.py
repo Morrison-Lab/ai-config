@@ -17,9 +17,11 @@ every retry after it, and `Read`ing any of this repo's prose did the same. So a
 verdict is admitted from the `tool_result` of a subagent-dispatch call whose
 named persona IS the reviewer, and only when that result is not an error.
 Which tool names count as a dispatch is `AGENT_TOOLS`, which spans harnesses --
-Claude's `Agent`/`Task` and Codex's `spawn_agent` among them -- because a
-harness this guard cannot see is indistinguishable from a review that never
-happened, and only one of those should block a push (ai-config#3707).
+Claude's `Agent`/`Task` and Codex's `spawn_agent` among them. A review that
+never happened must block a push; a harness whose dispatch records this guard
+cannot read must be taught to it, not left to present as the first. The two are
+indistinguishable from inside this function, which is why the remedy is the
+tool-name set rather than any softening here (ai-config#3707).
 A second provenance is admitted alongside it: a `Bash` call matching this
 file's own external-reviewer pattern, which today recognizes `agy --print`
 and none of the other delegation CLIs.
@@ -155,15 +157,30 @@ REVIEW_PROMPT_RE = re.compile(
 # ships. So this set decides which harnesses the guard can SEE, not which
 # reviews it trusts.
 #
-# `spawn_agent` is Codex's native subagent interface, reached in a session as
-# `collaboration.spawn_agent`; both spellings are listed because the transcript
-# may carry either. Its absence was the whole of ai-config#3707: a Codex
-# session dispatched the reviewer, got a clean report naming the exact commit,
-# and was denied for never having dispatched a reviewer at all.
-# `plugins/ai-config/codex-hook-adapter.py` already carried the same alias in
-# its `TOOL_ALIASES` for hook MATCHING, so the fact was in the repo and only
-# this half of it was missing. The two are deliberately not shared: the adapter
-# maps a live payload's tool name onto a matcher, this reads names out of a
+# `spawn_agent` is Codex's native subagent interface. Its absence was the whole
+# of ai-config#3707: a Codex session dispatched the reviewer, got a clean report
+# naming the exact commit, and was denied for never having dispatched a reviewer
+# at all.
+#
+# The two spellings have DIFFERENT standing, and conflating them is what an
+# earlier revision of this comment did. `spawn_agent` is attested in this
+# repository, by `TOOL_ALIASES` in `plugins/ai-config/codex-hook-adapter.py`.
+# `collaboration.spawn_agent` is the name ai-config#3707's reporter used for the
+# interface in prose; nothing here has measured it as the name a Codex
+# TRANSCRIPT carries, and the adapter cannot match it, since `matcher_hits` does
+# an exact dict lookup. It is listed anyway because a name that Codex never
+# emits costs nothing -- membership admits no verdict on its own -- while its
+# absence would reproduce #3707. Replace it with a measurement when one exists;
+# ai-config#3741 tracks that, and the adapter gap it implies.
+#
+# That earlier revision also claimed this was the only missing half of the
+# alias. It is not: sibling hooks gate on their own hard-coded subagent
+# tool-name sets that omit `spawn_agent` entirely, so they are silently inert
+# in a Codex session -- the Fable prohibition among them. Tracked as
+# ai-config#3740 rather than fixed here.
+#
+# The adapter's copy and this one are deliberately not shared: the adapter maps
+# a live payload's tool name onto a matcher, this reads names out of a
 # transcript, and a Codex rename would want re-attesting on both paths rather
 # than propagating silently through one constant.
 AGENT_TOOLS = {
@@ -1444,7 +1461,17 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
 def _agent_subtypes(inp: dict) -> list[str]:
     """Subagent names an Agent/Task dispatch names, from any observed key."""
     sub_types: list[str] = []
-    for k in ("subagent_type", "subagentType", "agent_type", "TypeName", "name", "Role"):
+    # `agent` and `persona` are here because `_is_reviewer_record` below already
+    # treats them as persona-naming keys, and two predicates in one file
+    # disagreeing about what names a persona is how a dispatch gets seen by one
+    # and not the other. Widening the TOOL set without widening this one left
+    # exactly that hole: a `spawn_agent` record keyed on `agent` reproduced
+    # ai-config#3707's denial verbatim after the tool name was recognized.
+    # Nothing downstream is relaxed -- every name found here is still matched
+    # against ADVERSARIAL_AGENT_NAME, or FALLBACK_AGENT_NAME plus a review
+    # prompt.
+    for k in ("subagent_type", "subagentType", "agent_type", "TypeName",
+              "name", "Role", "agent", "persona"):
         if inp.get(k):
             sub_types.append(str(inp.get(k)))
     if isinstance(inp.get("Subagents"), list):
@@ -1753,7 +1780,11 @@ def verify_review(transcript_path: str, directory: str | None,
     if not transcript_path and not saw_reviewer_call:
         return False, "No transcript available to verify the adversarial self-review."
 
-    if transcript_path and not os.path.exists(transcript_path) and not saw_reviewer_call:
+    # No `and not saw_reviewer_call` here: it cannot be False on this path, since
+    # `saw_reviewer_call` is assigned only inside the `os.path.exists` branch
+    # above, which this condition excludes. Stating that beats carrying an inert
+    # conjunct a later reader has to re-derive (`dead-code-is-tech-debt`).
+    if transcript_path and not os.path.exists(transcript_path):
         # Distinguished from the denial below because the two have different
         # remedies and only one of them is the pusher's to apply. Reporting a
         # harness integration gap as "you did not dispatch a reviewer" sends

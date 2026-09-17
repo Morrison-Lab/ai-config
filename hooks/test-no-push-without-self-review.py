@@ -2347,6 +2347,52 @@ def codex_cases() -> tuple[int, int]:
     check("an empty transcript path still reports no transcript available",
           rc == 0 and blocked and "No transcript available" in reason)
 
+    # 9. The persona key, varied. Recognizing Codex's TOOL name buys nothing if
+    #    the dispatch's persona sits under a key this guard does not read, and
+    #    every row above supplies Claude's `subagent_type` for free --- so those
+    #    rows are a Claude dispatch wearing a Codex tool name, and cannot see
+    #    this. `_agent_subtypes` and `_is_reviewer_record` are two predicates in
+    #    one file that must agree about what names a persona; these pin the keys
+    #    only the latter used to read.
+    for key in ("agent", "persona", "agent_type", "subagentType"):
+        rc, blocked, _ = push(reviewed(tool="spawn_agent", key=key))
+        check(f"a clean `spawn_agent` review keyed on `{key}` authorizes",
+              rc == 0 and not blocked)
+
+    #     ...and the persona gate still decides, whichever key carries it.
+    for key in ("agent", "persona"):
+        rc, blocked, _ = push(
+            reviewed(agent_name="doc-writer", tool="spawn_agent", key=key))
+        check(f"a non-reviewer persona under `{key}` does not authorize",
+              rc == 0 and blocked)
+
+    # 10. Reported-missing path PLUS a resolvable fallback. This is the case the
+    #     `main()` conditional was rewritten to arbitrate, and the one nothing
+    #     else reaches: `omo_cases` supplies an empty reported path, and cases 7
+    #     and 8 above supply no session_id, so the fallback is "" in each. A
+    #     mutant restoring the pre-change `if not transcript_path:` passes every
+    #     other case in this suite while breaking exactly this session shape ---
+    #     an OpenCode harness reporting a stale path alongside a live session_id,
+    #     whose genuinely reviewed push would be denied.
+    d = tempfile.mkdtemp(prefix="npwsr-codex-")
+    try:
+        tdir = os.path.join(d, "transcripts")
+        os.makedirs(tdir)
+        with open(os.path.join(tdir, "sess-codex.jsonl"), "w") as f:
+            for ev in reviewed(tool="spawn_agent"):
+                f.write(json.dumps(ev) + "\n")
+        rc, out = run_hook(
+            PUSH, None,
+            extra_env={"CLAUDE_CONFIG_DIR": d},
+            payload_extra={"transcript_path": os.path.join(d, "gone.jsonl"),
+                           "session_id": "sess-codex"})
+        nested = out.get("hookSpecificOutput") or {}
+        blocked = nested.get("permissionDecision") == "deny"
+        check("a stale reported path still falls back to a resolvable transcript",
+              rc == 0 and not blocked)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
     return failures, ran
 
 

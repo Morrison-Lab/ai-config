@@ -152,6 +152,8 @@ direction-neutral.
 It fires on the doubled form either way, which is the right behaviour here ---
 the doubled form is what is wrong, not the collapse.
 
+(Tracked as [ai-config#3710](https://github.com/Morrison-Lab/ai-config/issues/3710).)
+
 **A heredoc that writes SOURCE CODE has two parse layers, and there the doubled
 form is not the failing form --- it is the arithmetic.**
 Everything above is about content that must survive verbatim, where one layer
@@ -195,5 +197,4 @@ amount of reasoning about backslashes establishes.
   it cannot count layers, and flagging the form regardless is the behaviour
   the section above asks for.
 
-
-(Tracked as [ai-config#3710](https://github.com/Morrison-Lab/ai-config/issues/3710).)
+(Tracked as [ai-config#3738](https://github.com/Morrison-Lab/ai-config/issues/3738).)

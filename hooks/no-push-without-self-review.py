@@ -14,8 +14,12 @@ this corpus quotes verdict vocabulary constantly. Here it was self-defeating
 rather than merely unsound -- a `PreToolUse` deny reason is surfaced back into
 the transcript as the blocked call's result, so one blocked push authorized
 every retry after it, and `Read`ing any of this repo's prose did the same. So a
-verdict is admitted from the `tool_result` of an `Agent` call whose
-`subagent_type` IS the reviewer, and only when that result is not an error.
+verdict is admitted from the `tool_result` of a subagent-dispatch call whose
+named persona IS the reviewer, and only when that result is not an error.
+Which tool names count as a dispatch is `AGENT_TOOLS`, which spans harnesses --
+Claude's `Agent`/`Task` and Codex's `spawn_agent` among them -- because a
+harness this guard cannot see is indistinguishable from a review that never
+happened, and only one of those should block a push (ai-config#3707).
 A second provenance is admitted alongside it: a `Bash` call matching this
 file's own external-reviewer pattern, which today recognizes `agy --print`
 and none of the other delegation CLIs.
@@ -143,7 +147,30 @@ REVIEW_PROMPT_RE = re.compile(
     r"\b(?:adversarial[-_ ]?(?:self[-_ ]?)?review|pre[-_ ]?push[-_ ]?review|self[-_ ]?review)\b", re.I
 )
 
-AGENT_TOOLS = {"agent", "task", "invoke_subagent", "taskoutput", "task_output", "manage_task"}
+# Tool names that dispatch a subagent, lowercased. Membership here does not
+# authorize anything on its own: the dispatch's persona must still match
+# ADVERSARIAL_AGENT_NAME (or FALLBACK_AGENT_NAME plus a review prompt), the
+# verdict must still come back as that call's own non-errored result, and the
+# `Reviewed-Commit` fingerprint must still resolve and cover what the push
+# ships. So this set decides which harnesses the guard can SEE, not which
+# reviews it trusts.
+#
+# `spawn_agent` is Codex's native subagent interface, reached in a session as
+# `collaboration.spawn_agent`; both spellings are listed because the transcript
+# may carry either. Its absence was the whole of ai-config#3707: a Codex
+# session dispatched the reviewer, got a clean report naming the exact commit,
+# and was denied for never having dispatched a reviewer at all.
+# `plugins/ai-config/codex-hook-adapter.py` already carried the same alias in
+# its `TOOL_ALIASES` for hook MATCHING, so the fact was in the repo and only
+# this half of it was missing. The two are deliberately not shared: the adapter
+# maps a live payload's tool name onto a matcher, this reads names out of a
+# transcript, and a Codex rename would want re-attesting on both paths rather
+# than propagating silently through one constant.
+AGENT_TOOLS = {
+    "agent", "task", "invoke_subagent", "taskoutput", "task_output",
+    "manage_task",
+    "spawn_agent", "collaboration.spawn_agent",
+}
 
 # A cross-family reviewer invoked as a CLI, whose print-mode output IS its
 # review. Each value lists the flags putting that program in non-interactive
@@ -1726,6 +1753,23 @@ def verify_review(transcript_path: str, directory: str | None,
     if not transcript_path and not saw_reviewer_call:
         return False, "No transcript available to verify the adversarial self-review."
 
+    if transcript_path and not os.path.exists(transcript_path) and not saw_reviewer_call:
+        # Distinguished from the denial below because the two have different
+        # remedies and only one of them is the pusher's to apply. Reporting a
+        # harness integration gap as "you did not dispatch a reviewer" sends
+        # someone to re-run a review they already ran, and it is what made
+        # ai-config#3707 read as a reviewer problem rather than a discovery
+        # one. `fail-fast` wants the real condition named, not a plausible
+        # nearby one.
+        return False, (
+            f"This session reported a transcript at `{transcript_path}`, but no file "
+            "exists there, so no review could be read either way.\n"
+            "That is a harness gap rather than a verdict: nothing here says whether a "
+            "reviewer ran. Check that your harness writes the transcript it names in "
+            "the hook payload, and file the gap. Use the override and say so if you "
+            "need to push before it is fixed."
+        )
+
     if not saw_reviewer_call:
         return False, (
             "No `adversarial-reviewer` subagent or recognized external reviewer (`agy --print`) "
@@ -1920,10 +1964,20 @@ def main() -> int:
                      "so a verdict naming a commit in this one cannot cover it")
                 return 0
             transcript_path = payload.get("transcript_path") or ""
-            if not transcript_path or not os.path.exists(transcript_path):
-                transcript_path = _opencode_transcript_fallback(
+            if not os.path.exists(transcript_path):
+                # Adopt the fallback only when it resolves to a real file.
+                # Overwriting unconditionally erased a reported-but-missing
+                # path, so `verify_review` saw "" and reported no transcript
+                # available -- or, when the fallback was itself constructed but
+                # absent, reported that no reviewer had been dispatched. Both
+                # describe the session rather than the gap, and neither is
+                # something the pusher can act on. Keeping the reported path
+                # lets the denial name it (ai-config#3707).
+                fallback = _opencode_transcript_fallback(
                     payload.get("session_id")
                 )
+                if fallback and os.path.exists(fallback):
+                    transcript_path = fallback
             is_clean, reason = verify_review(
                 transcript_path, directory, argv, env
             )

@@ -2262,6 +2262,94 @@ def omo_cases() -> tuple[int, int]:
 
     return failures, ran
 
+def codex_cases() -> tuple[int, int]:
+    """Codex's native `spawn_agent` subagent dispatch (ai-config#3707).
+
+    Codex reaches its subagent interface as `collaboration.spawn_agent`, which
+    `AGENT_TOOLS` did not list -- so a Codex session that dispatched the
+    reviewer, got a clean report naming the exact commit, and pushed was denied
+    for never having dispatched a reviewer at all.
+
+    Widening a tool-name set is the kind of change that can quietly authorize
+    more than it means to, so the cases below pin BOTH directions: the Codex
+    dispatch now authorizes what a Claude `Agent` dispatch would, and it
+    authorizes nothing a Claude `Agent` dispatch would not. Every other gate --
+    the persona name, the errored result, the verdict, the fingerprint -- is
+    re-asserted here against the Codex tool name rather than assumed to carry
+    over, because assuming it carried over is what this suite exists to refuse.
+    """
+    failures = 0
+    ran = 0
+
+    def check(label, ok):
+        nonlocal failures, ran
+        ran += 1
+        print(f"{'PASS' if ok else 'FAIL'}: {label}")
+        failures += not ok
+
+    def push(events, payload_extra=None):
+        rc, out = run_hook(PUSH, events, payload_extra=payload_extra)
+        nested = out.get("hookSpecificOutput") or {}
+        return rc, nested.get("permissionDecision") == "deny", nested.get(
+            "permissionDecisionReason", "")
+
+    for tool in ("spawn_agent", "collaboration.spawn_agent"):
+        # 1. The whole point: a clean Codex review authorizes its own commit.
+        rc, blocked, _ = push(reviewed(tool=tool))
+        check(f"a clean review dispatched via `{tool}` authorizes the push",
+              rc == 0 and not blocked)
+
+        # 2. A blocking verdict still blocks. Recognizing the harness must not
+        #    turn into trusting whatever it returns.
+        rc, blocked, _ = push(reviewed(body("Needs more work"), tool=tool))
+        check(f"a blocking verdict via `{tool}` still blocks",
+              rc == 0 and blocked)
+
+        # 3. The fingerprint still has to cover what the push ships. A verdict
+        #    for an earlier commit is the stale-permission case the
+        #    `Reviewed-Commit` comparison exists for.
+        rc, blocked, _ = push(reviewed(body(commit=PREV), tool=tool))
+        check(f"a verdict via `{tool}` naming an earlier commit does not cover HEAD",
+              rc == 0 and blocked)
+
+        # 4. A report with no fingerprint at all is not a verdict.
+        rc, blocked, _ = push(reviewed(body(fingerprint=False), tool=tool))
+        check(f"an unfingerprinted report via `{tool}` does not authorize",
+              rc == 0 and blocked)
+
+        # 5. An errored dispatch carries no verdict, whatever its text says.
+        rc, blocked, _ = push(reviewed(tool=tool, is_error=True))
+        check(f"an errored `{tool}` dispatch does not authorize",
+              rc == 0 and blocked)
+
+        # 6. The persona gate is unchanged. This is the case that would fail if
+        #    widening AGENT_TOOLS had admitted the TOOL rather than the
+        #    reviewer dispatched through it: an unrelated persona returning a
+        #    perfectly-formed clean report must still block.
+        rc, blocked, _ = push(reviewed(agent_name="doc-writer", tool=tool))
+        check(f"a non-reviewer persona via `{tool}` does not authorize",
+              rc == 0 and blocked)
+
+    # 7. A transcript path that resolves to nothing is a harness gap, and says
+    #    so. Pinned on the wording because the two denials are one line apart
+    #    and both block -- so a mutant that reports the wrong one still passes
+    #    a blocked/not-blocked assertion, and the wrong one sends a reviewer
+    #    who did review back to review again (ai-config#3707's own symptom).
+    rc, blocked, reason = push([], payload_extra={
+        "transcript_path": os.path.join(tempfile.gettempdir(), "npwsr-absent.jsonl")})
+    check("a transcript path naming no file blocks", rc == 0 and blocked)
+    check("...and reports the harness gap rather than a missing dispatch",
+          "no file exists there" in reason
+          and "was dispatched" not in reason)
+
+    # 8. The pre-existing no-transcript denial is untouched by that new branch.
+    rc, blocked, reason = push([], payload_extra={"transcript_path": ""})
+    check("an empty transcript path still reports no transcript available",
+          rc == 0 and blocked and "No transcript available" in reason)
+
+    return failures, ran
+
+
 def main():
     failed = 0
     extra = 0
@@ -2294,7 +2382,7 @@ def main():
                    structured_payload_cases, transcript_scoping_cases,
                    cd_tracking_cases, fallback_cases,
                    fingerprint_guidance_cases, fingerprint_resolution_cases,
-                   omo_cases, external_reviewer_cases,
+                   omo_cases, codex_cases, external_reviewer_cases,
                    symlinked_plugin_root_cases):
             f, r = fn()
             failed += f

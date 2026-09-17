@@ -64,11 +64,12 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   `GET /projects/:id/merge_requests/:iid/notes` can return resolvable unresolved `DiffNote`s that a Discussions API sweep does not expose as an unresolved discussion.
   Filter every page on `.resolvable == true and .resolved == false`, then use the Discussions API only to locate and resolve the corresponding thread.
   Do not infer that there are no inline findings from an empty discussion-level timestamp filter.
-- **Activate manual review jobs before waiting on a GitLab pipeline.** After each
-  push, inspect the current pipeline's jobs rather than relying on the overall
-  `running` status; if the review job is `manual`, play it through the Jobs API
-  (for example, `POST /projects/:id/jobs/:job_id/play`) before starting the
-  watcher. A pipeline can run its tests while leaving the review stage dormant.
+- **Activate manual review jobs before waiting on a GitLab pipeline.**
+  After each push, inspect the current pipeline's jobs rather than relying on
+  the overall `running` status.
+  If the review job is `manual`, play it through the Jobs API (for example,
+  `POST /projects/:id/jobs/:job_id/play`) before starting the watcher.
+  A pipeline can run its tests while leaving the review stage dormant.
 - **A self-hosted GitLab instance on an institutional internal network may only resolve while on that network's VPN.**
   A DNS failure (`NXDOMAIN` / `no such host`) for the GitLab hostname, with ordinary internet DNS resolving fine otherwise, points at needing the VPN rather than a broader outage or sandbox restriction: `nslookup <host>` before and after connecting confirms it.
 - Key commands:

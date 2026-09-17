@@ -362,7 +362,7 @@ Tracked as [ai-config#3431](https://github.com/Morrison-Lab/ai-config/issues/343
 `test_flag_unassigned_worktree` and reached the same root cause and the same
 proposed fixes; read as a probable duplicate of #3431, and confirm before
 working either).
-#3744 carries the two-tree measurement this paragraph rests on: the same
+Issue #3744 carries the two-tree measurement this paragraph rests on: the same
 commit and the same suite give `Ran 17 tests ... OK` from a clean checkout of
 `aa32a3c1` and `FAILED (failures=1)` from #3690's dirty `work/3690` worktree,
 while `validate` on that PR's own head passed the suite in CI.

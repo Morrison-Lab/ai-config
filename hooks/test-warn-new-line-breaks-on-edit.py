@@ -59,6 +59,20 @@ def make_repo(with_checker=True) -> str:
 REPO_WITH_CHECKER = make_repo(with_checker=True)
 REPO_NO_CHECKER = make_repo(with_checker=False)
 
+# Round-1 finding 4 was that the warning named `scripts/semantic-line-breaks.py`
+# in every repo, though the hook fires wherever the checker is vendored. The fix
+# guards on that script's existence, and no fixture reached the guarded branch --
+# so the same regression would have passed the whole suite. This repo vendors the
+# script; REPO_WITH_CHECKER deliberately does not.
+REPO_WITH_SEMBR = make_repo(with_checker=True)
+os.makedirs(os.path.join(REPO_WITH_SEMBR, "scripts"), exist_ok=True)
+with open(
+    os.path.join(REPO_WITH_SEMBR, "scripts", "semantic-line-breaks.py"),
+    "w",
+    encoding="utf-8",
+) as _handle:
+    _handle.write("# stand-in for the real formatter; never executed\n")
+
 # Self-check, not a style assertion. If the fixture root ever lands somewhere
 # the hook classifies as scratch, every SHOULD_WARN case silently passes
 # through the skip branch and the suite reports success while measuring
@@ -111,6 +125,12 @@ def seed(path, body):
     return path
 
 
+def replace_all_payload(path, new_string, old_string="REPLACE_ME"):
+    payload = edit_payload(path, new_string, old_string)
+    payload["tool_input"]["replace_all"] = True
+    return payload
+
+
 def edit_payload(path, new_string, old_string="REPLACE_ME"):
     return {
         "tool_name": "Edit",
@@ -137,6 +157,12 @@ EDIT_DOC = seed(
     os.path.join(REPO_WITH_CHECKER, "docs", "bad.md"),
     "# Bad doc\n\nREPLACE_ME\n",
 )
+# The first occurrence is inside a fence and the second is prose, so the same
+# substituted text is a violation at one and not the other.
+MIXED_DOC = seed(
+    os.path.join(REPO_WITH_CHECKER, "docs", "mixed.md"),
+    "# Mixed doc\n\n```sh\nREPLACE_ME\n```\n\nREPLACE_ME\n",
+)
 
 
 SHOULD_WARN = [
@@ -155,6 +181,17 @@ SHOULD_WARN = [
     # block and skipped every line after it.
     ("W5", edit_payload(FENCED_DOC, "```\n\nFirst sentence. Second sentence on the same line.\n"),
      REPO_WITH_CHECKER, "new_string closing a fence then writing prose warns"),
+    # `replace_all` substitutes at every occurrence, and the SAME text can be
+    # code at one and prose at another. Inspecting only the first occurrence
+    # missed every violation the edit actually introduces at the rest.
+    ("W6", replace_all_payload(
+        MIXED_DOC, "First sentence. Second sentence on the same line."),
+     REPO_WITH_CHECKER, "replace_all sees an occurrence past the first"),
+    # A one-line new_string puts the violation on BOTH window boundaries at
+    # once, so an off-by-one at either edge flips this case.
+    ("W7", edit_payload(
+        PROSE_DOC, "First sentence. Second sentence on the same line."),
+     REPO_WITH_CHECKER, "a violation exactly on the window boundary warns"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -185,6 +222,11 @@ SHOULD_STAY_SILENT = [
              "# Doc\n\nOld line one. Old line two on the same line.\nREPLACE_ME\n"),
         "A single clean sentence."),
      REPO_WITH_CHECKER, "a pre-existing violation outside the edit stays silent"),
+    # The control for W6: without replace_all only the first occurrence is
+    # substituted, and that one is inside a fence.
+    ("S11", edit_payload(
+        MIXED_DOC, "First sentence. Second sentence on the same line."),
+     REPO_WITH_CHECKER, "without replace_all only the first occurrence counts"),
 ]
 
 NON_COMMAND_PAYLOADS = [
@@ -227,7 +269,37 @@ def test_main():
         wrong += got != "silent"
         print(f"  {got:<6} {desc}")
 
-    total = len(SHOULD_WARN) + len(SHOULD_STAY_SILENT) + len(NON_COMMAND_PAYLOADS)
+    print("\nremediation advice is guarded on the script's existence:")
+    sembr_doc = seed(
+        os.path.join(REPO_WITH_SEMBR, "docs", "bad.md"), "# Doc\n\nREPLACE_ME\n"
+    )
+    _, with_sembr = run_hook(
+        edit_payload(sembr_doc, BAD_CONTENT), cwd=REPO_WITH_SEMBR
+    )
+    _, without_sembr = run_hook(
+        edit_payload(EDIT_DOC, BAD_CONTENT), cwd=REPO_WITH_CHECKER
+    )
+    needle = "scripts/semantic-line-breaks.py"
+    guarded = [
+        ("names the script where the repo vendors it",
+         bool(with_sembr) and needle in (
+             with_sembr.get("hookSpecificOutput", {}).get("additionalContext", "")
+         )),
+        ("omits it where the repo does not",
+         bool(without_sembr) and needle not in (
+             without_sembr.get("hookSpecificOutput", {}).get("additionalContext", "")
+         )),
+    ]
+    for desc, is_ok in guarded:
+        wrong += not is_ok
+        print(f"  {'ok' if is_ok else 'WRONG':<6} {desc}")
+
+    total = (
+        len(SHOULD_WARN)
+        + len(SHOULD_STAY_SILENT)
+        + len(NON_COMMAND_PAYLOADS)
+        + len(guarded)
+    )
     print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
     return wrong
 
@@ -239,19 +311,19 @@ MUTATIONS = {
         "WRITE_TOOL_NAMES must include Write/Edit",
         [('WRITE_TOOL_NAMES = (\n    "Write", "Edit", "write_to_file", "replace_file_content", "apply_diff",\n)',
           'WRITE_TOOL_NAMES = ()')],
-        {"W1", "W2", "W3", "W4", "W5"},
+        {"W1", "W2", "W3", "W4", "W5", "W6", "W7"},
     ),
     "M2_md_extension_gate": (
         "the Markdown extension gate must actually match .md/.markdown",
         [(r'RX_MD_PATH = re.compile(r"\.(?:md|markdown)$", re.I)',
           r'RX_MD_PATH = re.compile(r"UNMATCHABLE_EXTENSION_PATTERN$", re.I)')],
-        {"W1", "W2", "W3", "W4", "W5"},
+        {"W1", "W2", "W3", "W4", "W5", "W6", "W7"},
     ),
     "M3_classify_call_dropped": (
         "violation detection must actually classify prose lines",
         [("        kind = checker.classify_line(content, clause_breaks, clause_min_length)\n        if kind is None:\n            continue",
           "        kind = None\n        if kind is None:\n            continue")],
-        {"W1", "W2", "W3", "W4", "W5"},
+        {"W1", "W2", "W3", "W4", "W5", "W6", "W7"},
     ),
     # The three above only pin the WARN cases. These pin silent ones, so a
     # regression that widens the hook is caught too (ai-config#3690 review).
@@ -261,11 +333,29 @@ MUTATIONS = {
           'RX_EXCLUDED_PATH = re.compile(r"UNMATCHABLE_EXCLUDED_PATH")')],
         {"S3"},
     ),
+    "M6_replace_all_ignored": (
+        "replace_all must splice at every occurrence, not just the first",
+        [('        if not tool_input.get("replace_all"):\n            break',
+          '        if True:\n            break')],
+        {"W6"},
+    ),
+    "M7_window_lower_bound": (
+        "the edit window's lower bound must include its own first line",
+        [("        if not any(lo <= line_no <= hi for lo, hi in ranges):",
+          "        if not any(lo < line_no <= hi for lo, hi in ranges):")],
+        {"W6", "W7"},
+    ),
+    "M8_window_upper_bound": (
+        "the edit window's upper bound must include its own last line",
+        [("        if not any(lo <= line_no <= hi for lo, hi in ranges):",
+          "        if not any(lo <= line_no < hi for lo, hi in ranges):")],
+        {"W6", "W7"},
+    ),
     "M5_splice_dropped": (
         "an Edit must be classified with its new_string spliced into the file",
         [("    old = tool_input.get(\"old_string\") or tool_input.get(\"TargetContent\")\n    if not isinstance(old, str) or not old:",
           "    old = None\n    if not isinstance(old, str) or not old:")],
-        {"W5", "S8", "S9"},
+        {"W5", "S8", "S9", "S11"},
     ),
 }
 

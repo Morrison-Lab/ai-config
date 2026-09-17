@@ -60,9 +60,10 @@ one keystroke from being fixed -- so nothing here should stop the edit.
       `scripts/check-new-line-breaks.py`)
   M4  the file as the edit would leave it (the `Write`'s full `content`,
       or the target file with the `Edit`'s `new_string` spliced in over
-      its `old_string`) contains, WITHIN the lines the edit itself
-      occupies, at least one prose line classified as a violation by that
-      checker's own `classify_line`
+      its `old_string`, at every occurrence when `replace_all` is set)
+      contains, WITHIN the lines the edit itself occupies, at least one
+      prose line classified as a violation by that checker's own
+      `classify_line`
 
 Fails OPEN on any parse trouble, non-git directory, missing checker,
 checker import error, or an `Edit` whose `old_string` cannot be located in
@@ -160,7 +161,7 @@ def _in_scope_path(path: str) -> bool:
 
 
 def splice_edit(tool_input: dict, target: str, content: str):
-    """Return (whole_text, lo, hi) -- the file as the edit would leave it.
+    """Return (whole_text, ranges) -- the file as the edit would leave it.
 
     `checker.prose_line_numbers` is a WHOLE-FILE state machine: it tracks
     frontmatter, fenced code and HTML comments from line 1. Handing it an
@@ -172,44 +173,77 @@ def splice_edit(tool_input: dict, target: str, content: str):
     replacement into the file on disk and classify that, reporting only
     the lines the edit itself occupies (`lo`..`hi`, 1-based, file-relative).
 
+    `ranges` is a list of 1-based inclusive `(lo, hi)` line spans, one per
+    substitution, because `replace_all` makes several. Taking only the first
+    occurrence there would inspect one region and miss every violation the
+    edit introduces at the others -- and a bulk find-and-replace is exactly
+    the edit most likely to introduce a style violation at scale
+    (ai-config#3690 review).
+
     A `Write` (or any whole-file replacement) needs no splice: its content
     IS the file. Returns None when the edit cannot be located on disk, so
     the caller stays silent rather than classifying a fragment blind.
     """
     old = tool_input.get("old_string") or tool_input.get("TargetContent")
     if not isinstance(old, str) or not old:
-        return content, 1, content.count("\n") + 1
+        return content, [(1, content.count("\n") + 1)]
     try:
         with open(target, encoding="utf-8") as handle:
             existing = handle.read()
     except Exception:
         return None
-    index = existing.find(old)
-    if index < 0:
+
+    indices = []
+    start = 0
+    while True:
+        index = existing.find(old, start)
+        if index < 0:
+            break
+        indices.append(index)
+        if not tool_input.get("replace_all"):
+            break
+        start = index + len(old)
+    if not indices:
         return None
-    lo = existing.count("\n", 0, index) + 1
-    spliced = existing[:index] + content + existing[index + len(old):]
-    return spliced, lo, lo + content.count("\n")
+
+    parts = []
+    ranges = []
+    previous = 0
+    line_no = 1
+    for index in indices:
+        gap = existing[previous:index]
+        parts.append(gap)
+        line_no += gap.count("\n")
+        lo = line_no
+        parts.append(content)
+        line_no += content.count("\n")
+        ranges.append((lo, line_no))
+        previous = index + len(old)
+    parts.append(existing[previous:])
+    return "".join(parts), ranges
 
 
 def find_violations_in_text(
-    checker, text: str, lo: int = 1, hi: int | None = None
+    checker, text: str, ranges: list[tuple[int, int]] | None = None
 ) -> list[dict[str, str | int]]:
-    """Classify prose lines `lo`..`hi` of `text` with `checker`'s own rules.
+    """Classify the prose lines of `text` inside `ranges`, per `checker`.
 
     Line numbers are relative to `text`, which `splice_edit` makes the
     whole file rather than the edit fragment, so they address the file the
-    edit is about to produce.
+    edit is about to produce. `ranges` are the spans the edit itself
+    occupies; None means every line.
     """
     lines = text.split("\n")
-    if hi is None:
-        hi = len(lines)
+    if ranges is None:
+        ranges = [(1, len(lines))]
     prose = checker.prose_line_numbers(text)
     clause_breaks = getattr(checker, "_DEFAULT_CLAUSE_BREAKS", True)
     clause_min_length = getattr(checker, "_DEFAULT_CLAUSE_MIN_LENGTH", 80)
     violations = []
     for line_no in sorted(prose):
-        if line_no < max(1, lo) or line_no > min(len(lines), hi):
+        if line_no < 1 or line_no > len(lines):
+            continue
+        if not any(lo <= line_no <= hi for lo, hi in ranges):
             continue
         raw = lines[line_no - 1]
         content = checker.line_content(raw)
@@ -299,10 +333,10 @@ def evaluate(tool_name: str, tool_input: dict) -> tuple[str, str] | None:
     spliced = splice_edit(tool_input, target, content)
     if spliced is None:
         return None
-    text, lo, hi = spliced
+    text, ranges = spliced
 
     try:
-        violations = find_violations_in_text(checker, text, lo, hi)
+        violations = find_violations_in_text(checker, text, ranges)
     except Exception:
         return None
     if not violations:

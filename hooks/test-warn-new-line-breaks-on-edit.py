@@ -4,8 +4,10 @@
 Tests that a `Write`/`Edit` about to place Markdown content on disk with a
 new-line-breaks violation (a multi-sentence or unseparated-clause line)
 surfaces a PreToolUse warning before the tool runs, while clean content,
-non-Markdown targets, scratch paths, non-Write/Edit tools, and repos without
-the vendored checker stay silent.
+non-Markdown targets, never-authored directories, non-Write/Edit tools, and
+repos without the vendored checker stay silent. An `Edit` is classified with
+its `new_string` spliced into the target file, so the suite also pins the
+block-context cases that a fragment read in isolation gets backwards.
 
 Run: python3 hooks/test-warn-new-line-breaks-on-edit.py hooks/warn-new-line-breaks-on-edit.py
 """
@@ -27,13 +29,15 @@ BAD_CONTENT = "# Bad doc\n\nFirst sentence. Second sentence on the same line.\n"
 CLEAN_CONTENT = "# Clean doc\n\nFirst sentence.\nSecond sentence on a new line.\n"
 
 
-# The hook under test treats any path with a `tmp` segment as scratch and
-# skips it. `tempfile.mkdtemp()` returns a path under `/tmp` on Linux (and
-# under `/var/folders/...` on macOS), so fixtures placed there are scratch
-# on CI and in scope locally -- the suite scored 14/14 on macOS and 11/14
-# on Linux from the same commit, with every SHOULD_WARN case short-circuiting
-# before it reached the checker. Root the fixtures somewhere with no
-# excluded segment instead, so the suite measures the same thing everywhere.
+# The hook no longer excludes a `tmp`/`scratchpad` segment by name, but it
+# does exclude `node_modules`/`.git`, and an earlier revision excluded `tmp`
+# too. `tempfile.mkdtemp()` returns a path under `/tmp` on Linux (and under
+# `/var/folders/...` on macOS), so fixtures placed there were scratch on CI
+# and in scope locally -- the suite scored 14/14 on macOS and 11/14 on Linux
+# from the same commit, with every SHOULD_WARN case short-circuiting before
+# it reached the checker. Root the fixtures somewhere with no excluded
+# segment regardless, so the suite measures the same thing everywhere and
+# stays correct if the excluded set grows again.
 FIXTURE_ROOT = tempfile.mkdtemp(prefix="nlb-edit-fixtures-", dir=os.path.expanduser("~"))
 atexit.register(shutil.rmtree, FIXTURE_ROOT, ignore_errors=True)
 
@@ -48,6 +52,7 @@ def make_repo(with_checker=True) -> str:
         shutil.copy(REAL_CHECKER, os.path.join(vendor_dir, "gha-check-new-line-breaks.py"))
     os.makedirs(os.path.join(d, "docs"), exist_ok=True)
     os.makedirs(os.path.join(d, "tmp"), exist_ok=True)
+    os.makedirs(os.path.join(d, "node_modules"), exist_ok=True)
     return d
 
 
@@ -63,11 +68,11 @@ _spec = importlib.util.spec_from_file_location("_nlb_edit_hook_under_test", HOOK
 _HOOK_MOD = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_HOOK_MOD)
 
-if _HOOK_MOD.RX_SCRATCH_PATH.search(os.path.join(REPO_WITH_CHECKER, "docs", "x.md")):
+if _HOOK_MOD.RX_EXCLUDED_PATH.search(os.path.join(REPO_WITH_CHECKER, "docs", "x.md")):
     raise SystemExit(
-        "fixture root is scratch-excluded by the hook under test "
+        "fixture root is path-excluded by the hook under test "
         f"({REPO_WITH_CHECKER}); the suite would pass without exercising "
-        "anything. Re-root FIXTURE_ROOT away from tmp/scratchpad/node_modules."
+        "anything. Re-root FIXTURE_ROOT away from node_modules/.git."
     )
 
 
@@ -98,20 +103,58 @@ def write_payload(path, content):
     return {"tool_name": "Write", "tool_input": {"file_path": path, "content": content}}
 
 
-def edit_payload(path, new_string):
+def seed(path, body):
+    """Write `body` to `path` so an Edit has something to splice into."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(body)
+    return path
+
+
+def edit_payload(path, new_string, old_string="REPLACE_ME"):
     return {
         "tool_name": "Edit",
-        "tool_input": {"file_path": path, "old_string": "old", "new_string": new_string},
+        "tool_input": {
+            "file_path": path,
+            "old_string": old_string,
+            "new_string": new_string,
+        },
     }
+
+
+# Block-context fixtures. The hook splices `new_string` over `old_string` in
+# the file and classifies the RESULT, so each of these pins a case that
+# classifying the fragment alone gets backwards (ai-config#3690 review).
+FENCED_DOC = seed(
+    os.path.join(REPO_WITH_CHECKER, "docs", "fenced.md"),
+    "# Fenced doc\n\n```sh\necho one\nREPLACE_ME\n```\n\nTrailing prose.\n",
+)
+PROSE_DOC = seed(
+    os.path.join(REPO_WITH_CHECKER, "docs", "prose.md"),
+    "# Prose doc\n\nOpening line.\nREPLACE_ME\nClosing line.\n",
+)
+EDIT_DOC = seed(
+    os.path.join(REPO_WITH_CHECKER, "docs", "bad.md"),
+    "# Bad doc\n\nREPLACE_ME\n",
+)
 
 
 SHOULD_WARN = [
     ("W1", write_payload(os.path.join(REPO_WITH_CHECKER, "docs", "bad.md"), BAD_CONTENT),
      REPO_WITH_CHECKER, "Write with a multi-sentence line warns"),
-    ("W2", edit_payload(os.path.join(REPO_WITH_CHECKER, "docs", "bad.md"), BAD_CONTENT),
+    ("W2", edit_payload(EDIT_DOC, BAD_CONTENT),
      REPO_WITH_CHECKER, "Edit's new_string with a multi-sentence line warns"),
     ("W3", write_payload(os.path.join(REPO_WITH_CHECKER, "docs", "BAD.MARKDOWN"), BAD_CONTENT),
      REPO_WITH_CHECKER, ".MARKDOWN extension (case-insensitive) warns"),
+    # A worktree under a session scratchpad is a full checkout; excluding a
+    # `tmp`/`scratchpad` segment by name silenced the hook on it while the
+    # push-time sibling still warned on the identical content.
+    ("W4", write_payload(os.path.join(REPO_WITH_CHECKER, "tmp", "bad.md"), BAD_CONTENT),
+     REPO_WITH_CHECKER, "a tmp/ path inside a checker-vendoring repo warns"),
+    # Fragment-only classification read the leading fence as OPENING a code
+    # block and skipped every line after it.
+    ("W5", edit_payload(FENCED_DOC, "```\n\nFirst sentence. Second sentence on the same line.\n"),
+     REPO_WITH_CHECKER, "new_string closing a fence then writing prose warns"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -119,8 +162,8 @@ SHOULD_STAY_SILENT = [
      REPO_WITH_CHECKER, "clean content stays silent"),
     ("S2", write_payload(os.path.join(REPO_WITH_CHECKER, "docs", "bad.py"), BAD_CONTENT),
      REPO_WITH_CHECKER, "non-Markdown extension stays silent"),
-    ("S3", write_payload(os.path.join(REPO_WITH_CHECKER, "tmp", "bad.md"), BAD_CONTENT),
-     REPO_WITH_CHECKER, "scratch (tmp/) path stays silent"),
+    ("S3", write_payload(os.path.join(REPO_WITH_CHECKER, "node_modules", "bad.md"), BAD_CONTENT),
+     REPO_WITH_CHECKER, "node_modules/ path stays silent"),
     ("S4", write_payload(os.path.join(REPO_NO_CHECKER, "docs", "bad.md"), BAD_CONTENT),
      REPO_NO_CHECKER, "repo without vendored checker stays silent"),
     ("S5", {"tool_name": "Read", "tool_input": {"file_path": os.path.join(REPO_WITH_CHECKER, "docs", "bad.md")}},
@@ -129,6 +172,19 @@ SHOULD_STAY_SILENT = [
      REPO_WITH_CHECKER, "empty content stays silent"),
     ("S7", write_payload("/not/a/git/repo/bad.md", BAD_CONTENT),
      tempfile.gettempdir(), "path outside any git repo stays silent"),
+    # Fragment-only classification read this as prose and warned about a
+    # line CI will never flag, because the enclosing fence is in the file.
+    ("S8", edit_payload(FENCED_DOC, "echo hello. echo goodbye on the same line and this is long."),
+     REPO_WITH_CHECKER, "new_string inside an existing fence stays silent"),
+    # No splice is possible, so classify nothing rather than guess.
+    ("S9", edit_payload(PROSE_DOC, BAD_CONTENT, old_string="NOT_IN_THE_FILE"),
+     REPO_WITH_CHECKER, "Edit whose old_string is absent stays silent"),
+    # The violation is already on disk, outside the edited region.
+    ("S10", edit_payload(
+        seed(os.path.join(REPO_WITH_CHECKER, "docs", "preexisting.md"),
+             "# Doc\n\nOld line one. Old line two on the same line.\nREPLACE_ME\n"),
+        "A single clean sentence."),
+     REPO_WITH_CHECKER, "a pre-existing violation outside the edit stays silent"),
 ]
 
 NON_COMMAND_PAYLOADS = [
@@ -183,19 +239,33 @@ MUTATIONS = {
         "WRITE_TOOL_NAMES must include Write/Edit",
         [('WRITE_TOOL_NAMES = (\n    "Write", "Edit", "write_to_file", "replace_file_content", "apply_diff",\n)',
           'WRITE_TOOL_NAMES = ()')],
-        {"W1", "W2", "W3"},
+        {"W1", "W2", "W3", "W4", "W5"},
     ),
     "M2_md_extension_gate": (
         "the Markdown extension gate must actually match .md/.markdown",
         [(r'RX_MD_PATH = re.compile(r"\.(?:md|markdown)$", re.I)',
           r'RX_MD_PATH = re.compile(r"UNMATCHABLE_EXTENSION_PATTERN$", re.I)')],
-        {"W1", "W2", "W3"},
+        {"W1", "W2", "W3", "W4", "W5"},
     ),
     "M3_classify_call_dropped": (
         "violation detection must actually classify prose lines",
         [("        kind = checker.classify_line(content, clause_breaks, clause_min_length)\n        if kind is None:\n            continue",
           "        kind = None\n        if kind is None:\n            continue")],
-        {"W1", "W2", "W3"},
+        {"W1", "W2", "W3", "W4", "W5"},
+    ),
+    # The three above only pin the WARN cases. These pin silent ones, so a
+    # regression that widens the hook is caught too (ai-config#3690 review).
+    "M4_excluded_path_gate": (
+        "the never-authored-directory gate must actually exclude node_modules",
+        [('RX_EXCLUDED_PATH = re.compile(\n    r"(?:^|[/\\\\])(?:node_modules|\\.git)(?:[/\\\\]|$)", re.I\n)',
+          'RX_EXCLUDED_PATH = re.compile(r"UNMATCHABLE_EXCLUDED_PATH")')],
+        {"S3"},
+    ),
+    "M5_splice_dropped": (
+        "an Edit must be classified with its new_string spliced into the file",
+        [("    old = tool_input.get(\"old_string\") or tool_input.get(\"TargetContent\")\n    if not isinstance(old, str) or not old:",
+          "    old = None\n    if not isinstance(old, str) or not old:")],
+        {"W5", "S8", "S9"},
     ),
 }
 

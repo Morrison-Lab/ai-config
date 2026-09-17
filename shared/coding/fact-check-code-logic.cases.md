@@ -94,7 +94,10 @@ Twelve cases pin it."
 Reverting the native path's fix does fail twelve cases.
 Reverting the OMO path's identical exclusion left the entire 345-case suite passing, because the one case built to catch this exact bypass constructs nested `message.content` blocks and can never reach the flat-record branch at all.
 The independent confirmation of that came with a lesson of its own, recorded here because it is the same error one level up.
-The first attempt ran the suite against a copy of the hook placed OUTSIDE the checkout, and reported a baseline of "6 pre-existing failures, unchanged by the mutant" --- a plausible-looking number that is an artifact of the copy's location, since this suite resolves paths relative to the hook it is given.
+The first attempt ran the suite against a copy of the hook placed OUTSIDE the checkout, and reported a baseline of "6 pre-existing failures, unchanged by the mutant" --- a plausible-looking number that is an artifact of the copy's location.
+The mechanism: the hook module itself, not the suite, resolves its sibling loader (`no-unreviewed-pr.py`) from `os.path.dirname(os.path.realpath(__file__))` and its `scripts/lib/review_payload.py` import's fallback path from `os.path.dirname(os.path.dirname(os.path.realpath(__file__)))` --- both computed from the hook's own file location at import time.
+A lone copy of the hook, with neither sibling present at those derived paths, imports in degraded mode (each loader's `try`/`except` swallows the failure) rather than the mode the checkout actually runs, so a run against it measures a different program and calls the difference "pre-existing".
+Copying `hooks/` and `scripts/` together, preserving their sibling layout under one parent directory, is the working form.
 Re-run in the checkout, `origin/main`'s hook against `origin/main`'s own test file passes 310 of 310, and the mutant applied in the checkout passes 345 of 345.
 Both runs support the finding;
 only one of them was evidence about the repository.

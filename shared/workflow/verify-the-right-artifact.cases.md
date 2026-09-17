@@ -373,3 +373,23 @@ it merged 2026-09-09.
   it can be exactly wrong about that state while being exactly right about its own trigger.
 - **Don't:** treat a second identical block as evidence the underlying action failed twice;
   check the world (here: did a review land) before repeating the action.
+
+## A structural-ordering fix was verified by rereading the edit, and the edit was a neighbour of the property in question
+
+(Morrison-Lab/ai-config#3707, commit `1cfcd075`, 2026-09-17: a UMS commit (`d256d23`) added a new `**Do:**` bullet to [`dead-code-is-tech-debt.md`](../principles/dead-code-is-tech-debt.md)'s Do/Don't list, landing it right after the list's first `**Don't:**` bullet and before its second --- between two `Don't`s, which the file's own convention says should not happen.
+That convention was asserted by the review as holding across every list in the corpus, and asserting it is the same move the case is about, so it was derived instead: 18 of 1218 Do/Don't blocks across 712 markdown files interleave, measured 2026-09-17.
+Near-universal rather than universal, which is enough to make the placement a defect and not enough to support the sentence the review used to argue it.
+The 18, and the absence of any instrument for the convention, are tracked as [ai-config#3751](https://github.com/Morrison-Lab/ai-config/issues/3751).
+The next review round found it, and the fixing commit's own message describes the placement as anchored "on the second `Don't` rather than the first," which is a precise diagnosis of what a rereading of the inserted lines would confirm: the new bullet no longer sits directly beside the specific `Don't` a reader's eye lands on first, so a check that looks at the touched lines finds nothing wrong there.
+The list was still wrong --- a `Do` bullet still sat between two `Don't` bullets --- because the property the finding names is about the **whole list's order**, not about the inserted bullet's distance from any one neighbour.
+
+The edit is a neighbour of the target, in [`verify-the-right-artifact`](verify-the-right-artifact.md#the-four-shapes)'s sense: the claim under test is a property of the **whole rendered list** (every `Do` precedes every `Don't`), and the artifact that was actually read was **the lines just touched**, which can look locally fixed while the population-level property they belong to stays false.
+Rereading the edit cannot show the claim is false, because the edit is exactly what the person doing the rereading already believes is correct --- the same blindness [`metacognitive-monitoring`](metacognitive-monitoring.md) names for a self-authored claim, applied here to a structural rather than a factual one.
+The check that can show it false costs one command: list the bullets in file order and confirm no `Do` follows any `Don't`, or grep for the pattern directly.
+The round-4 fix ran it: moving the bullet before all `Don't` bullets, verified by listing the section's bullets in order, which is what closed it.)
+
+- **Do:** for a fix to a structural property of a list or document --- ordering, grouping, uniqueness, a count --- re-derive that property over the whole artifact after editing (list the items, count them, grep the invariant), never confirm it by rereading the lines you just changed.
+- **Do:** treat "the diff moved in the direction the finding named" as distinct from "the property the finding named now holds" --- the first is visible in the diff, the second is a fact about the rendered whole.
+- **Don't:** anchor a structural fix on the nearest instance the finding quoted;
+  the invariant is over the whole list, not over that instance's immediate neighbours.
+- **Don't:** treat a second read of your own edit as a check --- it inherits every assumption the edit was written under, which is exactly what a structural-property check needs to be independent of.

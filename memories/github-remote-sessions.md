@@ -152,7 +152,9 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   `check-pr-fully-clean.py --from-json` then exits 2 with "payload has no 'review_threads' key".
   That is the checker doing its fail-fast job correctly, not a bug in it.
   The gap is upstream, in the builder, and it is tracked as [ai-config#3653](https://github.com/Morrison-Lab/ai-config/issues/3653) (open as of 2026-09-17), which carries the full diagnosis and states why its filer did not open the fix PR: patching the merge gate's own input builder to unblock your own merge is a conflict of interest.
-  - **Do:** fetch `GET /repos/{owner}/{repo}/pulls/{n}/ccr/review_threads` yourself (Bearer `$GITHUB_TOKEN` or `$GH_TOKEN`, `Accept: application/vnd.github+json`; returned HTTP 200 in this session) and splice the measured value into the payload the builder produced, before scoring it:
+  - **Do:** fetch `GET /repos/{owner}/{repo}/pulls/{n}/ccr/review_threads` yourself and splice the measured value into the payload the builder produced, before scoring it.
+    Bearer `$GITHUB_TOKEN` or `$GH_TOKEN`, with `Accept: application/vnd.github+json`;
+    it returned HTTP 200 in this session.
     ```python
     payload["review_threads"] = threads   # a plain list is accepted
     ```

@@ -76,16 +76,6 @@ Recognizable in advance, which is the point of enumerating them:
   A directory that happens to contain the files you expected
   is not thereby the path they are read from.
   It can coincide today and diverge tomorrow.
-- **A different endpoint for the same-sounding metric.**
-  Two APIs can describe overlapping but distinct populations under names
-  that read as synonyms --- GitHub's `pages/builds` and its
-  `deployments?environment=github-pages` each answer "how many times has
-  this site deployed," and do not count the same events.
-  Re-measuring a prior claim through the *other* endpoint and getting a
-  different number is evidence the two endpoints disagree, not evidence the
-  original figure decayed.
-  Use the endpoint the original measurement named; when checking someone
-  else's number, use theirs before concluding drift.
 
 **A document that delegates carries claims about its delegate, and those are
 the ones nobody checks.**
@@ -213,6 +203,25 @@ When a brief, an issue body, or a review finding asserts what a repository says,
 - **Don't:** read plausibility as freshness --- a feature branch forked from a `main` you already read returns exactly what you expect.
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale branch read that produced two issues and a config edit".
+
+## A different endpoint is another shape, and the two names read as synonyms
+
+Two APIs can describe overlapping but distinct populations under names that read as synonyms.
+GitHub's `pages/builds` and its `deployments?environment=github-pages` each answer "how many times has this site deployed," and they do not count the same events.
+
+What distinguishes it is not that the substitution is silent --- [`A working-directory checkout is another shape, and it stays silent`](#a-working-directory-checkout-is-another-shape-and-it-stays-silent) says the same of a stale read, and says it first.
+It is that there is no authoritative store to go to.
+Every other shape's remedy presumes one of the two artifacts is the right one, so suspecting the substitution is most of the work of undoing it.
+Here both endpoints are authoritative, each for its own population, and neither is the correct one in the abstract --- only the endpoint the original measurement used is comparable to the original measurement.
+So the usual move, go and check against the real thing, does not terminate: whichever endpoint you reach for is a real thing.
+
+Re-measuring a prior claim through the *other* endpoint and getting a different number is therefore evidence that the two endpoints disagree, not evidence that the original figure decayed.
+A drift claim needs both readings taken the same way, which is [`A drift claim is relational, so one read cannot settle it`](#a-drift-claim-is-relational-so-one-read-cannot-settle-it)'s requirement arriving through a second route.
+
+- **Do:** use the endpoint the original measurement named, and say which one it was.
+- **Do:** use the other party's endpoint when checking someone else's number, before concluding drift.
+- **Don't:** read a different number from a different endpoint as decay.
+- **Don't:** treat two API paths as interchangeable because their names describe the same thing in English.
 
 ## A mechanism's prose is not the mechanism's definition
 

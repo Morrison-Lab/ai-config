@@ -382,6 +382,31 @@ The mechanism now exists as `check_executable_bits` in
 `shared/principles/fail-fast.md`'s aggregate-count entry for how that check
 itself needed two more rounds to land soundly.)
 
+## 5.8 A splice that locates only the first occurrence silently under-inspects a `replace_all` edit
+
+`hooks/warn-new-line-breaks-on-edit.py` classifies an `Edit` by splicing its `new_string` over `old_string` into the file on disk, then running the checker on the spliced result.
+Its `splice_edit` located the match with `existing.find(old)` and stopped there, never reading `tool_input.get("replace_all")`.
+A single-occurrence edit is inspected correctly.
+A bulk find-and-replace is inspected at exactly one of its occurrences and silently misses every violation the edit introduces at the others --- and a bulk substitution is the edit most likely to introduce a style violation at scale, since the same inserted text lands repeatedly with no per-site review.
+
+The docstring said the function returns "the file as the edit would leave it," which was true for the input every hand-written test fixture used (a single occurrence) and false for the input `replace_all` names.
+This is the code-correctness form of [`ardi`](../shared/workflow/ardi.md)'s "Attempting the base form of a command is not attempting its variants": the base case was verified, the flagged variant was not, and the claim in the docstring does not scope itself to the case it actually covers.
+The discriminating test case is non-obvious for the same reason a mutation can survive by masking (see `shared/workflow/algorithmatize-checks.md`'s "A surviving mutation is a question before it is a coverage gap"): the same substituted text is inserted at every occurrence, so it looks like it must violate at all of them or none, and a fixture built that way can never separate "checks every occurrence" from "checks the first one."
+It discriminates only when the *context* differs across occurrences --- one inside a fenced code block, one in prose --- which generalizes to any check whose verdict depends on surrounding context rather than on the inserted text alone.
+
+A second, distinct finding from the same review round belongs beside it rather than folded in: no fixture placed a violation exactly on the edit window's boundary, so off-by-one mutants at either edge of the `(lo, hi)` range survived the whole suite (19 assertions, 5 declared mutations) with nothing to show for it.
+A one-line `new_string` that lands on both boundaries at once kills both mutants with one case, which is what closed it (24 assertions, 8 mutations).
+This is not the masking mechanism the "surviving mutation" section above covers --- nothing hides the boundary mutant's effect --- it is a plainer gap: the boundary is a distinguished value of the input space, and a fixture assembled from typical inputs never happens to land on it.
+
+- **Do:** when a splice, scan, or match locates one occurrence via `find`/`search`, check whether the tool schema carries a "do this everywhere" flag (`replace_all`, `global`, `all`) before trusting the single-match result covers the call.
+- **Do:** for a check whose match spans a numeric window, add at least one fixture whose interesting condition sits exactly on the window's boundary, not only strictly inside it.
+- **Don't:** read a docstring's "the file/result as the edit would leave it" as verified for every flag the tool accepts, when every fixture backing it used the same flag value.
+- **Don't:** treat a same-inserted-text-everywhere fixture as covering a `replace_all` path --- it cannot distinguish "checked once" from "checked at every site" unless the surrounding context differs per occurrence.
+
+(Morrison-Lab/ai-config#3690, review round 3, 2026-09-17, fixed in `01b8b07b5b`.
+Three findings on `splice_edit`; the two above are recorded here.
+The third, a fixture repo missing a vendored `scripts/semantic-line-breaks.py` that let every warning take an unguarded branch, is a fixture-completeness instance already covered by [`fixtures-are-not-evidence`](../shared/workflow/fixtures-are-not-evidence.md) rather than restated here.)
+
 ## 6. A guard that keeps firing after you satisfied it: stop, and read the copy that runs
 
 [`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md) already carries this defect in full --- the fail-open direction of a dated constant, why the newest cache directory is not a valid proxy for the loaded copy, and the `ps -eo args` capture that resolved it.

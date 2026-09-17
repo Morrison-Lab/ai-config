@@ -18,8 +18,10 @@ verdict is admitted from the `tool_result` of a subagent-dispatch call whose
 named persona IS the reviewer, and only when that result is not an error.
 Which tool names count as a dispatch is `AGENT_TOOLS` MINUS `TASK_OUTPUT_TOOLS`,
 spanning harnesses -- Claude's `Agent`/`Task` and Codex's `spawn_agent` among
-them. The subtracted names retrieve a dispatch's output instead of making one,
-so they reach a task-id gate rather than a persona check; see `TASK_OUTPUT_TOOLS`. A review that
+them. The subtracted names retrieve a dispatch's output instead of making one.
+On the native path they reach a task-id gate rather than a persona check; on the
+flat OMO records there is no such gate to reach, since nothing on that path
+records task ids, so they reach nothing. See `TASK_OUTPUT_TOOLS`. A review that
 never happened must block a push; a harness whose dispatch records this guard
 cannot read must be taught to it, not left to present as the first. The two are
 indistinguishable from inside this function, which is why the remedy is the
@@ -1497,17 +1499,30 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
 def _agent_subtypes(inp: dict) -> list[str]:
     """Subagent names an Agent/Task dispatch names, from any observed key."""
     sub_types: list[str] = []
-    # `agent` and `persona` are here because `_is_reviewer_record` below already
-    # treats them as persona-naming keys, and two predicates in one file
+    # `agent`, `persona` and `role` are here because `_is_reviewer_record` below
+    # already treats them as persona-naming keys, and two predicates in one file
     # disagreeing about what names a persona is how a dispatch gets seen by one
     # and not the other. Widening the TOOL set without widening this one left
     # exactly that hole: a `spawn_agent` record keyed on `agent` reproduced
     # ai-config#3707's denial verbatim after the tool name was recognized.
+    #
+    # Parity is with the persona KEYS, not with that function's key list, and
+    # the difference is deliberate. `_is_reviewer_record` also reads
+    # `attributionAgent`, which this must not: that one names who AUTHORED a
+    # transcript record, while this reads a tool's INPUT. Copying it across
+    # would be structural fit standing in for a transferred purpose
+    # (`check-purpose-before-reusing`). `role` does transfer -- `Role` is
+    # already read here and the two are one key in different casings -- and it
+    # is safe on its own terms besides: a message's `role` value can only be
+    # `user`, `assistant` and the like, which is why `_is_reviewer_record`
+    # filters them and this does not have to. Neither name regex matches any of
+    # them.
+    #
     # Nothing downstream is relaxed -- every name found here is still matched
     # against ADVERSARIAL_AGENT_NAME, or FALLBACK_AGENT_NAME plus a review
     # prompt.
     for k in ("subagent_type", "subagentType", "agent_type", "TypeName",
-              "name", "Role", "agent", "persona"):
+              "name", "Role", "role", "agent", "persona"):
         if inp.get(k):
             sub_types.append(str(inp.get(k)))
     if isinstance(inp.get("Subagents"), list):

@@ -2471,8 +2471,16 @@ def codex_cases() -> tuple[int, int]:
     #
     #     OMO never populates `reviewer_task_ids` -- its result handler reads
     #     no task ids -- so the exclusion is absolute there rather than a
-    #     reordering. That costs no real capability: a genuine OMO
-    #     dispatch-then-retrieve returns no verdict on origin/main either.
+    #     reordering. A genuine OMO dispatch-then-retrieve costs nothing by it:
+    #     that shape returns no verdict on origin/main either.
+    #
+    #     One shape DOES lose authorization, and saying only the sentence above
+    #     hid it: a SINGLE flat OMO record under one of these names, dispatching
+    #     the reviewer and carrying the report in its own paired result, is
+    #     admitted on origin/main and denied here. Case 18 pins it. It is the
+    #     OMO twin of case 15's native `manage_task` dispatch and is tracked by
+    #     the same issue, ai-config#3746 -- the retrieval classification is what
+    #     decides both, so measuring it settles both.
     for key in ("persona", "agent", "name", "subagentType"):
         for out_tool in ("taskoutput", "task_output", "manage_task"):
             rc, out = run_hook(PUSH, [
@@ -2534,6 +2542,50 @@ def codex_cases() -> tuple[int, int]:
     ])
     check("`manage_task` used as a dispatcher does not authorize (unmeasured, ai-config#3746)",
           rc == 0 and blocked)
+
+    # 16. A dispatch keyed on `role` authorizes. `Role` was already read here
+    #     and the two are one key in different casings, so reading one and not
+    #     the other is the same split-predicate defect the widening above was
+    #     for -- just inside this function rather than between two of them.
+    for tool in ("Agent", "spawn_agent"):
+        rc, blocked, _ = push(reviewed(tool=tool, key="role"))
+        check(f"a `{tool}` dispatch keyed on `role` authorizes", rc == 0 and not blocked)
+
+    # 17. A dispatch keyed on `attributionAgent` does NOT authorize, and that is
+    #     deliberate rather than an oversight. `_is_reviewer_record` reads that
+    #     key because it names who AUTHORED a transcript record; this function
+    #     reads a tool's INPUT, where the key means nothing. Pinned so that
+    #     "make the two predicates agree" cannot later be applied to it by
+    #     symmetry -- which is structural fit standing in for a transferred
+    #     purpose (`check-purpose-before-reusing`).
+    for tool in ("Agent", "spawn_agent"):
+        rc, blocked, _ = push(reviewed(tool=tool, key="attributionAgent"))
+        check(f"a `{tool}` dispatch keyed only on `attributionAgent` does not authorize",
+              rc == 0 and blocked)
+
+    # 18. The capability the OMO exclusion actually costs, pinned rather than
+    #     described. A single flat record under a retrieval tool name, which
+    #     dispatches the reviewer and carries the report in its own result, is
+    #     admitted on origin/main and denied here. Distinct from case 13, where
+    #     the persona label is a lie told over an unrelated agent's output; here
+    #     the dispatch is genuine and only the TOOL NAME is one this guard has
+    #     classified as retrieval. Denying it is the fail-closed direction of an
+    #     unmeasured classification (ai-config#3746), so this case exists to
+    #     make that cost visible, not to argue it is correct.
+    for out_tool in ("taskoutput", "task_output", "manage_task"):
+        rc, out = run_hook(PUSH, [
+            {"type": "tool_use", "timestamp": "2026-09-17T00:00:00Z",
+             "tool_name": out_tool,
+             "tool_input": {"subagentType": "adversarial-reviewer",
+                            "description": "review",
+                            "prompt": "Review the diff"}},
+            {"type": "tool_result", "timestamp": "2026-09-17T00:00:01Z",
+             "tool_name": out_tool, "tool_input": {},
+             "tool_output": body(commit=HEAD)},
+        ])
+        nested = out.get("hookSpecificOutput") or {}
+        check(f"OMO `{out_tool}` dispatching the reviewer does not authorize (ai-config#3746)",
+              rc == 0 and nested.get("permissionDecision") == "deny")
 
     return failures, ran
 

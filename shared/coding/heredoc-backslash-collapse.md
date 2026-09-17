@@ -142,7 +142,7 @@ it is equally the check for a literal you believe is correct.
 - **Don't:** double escapes as compensation --- that is not the remedy above,
   and it is wrong wherever the hazard is absent.
 - **Don't:** read this file's argument as making the doubled form the safe default;
-  it is the failing form in both directions, which is why the hook flags it regardless of transport. (One bounded exception: a heredoc writing SOURCE CODE on a non-collapsing transport, where the doubled form is arithmetic rather than error --- see the two-parse-layer section below, which bounds this claim rather than contradicting it.)
+  it is the failing form in both directions, which is why the hook flags it regardless of transport. (One bounded exception, stated here rather than pointed at: a heredoc writing SOURCE CODE puts two parsers between the keyboard and the behaviour rather than one, so on a non-collapsing transport the doubled form is what the second parser needs and is arithmetic rather than error.)
 
 `hooks/warn-heredoc-doubled-backslash.py` needs nothing for this direction: it says the transport *can* collapse and prescribes building the character, both direction-neutral.
 It fires on the doubled form either way, which is the right behaviour here --- the doubled form is what is wrong, not the collapse.
@@ -155,11 +155,11 @@ A generator adds a second: the heredoc feeds Python, and the string Python write
 On a transport that does not collapse, `"\\n"` in the generator is then exactly right: it puts `\n` in the generated file, which that file parses as a newline.
 Neither the collapse rule nor its inverse applies there, and both of them read as though they do.
 
-**On a collapsing transport the doubled form fails exactly as the sections above say, and the number that replaces it is derived rather than measured.**
+**On a collapsing transport the doubled form fails exactly as the sections above say, and this file deliberately does not say what number replaces it.**
 The first layer eats one before Python ever sees it, so `"\\n"` hands the generator a real newline and the generated file gets a literal line break inside a string literal.
 How many to type instead follows from what the transport does to a run, which this file has measured only at length two (`\\` arrives as `\`) and length one (`\` survives).
-Both readings of the longer runs put `\\n` in front of the generator, so either three or four works and neither is attested;
-the count is stated here as an inference so that nobody reads it as one of this file's measurements.
+What that does to a run of three or four is not derivable from those two, and this container does not collapse, so it cannot be measured from here either.
+So none is given: `chr(92)` is correct whatever the transport does to a run, which is the whole reason the arithmetic never had to be settled, and a number asserted here would be exactly the reasoning-instead-of-measuring this section exists to warn about.
 That literal line break is the 2026-09-08 recurrence recorded above, which was a generator case: a Python-heredoc edit writing `"\\n"` into a test fixture produced literal newlines and a `SyntaxError` that reached a PR.
 So layer counting says how many doublings the *parsers* need, and the transport says how many survive --- and `chr(92)` is correct on both, which is why it stays the prescription rather than any arithmetic.
 

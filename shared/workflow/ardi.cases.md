@@ -162,6 +162,22 @@ half-truth that made it survive re-reading.
 [`memories/git-worktrees.md`](../../memories/git-worktrees.md) now records the
 working form.)
 
+(Second instance, 2026-09-17, `Morrison-Lab/ai-config`, mirrored rather than
+repeated: `npx --no-install markdownlint-cli2 --version` failed in a remote
+session's container with `npm error npx canceled due to missing packages and
+no YES option`, and a commit message asserted "markdownlint is not
+installable in this container and was not run".
+The untried variant here was not an added flag but a dropped one:
+`npx --yes markdownlint-cli2@0.23.2` installed through the session's agent
+proxy and ran in the same container moments later, reporting 772 files
+linted and 0 issues.
+`--no-install`'s refusal is not incidental the way a single failed version
+query is --- it is the flag's designed behavior whenever the package is not
+already cached, so it reproduces on every retry and reads as confirmation
+rather than as one symptom.
+[`memories/markdownlint.md`](../../memories/markdownlint.md) now records the
+working form.)
+
 ## Name the specific gate, not a category word
 
 (2026-08-01, `Morrison-Lab/ai-config` worked from a `the repository owner`-scoped

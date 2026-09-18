@@ -79,6 +79,16 @@ def setup_fixtures():
     with open(os.path.join(d, "empty.dat"), "wb"):
         pass
     os.mkdir(os.path.join(d, "adir"))
+    # A pre-existing BINARY file used only as a REDIRECTION TARGET -- the
+    # `cat note.txt > redirect-target.bin` case must not fire on it, since
+    # it is being written, not read.
+    with open(os.path.join(d, "redirect-target.bin"), "wb") as fh:
+        fh.write(b"\x00old binary content that must not be reported as read")
+    # A binary file reachable only via a glob pattern, to prove a MATCHED
+    # glob is expanded rather than silently missed like an unmatched one.
+    os.mkdir(os.path.join(d, "globdir"))
+    with open(os.path.join(d, "globdir", "only.weirdext"), "wb") as fh:
+        fh.write(b"\x00glob-matched binary payload")
     return d
 
 
@@ -90,6 +100,20 @@ CWD = setup_fixtures()
 # escape character) would mangle it -- that is a property of testing with an
 # unrealistic input, not a bug in the guard.
 BIN_ABS = os.path.join(CWD, "binary.bin").replace("\\", "/")
+
+# MSYS (`/c/Users/...`) and WSL-mount (`/mnt/c/Users/...`) spellings of the
+# same fixture, built from CWD's own drive letter rather than a fixed "C" so
+# the suite works whatever drive the temp directory actually lands on.
+# Windows-only: on any other OS a leading slash is already the native form,
+# so `/c/...` is simply not this fixture's own binary.bin there, and
+# exercising the translation would test nothing.
+if os.name == "nt":
+    _drive = CWD[0].lower()
+    _rest = CWD[2:].replace("\\", "/")
+    MSYS_BIN_ABS = f"/{_drive}{_rest}/binary.bin"
+    WSL_BIN_ABS = f"/mnt/{_drive}{_rest}/binary.bin"
+else:
+    MSYS_BIN_ABS = WSL_BIN_ABS = None
 
 # (id, command) -- must warn.
 FIRES = [
@@ -107,7 +131,17 @@ FIRES = [
     # (unsupported) flag to it, so the head/tail-only exemption must not
     # apply here.
     ("F11-cat-dash-c-is-not-an-exemption", "cat -c binary.bin"),
+    # Output redirection must not blind the guard to the actual INPUT.
+    ("F12-binary-input-with-redirected-output", "cat binary.bin > /dev/null"),
+    # A binary file reachable only by expanding the glob -- see the
+    # `globdir` fixture. Proves a MATCHED glob is expanded, not silently
+    # missed like an unmatched one.
+    ("F13-matched-glob", "cat globdir/*.weirdext"),
 ]
+
+if os.name == "nt":
+    FIRES.append(("F14-msys-style-absolute-path", f"cat {MSYS_BIN_ABS}"))
+    FIRES.append(("F15-wsl-mount-style-absolute-path", f"cat {WSL_BIN_ABS}"))
 
 # (id, command) -- must stay silent. This list is where the guard earns its
 # keep: every one of these is an ordinary, legitimate command.
@@ -128,6 +162,21 @@ QUIET = [
     ("Q14-no-path-argument", "cat"),
     ("Q15-unrelated-command", "git status --short"),
     ("Q16-unparseable-command", "cat 'unterminated"),
+    # The redirection TARGET is a pre-existing binary file; the command
+    # reads a text file and only WRITES the binary one, so this must stay
+    # silent -- the exact false positive the adversarial review found.
+    ("Q17-redirect-target-not-read", "cat text.txt > redirect-target.bin"),
+    ("Q18-redirect-target-append-not-read", "cat text.txt >> redirect-target.bin"),
+    # `2>` (no space) is indistinguishable, after tokenizing, from the
+    # argument "2" followed by a `>` redirect -- seeing "2" as a path
+    # candidate would misreport a stderr redirect as an offending read.
+    ("Q19-stderr-redirect-fd-not-a-path", "cat text.txt 2> redirect-target.bin"),
+    # Full end-to-end exercise of the device-path guard THROUGH evaluate(),
+    # not just a direct is_binary_file() call -- proves the resolution
+    # pipeline (absolute-path detection, then the device check) actually
+    # reaches it, rather than merely proving the device check is correct in
+    # isolation.
+    ("Q20-dev-null-via-evaluate", "cat /dev/null"),
 ]
 
 
@@ -302,11 +351,31 @@ def unit_checks():
           guard.has_bounded_read("head", ["-c10", "f"]), True)
     check("has_bounded_read: --bytes= form",
           guard.has_bounded_read("tail", ["--bytes=10", "f"]), True)
+    check("has_bounded_read stops at a literal --",
+          guard.has_bounded_read("head", ["--", "-c"]), False)
+    check("_posix_absolute treats a leading slash as absolute on any OS",
+          guard._posix_absolute("/c/Users/x"), True)
+    check("_posix_absolute treats a relative path as not absolute",
+          guard._posix_absolute("relative/x"), False)
+    check("_strip_redirections drops an operator and its target",
+          guard._strip_redirections(["a.txt", ">", "out.bin"]), ["a.txt"])
+    check("_strip_redirections drops a bare fd digit before the operator",
+          guard._strip_redirections(["a.txt", "2", ">", "err.log"]), ["a.txt"])
+    if os.name == "nt":
+        check("_to_native translates an MSYS /c/... path on Windows",
+              guard._to_native("/c/Users/x"), "C:/Users/x")
+        check("_to_native translates a WSL /mnt/c/... path on Windows",
+              guard._to_native("/mnt/c/Users/x"), "C:/Users/x")
+        check("_to_native leaves a non-drive absolute path alone",
+              guard._to_native("/dev/null"), "/dev/null")
+    else:
+        check("_to_native is a no-op off Windows",
+              guard._to_native("/c/Users/x"), "/c/Users/x")
 
     return failures, ran
 
 
-UNIT_CASES = 8
+UNIT_CASES = 16 if os.name == "nt" else 14
 
 
 # ---------------------------------------------------------------------------
@@ -326,21 +395,39 @@ MUTATIONS = [
       '            chunk = fh.read(SNIFF_BYTES)\n'
       '        return True'),
      {"Q1-cat-text-file", "Q13-head-n-on-a-text-file",
-      "Q11-empty-file", "Q12-nul-past-sniff-window"}),
+      "Q11-empty-file", "Q12-nul-past-sniff-window",
+      # These three also read a real (now falsely "binary") text file --
+      # Q17/Q18 read text.txt, Q19 reads text.txt too -- so the NUL-sniff
+      # mutation flips them as a side effect, not because redirection
+      # stripping is what is broken here.
+      "Q17-redirect-target-not-read", "Q18-redirect-target-append-not-read",
+      "Q19-stderr-redirect-fd-not-a-path"}),
 
     ("M2-drop-byte-limit-exemption",
      # `has_bounded_read` now always reports "not bounded", so a `-c`
      # byte-limited head/tail is treated exactly like an unbounded read.
      ('    if cmd_name not in ("head", "tail"):\n'
       '        return False\n'
-      '    for a in args:',
+      '    for a in _strip_redirections(args):',
       '    if cmd_name not in ("head", "tail"):\n'
       '        return False\n'
       '    return False\n'
-      '    for a in args:'),
+      '    for a in _strip_redirections(args):'),
      {"Q3-head-c-space-form", "Q4-head-c-attached-form",
       "Q5-head-bytes-equals-form", "Q6-head-bytes-space-form",
       "Q7-tail-c-space-form"}),
+
+    ("M3-drop-redirection-target-stripping",
+     # `extract_paths` stops removing a redirection target, so the file a
+     # command WRITES to is read back as if it were a candidate for reading.
+     # The direct probe is Q17: `cat text.txt > redirect-target.bin` must
+     # start firing on the (pre-existing, binary) redirection target.
+     ('    for a in _strip_redirections(args):\n'
+      '        if skip_next:',
+      '    for a in args:\n'
+      '        if skip_next:'),
+     {"Q17-redirect-target-not-read", "Q18-redirect-target-append-not-read",
+      "Q19-stderr-redirect-fd-not-a-path"}),
 ]
 
 

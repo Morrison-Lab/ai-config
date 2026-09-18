@@ -35,6 +35,17 @@ only a fast-path shortcut that skips the read for an unambiguous case; it is
 never treated as sufficient on its own, and a file whose extension is not on
 the list is still sniffed.
 
+A path argument is resolved the way the SHELL would resolve it, not the way
+this hook's own host OS would: a leading `/` is absolute regardless of
+platform, a Git-Bash/MSYS (`/c/Users/...`) or WSL-mount (`/mnt/c/Users/...`)
+drive spelling is translated to native form when this hook runs as a native
+Windows Python process (the incident this hook exists to catch used exactly
+that path shape), and a glob (`*.exe`) is expanded against the resolved
+directory -- the shell that would normally do that expansion never actually
+runs the command this hook only reads the text of. A redirection target
+(`cat file > out.bin`) is excluded from the candidate paths; it is being
+written, not read.
+
 ## Why this warns rather than blocks
 
 A hard block on a read tool would be more annoying than the mistake it
@@ -55,13 +66,13 @@ hook's delivery shape is modelled on).
 ## Failure mode
 
 Degrades silently -- no warning, no crash -- on a missing file, a
-permission error, a directory, an unmatched glob (which never resolves to a
-real path in the first place), a device/pseudo-filesystem path, or a
-compound command this hook cannot parse.
+permission error, a directory, an unmatched glob, a device/pseudo-filesystem
+path, or a compound command this hook cannot parse.
 """
 
 from __future__ import annotations
 
+import glob
 import json
 import os
 import re
@@ -80,14 +91,27 @@ _SHELL_OPS = set("();|&")
 
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 # Leading words that do not change WHICH file-reading command runs, so the
-# real command name is whatever follows them. `env` is included here rather
-# than given its own flag-skipping logic -- any `env`-only flags (`-i`, `-u
-# NAME`) are simply skipped like any other flag by `_command_name` below,
-# which is a heuristic simplification: it can misread a value-taking `env`
-# flag's value as the command name on an unusual invocation, and the result
-# is then not in TARGET_CMDS and the call is silently ignored -- a false
-# negative, the safe direction for a warn-only guard.
+# real command name is whatever follows them. `env`/`sudo` are included here
+# rather than given their own flag-skipping logic: `_command_name` below has
+# no notion of an `env`-only flag (`-i`, `-u NAME`) or a `sudo`-only flag
+# (`-u user`) at all -- it just stops at the first token that is neither an
+# assignment nor a LEAD_WORD, so `env -u NAME cat x` or `sudo -u user cat x`
+# misreads the flag token itself (`-u`) as the command name. That name is
+# then not in TARGET_CMDS, so the call is silently ignored -- a false
+# negative, the safe direction for a warn-only guard, but a real gap rather
+# than a handled case.
 LEAD_WORDS = {"sudo", "command", "exec", "nohup", "time", "doas", "env"}
+
+# Shell redirection operators, as `shlex` (in punctuation-aware mode) tokenizes
+# them. A bare fd number immediately before one of these (`2>`, tokenized as
+# separate `2` and `>` tokens with no way to tell it apart from `cat 2 > out`,
+# an actual argument "2" followed by a redirect) is dropped along with the
+# operator -- treating a lone digit before `>`/`>>`/`&>` as part of the
+# redirect rather than a path is the conservative call for a warn-only guard:
+# it costs a rare false negative (a file genuinely named "2") to avoid a
+# common false positive (every `2>` fd redirect otherwise reading "2" as a
+# path argument).
+REDIR_OPS = {"<", ">", ">>", "<<", "<>", "&>", ">&", "&>>", "<&", "<<<"}
 
 TARGET_CMDS = {"cat", "head", "tail", "less", "more"}
 
@@ -153,6 +177,33 @@ def _command_name(argv):
     return name, argv[i + 1:]
 
 
+def _strip_redirections(args):
+    """Drop shell redirection operators and their targets from an argv-like
+    token list, along with a bare fd-number token immediately preceding one
+    (see the REDIR_OPS comment above). Applied BEFORE both `has_bounded_read`
+    and `extract_paths` so neither one has to know about redirection --
+    `has_bounded_read` would otherwise miscount an unrelated `-c` written
+    after a redirect, and `extract_paths` would otherwise read a redirection
+    TARGET (something being written, not read) as a candidate path -- e.g.
+    `cat note.txt > out.bin` misreading `out.bin` as a file `cat` reads.
+    """
+    out = []
+    i = 0
+    n = len(args)
+    while i < n:
+        a = args[i]
+        if a in REDIR_OPS:
+            if out and out[-1].isdigit():
+                out.pop()
+            i += 1
+            if i < n:
+                i += 1  # also drop the redirection target
+            continue
+        out.append(a)
+        i += 1
+    return out
+
+
 # `head`/`tail` flags that consume a separate token as their value, so that
 # value is never mistaken for a path argument.
 _VALUE_FLAGS = {"-c", "-n", "--bytes", "--lines"}
@@ -163,11 +214,16 @@ def has_bounded_read(cmd_name, args):
 
     `-n` (a LINE count) does NOT exempt: a binary file with few newlines can
     still dump its entire contents under `-n 5`. Only a BYTE bound is a real
-    guarantee about how much gets read.
+    guarantee about how much gets read. Stops at a literal `--`, matching
+    `extract_paths` below -- the two must agree on where the flag region
+    ends, or a file literally named `-c` read via `head -- -c` would be
+    wrongly exempted as if `-c` were still a flag there.
     """
     if cmd_name not in ("head", "tail"):
         return False
-    for a in args:
+    for a in _strip_redirections(args):
+        if a == "--":
+            break
         if a in ("-c", "--bytes"):
             return True
         if a.startswith("--bytes="):
@@ -179,11 +235,11 @@ def has_bounded_read(cmd_name, args):
 
 
 def extract_paths(cmd_name, args):
-    """Non-flag arguments, treated as candidate file paths."""
+    """Non-flag, non-redirection arguments, treated as candidate file paths."""
     paths = []
     skip_next = False
     seen_dashdash = False
-    for a in args:
+    for a in _strip_redirections(args):
         if skip_next:
             skip_next = False
             continue
@@ -224,6 +280,67 @@ def is_binary_file(path):
         return False
 
 
+# A Bash command's paths are always POSIX, even when THIS hook itself runs
+# as a native Windows Python process. `os.path.isabs('/c/Users/x')` is False
+# under `ntpath` (no drive letter), so joining it onto `cwd` produces a
+# garbage path that silently never matches a real file -- which is exactly
+# the incident this hook exists to catch: `cat /c/Users/dougm/bin/godot`,
+# verbatim, would have gone undetected on the platform it happened on.
+def _posix_absolute(raw_path):
+    return raw_path.startswith("/") or os.path.isabs(raw_path)
+
+
+# Git-Bash/MSYS (`/c/Users/...`) and WSL-mount (`/mnt/c/Users/...`) spellings
+# of a Windows drive path. A program actually EXEC'd by Git Bash gets this
+# translation for free from the MSYS runtime; this hook only reads the
+# command's TEXT and never runs it, so nothing translates it on its behalf.
+_MSYS_DRIVE_RE = re.compile(r"^/([A-Za-z])(/.*)?$")
+_WSL_DRIVE_RE = re.compile(r"^/mnt/([A-Za-z])(/.*)?$")
+
+
+def _to_native(path):
+    """Translate an MSYS/WSL drive path to native Windows form. A no-op
+    everywhere else -- on a POSIX host a leading slash is already native."""
+    if os.name != "nt":
+        return path
+    m = _WSL_DRIVE_RE.match(path) or _MSYS_DRIVE_RE.match(path)
+    if not m:
+        return path
+    return f"{m.group(1).upper()}:{m.group(2) or '/'}"
+
+
+def _resolve(raw_path, cwd):
+    candidate = raw_path if _posix_absolute(raw_path) else os.path.join(cwd, raw_path)
+    return os.path.normpath(_to_native(candidate))
+
+
+GLOB_CHARS = frozenset("*?[")
+# A pathological pattern (`**` over a huge tree) should cost this hook a
+# bounded amount of work, not an unbounded glob walk -- capped rather than
+# exhaustively matched.
+MAX_GLOB_MATCHES = 200
+
+
+def _candidates(raw_path, cwd):
+    """Resolved filesystem path(s) `raw_path` could refer to.
+
+    The shell that would normally expand a glob (`*.exe`) never actually
+    runs this command -- this hook only reads its text -- so an unexpanded
+    pattern must be expanded here, or a MATCHED glob is missed exactly like
+    an unmatched one: the guard would stay silent on `cat *.exe` even when
+    the directory holds exactly one binary file, which is a second shape of
+    this hook's own founding incident. An UNMATCHED pattern still yields
+    nothing, which is correct -- it was never a real path.
+    """
+    resolved = _resolve(raw_path, cwd)
+    if not any(ch in raw_path for ch in GLOB_CHARS):
+        return [resolved]
+    try:
+        return glob.glob(resolved)[:MAX_GLOB_MATCHES]
+    except OSError:
+        return []
+
+
 def offending_reads(command, cwd):
     """[(cmd_name, raw_path, resolved_path)] for each whole-file read of a
     binary file found in `command`. Empty on anything unparseable."""
@@ -241,14 +358,13 @@ def offending_reads(command, cwd):
             if not raw_path or raw_path == "-":
                 continue
             try:
-                resolved = os.path.normpath(
-                    raw_path if os.path.isabs(raw_path)
-                    else os.path.join(cwd, raw_path)
-                )
+                candidates = _candidates(raw_path, cwd)
             except (TypeError, ValueError):
                 continue
-            if is_binary_file(resolved):
-                found.append((name, raw_path, resolved))
+            for resolved in candidates:
+                if is_binary_file(resolved):
+                    found.append((name, raw_path, resolved))
+                    break  # one hit is enough to warn on this argument
     return found
 
 

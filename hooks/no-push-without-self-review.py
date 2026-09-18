@@ -254,7 +254,20 @@ TASK_OUTPUT_TOOLS = {"taskoutput", "task_output", "manage_task"}
 # ends of that exact chain and still omitted the spelling the measurement named
 # -- the tuple was assembled from what the code already read rather than from
 # what the corpus had already recorded (ai-config#3737 round 7).
-TASK_ID_KEYS = ("task_id", "taskId", "TaskId", "conversationId", "agentId", "id")
+# The generic `id` is split out, because it is the one spelling that is not
+# self-evidently a task id. Under the earlier first-wins producer it was a LAST
+# RESORT, reached only when no specific spelling was present. Registering every
+# spelling instead made it a peer, and a low-entropy value safe as a fallback is
+# not safe as a peer: a dispatch result carrying `{"task_id": "REAL", "id": "7"}`
+# then trusted `7`, so an unrelated task-output call numbered 7 authorized the
+# push. Measured against `d25ea1e`: base DENY, widened ALLOW, with three
+# controls denying on both sides (ai-config#3737 round 9).
+#
+# The same argument is already written thirty lines below, as the reason
+# `TASK_ID_KEYS_ORIGIN` omits the key. It was not applied to this constant.
+TASK_ID_KEYS_SPECIFIC = ("task_id", "taskId", "TaskId", "conversationId", "agentId")
+TASK_ID_KEYS_GENERIC = ("id",)
+TASK_ID_KEYS = TASK_ID_KEYS_SPECIFIC + TASK_ID_KEYS_GENERIC
 
 # The task-notification `origin` envelope gets a NARROWER list, deliberately.
 # `origin` identifies a notification, so its `id` is the notification's own id
@@ -291,6 +304,25 @@ def _task_ids(source, keys=TASK_ID_KEYS):
         if v:
             out.append(str(v))
     return out
+
+
+def _registrable_task_ids(source):
+    """The ids a reviewer dispatch result may be TRUSTED for, most specific first.
+
+    Asymmetric with `_task_ids` on purpose. The consumer reads every spelling
+    of its OWN input, which is not a trust decision -- it asks "is any id I
+    name already trusted?". The producer decides what BECOMES trusted, so the
+    generic `id` stays a last resort here: taken only when no specific spelling
+    is present, exactly as the first-wins producer took it.
+
+    Relaxing a lookup from first-match to any-match makes every previously
+    shadowed key independently trusted, which is a change to the set's SAFETY
+    rather than only its completeness. Dropping `id` altogether would close the
+    collision and reopen the false denial this chain exists to prevent, since a
+    result whose only id key is `id` would then register nothing.
+    """
+    specific = _task_ids(source, TASK_ID_KEYS_SPECIFIC)
+    return specific if specific else _task_ids(source, TASK_ID_KEYS_GENERIC)
 
 
 def _first_task_id(source, keys=TASK_ID_KEYS) -> str:
@@ -1847,7 +1879,7 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                         try:
                             res_data = json.loads(res_text)
                             if isinstance(res_data, dict):
-                                for tid in _task_ids(res_data):
+                                for tid in _registrable_task_ids(res_data):
                                     reviewer_task_ids.add(tid)
                         except Exception:
                             tid_match = re.search(r"\b(?:task[-_ ]?id|conversationId|agentId)[:=]\s*[`\"']?([\w-]+)", res_text, re.I)

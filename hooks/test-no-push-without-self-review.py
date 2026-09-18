@@ -2823,12 +2823,36 @@ def codex_cases() -> tuple[int, int]:
     #     name different identifier spaces, so a harness carrying both is
     #     carrying two ids, not one id twice.
     for (first, fval), (second, sval) in ((("taskId", "T9"), ("conversationId", "C4")),
-                                          (("task_id", "T9"), ("id", "I7")),
                                           (("conversationId", "C4"), ("agentId", "A2"))):
         rc, blocked, _ = push(multi_key_flow(
             ((first, fval), (second, sval)), second, retrieve_value=sval))
         check(f"a result announcing `{first}`={fval} and `{second}`={sval}, "
               f"retrieved as `{second}`, authorizes", rc == 0 and not blocked)
+
+    #     The generic `id` is deliberately NOT in that loop, and this row is
+    #     why. It used to sit there asserting that a result announcing
+    #     `task_id`=T9 and `id`=I7, retrieved as `id`, authorizes -- and that
+    #     assertion WAS the vulnerability, not a description of it. Registering
+    #     every spelling made the low-entropy `id` trusted alongside the real
+    #     one, so an unrelated task-output call that happened to carry the same
+    #     `id` authorized the push. Measured against `d25ea1e`: base DENY,
+    #     widened ALLOW (ai-config#3737 round 9).
+    #
+    #     `_registrable_task_ids` keeps `id` a LAST RESORT on the producing
+    #     end, so a specific spelling in the same result shadows it.
+    rc, blocked, _ = push(multi_key_flow(
+        (("task_id", "REAL-REVIEW-ABC"), ("id", "7")), "id", retrieve_value="7"))
+    check("a retrieval naming only the generic `id` is denied when the result "
+          "also announced a specific spelling", rc != 0 or blocked)
+
+    #     The other half of that boundary, and the reason `id` is shadowed
+    #     rather than dropped. Dropping it outright would close the collision
+    #     above by reopening the FALSE DENIAL this whole chain exists to
+    #     prevent: a result whose only id key is `id` would register nothing.
+    rc, blocked, _ = push(multi_key_flow(
+        (("id", "ONLY-ID-7"),), "id", retrieve_value="ONLY-ID-7"))
+    check("a result whose ONLY id spelling is the generic `id` still "
+          "authorizes a retrieval naming it", rc == 0 and not blocked)
 
     #     The mirror, on the consuming end: the retrieval call carries an
     #     unrelated id under an earlier spelling and the reviewer's own id under

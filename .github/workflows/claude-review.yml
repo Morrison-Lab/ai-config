@@ -39,12 +39,13 @@ jobs:
   #     reusable workflow -- its `if:` admits `workflow_dispatch`
   #     unconditionally -- but `claude-code-action` then rejects the triggering
   #     actor, because the caller's `allowed-bots` lists only
-  #     `github-actions[bot]`. Measured 2026-09-18 on this repo: four dispatched
-  #     runs with `triggering_actor: claude[bot]` (35268075963, 35312346178,
-  #     35312509759) all ended `failure-kind: short-circuit`, `attempts: 1`,
+  #     `github-actions[bot]`. Measured 2026-09-18 on this repo: all four
+  #     dispatched runs with `triggering_actor: claude[bot]` (35267489584,
+  #     35268075963, 35312346178, 35312509759) ended `failure-kind:
+  #     short-circuit`, `attempts: 1`,
   #     `total-cost-usd: 0.0000`, with the "Run Claude Code Review" step lasting
-  #     35ms and skipping its own Bun install; every dispatched run with
-  #     `triggering_actor: github-actions[bot]` in the same window
+  #     35ms and skipping its own Bun install; the four dispatched runs with
+  #     `triggering_actor: github-actions[bot]` checked in the same window
   #     (35311949751, 35312775441, 35312827292, 35312866850) produced a real
   #     review. `SELF_MOD` was `false` on the failures, so this is not the
   #     gha#598 workflow-restore path.
@@ -67,7 +68,7 @@ jobs:
       github.event.issue.pull_request &&
       startsWith(github.event.comment.body, '/review') &&
       (contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) ||
-      contains(fromJSON('["claude[bot]"]'), github.event.comment.user.login))
+      contains(fromJSON('["claude[bot]","cursor[bot]"]'), github.event.comment.user.login))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -79,6 +80,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.issue.number }}
+          # Hardcoded, where gha's own copy of this job derives it from
+          # `github.workflow_ref` via `parse-workflow-ref@v2`. Safe here because
+          # this is a caller workflow in a fixed location rather than a reusable
+          # one that can be invoked under another filename; rename this file and
+          # this line has to change with it.
           WF_FILE: claude-review.yml
           # Passed via env (not inlined into the script) so the comment body is
           # a shell value, never interpreted as script -- avoids injection.

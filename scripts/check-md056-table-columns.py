@@ -79,6 +79,7 @@ IGNORED_DIRS = {
     "build",
     ".gemini",
     ".cursor",
+    "worktrees",
 }
 
 

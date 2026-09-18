@@ -264,7 +264,33 @@ def main() -> int:
         rc, out, _ = run_script(str(f_unclosed_backtick))
         check("unclosed backticks advance correctly and detect subsequent pipe", rc == 1 and "Expected: 2; Actual: 3" in out)
 
-        # 16. CLI JSON output verification
+        # 16. Agent worktrees under .claude/worktrees are ignored (ai-config#1511)
+        with tempfile.TemporaryDirectory() as isolated_td:
+            isolated_root = Path(isolated_td)
+            worktrees_dir = isolated_root / ".claude" / "worktrees" / "feature-branch"
+            worktrees_dir.mkdir(parents=True, exist_ok=True)
+            f_worktree_bad = worktrees_dir / "bad_table.md"
+            f_worktree_bad.write_text(
+                "| Col 1 | Col 2 |\n"
+                "|---|---|\n"
+                "| Val 1 | `unescaped|pipe` |\n",
+                encoding="utf-8",
+            )
+            # Add a good table in root to ensure directory scan finds files
+            f_good = isolated_root / "good.md"
+            f_good.write_text(
+                "| Col 1 | Col 2 |\n"
+                "|---|---|\n"
+                "| Val 1 | Val 2 |\n",
+                encoding="utf-8",
+            )
+            rc, out, _ = run_script("--root", str(isolated_root))
+            check(
+                "files inside .claude/worktrees/ are ignored during directory scan",
+                rc == 0 and "OK:" in out and "Checked 1 table(s) across 1 markdown file(s)." in out,
+            )
+
+        # 17. CLI JSON output verification
         rc, json_out, _ = run_script(str(f_repro_3737), "--json")
         try:
             data = json.loads(json_out)
@@ -279,7 +305,7 @@ def main() -> int:
             valid_json = False
         check("JSON output carries structured violation details", rc == 1 and valid_json)
 
-    # 17. Dogfood check: test on current repository
+    # 18. Dogfood check: test on current repository
     rc, out, _ = run_script("--root", str(REPO))
     check("dogfood check on current repository passes cleanly", rc == 0 and "OK:" in out)
 

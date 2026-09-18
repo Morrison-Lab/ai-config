@@ -256,6 +256,18 @@ CASES = [
      "a URL EARLIER on the line does not exempt a token outside it -- without "
      "the $ anchor the exemption would swallow this"),
 
+    ([PROMPT],
+     mcp("mcp__github__add_issue_comment",
+         "The env var is DEADBEEFDEADBEEFDEADBEEFDEADBEEFXYZ in the config."
+         + MARKER), False,
+     "a canonical-length hex PREFIX of a longer alphanumeric identifier is not "
+     "a digest -- the trailing boundary must exclude any alphanumeric, not "
+     "just another hex character"),
+    ([PROMPT],
+     mcp("mcp__github__add_issue_comment",
+         "Token zzDEADBEEFDEADBEEFDEADBEEFDEADBEEF ends the line." + MARKER), False,
+     "the same on the leading side, which the lookbehind already covered"),
+
     # --- out of scope ---------------------------------------------------------
     ([PROMPT],
      bash("git log --oneline -5"), False,

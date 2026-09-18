@@ -177,7 +177,7 @@ RX_CREATE_POST = re.compile(
 # Bounded on BOTH sides. Without the trailing lookahead MAX_HEX bounds
 # nothing: a 120-character hex dump still matches its first 64 characters
 # and reads as a canonical sha256.
-RX_HEX = re.compile(r"(?<![0-9a-zA-Z])([0-9a-fA-F]{%d,%d})(?![0-9a-fA-F])(\.{3}|…)?" % (MIN_HEX, MAX_HEX))
+RX_HEX = re.compile(r"(?<![0-9a-zA-Z])([0-9a-fA-F]{%d,%d})(?![0-9a-zA-Z])(\.{3}|…)?" % (MIN_HEX, MAX_HEX))
 
 # Each alternative is boundary-anchored. Without that, `sha` matches inside
 # "shall", "shared" and "shape", and `oid` inside "avoid" and "android" -- so

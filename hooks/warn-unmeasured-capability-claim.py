@@ -185,7 +185,21 @@ RX_ABSOLUTE = re.compile(
     r"|parsed|read|detected|measured|observed|recovered)"
     r"|no matter (?:what|how)"
     r"|never (?:works|fires|runs|returns)"
-    r"|no (?:\w+ ){0,3}(?:can|will|could) (?:ever )?(?!be\b)\w+"
+    # Split by MODAL rather than by a blanket `be` exclusion. Round 9 measured
+    # the earlier `(?:ever )?(?!be\b)` form failing in both directions at once:
+    # it discarded "No transcript can be read by this hook", the passive voice
+    # of this hook's own subject matter, while still firing on "No changes will
+    # ever be needed to the CI workflow", the noise it was added to suppress --
+    # the engine backtracks through the optional group, matches `will` without
+    # `ever`, and tests the lookahead against "ever" instead of "be"
+    # (ai-config#3737 round 9).
+    #
+    # `can`/`could` + `be` is a capability claim about the system and SHOULD
+    # fire. `will`/`would` + `be` is a claim about future work ("will be
+    # needed", "will be required") and should not. The lookahead therefore sits
+    # BEFORE the optional group and spans it, so no backtrack can satisfy it.
+    r"|no (?:\w+ ){0,3}(?:can|could) (?:ever )?\w+"
+    r"|no (?:\w+ ){0,3}(?:will|would) (?!(?:ever )?be\b)(?:ever )?\w+"
     r")\b",
     re.I,
 )

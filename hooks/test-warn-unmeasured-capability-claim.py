@@ -140,6 +140,36 @@ for label, phrase in (
     fired, _ = run(mcp(phrase))
     check(f"the `{label}` idiom fires", fired is True)
 
+#     The `no X can/could Y` branch is split by MODAL, and both halves need
+#     pinning because round 9 found the earlier blanket `be` exclusion failing
+#     in BOTH directions while all 97 cases passed. Changing that clause
+#     changed nothing in this suite, which is how an unpinned narrowing looks
+#     from the inside (ai-config#3737 round 9).
+#
+#     Capability claims about the system, in the passive voice this hook's own
+#     subject matter is usually written in. These MUST fire.
+for phrase in (
+        "No transcript can be read by this hook.",
+        "No id can be recovered from the transcript by the guard.",
+        "No verdict could be parsed by the guard.",
+        "No transcript can ever be read by this hook.",
+):
+    fired, _ = run(mcp(phrase))
+    check(f"passive capability claim fires: {phrase!r}", fired is True)
+
+#     Claims about future WORK rather than about capability. These must NOT
+#     fire, and the `ever` variants are the ones the previous form let through:
+#     the engine backtracked past the optional group and tested the lookahead
+#     against "ever" rather than against "be".
+for phrase in (
+        "No changes will be needed to the CI workflow in this hook.",
+        "No changes will ever be needed to the CI workflow in this hook.",
+        "No further work will be required on this guard.",
+        "No migration would ever be needed for this hook.",
+):
+    fired, _ = run(mcp(phrase))
+    check(f"future-work claim stays silent: {phrase!r}", fired is False)
+
 #     And the affirmative that the negated and prefixed branches must NOT be
 #     folded together to match. Collapsing them into one optional-`un` form
 #     fires here, on prose asserting the opposite of this hook's subject.

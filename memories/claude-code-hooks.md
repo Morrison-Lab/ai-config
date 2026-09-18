@@ -834,31 +834,6 @@ check, and it is the one a `MUTATIONS` table cannot perform for you.
 - **Don't:** read an all-clauses-pass run as covering the imported code; the
   imported code was never the mutant.
 
-### A mutation battery whose control is not a full pass reports nothing, and two batteries sharing one scratch copy corrupt it permanently
-
-The three subsections above are all about the mutant not really running the code under test.
-This one is about the *baseline* not really being the baseline, which is the same class of defect one level up: the battery's verdicts are computed against a copy that is already wrong, so every row in its table is uninterpretable rather than merely noisy.
-
-Measured 2026-09-17 on this repository.
-A battery reported 15 of 17 mutants KILLED, which reads as a strong result and invites reading the two survivors as the finding.
-Its control line said `88/97 cases passed`, not `All 97`.
-Under nine standing failures, a mutant scored KILLED may have been killed by those failures rather than by the mutation, so the whole run was worthless --- and the two rows reporting ANCHOR-MISS (a replacement string not found in the file) were the actual signal, because a file you believe you know cannot be missing an anchor you just read out of it.
-
-The cause was two batteries run concurrently against one scratch copy.
-Each battery reads the subject file into `ORIG`, applies a mutant, runs the suite, then writes `ORIG` back.
-The second battery started while the first had a mutant applied, so *its* `ORIG` was a mutated file, and its restore step then wrote that mutant back permanently.
-The copy was left matching neither the checkout nor any intended state, and nothing said so except a control line sitting above seventeen lines that all said KILLED.
-
-That placement is what makes it skippable.
-The result table looks more authoritative than the one line above it, which inverts what each is worth: the control establishes the measurement's *validity* and the table carries only its *content*.
-
-- **Do:** read the control line before reading any verdict, and discard a run whose control is not a full pass rather than interpreting it.
-- **Do:** print the control again at the END of the battery, so a corrupted restore is visible in the same output.
-- **Do:** `mktemp -d` per battery, and `sha256sum` the copy's subject file against the checkout's before starting.
-- **Do:** read an ANCHOR-MISS row as evidence the file is not what you think, rather than as a typo in the battery's replacement string.
-- **Don't:** run two batteries against one directory, or reuse a previous battery's directory because it looks idle.
-- **Don't:** report a kill count from a run whose control failed --- the count is not a weaker result, it is not a result.
-
 ## A hook's fire-once sentinel makes its own test suite vacuous
 
 A `PreToolUse` or `Stop` hook that fires once per distinct input keeps a sentinel file keyed on a hash of that input.

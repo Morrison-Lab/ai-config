@@ -1072,6 +1072,45 @@ See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
 "A shared scratch directory reporting one mutation's failure under another's
 name".
 
+**Both outcomes above assume the control PASSED, and the case that bites is the
+one where it did not.**
+The seventh's last Don't warns against reading per-row names as attributable
+*because* the control passed; nothing yet says what to do when it plainly did
+not.
+Measured 2026-09-17: a matrix reported 15 of 17 mutants KILLED over a control
+line reading `88/97 cases passed` rather than `All 97`.
+With nine standing failures, a row's KILLED means only "not all cases passed",
+which every applicable mutant satisfies trivially --- so the column carried no
+information about any mutation, while reading exactly like a strong result.
+
+That is a placement problem as much as a reading one.
+The control is one line, the verdicts are seventeen, and the table looks more
+authoritative than the line above it --- which inverts what each is worth,
+since the control establishes the run's VALIDITY and the table carries only its
+content.
+
+Two cheap instruments, neither of which the outcomes above imply:
+
+- Print the control again at the END of the matrix, not only at the start.
+  A restore that corrupts the copy mid-run is invisible to an opening control
+  by construction, and that is exactly how one matrix left a mutant written
+  back permanently.
+- `sha256sum` the copy's subject file against the checkout's before starting,
+  and treat a mismatch as a corrupted copy rather than as a diff to explain.
+
+- **Do:** read the control line before any verdict, and discard a run whose
+  control is not a full pass rather than interpreting it.
+- **Do:** print the control at both ends of the matrix.
+- **Don't:** report a kill count from a run whose control failed --- it is not
+  a weaker result, it is not a result.
+
+A row reporting that a replacement string was not found is a second reason to
+look at the copy, though not on its own evidence of corruption: a mistyped
+anchor is the commoner cause, and
+[`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md)'s fourth
+outcome records one arising from a `repr()` mismatch.
+Check which before concluding either.
+
 **One more belongs to the matrix, and it is not an outcome but the matrix's own
 PASS CONDITION: a case that flipped for a reason other than the clause.**
 

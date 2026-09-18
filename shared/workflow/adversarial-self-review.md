@@ -434,7 +434,7 @@ What it cannot do is supply the go/no-go verdict that gates a push or a merge, b
 - **Don't:** treat a resumed reviewer's declining finding count, or a "ready for merge" it restates after several resumes, as the gating verdict.
 - **Don't:** read "an `Agent` call was made" alone as satisfying independence --- a resumed call was made and still fails this bullet.
 
-(Measured 2026-09-18 on `fix/1601-baseline-tolerance-band` / [Lacaedemon/sparta#1603](https://github.com/Lacaedemon/sparta/pull/1603), reconstructed from the PR's own commit messages rather than from session-internal reviewer state, which is not recoverable after the fact --- so every claim below is a direct quote from a commit on that PR, not a paraphrase of what any one session did.
+(Measured 2026-09-18 on `fix/1601-baseline-tolerance-band` / [Lacaedemon/sparta#1603](https://github.com/Lacaedemon/sparta/pull/1603), reconstructed from the PR's own commit messages rather than from session-internal reviewer state, which is not recoverable after the fact --- so the quoted headline in each item below is a direct quote from that commit's own message, not a reconstructed round-by-round narrative layered on top of it.
 Round 1 (commit `d8fbc397`): "Six findings from the pre-push adversarial review, all addressed."
 Round 2 (commit `67b58d26`): "Three findings from the second adversarial review."
 A later round (commit `631c9216`) names the contrast this section is about directly: "A fresh adversarial review, run without the previous rounds' context, found two real defects the context-carrying reviewer had passed over."

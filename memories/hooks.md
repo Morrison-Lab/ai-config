@@ -177,6 +177,24 @@ fail-fast.
   fail-loudly instruction --- a raise into a blanket `except Exception` is a
   silent fail-open wearing a safeguard's shape.
 
+### 3.3 Editing a fail-open guard: the suite is the only thing that can see the breakage
+
+The section above is about a `raise` written *deliberately* into a blanket handler.
+The commoner case is an *accidental* breakage reaching the same handler, and it presents as success rather than as an error.
+
+Measured 2026-09-17 while fixing ai-config#3485.
+A patch removed a block of code by slicing between two textual anchors, and the slice swallowed two unrelated module-level constants that happened to sit between them.
+Every call then raised `NameError` inside `scan()`, `main()`'s `except Exception: return 0` converted it to the allow outcome, and the hook exited 0 on every input.
+It parsed, it imported, it ran, and it authorized everything.
+
+What caught it was the test suite reporting 36 failures, and specifically the 36 cases asserting **block** or **warn**.
+A suite composed only of allow-cases would have gone green on a guard that had stopped guarding --- which is the shape a fail-open hook's suite drifts toward, since allow-cases are the cheap ones to write.
+
+- **Do:** re-run the hook's own suite after every edit to it, and read the pass count rather than the exit status of the edit.
+- **Do:** keep block/warn cases in the majority, since only a case that expects the guard to FIRE can detect a guard that has stopped firing.
+- **Do:** prefer an anchored replace of an exact known string over a slice between two anchors, whose span you are asserting rather than reading.
+- **Don't:** read "it parses" or "it exits 0" as evidence an edited fail-open guard still works --- both are exactly what total breakage looks like.
+
 ---
 
 ## 4. Detached Timers & Monitoring Services

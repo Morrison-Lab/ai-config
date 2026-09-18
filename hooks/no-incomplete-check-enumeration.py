@@ -39,6 +39,41 @@ where a complete read is `check-pr-fully-clean.py` (exit status + finding
 bullets). A paginated `commits/<sha>/check-runs` read covers the check-run
 half only and does not authorize "fully clean" / "ready to merge".
 
+SUBJECT -- the read's argument, measured 2026-09-17, ai-config#3485
+-------------------------------------------------------------------------------
+`RX_COMPLETE` matches the call's SHAPE and never its ARGUMENT, so a complete
+read of one PR discharged a terminal claim about another:
+
+    python3 scripts/check-pr-fully-clean.py 50 -R owner/repo
+    -> "#100 is fully clean."
+
+`last_complete` was set, the discharge held, and nothing had been verified
+about #100. The evidence is the right KIND and about the wrong THING, which
+is why no other guard here sees it: the instrument ran, it exited cleanly,
+and its output says nothing whatever about the PR being claimed.
+
+It happened for real on Morrison-Lab/ai-config the same day. One PR was
+scored, five were reported as sharing its blocker; rescoring each separately
+showed two different blockers, and two of the five were failing on a verdict
+two days older than their own head.
+
+A read now contributes coverage only for the PRs its own argv names, and only
+when it postdates the push or subagent report it would have to follow. A
+claim naming a PR no fresh read covers earns a WARN.
+
+It never BLOCKS, and it fails open when the argument cannot be recovered at
+all. #3485 warns specifically against fixing this by tightening: a guard that
+reads every unparsed argument as a mismatch fires on every session whose
+extraction misses, which is how this hook got silenced once already.
+
+One limit is accepted and NOT closed here, because it is on the other axis and
+predates this change. `hit` resolves only the FIRST declare-phrase in a
+message, and `claim_pr_refs` is windowed around that one hit, so a recap whose
+second, separately-worded "#200 is fully clean too" sits more than
+`_LABEL_WINDOW` from the first declaration is never evaluated at all. This
+change is about the READ's subject; that one is about the CLAIM's, and
+widening `hit` to every declare-phrase match is its own diff.
+
 EXTENSION -- two gaps measured 2026-09-09, written up in ai-config#3472
 -------------------------------------------------------------------------------
 A session dispatched sidecar subagents to open PRs. One subagent's own
@@ -193,6 +228,44 @@ RX_COMPLETE = re.compile(
 
 RX_PUSH = re.compile(r"git\s+push|create_or_update_file|push_files", re.I)
 
+# The PR a complete instrument read was actually ABOUT.
+#
+# `RX_COMPLETE` matches the call's SHAPE and never its ARGUMENT, so a complete
+# read of one PR silently discharged a terminal claim about another
+# (ai-config#3485). This recovers the read's own subject.
+#
+# ONLY the first positional argument counts, taken immediately after the
+# script name. A windowed scan for any bare integer nearby was tried first and
+# is unsound in two ways a reviewer reproduced against real input: the script
+# has a genuine `--quorum N` integer flag, so `--quorum 2` manufactured
+# coverage for PR #2; and a window wide enough for the repo and a payload path
+# also reaches past a shell `&&` into whatever the next command names, so a
+# trailing `gh pr comment 3745` manufactured coverage for #3745. Both
+# reproduced #3485's exact failure through the mechanism meant to close it.
+#
+# Anchoring to the first token cannot do either: a flag value is never first,
+# and nothing after an `&&` is. It also cannot see `-R owner/repo 3760`, where
+# the PR trails the flag -- that returns nothing, and returning nothing means
+# falling back to the pre-#3485 behaviour rather than asserting a mismatch.
+# The lookbehind and the trailing lookahead are `RX_COMPLETE`'s own, so a
+# `test_check-pr-fully-clean.py` invocation and a path digit are both excluded
+# here exactly as they are there.
+RX_COMPLETE_ARG = re.compile(
+    r"(?<!test_)\bcheck-pr-fully-clean\.py[\s\"']+#?(\d{1,6})(?![\w./-])",
+    re.I,
+)
+
+
+def _complete_refs(blob):
+    """The PR numbers a `check-pr-fully-clean.py` invocation names.
+
+    Returns a set of `#N` strings so it compares directly against the
+    `#N` references `_claim_window_refs` pulls out of the message, and an
+    empty set when no positional argument is recoverable.
+    """
+    return {"#" + m.group(1) for m in RX_COMPLETE_ARG.finditer(blob)}
+
+
 # A PR reference in the claim itself, so the warning can name it instead of
 # saying "the PR" generically. First match wins; good enough for a hook that
 # fails open on anything it cannot parse.
@@ -205,7 +278,15 @@ AGENT_TOOLS = {"Agent", "Task", "agent", "task", "dispatch_agent", "run_agent"}
 
 
 def scan(path):
-    """Return (last_push, last_partial, last_complete, subagent_events, text).
+    """Return (last_push, last_partial, last_complete, complete_events,
+    subagent_events, text).
+
+    `complete_events` is a list of `(index, pr_refs)` for every complete
+    instrument read, where `pr_refs` is the set of `#N` arguments that
+    invocation actually named. `last_complete` records only THAT a
+    complete read happened; it cannot say which PR was read, which is how
+    a read of one PR came to discharge a claim about another
+    (ai-config#3485).
 
     `subagent_events` is a list of `(index, pr_refs)` for every
     `tool_result` in THIS transcript whose `tool_use_id` belongs to a
@@ -220,6 +301,7 @@ def scan(path):
     last_push = last_partial = last_complete = -1
     agent_pr_refs = {}
     subagent_events = []
+    complete_events = []
     text = ""
     i = 0
     with open(path, errors="ignore") as fh:
@@ -243,6 +325,7 @@ def scan(path):
                             last_push = i
                         if RX_COMPLETE.search(blob):
                             last_complete = i
+                            complete_events.append((i, _complete_refs(blob)))
                         elif RX_PARTIAL.search(blob):
                             last_partial = i
 
@@ -263,6 +346,7 @@ def scan(path):
                             last_push = i
                         if RX_COMPLETE.search(blob):
                             last_complete = i
+                            complete_events.append((i, _complete_refs(blob)))
                         elif RX_PARTIAL.search(blob):
                             last_partial = i
                         if bname in AGENT_TOOLS:
@@ -281,7 +365,8 @@ def scan(path):
                             text = b["text"]
             elif isinstance(blocks, str) and role == "assistant" and blocks.strip():
                 text = blocks
-    return last_push, last_partial, last_complete, subagent_events, text
+    return (last_push, last_partial, last_complete, complete_events,
+            subagent_events, text)
 
 
 def already_fired(text):
@@ -393,7 +478,8 @@ def main() -> int:
     try:
         payload = json.load(sys.stdin)
         path = payload.get("transcript_path") or ""
-        last_push, last_partial, last_complete, subagent_events, text = scan(path)
+        (last_push, last_partial, last_complete, complete_events,
+         subagent_events, text) = scan(path)
     except Exception:
         return 0  # fail open
 
@@ -451,7 +537,53 @@ def main() -> int:
         for idx, refs in subagent_events)
 
     reading_needed_since = max(last_push, last_subagent)
+
+    # Which PRs the fresh complete reads were actually ABOUT. A read taken
+    # before the push or subagent report it would have to postdate is not
+    # evidence for anything here, so it does not contribute a subject.
+    fresh_complete_refs = set()
+    for idx, refs in complete_events:
+        if idx > reading_needed_since:
+            fresh_complete_refs |= refs
+
+    uncovered = sorted(r for r in claim_pr_refs if r not in fresh_complete_refs)
     if last_complete > reading_needed_since:
+        # Fail open when the read's subject could not be recovered at all --
+        # an MCP-shaped call, a wrapper script, a number the lookarounds
+        # rightly refused. #3485 warns against fixing this by tightening
+        # alone: a hook that treats every unparsed argument as a mismatch
+        # fires on every session whose extraction misses, which is how the
+        # guard got silenced once already.
+        if not fresh_complete_refs:
+            return 0
+        if not uncovered:
+            return 0
+        if already_fired(text):
+            return 0
+        read = ", ".join(sorted(fresh_complete_refs))
+        missing = ", ".join(uncovered)
+        print(json.dumps({
+            "systemMessage": (
+                "Your message makes a terminal merge-readiness claim -- "
+                "\"%s\" -- and the only complete instrument read in this "
+                "transcript is of %s. Nothing in this transcript names %s.\n\n"
+                "A complete read is the right KIND of evidence about the "
+                "wrong THING, which is why nothing else catches it: the "
+                "instrument ran, it exited cleanly, and its output says "
+                "nothing whatever about the other PRs. Measured 2026-09-17 on "
+                "Morrison-Lab/ai-config: one PR was scored and five were "
+                "reported as sharing its blocker; rescoring each separately "
+                "showed two different blockers, and two of the five were "
+                "failing on a verdict two days older than their own head.\n\n"
+                "Score each PR the claim covers, and report each one from its "
+                "own exit status:\n\n"
+                "    python3 scripts/check-pr-fully-clean.py <PR> -R "
+                "<owner>/<repo>\n\n"
+                "If you have not run it against a PR in this transcript, you "
+                "have no evidence about that PR -- say so rather than "
+                "extending a neighbour's reading to cover it."
+            ) % (hit.group(0).strip(), read, missing),
+        }))
         return 0
 
     # Nothing to warn about: no partial CI reading, and no subagent report

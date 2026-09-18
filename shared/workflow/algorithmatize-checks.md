@@ -514,6 +514,69 @@ not the void tag had reparented anything.
 The first replacement test asserted on anchors and passed under the mutation;
 the one that discriminates asserts on parents.)
 
+**Before either reading, confirm the suite actually survived --- a mutation
+harness needs a negative control of its own.**
+The section above asks what a survivor *means*.
+This asks whether there was one.
+A harness scores each mutant by reading the suite's output, and that reader is
+an instrument like any other: key it on a signal the suite does not always
+emit, and a suite that went red is scored SURVIVED.
+The harness then reports a coverage gap that does not exist.
+
+The failure direction is the unusual one, which is why the rest of this file's
+checks do not reach it.
+Almost all of them are written against an instrument failing toward **clean**.
+This one fails toward **alarm**: it invents an untested behaviour, and the work
+that follows --- a test for something already tested, or worse, an edit to code
+the suite was guarding correctly --- all looks like diligence.
+Nothing about a SURVIVED verdict invites the question either, because a
+survivor is exactly what the harness was dispatched to find.
+
+[`batch-merge-and-resolve`](batch-merge-and-resolve.md) already states the
+general form: any sweep needs a negative control, run first, because a zero
+matrix is indistinguishable from a detector that never ran.
+A mutation harness is such a sweep.
+Its negative control is the **unmutated** tree, run through the same scoring
+path, which must report SURVIVED.
+An unmutated run scored CAUGHT means the scorer is keyed on something other
+than the suite's verdict;
+a deliberately-caught mutation also scored SURVIVED means it is keyed on
+nothing at all.
+
+Prefer the suite's **exit status** to a grep of its stdout, for the reason this
+file's "Reading an instrument's PROSE instead of its exit status, generalized
+past the PR checker" section gives about every other instrument here: the prose
+is written for a human and the status is the stable interface.
+A grep for a phrase additionally narrows the population without saying so, to
+whichever test paths happen to print it.
+
+- **Do:** score each mutant on the suite's exit status, not on a string in its
+  output.
+- **Do:** run an unmutated control through the harness's own scoring path
+  before reading any SURVIVED verdict, and report that the control came back
+  SURVIVED alongside the results.
+- **Don't:** treat a SURVIVED verdict as a finding about the suite until the
+  harness has been shown able to report CAUGHT.
+- **Don't:** key a scorer on output only some of the suite's cases emit --- a
+  table-driven case's progress line is not the suite's verdict.
+
+(Measured 2026-09-17 on
+[ai-config#3692](https://github.com/Morrison-Lab/ai-config/pull/3692).
+An ad-hoc harness written to mutation-test
+`hooks/no-clean-stop-with-live-agent.py` detected a caught mutation by grepping
+the suite's stdout for a string only its table-driven cases print.
+Removing a sentinel scored SURVIVED while the suite had in fact gone red,
+producing a false "this behaviour is untested" verdict.
+Re-keying the scorer on the suite's exit status, and running an unmutated
+control through the same harness to confirm it reported SURVIVED, corrected it;
+the finding and both halves of the fix came from an `adversarial-reviewer`
+dispatch and were accepted in `f947dc94`.
+Reported by that session rather than re-measured here --- the harness was
+ad-hoc and is not in the tree.
+The generalization past this one harness to any sweep's scorer is
+[`batch-merge-and-resolve`](batch-merge-and-resolve.md)'s, restated for the
+mutation case.)
+
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 
 "Test the instrument against the incident that prompted it, verbatim"'s closing **Don't** governs a comment claiming *what* a matcher matches.
@@ -668,6 +731,74 @@ an added-lines scan for the same shape found it immediately.
 
 - **Do:** write a diff-scoped scan for the property when the rule is disabled, rather than re-enabling it.
 - **Don't:** re-enable a repo-wide disable to close the gap --- that reflags the drift the disable exists to tolerate.
+
+## A control that borrows its near-copy from content the test does not own
+
+The three sections above audit whether a control fires, whether it fires for
+the right reason, and whether the instrument it cites can ever disagree.
+This audits where the control's own *material* came from.
+
+A negative control needs a near-copy: something that resembles the thing under
+test closely enough that its survival proves the check was specific rather than
+lucky.
+The cheapest near-copy is usually already lying around, elsewhere in the very
+file the check scans, and reaching for it feels like reuse rather than like
+coupling --- the corpus supplied it, so nobody wrote it, so there is nothing
+that looks like a fixture to review.
+
+Two costs follow, and only the first announces itself.
+
+**The test becomes hostage to edits it has no relationship with.**
+The borrowed passage belongs to whoever wrote it, for their own reasons, and
+they may move it, reword it, or split the file it lives in without ever opening
+the test.
+The suite then goes red with the checker unchanged and the property under test
+untouched, which is the most expensive failure shape there is: it reads as a
+regression in the thing being guarded.
+
+**The control may also never have discriminated**, and that half is silent.
+A borrowed passage sits wherever its own author put it, which is usually
+outside whatever scope the checker actually applies --- so the mutation the
+control exists to catch was always going to be caught by the scoping, and the
+control was measuring nothing.
+Nothing distinguishes the two cases from a green run, which is why the
+mutation-testing sections above are the instrument here rather than a
+re-reading.
+
+The remedy is that a test constructs its own near-copy.
+A literal written in the test file is owned by the test, reviewed with it, and
+moves only when someone editing the test moves it.
+
+- **Do:** write a control's near-copy as a literal in the test file, so the
+  test owns every string its verdict depends on.
+- **Do:** when a control must reference live corpus content, assert on the
+  property the check is scoped to rather than on a passage the check never
+  reads.
+- **Do:** treat a control going red after an unrelated edit as a finding about
+  the control's provenance, not only as a merge conflict to patch.
+- **Don't:** reach for an existing mention elsewhere in the scanned file as a
+  near-copy --- its author owes your test nothing.
+- **Don't:** read a control's green run as evidence it discriminates; mutate
+  the checker and confirm the control goes red.
+
+(Measured 2026-09-17 in `Morrison-Lab/ai-config`.
+`scripts/test_check_github_actions_step_if.py` replaces one required sentence
+in `memories/github-actions.md` with a variant, then asserts that a bare
+`GitHub auto-applies` still appears in the mutated text --- a mention it
+borrows from a different bullet several hundred lines further down the same
+file, which the test never wrote.
+The first cost was reported by the session that hit it: splitting that file at
+the 1250-line cap moved the borrowed bullet out and turned the assertion red
+with `scripts/check-github-actions-step-if.py` unchanged.
+That split is not in this tree, where the borrowed mention is still present, so
+it is recorded as that session's account rather than as a measurement.
+The second cost was measured directly and is reproducible here: loosening the
+checker's own required needle to a bare `GitHub auto-applies` leaves the suite
+at 31 passed, 0 failed.
+The mutation survives because `required_findings()` is scoped by
+`extract_section()` to the step-if bullet, and the borrowed mention sits
+outside that bullet --- so the specificity the control is written to
+demonstrate is supplied by the scoping, and the control never tested it.)
 
 ## Widening an instrument invalidates every figure it produced, not only the one that exposed it
 
@@ -1876,6 +2007,72 @@ Read as of 2026-09-03, its filed body carries a discharge this section would rej
 Both halves are strings a session can type, and neither names a workflow definition or the branch a run's job names came from, so the pair is the third candidate above wearing two commands.
 The issue is open and no hook file exists on `main`, so this section is the argument that its discharge should be dropped rather than a description of a shipped file;
 a comment recording that argument was posted on the issue on 2026-09-03.)
+
+**A third component neither matcher covers: the WINDOW the scan runs over, and
+where its lower bound sits.**
+The trigger and the discharge above are both *matchers* --- questions about
+whether a record is the kind of thing being looked for.
+A guard that asks "has anything happened **since** X" carries a third thing,
+which is the choice of X.
+It is not a pattern, so neither of the rules above fires on it, and it is
+usually one line: a `max`, an index, a `baseline =`.
+
+The failure is that X gets chosen as **the most recent event of one kind**,
+when what it has to be is the **maximum over every event that can start the
+thing being guarded**.
+Those two agree on the sequence you have in mind while writing the guard,
+which is why the line reads as obviously correct, and they come apart exactly
+when a second instance of the guarded thing begins after the last event of the
+chosen kind.
+
+Note which way it fails, because it is the discharging direction and it is
+*inverted* rather than merely weakened: the guard is silent for the whole
+interval in which its condition is true, and fires once that condition has
+become false.
+A guard that fires late is worse than one that never fires at all, since it
+goes on producing output often enough to look alive, and a correctly-timed
+silence is indistinguishable from this one.
+
+- **Do:** write the lower bound as a `max` over every event kind that can put
+  the guarded thing in flight, and say in the code why each kind is in that
+  set.
+- **Do:** trace the guard by hand over the *standard* sequence its subject
+  actually performs, not over the incident that prompted it --- the incident
+  is the sequence whatever bound you chose already handles.
+- **Do:** ask of any late-firing guard whether its bound excludes a starter,
+  rather than whether its matcher is too narrow.
+- **Don't:** take the most recent event of one kind as "since when", however
+  obviously that kind is the relevant one.
+- **Don't:** read a guard's own docstring statement of its decidable condition
+  as independent evidence --- the specification is where this defect is
+  usually written down first, and the code then implements it faithfully.
+
+(Measured 2026-09-17 on
+[ai-config#3692](https://github.com/Morrison-Lab/ai-config/pull/3692),
+`hooks/no-clean-stop-with-live-agent.py` --- a `Stop` guard that blocks a clean
+stopping-point declaration made while a dispatched subagent is still live.
+At `79363d7a` its bound read
+`baseline = notification if notification >= 0 else dispatch`, so any dispatch
+later than the last notification was discarded.
+On this corpus's own standard sidecar shape --- dispatch, read the result,
+check liveness, dispatch a sidecar, declare clean --- the sidecar has never
+notified, so the liveness check taken *before* it still cleared the bound and
+the guard stayed quiet while that agent ran.
+It would then fire once the sidecar finally notified, which is after the moment
+it exists to catch.
+The docstring stated the same bound in prose --- "a liveness check taken AFTER
+the last notification" --- so the implementation was faithful to a
+specification that was itself wrong, and reading the two against each other
+could not have found it.
+An `adversarial-reviewer` dispatch did;
+`f947dc94` changed the bound to `max(notification, dispatch)` and rewrote the
+stated condition to match.
+Both revisions were read directly, and the three `Do`s and the first `Don't`
+follow from that pair.
+That a late-firing guard is worse than an absent one is inferred rather than
+measured, and rests on
+[`deterministic-tools`](../principles/deterministic-tools.md)'s argument that
+an instrument which has stopped measuring reports what an all-clear reports.)
 
 ## Your own command's shape is part of a transcript-read discharge condition
 

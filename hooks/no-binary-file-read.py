@@ -318,9 +318,10 @@ def _resolve(raw_path, cwd):
 
 
 GLOB_CHARS = frozenset("*?[")
-# A pathological pattern (`**` over a huge tree) should cost this hook a
-# bounded amount of work, not an unbounded glob walk -- capped rather than
-# exhaustively matched.
+# `glob.glob()` is called below WITHOUT `recursive=True`, so `**` behaves
+# like an ordinary `*` and never walks a subtree -- this cap is only about a
+# single directory holding many matches (`cat *` in a large flat directory),
+# not about bounding a recursive walk that cannot happen in the first place.
 MAX_GLOB_MATCHES = 200
 
 
@@ -405,7 +406,13 @@ def main() -> int:
         "Bash", "bash", "run_command", "execute_command", "terminal", "shell",
     ):
         return 0
-    inp = payload.get("tool_input") or {}
+    inp = payload.get("tool_input")
+    # `or {}` alone only catches a FALSY tool_input (None, "", missing); a
+    # truthy non-dict (a string, an int, a list) would pass through and crash
+    # the next line's .get() -- ai-config#3772, found across sibling hooks by
+    # this hook's own third review round.
+    if not isinstance(inp, dict):
+        inp = {}
     command = (inp.get("command") or inp.get("CommandLine")
                or inp.get("cmd") or inp.get("script") or "")
     if not command:

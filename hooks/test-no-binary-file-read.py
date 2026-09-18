@@ -202,7 +202,20 @@ def run_hook(command, cwd, tool_name="Bash", antigravity=False):
     return proc.returncode, proc.stdout, proc.stderr
 
 
-DELIVERY_CASES = 10
+def run_raw_payload(payload):
+    """Run the hook against an arbitrary JSON-able payload; return
+    (rc, stdout, stderr). For payload shapes `run_hook` cannot construct,
+    such as a non-dict `tool_input`."""
+    proc = subprocess.run(
+        [sys.executable, HOOK],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+    )
+    return proc.returncode, proc.stdout, proc.stderr
+
+
+DELIVERY_CASES = 11
 
 
 def check_delivery():
@@ -313,6 +326,18 @@ def check_delivery():
         failures += 1
     else:
         print("OK   delivers: under ANTIGRAVITY_AGENT, context only")
+
+    # ai-config#3772: a truthy non-dict tool_input (found by this hook's own
+    # third adversarial-review round) must not crash the hook.
+    rc, out, err = run_raw_payload(
+        {"tool_name": "Bash", "tool_input": "not-a-dict", "cwd": CWD})
+    ran += 1
+    if rc != 0:
+        print(f"::error::a non-dict tool_input must not crash; rc={rc} stderr={err!r}",
+              file=sys.stderr)
+        failures += 1
+    else:
+        print("OK   delivers: a non-dict tool_input degrades silently, not a crash")
 
     return failures, ran
 

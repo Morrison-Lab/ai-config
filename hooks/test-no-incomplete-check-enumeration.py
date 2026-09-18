@@ -46,6 +46,52 @@ CHECKER_3468 = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "python3 scripts/check-pr-fully-clean.py 3468 "
                    "-R Morrison-Lab/ai-config"}}]}}
+CHECKER_87 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 87 "
+                   "-R d-morrison/macros"}}]}}
+CHECKER_3760 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 3760 "
+                   "-R Morrison-Lab/ai-config --from-json /tmp/s3760.json"}}]}}
+# A read of ONE PR whose payload path happens to carry ANOTHER PR's digits --
+# the shape a scratchpad naming scheme produces. Counting the filename's
+# digits as an argument would manufacture coverage the session never had.
+CHECKER_3745_PATH_3750 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 3745 "
+                   "-R Morrison-Lab/ai-config --from-json /tmp/w3750.json"}}]}}
+# The script has a real `--quorum N` integer flag
+# (scripts/check-pr-fully-clean.py). A scan for any bare integer near the call
+# reads that N as a PR and manufactures coverage for it.
+CHECKER_651_QUORUM_2 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 651 "
+                   "-R ucdavis/bcs --quorum 2"}}]}}
+# A window wide enough for the repo and a payload path also reaches past a
+# shell `&&` into whatever the next command names.
+CHECKER_651_THEN_3745 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 651 -R ucdavis/bcs"
+                   " && gh pr comment 3745 --body done"}}]}}
+# The PR trailing the flag instead of leading. Not recoverable by a
+# first-token anchor, so coverage is unknown and the guard must fail open.
+CHECKER_FLAG_FIRST = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py -R ucdavis/bcs 651"}}]}}
+# A first token that is not a bare integer. Reading its leading digits as a
+# PR number would invent a subject the command never had.
+CHECKER_MALFORMED_ARG = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 3745x "
+                   "-R Morrison-Lab/ai-config"}}]}}
+# The instrument invoked through a shape whose argument these lookarounds
+# cannot recover. Coverage is then unknown, and the hook must fall back to
+# its pre-#3485 behaviour rather than treat unknown as mismatched.
+CHECKER_NO_ARG = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "bash scripts/score-every-open-pr.sh  # runs "
+                   "check-pr-fully-clean.py per PR"}}]}}
 # One turn carrying BOTH a push and a complete read -- two tool_use blocks in
 # a single message, the shape a real session produces when it pushes and then
 # verifies. Both land on the SAME transcript index, so neither `last_push >
@@ -219,8 +265,41 @@ CASES = [
      "d-morrison/macros#87: merge-readiness vocabulary outside the original set"),
     ([say("#87 is green, awaiting your merge.")], "allow",
      "merge-ready phrasing with no reading and no subagent -- nothing to warn about"),
-    ([PARTIAL, CHECKER, say("#87 is green, awaiting your merge.")], "allow",
-     "checker ran last -- the merge-ready phrasing is covered"),
+    ([PARTIAL, CHECKER_87, say("#87 is green, awaiting your merge.")], "allow",
+     "checker ran last ON #87 -- the merge-ready phrasing is covered"),
+
+    # --- ai-config#3485: the read's SUBJECT, not just its shape ---
+    # This case previously expected `allow` and was the bug in miniature:
+    # the checker read #651 and the claim was about #87, and the hook saw
+    # only that a complete read had happened.
+    ([PARTIAL, CHECKER, say("#87 is green, awaiting your merge.")], "warn",
+     "#3485: a complete read of #651 must not cover a claim about #87"),
+    ([CHECKER, say("#100 is fully clean.")], "warn",
+     "#3485's own example: read 50-style mismatch, no partial reading needed"),
+    ([CHECKER_3760, say("#3760 is fully clean.")], "allow",
+     "the argument survives a --from-json path carrying the same digits"),
+    ([CHECKER_3760, say("#3745 and #3750 are fully clean too.")], "warn",
+     "a read of #3760 covers neither #3745 nor #3750 -- both named"),
+    ([CHECKER_87, PUSH, CHECKER,
+      say("#87 is green, awaiting your merge.")], "warn",
+     "a read of #87 that PREDATES the push cannot supply coverage, even "
+     "though a later read of #651 keeps last_complete fresh"),
+    ([CHECKER_3745_PATH_3750, say("#3750 is fully clean.")], "warn",
+     "digits inside a --from-json filename are not an argument: #3750 in "
+     "the path must not cover a claim about #3750 when #3745 was read"),
+    ([CHECKER_651_QUORUM_2, say("#2 is fully clean now.")], "warn",
+     "the script's own --quorum 2 flag must not manufacture coverage for #2"),
+    ([CHECKER_651_THEN_3745, say("#3745 is fully clean now.")], "warn",
+     "a PR named by a command chained after && is not what the checker read"),
+    ([CHECKER_FLAG_FIRST, say("#651 is fully clean.")], "allow",
+     "a PR trailing the -R flag is unrecoverable, so coverage is unknown and "
+     "the guard falls back to its pre-#3485 behaviour"),
+    ([CHECKER_MALFORMED_ARG, say("#3760 is fully clean.")], "allow",
+     "a malformed first token yields no subject at all, not its leading "
+     "digits -- coverage is unknown, so the guard falls back"),
+    ([CHECKER_NO_ARG, say("#651 is fully clean.")], "allow",
+     "#3485's warning: an unrecoverable argument must fail open, not "
+     "count as a mismatch"),
     ([PARTIAL, say("13 pass, 5 pending, waiting on your review.")], "allow",
      "not merge-readiness vocabulary -- 'your review' is not 'your merge'"),
 

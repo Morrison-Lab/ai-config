@@ -416,6 +416,32 @@ This is the Agent tool's own criterion for `run_in_background: false` --- the ve
 The reviewer reports; the author disposes.
 A reviewer that can edit turns a finding into a silent fix, which loses the finding and the disposition together.
 
+**Freshly dispatched, not resumed --- and this applies per round, not just to the first one.**
+"Its own context window" above rules out reviewing in the author's own turn.
+It does not by itself rule out a second failure with the same shape: resuming the *same* reviewer session across rounds (`SendMessage` back to an existing subagent) instead of dispatching a new one each time.
+A resumed reviewer keeps its own context window separate from the author's, so it still satisfies the first bullet.
+What it no longer has is independence from **itself** --- round 4 of a resumed reviewer is reading the diff with round 1 through 3's own conclusions already in its context, which is [`learn-from-review-findings`](learn-from-review-findings.md)'s convergence pattern happening *inside one reviewer* rather than across a series of different ones.
+Findings-per-round on a resumed reviewer characteristically decline toward zero, and the decline is not evidence the diff has actually gotten cleaner --- it is at least partly the reviewer running out of things it has not already told itself are fine.
+
+This is the same failure "The PR's own review history is rationale you cannot withhold" describes below, one layer more direct: there a *fresh* reviewer inherits the narrowing by reading about prior rounds in the artifact, while here the reviewer does not need to read about its own prior rounds because it remembers making them.
+
+A resumed reviewer is not useless.
+It is the right tool for a narrower job: confirming that the specific findings *it already raised* were actually fixed, where continuity of context is exactly what makes it efficient.
+What it cannot do is supply the go/no-go verdict that gates a push or a merge, because that verdict needs to be checking the diff against the standards, not against its own earlier self.
+
+- **Do:** gate a push or merge's go/no-go verdict on a freshly dispatched reviewer with no prior context on this diff, every round, not only the first.
+- **Do:** use a resumed reviewer for the narrower job of confirming that findings it already raised were fixed --- continuity is an asset there.
+- **Don't:** treat a resumed reviewer's declining finding count, or a "ready for merge" it restates after several resumes, as the gating verdict.
+- **Don't:** read "an `Agent` call was made" alone as satisfying independence --- a resumed call was made and still fails this bullet.
+
+(Measured 2026-09-18 on a Lacaedemon/sparta session, `fix/1601-baseline-tolerance-band` / [Lacaedemon/sparta#1603](https://github.com/Lacaedemon/sparta/pull/1603).
+An `adversarial-reviewer` subagent was dispatched once and then resumed four times via `SendMessage` against an evolving diff.
+Its findings per round went 6, 3, 2, 0, converging on "Ready for merge".
+Three separate **fresh** dispatches against the same evolving diff each then found a real defect the resumed reviewer had passed over, corroborated by the PR's own fix commits, each of which names its own independently-dispatched reviewer number in its message, up to a sixth.
+A corrupt-but-present baseline unpacked without raising, so the old gate read it as "no baseline" and routed the run into the bootstrap branch instead of reporting it as corrupt (commit `e21f2a4e`, "Three findings from a fourth independently-dispatched reviewer").
+Only the *average* of two benchmark runs was validated, so a `-1.0` raw run paired with a normal one would have averaged to a plausible positive value and been committed (commit `42b78526`, "Five findings from a fifth independently-dispatched reviewer").
+And `math.isfinite` raised `OverflowError` on an integer too large to convert to `float`, crashing the very predicate written to absorb corrupt input (commit `3453e113`, "Three findings from a sixth independently-dispatched reviewer").)
+
 **No Agent tool, or no reviewer registered here?**
 A separate CLI is the same move and a stronger one ---
 [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md),

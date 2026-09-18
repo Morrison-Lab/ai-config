@@ -204,6 +204,26 @@ When a brief, an issue body, or a review finding asserts what a repository says,
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale branch read that produced two issues and a config edit".
 
+## A different endpoint is another shape, and the two names read as synonyms
+
+Two APIs can describe overlapping but distinct populations under names that read as synonyms.
+GitHub's `GET /repos/{owner}/{repo}/pages/builds` documents itself as listing *builds* of a Pages site ([REST API docs](https://docs.github.com/en/rest/pages/pages), read 2026-09-17), while `GET /repos/{owner}/{repo}/deployments?environment=github-pages` lists *deployments* to an environment.
+Both answer to "how many times has this site deployed" in English, and they enumerate different objects, so a count taken from one is not comparable to a count taken from the other.
+
+What distinguishes it is not that the substitution is silent --- [`A working-directory checkout is another shape, and it stays silent`](#a-working-directory-checkout-is-another-shape-and-it-stays-silent) says the same of a stale read, and says it first.
+It is that there is no authoritative store to go to.
+Every other shape's remedy presumes one of the two artifacts is the right one, so suspecting the substitution is most of the work of undoing it.
+Here both endpoints are authoritative, each for its own population, and neither is the correct one in the abstract --- only the endpoint the original measurement used is comparable to the original measurement.
+So the usual move, go and check against the real thing, does not terminate: whichever endpoint you reach for is a real thing.
+
+Re-measuring a prior claim through the *other* endpoint and getting a different number is therefore evidence that the two endpoints disagree, not evidence that the original figure decayed.
+A drift claim needs both readings taken the same way, and the endpoint is part of "the same way".
+
+- **Do:** use the endpoint the original measurement named, and say which one it was.
+- **Do:** use the other party's endpoint when checking someone else's number, before concluding drift.
+- **Don't:** read a different number from a different endpoint as decay.
+- **Don't:** treat two API paths as interchangeable because their names describe the same thing in English.
+
 ## A mechanism's prose is not the mechanism's definition
 
 A hook's comment, a skill's description, a docstring: each one explains a
@@ -819,7 +839,8 @@ the code.)
 that capability through a different one.**
 
 The shapes above substitute a cached copy for an origin, a checkout for a run,
-half a mechanism for the whole, a neighbour for the target.
+half a mechanism for the whole, a neighbour for the target, a different
+endpoint for the same-sounding metric.
 This is another: the documentation is correct, your reading of it is correct,
 every quotation checks out --- and it describes the feature as reached through
 a surface your code does not use.

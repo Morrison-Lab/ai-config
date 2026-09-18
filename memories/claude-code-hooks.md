@@ -976,7 +976,8 @@ that was wrong for one of the halves, and the correction is the reason the split
 - **Don't:** spend a round trying to make a reviewer "report differently" --- no reporting style reaches any of the four paths.
 - **Don't:** read a foreground dispatch's `agentId`-only tool result as evidence that foreground dispatch did not happen.
 
-(ai-config#3737 shipped the producer half; ai-config#3739 carries the remaining guard side, ai-config#3754 the Stop-hook side.
+(ai-config#3737 shipped the producer half;
+ai-config#3739 carries the remaining guard side, ai-config#3754 the Stop-hook side.
 Measured against a scratch copy of `hooks/` rather than the live directory, so a mutant could not leak into the session's own guard.)
 
 ## A project-thread session can reach a push deadlock whose layers are each behaving as designed

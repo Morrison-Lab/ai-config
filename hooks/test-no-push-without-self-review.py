@@ -2746,6 +2746,55 @@ def codex_cases() -> tuple[int, int]:
     check("a task notification identifying its task only as `id` does not authorize",
           rc == 0 and blocked)
 
+    # 22c. The same widening 22b keeps OUT of the origin gate has to be pinned
+    #      on the way IN, for the four spellings that belong there. Round 9
+    #      reverted this site to first-wins and all 439 cases still passed, so
+    #      the third of the three call sites the shared helper feeds was the one
+    #      nothing covered -- while the suite argued at length that a conjunct a
+    #      mutation cannot see still needs a direct case, and applied that to
+    #      the helper's two internal guards only (ai-config#3737 round 9).
+    #
+    #      `taskId` precedes `conversationId` in `TASK_ID_KEYS_ORIGIN`, so a
+    #      first-wins reader takes the decoy and denies a genuine notification.
+    notif_multi = [
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "codex-n2", "name": "Agent",
+             "input": {"subagent_type": "adversarial-reviewer",
+                       "prompt": "Review the diff"}}]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": "codex-n2",
+             "content": json.dumps({"conversationId": "C4"})}]}},
+        {"type": "user", "origin": {"kind": "task-notification",
+                                    "taskId": "UNRELATED-TASK",
+                                    "conversationId": "C4"},
+         "message": {"content": [{"type": "text", "text": body()}]}},
+    ]
+    rc, blocked, _ = push(notif_multi)
+    check("a task notification naming an unrelated task first and the "
+          "reviewer's own second authorizes", rc == 0 and not blocked)
+
+    #      Its negative control. Without it the row above is indistinguishable
+    #      from a fixture that authorizes for some other reason: when NO
+    #      spelling in the origin names a registered id, the push must be
+    #      denied. The VALUE is what varies, not the key -- membership tests the
+    #      value, which is the slip round 7 found twice in case 24.
+    notif_none = [
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "codex-n3", "name": "Agent",
+             "input": {"subagent_type": "adversarial-reviewer",
+                       "prompt": "Review the diff"}}]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": "codex-n3",
+             "content": json.dumps({"conversationId": "C4"})}]}},
+        {"type": "user", "origin": {"kind": "task-notification",
+                                    "taskId": "UNRELATED-TASK",
+                                    "conversationId": "NOT-REGISTERED"},
+         "message": {"content": [{"type": "text", "text": body()}]}},
+    ]
+    rc, blocked, _ = push(notif_none)
+    check("a task notification naming no registered id does not authorize",
+          rc == 0 and blocked)
+
     # 23. The non-JSON registration path. A dispatch result that does not parse
     #     as a dict never reaches the JSON branch, so this regex is the SOLE
     #     registrar for a text-shaped announcement -- and deleting it left all

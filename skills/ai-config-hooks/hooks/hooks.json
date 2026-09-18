@@ -1316,6 +1316,13 @@
             "timeout": 15,
             "script": "warn-bash-command-for-powershell-user.py",
             "why": "memories/shell.md 'Two shells coexist' -- warns, never blocks, when a reply hands the user a short fenced command carrying a construct Windows PowerShell 5.1 cannot run (&&, ||, an MSYS path, an inline VAR=value prefix, 2>/dev/null, a heredoc) while the session's environment brief says their shell is PowerShell. Separation from a QUOTED failure is done on the block's shape -- short, no prompt, no output -- because prose framing marks a directive and a post-mortem identically. Measured over 120 transcripts: 3 firings, all the same true positive, 0 false positives -- which establishes only that the matcher is quiet on the other 13 fenced messages, NOT the false-positive rate; the real evidence is the suite's constructed negatives."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-clean-stop-with-live-agent.py\"'",
+            "timeout": 10,
+            "script": "no-clean-stop-with-live-agent.py",
+            "why": "flag-session-boundaries -- blocks a CLEAN stopping-point declaration when a subagent was dispatched and no liveness check followed the last task-notification or the last dispatch, whichever came later (ai-config#3689)."
           }
         ]
       }

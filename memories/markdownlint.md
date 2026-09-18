@@ -10,14 +10,29 @@ Split out of [`tools.md`](tools.md) on 2026-09-01 when that file crossed the 125
   ai-config#2906 went red on `lint-markdown` because two hook-catalog rows contained `` `HH:MM PDT|PST|PT` `` (a regex-style alternation written in backticks).
   `memories/hooks.md:69` reported "Expected: 5; Actual: 7",
   and `README.md:405` reported "Expected: 3; Actual: 5".
-  The rule scans the raw row text for `|`, so a code span's contents are counted exactly like bare table syntax, splitting one cell into three and inflating the column count.
-  **Do:** spell alternatives out in prose (`` an `HH:MM` stamp suffixed `PDT`, `PST`, or `PT` ``) instead of writing a `|`-joined alternation, in backticks or not, inside a table cell.
+  ai-config#3737 failed on the same pattern in `README.md:473`:
+  shell alternations inside code spans (`` `gh issue|pr comment` ``, `` `gh issue|pr create|edit` ``, `` `glab issue|mr note` ``)
+  inflated a 3-column row to 7 cells ("Expected: 3; Actual: 7").
+  `scripts/check-md056-table-columns.py` provides a pure-Python, zero-dependency pre-commit scan that checks all GFM tables for MD056 column-count mismatches and unescaped pipes inside code spans, avoiding the need for an npm/node runtime locally when verifying table syntax before pushing.
+  **Do:** spell alternatives out in prose (`` an `HH:MM` stamp suffixed `PDT`, `PST`, or `PT` ``) or escape the delimiter (`\|`) inside the code span (as `520db260` did for PR #3737) instead of leaving an unescaped `|`-joined alternation inside a table cell.
+  **Do:** run `python3 scripts/check-md056-table-columns.py` before pushing to verify table column counts and code span pipes locally without npm.
   **Don't:** write a regex-style alternation containing `|` in a table cell and trust the backticks to shield it -- MD056 reads raw text, not rendered Markdown.
-  (Morrison-Lab/ai-config#2906, 2026-09-01.)
+  (Morrison-Lab/ai-config#2906, 2026-09-01.
+  Morrison-Lab/ai-config#3764, 2026-09-17.)
 - **A line that begins with an issue reference is parsed as a heading (MD018).**
   Covered in full by [`semantic-line-breaks`](../shared/writing/semantic-line-breaks.md)'s MD018 section, which owns the rule, the collision with bare references, and both remedies (link the reference, or reword so the line does not open with it).
   Recorded here only for the sweep, since this file is where the linter's rule numbers are indexed: `grep -rn --include='*.md' '^#[0-9]' .` finds every instance.
-  (Morrison-Lab/ai-config#3060, 2026-09-03.)
+  **Third occurrence, 2026-09-17:** `memories/hooks.md:365` opened a line with `#3744 carries the two-tree measurement...`.
+  The fix prefixed "Issue ", which is the reword remedy above rather than a third one.
+  The same idiom already sits at `memories/claude-code.md:1041` ("Issue #3230's done-when...").
+  Checked whether any local hook catches this before CI, rather than assuming a gap.
+  `hooks/warn-new-line-breaks-on-push.py` is the only `PreToolUse` guard on this class of prose defect, and it runs the semantic-line-breaks (clause-density) checker, not markdownlint, so neither it nor any other hook reads column 1.
+  A line-initial `#NNNN` therefore reaches CI's `lint-markdown` job before anything local reports it.
+  The corpus's current mitigation is the manual scan `semantic-line-breaks.md` already prescribes ("scan added lines for a column-1 `#` before pushing"), not a hook.
+  **Do:** run that manual scan before pushing prose that adds `#NNNN` references, since nothing automated does it yet (measured: no hook in `hooks/` reads markdownlint's rule set or column 1).
+  **Don't:** read `warn-new-line-breaks-on-push.py`'s presence as covering this rule --- it is scoped to clause density and semicolons, not to ATX-heading collisions (inferred from its own match conditions, which name neither MD018 nor markdownlint).
+  (Morrison-Lab/ai-config#3060, 2026-09-03.
+  Third occurrence Morrison-Lab/ai-config#3745, 2026-09-17.)
 - **markdownlint-cli2 runs locally with no install step, at CI's exact version.**
   `npx --yes markdownlint-cli2@<version>` reads `.markdownlint-cli2.jsonc` and lints the whole repo in seconds;
   take the version from the `lint-markdown` job log, which prints it as its first line.
@@ -28,6 +43,19 @@ Split out of [`tools.md`](tools.md) on 2026-09-01 when that file crossed the 125
   **Do:** run it before pushing markdown, and say which of the four checks it covered.
   **Don't:** read a clean markdownlint run as the `lint-markdown` job passing.
   (Morrison-Lab/ai-config#3060, 2026-09-03.)
+  **The two flags this bullet already names diverge on a cold cache, and reading the wrong one's failure as "not installable" is a distinct, measured mistake.**
+  `--yes` (line above) installs on demand.
+  `--no-install` (the `run-local-validation.py` equivalent) refuses instead, by design, whenever the package is not already cached --- that is the whole point of the flag, not a defect in it.
+  Measured 2026-09-17 in a remote session's container: `npx --no-install markdownlint-cli2 --version` failed with `npm error npx canceled due to missing packages and no YES option`, and a commit message reported "markdownlint itself is not installable in this container and was not run".
+  That commit was `c40259f8` and it was **amended away** once the tool did run, so the quoted wording is no longer reachable from any ref --- a later `git log --all` search finds only the replacement, which says "not installed" rather than "not installable".
+  An adversarial review of this entry duly reported the quote as a misquote on exactly that evidence.
+  Cite the superseded SHA whenever quoting a commit message you then amended, or the quote is uncheckable by anyone without that repository's dangling objects.
+  `npx --yes markdownlint-cli2@0.23.2` then installed and ran cleanly in the same container, reporting 772 files linted and 0 issues.
+  **Do:** on a `--no-install` refusal, retry with `--yes` (or a plain install) before concluding the tool is unavailable --- a cold cache and a genuinely missing tool produce the identical error text.
+  **Don't:** read `run-local-validation.py`'s own `--no-install` "missing tool" SKIP as a verdict on the tool's availability.
+  The script reports it correctly as a cache/install-hint state (see its `install_hint` field), which is the distinction the commit message above collapsed.
+  See [`ardi`](../shared/workflow/ardi.md)'s "A flag whose whole job is to forbid the thing being tested" and [`ardi.cases.md`](../shared/workflow/ardi.cases.md)'s "Attempting the base form is not attempting its variants" for the general rule this instantiates.
+  (Morrison-Lab/ai-config#3745, 2026-09-17.)
 - **The `Summary:` line's exact wording changes between markdownlint-cli2
   versions, so pin the version rather than reading CI's wording as a
   property of the check itself.**

@@ -241,6 +241,79 @@ a sweep reporting zero leaks and a sweep that never ran print the same line.
   an enumeration of realistic shapes is worth more there than nothing,
   and nothing is what a rewrite silently spends.
 
+**Two loops over two dimensions are not the product,
+and the shape that gets written instead is the sum.**
+`for a in A: check(a, fixed)` followed by `for b in B: check(fixed, b)`
+reads as having enumerated both dimensions,
+and it has ---
+marginally.
+It visits `len(A) + len(B)` cells where the product has `len(A) * len(B)`,
+and the cells it skips are every one where both dimensions vary at once.
+
+That distinction is invisible in a diff and decisive when the invariant
+is *agreement between the two dimensions*.
+The held-fixed value has to be one both sides accept,
+or the sweep would fail on its own baseline ---
+so a sum-shaped sweep is **structurally incapable** of detecting a disagreement,
+however many members each loop carries.
+Every row passes, the count looks thorough,
+and the defect the sweep exists for cannot reach it.
+
+The check is arithmetic rather than judgment:
+count the cells the sweep actually runs,
+and compare that against the product of the dimension sizes.
+Where those differ, say which cells are missing and why,
+rather than reading two loops as coverage of two dimensions.
+
+- **Do:** write the nested loop when the invariant relates two dimensions,
+  and report the cell count alongside the dimension sizes.
+- **Don't:** read consecutive single-dimension loops as having covered the product ---
+  they cover the margins, and the margins are where agreement is assumed rather than tested.
+
+**And where the invariant is agreement between two sites,
+prefer making it structural over asserting it in prose.**
+A comment instructing two key lists to stay in step
+is the least enforceable form the invariant can take:
+it is not compiled, not tested, and not read at the moment either list is edited.
+One shared constant both sites read
+converts the invariant from something maintained into something true by construction,
+and leaves the sweep above to catch what the constant cannot ---
+a site that reads the wrong constant, or none.
+
+Prefer the constant, then generate the product, then report the count.
+Asserting the invariant in a comment is the rung below all three,
+and it reads exactly like the rung above it.
+
+- **Do:** hoist a cross-site invariant into a shared constant before writing a comment about it.
+- **Don't:** treat a comment stating an invariant as any evidence the invariant holds ---
+  stating one is not enforcing one.
+
+(Measured on [ai-config#3737](https://github.com/Morrison-Lab/ai-config/pull/3737), 2026-09-17.
+A guard read a background task's id at three sites with three different key lists,
+under a comment asserting that two of them must carry every spelling the module knows.
+They did not, in both directions, at the moment the comment was written:
+one read `TaskId` and the other did not,
+the other read `conversationId` and the first did not.
+Two loops pinned the spellings,
+one per end, each holding the opposite end at `task_id` ---
+a spelling both ends had always read.
+Both loops ran green under exactly the defect,
+and had done so through a full review round.
+The 25-cell product fails on nine cells;
+the two marginal loops fail on none.
+Nine rather than four, which is what the first version of this paragraph said:
+five rows where the retrieval names `conversationId`,
+which the consumer's list omitted,
+plus four more where the result announces `TaskId`,
+which the producer's list omitted.
+The count was written from the shape of the defect rather than from the run,
+inside the one passage arguing that the check is arithmetic rather than judgment ---
+so the example asserted a product it had not multiplied.
+A later round re-ran it: post-fix suite against the pre-fix hook,
+with the post-fix pair as a negative control first,
+giving `All 416 cases passed` and then `15/416 cases failed`,
+nine of them cross-product rows.)
+
 (Measured on [ai-config#1947](https://github.com/Morrison-Lab/ai-config/pull/1947),
 merged 2026-08-22 after six review rounds.
 Four of those rounds each closed one more way of wrapping a read of the same path ---
@@ -1129,6 +1202,45 @@ failure reported under the wrong mutation's name.**
 See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
 "A shared scratch directory reporting one mutation's failure under another's
 name".
+
+**Both outcomes above assume the control PASSED, and the case that bites is the
+one where it did not.**
+The seventh's last Don't warns against reading per-row names as attributable
+*because* the control passed; nothing yet says what to do when it plainly did
+not.
+Measured 2026-09-17: a matrix reported 15 of 17 mutants KILLED over a control
+line reading `88/97 cases passed` rather than `All 97`.
+With nine standing failures, a row's KILLED means only "not all cases passed",
+which every applicable mutant satisfies trivially --- so the column carried no
+information about any mutation, while reading exactly like a strong result.
+
+That is a placement problem as much as a reading one.
+The control is one line, the verdicts are seventeen, and the table looks more
+authoritative than the line above it --- which inverts what each is worth,
+since the control establishes the run's VALIDITY and the table carries only its
+content.
+
+Two cheap instruments, neither of which the outcomes above imply:
+
+- Print the control again at the END of the matrix, not only at the start.
+  A restore that corrupts the copy mid-run is invisible to an opening control
+  by construction, and that is exactly how one matrix left a mutant written
+  back permanently.
+- `sha256sum` the copy's subject file against the checkout's before starting,
+  and treat a mismatch as a corrupted copy rather than as a diff to explain.
+
+- **Do:** read the control line before any verdict, and discard a run whose
+  control is not a full pass rather than interpreting it.
+- **Do:** print the control at both ends of the matrix.
+- **Don't:** report a kill count from a run whose control failed --- it is not
+  a weaker result, it is not a result.
+
+A row reporting that a replacement string was not found is a second reason to
+look at the copy, though not on its own evidence of corruption: a mistyped
+anchor is the commoner cause, and
+[`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md)'s fourth
+outcome records one arising from a `repr()` mismatch.
+Check which before concluding either.
 
 **One more belongs to the matrix, and it is not an outcome but the matrix's own
 PASS CONDITION: a case that flipped for a reason other than the clause.**

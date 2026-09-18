@@ -42,6 +42,66 @@ Worked-example case records for the rules below live in
   job when neither attempt succeeded) --- the failure is deferred and
   handled, not ignored.
 
+## A `getattr(module, name, fallback)` import is only as loud as its fallback
+
+`getattr(sibling_module, "NAME", <fallback>)` is a common way to read an
+optional cross-module constant without a hard `import` dependency.
+The fallback decides, entirely on its own, whether a broken or renamed
+sibling attribute is discovered or absorbed --- and the two shapes look
+equally defensive side by side.
+
+A fallback that can never match anything real --- `re.compile(r"(?!)")`, an
+empty tuple, `None` --- fails loud: once the sibling attribute goes missing,
+every case depending on the real value stops passing, and the break is
+visible the next time the suite runs.
+A fallback that is a **hand-written copy of the same value** the import was
+trying to read fails silent: the code keeps working exactly as if the
+sibling attribute still existed, because it does, just duplicated rather
+than shared.
+Nothing about the second shape reads as riskier than the first while writing
+it --- both are one line, both look like "a sensible default", and the
+difference only shows up once the sibling actually changes.
+
+(Measured 2026-09-17 on `ai-config#3737`, `hooks/warn-unmeasured-capability-claim.py`.
+Two sibling imports sit a few lines apart:
+
+```python
+_NEVER = re.compile(r"(?!)")
+RX_COMMENT_POST = getattr(_rebuttal, "RX_COMMENT_POST", _NEVER)
+
+_CANONICAL_POST_TOOLS = getattr(_disclosure, "MCP_POST_TOOLS", (
+    "mcp__github__add_issue_comment", "mcp__github__add_comment_to_pending_review",
+    "mcp__github__add_reply_to_pull_request_comment", "mcp__github__pull_request_review_write",
+    "mcp__github__discussion_comment_write",
+))
+```
+
+The file's own comment on the second names the hazard it is nonetheless
+committing: a hand-maintained copy "is how a surface goes missing".
+Reproduced directly by renaming each sibling's attribute in a scratch copy
+and re-running the 97-case suite: renaming `RX_COMMENT_POST` in
+`flag-uncited-rebuttal.py` turns 4 cases red (`93/97 cases passed`), because
+`_NEVER` matches nothing they depend on.
+Renaming `MCP_POST_TOOLS` in `require-agent-disclosure.py` leaves the suite
+at `All 97 cases passed`, because the fallback tuple already contains the
+same five members the tests check for --- the import silently stopped
+reading the shared source of truth, and nothing observed it.)
+
+- **Do:** give a `getattr`-with-fallback import a fallback that cannot
+  satisfy any real case --- an empty collection, a never-matching pattern,
+  `None` --- when the fallback exists only to avoid a hard import error.
+- **Do:** if the fallback must be a working value (so the module keeps
+  functioning standalone), assert elsewhere that it still equals the live
+  import when both are available, rather than trusting silent agreement.
+- **Don't:** copy a sibling's constant into a fallback literal and consider
+  the dependency handled; a literal fallback with the same shape as the
+  import is the exact case [`avoid-hardcoding-external-data.md`](../coding/avoid-hardcoding-external-data.md)
+  warns against, here reached through `getattr` rather than through a second
+  hand-maintained list.
+- **Don't:** trust a passing suite as evidence a cross-module import still
+  resolves; rename the sibling's attribute in a scratch copy and re-run
+  before believing either fallback is safe.
+
 ## A secret-presence guard can mean two different things
 
 A step that checks whether a secret is set and exits 0 if it is not reads as

@@ -160,6 +160,54 @@ touches only that file.
 Reported by the agent that made it.
 Tracked as ai-config#2149.)
 
+## A date is coarser than the artifact it dates, when the artifact changes same-day
+
+Everything above treats a date or "as of" stamp as the fix for a volatile
+claim.
+That assumes the date resolves to one state of the artifact being measured.
+It does not when the artifact is edited more than once on the day the
+measurement is dated --- a hook, a script, a regex --- and a corpus-scale
+figure is quoted against it with no commit named.
+
+A date and a chunk size are not enough to make such a figure reproducible,
+because they under-determine the one thing a reader would need to re-run it:
+which revision of the code that produced the classification the figure
+counts.
+Two commits made hours apart on the same calendar day can each change what
+"fires" means, so "2026-09-17" resolves to several different true answers
+depending on which of that day's commits is meant.
+
+(Measured 2026-09-17 on `ai-config#3737`,
+`hooks/warn-unmeasured-capability-claim.py`'s docstring, which reports
+"2000-character chunks: 81 of 1992 fire, 4.1%, down from 5.7% before the
+branches below were trimmed" and dates the whole measurement to
+2026-09-17 with no commit named.
+Reproducing the sweep independently, over the same `shared/**/*.md` chunking
+at 2000 characters against the code as it stands on this branch, gives 83
+hits over 2004 chunks when every trailing partial chunk is kept, or 81 hits
+over 1849 chunks when partial trailing chunks are dropped --- neither
+matches the docstring's own 81/1992 exactly, because "how a chunk is formed"
+is a second undocumented parameter the date does nothing to pin.
+A parallel review round on the same PR reproduced 81 of 1994 against the
+committed tree and 80 of 1992 against the pre-PR base tree: the numerator
+the docstring quotes and the denominator it quotes came from two different
+tree states that never coexisted, which a same-day timestamp cannot reveal
+because both states share that timestamp.)
+
+- **Do:** name the commit SHA a corpus-scale figure was measured against,
+  not only the calendar date, whenever the code producing the classification
+  can plausibly change more than once that day.
+- **Do:** state the chunking, windowing, or sampling method precisely enough
+  that a reader's re-run and the original run count the same population ---
+  "2000-character chunks" is under-specified without saying whether a
+  trailing partial chunk counts.
+- **Don't:** treat a date as pinning a measurement once the measured
+  artifact is itself under active edit; pin the commit instead.
+- **Don't:** quote a numerator and a denominator as a pair without
+  confirming both came from one run against one tree --- a pair assembled
+  from two different revisions can be individually accurate and jointly
+  impossible.
+
 ## Relationship to other rules
 
 - [`fact-check-prose.md`](fact-check-prose.md) checks that a claim is *true*

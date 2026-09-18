@@ -868,8 +868,59 @@ A checker that maps `\alias{}` to declaring file and reports the population cann
 
 - **Do:** enumerate the population a review claim quantifies over (`grep`/an instrument over every file, not the files the diff already named) before writing "every one" or "all of them".
 - **Do:** ask, once a review has correctly named *why* a diff exists, whether the diff addresses that cause or only removes the thing that detected it -- a warning silenced and a defect fixed are not the same outcome even when both diffs are one line.
+- **Do:** run the instrument against the commit the claim was made at, not against the branch head, before offering its output as a counterexample.
 - **Don't:** accept a stated sample --- "spot-checked a few" --- as support for a universal claim when the population was derivable at that commit.
 - **Don't:** read a correct mechanism diagnosis in a review as license to skip asking whether the fix under review acts on that mechanism or merely hides its symptom.
-- **Do:** run the instrument against the commit the claim was made at, not against the branch head, before offering its output as a counterexample.
 - **Don't:** treat "this claim was underived" as equivalent to "this claim was false" --- the first is about method and is usually right, the second needs an artifact that existed at the time.
 - **Don't:** author a new rule for a case without first searching for an existing one --- and check whether the existing rule was even loaded, since an uninstalled rule wants an install and a bypassed one wants an instrument.
+
+## A parity comment justified a fix that only partly achieved the parity it named
+
+(Morrison-Lab/ai-config#3707, commit `1cfcd075`, 2026-09-17, addressing a review round against `d256d23`: a guard function, `_agent_subtypes`, was widened to read two more dict keys (`agent`, `persona`), and the comment introducing the widening gave its reason as a scope claim about a sibling function in the same file: "`agent` and `persona` are here because `_is_reviewer_record` below already treats them as persona-naming keys, and two predicates in one file disagreeing about what names a persona is how a dispatch gets seen by one and not the other."
+
+That sentence states a population --- the keys the sibling predicate reads --- and a target: this function should read the same ones.
+Nobody derived either set.
+`_is_reviewer_record` reads ten distinct keys across its two passes: `attributionAgent`, `agent_type`, `subagent_type`, `subagentType`, `TypeName`, `Role`, `agent`, `name` and `persona` in both, plus a lowercase `role` read only from a nested `message` dict.
+`_agent_subtypes` before the widening read six of those;
+the widening added two more, landing at eight and leaving two uncovered (`role`, `attributionAgent`) that the justifying comment's own wording already promised to close.
+The fix read as complete because the comment supplied the reason and the diff visibly acted on it --- two keys were added, disagreement was reduced, and a reader checking the diff against the stated reason finds them consistent.
+Consistent with the reason is not the same as satisfying it: the reason was a claim about two full sets matching, and "some progress toward matching" confirms a directional claim while leaving a quantified one unchecked.
+A later review round derived both sets and found the gap by counting, not by rereading the comment.
+
+**The record of that gap was itself under-derived on the first pass.**
+A companion case describing this incident first named the miss as "two keys a sibling predicate read that this one did not" --- the two the fixture had happened to surface (see [`fixtures-are-not-evidence.cases.md`](fixtures-are-not-evidence.cases.md)).
+Deriving both key-lists directly (rather than reading the number off the test fixture that had exposed part of it) showed the true gap was four, not two.
+A count copied from evidence that was real but partial repeats exactly the error the parity comment made one level up: it reports what a nearby artifact showed, not what the population contains.
+
+**The resolution was not "close the gap completely," and that half of the fix is the more useful fact to keep.**
+`role` was added, because it is the same key as the already-read `Role` in a different casing --- reading one and not the other is the identical split-predicate defect one level in, and it is safe on its own terms besides (a message's `role` can only hold values like `user`/`assistant`, which the sibling predicate itself filters).
+`attributionAgent` was deliberately left out, with the comment now saying why: it names who *authored* a transcript record, while `_agent_subtypes` reads a tool's *input* --- a different question, so copying the key across would be structural fit standing in for a transferred purpose (see [`check-purpose-before-reusing`](check-purpose-before-reusing.md)).
+Parity with the sibling function's *principle* ("a name key means the same thing to both predicates") is not parity with its *key list*: the correct target set was never "every key the sibling reads," and deriving the list without also asking whether each key's purpose transfers would have produced the wrong fix by symmetry.)
+
+- **Do:** when a fix's own comment states a parity or consistency claim between two predicates, derive both key/case sets and diff them, rather than confirming the diff moves toward the stated reason.
+- **Do:** when the gap between two derived sets was found via a fixture or other partial evidence, re-derive it directly before recording its size --- the fixture's own coverage is a fact about the fixture, not the gap.
+- **Do:** ask separately, for each item the diff would need to add for full parity, whether its *purpose* transfers to the new site --- a name that recurs in both structures can still mean two different things.
+- **Don't:** read "the diff added items toward the stated reason" as "the diff satisfies the stated reason" --- a directional claim and a quantified one need different checks.
+- **Don't:** treat full parity with a sibling's key list as the correct fix by default;
+  parity is owed to the principle the comment states, and a key whose purpose does not transfer is correctly excluded even when doing so leaves the sets unequal.
+
+## A "this costs nothing" claim was measured against one of two shapes it implicitly covered
+
+(Morrison-Lab/ai-config#3707 / #3746, commit `1cfcd075`, 2026-09-17: a guard excludes certain tool names from being treated as reviewer dispatches on a flat, call-id-less transcript shape (OpenCode/OMO), since that shape never populates the field the exclusion's ordinary safety net depends on.
+The comment defending the exclusion read: "That costs no real capability: a genuine OMO dispatch-then-retrieve returns no verdict on origin/main either."
+
+The sentence's subject --- "a genuine OMO [reviewer report]" --- is not one shape.
+A dispatch-then-retrieve (two paired records, a dispatch call and a separate retrieval call under an excluded tool name) is one;
+a single flat record under an excluded tool name that both dispatches the reviewer and carries its report in its own paired result is a second, and the comment's claim was checked against only the first.
+The second shape does lose authorization under the exclusion where it would not on `origin/main`, which a new regression case (case 18) pins directly: denied here, admitted on the unpatched branch.
+The claim was true of the instance it was written against and false of the instance it never named, and both instances are equally "a genuine OMO [report]" under the sentence's own wording.
+
+This is the "costs nothing" shape of the "Do: scope the claim to what was measured" bullet under ["Search for the artifact instead of arguing about whether it would exist"](metacognitive-monitoring.md#search-for-the-artifact-instead-of-arguing-about-whether-it-would-exist): a no-loss claim quantifies over every way the excluded population can arise, so it needs that population enumerated --- every shape the transcript format allows a reviewer dispatch to take --- not one representative shape checked and generalized from.
+Writing the claim felt like reporting a measurement, because the checked shape genuinely does cost nothing;
+the population it was silently generalized to was never listed.)
+
+- **Do:** before writing "this costs nothing" or "this loses no capability," enumerate every shape the excluded input can take, not only the one a test or a mental model already covers.
+- **Do:** add the regression case for the unchecked shape in the same round that names the gap, so the population claim becomes checkable rather than merely narrowed in prose.
+- **Don't:** generalize a no-loss claim from a single checked shape to "a genuine [format]" when the format admits more than one paired-record layout --- name the shape actually measured instead.
+- **Don't:** treat a claim as safe because it is true of the case that prompted writing it;
+  a no-loss claim's failure mode is the case nobody thought to name.

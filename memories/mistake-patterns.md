@@ -1243,3 +1243,8 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
 - **Do:** when a scratch-directory test of a git-aware (or otherwise environment-sensitive) tool fails unexpectedly, retry inside a real or minimally initialized instance of whatever context the tool expects, before trusting the negative result.
 - **Don't:** treat a scratch `/tmp` directory as a neutral stand-in for a project checkout --- many tools behave differently, or not at all, outside one, with no error message distinguishing "unsupported" from "misconfigured environment."
 - **Don't:** let a single negative trial, however cleanly reproduced, stand in for a capability claim without first ruling out the test's own setup as the cause.
+
+## Pattern 57: Pronouncing a Two-Part Fix Dangerous From Its Combined Effect, With Neither Half Tested Alone
+- **Mistake**: judging a fix dangerous from what the WHOLE change would do, when only the conjunction of its halves carries the risk and one half is safe alone (measured case in [`mistake-patterns.cases.md`](mistake-patterns.cases.md)).
+- **Do:** apply each half of a multi-part fix separately, in a scratch copy, and re-run the check against real input before pronouncing the whole dangerous.
+- **Don't:** let a true claim about the conjunction stand for both halves --- it can block a half that measurement shows is safe.

@@ -2262,6 +2262,711 @@ def omo_cases() -> tuple[int, int]:
 
     return failures, ran
 
+def codex_cases() -> tuple[int, int]:
+    """Codex's native `spawn_agent` subagent dispatch (ai-config#3707).
+
+    `AGENT_TOOLS` listed no Codex dispatch tool, so a Codex session that
+    dispatched the reviewer, got a clean report naming the exact commit, and
+    pushed was denied for never having dispatched a reviewer at all.
+
+    Two spellings are exercised, with different standing. `spawn_agent` is
+    attested, by `TOOL_ALIASES` in `plugins/ai-config/codex-hook-adapter.py`.
+    `collaboration.spawn_agent` is the name ai-config#3707's reporter used for
+    the interface in prose and has never been measured as a tool name;
+    ai-config#3741 tracks getting that measurement. It is covered here because
+    the guard accepts it, not because it is known to occur.
+
+    Widening a tool-name set is the kind of change that can quietly authorize
+    more than it means to, so the cases below pin BOTH directions: the Codex
+    dispatch now authorizes what a Claude `Agent` dispatch would, and it
+    authorizes nothing a Claude `Agent` dispatch would not. Every other gate --
+    the persona name, the errored result, the verdict, the fingerprint -- is
+    re-asserted here against the Codex tool name rather than assumed to carry
+    over, because assuming it carried over is what this suite exists to refuse.
+    """
+    failures = 0
+    ran = 0
+
+    def check(label, ok):
+        nonlocal failures, ran
+        ran += 1
+        print(f"{'PASS' if ok else 'FAIL'}: {label}")
+        failures += not ok
+
+    def push(events, payload_extra=None):
+        rc, out = run_hook(PUSH, events, payload_extra=payload_extra)
+        nested = out.get("hookSpecificOutput") or {}
+        return rc, nested.get("permissionDecision") == "deny", nested.get(
+            "permissionDecisionReason", "")
+
+    for tool in ("spawn_agent", "collaboration.spawn_agent"):
+        # 1. The whole point: a clean Codex review authorizes its own commit.
+        rc, blocked, _ = push(reviewed(tool=tool))
+        check(f"a clean review dispatched via `{tool}` authorizes the push",
+              rc == 0 and not blocked)
+
+        # 2. A blocking verdict still blocks. Recognizing the harness must not
+        #    turn into trusting whatever it returns.
+        rc, blocked, _ = push(reviewed(body("Needs more work"), tool=tool))
+        check(f"a blocking verdict via `{tool}` still blocks",
+              rc == 0 and blocked)
+
+        # 3. The fingerprint still has to cover what the push ships. A verdict
+        #    for an earlier commit is the stale-permission case the
+        #    `Reviewed-Commit` comparison exists for.
+        rc, blocked, _ = push(reviewed(body(commit=PREV), tool=tool))
+        check(f"a verdict via `{tool}` naming an earlier commit does not cover HEAD",
+              rc == 0 and blocked)
+
+        # 4. A report with no fingerprint at all is not a verdict.
+        rc, blocked, _ = push(reviewed(body(fingerprint=False), tool=tool))
+        check(f"an unfingerprinted report via `{tool}` does not authorize",
+              rc == 0 and blocked)
+
+        # 5. An errored dispatch carries no verdict, whatever its text says.
+        rc, blocked, _ = push(reviewed(tool=tool, is_error=True))
+        check(f"an errored `{tool}` dispatch does not authorize",
+              rc == 0 and blocked)
+
+        # 6. The persona gate is unchanged. This is the case that would fail if
+        #    widening AGENT_TOOLS had admitted the TOOL rather than the
+        #    reviewer dispatched through it: an unrelated persona returning a
+        #    perfectly-formed clean report must still block.
+        rc, blocked, _ = push(reviewed(agent_name="doc-writer", tool=tool))
+        check(f"a non-reviewer persona via `{tool}` does not authorize",
+              rc == 0 and blocked)
+
+    # 7. A transcript path that resolves to nothing is a harness gap, and says
+    #    so. Pinned on the wording because the two denials are one line apart
+    #    and both block -- so a mutant that reports the wrong one still passes
+    #    a blocked/not-blocked assertion, and the wrong one sends a reviewer
+    #    who did review back to review again (ai-config#3707's own symptom).
+    rc, blocked, reason = push([], payload_extra={
+        "transcript_path": os.path.join(tempfile.gettempdir(), "npwsr-absent.jsonl")})
+    check("a transcript path naming no file blocks", rc == 0 and blocked)
+    check("...and reports the harness gap rather than a missing dispatch",
+          "no file exists there" in reason
+          and "was dispatched" not in reason)
+
+    # 8. The pre-existing no-transcript denial is untouched by that new branch.
+    rc, blocked, reason = push([], payload_extra={"transcript_path": ""})
+    check("an empty transcript path still reports no transcript available",
+          rc == 0 and blocked and "No transcript available" in reason)
+
+    # 9. The persona key, varied. Recognizing Codex's TOOL name buys nothing if
+    #    the dispatch's persona sits under a key this guard does not read, and
+    #    every row above supplies Claude's `subagent_type` for free --- so those
+    #    rows are a Claude dispatch wearing a Codex tool name, and cannot see
+    #    this. `_agent_subtypes` and `_is_reviewer_record` are two predicates in
+    #    one file that must agree about what names a persona; these pin the keys
+    #    only the latter used to read.
+    for key in ("agent", "persona", "agent_type", "subagentType"):
+        rc, blocked, _ = push(reviewed(tool="spawn_agent", key=key))
+        check(f"a clean `spawn_agent` review keyed on `{key}` authorizes",
+              rc == 0 and not blocked)
+
+    #     ...and the persona gate still decides, whichever key carries it.
+    for key in ("agent", "persona"):
+        rc, blocked, _ = push(
+            reviewed(agent_name="doc-writer", tool="spawn_agent", key=key))
+        check(f"a non-reviewer persona under `{key}` does not authorize",
+              rc == 0 and blocked)
+
+    # 10. Reported-missing path PLUS a resolvable fallback. This is the case the
+    #     `main()` conditional was rewritten to arbitrate, and the one nothing
+    #     else reaches: `omo_cases` supplies an empty reported path, and cases 7
+    #     and 8 above supply no session_id, so the fallback is "" in each. A
+    #     mutant restoring the pre-change `if not transcript_path:` passes every
+    #     other case in this suite while breaking exactly this session shape ---
+    #     an OpenCode harness reporting a stale path alongside a live session_id,
+    #     whose genuinely reviewed push would be denied.
+    d = tempfile.mkdtemp(prefix="npwsr-codex-")
+    try:
+        tdir = os.path.join(d, "transcripts")
+        os.makedirs(tdir)
+        with open(os.path.join(tdir, "sess-codex.jsonl"), "w") as f:
+            for ev in reviewed(tool="spawn_agent"):
+                f.write(json.dumps(ev) + "\n")
+        rc, out = run_hook(
+            PUSH, None,
+            extra_env={"CLAUDE_CONFIG_DIR": d},
+            payload_extra={"transcript_path": os.path.join(d, "gone.jsonl"),
+                           "session_id": "sess-codex"})
+        nested = out.get("hookSpecificOutput") or {}
+        blocked = nested.get("permissionDecision") == "deny"
+        check("a stale reported path still falls back to a resolvable transcript",
+              rc == 0 and not blocked)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+    # 11. Reported path WINS when it exists. The complementary direction to
+    #     case 10, and the one a `if True:` mutant on the same line slips past:
+    #     that mutant lets the fallback override a LIVE reported transcript, so
+    #     a session whose session_id collides with a stale
+    #     `~/.claude/transcripts/<id>.jsonl` is graded against the wrong one.
+    #     Here the reported transcript carries no review and the fallback
+    #     carries a clean one, so only the correct precedence denies.
+    d = tempfile.mkdtemp(prefix="npwsr-codex-")
+    try:
+        tdir = os.path.join(d, "transcripts")
+        os.makedirs(tdir)
+        with open(os.path.join(tdir, "sess-other.jsonl"), "w") as f:
+            for ev in reviewed(tool="spawn_agent"):
+                f.write(json.dumps(ev) + "\n")
+        reported = os.path.join(d, "reported.jsonl")
+        with open(reported, "w") as f:
+            f.write(json.dumps(poison_assistant_prose()) + "\n")
+        rc, out = run_hook(
+            PUSH, None,
+            extra_env={"CLAUDE_CONFIG_DIR": d},
+            payload_extra={"transcript_path": reported,
+                           "session_id": "sess-other"})
+        nested = out.get("hookSpecificOutput") or {}
+        check("a live reported transcript is not overridden by the fallback",
+              rc == 0 and nested.get("permissionDecision") == "deny")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+    # 12. A task-output tool carrying a reviewer PERSONA label must not reach
+    #     the persona path at all. For a dispatching tool the persona names who
+    #     will run; for one of these `task_id` names whose output is returning,
+    #     so admitting it on the label alone severs the WHO-said-it chain. The
+    #     dispatch here is a non-reviewer whose task id the retrieval quotes
+    #     correctly -- only the label is a lie, and no reviewer ever ran.
+    #     `name` is included because it reproduces on origin/main: this is a
+    #     pre-existing hole (ai-config#3742) that the persona-key widening would
+    #     otherwise have spread from one spelling to three.
+    for key in ("persona", "agent", "name", "subagent_type"):
+        for out_tool in ("taskoutput", "task_output", "manage_task"):
+            events = [
+                {"type": "assistant", "message": {"content": [
+                    {"type": "tool_use", "id": "codex-d1", "name": "Agent",
+                     "input": {"subagent_type": "doc-writer",
+                               "prompt": "describe the review report contract"}}]}},
+                {"type": "user", "message": {"content": [
+                    {"type": "tool_result", "tool_use_id": "codex-d1",
+                     "content": json.dumps({"task_id": "T7"})}]}},
+                {"type": "assistant", "message": {"content": [
+                    {"type": "tool_use", "id": "codex-d2", "name": out_tool,
+                     "input": {"task_id": "T7", key: "adversarial-reviewer"}}]}},
+                {"type": "user", "message": {"content": [
+                    {"type": "tool_result", "tool_use_id": "codex-d2",
+                     "content": body()}]}},
+            ]
+            rc, blocked, _ = push(events)
+            check(f"`{out_tool}` labelled `{key}` does not authorize",
+                  rc == 0 and blocked)
+
+    # 13. The OMO-shaped counterpart of case 12, and the reason it exists: the
+    #     provenance fix landed on BOTH transcript shapes, and case 12 pinned
+    #     only one. Case 12 builds nested `message.content` blocks, so its
+    #     twelve rows cannot reach the flat-record branch at all -- removing
+    #     that branch's `name not in TASK_OUTPUT_TOOLS` conjunct restored the
+    #     bypass verbatim while the whole suite still passed.
+    #
+    #     The transferable point, recorded because the aggregate pass count is
+    #     what hid it: when one fix touches two parallel paths, the mutation
+    #     check has to be run per path. A suite that exercises one shape cannot
+    #     fail on the other, so a single green total is evidence about neither.
+    #
+    #     OMO never populates `reviewer_task_ids` -- its result handler reads
+    #     no task ids -- so the exclusion is absolute there rather than a
+    #     reordering. A genuine OMO dispatch-then-retrieve costs nothing by it:
+    #     that shape returns no verdict on origin/main either.
+    #
+    #     One shape DOES lose authorization, and saying only the sentence above
+    #     hid it: a SINGLE flat OMO record under one of these names, dispatching
+    #     the reviewer and carrying the report in its own paired result, is
+    #     admitted on origin/main and denied here. Case 18 pins it. It is the
+    #     OMO twin of case 15's native `manage_task` dispatch and is tracked by
+    #     the same issue, ai-config#3746 -- the retrieval classification is what
+    #     decides both, so measuring it settles both.
+    for key in ("persona", "agent", "name", "subagentType"):
+        for out_tool in ("taskoutput", "task_output", "manage_task"):
+            rc, out = run_hook(PUSH, [
+                {"type": "tool_use", "timestamp": "2026-09-17T00:00:00Z",
+                 "tool_name": out_tool,
+                 "tool_input": {"task_id": "T7", key: "adversarial-reviewer"}},
+                {"type": "tool_result", "timestamp": "2026-09-17T00:00:01Z",
+                 "tool_name": out_tool, "tool_input": {},
+                 "tool_output": body(commit=HEAD)},
+            ])
+            nested = out.get("hookSpecificOutput") or {}
+            check(f"OMO `{out_tool}` labelled `{key}` does not authorize",
+                  rc == 0 and nested.get("permissionDecision") == "deny")
+
+    # 14. When the reported path is missing AND the fallback is missing too,
+    #     the denial must name the path the HARNESS reported. Cases 10 and 11
+    #     pin which transcript is read; neither pins what the message says when
+    #     neither exists, so dropping the `os.path.exists(fallback)` conjunct
+    #     passed the whole suite while silently sending the pusher to inspect
+    #     `~/.claude/transcripts/<id>.jsonl` -- a file their harness never
+    #     claimed to write. Both branches deny, so this is message quality
+    #     rather than authorization, and it is the whole point of the branch
+    #     the same change added: a remedy naming the wrong artifact is what
+    #     made ai-config#3707 read as a reviewer problem.
+    d = tempfile.mkdtemp(prefix="npwsr-codex-")
+    try:
+        reported = os.path.join(d, "reported-but-absent.jsonl")
+        rc, out = run_hook(
+            PUSH, None,
+            extra_env={"CLAUDE_CONFIG_DIR": d},
+            payload_extra={"transcript_path": reported,
+                           "session_id": "sess-no-fallback"})
+        nested = out.get("hookSpecificOutput") or {}
+        reason = nested.get("permissionDecisionReason", "")
+        check("a denial names the reported path, not a fallback that is also absent",
+              rc == 0 and nested.get("permissionDecision") == "deny"
+              and reported in reason)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+    # 15. `manage_task` used as a DISPATCHER is denied. Pinned rather than
+    #     argued: the repository has never measured whether Antigravity's
+    #     `manage_task` creates tasks as well as reporting on them, and
+    #     `TASK_OUTPUT_TOOLS` classifies it as retrieval-only on that
+    #     unmeasured inference. Listing it changed behaviour here from admitted
+    #     to denied, which is the safe direction for an authorization guard and
+    #     is not free -- this session gets ai-config#3707's own misleading
+    #     denial. ai-config#3746 tracks measuring it. This case exists so that
+    #     whichever answer arrives, the change is visible rather than silent.
+    rc, blocked, _ = push([
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "codex-mt", "name": "manage_task",
+             "input": {"Action": "create",
+                       "subagent_type": "adversarial-reviewer",
+                       "prompt": "Review the diff"}}]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": "codex-mt",
+             "content": body()}]}},
+    ])
+    check("`manage_task` used as a dispatcher does not authorize (unmeasured, ai-config#3746)",
+          rc == 0 and blocked)
+
+    # 16. A dispatch keyed on `role` authorizes. `Role` was already read here
+    #     and the two are one key in different casings, so reading one and not
+    #     the other is the same split-predicate defect the widening above was
+    #     for -- just inside this function rather than between two of them.
+    for tool in ("Agent", "spawn_agent"):
+        rc, blocked, _ = push(reviewed(tool=tool, key="role"))
+        check(f"a `{tool}` dispatch keyed on `role` authorizes", rc == 0 and not blocked)
+
+    # 17. A dispatch keyed on `attributionAgent` does NOT authorize, and that is
+    #     deliberate rather than an oversight. `_is_reviewer_record` reads that
+    #     key because it names who AUTHORED a transcript record; this function
+    #     reads a tool's INPUT, where the key means nothing. Pinned so that
+    #     "make the two predicates agree" cannot later be applied to it by
+    #     symmetry -- which is structural fit standing in for a transferred
+    #     purpose (`check-purpose-before-reusing`).
+    for tool in ("Agent", "spawn_agent"):
+        rc, blocked, _ = push(reviewed(tool=tool, key="attributionAgent"))
+        check(f"a `{tool}` dispatch keyed only on `attributionAgent` does not authorize",
+              rc == 0 and blocked)
+
+    # 18. The capability the OMO exclusion actually costs, pinned rather than
+    #     described. A single flat record under a retrieval tool name, which
+    #     dispatches the reviewer and carries the report in its own result, is
+    #     admitted on origin/main and denied here. Distinct from case 13, where
+    #     the persona label is a lie told over an unrelated agent's output; here
+    #     the dispatch is genuine and only the TOOL NAME is one this guard has
+    #     classified as retrieval. Denying it is the fail-closed direction of an
+    #     unmeasured classification (ai-config#3746), so this case exists to
+    #     make that cost visible, not to argue it is correct.
+    for out_tool in ("taskoutput", "task_output", "manage_task"):
+        rc, out = run_hook(PUSH, [
+            {"type": "tool_use", "timestamp": "2026-09-17T00:00:00Z",
+             "tool_name": out_tool,
+             "tool_input": {"subagentType": "adversarial-reviewer",
+                            "description": "review",
+                            "prompt": "Review the diff"}},
+            {"type": "tool_result", "timestamp": "2026-09-17T00:00:01Z",
+             "tool_name": out_tool, "tool_input": {},
+             "tool_output": body(commit=HEAD)},
+        ])
+        nested = out.get("hookSpecificOutput") or {}
+        check(f"OMO `{out_tool}` dispatching the reviewer does not authorize (ai-config#3746)",
+              rc == 0 and nested.get("permissionDecision") == "deny")
+
+    # The spellings `TASK_ID_KEYS` carries in the hook. Kept as a literal rather
+    # than imported, so a spelling silently dropped from the hook's tuple fails
+    # a case here instead of shrinking the matrix to match itself.
+    TASK_ID_SPELLINGS = ("task_id", "taskId", "TaskId", "conversationId",
+                         "agentId", "id")
+
+    def background_flow(result_key, retrieve_key, raw_result=None):
+        """A genuine background reviewer: dispatch, task id, retrieve, report.
+
+        `raw_result` replaces the JSON dispatch result with literal text, which
+        is the only way to reach the regex registrar -- a result that parses as
+        a dict never gets there.
+        """
+        announce = (raw_result if raw_result is not None
+                    else json.dumps({result_key: "T9"}))
+        return [
+            {"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "id": "codex-bg", "name": "Agent",
+                 "input": {"subagent_type": "adversarial-reviewer",
+                           "prompt": "Review the diff"}}]}},
+            {"type": "user", "message": {"content": [
+                {"type": "tool_result", "tool_use_id": "codex-bg",
+                 "content": announce}]}},
+            {"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "id": "codex-bg2", "name": "taskoutput",
+                 "input": {retrieve_key: "T9"}}]}},
+            {"type": "user", "message": {"content": [
+                {"type": "tool_result", "tool_use_id": "codex-bg2",
+                 "content": body()}]}},
+        ]
+
+    # 19. Every task-id spelling the retrieval side reads authorizes, and this
+    #     is now load-bearing rather than tidy. Before the reorder a retrieval
+    #     call had a second way through -- the persona path -- so a spelling
+    #     this list missed was caught by something else. That path was the
+    #     bypass, and closing it made this key list the ONLY provenance these
+    #     tools have, which converts every missing spelling into a denial of a
+    #     review that genuinely ran.
+    #
+    #     `taskId` was missing from both ends while `origin.get("taskId")` in
+    #     the task-notification branch read it, so the module knew the spelling
+    #     and the two gates carrying the weight did not. Case 12's own lesson
+    #     was that the fixture must vary the key under test; these rows carry
+    #     it to the id key, which the earlier rounds left pinned at `task_id`.
+    #     Round 6 widened both loops to the same tuple. They used to enumerate
+    #     the two ends' key lists SEPARATELY, which pinned the asymmetry in
+    #     place instead of catching it: `TaskId` was tested on the retrieval
+    #     side only and `conversationId` on the result side only, so each ran
+    #     green against the one end that read it while the other end did not.
+    #     A cross-product over one shared tuple is what makes a missing
+    #     spelling fail somewhere.
+    for retrieve_key in TASK_ID_SPELLINGS:
+        rc, blocked, _ = push(background_flow("task_id", retrieve_key))
+        check(f"a background review retrieved under `{retrieve_key}` authorizes",
+              rc == 0 and not blocked)
+
+    # 20. The producing half of the same chain. A task id is only in
+    #     `reviewer_task_ids` because the dispatch's own result registered it,
+    #     so a spelling missing HERE denies just as surely, one step earlier
+    #     and with nothing in the retrieval call to suggest why.
+    for result_key in TASK_ID_SPELLINGS:
+        rc, blocked, _ = push(background_flow(result_key, "task_id"))
+        check(f"a dispatch result announcing its task under `{result_key}` authorizes",
+              rc == 0 and not blocked)
+
+    #     And the cross-product, which is the only shape that can fail when the
+    #     two ends disagree. Either loop above holds one end at `task_id`, a
+    #     spelling both ends have always read, so both stay green under exactly
+    #     the defect round 6 found.
+    for result_key in TASK_ID_SPELLINGS:
+        for retrieve_key in TASK_ID_SPELLINGS:
+            rc, blocked, _ = push(background_flow(result_key, retrieve_key))
+            check(f"announced as `{result_key}`, retrieved as `{retrieve_key}`, authorizes",
+                  rc == 0 and not blocked)
+
+    # 21. `verify_review` DENIES a non-`str` transcript path rather than
+    #     raising. Called directly, because `main` always passes
+    #     `payload.get("transcript_path") or ""` and no transcript this suite
+    #     can write reaches the function with anything else -- so the guard
+    #     under test is unreachable through the hook binary, and a case that
+    #     went through it would assert nothing.
+    #
+    #     This pins the one conjunct in the function that reads inert and is
+    #     not. Two identical `transcript_path and` operands were removed from
+    #     the conditions below it, correctly: a preceding `return` had already
+    #     proven them. This one stands between a `None` and `os.path.exists`,
+    #     which raises. Mutation alone cannot tell the two situations apart --
+    #     without this case, deleting the operand passes the whole suite.
+    #
+    #     What this case does NOT do, contrary to what its first version said,
+    #     is close a fail-open. That claim was checked in round 6 and was
+    #     wrong: the sole caller's `or ""` already turned `None` into `""`
+    #     before it could arrive, so the `None` asserted here is a value the
+    #     binary could not produce. The real fail-open was one line earlier in
+    #     that caller, on the `list`/`dict`/`True` values `or ""` does NOT
+    #     rescue -- see case 22, which reaches it through the binary. Keeping
+    #     both cases, and this note: a test that pins a hypothetical caller is
+    #     worth having, and is not evidence about the reachable one.
+    spec = importlib.util.spec_from_file_location("npwsr_none_arg", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    #     `None` is the discriminating input and the only one asserted. An
+    #     int was tried first and is not: `os.path.exists(0)` tests FILE
+    #     DESCRIPTOR zero, which exists, so the mutant reads stdin and then
+    #     denies for a different reason -- a row that passes either way, and
+    #     touches stdin to do it.
+    try:
+        is_clean, reason = mod.verify_review(None, None, ["git", "push"], [])
+        ok = (not is_clean) and "No transcript available" in reason
+    except Exception as exc:
+        ok = False
+        reason = f"raised {type(exc).__name__}"
+    check(f"verify_review(None) denies rather than raising into the fail-open "
+          f"[got: {reason}]", ok)
+
+    # 22. A non-`str` `transcript_path` in the PAYLOAD denies, through the hook
+    #     binary. This is the reachable counterpart of case 21, and the one
+    #     that was actually failing open: `payload.get(...) or ""` rescues only
+    #     the FALSY non-`str` values, so a truthy `list` or `dict` reached
+    #     `os.path.exists`, which raises `TypeError` -- and that raise landed in
+    #     `main`'s deliberate `except Exception: return 0`. No denial, no
+    #     message, nothing in the transcript telling it apart from an
+    #     authorized push. Measured on `main` too, so it predates this branch
+    #     (ai-config#3752).
+    #
+    #     `True` is in the matrix for a reason a narrower fix would miss: it
+    #     never raised. `os.path.exists(True)` tests FILE DESCRIPTOR 1, which
+    #     exists, so the bool sailed past the check and into `verify_review`.
+    #     A fix aimed only at the `TypeError` would leave that row allowing.
+    for label, value in (("a null", None), ("an int", 123), ("a bool", True),
+                         ("a list", ["/tmp/x"]), ("a dict", {"p": 1}),
+                         ("an empty string", "")):
+        rc, blocked, reason = push(None, payload_extra={"transcript_path": value})
+        check(f"{label} `transcript_path` denies rather than failing open",
+              rc == 0 and blocked and "No transcript available" in reason)
+
+    # 22b. The task-notification `origin` envelope reads a NARROWER tuple, and
+    #      this is the case that keeps it narrow. `origin` identifies a
+    #      notification, so its `id` is the notification's own -- a different
+    #      identifier space from a task id, and matching it would test
+    #      membership for a value that never was one. Nothing else in the suite
+    #      distinguishes a deliberately-narrower list from a list somebody
+    #      forgot to widen, so a later round tidying the four sites into one
+    #      tuple would look like a cleanup and would silently widen this gate.
+    notif = [
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "codex-n1", "name": "Agent",
+             "input": {"subagent_type": "adversarial-reviewer",
+                       "prompt": "Review the diff"}}]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": "codex-n1",
+             "content": json.dumps({"task_id": "T9"})}]}},
+        {"type": "user", "origin": {"kind": "task-notification", "id": "T9"},
+         "message": {"content": [{"type": "text", "text": body()}]}},
+    ]
+    rc, blocked, _ = push(notif)
+    check("a task notification identifying its task only as `id` does not authorize",
+          rc == 0 and blocked)
+
+    # 22c. The same widening 22b keeps OUT of the origin gate has to be pinned
+    #      on the way IN, for the four spellings that belong there. Round 9
+    #      reverted this site to first-wins and all 439 cases still passed, so
+    #      the third of the three call sites the shared helper feeds was the one
+    #      nothing covered -- while the suite argued at length that a conjunct a
+    #      mutation cannot see still needs a direct case, and applied that to
+    #      the helper's two internal guards only (ai-config#3737 round 9).
+    #
+    #      `taskId` precedes `conversationId` in `TASK_ID_KEYS_ORIGIN`, so a
+    #      first-wins reader takes the decoy and denies a genuine notification.
+    notif_multi = [
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "codex-n2", "name": "Agent",
+             "input": {"subagent_type": "adversarial-reviewer",
+                       "prompt": "Review the diff"}}]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": "codex-n2",
+             "content": json.dumps({"conversationId": "C4"})}]}},
+        {"type": "user", "origin": {"kind": "task-notification",
+                                    "taskId": "UNRELATED-TASK",
+                                    "conversationId": "C4"},
+         "message": {"content": [{"type": "text", "text": body()}]}},
+    ]
+    rc, blocked, _ = push(notif_multi)
+    check("a task notification naming an unrelated task first and the "
+          "reviewer's own second authorizes", rc == 0 and not blocked)
+
+    #      Its negative control. Without it the row above is indistinguishable
+    #      from a fixture that authorizes for some other reason: when NO
+    #      spelling in the origin names a registered id, the push must be
+    #      denied. The VALUE is what varies, not the key -- membership tests the
+    #      value, which is the slip round 7 found twice in case 24.
+    notif_none = [
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "codex-n3", "name": "Agent",
+             "input": {"subagent_type": "adversarial-reviewer",
+                       "prompt": "Review the diff"}}]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": "codex-n3",
+             "content": json.dumps({"conversationId": "C4"})}]}},
+        {"type": "user", "origin": {"kind": "task-notification",
+                                    "taskId": "UNRELATED-TASK",
+                                    "conversationId": "NOT-REGISTERED"},
+         "message": {"content": [{"type": "text", "text": body()}]}},
+    ]
+    rc, blocked, _ = push(notif_none)
+    check("a task notification naming no registered id does not authorize",
+          rc == 0 and blocked)
+
+    # 23. The non-JSON registration path. A dispatch result that does not parse
+    #     as a dict never reaches the JSON branch, so this regex is the SOLE
+    #     registrar for a text-shaped announcement -- and deleting it left all
+    #     375 cases passing, which is how round 6 found it. An entire admitting
+    #     path with no case on it.
+    #
+    #     The regex is case-insensitive and tolerates the separator, so it
+    #     accepts spellings the JSON branch's tuple lists individually. A bare
+    #     `id:` is deliberately NOT among them: in free text that is far too
+    #     loose to be provenance, and unlike the JSON branch there is no key
+    #     structure to make it unambiguous.
+    for raw in ('Started background task. task_id: T9',
+                'Started background task. taskId: T9',
+                'Started background task. TaskId: T9',
+                'Started background task. task-id: T9',
+                'Started background task. task id: T9',
+                'Started background task. conversationId: T9',
+                'Started background task. agentId: T9'):
+        rc, blocked, _ = push(background_flow(None, "task_id", raw_result=raw))
+        spelling = raw.split(".")[1].split(":")[0].strip()
+        check(f"a text-shaped dispatch result announcing `{spelling}` authorizes",
+              rc == 0 and not blocked)
+
+    #     And the negative: free text carrying no recognizable task-id spelling
+    #     registers nothing, so the retrieval that follows has no provenance.
+    #     Without this row the case above cannot distinguish "the regex matched"
+    #     from "something else admitted the push".
+    rc, blocked, _ = push(background_flow(None, "task_id",
+                                          raw_result="Started background task. ref: T9"))
+    check("a text-shaped result with no task-id spelling does not authorize",
+          rc == 0 and blocked)
+
+    # 24. A dispatch result carrying MORE THAN ONE id spelling. Every row above
+    #     varies WHICH spelling each end uses and none varies HOW MANY, because
+    #     `background_flow` builds single-key dicts on both ends -- so a
+    #     producer that registered only the first spelling present passed the
+    #     whole 36-cell cross-product while denying the ordinary real shape,
+    #     which is a harness response carrying several id keys at once.
+    #
+    #     That is the same denial the shared tuple exists to prevent, reached by
+    #     a route the tuple cannot address: agreeing on the VOCABULARY does not
+    #     make the two ends agree on the VALUE when the vocabulary has several
+    #     words in it (ai-config#3737 round 7).
+    def multi_key_flow(result_keys, retrieve_key, retrieve_extra=None,
+                       retrieve_value="T9"):
+        """A dispatch result announcing several spellings of one task id."""
+        announce = json.dumps({k: v for k, v in result_keys})
+        inp = dict(retrieve_extra or {})
+        inp[retrieve_key] = retrieve_value
+        return [
+            {"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "id": "codex-mk", "name": "Agent",
+                 "input": {"subagent_type": "adversarial-reviewer",
+                           "prompt": "Review the diff"}}]}},
+            {"type": "user", "message": {"content": [
+                {"type": "tool_result", "tool_use_id": "codex-mk",
+                 "content": announce}]}},
+            {"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "id": "codex-mk2", "name": "taskoutput",
+                 "input": inp}]}},
+            {"type": "user", "message": {"content": [
+                {"type": "tool_result", "tool_use_id": "codex-mk2",
+                 "content": body()}]}},
+        ]
+
+    #     The two spellings carry DIFFERENT values, which is what makes these
+    #     rows discriminate. The first version gave both keys `T9`, and a
+    #     first-wins producer then registered `T9` anyway -- membership tests
+    #     the VALUE, so every row passed against the very code it was written
+    #     to catch, and the mutant survived the whole suite. The same
+    #     key-for-value slip appears in the negative control below; both were
+    #     found by mutation rather than by reading (ai-config#3737 round 7).
+    #
+    #     Distinct values are also the real shape: `taskId` and `conversationId`
+    #     name different identifier spaces, so a harness carrying both is
+    #     carrying two ids, not one id twice.
+    for (first, fval), (second, sval) in ((("taskId", "T9"), ("conversationId", "C4")),
+                                          (("conversationId", "C4"), ("agentId", "A2"))):
+        rc, blocked, _ = push(multi_key_flow(
+            ((first, fval), (second, sval)), second, retrieve_value=sval))
+        check(f"a result announcing `{first}`={fval} and `{second}`={sval}, "
+              f"retrieved as `{second}`, authorizes", rc == 0 and not blocked)
+
+    #     The generic `id` is deliberately NOT in that loop, and this row is
+    #     why. It used to sit there asserting that a result announcing
+    #     `task_id`=T9 and `id`=I7, retrieved as `id`, authorizes -- and that
+    #     assertion WAS the vulnerability, not a description of it. Registering
+    #     every spelling made the low-entropy `id` trusted alongside the real
+    #     one, so an unrelated task-output call that happened to carry the same
+    #     `id` authorized the push. Measured against `d25ea1e`: base DENY,
+    #     widened ALLOW (ai-config#3737 round 9).
+    #
+    #     `_registrable_task_ids` keeps `id` a LAST RESORT on the producing
+    #     end, so a specific spelling in the same result shadows it.
+    rc, blocked, _ = push(multi_key_flow(
+        (("task_id", "REAL-REVIEW-ABC"), ("id", "7")), "id", retrieve_value="7"))
+    check("a retrieval naming only the generic `id` is denied when the result "
+          "also announced a specific spelling", rc != 0 or blocked)
+
+    #     The other half of that boundary, and the reason `id` is shadowed
+    #     rather than dropped. Dropping it outright would close the collision
+    #     above by reopening the FALSE DENIAL this whole chain exists to
+    #     prevent: a result whose only id key is `id` would register nothing.
+    rc, blocked, _ = push(multi_key_flow(
+        (("id", "ONLY-ID-7"),), "id", retrieve_value="ONLY-ID-7"))
+    check("a result whose ONLY id spelling is the generic `id` still "
+          "authorizes a retrieval naming it", rc == 0 and not blocked)
+
+    #     The mirror, on the consuming end: the retrieval call carries an
+    #     unrelated id under an earlier spelling and the reviewer's own id under
+    #     a later one. A first-wins consumer reads the decoy and denies.
+    rc, blocked, _ = push(multi_key_flow(
+        (("task_id", "T9"),), "conversationId",
+        retrieve_extra={"task_id": "SOMETHING-ELSE"}))
+    check("a retrieval naming an unrelated id first and the reviewer's second "
+          "authorizes", rc == 0 and not blocked)
+
+    #     The negative control both rows need. Without it, "authorizes" above is
+    #     indistinguishable from a fixture that authorizes for some other
+    #     reason: if NO spelling in the retrieval names a registered id, the
+    #     push must still be denied.
+    #
+    #     The VALUE is what varies here, and the first version of this row got
+    #     that wrong: it changed only the key and kept `T9`, which is exactly
+    #     what membership tests, so the row failed as a false alarm against
+    #     correct code. Naming a different spelling of a registered id is not
+    #     an unregistered id.
+    rc, blocked, _ = push(multi_key_flow(
+        (("task_id", "T9"), ("conversationId", "T9")), "taskId",
+        retrieve_extra={"task_id": "SOMETHING-ELSE"},
+        retrieve_value="NOT-REGISTERED"))
+    check("a retrieval naming no registered id does not authorize",
+          rc == 0 and blocked)
+
+    # 25. The two conjuncts inside `_task_ids`, asserted directly. Both survived
+    #     out-of-tree mutation against all 416 cases in round 7 -- `isinstance`
+    #     relaxed to `is None`, and `str(v)` dropped -- so neither was pinned by
+    #     anything, in the same commit whose case 21 argues at length that a
+    #     conjunct mutation cannot see still needs a direct case.
+    #
+    #     Neither is decorative. `str()` is what lets a producer reporting an id
+    #     as a JSON number match a consumer quoting it as text; the `isinstance`
+    #     guard is what keeps a malformed `tool_input` from raising
+    #     `AttributeError` into a handler that reports "Failed reading
+    #     transcript" rather than evaluating the session.
+    spec_ids = importlib.util.spec_from_file_location("npwsr_task_ids", HOOK)
+    mod_ids = importlib.util.module_from_spec(spec_ids)
+    spec_ids.loader.exec_module(mod_ids)
+
+    for label, source in (("a list", ["task_id", "T9"]),
+                          ("a string", "task_id=T9"),
+                          ("None", None)):
+        try:
+            got = mod_ids._task_ids(source)
+            ok = got == []
+        except Exception as exc:
+            got = f"raised {type(exc).__name__}"
+            ok = False
+        check(f"`_task_ids` returns [] for {label}, rather than raising "
+              f"(got {got!r})", ok)
+
+    try:
+        got = mod_ids._task_ids({"task_id": 9})
+        ok = got == ["9"]
+    except Exception as exc:
+        got = f"raised {type(exc).__name__}"
+        ok = False
+    check(f"`_task_ids` coerces a numeric id to `str` (got {got!r})", ok)
+
+    return failures, ran
+
+
 def main():
     failed = 0
     extra = 0
@@ -2294,7 +2999,7 @@ def main():
                    structured_payload_cases, transcript_scoping_cases,
                    cd_tracking_cases, fallback_cases,
                    fingerprint_guidance_cases, fingerprint_resolution_cases,
-                   omo_cases, external_reviewer_cases,
+                   omo_cases, codex_cases, external_reviewer_cases,
                    symlinked_plugin_root_cases):
             f, r = fn()
             failed += f

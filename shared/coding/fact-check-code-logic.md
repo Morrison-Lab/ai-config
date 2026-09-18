@@ -265,6 +265,26 @@ The pass count is routinely quoted in commit messages and reviews as evidence of
 A third instance in the same suite iterated the flag list, so dropping the flag that marks harness-injected records stayed green.
 The malformed-mutant hazard was hit in the same session while checking these very fixes.)
 
+**Fourth occurrence, 2026-09-17 on [ai-config#3737](https://github.com/Morrison-Lab/ai-config/pull/3737) round 9, `hooks/test-warn-unmeasured-capability-claim.py`.**
+Its surfaces case is exactly this shape:
+
+```python
+for tool in hook.MCP_POST_TOOLS:            # generates one case per entry
+    fired, _ = run(mcp(REAL_2, tool=tool))
+    check(f"`{tool}` is in scope", fired is True)
+```
+
+Verified by reproducing the suite (97 cases, all passing) and re-running it
+against a copy of the sibling module with its shared `MCP_POST_TOOLS`
+constant renamed, which forces the hook's `getattr(..., MCP_POST_TOOLS,
+<fallback tuple>)` to fall through to its own hand-written fallback: the
+suite still reports `All 97 cases passed`, because the fallback tuple
+duplicates the same five members the generated loop already iterates.
+This file's own remedy is already present for one member --- a by-name
+check that `"mcp__github__discussion_comment_write" in hook.MCP_POST_TOOLS`
+--- which pins that one entry against deletion but not the other seven, so
+the class is only partly closed rather than absent.)
+
 ### A verdict script must not grep an interpreter's own echoed source
 
 Some interpreters echo the source they were handed before executing it, so a
@@ -544,6 +564,11 @@ for eight of the nine;
 against a source outside the diff instead, since there is no correct fix yet
 to mutate away from.
 
+A tenth failure mode lives at the SUITE level rather than in any one test.
+When a fix is applied identically to two parallel code paths --- two transcript shapes, two harness formats, any pair of branches implementing one logical rule --- a single combined pass/fail total is not evidence about either path on its own.
+A suite whose cases concentrate on one shape can report every case passing with the other shape's half of the fix fully reverted, simply because nothing in the suite ever exercises that shape's branch.
+The total reads as coverage of "the fix" when it is coverage of one of its two copies.
+
 - **Do:** mutate the exact fix and watch the new test fail before trusting it.
 - **Do:** route the fixture through the real entry point
   and confirm it reaches the branch whose behaviour the test names.
@@ -553,6 +578,9 @@ to mutate away from.
 - **Do:** give a mapping or ordering bug a fixture whose order differs
   from the implementation's,
   since the two paths agree on every fixture that shares it.
+- **Do:** when a fix touches two parallel code paths, mutate (revert) each path's own copy separately and confirm a case fails for that specific reversion --- run the mutation once per path, not once for the suite.
+- **Don't:** read a single aggregate PASS total as having pinned every path a fix touches;
+  a suite concentrated on one shape can stay green with the other shape's half of the fix reverted out entirely.
 - **Don't:** accept a test because it mentions the helper that changed,
   or because a coverage report marks the line covered.
 - **Don't:** trust a test label as evidence of what the assertion checks.
@@ -1191,6 +1219,27 @@ The four comment lines directly above went untouched, so they still said 6, thei
 Only the directive line was ever read.
 An AI reviewer returned "Needs more work" on the contradiction.)
 
+## A disclosed gap next to an undisclosed one makes the second read as checked
+
+When two adjacent comments each classify or assert something about the code, and only one of them labels its own uncertainty, the labelled one does not just describe itself --- it changes how the unlabelled one reads.
+A reader (including the author, on a later pass) sees the careful hedging on the first claim and infers the same diligence was applied to its neighbour, precisely because the neighbour offers no hedge to notice.
+Disclosure discipline applied unevenly within one change is worse than applied nowhere: an undisclosed guess sitting alone reads as a guess, while the same guess sitting beside a disclosed one reads as verified.
+
+This is a distinct failure from stating a claim confidently in isolation.
+The mechanism here is contrast: the disclosed neighbour is what manufactures the undisclosed claim's appearance of having been checked, so the tell is "does this comment have a sibling that hedges, right where this one doesn't."
+
+- **Do:** when one classification in a group carries a disclosed gap (unmeasured, inferred, unattested), audit every sibling classification in the same comment or block for the same standard, not just the one already flagged.
+- **Do:** state the actual evidence for a classification next to the classification itself --- "the repo's only evidence is X, which does not cover Y" --- rather than a bare assertion, so a reader can tell it apart from a measured fact without needing a neighbour's hedge as a contrast.
+- **Don't:** leave one classification in a group stated as flat fact while a sibling in the same group is explicitly labelled as inference or unmeasured --- fix the labelling in the same pass that adds the disclosed one, not in a later round.
+- **Don't:** treat "I disclosed the other gap" as having discharged scrutiny on the whole group;
+  disclosure of one item says nothing about a different item's evidence.
+
+(Morrison-Lab/ai-config#3707, commit `0a125ec`, 2026-09-17: a hook's dispatch-tool-name set carried two comments about names added on incomplete evidence.
+One explicitly said "`collaboration.spawn_agent` is the name a reporter used for the interface in prose;
+nothing here has measured it as the name a transcript carries" --- a disclosed, cited gap.
+Three entries later, `manage_task` was classified retrieval-only with no such hedge, stated as settled fact, though the repository's only evidence for it (three files, two showing `Action='status'` and the third naming the tool with no `Action` at all) never covers the creation case the classification also assumes.
+A review round found it by asking whether every classification in the group met the same bar the disclosed one had already set, not by doubting the `manage_task` line on its own.)
+
 ## A comment asserting the state of ANOTHER artifact is a claim with an expiry across commits
 
 A comment asserting facts about *another* file, prompt format, or test expectation
@@ -1429,6 +1478,26 @@ ordinary commit, the same failure mode the heuristic existed to prevent.
 Caught and fixed before merge, so the shipped hook implements the correct
 precedence; the false rationale never reached `main`, but it did reach a
 draft of the code that acted on it.)
+
+**Second occurrence, 2026-09-17, `ai-config#3737` round 9, and the false
+claim is about what a POSITION anchor excludes rather than about a git
+command.**
+`hooks/warn-unmeasured-capability-claim.py` gates a forge-write command on
+one of several position-anchored regexes (`RX_COMMENT_POST`, `RX_GLAB_POST`,
+`RX_GH_CREATE_EDIT`), each anchored with `(?:^|[;&|\n])` so the command must
+start a line or a statement.
+A comment beside the gate reads: "Each shape is position-anchored, so prose
+or a heredoc quoting the command does not count as issuing it."
+That is false for the heredoc half, and the code built from it is wrong in
+exactly the way the belonged-elsewhere case above is not: a `cat <<'EOF' ...
+EOF` heredoc's body is literal text whose every line begins right after a
+`\n`, which is the same character the anchor accepts as a line start, so a
+heredoc merely documenting a `gh pr comment` invocation is read as issuing
+one.
+Reproduced directly: `RX_COMMENT_POST.search()` against a heredoc body
+quoting `gh pr comment 123 --body "hi"` inside a `cat <<'EOF2' > /tmp/notes.md`
+block returns a match at the embedded line, confirming the gate fires on
+exactly the case the comment says it does not.)
 
 ## A reported digit finer than its Monte Carlo error is a claim about precision
 

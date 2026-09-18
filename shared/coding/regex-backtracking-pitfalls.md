@@ -40,6 +40,58 @@ If branch A and branch B can consume the same leading character
 (such as `\([^()\n]{0,120}\)` and `[^,:;.!?]`, both of which consume `(`),
 a failing input like `"(1) " * 24` triggers exponential backtracking.
 
+## Backtracking through an optional group can defeat a following negative lookahead
+
+Catastrophic backtracking wastes time; this failure wastes correctness while
+running instantly, so nothing about a slow run flags it.
+A negative lookahead placed immediately after an optional group is
+positioned to reject the specific token that follows the group when it is
+present --- but a regex engine tries the group's "present" branch first and
+only falls back to its "absent" branch if the rest of the pattern then
+fails.
+So a lookahead written to suppress one phrase can still match, provided some
+*other* token after the optional group makes the whole match succeed with
+the group absorbed as absent.
+
+```python
+r"no (?:\w+ ){0,3}(?:can|will|could) (?:ever )?(?!be\b)\w+"
+```
+
+`(?!be\b)` was added to stop this pattern matching "will be needed" and
+"will be required" --- ordinary, non-absolute prose.
+It stops the literal case, "no X will be ...", because there the group is
+empty and the lookahead sits directly before `be`.
+It does not stop "no X will *ever* be ...": the engine first tries `(?:ever
+)?` present, lands on `be`, and the lookahead --- which only inspects the
+text immediately to its right --- has nothing to say about the `ever` that
+already matched behind it.
+The suppression and the phrase it was written for are separated by exactly
+the group the fix never accounted for.
+
+(Measured 2026-09-17 on `ai-config#3737`,
+`hooks/warn-unmeasured-capability-claim.py`'s `RX_ABSOLUTE`.
+Reproduced directly against the shipped pattern: `"No hooks can be read"` ---
+a genuine absolute-capability claim, the true positive this hook exists to
+catch --- does not match, because there the lookahead does sit directly
+before `be`.
+`"No changes will ever be needed"` --- ordinary prose, the exact false
+positive `(?!be\b)` was added to suppress --- does match, at `"No changes
+will ever"`, because the optional `ever` gave the engine a way in that skips
+past the lookahead's blind spot entirely.)
+
+- **Do:** test a negative lookahead placed after an optional group against
+  the phrase with the optional part **both present and absent**; a fix
+  verified only on the absent case has not exercised the group at all.
+- **Do:** move the exclusion to look past the optional group too --- a
+  lookahead of `(?!(?:ever )?be\b)` covers both branches the group can take
+  --- when the group's content should not change what gets excluded.
+- **Don't:** trust that a lookahead "right before" the token it excludes
+  covers every path to that token; an optional group upstream is a second
+  path the lookahead never sees.
+- **Don't:** treat the false positive the lookahead was written for as
+  fixed once one phrasing of it stops matching; vary the optional pieces of
+  the match and re-test.
+
 ## Remedies
 
 1. **Replace nested quantifiers with linear scans.**

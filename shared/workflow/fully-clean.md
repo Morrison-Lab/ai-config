@@ -1041,8 +1041,42 @@ so a human's comment carrying verdict-shaped text enters on body text alone.
   read the matched pattern and reword your own comment,
   rather than requesting another bot round that cannot supersede it.
 - **Don't:** write "Blocking", "Changes requested", "Rejected",
+  "Needs more work",
   or the other not-clean vocabulary in a comment you post on your own PR,
   even inside "X: Addressed".
+
+**Quoting a reviewer's verdict is the same hazard, and it is the likelier one,
+because quoting reads as reporting rather than as declaring.**
+The bullets above govern vocabulary you write as your own disposition.
+They do not obviously cover the sentence that opens a review-response
+comment --- "the review returned **Needs more work** with five findings" ---
+which is a factual report about a round you have just closed, and feels like
+the opposite of asserting a verdict.
+The scanner cannot tell the two apart, so a comment announcing that every
+finding is fixed scores the PR not-clean on its own first line.
+
+Single backticks are the fix, not bold and not double backticks:
+`strip_cited_finding_vocab` blanks single-backtick spans only
+(ai-config#2449), so a bolded or double-backticked quotation stays live in
+the scan.
+Note that "Needs more work" is this repo's reviewer's own verdict string,
+which is exactly why it is the phrase a response comment quotes.
+
+- **Do:** single-backtick every verdict phrase you quote, including in a
+  comment reporting that the round is resolved.
+- **Don't:** bold it for emphasis --- that is the formatting the sentence
+  invites, and it leaves the phrase live.
+
+(Measured 2026-09-17 on ai-config#3750: a review-response comment opened
+"An adversarial subagent review of `f8d7aec6` returned **Needs more work**
+with five findings", and `check-pr-fully-clean.py` then reported
+`examined 1 dated automated review item(s), 1 bore a verdict, latest =
+not-clean`, naming the comment's own author as the not-clean reviewer.
+Single-backticking the phrase took the same scan to
+`0 bore a verdict, latest = NONE`.
+The repo's `claude-review.yml` prompt-addendum already warns the *reviewer*
+about this at length, citing #2449 and #2497;
+nothing warned the author writing back.)
 - **Don't:** expect a later "all addressed" comment of yours to clear it;
   as of 2026-09-09 the phrase scan does not read that shape as clean.
 

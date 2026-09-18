@@ -285,6 +285,125 @@ fired, _ = run(bash(
     'echo "run gh issue comment 1 --body \\"the harness is unavailable\\" later"'))
 check("prose quoting a forge command is not a forge write", fired is False)
 
+#     A HEREDOC body is a different matter, and the comment in `_extract_body`
+#     used to claim otherwise. `(?:^|[;&|\n])` treats a newline as a command
+#     boundary and every line of a heredoc body begins after one, so a document
+#     quoting a forge command fires. Pinned as the CURRENT behaviour, with the
+#     tradeoff stated at the call site: the claim was the defect, not the
+#     behaviour (ai-config#3737 round 9).
+fired, _ = run(bash(
+    "cat <<'DOC' > /tmp/capclaim-doc.md\n"
+    'gh pr comment 1 --body "the chain is unbuildable in this harness"\n'
+    "DOC"))
+check("a heredoc body quoting a forge command fires, as the code does",
+      fired is True)
+
+# --- 7b. Surfaces: the FILE-based body routes -------------------------------
+#     This corpus mandates `--body-file` / `-F body=@<file>` for any body
+#     carrying backticks, which a capability claim quoting a tool name
+#     routinely does, and `skills/ard/SKILL.md:137` posts its round summary as
+#     `glab mr note <N> -F ard-summary.md`. Round 9 measured every one of these
+#     blind while the inline `--body` form fired, so three of the four routes a
+#     real session uses reached nothing (ai-config#3737 round 9).
+#
+#     `glab`'s `-F` takes a BARE filename where `gh api`'s takes `body=@file`,
+#     which is why the sibling's extractor cannot carry it and this hook adds
+#     its own, scoped to a command already matched as a `glab` note.
+_BODY_DIR = tempfile.mkdtemp(prefix="capclaim-bodies-")
+_CLAIM_FILE = os.path.join(_BODY_DIR, "claim.md")
+with open(_CLAIM_FILE, "w", encoding="utf-8") as _fh:
+    _fh.write("The provenance chain is unbuildable in this harness for any hook.")
+_BENIGN_FILE = os.path.join(_BODY_DIR, "benign.md")
+with open(_BENIGN_FILE, "w", encoding="utf-8") as _fh:
+    _fh.write("Routine status update. Nothing absolute is claimed here.")
+_ABSENT_FILE = os.path.join(_BODY_DIR, "absent.md")
+
+
+def bash_in(command):
+    return {"tool_name": "Bash", "tool_input": {"command": command},
+            "cwd": _BODY_DIR}
+
+
+for label, cmd in (
+        ("gh --body-file", f"gh pr comment 1 --body-file {_CLAIM_FILE}"),
+        ("gh api -F body=@",
+         f"gh api repos/o/r/issues/1/comments -F body=@{_CLAIM_FILE}"),
+        ("glab -F <file>", f"glab mr note 1 -F {_CLAIM_FILE}"),
+        ("glab --file", f"glab issue note 1 --file {_CLAIM_FILE}"),
+):
+    fired, _ = run(bash_in(cmd))
+    check(f"a claim posted via `{label}` fires", fired is True)
+
+#     The negative controls these rows need. Without them "fires" above is
+#     indistinguishable from a rule that fires on any command mentioning a
+#     path: the file's CONTENT has to be what decides it.
+fired, _ = run(bash_in(f"gh pr comment 1 --body-file {_BENIGN_FILE}"))
+check("a file-based body with no absolute claim stays silent", fired is False)
+
+fired, _ = run(bash_in(f"gh pr comment 1 --body-file {_ABSENT_FILE}"))
+check("an unreadable file-based body fails open rather than firing",
+      fired is False)
+
+#     `-F` means `body=@file` in `gh api` and a bare filename in `glab`, so the
+#     glab reader is scoped to a glab note. A `gh api -F foo=bar` must not be
+#     read as a path.
+fired, _ = run(bash_in("gh api repos/o/r/x -F foo=bar"))
+check("a `gh api -F` field that is not a body is not read as a path",
+      fired is False)
+
+#     Relative paths resolve against the payload's `cwd`, which is how a real
+#     session writes them.
+fired, _ = run(bash_in("gh pr comment 1 --body-file claim.md"))
+check("a relative file-based body resolves against the payload cwd",
+      fired is True)
+
+# --- 7c. The sibling fallback is a copy, so pin it to its source -------------
+#     `MCP_POST_TOOLS` is taken from `require-agent-disclosure.py` with a
+#     hand-written `getattr` default. Round 9 measured that default failing
+#     SILENT: renaming the sibling left all 97 cases passing, while the other
+#     sibling's `re.compile(r"(?!)")` default failed loud and dropped four.
+#     The comment above the fallback says a hand-maintained copy "is how a
+#     surface goes missing", and the fallback is one (ai-config#3737 round 9).
+#
+#     Comparing it to its source is what makes it safe to keep: the literal is
+#     still there so the hook degrades rather than crashing, and drift or a
+#     rename now fails here instead of silently freezing the surface list.
+_canon_tools = None
+try:
+    _canonical = importlib.util.spec_from_file_location(
+        "capclaim_disclosure",
+        os.path.join(os.path.dirname(HOOK), "require-agent-disclosure.py"))
+    _canon_mod = importlib.util.module_from_spec(_canonical)
+    _canonical.loader.exec_module(_canon_mod)
+    _canon_tools = getattr(_canon_mod, "MCP_POST_TOOLS", None)
+except Exception:
+    _canon_tools = None
+
+#     Caught rather than raised, so a renamed or moved sibling fails HERE as a
+#     named case. Letting it raise would abort the run, which reports a broken
+#     suite rather than a broken import.
+check("the canonical sibling still exposes MCP_POST_TOOLS",
+      isinstance(_canon_tools, tuple) and bool(_canon_tools))
+check("every canonical post tool is in this hook's tuple",
+      bool(_canon_tools) and set(_canon_tools) <= set(hook.MCP_POST_TOOLS))
+
+#     The fallback literal is the copy the comment warns about. Comparing it to
+#     its source is the whole reason it is a named constant: drift between the
+#     two now fails, where before renaming the sibling passed 97 of 97.
+check("the fallback literal still matches the canonical tuple",
+      bool(_canon_tools) and set(hook._FALLBACK_POST_TOOLS) == set(_canon_tools))
+
+#     And the extras, named as LITERALS rather than derived from the hook's own
+#     tuple. Section 6 loops over `hook.MCP_POST_TOOLS`, so dropping an entry
+#     deletes its own case -- round 9 dropped two and the suite still passed.
+#     Coverage of the ADD direction is not coverage of the REMOVE direction.
+for _extra in ("mcp__github__issue_write",
+               "mcp__github__update_pull_request",
+               "mcp__github__create_pull_request",
+               "mcp__github__discussion_comment_write"):
+    check(f"`{_extra}` is still a covered surface",
+          _extra in hook.MCP_POST_TOOLS)
+
 # --- 8. The quote the reminder actually shows -------------------------------
 #     `_quote` used a bare `.` as a sentence boundary, so a decimal, a fragment
 #     filename or a URL earlier in the body truncated the quote mid-token. The

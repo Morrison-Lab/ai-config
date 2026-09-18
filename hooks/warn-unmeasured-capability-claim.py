@@ -118,13 +118,21 @@ _rebuttal = _sibling("flag-uncited-rebuttal.py", "_sib_capability_rebuttal")
 # tuple itself is ruled out at `flag-unread-commit-citation.py` -- a sibling
 # imports it and the meaning of that import would change -- so the extras this
 # hook needs are added here, where they affect nothing else.
-_CANONICAL_POST_TOOLS = getattr(_disclosure, "MCP_POST_TOOLS", (
+# NAMED rather than inline in the `getattr` call, so the suite can compare it
+# to the source it copies. Round 9 measured this fallback failing SILENT:
+# renaming the sibling left every case passing, while the other sibling's
+# `re.compile(r"(?!)")` default failed loud. A default that is a copy of the
+# thing it stands in for cannot be checked unless something can reach it
+# (ai-config#3737 round 9).
+_FALLBACK_POST_TOOLS = (
     "mcp__github__add_issue_comment",
     "mcp__github__add_comment_to_pending_review",
     "mcp__github__add_reply_to_pull_request_comment",
     "mcp__github__pull_request_review_write",
     "mcp__github__discussion_comment_write",
-))
+)
+_CANONICAL_POST_TOOLS = getattr(
+    _disclosure, "MCP_POST_TOOLS", _FALLBACK_POST_TOOLS)
 MCP_POST_TOOLS = tuple(dict.fromkeys(_CANONICAL_POST_TOOLS + (
     "mcp__github__issue_write",
     "mcp__github__update_pull_request",
@@ -139,6 +147,27 @@ BASH_TOOL_NAMES = ("Bash", "bash", "run_command", "execute_command", "terminal",
 # this corpus documents and uses (ai-config#3737 round 8).
 _NEVER = re.compile(r"(?!)")
 RX_COMMENT_POST = getattr(_rebuttal, "RX_COMMENT_POST", _NEVER)
+
+# The sibling also carries the only body extractor in this corpus that reads
+# the FILE-based forms. Round 9 measured this hook blind to all of them:
+# `--body-file` and `-F body=@file` posted the claim and nothing fired, while
+# the inline `--body` form did. Those are not exotic spellings -- CLAUDE.md
+# mandates them for any body carrying backticks, which a capability claim
+# quoting a tool name or an `is unavailable` span routinely does, and
+# `skills/ard/SKILL.md` posts its round summary that way (ai-config#3737
+# round 9).
+#
+# The first revision took the sibling's DETECTION half and re-derived a weaker
+# EXTRACTION half, which is the same split the comment above warns about one
+# surface up.
+_EXTRACT_BODY_TEXT = getattr(_rebuttal, "extract_body_text", None)
+
+# `glab`'s own file flag, which the sibling's extractor cannot carry: in
+# `gh api` the spelling is `-F body=@file`, and in `glab` it is a BARE
+# filename (`glab mr note <N> -F ard-summary.md`, `skills/ard/SKILL.md:137`).
+# Scoped to a command `RX_GLAB_POST` already matched, so `gh api -F foo=bar`
+# can never be read as a path.
+RX_GLAB_BODY_FILE = re.compile(r"(?:-F|--file)[= ]+(?:\"([^\"]+)\"|'([^']+)'|(\S+))")
 RX_REVIEW_POST = re.compile(
     r"(?:^|[;&|\n])\s*"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
@@ -149,8 +178,8 @@ RX_REVIEW_POST = re.compile(
 # `glab`'s note forms, which no sibling carries. `skills/gi/SKILL.md` uses
 # `glab issue note <N> --message`, `skills/ard/SKILL.md` uses `glab mr note
 # <N> -F`, and `skills/claim-pr/SKILL.md` uses `glab mr note create <N>`.
-# Position-anchored like the sibling, so prose quoting the command does not
-# fire.
+# Position-anchored like the sibling, so an inline `echo` quoting the command
+# does not fire. A heredoc body does -- see `_extract_body`.
 RX_GLAB_POST = re.compile(
     r"(?:^|[;&|\n])\s*"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
@@ -252,7 +281,7 @@ A forge comment outlives the session and gets read by people who were not
 here, so this one needs a public retraction if it is wrong."""
 
 
-def _extract_body(tool_name, tool_input):
+def _extract_body(tool_name, tool_input, cwd=""):
     """(body, surface) for a forge write, or (None, None)."""
     if not isinstance(tool_input, dict):
         return None, None
@@ -268,13 +297,47 @@ def _extract_body(tool_name, tool_input):
         if not isinstance(command, str):
             return None, None
         # Only a forge write; a local `git commit -m` is not this surface.
-        # Each shape is position-anchored, so prose or a heredoc quoting the
-        # command does not count as issuing it.
+        #
+        # Each shape is position-anchored, so an inline `echo "gh pr comment
+        # ..."` does not count as issuing it. A HEREDOC BODY is not covered by
+        # that, and the previous wording claimed it was: `(?:^|[;&|\n])` treats
+        # a newline as a command boundary, and every line of a heredoc body
+        # begins after one. Measured -- `cat <<'EOF' > doc.md` followed by a
+        # `gh pr comment` line posts nothing and fires (ai-config#3737 round 9).
+        #
+        # Left as is rather than fixed. This hook is advisory, so the cost is a
+        # spurious reminder on a document that quotes a forge command, against
+        # the cost of teaching every shape to skip heredoc bodies. The claim
+        # was the defect, not the behaviour.
         if not (RX_COMMENT_POST.search(command)
                 or RX_REVIEW_POST.search(command)
                 or RX_GLAB_POST.search(command)
                 or RX_GH_CREATE_EDIT.search(command)):
             return None, None
+        # A file-based body is the corpus's own default route, so read it. The
+        # extractor fails open (returns None on a missing or unreadable file),
+        # and a None falls through to scanning the command text, which is what
+        # this did for every shape before.
+        base = cwd or os.getcwd()
+        if _EXTRACT_BODY_TEXT is not None:
+            try:
+                from_file = _EXTRACT_BODY_TEXT(command, base)
+            except Exception:
+                from_file = None
+            if isinstance(from_file, str) and from_file.strip():
+                return from_file, "forge command"
+        if RX_GLAB_POST.search(command):
+            m = RX_GLAB_BODY_FILE.search(command)
+            if m:
+                rel = next((g for g in m.groups() if g), "")
+                path = rel if os.path.isabs(rel) else os.path.join(base, rel)
+                try:
+                    with open(path, encoding="utf-8", errors="replace") as fh:
+                        text = fh.read()
+                except OSError:
+                    text = ""
+                if text.strip():
+                    return text, "forge command"
         return command, "forge command"
     return None, None
 
@@ -326,7 +389,8 @@ def main() -> int:
 
     try:
         tool_name = payload.get("tool_name") or ""
-        body, surface = _extract_body(tool_name, payload.get("tool_input") or {})
+        body, surface = _extract_body(tool_name, payload.get("tool_input") or {},
+                                     payload.get("cwd") or "")
         if not body:
             return 0
 

@@ -420,10 +420,10 @@ A reviewer that can edit turns a finding into a silent fix, which loses the find
 "Its own context window" above rules out reviewing in the author's own turn.
 It does not by itself rule out a second failure with the same shape: resuming the *same* reviewer session across rounds (`SendMessage` back to an existing subagent) instead of dispatching a new one each time.
 A resumed reviewer keeps its own context window separate from the author's, so it still satisfies the first bullet.
-What it no longer has is independence from **itself** --- round 4 of a resumed reviewer is reading the diff with round 1 through 3's own conclusions already in its context, which is [`learn-from-review-findings`](learn-from-review-findings.md)'s convergence pattern happening *inside one reviewer* rather than across a series of different ones.
+What it no longer has is independence from **itself** --- a later round of a resumed reviewer is reading the diff with every earlier round's own conclusions already in its context, which is [`learn-from-review-findings`](learn-from-review-findings.md)'s convergence pattern happening *inside one reviewer* rather than across a series of different ones.
 Findings-per-round on a resumed reviewer characteristically decline toward zero, and the decline is not evidence the diff has actually gotten cleaner --- it is at least partly the reviewer running out of things it has not already told itself are fine.
 
-This is the same failure "The PR's own review history is rationale you cannot withhold" describes below, one layer more direct: there a *fresh* reviewer inherits the narrowing by reading about prior rounds in the artifact, while here the reviewer does not need to read about its own prior rounds because it remembers making them.
+This is the same failure ["The PR's own review history is rationale you cannot withhold"](#the-prs-own-review-history-is-rationale-you-cannot-withhold) describes, one layer more direct: there a *fresh* reviewer inherits the narrowing by reading about prior rounds in the artifact, while here the reviewer does not need to read about its own prior rounds because it remembers making them.
 
 A resumed reviewer is not useless.
 It is the right tool for a narrower job: confirming that the specific findings *it already raised* were actually fixed, where continuity of context is exactly what makes it efficient.
@@ -435,7 +435,7 @@ What it cannot do is supply the go/no-go verdict that gates a push or a merge, b
 - **Don't:** read "an `Agent` call was made" alone as satisfying independence --- a resumed call was made and still fails this bullet.
 
 (Measured 2026-09-18 on a Lacaedemon/sparta session, `fix/1601-baseline-tolerance-band` / [Lacaedemon/sparta#1603](https://github.com/Lacaedemon/sparta/pull/1603).
-An `adversarial-reviewer` subagent was dispatched once and then resumed four times via `SendMessage` against an evolving diff.
+An `adversarial-reviewer` subagent was dispatched once and then resumed three times via `SendMessage` against an evolving diff, for four rounds total.
 Its findings per round went 6, 3, 2, 0, converging on "Ready for merge".
 Three separate **fresh** dispatches against the same evolving diff each then found a real defect the resumed reviewer had passed over, corroborated by the PR's own fix commits, each of which names its own independently-dispatched reviewer number in its message, up to a sixth.
 A corrupt-but-present baseline unpacked without raising, so the old gate read it as "no baseline" and routed the run into the bootstrap branch instead of reporting it as corrupt (commit `e21f2a4e`, "Three findings from a fourth independently-dispatched reviewer").

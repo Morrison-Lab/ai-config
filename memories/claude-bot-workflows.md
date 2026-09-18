@@ -1060,9 +1060,30 @@ the `claude[bot]` App identity:
 - That one comment skipped **Antigravity Code Review** and **Jules PR Review**
   in the same second, so this is not one reviewer's own gate.
 
-Both documented fallbacks therefore fail from a bot identity:
-`workflow_dispatch` binds its check runs to the dispatched ref rather than the
-PR head and short-circuits (gha#368), and a comment never reaches the agent.
+A comment from a bot identity therefore never reaches the agent.
+The `workflow_dispatch` fallback is a separate story, and a coarse reading of
+it is wrong in both directions.
+Three dispatches were observed on 2026-09-18 between 05:43 and 05:53:
+
+| run | bound ref | outcome |
+| --- | --- | --- |
+| `35311949751` | `d36a6a62`, PR #3762's own head | all seven `review /` jobs succeeded; posted a real verdict |
+| `35312346178` | `aa32a3c1`, `main` | `claude-review` short-circuited; posted the gha#543 caution **onto #3762** |
+| `35312509759` | `26fd21fb`, PR #3763's own head | short-circuited too, with the right ref |
+
+So binding to the wrong ref (gha#368) and the action exiting without an
+execution result are **two independent failures**, and neither is universal:
+a dispatch can bind correctly and still short-circuit, and one of the three
+did neither and produced a usable verdict.
+
+Two consequences worth holding on to.
+A dispatch bound to `main` attaches its red check runs to `main`, so the PR it
+posted a caution onto still reads green on its own head --- the caution and
+the check state disagree by construction, and only the caution is about that
+PR.
+And the caution's wording, "this PR has **not** been reviewed", is a claim
+about *its own run*, not about the PR: an earlier run on the same head may
+already have posted a verdict, as happened on #3762.
 
 - **Do:** have a human push, or post `@claude review`, from their own account.
   A User-actor event passes the filter.

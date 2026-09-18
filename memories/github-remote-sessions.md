@@ -183,7 +183,7 @@ PRs the scorer had just passed:
   through the Bash tool is refused by the Claude Code **auto mode classifier**,
   with reason `[Merge Without Review]`.
   The refusal is client-side, so nothing about the token, the proxy, or the
-  PR's state changes it --- an active `mwc` grant and a `check-pr-fully-clean`
+  PR's state changes it --- an active `mwc` grant and a `check-pr-fully-clean.py`
   exit 0 both leave it in place.
 - `mcp__github__merge_pull_request` performs the same merge with no prompt.
   It is not a bypass, and the reason is **not** that the authorization hook has
@@ -223,6 +223,71 @@ above.
   grant and the route are separate questions.
 - **Don't:** treat a `dirty` or `unknown` reading taken seconds after a merge
   as a conflict.
+
+## Scoring and merging are not atomic, and the merge identity attributes nothing
+
+Two findings measured 2026-09-18 by a peer project-thread session driving
+[#3737](https://github.com/Morrison-Lab/ai-config/pull/3737) to its merge, and
+handed over rather than published separately.
+
+**A verdict is a reading of one commit, and the head can move between the score
+and the merge.**
+`check-pr-fully-clean.py` exited 0 on `a83e5d33` at 07:01 UTC;
+the squash merge about ninety seconds later returned
+`409 Head branch was modified`, because the repository owner had merged `main`
+into that branch at 07:02:13.
+The 409 is the protection working, and it only fires because the merge call
+pinned the head it had scored.
+
+The tempting recovery is the wrong one: retrying with the new SHA ships a
+commit no instrument evaluated, while the verdict in hand describes the commit
+that is no longer there.
+Re-query, identify the new commit, and re-score it.
+
+**`merged_by` names the shared identity, not the session.**
+Every project-thread session here acts as `claude[bot]`, so #3737 shows
+`merged_by: claude[bot]`, `auto_merge: null`, and no `auto_merge_enabled`
+timeline event --- while the session reading those fields had had its own merge
+call fail.
+A different session had merged it.
+The only evidence a session has that it merged something is its own merge
+call's success.
+
+- **Do:** pass the full `expectedHeadSha` from the payload you actually scored.
+- **Do:** re-score after a 409, on the commit the re-query names.
+- **Don't:** retry a 409 with the new SHA and the old verdict.
+- **Don't:** read `merged_by` as attribution --- it cannot distinguish two
+  sessions sharing one bot identity.
+
+## A base-sync push from a human account is the cheapest way to start a review
+
+The sender gate above means a review never fires for anything this session
+does.
+Two measurements from 2026-09-18 narrow what does work, and the second is the
+useful one.
+
+**The comment route is gated on the sender too, measured rather than
+inferred.**
+An `@claude review` comment from the repository owner dispatched run
+35316843835;
+an identical comment from `claude[bot]` fifty-four seconds later produced run
+35316910289, which completed `skipped` in two seconds.
+So mentioning the agent is not a way around the gate --- it is the same gate.
+
+**A human account merging `main` into the branch starts the review on its
+own.**
+That push began `review / claude-review` thirty-one seconds later with no
+mention at all, which makes it cheaper and more reliable than asking for one:
+it needs no particular comment text, and it clears the branch's staleness in
+the same action.
+It is [#3743](https://github.com/Morrison-Lab/ai-config/issues/3743)'s
+asymmetry working the useful way round.
+
+- **Do:** ask for a base-sync push rather than a mention when a review is
+  needed and the session cannot trigger one.
+- **Don't:** treat an `@claude review` comment as a route around the sender
+  gate;
+  it is subject to the same gate as a push.
 
 ## The classifier also refuses a COMMIT on a branch this session does not own
 

@@ -865,14 +865,17 @@ Run the pipeline rather than reading it, where you can.
 ## `head -N` on a multi-directory grep deletes whole directories, not whole lines
 
 Every rule above is about a query too narrow to reach the answer.
-This one is about a query that reached it and a pipe that threw it away, which
-is worse in one specific respect: the search was right, so re-running it in your
-head finds nothing wrong with it.
+This one is about a query that reached it and a pipe that threw it away.
+That is worse in one specific respect:
+the search was right,
+so re-running it in your head finds nothing wrong with it.
 
 `grep -r <term> shared/ memories/ skills/... | head -20` walks its path
-arguments in order, so the cap is spent on the first directory and the later
-ones are never *printed* --- indistinguishable, in the output, from their having
-been searched and found empty.
+arguments in order,
+so the cap is spent on the first directory
+and the later ones are never *printed* ---
+indistinguishable, in the output,
+from their having been searched and found empty.
 The habit that produces it is the right one: capping output is how a session
 keeps a read small.
 
@@ -888,12 +891,34 @@ and read 20 hits, all from `shared/`, all describing that hook's shell-parsing
 machinery.
 It concluded the corpus nowhere documented the MCP path and wrote that
 conclusion into a new memory entry.
-The full query returns 45 hits;
-13 are in `memories/`;
+Against the tree that query actually ran on, it returns 44 hits;
+12 are in `memories/`;
 the first is hit **21**, and hit 22 is `memories/hooks.md`'s
 "MCP Tool Interceptors" table row saying the hook blocks `merge_pull_request`.
 The answer sat one line past the cut, in the very file the new entry was
 appended to, and an adversarial review caught it rather than the author.
+
+That qualifier is load-bearing, and the first write-up of this entry did not
+carry it.
+It reported 45 and 13, which are the counts on the tree *after* the false
+section had been written --- the section's own text is a 45th hit, in
+`memories/`.
+So the numbers offered as evidence about the query were measured on a tree the
+query never saw, which is
+[`verify-the-right-artifact`](verify-the-right-artifact.md)'s substitution
+arriving inside the entry written to record a different instance of it.
+A count re-derived later is a measurement of the tree you are standing on, not
+of the one you were standing on when you ran the command:
+
+```bash
+git stash && grep -rc <term> <paths>   # or re-run it in a worktree at the
+git worktree add /tmp/base <base-sha>  # commit the original query saw
+```
+
+- **Do:** name the commit a re-derived count was taken against, and take it
+  against the tree the original command ran on.
+- **Don't:** re-run a query in your current working tree to check a number you
+  are about to write about a query you ran before editing it.
 
 The tell is structural rather than topical:
 **a capped result whose hit count equals the cap is a truncated result**, and a
@@ -916,7 +941,6 @@ grep -rn <term> memories/ | head -20        # then read one path at a time
 - **Don't:** treat "the output contained only `shared/` hits" as evidence that
   `memories/` had none;
   the command never got there.
-
 
 ## Where this fires
 

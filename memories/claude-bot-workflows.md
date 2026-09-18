@@ -1138,7 +1138,7 @@ table omitted it:
 | `35312346178` | `claude[bot]` | `aa32a3c1`, `main` | `claude-review` short-circuited; posted the gha#543 caution **onto #3762** |
 | `35312509759` | `claude[bot]` | `26fd21fb`, PR #3763's own head | short-circuited too, with the right ref |
 
-So binding to the wrong ref (gha#368) and the action refusing the actor are
+So binding to the wrong ref (gha#285) and the action refusing the actor are
 **two independent failures**, and the second is not luck.
 **A dispatch meets a second, different gate.**
 
@@ -1155,10 +1155,23 @@ A thread's dispatch carries `actor=claude[bot]`, which is not on that list, so
 the action stands down without reviewing.
 
 The correlation holds across every `workflow_dispatch` run of
-`claude-review.yml` visible on 2026-09-17/18: all four `claude[bot]` dispatches
-(`35312509759`, `35312346178`, `35268075963`, `35267489584`) concluded
-`failure`, and the `github-actions[bot]` dispatches in the same window
-succeeded.
+`claude-review.yml` visible on 2026-09-17/18, but it is a correlation with the
+`claude-review` **job**, not with the run's conclusion.
+All four `claude[bot]` dispatches (`35312509759`, `35312346178`,
+`35268075963`, `35267489584`) concluded `failure` with that job short-circuited.
+Of the nine `github-actions[bot]` dispatches in the same window, two concluded
+`failure` and one `cancelled`.
+Those are not counter-examples, and reading them as any is the trap: on
+`35317602132`, the one read job-by-job, `claude-review` and `require-review`
+both succeeded and only `require-clean-verdict` failed, which is the action
+reviewing and returning a verdict of "not clean".
+A run conclusion aggregates the gate jobs downstream of the review, so it
+answers "is this PR clean" rather than "did the reviewer run".
+
+- **Do:** read `claude-review`'s own conclusion when the question is whether
+  the action was let in at all.
+- **Don't:** count a `failure` run conclusion as an actor rejection;
+  a real review with findings produces the same colour.
 
 **Settle it from the run list, not from the job log.**
 A check run carries no actor, so this is one of the cases that genuinely needs

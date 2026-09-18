@@ -862,6 +862,62 @@ Run the pipeline rather than reading it, where you can.
   The same query against the same artifact is one measurement, however many sessions run it.
 - **Don't:** file an issue whose whole content is a zero, without naming what a non-zero would have looked like.
 
+## `head -N` on a multi-directory grep deletes whole directories, not whole lines
+
+Every rule above is about a query too narrow to reach the answer.
+This one is about a query that reached it and a pipe that threw it away, which
+is worse in one specific respect: the search was right, so re-running it in your
+head finds nothing wrong with it.
+
+`grep -r <term> shared/ memories/ skills/... | head -20` walks its path
+arguments in order, so the cap is spent on the first directory and the later
+ones are never *printed* --- indistinguishable, in the output, from their having
+been searched and found empty.
+The habit that produces it is the right one: capping output is how a session
+keeps a read small.
+
+Measured 2026-09-18 on this corpus.
+A UMS pass asked whether anything in `memories/` documented
+`hooks/no-unauthorized-merge.py`'s MCP path, ran
+
+```bash
+grep -rn "no-unauthorized-merge" shared/ memories/ skills/mwc/SKILL.md | head -20
+```
+
+and read 20 hits, all from `shared/`, all describing that hook's shell-parsing
+machinery.
+It concluded the corpus nowhere documented the MCP path and wrote that
+conclusion into a new memory entry.
+The full query returns 45 hits;
+13 are in `memories/`;
+the first is hit **21**, and hit 22 is `memories/hooks.md`'s
+"MCP Tool Interceptors" table row saying the hook blocks `merge_pull_request`.
+The answer sat one line past the cut, in the very file the new entry was
+appended to, and an adversarial review caught it rather than the author.
+
+The tell is structural rather than topical:
+**a capped result whose hit count equals the cap is a truncated result**, and a
+truncated result supports no claim about anything the cap did not reach.
+So the repair is not "cap less".
+It is to make the cap's own arithmetic visible, and to derive an absence from a
+count rather than from a listing:
+
+```bash
+grep -rc <term> shared/ memories/ skills/   # per-path counts, uncapped
+grep -rn <term> memories/ | head -20        # then read one path at a time
+```
+
+- **Do:** read a hit count equal to your `head -N` as "truncated", and re-run
+  before concluding anything.
+- **Do:** settle an absence with a count per path, then cap the *reading* of
+  whichever path you are actually asking about.
+- **Don't:** pass several path arguments to a capped grep and then make a claim
+  about the last of them.
+- **Don't:** treat "the output contained only `shared/` hits" as evidence that
+  `memories/` had none;
+  the command never got there.
+
+
 ## Where this fires
 
 The skills whose workflows run exactly this grep, and whose next step is to

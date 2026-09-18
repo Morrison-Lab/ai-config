@@ -91,7 +91,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 
 | Hook Script | Type | Trigger / Purpose | Proactive Compliance Rule |
 |---|---|---|---|
-| [`no-unauthorized-merge.py`](../hooks/no-unauthorized-merge.py) | **Block** | Blocks `merge_pull_request` MCP calls without authorization. | Do not invoke MCP merge tools without explicit permission or active `/mwc`. |
+| [`no-unauthorized-merge.py`](../hooks/no-unauthorized-merge.py) | **Block** | Blocks `merge_pull_request` and the `enable`/`disable_auto_merge` tools, under any `mcp__<server>__` prefix, without authorization. `check_mcp_merge` reads `owner`/`repo` out of `tool_input` and clears the call on an `allow_merge` override, an active `mwc` grant, or a target in `STANDING_MERGE_GRANT_REPOS` --- the same three grounds the shell path uses. | Do not invoke MCP merge tools without explicit permission or an active `/mwc`; a target carrying the standing per-repository grant needs neither. |
 | [`warn-pr-create-without-dupe-check.py`](../hooks/warn-pr-create-without-dupe-check.py) | Warn | Warns when creating PRs/issues via MCP without a prior search query. | Run `search_issues` or `search_pull_requests` before creating items via MCP tools. |
 | [`warn-unlabelled-agent-issue.py`](../hooks/warn-unlabelled-agent-issue.py) | Warn | Warns when `mcp__github__issue_write` (`method: create`) files an issue with no `ai-authored` label. | Pass `labels: ["ai-authored", "model:<model-id>"]` on the create call. |
 | [`require-agent-disclosure.py`](../hooks/require-agent-disclosure.py) | Warn | Warns when posting comments via MCP without the disclosure trailer. | Include `\n\n_Posted by <Agent Name> (AI agent) --- not written by a human._` in the `body` argument of MCP comment tools. |
@@ -764,39 +764,3 @@ a set named for a behaviour has a membership test by construction, so derive the
 
 (Tracked as [#2981](https://github.com/Morrison-Lab/ai-config/issues/2981).
 An earlier wave's snapshot branch `fix/2981-self-review-guard-sibling-import` treated it as a missing install and added a `.git`-rooted fallback search, which is why the root cause is stated here rather than only the remedy.)
-
-## A hook's guarded surfaces are its dispatch, not whichever path the corpus happens to describe
-
-`hooks/no-unauthorized-merge.py` guards two tool families, not one.
-Its `main()` branches on `tool_name`:
-a shell-tool name routes into `offending()`, the command-text scanner;
-a name matching `is_mcp_merge_tool` --- `merge_pull_request`,
-`enable_auto_merge`, `disable_auto_merge`, under any `mcp__<server>__` prefix
---- routes into `check_mcp_merge()` instead, which reads `owner`/`repo` out of
-`tool_input` and clears the call only on an `allow_merge` override, an active
-`mwc` grant, or a target in `STANDING_MERGE_GRANT_REPOS`.
-So an MCP merge is authorization-checked on exactly the same three grounds a
-`gh pr merge` is.
-
-**The reason this gets read wrong is that every write-up of the hook is about
-the other half.**
-`algorithmatize-checks`, `check-purpose-before-reusing`, `ardi.cases`, and
-`fail-fast.cases` all cite it, and all of them cite `mask_heredocs`, the
-`LEAD`/`PERMISSIVE_LEAD` command-position anchors, or `_depth_view` --- the
-shell-parsing machinery, which is where the six review rounds went and so
-where the interesting prose is.
-A reader who greps the corpus for the hook gets a consistent picture of a
-Bash-text guard, and concludes an MCP merge goes unchecked.
-Nothing in that picture is wrong;
-it is half a mechanism read as the whole, which
-[`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)
-names as a shape in its own right.
-
-The corollary is that the *volume* of writing about a component is a measure of
-how hard it was to get right, never of what it covers.
-
-- **Do:** read a hook's `main()` dispatch before claiming what it does and does
-  not guard;
-  it is one function and it enumerates the surfaces exhaustively.
-- **Don't:** infer a guard's scope from the corpus's description of it, or from
-  the code path a previous session happened to debug.

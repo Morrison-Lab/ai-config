@@ -1140,8 +1140,7 @@ table omitted it:
 
 So binding to the wrong ref (gha#368) and the action refusing the actor are
 **two independent failures**, and the second is not luck.
-**A dispatch meets a second, different gate, and the corpus recorded its
-effect for a day before anyone read the mechanism.**
+**A dispatch meets a second, different gate.**
 
 The job `if:` in `Morrison-Lab/gha`'s `claude-code-review.yml` opens
 `github.event_name == 'workflow_dispatch' ||`, so a dispatch is *exempt* from
@@ -1214,8 +1213,10 @@ constant.
 
 - **Do:** treat the SHA your own merge call returned as the only attribution
   you have;
-  a `409` from it means the head moved between scoring and merging, so re-run
-  the clean gate rather than retrying on the old verdict, per
-  [`fully-clean`](../shared/workflow/fully-clean.md)'s pin machinery.
+  a refusal naming a moved head means the head changed between scoring and
+  merging, so re-run the clean gate rather than retrying on the old verdict,
+  per [`fully-clean`](../shared/workflow/fully-clean.md)'s pin machinery,
+  which carries the one status code measured here (`422`, on the
+  `update-branch` endpoint's `expected_head_sha`).
 - **Don't:** read `merged_by: claude[bot]` as evidence that this session was
   the one that merged it.

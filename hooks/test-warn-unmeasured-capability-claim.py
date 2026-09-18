@@ -170,6 +170,21 @@ for phrase in (
     fired, _ = run(mcp(phrase))
     check(f"future-work claim stays silent: {phrase!r}", fired is False)
 
+#     Both apostrophe forms. A forge body is typed or pasted by a human as
+#     often as it is generated, and the ASCII-punctuation rule governs SOURCE
+#     files rather than a comment body, so the curly form reached this branch
+#     and missed (ai-config#3737 round 9). The ASCII row is the control: without
+#     it, a mutant deleting the whole negated branch would fail only one case
+#     and could read as a curly-quote problem.
+for label, phrase in (
+        ("ASCII", "The harness isn't available for this hook."),
+        ("U+2019", "The harness isn" + chr(8217) + "t available for this hook."),
+        ("spelled out", "The harness is not available for this hook."),
+):
+    fired, _ = run(mcp(phrase))
+    check(f"a negated-capability claim with an {label} apostrophe fires",
+          fired is True)
+
 #     And the affirmative that the negated and prefixed branches must NOT be
 #     folded together to match. Collapsing them into one optional-`un` form
 #     fires here, on prose asserting the opposite of this hook's subject.

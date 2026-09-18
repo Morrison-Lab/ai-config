@@ -821,6 +821,47 @@ whether a figure is derivable requires arithmetic over an arbitrary source
 document, so no matcher over the assertion can see it --- the same conclusion
 the negative-existence section above reached about its own rejected guard.)
 
+## Indirection defeats a literal search, and the conclusion arrives as a reviewer's finding
+
+Every case above searches PROSE for a concept.
+This one searches CONFIGURATION for a step, and it fails for a structural reason the others do not have:
+the artifact that would carry the string does not carry it, by design.
+
+A CI workflow that runs a hundred test suites does not name a hundred paths.
+It invokes one runner that globs them.
+So grepping `.github/workflows/` for `hooks/test-*.py` returns zero,
+and that zero is not weak evidence of a gap --- it is no evidence at all,
+because a conforming repository and a broken one return the same zero.
+The search cannot distinguish the two states it was run to distinguish.
+
+Measured 2026-09-17 on this repository.
+A review reported that "no `hooks/test-*.py` suite is CI-gated anywhere in `.github/workflows/` (85 such suites exist, 0 referenced)",
+scoped carefully as pre-existing rather than as a defect of the diff.
+The grep was rerun independently and agreed: 85 files, 0 references.
+Both were wrong.
+`scripts/test_hooks.py` globs `hooks/test-*.py`, runs each against its subject,
+and is invoked at `.github/workflows/validate.yml:293`.
+An open issue in the same tracker named its runtime, which is what prompted the re-check.
+
+The trap is that the independent confirmation feels like verification and is the same mistake run twice.
+Two searches of the same wrong artifact are one measurement, not two,
+so agreement between them carries no information ---
+which is `verify-the-right-artifact.md`'s substitution, arriving here through a reviewer rather than through your own reasoning.
+A finding you did not generate gets less scrutiny than one you did, because checking it feels like the scrutiny.
+
+The remedy is not a better pattern.
+It is to ask what would have to be true for the absence to be real,
+and then to look for the thing that would make it false:
+an aggregator, a generated manifest, a wildcard, a `Makefile` target, a pre-commit config.
+Run the pipeline rather than reading it, where you can.
+
+- **Do:** ask whether the string you are grepping for would exist even if the behaviour did, before reading a zero as an absence.
+- **Do:** look for an aggregator by name --- a runner, a glob, a generated manifest --- whenever the claim is about configuration rather than prose.
+- **Do:** treat a reviewer's absence finding as a claim to derive independently, by a DIFFERENT method than the one that produced it.
+- **Don't:** count your own grep agreeing with a reviewer's grep as confirmation.
+  The same query against the same artifact is one measurement, however many sessions run it.
+- **Don't:** file an issue whose whole content is a zero, without naming what a non-zero would have looked like.
+
 ## Where this fires
 
 The skills whose workflows run exactly this grep, and whose next step is to
@@ -874,44 +915,3 @@ fragment is about, reproduced while writing this fragment.
 The third re-proposed an already-covered delegation rule.
 None of the three greps was badly written; each conclusion simply did not
 follow from its evidence.)
-
-## Indirection defeats a literal search, and the conclusion arrives as a reviewer's finding
-
-Every case above searches PROSE for a concept.
-This one searches CONFIGURATION for a step, and it fails for a structural reason the others do not have:
-the artifact that would carry the string does not carry it, by design.
-
-A CI workflow that runs a hundred test suites does not name a hundred paths.
-It invokes one runner that globs them.
-So grepping `.github/workflows/` for `hooks/test-*.py` returns zero,
-and that zero is not weak evidence of a gap --- it is no evidence at all,
-because a conforming repository and a broken one return the same zero.
-The search cannot distinguish the two states it was run to distinguish.
-
-Measured 2026-09-17 on this repository.
-A review reported that "no `hooks/test-*.py` suite is CI-gated anywhere in `.github/workflows/` (85 such suites exist, 0 referenced)",
-scoped carefully as pre-existing rather than as a defect of the diff.
-The grep was rerun independently and agreed: 85 files, 0 references.
-Both were wrong.
-`scripts/test_hooks.py` globs `hooks/test-*.py`, runs each against its subject,
-and is invoked at `.github/workflows/validate.yml:293`.
-An open issue in the same tracker named its runtime, which is what prompted the re-check.
-
-The trap is that the independent confirmation feels like verification and is the same mistake run twice.
-Two searches of the same wrong artifact are one measurement, not two,
-so agreement between them carries no information ---
-which is `verify-the-right-artifact.md`'s substitution, arriving here through a reviewer rather than through your own reasoning.
-A finding you did not generate gets less scrutiny than one you did, because checking it feels like the scrutiny.
-
-The remedy is not a better pattern.
-It is to ask what would have to be true for the absence to be real,
-and then to look for the thing that would make it false:
-an aggregator, a generated manifest, a wildcard, a `Makefile` target, a pre-commit config.
-Run the pipeline rather than reading it, where you can.
-
-- **Do:** ask whether the string you are grepping for would exist even if the behaviour did, before reading a zero as an absence.
-- **Do:** look for an aggregator by name --- a runner, a glob, a generated manifest --- whenever the claim is about configuration rather than prose.
-- **Do:** treat a reviewer's absence finding as a claim to derive independently, by a DIFFERENT method than the one that produced it.
-- **Don't:** count your own grep agreeing with a reviewer's grep as confirmation.
-  The same query against the same artifact is one measurement, however many sessions run it.
-- **Don't:** file an issue whose whole content is a zero, without naming what a non-zero would have looked like.

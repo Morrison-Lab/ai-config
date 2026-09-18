@@ -412,8 +412,17 @@ repo, and its commit is still not where the session actually is.
 
 Measured 2026-09-17: a session checked out on `claude/project-thread-6oaft0`
 at `d25ea1e` dispatched an `Agent` call with `isolation: "worktree"`.
-The resulting worktree landed on `origin/main` at `49f0109` --- a different
+The resulting worktree landed on the LOCAL `main` at `49f0109` --- a different
 branch and a different commit from the dispatching session's own HEAD.
+
+The ref name is the load-bearing part, and the first version of this entry got
+it wrong by writing `origin/main`. It cuts from the local default branch, which
+can lag the remote: measured in the same repository the next day,
+`git rev-parse main` was `49f01097` while `git rev-parse origin/main` was
+`aa32a3c1`, so an agent briefed against "the remote default branch" and an
+agent briefed against "the default branch" would have been handed different
+trees. Resolve it in the worktree rather than assuming either
+(ai-config#3737 round 9).
 A brief that told the agent to review `git diff 8772ee1..HEAD` was
 unfollowable as written, because `8772ee1` was not an ancestor of that
 worktree's `HEAD`: the diff it actually produced was a 1066-line deletion of

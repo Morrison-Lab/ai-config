@@ -60,11 +60,29 @@ no absolute marker. "There is no way to know what the user meant" has no
 tooling noun.
 
 Requiring both narrows the field; it does not separate system claims from
-ordinary prose, and an earlier draft of this paragraph claimed it did. Measured
-2026-09-17 against this corpus's own `shared/**/*.md` in comment-sized
-2000-character chunks: 81 of 1992 fire, 4.1%, down from 5.7% before the
-branches below were trimmed. Sentences like "No changes will be needed to the
-CI workflow" carry both factors while asserting nothing about a capability.
+ordinary prose, and an earlier draft of this paragraph claimed it did.
+Sentences like "No changes will be needed to the CI workflow" carry both
+factors while asserting nothing about a capability.
+
+Measured 2026-09-17 at `6a870ecc`, over `shared/**/*.md` (155 files) split
+into non-overlapping 2000-character chunks from offset 0: **88 of 2010 chunks
+fire, 4.38%**. Dropping each file's trailing partial chunk instead gives 86 of
+1855, 4.64%.
+
+The chunk COUNT is part of the measurement, and the previous figure omitted
+what it was taken against. It read "81 of 1992 fire, 4.1%, down from 5.7%", and
+round 9 could reproduce neither pair: 81 belonged to one tree state and 1992 to
+another, so they never coexisted, and 5.7% matched no candidate baseline
+because the hook state it was measured against was never named. A rate over a
+corpus is a claim about three things -- the ref, the file set, and the chunking
+-- and naming the corpus and the date fixes only one of them
+(ai-config#3737 round 9).
+
+Read it as a FIRING rate rather than a false-positive rate. This corpus is
+largely about hooks, guards and harness limits, so a fair share of those 88 are
+true positives: the same modal split that stopped "No changes will ever be
+needed" also restored "No transcript can be read by this hook", which is
+exactly the claim this hook exists to catch.
 
 Three branches were narrowed for that reason, each measured as a top noise
 source: `regardless of` (a scope qualifier) and bare `unreachable` (a
@@ -206,7 +224,13 @@ RX_GH_CREATE_EDIT = re.compile(
 # something CAN be done -- the exact opposite of this hook's subject.
 RX_ABSOLUTE = re.compile(
     r"\b(?:"
-    r"(?:is|are|was|were)(?:n't| not) (?:available|possible|supported)"
+    # The apostrophe class admits U+2019 as well as ASCII. A forge body is
+    # typed or pasted by a human as often as it is generated, and
+    # `shared/coding/ascii-punctuation-in-source.md` governs SOURCE files
+    # rather than a comment body -- so `isn\u2019t available` reached this
+    # branch and missed (ai-config#3737 round 9). Written as an escape so
+    # no non-ASCII character enters this file.
+    r"(?:is|are|was|were)(?:n['\u2019]t| not) (?:available|possible|supported)"
     r"|(?:is|are|was|were) (?:unavailable|unsupported|unreachable)"
     r"|unbuildable|impossible"
     r"|there(?:'s| is| was) no way (?:to|of)"

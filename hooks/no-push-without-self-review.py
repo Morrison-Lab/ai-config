@@ -2205,8 +2205,22 @@ def main() -> int:
             # `OSError: [Errno 9]` on read, and CLOSES STDOUT leaving the
             # `with`. The guard does reach a denial; it cannot EMIT one,
             # because every `print` after that raises into the deliberate
-            # `except Exception: return 0`. Measured on `main`: all three
-            # non-`str` values produce zero bytes on stdout AND on stderr.
+            # `except Exception: return 0`. Measured on `main`: of the five
+            # non-`str` values case 22 pins, exactly three produce zero bytes on
+            # stdout AND on stderr, by TWO different routes.
+            #
+            #   None        falsy, so `or ""` rescues it     denial emitted
+            #   123         truthy; exists(123) is False     denial emitted
+            #   True        truthy; exists(True) is True      SILENT
+            #   ["/tmp/x"]  TypeError inside exists()         SILENT
+            #   {"p": 1}    TypeError inside exists()         SILENT
+            #
+            # The list and the dict raise at `os.path.exists` itself. `True`
+            # does not: fd 1 is open, so it passes, and the failure arrives
+            # later -- `open(True)` succeeds, raises on read, and closes stdout
+            # on the way out of the `with`, so the guard reaches a denial it can
+            # no longer emit. Naming "all three" without naming WHICH three read
+            # as a count of the pinned matrix, which has five (round 9).
             #
             # `isinstance` closes this instance and NOT the class. Any failure
             # inside `deny()` is a silent allow by the same route, a residue

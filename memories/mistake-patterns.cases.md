@@ -127,3 +127,13 @@ What does not: the Mistake, Canonical Rule, Fix, or Do/Don't lines, which are wh
   Whether the pair should distinguish a different operation from a rephrasing is a question for the pattern entry rather than something a case record may settle, and it is filed as [#3483](https://github.com/Morrison-Lab/ai-config/issues/3483).
   The 2026-09-06/07 occurrence recorded in this file measured that an identical re-run often succeeds.
   This occurrence is not evidence about that, since the command that succeeded was not the one denied.
+
+## Pattern 57: pronouncing a two-part fix dangerous with neither half tested alone
+
+2026-09-17, `Morrison-Lab/ai-config` project memory.
+A note recorded that a two-part guard fix "authorizes the editing session's own push" and must not be made unprompted.
+That was true of the conjunction and false of one half taken alone.
+
+Applying only the producer half --- registering `agentId` --- in a scratch copy of `hooks/`, then re-running the guard against the session's own real transcript, still produced a denial on the same branch.
+The self-authorization risk lived entirely in the consumer half (reading a `peer` origin as a verdict source).
+So the blanket "do not make this unprompted" blocked a change measurement showed was safe.

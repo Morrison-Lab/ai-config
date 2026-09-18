@@ -141,18 +141,47 @@ it is equally the check for a literal you believe is correct.
   confirm it fires on a known-positive input.
 - **Don't:** double escapes as compensation --- that is not the remedy above,
   and it is wrong wherever the hazard is absent.
-- **Don't:** read this file's argument as making the doubled form the safe
-  default;
-  it is the failing form in both directions, which is why the hook flags it
-  regardless of transport.
+- **Don't:** read this file's argument as making the doubled form the safe default;
+  it is the failing form in both directions, which is why the hook flags it regardless of transport. (One bounded exception, stated here rather than pointed at: a heredoc writing SOURCE CODE puts two parsers between the keyboard and the behaviour rather than one, so on a non-collapsing transport the doubled form is what the second parser needs and is arithmetic rather than error.)
 
-`hooks/warn-heredoc-doubled-backslash.py` needs nothing for this direction: it
-says the transport *can* collapse and prescribes building the character, both
-direction-neutral.
-It fires on the doubled form either way, which is the right behaviour here ---
-the doubled form is what is wrong, not the collapse.
+`hooks/warn-heredoc-doubled-backslash.py` needs nothing for this direction: it says the transport *can* collapse and prescribes building the character, both direction-neutral.
+It fires on the doubled form either way, which is the right behaviour here --- the doubled form is what is wrong, not the collapse.
 
 (Tracked as [ai-config#3710](https://github.com/Morrison-Lab/ai-config/issues/3710).)
+
+**A heredoc that writes SOURCE CODE has two parse layers, and there the doubled form is not the failing form --- it is the arithmetic.**
+Everything above is about content that must survive verbatim, where one layer sits between what you type and what the interpreter sees.
+A generator adds a second: the heredoc feeds Python, and the string Python writes is itself Python source that will be parsed again.
+On a transport that does not collapse, `"\\n"` in the generator is then exactly right: it puts `\n` in the generated file, which that file parses as a newline.
+Neither the collapse rule nor its inverse applies there, and both of them read as though they do.
+
+**On a collapsing transport the doubled form fails exactly as the sections above say, and this file deliberately does not say what number replaces it.**
+The first layer eats one before Python ever sees it, so `"\\n"` hands the generator a real newline and the generated file gets a literal line break inside a string literal.
+How many to type instead follows from what the transport does to a run, which this file has measured only at length two (`\\` arrives as `\`) and length one (`\` survives).
+What that does to a run of three or four is not derivable from those two, and this container does not collapse, so it cannot be measured from here either.
+So none is given: `chr(92)` is correct whatever the transport does to a run, which is the whole reason the arithmetic never had to be settled, and a number asserted here would be exactly the reasoning-instead-of-measuring this section exists to warn about.
+That literal line break is the 2026-09-08 recurrence recorded above, which was a generator case: a Python-heredoc edit writing `"\\n"` into a test fixture produced literal newlines and a `SyntaxError` that reached a PR.
+So layer counting says how many doublings the *parsers* need, and the transport says how many survive --- and `chr(92)` is correct on both, which is why it stays the prescription rather than any arithmetic.
+
+The danger is diagnostic rather than mechanical, which is why it needs saying after everything above rather than being derivable from it.
+Measured 2026-09-17, in a Linux remote Claude Code container: a generator heredoc carrying `"\\n"` produced a file containing `"\n"`, and that was read as the transport having collapsed it --- a conclusion that would have contradicted the 2026-09-01 and 2026-09-15 measurements recorded above, both of which are correct.
+The canonical interpreter-free reproducer, run in the same session, left `a\\nb` intact.
+So the wrong artifact was consulted: a two-layer edit cannot measure a one-layer transport, and it is the artifact nearest to hand at exactly the moment the question arises.
+
+Counting the layers first settles it and costs nothing.
+Ask how many times the text will be parsed between the keyboard and the behaviour, and expect one doubling per layer beyond the first.
+A collapsing transport is another such layer rather than a fixed surcharge, so it wants a doubling of its own and not one extra backslash --- an earlier revision of this paragraph said "then one more", which happens to land on a working count for the two-layer case above and understates every longer one.
+Or sidestep the count entirely with `chr(92)`, which is why the count is an aside here rather than the prescription.
+Then confirm the outcome rather than the theory, by exercising the generated code --- here, the denial message printed with a real line break, which no amount of reasoning about backslashes establishes.
+
+- **Do:** count the parse layers before judging whether a doubled escape is wrong.
+- **Do:** measure a transport with the interpreter-free reproducer above, never with a generator edit that happens to be in front of you.
+- **Do:** confirm the generated code behaves, rather than confirming the literal looks right.
+- **Don't:** read a correct two-layer escape as evidence about the transport --- that is how a true measurement gets overturned by a wrong one.
+- **Don't:** read the hook's warning on a generator heredoc as a defect;
+  it cannot count layers, and flagging the form regardless is the behaviour the section above asks for.
+
+(Tracked as [ai-config#3738](https://github.com/Morrison-Lab/ai-config/issues/3738).)
 
 ## A collapse into a VALID escape gets past the PARSER checks this file prescribes
 

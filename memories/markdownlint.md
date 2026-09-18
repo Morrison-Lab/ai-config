@@ -10,13 +10,15 @@ Split out of [`tools.md`](tools.md) on 2026-09-01 when that file crossed the 125
   ai-config#2906 went red on `lint-markdown` because two hook-catalog rows contained `` `HH:MM PDT|PST|PT` `` (a regex-style alternation written in backticks).
   `memories/hooks.md:69` reported "Expected: 5; Actual: 7",
   and `README.md:405` reported "Expected: 3; Actual: 5".
-  The rule scans the raw row text for `|`, so a code span's contents are counted exactly like bare table syntax, splitting one cell into three and inflating the column count.
-  ai-config#3737 failed on the same pattern in `README.md:473`: shell alternations inside code spans (`` `gh issue|pr comment` ``, `` `gh issue|pr create|edit` ``, `` `glab issue|mr note` ``) inflated a 3-column row to 7 cells ("Expected: 3; Actual: 7").
+  ai-config#3737 failed on the same pattern in `README.md:473`:
+  shell alternations inside code spans (`` `gh issue|pr comment` ``, `` `gh issue|pr create|edit` ``, `` `glab issue|mr note` ``)
+  inflated a 3-column row to 7 cells ("Expected: 3; Actual: 7").
   `scripts/check-md056-table-columns.py` provides a pure-Python, zero-dependency pre-commit scan that checks all GFM tables for MD056 column-count mismatches and unescaped pipes inside code spans, avoiding the need for an npm/node runtime locally when verifying table syntax before pushing.
   **Do:** spell alternatives out in prose (`` an `HH:MM` stamp suffixed `PDT`, `PST`, or `PT` ``) or escape the delimiter (`\|`) inside the code span (as `520db260` did for PR #3737) instead of leaving an unescaped `|`-joined alternation inside a table cell.
   **Do:** run `python3 scripts/check-md056-table-columns.py` before pushing to verify table column counts and code span pipes locally without npm.
   **Don't:** write a regex-style alternation containing `|` in a table cell and trust the backticks to shield it -- MD056 reads raw text, not rendered Markdown.
-  (Morrison-Lab/ai-config#2906, 2026-09-01; Morrison-Lab/ai-config#3764, 2026-09-17.)
+  (Morrison-Lab/ai-config#2906, 2026-09-01.
+  Morrison-Lab/ai-config#3764, 2026-09-17.)
 - **A line that begins with an issue reference is parsed as a heading (MD018).**
   Covered in full by [`semantic-line-breaks`](../shared/writing/semantic-line-breaks.md)'s MD018 section, which owns the rule, the collision with bare references, and both remedies (link the reference, or reword so the line does not open with it).
   Recorded here only for the sweep, since this file is where the linter's rule numbers are indexed: `grep -rn --include='*.md' '^#[0-9]' .` finds every instance.

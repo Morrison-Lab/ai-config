@@ -91,10 +91,12 @@ and reached opposite, both wrong, conclusions.
 That is the tell that the evidence does not discriminate: it produced "quiet
 but alive" and "quiet and abandoned" from the identical two facts.
 
-**A `pgrep` for an in-process subagent's id is the one detector here that cannot produce a true positive, and it reads as the strongest.**
+**A `pgrep` for a dispatched subagent's id is the one detector here that cannot produce a true positive, and it reads as the strongest.**
 The evidence above fails to *discriminate*: a clean `git status` or an absent `ListAgents` entry is at least capable of describing a live agent and a dead one differently.
-A process-table query for an in-process subagent is not.
-Such an agent has no operating-system process of its own, so `pgrep -f <agentId>` returns empty while it is mid-run and equally empty an hour after it finished.
+A process-table query keyed on the agent id is not.
+What was measured is that `pgrep -f <agentId>` returned empty while the agent was demonstrably still working, so the empty result is not evidence of anything.
+Two explanations fit --- the agent runs in the dispatching process and owns no process of its own, or it owns one whose command line never carries the id --- and **this session did not establish which**.
+The practical conclusion is the same under both, which is why the detector can be ruled out without settling the mechanism: it returns empty mid-run and equally empty an hour after the agent finished.
 The negative carries no information whatever, and a process table feels like ground truth in a way a status field does not --- which is what makes the reading confident rather than tentative.
 
 Note the mirror with [`shell.md`](shell.md)'s self-match deadlock, since the two point opposite ways and the remedy differs.
@@ -118,7 +120,7 @@ It is the full subagent JSONL and reading it overflows the reader's context, whi
 
 - **Do:** stat the transcript (`ls -laL`) and take a clock reading in the same command, when you want liveness without messaging the agent.
 - **Do:** ask the agent directly when the mtime is old, since an old mtime is a snapshot again and lands back in the non-discriminating class above.
-- **Don't:** run `pgrep`, `ps`, or `kill -0` against an in-process subagent's id --- there is no process, so an empty result is not a finding.
+- **Don't:** read an empty `pgrep -f <agentId>` as the agent having stopped --- it returns empty either way, so it is not a finding.
 - **Don't:** `ls` the `tasks/` path without `-L` and read the result as the transcript's mtime.
 - **Don't:** read the transcript itself to find out whether the agent is alive.
 

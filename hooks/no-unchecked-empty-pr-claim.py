@@ -222,7 +222,7 @@ RX_MESSAGE_BODY = re.compile(
 # commit-list query because the PATH contains the endpoint's shape -- the same
 # path-is-not-a-query confusion the denylist draft made, one level down.
 RX_QUERY_COMMAND = re.compile(
-    r"\b(?:gh|glab|curl|wget|http|https?ie|git)\b|build-pr-payload", re.I)
+    r"\b(?:gh|glab|curl|wget|https?|httpie|git)\b|build-pr-payload", re.I)
 
 
 def commit_read_pattern(number: str) -> re.Pattern:

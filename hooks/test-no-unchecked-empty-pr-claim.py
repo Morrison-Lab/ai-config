@@ -144,6 +144,10 @@ PAYLOAD_BUILDER = call("Bash", {
                "3737 /tmp/p.json"})
 GIT_LOG = call("Bash", {
     "command": "git log --oneline origin/main..origin/claude/pr-3737"})
+BARE_HTTPS_COMMITS = call("Bash", {
+    "command": "python3 -c \"import urllib.request; urllib.request.urlopen("
+               "'https://api.github.com/repos/Morrison-Lab/ai-config/pulls/"
+               "3737/commits')\""})
 
 # A shell read of a PATH that looks like the commit endpoint. A path is not a
 # query, so it is not evidence.
@@ -295,6 +299,9 @@ CASES = [
      "this repo's own build-pr-payload.py discharges it"),
     ([GIT_LOG, PLAIN_EMPTY], False,
      "a local git log over the PR's branch discharges it"),
+    ([BARE_HTTPS_COMMITS, PLAIN_EMPTY], False,
+     "a bare-https urllib read of the commits endpoint discharges it, with no "
+     "gh/curl/wget/git token on the line"),
     ([OTHER_PR_COMMITS, PLAIN_EMPTY], True,
      "a commit-list read on ANOTHER PR does not"),
     ([pr_read("get_commits", 3740), BATCH_PLURAL], True,

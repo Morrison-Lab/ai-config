@@ -160,6 +160,32 @@ touches only that file.
 Reported by the agent that made it.
 Tracked as ai-config#2149.)
 
+## The corpus prose a PR adds is the same class, and a sibling PR is a third trigger
+
+The section above names four surfaces --- a PR body, a review comment, a commit message, and a source-file comment --- and calls the fourth the one to watch, because it ships and stays where the other three scroll away.
+A fifth is easier to miss than any of them: the **corpus prose the PR is adding**.
+A memory entry or a shared fragment describing how a hook, a script, or a workflow behaves is not a comment riding alongside the change.
+It is the deliverable, so nothing about writing it feels like asserting mutable state --- and it ships and stays exactly as the fourth class does.
+
+The trigger widens too, and the new one is neither of the two already named.
+That section moved the trigger from a push to this PR out to this PR's own merge, keying on state **somebody else owns** --- a repository secret, an org setting, a dependency version.
+A sibling PR in the same repository is a third case, and it is nearer than either: it changes the very file the prose describes, in the tree this PR will merge into, while this PR sits open.
+No push happened here, the diff did not change, and the merge has not arrived, so neither existing trigger fires.
+
+The remedy is the same query aimed one step later: re-read the artifact the prose describes at its current state on the default branch, rather than trusting the reading that produced the sentence.
+A measurement is a statement about a moment, and the moment passes whether or not anything you did made it pass.
+
+- **Do:** re-read the file a corpus entry describes, on the current default branch, before the entry merges.
+- **Do:** write a preserved reading in the past tense ("the regex was then"), and state the present state separately.
+- **Don't:** treat corpus prose as exempt because it is the deliverable rather than a comment attached to one.
+- **Don't:** read "no push since I measured" as "nothing changed" --- a sibling PR merging is the commonest way the artifact moves underneath you.
+
+(Measured 2026-09-18 on ai-config#3778.
+A `memories/claude-code-hooks.md` entry quoted `hooks/no-push-without-self-review.py`'s `tid_match` regex as lacking `agentId`, which was true when it was measured.
+ai-config#3737 added `agentId` to that regex and to `TASK_ID_KEYS_SPECIFIC`, merging at 2026-09-18T07:15:19Z --- before #3778 was opened, and while its branch was being written.
+The reviewer caught it; the session had not re-read the file.
+That entry's own subject is trusting a measured artifact over a recollection.)
+
 ## A date is coarser than the artifact it dates, when the artifact changes same-day
 
 Everything above treats a date or "as of" stamp as the fix for a volatile

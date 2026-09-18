@@ -1662,3 +1662,26 @@ Running the checker on file A and generalizing to the diff is the same shape as 
   correcting the body in place does not reset a review, and one reply on the thread carries the derivation.
 - **Don't:** write a whole-diff claim from one file's output.
 - **Don't:** type a placeholder clock time into a correction paragraph and patch it afterwards --- take a fresh `TZ=America/Los_Angeles date` reading in the same command that writes the paragraph.
+
+**The set of checks you ran is the same claim one level up, and a derivation is what disguises it.**
+The section above quantifies over the **files** a checker touched.
+Its mirror quantifies over the **checkers**: "every check this workflow runs passed locally" is a claim about that workflow's jobs, and a list built by grepping it for script invocations is not that population.
+
+Measured 2026-09-18 on [ai-config#3778](https://github.com/Morrison-Lab/ai-config/pull/3778).
+A local sweep was derived by grepping `.github/workflows/validate.yml` for `scripts/*.py`, every one of those scripts exited 0, and the PR comment said so.
+That sentence was true and read as something wider.
+Three of that file's jobs invoke no local script at all --- two call a reusable workflow, and `new-line-breaks` runs a pinned composite action as its only step --- so the grep could not reach them by construction.
+`new-line-breaks` failed on the next push, and a `PreToolUse` hook rather than the sweep is what named the offending line.
+
+A derivation is what makes this invisible, and that is the opposite of the usual reading: deriving a list beats enumerating one precisely because it cannot go stale, so a derived population feels settled.
+The derivation was sound and ran over the wrong set.
+So state what the deriving query matched, rather than what you take it to stand for, and prefer a population the CI configuration itself defines --- the job list --- over one a pattern happens to select out of it.
+
+This entry's own first draft asserted that `new-line-breaks` was a separate workflow, which is why the grep had missed it.
+Reading `validate.yml` refuted that assertion before the commit: the job is in the same file, and how it invokes its check is what put it outside the pattern.
+
+- **Do:** state the query a locally-derived check list came from, so the set it examined is on the record.
+- **Do:** derive the population from the jobs a workflow declares when the claim is about that workflow passing.
+- **Don't:** read "every script this workflow runs passed" as "this workflow will pass" --- a job that shells out to nothing local is outside that set.
+- **Don't:** treat a mechanical derivation as evidence about coverage;
+  it fixes staleness and says nothing about scope.

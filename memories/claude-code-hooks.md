@@ -954,7 +954,7 @@ The guard admits a verdict from exactly four shapes:
    a subagent's records live only in `tasks/<agentId>.output`, which the guard never reads.
 3. **A native `tool_result` matched through `reviewer_call_ids`** --- the dispatch's tool result carries only `agentId: <id>` and the words "report was delivered to you as a message".
    No verdict text.
-4. **A task notification matched through `reviewer_task_ids`** --- the producing regex is `task[-_ ]?id|conversationId`, which `agentId` does not match;
+4. **A task notification matched through `reviewer_task_ids`** --- the producing regex was then `task[-_ ]?id|conversationId`, which `agentId` does not match;
    and the `task-notification` record's whole `origin` is `{"kind": "task-notification"}` with `sender: null`.
 
 Two claims worth keeping, because both were asserted confidently before being measured.
@@ -965,6 +965,8 @@ The guard gates on `origin.kind in ("task-notification", "task_notification")` a
 
 **The fix has two independent halves, and only their conjunction is dangerous.**
 The **producer** half --- adding `agentId` to `TASK_ID_KEYS` and to the text registrar regex --- is safe alone: applied to a scratch copy and re-run against that session's real transcript, the guard still denied on the same branch.
+That half **shipped in ai-config#3737** (rounds 6/7/9, merged 2026-09-18T07:15:19Z), so `TASK_ID_KEYS_SPECIFIC` and the `tid_match` regex both carry `agentId` today and bullet 4's quoted pattern is the pre-#3737 one.
+Path 4 is still unreachable, because the `origin`/`sender: null` obstacle in that bullet is untouched by the widening --- a conclusion drawn from the measurement rather than from a re-run against the shipped guard.
 The **consumer** half --- reading the `peer` origin plus `senderTaskId` as a verdict source --- is the one that would authorize the editing session's own push, so it needs a human decision and a different session's review before it ships.
 An earlier version of this finding said the whole fix self-authorizes;
 that was wrong for one of the halves, and the correction is the reason the split is recorded rather than the conclusion.
@@ -974,8 +976,8 @@ that was wrong for one of the halves, and the correction is the reason the split
 - **Don't:** spend a round trying to make a reviewer "report differently" --- no reporting style reaches any of the four paths.
 - **Don't:** read a foreground dispatch's `agentId`-only tool result as evidence that foreground dispatch did not happen.
 
-(ai-config#3739 carries the guard side, ai-config#3754 the Stop-hook side.
-Measured without writing into the live `hooks/` directory, per the section below.)
+(ai-config#3737 shipped the producer half; ai-config#3739 carries the remaining guard side, ai-config#3754 the Stop-hook side.
+Measured against a scratch copy of `hooks/` rather than the live directory, so a mutant could not leak into the session's own guard.)
 
 ## A project-thread session can reach a push deadlock whose layers are each behaving as designed
 

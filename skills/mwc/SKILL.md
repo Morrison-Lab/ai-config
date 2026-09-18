@@ -360,8 +360,7 @@ The `head.ref` does distinguish: a thread's own branch is `claude/project-thread
 A thread session merged that peer-owned PR nine minutes after its clean verdict landed, with no hold-off comment and no message to the session driving it.
 Nothing was lost --- the PR was fully clean and the maintainer had told that session to merge when ready --- but its own merge call had failed with a `409 Head branch was modified` seconds earlier, so it was actively working the PR at the moment it was taken.
 The scorer is what made this feel authorized: `check-pr-fully-clean.py` answers *is this PR mergeable*, which is a different question from *is this PR mine to merge*, and nothing in it knows the second --- so a clean exit reads as complete authorization when it is half of it.
-A clean scorer exit is not the hold-off, and neither is the standing grant below.)
-
+A clean scorer exit is not the hold-off, and neither is a standing merge grant.)
 
 ## The standing per-repository grant
 

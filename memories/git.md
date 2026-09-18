@@ -1116,7 +1116,6 @@ mid-session with no self-review yet dispatched, and `git push --dry-run
 --repo=/nonexistent origin main` was the fallback that measured git's `--repo`
 precedence without a real push or the override.)
 
-
 ## `git commit -F -` in a compound command can make no commit and report nothing
 
 The backtick rule above pushes you toward `-F` in the first place.

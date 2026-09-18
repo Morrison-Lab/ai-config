@@ -1245,21 +1245,6 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
 - **Don't:** let a single negative trial, however cleanly reproduced, stand in for a capability claim without first ruling out the test's own setup as the cause.
 
 ## Pattern 57: Pronouncing a Two-Part Fix Dangerous From Its Combined Effect, With Neither Half Tested Alone
-
-- **Mistake**: judging a fix self-authorizing (or otherwise dangerous) from
-  what the whole change would do, when only the CONJUNCTION of its two
-  halves carries the risk and one half is safe by itself.
-- **Example**: 2026-09-17, `Morrison-Lab/ai-config` project memory.
-  A note said a two-part guard fix "authorizes the editing session's own
-  push" and must not be made unprompted.
-  Applying only one half in a scratch copy and re-running the guard against
-  the real transcript showed it still denied on the same branch --- the risk
-  lived in the other half alone.
-- **Fix**: decompose a multi-part fix into its independently-applicable
-  halves and mutation-test each one against real input before ruling on the
-  combination.
-- **Do:** apply each half of a multi-part fix separately, in a scratch copy,
-  and re-run the check against real input before pronouncing the whole
-  dangerous.
-- **Don't:** let a true claim about the conjunction stand for both halves ---
-  it can block a half that measurement shows is safe.
+- **Mistake**: judging a fix dangerous from what the WHOLE change would do, when only the conjunction of its halves carries the risk and one half is safe alone (measured case in [`mistake-patterns.cases.md`](mistake-patterns.cases.md)).
+- **Do:** apply each half of a multi-part fix separately, in a scratch copy, and re-run the check against real input before pronouncing the whole dangerous.
+- **Don't:** let a true claim about the conjunction stand for both halves --- it can block a half that measurement shows is safe.

@@ -991,10 +991,12 @@ the cause".
 - **Don't:** let tests you wrote from your own restatement stand in for the
   reviewer's case --- they were derived from the same reading as the fix and
   agree with it by construction.
-- **Don't:** read a visibly changed flagged line as evidence the finding is
-  closed;
-  that is the mirror of the enumeration bullet above, one finding rather than
-  several.
+- **Don't:** treat a *complete* fix on the flagged line as a fix of the flagged
+  *finding*.
+  "The mirror case: the enumeration was complete and the fix was not" above
+  covers a fix that stopped halfway and left its other half in the diff as
+  context;
+  here the fix finished, passed its tests, and closed a different defect.
 
 See [`address-every-comment.cases.md`](address-every-comment.cases.md),
 "A hex-prefix finding closed by fixing a length bug on the same line".

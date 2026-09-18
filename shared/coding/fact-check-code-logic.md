@@ -265,6 +265,26 @@ The pass count is routinely quoted in commit messages and reviews as evidence of
 A third instance in the same suite iterated the flag list, so dropping the flag that marks harness-injected records stayed green.
 The malformed-mutant hazard was hit in the same session while checking these very fixes.)
 
+**Fourth occurrence, 2026-09-17 on [ai-config#3737](https://github.com/Morrison-Lab/ai-config/pull/3737) round 9, `hooks/test-warn-unmeasured-capability-claim.py`.**
+Its surfaces case is exactly this shape:
+
+```python
+for tool in hook.MCP_POST_TOOLS:            # generates one case per entry
+    fired, _ = run(mcp(REAL_2, tool=tool))
+    check(f"`{tool}` is in scope", fired is True)
+```
+
+Verified by reproducing the suite (97 cases, all passing) and re-running it
+against a copy of the sibling module with its shared `MCP_POST_TOOLS`
+constant renamed, which forces the hook's `getattr(..., MCP_POST_TOOLS,
+<fallback tuple>)` to fall through to its own hand-written fallback: the
+suite still reports `All 97 cases passed`, because the fallback tuple
+duplicates the same five members the generated loop already iterates.
+This file's own remedy is already present for one member --- a by-name
+check that `"mcp__github__discussion_comment_write" in hook.MCP_POST_TOOLS`
+--- which pins that one entry against deletion but not the other seven, so
+the class is only partly closed rather than absent.)
+
 ### A verdict script must not grep an interpreter's own echoed source
 
 Some interpreters echo the source they were handed before executing it, so a
@@ -1458,6 +1478,26 @@ ordinary commit, the same failure mode the heuristic existed to prevent.
 Caught and fixed before merge, so the shipped hook implements the correct
 precedence; the false rationale never reached `main`, but it did reach a
 draft of the code that acted on it.)
+
+**Second occurrence, 2026-09-17, `ai-config#3737` round 9, and the false
+claim is about what a POSITION anchor excludes rather than about a git
+command.**
+`hooks/warn-unmeasured-capability-claim.py` gates a forge-write command on
+one of several position-anchored regexes (`RX_COMMENT_POST`, `RX_GLAB_POST`,
+`RX_GH_CREATE_EDIT`), each anchored with `(?:^|[;&|\n])` so the command must
+start a line or a statement.
+A comment beside the gate reads: "Each shape is position-anchored, so prose
+or a heredoc quoting the command does not count as issuing it."
+That is false for the heredoc half, and the code built from it is wrong in
+exactly the way the belonged-elsewhere case above is not: a `cat <<'EOF' ...
+EOF` heredoc's body is literal text whose every line begins right after a
+`\n`, which is the same character the anchor accepts as a line start, so a
+heredoc merely documenting a `gh pr comment` invocation is read as issuing
+one.
+Reproduced directly: `RX_COMMENT_POST.search()` against a heredoc body
+quoting `gh pr comment 123 --body "hi"` inside a `cat <<'EOF2' > /tmp/notes.md`
+block returns a match at the embedded line, confirming the gate fires on
+exactly the case the comment says it does not.)
 
 ## A reported digit finer than its Monte Carlo error is a claim about precision
 

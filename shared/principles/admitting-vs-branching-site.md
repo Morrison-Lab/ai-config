@@ -120,6 +120,53 @@ A chain closed at one end and left incomplete at the other is no stronger than b
 - **Don't:** review only the diff that closes the bypass;
   the code whose risk just changed is the code that diff leaves untouched.
 
+## Widening a lookup from first-match to any-match promotes every shadowed key to a peer
+
+The two sections above are about a *predicate* or a *path* whose scope
+changes.
+This is the same shift in a *lookup*: when a function that returns only its
+first hit is changed to return every hit, a key that used to be masked by an
+earlier, more specific key on the same call stops being masked and starts
+being trusted on its own.
+
+A low-entropy fallback --- a bare `id`, kept last in an ordered key list
+precisely so a more specific spelling is tried first --- is safe exactly
+because first-match reaches it only when nothing better is present.
+Under any-match it is consulted on every input whether or not a better
+spelling is also there, so a coincidental `id` collision between two
+unrelated payloads now authorizes on its own, with nothing in the diff that
+touched the key list itself.
+
+(`Morrison-Lab/ai-config#3737`, round 7, commit `c2cbd6e3`.
+`hooks/no-push-without-self-review.py`'s `_task_ids()` was widened from
+returning the first spelling present in `TASK_ID_KEYS` to returning every
+spelling present, to fix the producer/consumer disagreement over
+`taskId`/`conversationId` the section above records.
+`TASK_ID_KEYS`'s own generic `"id"` entry, a low-entropy last resort under
+first-match, is now registered unconditionally by any reviewer-dispatch
+result carrying an `"id"` field for anything other than a task --- so a
+background task numbered the same as an unrelated object's `id` can register
+as a reviewer task id and authorize a push that reviewed nothing.
+The counter-argument was already written in the same file, on the sibling
+constant: `TASK_ID_KEYS_ORIGIN`'s own comment says admitting a bare `id`
+there "would test membership for a value that was never a task id" --- an
+argument about the *value's meaning*, not about the envelope, and one that
+applies to `TASK_ID_KEYS` exactly as written, but was never re-read against
+it when the lookup mode changed from first-match to any-match.)
+
+- **Do:** before changing a lookup from first-match to any-match, re-read
+  every key ordered *after* the first, since ordering is often doing implicit
+  safety work that only first-match enforces.
+- **Do:** re-read an argument already written against admitting a
+  low-entropy key on a sibling constant, and ask whether it applies to the
+  constant you are widening.
+- **Don't:** assume a key's presence in an existing list is still safe once
+  every present key registers, rather than only the first one found.
+- **Don't:** treat "the keys already agree" (this file's own
+  admitting-vs-branching argument, and the bypass-closing argument above) as
+  covering a widening that changes *how* the keys are consumed rather than
+  *which* keys are consumed.
+
 ## Related rules
 
 - [`dead-code-is-tech-debt.md`](dead-code-is-tech-debt.md) section 5:

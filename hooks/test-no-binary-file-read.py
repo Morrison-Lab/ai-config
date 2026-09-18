@@ -171,6 +171,11 @@ QUIET = [
     # argument "2" followed by a `>` redirect -- seeing "2" as a path
     # candidate would misreport a stderr redirect as an offending read.
     ("Q19-stderr-redirect-fd-not-a-path", "cat text.txt 2> redirect-target.bin"),
+    # `>|` (the noclobber-override redirect) tokenizes as its own punctuation
+    # token, distinct from `>` -- a second adversarial-review round found it
+    # missing from REDIR_OPS, reopening the exact false positive Q17 exists
+    # to close.
+    ("Q21-noclobber-override-redirect-not-a-path", "cat text.txt >| redirect-target.bin"),
     # Full end-to-end exercise of the device-path guard THROUGH evaluate(),
     # not just a direct is_binary_file() call -- proves the resolution
     # pipeline (absolute-path detection, then the device check) actually
@@ -401,7 +406,8 @@ MUTATIONS = [
       # mutation flips them as a side effect, not because redirection
       # stripping is what is broken here.
       "Q17-redirect-target-not-read", "Q18-redirect-target-append-not-read",
-      "Q19-stderr-redirect-fd-not-a-path"}),
+      "Q19-stderr-redirect-fd-not-a-path",
+      "Q21-noclobber-override-redirect-not-a-path"}),
 
     ("M2-drop-byte-limit-exemption",
      # `has_bounded_read` now always reports "not bounded", so a `-c`
@@ -427,7 +433,15 @@ MUTATIONS = [
       '    for a in args:\n'
       '        if skip_next:'),
      {"Q17-redirect-target-not-read", "Q18-redirect-target-append-not-read",
-      "Q19-stderr-redirect-fd-not-a-path"}),
+      "Q19-stderr-redirect-fd-not-a-path",
+      "Q21-noclobber-override-redirect-not-a-path"}),
+
+    ("M4-drop-noclobber-override-operator",
+     # Remove `>|` from REDIR_OPS: the noclobber-override redirect is no
+     # longer recognized, so its target is read back as a candidate path
+     # again -- the second-review regression, direct-probed by Q21.
+     ('"<&", "<<<", ">|"}', '"<&", "<<<"}'),
+     {"Q21-noclobber-override-redirect-not-a-path"}),
 ]
 
 

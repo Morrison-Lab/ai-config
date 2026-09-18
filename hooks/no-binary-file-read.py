@@ -30,10 +30,12 @@ it would be noise pointed at its own fix. `-n` (a LINE count) is not a byte
 bound and does not exempt -- a binary file with few newlines can still dump
 its entire contents under `-n 5`.
 
-The NUL sniff is the decider. An extension match (`.exe`, `.png`, ...) is
-only a fast-path shortcut that skips the read for an unambiguous case; it is
-never treated as sufficient on its own, and a file whose extension is not on
-the list is still sniffed.
+The NUL sniff is the decider for a file whose extension is not on the
+BINARY_EXTENSIONS list -- that file is always sniffed, and only the sniff's
+result decides. A file whose extension IS on the list is flagged on that
+match alone, with no sniff at all: `BINARY_EXTENSIONS` is only a fast-path
+shortcut in the sense that it exists to skip a read for an unambiguous case
+(`.exe`, `.png`, ...), not in the sense that its match is provisional.
 
 A path argument is resolved the way the SHELL would resolve it, not the way
 this hook's own host OS would: a leading `/` is absolute regardless of
@@ -111,7 +113,7 @@ LEAD_WORDS = {"sudo", "command", "exec", "nohup", "time", "doas", "env"}
 # it costs a rare false negative (a file genuinely named "2") to avoid a
 # common false positive (every `2>` fd redirect otherwise reading "2" as a
 # path argument).
-REDIR_OPS = {"<", ">", ">>", "<<", "<>", "&>", ">&", "&>>", "<&", "<<<"}
+REDIR_OPS = {"<", ">", ">>", "<<", "<>", "&>", ">&", "&>>", "<&", "<<<", ">|"}
 
 TARGET_CMDS = {"cat", "head", "tail", "less", "more"}
 
@@ -121,9 +123,10 @@ TARGET_CMDS = {"cat", "head", "tail", "less", "more"}
 DEVICE_PREFIXES = ("/dev/", "/proc/", "/sys/")
 DEVICE_EXACT = {"/dev", "/proc", "/sys"}
 
-# Fast-path only -- see the module docstring. The NUL sniff below is what
-# actually decides; this list exists so an unambiguous case (a real .exe, a
-# .png) does not pay for an open() + read() it does not need.
+# See the module docstring: a match here flags on its own, no sniff. This
+# list exists so an unambiguous case (a real .exe, a .png) does not pay for
+# an open() + read() it does not need -- the NUL sniff only runs, and only
+# decides, for an extension NOT on this list.
 BINARY_EXTENSIONS = {
     ".exe", ".dll", ".so", ".dylib", ".bin", ".o", ".a", ".obj", ".lib",
     ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".webp", ".tiff",

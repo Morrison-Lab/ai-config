@@ -103,6 +103,30 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   So a `GET /user` probe answers nothing about what a write will look like, which is the trap:
   it reports the friendly answer, and the write then lands under a different actor.
   Read the artifact the write produced --- the comment's `user`, or the run's `actor` --- rather than the token's self-description.
+
+  **The push row has since been measured the other way, so read the table as
+  one session's reading rather than as the harness's contract.**
+  On 2026-09-17, in a remote session on this same repository, pushes to two PR
+  branches were sent as `claude[bot]` and every `review /` job skipped:
+  [#3692](https://github.com/Morrison-Lab/ai-config/pull/3692) run 35265853275
+  and [#3690](https://github.com/Morrison-Lab/ai-config/pull/3690) run
+  35267111533, against a `d-morrison` control on the same branch
+  (run 34943644439) that ran the review normally.
+  [`claude-bot-workflows`](claude-bot-workflows.md)'s bot-sender-push entry
+  carries that measurement and what the skip costs downstream.
+  The MCP-write row is implicated too, by the same day's
+  [#3745](https://github.com/Morrison-Lab/ai-config/pull/3745): its review run
+  35270553450 is `actor: claude[bot]`, on a pull request opened through
+  `mcp__github__create_pull_request`.
+  The consequence is narrow and worth stating where the table is read: the
+  next bullet's remedy of re-triggering a review by pushing is conditional on
+  this row rather than guaranteed by it, and the row's own instruction --- read
+  the artifact the write produced --- is what settles it each time.
+  - **Do:** read the resulting run's `actor` after re-triggering a review by
+    pushing, and fall back to a dispatch when it reports a bot.
+  - **Don't:** treat the push row above as settling how a later session's
+    pushes will be attributed; it was measured once, and the opposite has
+    since been measured on the same repository.
 - **Two consequences follow, and both bite where a workflow gates on who acted.**
   A REST write produces a **bot-authored** event, so any workflow gated on `github.event.sender.type != 'Bot'` skips for it;
   `git push` produces a User-authored event and does not.
@@ -120,6 +144,33 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   - **Do:** re-trigger a review by pushing with `git`, or by the MCP client's dispatch or mention, the writes here that carry a User identity.
   - **Don't:** reach for `workflow_dispatch` or an `@claude review` comment as the fallback through the raw API --- in this session both are closed, for the two distinct reasons above;
     the MCP client dispatches where GitHub refuses the raw call and mentions where the gate ignores the raw comment, per [`github-mcp-tools.md`](github-mcp-tools.md)'s recurrence bullet.
+- **`build-pr-payload.py` cannot gather `review_threads` over GraphQL in a CCR session, and the 403 body itself names the working substitute.**
+  Measured 2026-09-17: `python3 scripts/build-pr-payload.py Morrison-Lab/ai-config <N> out.json` warns on stderr and omits the `review_threads` key from the payload entirely:
+  ```
+  warning: GraphQL reviewThreads query failed (403 {"message":"GitHub GraphQL is not available from Claude Code sessions; use the REST API (gh api repos/{owner}/{repo}/...). For review threads, auto-merge, and draft/ready-for-review use the CCR routes on api.github.com: GET /repos/{owner}/{repo}/pulls/{n}/ccr/review_threads, POST /repos/{owner}/{repo}/pulls/{n}/ccr/comments/{comment_id}/resolve (or /unresolve), PUT or DELETE /repos/{owner}/{repo}/pulls/{n}/ccr/auto_merge, POST /repos/{owner}/{repo}/pulls/{n}/ccr/ready_for_review, POST /repos/{owner}/{repo}/pulls/{n}/ccr/convert_to_draft.","documentation_url":"https://docs.anthropic.com/en/docs/claude-code/github-actions"})
+  ```
+  `check-pr-fully-clean.py --from-json` then exits 2 with "payload has no 'review_threads' key".
+  That is the checker doing its fail-fast job correctly, not a bug in it.
+  The gap is upstream, in the builder, and it is tracked as [ai-config#3653](https://github.com/Morrison-Lab/ai-config/issues/3653) (open as of 2026-09-17), which carries the full diagnosis and states why its filer did not open the fix PR: patching the merge gate's own input builder to unblock your own merge is a conflict of interest.
+  - **Do:** fetch `GET /repos/{owner}/{repo}/pulls/{n}/ccr/review_threads` yourself and splice the measured value into the payload the builder produced, before scoring it.
+    Bearer `$GITHUB_TOKEN` or `$GH_TOKEN`, with `Accept: application/vnd.github+json`;
+    it returned HTTP 200 in this session.
+    ```python
+    payload["review_threads"] = threads   # a plain list is accepted
+    ```
+    `scripts/lib/payload_fetcher.py` accepts `review_threads` as a plain list, or an object with a `nodes` key, with per-thread keys `id`, `path`, `line`, and `isResolved`/`is_resolved`, `isOutdated`/`is_outdated`.
+  - **Don't:** patch `build-pr-payload.py` or `check-pr-fully-clean.py` to route around the gap --- ai-config#3653 already tracks the real fix and gives the reason a blocked session should not be the one to write it.
+  - **A `[]` reading from that route is a zero-denominator result, and it needs corroboration before it stands in for "verified clean."**
+    Measured 2026-09-17: the CCR route returned `[]` on all fifteen PRs it was run against in this repo (the four then open, and eleven recently merged).
+    No positive control could be built from any of them, because the independent REST field `.review_comments` on `GET /repos/{owner}/{repo}/pulls/{n}` also reads `0` on all nine of the PRs where it was checked --- this repo's reviewer posts issue comments rather than inline ones, so it has no inline review threads anywhere to control against.
+    So the zero here is corroborated by a second, independent endpoint, not proven by a positive control on a PR known to carry threads --- state that distinction rather than calling the reading "verified."
+    - **Do:** splice in a measured value, and name what corroborated a suspicious zero (here, a second independent field reading zero too).
+    - **Don't:** report a spliced-in `[]` as "verified clean" when no positive control existed to confirm the route itself returns non-empty data --- that conflation is exactly what the checker's own fail-fast behavior exists to refuse.
+  - **GitHub GraphQL is blocked entirely in CCR sessions, and this 403 body is a routing table for the REST substitutes, not just an error for this one field.**
+    It names CCR routes on `api.github.com` for review threads, comment resolve/unresolve, auto-merge (PUT/DELETE), ready-for-review, and convert-to-draft.
+    As of 2026-09-17, `ccr/review_threads` appears nowhere else in this repo's markdown (`grep -rn "ccr/review_threads" . --include="*.md"` returns only this entry), and ai-config#3653 is cited nowhere else in the corpus either.
+    - **Do:** read a GraphQL-backed call's 403 body in a CCR session before assuming there is no substitute --- it names the specific REST route to use.
+    - **Don't:** treat a GraphQL failure in one of these sessions as a dead end merely because GraphQL or a GraphQL-backed `gh` subcommand is the path documented elsewhere in this corpus.
 
 ## The merge call is not blocked by the proxy, and is still refused --- by the client
 
@@ -135,11 +186,18 @@ PRs the scorer had just passed:
   PR's state changes it --- an active `mwc` grant and a `check-pr-fully-clean`
   exit 0 both leave it in place.
 - `mcp__github__merge_pull_request` performs the same merge with no prompt.
-  It is not a bypass: the classifier's own text directs the session to a tool
-  that naturally accomplishes the goal, and
-  [`hooks/no-unauthorized-merge.py`](../hooks/no-unauthorized-merge.py) reads
-  **Bash command text**, which neither route supplies here because there is no
-  `gh` to parse.
+  It is not a bypass, and the reason is **not** that the authorization hook has
+  no opinion about this route.
+  [`hooks/no-unauthorized-merge.py`](../hooks/no-unauthorized-merge.py) carries
+  a dedicated MCP path (`is_mcp_merge_tool` / `check_mcp_merge`), which reads
+  `tool_input`'s `owner`, `repo` and `pull_number` rather than any Bash command
+  text, and permits the call only when `allow_merge` is set, `check_mwc_active`
+  returns true, or the target is in `STANDING_MERGE_GRANT_REPOS` --- a set
+  holding just `morrison-lab/ai-config` as of 2026-09-18.
+  These merges targeted that repo, so the standing grant is what let them
+  through.
+  The same call against a repo with no standing grant and no active `mwc` is
+  refused, so read this as an authorized route rather than an unchecked one.
   Disclose the merge and why the PR qualified, as under any grant.
 - The tool's `expectedHeadSha` takes the **full 40-character** SHA; an
   abbreviated one is refused with "The sha parameter must be exactly 40

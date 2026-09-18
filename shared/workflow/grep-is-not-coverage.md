@@ -910,9 +910,17 @@ arriving inside the entry written to record a different instance of it.
 A count re-derived later is a measurement of the tree you are standing on, not
 of the one you were standing on when you ran the command:
 
+Either of these gets you back to it;
+they are alternatives, not a sequence:
+
 ```bash
-git stash && grep -rc <term> <paths>   # or re-run it in a worktree at the
-git worktree add /tmp/base <base-sha>  # commit the original query saw
+# in place, if the edits are yours and stashing them is safe
+git stash && grep -rc <term> <paths> && git stash pop
+```
+
+```bash
+# or against the commit the original query saw, leaving your tree alone
+git worktree add /tmp/base <base-sha> && grep -rc <term> /tmp/base/<paths>
 ```
 
 - **Do:** name the commit a re-derived count was taken against, and take it

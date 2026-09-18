@@ -1155,23 +1155,37 @@ A thread's dispatch carries `actor=claude[bot]`, which is not on that list, so
 the action stands down without reviewing.
 
 The correlation holds across every `workflow_dispatch` run of
-`claude-review.yml` visible on 2026-09-17/18, but it is a correlation with the
-`claude-review` **job**, not with the run's conclusion.
+**`Morrison-Lab/ai-config`'s** `claude-review.yml` visible on 2026-09-17/18,
+but it is a correlation with the `claude-review` **job**, not with the run's
+conclusion.
 All four `claude[bot]` dispatches (`35312509759`, `35312346178`,
 `35268075963`, `35267489584`) concluded `failure` with that job short-circuited.
 Of the nine `github-actions[bot]` dispatches in the same window, two concluded
 `failure` and one `cancelled`.
-Those are not counter-examples, and reading them as any is the trap: on
-`35317602132`, the one read job-by-job, `claude-review` and `require-review`
-both succeeded and only `require-clean-verdict` failed, which is the action
-reviewing and returning a verdict of "not clean".
+Those three are not counter-examples, and reading them as counter-examples is
+the trap: on `35317602132`, the one read job-by-job, `claude-review` and
+`require-review` both succeeded and only `require-clean-verdict` failed, which
+is the action reviewing and returning a verdict of "not clean".
 A run conclusion aggregates the gate jobs downstream of the review, so it
 answers "is this PR clean" rather than "did the reviewer run".
 
+**Name the repository whenever you write a run id down.**
+Every id above belongs to `ai-config`, the *caller*, while the reusable
+`claude-code-review.yml` this section mostly discusses lives in `gha` --- so a
+reader carrying that repo forward looks them up in the wrong one, and a run id
+is scoped to its repository.
+The wrong repo returns a plain `404`, which reads as "this id was invented"
+rather than "you are asking the wrong repository":
+a reviewer of this paragraph 404'd on all seven and reported them fabricated.
+
 - **Do:** read `claude-review`'s own conclusion when the question is whether
   the action was let in at all.
+- **Do:** write the owner and repo beside a run id, in a passage that names
+  more than one repository.
 - **Don't:** count a `failure` run conclusion as an actor rejection;
   a real review with findings produces the same colour.
+- **Don't:** read a `404` on a run id as evidence the id is wrong until you
+  have confirmed which repository it belongs to.
 
 **Settle it from the run list, not from the job log.**
 A check run carries no actor, so this is one of the cases that genuinely needs

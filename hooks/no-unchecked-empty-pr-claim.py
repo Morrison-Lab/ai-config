@@ -146,10 +146,11 @@ RX_EMPTY = re.compile(
 # constraints, each of which a draft got wrong. Every literal is
 # boundary-anchored, since an unanchored alternation matches inside
 # "deadline", "closely", "disclosed", "dropdown" and "reapply". And every
-# literal is an ACTION: the adjectives ("dead", "stale", "forgotten") are
-# family-A triggers in their own right when they qualify a PR, and as cues
-# they fire on prose that disposes of nothing -- "#N has zero changed files
-# and the dropdown in the docs is stale too".
+# literal is an ACTION. The adjectives ("dead", "stale", "forgotten") are NOT
+# cues here, and they are not family-A triggers either -- see RX_ABANDON's own
+# comment, which rules them out for the same reason: as cues they would fire on
+# prose that disposes of nothing -- "#N has zero changed files and the dropdown
+# in the docs is stale too".
 RX_DISPOSITION = re.compile(
     r"\b(?:"
     r"clos(?:e|es|ed|ing|eable|able)"
@@ -221,8 +222,24 @@ RX_MESSAGE_BODY = re.compile(
 # forge or to git. Without this, `cat /tmp/pulls/3737/commits.json` reads as a
 # commit-list query because the PATH contains the endpoint's shape -- the same
 # path-is-not-a-query confusion the denylist draft made, one level down.
+#
+# Every alternative names an INVOCATION, never a URL scheme. A bare `https?`
+# was tried and reverted: it recognized a Python HTTP read, and it also made
+# any line MENTIONING an https URL a query, so `echo "see .../pulls/3737/
+# commits"` discharged a claim nothing had read -- trading the tolerated
+# failure (over-warning on a real read it cannot see) for the intolerable one
+# (silent discharge). `urlopen`/`urllib`/`requests.get` recognize the same read
+# by the call that performs it. `http` and `httpie` are the HTTPie client's two
+# command names, not schemes; `httpie` replaces a garbled `https?ie` that only
+# ever matched the literal `httpie`/`httpsie`.
+#
+# Stated limit, pre-existing and not narrowed here: a line that merely quotes
+# one of these tokens beside the endpoint (`echo "curl .../commits"`) still
+# reads as a query. Separating a mention from a call wants a shell parse rather
+# than an alternation, and the guard only warns.
 RX_QUERY_COMMAND = re.compile(
-    r"\b(?:gh|glab|curl|wget|https?|httpie|git)\b|build-pr-payload", re.I)
+    r"\b(?:gh|glab|curl|wget|http|httpie|git"
+    r"|urlopen|urllib|requests\.(?:get|post))\b|build-pr-payload", re.I)
 
 
 def commit_read_pattern(number: str) -> re.Pattern:

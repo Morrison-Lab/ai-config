@@ -149,6 +149,13 @@ BARE_HTTPS_COMMITS = call("Bash", {
                "'https://api.github.com/repos/Morrison-Lab/ai-config/pulls/"
                "3737/commits')\""})
 
+# A line that MENTIONS the endpoint's URL without fetching it. The counterpart
+# to BASH_CAT_PATH one level up: there a path resembled the endpoint, here a
+# URL does. Recognizing a bare `https?` scheme would make this a query.
+ECHOED_HTTPS_URL = call("Bash", {
+    "command": "echo \"see https://api.github.com/repos/Morrison-Lab/ai-config"
+               "/pulls/3737/commits -- not read yet\""})
+
 # A shell read of a PATH that looks like the commit endpoint. A path is not a
 # query, so it is not evidence.
 BASH_CAT_PATH = call("Bash", {"command": "cat /tmp/pulls/3737/commits.json"})
@@ -302,6 +309,9 @@ CASES = [
     ([BARE_HTTPS_COMMITS, PLAIN_EMPTY], False,
      "a bare-https urllib read of the commits endpoint discharges it, with no "
      "gh/curl/wget/git token on the line"),
+    ([ECHOED_HTTPS_URL, PLAIN_EMPTY], True,
+     "echoing the commits endpoint's URL without fetching it does NOT "
+     "discharge it"),
     ([OTHER_PR_COMMITS, PLAIN_EMPTY], True,
      "a commit-list read on ANOTHER PR does not"),
     ([pr_read("get_commits", 3740), BATCH_PLURAL], True,

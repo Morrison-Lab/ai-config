@@ -323,12 +323,8 @@ Do-Confirm; per
 - [ ] Every table row has exactly one disposition (A/R/D/K), and no change
       request is labeled K.
 - [ ] Every Address row points to a pushed commit SHA.
-- [ ] Every Address row whose finding quoted a concrete input re-ran
-      **that** input against the fixed code, not a case derived from your
-      own restatement of the finding.
-      A visibly changed flagged line is not the evidence: the bug you
-      found on it may not be the bug that was reported.
-      See
+- [ ] Every Address row whose finding quoted a concrete input re-ran **that**
+      input against the fixed code, with the result in the reply --- see
       [`address-every-comment`](../../shared/workflow/address-every-comment.md)'s
       "The same reviewer's case, never run at all".
 - [ ] Every Defer row links a filed tracking issue.

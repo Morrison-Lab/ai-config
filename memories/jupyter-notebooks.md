@@ -87,8 +87,12 @@ the machine where this was measured, so its behaviour here is unverified.
 A file whose visible content and its stored byproducts are different things is
 a recurring shape rather than a notebook quirk.
 The `.pptx` case --- a hash reconciliation that cannot see inside a zip
-container, plus a slide hidden with `show="0"` --- is recorded separately in
-[ai-config#3783](https://github.com/Morrison-Lab/ai-config/pull/3783).
+container, plus a slide hidden with `show="0"` --- is recorded separately by
+[ai-config#3783](https://github.com/Morrison-Lab/ai-config/pull/3783), which
+adds it to [`office-open-xml.md`](office-open-xml.md).
+That pull request was **open** when this entry was written, so look in that
+file first and fall back to the pull request's own diff if the section is not
+there yet.
 
 Notebooks are **not** an instance of the opaque-container problem, though, and
 the distinction decides which instrument applies.

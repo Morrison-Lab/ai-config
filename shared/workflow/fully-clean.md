@@ -1855,3 +1855,33 @@ The checker requires `pr_number` even with `--from-json`, and omitting it exits 
 
 (Measured 2026-09-17 on ai-config#3745, #3750 and #3760 for case 1, and on #3690 and #3692 for case 2, the latter carrying verdicts dated two days before their current heads.
 Both classes clear the same way --- a push from a non-bot account re-runs the reviewer --- so the remedy is shared even though the diagnosis is not.)
+
+## A blocked claim expires exactly as a clean one does
+
+Everything above governs the claim that a PR is ready.
+Its mirror gets no attention anywhere in this corpus, and it is the one a session repeats: the claim that a PR is **not** ready.
+
+The asymmetry is what hides it.
+Understating readiness reads as caution rather than as a claim that could be wrong, so "not eligible yet" feels like the safe thing to say while being a live-state assertion exactly as "ready to merge" is.
+`hooks/no-stale-pr-status.py` mechanizes the clean direction, and nothing points the other way.
+
+**No hook can cover it, and widening that one would cost more than the gap.**
+It works because the event invalidating a clean claim is *your own push*, which the transcript carries.
+The event invalidating a blocked claim is a third party's review landing, which never appears in the transcript at all.
+The hook's own comments name "waiting on CI" as honest phrasing it must not trip --- the exact sentence at issue --- so widening it would fire on nearly every truthful status line.
+
+**The evidence gap is a wrong artifact rather than a missing query.**
+A session repeating "blocked" is usually querying every turn, on the current head, and a check-runs query cannot see a verdict.
+Where review jobs skip for a bot-pushed head, a skipped required check reads as satisfied, so conclusions say nothing in either direction.
+Only `scripts/check-pr-fully-clean.py`, or the verdict comment body itself, settles it.
+That is [`verify-the-right-artifact`](verify-the-right-artifact.md)'s substitution in its most convincing form, because querying the wrong artifact felt like checking.
+
+- **Do:** re-run the scorer before repeating that a PR is blocked, not only before saying it is ready.
+- **Do:** run the query before answering, when someone asks why something has not happened yet.
+- **Don't:** read a check-runs sweep as evidence about a verdict --- it is evidence about jobs.
+- **Don't:** carry a status claim across a turn boundary in either direction, since a verdict can land on an unchanged head at any moment.
+
+(Measured 2026-09-18 on ai-config#3760.
+A clean verdict landed at 18:20:12Z, and at 18:25:44Z the maintainer asked why the PR had not merged under this repository's standing `mwc` grant.
+It had been reported blocked several times, each report repeated rather than re-derived.
+The scorer exited 0 the moment it was actually run, and the PR merged.)

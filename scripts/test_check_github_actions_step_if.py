@@ -6,9 +6,9 @@ otherwise-valid fixture so deleting that finder turns the matching test
 red. A check that has never been watched fail is a guess.
 
 Forbidden needles are file-wide: a sibling bullet or a tail append of the
-old heading must fail. Required phrases are unique to the #2307 bullet
-and scanned only there. The Jules wrap Do uses similar shorter wording,
-not these needles; heading deletion is ``missing step-if bullet``.
+old heading must fail. Required phrases are scanned only inside the #2307
+bullet, so a tail append of one must still fail; heading deletion is
+``missing step-if bullet``.
 """
 from __future__ import annotations
 
@@ -158,20 +158,34 @@ case_exits(
 docs = "GitHub auto-applies `success()` when the condition has no such function"
 docs_gone = live_text.replace(docs, "GitHub applies success() when prior steps passed")
 check("docs auto-applies sentence removal actually applied", docs not in docs_gone)
-check(
-    "Jules wrap auto-applies still present after docs sentence removal",
-    "GitHub auto-applies" in docs_gone,
-)
 case_exits(
     "docs auto-applies sentence removed",
     docs_gone,
     1,
     "GitHub auto-applies `success()` when the condition has no such function",
 )
+# The docstring claims required phrases are scanned ONLY inside the #2307
+# bullet, so an exact copy elsewhere in the file must not keep the gate
+# green once the bullet's own sentence is gone. Nothing tested that until
+# now. What stood here instead asserted that SOME other mention of
+# "GitHub auto-applies" survived the removal, borrowing one from the Jules
+# wrap Do bullet further down this memory -- which tested nothing (that
+# bullet also sits outside the scanned section, so loosening the required
+# needle to a bare "GitHub auto-applies" leaves the suite green) and
+# coupled the control to where unrelated prose happened to sit. That
+# section moved to memories/github-actions-event-gating.md at the
+# 1250-line split and the assertion went red with the checker unchanged.
+tail_copy = docs_gone + f"\n- A tail append outside the bullet: {docs}.\n"
+check("the tail copy is present in the fixture", docs in tail_copy)
+case_exits(
+    "an exact copy outside the bullet does not satisfy the required phrase",
+    tail_copy,
+    1,
+    "GitHub auto-applies `success()` when the condition has no such function",
+)
 
 # Deleting the #2307 writeup heading is not a clean pass: that is
-# MISSING_SECTION, even though the Jules wrap Do still says auto-applies
-# / success().
+# MISSING_SECTION, and no surviving prose elsewhere in the file excuses it.
 gutted = live_text.replace(SECTION_START, "- **A step if: that names a status function")
 check("writeup heading removal actually applied", SECTION_START not in gutted)
 case_exits(

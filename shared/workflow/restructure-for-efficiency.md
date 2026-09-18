@@ -146,3 +146,60 @@ The check on any addition to this corpus is the same one: which pool does it lan
 - **Don't:** reshape a workflow inside a task that was doing something else.
 - **Don't:** name a human behaviour change and leave it at that.
   A suggestion nobody was given a reason to adopt is the empty promise pointed outward.
+
+## A monitoring loop over state only a human can change
+
+[`ardi`](ardi.md) and `CLAUDE.md`'s "Monitor every pushed PR head to completion"
+both oblige a poll, and both are written for a PR whose state is moving:
+CI is running, a review is queued, a push just landed.
+Neither says what to do once the PR's only remaining blocker is a person.
+
+That case inverts the economics.
+A poll is worth its cost when it measures something that changes on its own.
+A person's decision does not change on its own,
+so each firing re-derives the same answer at full price,
+and the loop's yield stays at zero right up until the moment it is not.
+
+The loop is also the *weaker* of two available detectors, which is the part
+that is easy to miss.
+Anything the user writes wakes the session immediately, trigger or no trigger,
+so a scheduled firing only ever catches a change nobody mentions:
+a silent push, or a merge performed somewhere else.
+Weigh the cadence against that narrow remainder
+rather than against everything that could happen to the PR.
+
+**Thinning the cadence is the near-miss, and it reads as having managed the cost.**
+Noticing that several consecutive sweeps returned identical output,
+and responding by lengthening the interval,
+keeps the loop, keeps most of its cost,
+and turns a decision into a smaller version of the same mistake.
+A repeated identical reading answers whether the loop should exist.
+It does not answer how often it should fire.
+
+**Delete the routine and wait for a wake.**
+A session carrying no armed timer is not an abandoned session:
+the user's next message, a PR-activity event, and a fresh instruction
+all still reach it.
+Say in one line that the loop is gone and why,
+so its silence is not read as the work having stopped.
+
+The boundary with [`flag-session-boundaries`](flag-session-boundaries.md)'s
+"Arm resumption before every non-clean pause" is the kind of pause.
+That rule exists so a *resumable step of your own* is not dropped.
+A pause with no such step, because the next move belongs to the user,
+has nothing to resume, and needs the disclosure rather than the timer.
+
+- **Do:** ask what a poll could observe that a wake would not, before arming it.
+- **Do:** delete the routine once repeated firings return the same reading,
+  and say so.
+- **Don't:** thin a loop's cadence in place of deciding whether it should run
+  at all.
+- **Don't:** read "the rule says monitor to completion" as covering a PR whose
+  only blocker is a person.
+
+(Measured 2026-09-17 in a Claude Code project thread on `Morrison-Lab/ai-config`.
+Six open PRs sat blocked on one decision of the owner's.
+An hourly routine re-derived the open set and rescored all six every firing,
+returning byte-identical output across five consecutive firings.
+At the fourth, the cadence was thinned rather than the routine deleted.
+The owner's next message was "you wasted 16% of my weekly quota".)

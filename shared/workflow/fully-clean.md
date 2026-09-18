@@ -1794,3 +1794,64 @@ finding.**
 **Algorithmic safeguards:** Algorithmic checks and hooks can only invalidate, not validate, a PR.
 You still need to use your own judgment in addition to satisfying the algorithmic safeguards;
 they are a safety net, not a gold standard.
+
+**Never characterize a PR with a verdict word.**
+`clean`, `green`, `clear`, `ready` --- each is a claim quantified over the whole PR: every required check, every review pathway, every touched file.
+It is produced from whatever subset happened to be looked at, so the word asserts far more than the reading behind it.
+
+The gap is mechanical rather than a matter of tone, and on a repo whose review jobs skip for bot-sender pushes it runs the wrong way by construction.
+A skipped required check satisfies branch protection, so the PR's own status display, `mergeable_state`, and a conclusions sweep all agree the PR is fine while **nothing has reviewed that head** ([`claude-bot-workflows`](../../memories/claude-bot-workflows.md) carries the measurement and the four occurrences).
+Relaying the display as a whole-PR verdict converts an absence of evidence into a report of evidence, which is strictly worse than an ordinary overreach: the more you trust the summary, the further off you are.
+
+Report the **triple** instead --- *what was measured*, *on which SHA*, *what remains unverified*:
+
+> no merge conflict;
+> `validate` concluded `success` on `38368e1`;
+> the six `review /` jobs are `skipped` on this head, so nothing has reviewed it.
+
+The word also carries three meanings in this corpus at once --- conflict-free, CI green, and fully clean in this fragment's sense --- so a stopping-point declaration reading "clean stopping point" in the same message that reports on a PR merges the session sense into the PR sense.
+A caveat placed after a headline does not survive being skimmed: disclosing "no verdict exists" below a sentence that already said clean is not a correction, it is a footnote to a claim the reader has already taken.
+
+- **Do:** state what was measured, on which SHA, and what is still unverified, and let the human draw the conclusion --- including when asked point-blank whether a PR is ready.
+- **Do:** pin the SHA on every status sentence;
+  a status without a head SHA is not a measurement, because the head moves under it.
+- **Do:** say so explicitly when a bot pushed the head, since that is the condition that silences the review jobs.
+- **Do:** lead with the fully-clean status when it is negative --- "not fully clean, no verdict on this head, and the conflict is gone" --- rather than trailing it as a caveat.
+- **Don't:** write a verdict word about a PR anywhere: project chat, a thread reply, a PR body, a commit message, or a handback summary.
+- **Don't:** read `skipped` as satisfied, whatever the required-checks rollup shows.
+  Enumerate the check runs and read each `conclusion` rather than reading the rollup.
+- **Don't:** use "clean stopping point" in a message that also characterizes a PR;
+  the session sense and the PR sense need different words when they share a message.
+
+(Maintainer directive, 2026-09-18, after ai-config#3767 was reported `fully clear` on the strength of two readings --- no merge conflict, and `validate` concluding `success` on `38368e1`.
+All six `review /` jobs were `skipped` on that head under the ai-config#3743 sender gate, and a real review landed hours later on that same commit returning `NOT_CLEAN` with two findings, one of them a `permissions:` block missing `pull-requests: read`.
+It is [`metacognitive-monitoring`](metacognitive-monitoring.md)'s scope claim applied to check status rather than to file coverage.)
+
+**`check-pr-fully-clean.py` exits 1 for two distinct reasons, and they need different things.**
+Both produce identical green checks and an identical `mergeable_state`, so nothing on the PR page separates them --- only the scorer's `verdict scan` line does.
+
+1. **No verdict on the head** --- `verdict scan: examined N ... 0 bore a verdict, latest = NONE`.
+   Nothing has ever reviewed this commit.
+2. **A standing not-clean verdict** --- `latest = not-clean`, dated before the current head.
+   The scorer reports these from the reviewer's review-data payload, with the prose phrase scan skipped.
+
+Score every PR rather than generalizing from one.
+Asserting that a group of PRs "all fail on the same line" is the scope claim again, one level up: measured 2026-09-17 across five open ai-config PRs, three were case 1 and two were case 2.
+
+Both scripts take **positional** arguments, and calling either wrong costs a round trip:
+
+```bash
+python3 scripts/build-pr-payload.py <owner>/<repo> <N> <OUT.json>
+python3 scripts/check-pr-fully-clean.py -R <owner>/<repo> --from-json <OUT.json> <N>
+```
+
+The checker requires `pr_number` even with `--from-json`, and omitting it exits 2 --- the same exit code the missing-`review_threads` failure produces (ai-config#3653), so an argument mistake reads as the known GraphQL blocker.
+
+- **Do:** read the `verdict scan` line per PR before characterizing any group of them.
+- **Do:** splice measured review threads from `GET /repos/{owner}/{repo}/pulls/{n}/ccr/review_threads` before `--from-json` where the builder's GraphQL fetch is blocked;
+  substituting `[]` for a failed fetch manufactures the same output as a PR with no threads.
+- **Don't:** summarize several PRs' blockers from one PR's output.
+- **Don't:** chase the NOTE's cited issue on a case-2 reading --- ai-config#3054 is closed as completed, so the citation is the checker's own stale message text rather than a live blocker.
+
+(Measured 2026-09-17 on ai-config#3745, #3750 and #3760 for case 1, and on #3690 and #3692 for case 2, the latter carrying verdicts dated two days before their current heads.
+Both classes clear the same way --- a push from a non-bot account re-runs the reviewer --- so the remedy is shared even though the diagnosis is not.)

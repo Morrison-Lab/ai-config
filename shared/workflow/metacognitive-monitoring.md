@@ -1640,3 +1640,25 @@ The orchestrator restored it, arguing the coverage was real.
 A reviewer then showed the argument was false in two ways at once: the allowlist that case exercised is keyed by a body fingerprint, so two identical blocks share one key and it cannot distinguish them, and the body the fixture wrote was not allowlisted at all, so the first copy alone already produced the asserted exit code.
 The case could not fail.
 It was deleted again, along with the fixture lines that existed only to feed it, two review rounds after the agent had it right.)
+
+## A PR body's "checks I ran" section is a scope claim, and reads as a report
+
+The scope-claim rule above fires on a sentence that quantifies over a population.
+A "checks run" paragraph does exactly that and never presents as a claim at all --- it reads as a report of work performed, so it collects none of the scrutiny a claim collects, and its author is the one person who already believes it.
+
+Measured 2026-09-17 on [ai-config#3763](https://github.com/Morrison-Lab/ai-config/pull/3763).
+The PR body said `check-ambiguous-referents.py`'s hits were "all pre-existing `CLAUDE.md` sentences, none from this diff".
+Review caught it as a false state claim.
+It was true of `CLAUDE.md` and false of the other touched file: re-derived against the PR head, the checker flags 34 sentences in `shared/workflow/restructure-for-efficiency.md`, **8 of them lines the diff adds**.
+
+"None from this diff" quantifies over every touched file and every flagged sentence.
+Running the checker on file A and generalizing to the diff is the same shape as scoring one pull request and characterizing the queue.
+
+- **Do:** derive the intersection rather than eyeballing it --- dump the checker's flagged sentences, dump `git diff origin/<default>...HEAD -- <file>` added lines, and count the overlap.
+  Report the count, not an impression.
+- **Do:** report per file when a checker ran on more than one, or state the aggregate as a derived number.
+- **Do:** fix the **body** rather than the diff when a claim of this kind is false.
+  An advisory checker exiting 0 needs no code change;
+  correcting the body in place does not reset a review, and one reply on the thread carries the derivation.
+- **Don't:** write a whole-diff claim from one file's output.
+- **Don't:** type a placeholder clock time into a correction paragraph and patch it afterwards --- take a fresh `TZ=America/Los_Angeles date` reading in the same command that writes the paragraph.

@@ -1068,6 +1068,37 @@ a refusal describes the invocation you ran, never the flag you did not try.**
 - **Don't:** count an attempt at the base form as discharging the rule above
   for a variant of it.
 
+**A flag whose whole job is to forbid the thing being tested makes the
+untried variant the more permissive one, and its refusal is a stronger
+trap than an incidental symptom because it is deterministic rather than
+a fluke.**
+The rule above reads naturally as "try adding a flag"; this is the mirror
+where the flag already added is the restrictive one, and the untried
+variant is dropping it.
+`npx --no-install <pkg>` refuses whenever `<pkg>` is not already cached, by
+design, every time --- so the refusal reproduces on a second attempt and
+looks like confirmation rather than like the single incidental symptom
+[`ardi.rationale.md`](ardi.rationale.md) warns against.
+Measured: `npx --no-install markdownlint-cli2` failed in this session's
+container with `npm error npx canceled due to missing packages and no YES
+option`, and `npx --yes markdownlint-cli2@0.23.2` installed and ran cleanly
+moments later in the same container.
+The first result was written into a commit message (`c40259f8`, since amended
+away) as "markdownlint itself is not installable in this container", which
+generalizes from the flag's refusal to the package's availability --- two
+different claims the command cannot distinguish between.
+
+- **Do:** before reporting a package or tool unavailable, try the
+  install-permitting form (`--yes`, no flag, or the documented equivalent),
+  not only the install-forbidding one --- both measured above.
+- **Don't:** read a `--no-install`-style flag's refusal as evidence about the
+  tool; it is evidence only about the local cache at that moment (inferred
+  from the mechanism: the flag's contract is to fail rather than fetch,
+  regardless of whether fetching would succeed).
+
+See [`ardi.cases.md`](ardi.cases.md), "Attempting the base form is not
+attempting its variants".
+
 **Name the specific gate when you report a blocker, not a category word that
 happens to be one of several.**
 

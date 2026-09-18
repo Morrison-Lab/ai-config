@@ -179,9 +179,61 @@ fail-fast.
   fail-loudly instruction --- a raise into a blanket `except Exception` is a
   silent fail-open wearing a safeguard's shape.
 
+**The same handler erases a whole SCAN when the exception is incidental
+rather than deliberate.**
+The case above is a `raise` written on purpose and swallowed.
+The commoner one carries no intent at all: a loop under that same blanket
+`except Exception: return 0` meets one record of an unexpected shape --- a
+string-valued `message`, a bare JSON list, a `tool_use` whose `input` is a
+string, a null `text` --- and the exception unwinds past every record still
+unread.
+The guard then returns 0 with empty stdout, which is the ALLOW outcome, for
+the rest of the session.
+
+Note the difference in blast radius, which is what makes this the worse half.
+A swallowed `raise` loses the one check it guarded.
+A swallowed parse error loses **everything the loop had not reached yet**, so
+a single malformed record early in a transcript disables the guard entirely
+--- silently, since the fail-open path prints nothing by design.
+
+The remedy is a per-item guard inside the loop, not a narrower handler at the
+top.
+Skipping one record loses at most one event;
+aborting loses the guard.
+Where the top-level fail-open is deliberate --- and in a `Stop` or
+`PreToolUse` hook it usually is, because a crashing guard must not break the
+session --- every loop beneath it owes its own `try` / `except ...: continue`.
+
+- **Do:** wrap each iteration of a guard's scan loop in its own handler, so a
+  malformed item is skipped rather than terminal.
+- **Do:** ask, of every blanket fail-open you keep, what the largest thing an
+  inner exception could cancel is --- the answer is rarely the one statement
+  that raised.
+- **Don't:** read a top-level `except Exception: return 0` as covering a loop
+  beneath it; it converts one parse error into a whole-session no-op.
+- **Don't:** narrow the top-level handler instead --- a guard that crashes on
+  an unexpected payload obstructs correct work, which is the shape section 4.5
+  below records getting switched off, taking its true positives with it.
+
+(Measured 2026-09-17 on
+[ai-config#3692](https://github.com/Morrison-Lab/ai-config/pull/3692),
+`hooks/no-clean-stop-with-live-agent.py`.
+An `adversarial-reviewer` dispatch against `79363d7a` found the whole reader
+loop of `scan()` sitting under `main()`'s `except Exception: return 0` with no
+per-record guard;
+`f947dc94` accepted the finding and wrapped each record's body in
+`try` / `except Exception: continue`.
+Its comment names the reachable input rather than a hypothetical one: the
+Antigravity adapter already handles a subagent argument arriving as a JSON
+string.
+Both `Do`s and the first `Don't` are derived from reading those two revisions
+of the file directly.
+The second `Don't` is inferred --- nothing measured here shows a narrowed
+handler causing a guard to be switched off.)
+
 ### 3.3 Editing a fail-open guard: the suite is the only thing that can see the breakage
 
-The section above is about a `raise` written *deliberately* into a blanket handler.
+Section 3.2 above is about a `raise` written *deliberately* into a blanket handler, and its closing note about an incidental exception is the same handler seen from a third angle.
 The commoner case is an *accidental* breakage reaching the same handler, and it presents as success rather than as an error.
 
 Measured 2026-09-17 while fixing ai-config#3485.
@@ -410,6 +462,47 @@ The natural reading was contamination from the several worktrees active at once,
 Every run was `flag-unassigned-worktree.py` correctly returning `deny` against a fixture that only ever constructed the `warn` case.
 The quiet-tree run is what makes that distinguishable: without a control run on a committed, unedited tree, "several worktrees were active" explains a real defect exactly as comfortably as a contaminated one.)
 
+**CI structurally cannot see this failure, which is why it survives being
+diagnosed.**
+The section above establishes what the failure is and how to tell it from
+contamination.
+What it leaves implicit is where it can occur, and that turns out to be one
+place only.
+`flag-unassigned-worktree.py` reaches its deny path solely on a non-default
+branch carrying uncommitted tracked changes or unpushed commits, and its own
+docstring records that every read on that path fails toward *not* denying ---
+a non-repository working directory, a detached `HEAD`, an unresolved default
+branch, or any error.
+A pull-request checkout satisfies the branch half and never the pending-work
+half, because `actions/checkout` leaves no uncommitted tracked changes, so the
+deny path is unreachable there and the warn assertion holds.
+
+That makes the red a local-only event, appearing in a pre-push sweep and
+nowhere else --- which is exactly the setting in which a red is cheapest to
+attribute to the several worktrees running at once and re-run away.
+The section above gives the quiet-tree control that settles it; this says why
+nothing else will.
+Read a test that can only fail locally as under-covered rather than as flaky,
+and note that a green CI run is not evidence about it in either direction.
+
+- **Do:** ask where a hook test's deny path can be reached before reading a
+  green CI run as covering it.
+- **Don't:** treat CI green on a hook that branches on live repository state as
+  evidence the branch the test misses is fine --- a PR checkout can reach only
+  one of the branches.
+
+Tracked as [ai-config#3431](https://github.com/Morrison-Lab/ai-config/issues/3431)
+(2026-09-09) and again as
+[ai-config#3744](https://github.com/Morrison-Lab/ai-config/issues/3744)
+(2026-09-17, filed by a session that hit the identical failure on
+`test_flag_unassigned_worktree` and reached the same root cause and the same
+proposed fixes; read as a probable duplicate of #3431, and confirm before
+working either).
+Issue #3744 carries the two-tree measurement this paragraph rests on: the same
+commit and the same suite give `Ran 17 tests ... OK` from a clean checkout of
+`aa32a3c1` and `FAILED (failures=1)` from #3690's dirty `work/3690` worktree,
+while `validate` on that PR's own head passed the suite in CI.
+
 ## 5.6 A hot-path guard's own correctness suite does not exercise its performance envelope --- test adversarial-length input separately
 
 A guard's test suite proves each case classifies correctly.
@@ -465,6 +558,47 @@ The mechanism now exists as `check_executable_bits` in
 `memories/git.md`'s `git ls-files -s` stage-semantics entry and
 `shared/principles/fail-fast.md`'s aggregate-count entry for how that check
 itself needed two more rounds to land soundly.)
+
+## 5.8 A splice that locates only the first occurrence silently under-inspects a `replace_all` edit
+
+`hooks/warn-new-line-breaks-on-edit.py` classifies an `Edit` by splicing its `new_string` over `old_string` into the file on disk, then running the checker on the spliced result.
+(That hook is not on `main` yet: it lives on the still-open ai-config#3690, so a reader looking for `splice_edit` in the tree will not find it until that PR merges, and this entry goes stale if the PR changes further or does not land.)
+Its `splice_edit` located the match with `existing.find(old)` and stopped there, never reading `tool_input.get("replace_all")`.
+A single-occurrence edit is inspected correctly.
+A bulk find-and-replace is inspected at exactly one of its occurrences and silently misses every violation the edit introduces at the others --- and a bulk substitution is the edit most likely to introduce a style violation at scale, since the same inserted text lands repeatedly with no per-site review.
+
+The docstring said the function returns "the file as the edit would leave it," which was true for the input every hand-written test fixture used (a single occurrence) and false for the input `replace_all` names.
+This is the code-correctness form of [`ardi`](../shared/workflow/ardi.md)'s "Attempting the base form of a command is not attempting its variants": the base case was verified, the flagged variant was not, and the claim in the docstring does not scope itself to the case it actually covers.
+The discriminating test case is non-obvious for the same reason a mutation can survive by masking (see `shared/workflow/algorithmatize-checks.md`'s "A surviving mutation is a question before it is a coverage gap"): the same substituted text is inserted at every occurrence, so it looks like it must violate at all of them or none, and a fixture built that way can never separate "checks every occurrence" from "checks the first one."
+It discriminates only when the *context* differs across occurrences --- one inside a fenced code block, one in prose --- which generalizes to any check whose verdict depends on surrounding context rather than on the inserted text alone.
+
+A second, distinct finding from the same review round belongs beside it rather than folded in: no fixture placed a violation exactly on the edit window's boundary, so off-by-one mutants at either edge of the `(lo, hi)` range survived the whole suite (19 assertions, 5 declared mutations) with nothing to show for it.
+A one-line `new_string` that lands on both boundaries at once kills both mutants with one case, which is what closed it (24 assertions, 8 mutations).
+This is not the masking mechanism the "surviving mutation" section above covers --- nothing hides the boundary mutant's effect --- it is a plainer gap: the boundary is a distinguished value of the input space, and a fixture assembled from typical inputs never happens to land on it.
+
+- **Do:** when a splice, scan, or match locates one occurrence via `find`/`search`, check whether the tool schema carries a "do this everywhere" flag (`replace_all`, `global`, `all`) before trusting the single-match result covers the call (measured: the pre-fix `splice_edit` at `ad5601b0` used a bare `existing.find(old)` and never read `replace_all`).
+- **Do:** for a check whose match spans a numeric window, add at least one fixture whose interesting condition sits exactly on the window's boundary, not only strictly inside it (measured: 19 assertions and 5 mutations before, 24 and 8 after, with the two boundary mutants surviving the former suite).
+- **Don't:** read a docstring's "the file/result as the edit would leave it" as verified for every flag the tool accepts, when every fixture backing it used the same flag value (measured: that docstring shipped at `ad5601b0` over a first-occurrence-only splice).
+- **Don't:** treat a same-inserted-text-everywhere fixture as covering a `replace_all` path --- it cannot distinguish "checked once" from "checked at every site" unless the surrounding context differs per occurrence (inferred from the mechanism: the checker's verdict depends on each occurrence's surrounding context, so identical inserted text cannot separate the two behaviours).
+
+(Morrison-Lab/ai-config#3690, review round 3, 2026-09-17, fixed in `01b8b07b5b`.
+Three findings on `splice_edit`; the two above are recorded here.
+The third, a fixture repo missing a vendored `scripts/semantic-line-breaks.py` that let every warning take an unguarded branch, is a fixture-completeness instance already covered by [`fixtures-are-not-evidence`](../shared/workflow/fixtures-are-not-evidence.md) rather than restated here.)
+
+## 5.9 A denial message's remedy should name the condition, not prescribe an action the harness may not support
+
+Section 4.5 above asks whether a warning "already names the concrete remedy" before treating a recurrence as an escalation signal.
+Concreteness is not the whole test: a remedy can be perfectly concrete and still be wrong for the session reading it, when it prescribes one specific action ("dispatch it in the foreground") that assumes a capability the current harness does not actually offer.
+
+A harness whose subagent dispatch never returns synchronously -- no `run_in_background` field to set, or the field set and ignored -- cannot follow "dispatch in the foreground" at all.
+The message then reads as a mistake the author must have made (they must have backgrounded it) rather than as a gap in what the harness reports, and it leaves no next step: the one action named is unavailable, and nothing else is offered.
+
+`shared/workflow/adversarial-self-review.md`'s "A harness that always backgrounds the `Agent` tool" section (ai-config#3045) is the concrete instance and its concrete escape hatch (`ALLOW_UNREVIEWED_PUSH=1`, stated plainly, with the reason recorded).
+This entry is the general authoring lesson it implies for any future guard: prefer describing the **condition** the guard needs satisfied ("a synchronous reviewer verdict for this commit exists") over prescribing the **action** most sessions would take to satisfy it, and pair a prescribed action with a stated fallback whenever the harness might not support it.
+
+- **Do:** phrase a guard's remedy around the condition it is checking for, naming the usual action as one way to satisfy it rather than the only way.
+- **Do:** when a specific action is genuinely required (an env var, a specific flag), still name the fallback that applies when the harness cannot perform the usual action.
+- **Don't:** write a remedy that assumes every harness can perform the same action synchronously -- a dispatch, a foreground run, a specific tool call -- without naming what to do when it cannot.
 
 ## 6. A guard that keeps firing after you satisfied it: stop, and read the copy that runs
 

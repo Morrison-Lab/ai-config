@@ -834,6 +834,35 @@ check, and it is the one a `MUTATIONS` table cannot perform for you.
 - **Don't:** read an all-clauses-pass run as covering the imported code; the
   imported code was never the mutant.
 
+## A hook's fire-once sentinel makes its own test suite vacuous
+
+A `PreToolUse` or `Stop` hook that fires once per distinct input keeps a sentinel file keyed on a hash of that input.
+The suppression is correct at runtime and a trap in the suite, because every case runs against one shared `tempfile.gettempdir()`.
+A case that reuses an earlier case's fixture body therefore receives empty output, and any assertion of the form "the output does not contain X" passes against `""`.
+
+Measured 2026-09-17 while building `hooks/warn-unmeasured-capability-claim.py`.
+The case asserting that a firing emits no `permissionDecision` reused the suite's first fixture verbatim.
+It passed from the moment it was written, and a mutant adding a deny decision to every firing passed with it.
+Reading the case found nothing wrong: it names the right property, calls the right hook, and asserts the right string's absence.
+Only mutation exposed it, which is the transferable half --- an absence assertion cannot distinguish "the hook did not emit it" from "the hook did not run", so it is vacuous in exactly the case where reading it reassures you.
+
+- **Do:** give every case a fixture carrying a unique token, even when the text under test is meant to be the same claim.
+- **Do:** pair each absence assertion with a positive one that fails on empty output.
+- **Don't:** accept an absence assertion on a read --- it looks correct precisely when it is vacuous.
+
+### The sentinel's key must carry every dimension the event varies along
+
+The same hook first computed its key from the body alone.
+That is the intuitive choice, since the body is what the reminder is about.
+It silently suppressed the second publication of one claim to a second surface --- an issue comment and then a PR body, which are two durable publications and two occasions worth interrupting.
+The incident the hook was built from had that exact shape, so keyed that way it would have fired on half of the event it exists to catch.
+
+A dedupe key answers "is this the same event?", and that question has as many dimensions as the event does.
+Enumerate them before hashing: for a forge write, the destination is one and the text is another.
+
+- **Do:** enumerate what makes two firings distinct, and hash all of it.
+- **Don't:** key on the payload's most salient field just because it is the one the hook reasons about.
+
 ## A verdict the pre-push guard cannot parse leaves an EARLIER report's verdict standing
 
 The sibling section below covers a report the guard never sees.

@@ -311,6 +311,71 @@ Triggering a review, and what becomes of the reply it writes, live in
     dispatch `claude-review.yml` for the head.
   - **Don't:** read a green "Claude Code Review" run on a bot-pushed head
     as a review having happened --- `success` there is the skip path.
+  - **Third occurrence, 2026-09-17, and this time the bot sender was the
+    harness running the session itself.**
+    The two senders above are third-party (Cursor, the @claude sync), so
+    "a bot pushed it" is a fact about someone else and is available to be
+    checked.
+    A remote/web Claude Code session is the third, and it is the sender
+    least likely to be checked, because the push is your own.
+    Measured on [#3692](https://github.com/Morrison-Lab/ai-config/pull/3692)
+    (run 35265853275, 19:36:10Z to 19:36:20Z) and on
+    [#3690](https://github.com/Morrison-Lab/ai-config/pull/3690)
+    (run 35267111533, 19:49:03Z to 19:49:10Z):
+    `actor` and `triggering_actor` both `claude[bot]`, all six `review /`
+    jobs `skipped`, run conclusion `success`.
+    Control on #3692's own branch two days earlier: runs 34943644439,
+    34944701954 and 34945610733, all `triggering_actor: d-morrison`, each of
+    which ran the reviewer and posted a real verdict (the first for nine
+    minutes, 07:49:05Z to 07:58:15Z).
+    The skipped runs and the measured control cite the same callee,
+    `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2` at
+    `27721bd629f692bce0c517149be9c22b0f1e2f9e`.
+    This contradicts
+    [`github-remote-sessions`](github-remote-sessions.md)'s 2026-09-02
+    identity table, whose push row reads `d-morrison` (User) and whose
+    remedy is therefore to re-trigger a review by pushing from the
+    command line.
+    That row records one session rather than the class, so derive the
+    sender from the run and not from the table.
+    The PR recording this entry reproduced it on itself within minutes:
+    [#3745](https://github.com/Morrison-Lab/ai-config/pull/3745)'s own review
+    run 35270553450 is `actor: claude[bot]` with all six `review /` jobs
+    `skipped`, on a branch pushed from the command line and opened through
+    `mcp__github__create_pull_request` --- so the same reading extends to that
+    table's MCP-write row, which also reads `d-morrison` (User).
+  - **The skip reaches the merge gate, so the PR reads `clean` rather than
+    blocked.**
+    Three facts this corpus already holds compose into one that none of them
+    states on its own: a job with a false `if:` counts as skipped-passing for
+    branch protection ([`github-actions`](github-actions.md)); the job
+    skipped here is `review / require-clean-verdict`; and a forge's
+    `mergeable` result is an integration signal rather than a review verdict
+    ([`fully-clean`](../shared/workflow/fully-clean.md)).
+    So the gate that exists to withhold merge reports satisfied.
+    Measured on #3692 the same day: `mergeable_state: clean` while both of the
+    head's review-bearing checks, `review / require-clean-verdict` and
+    `review / require-review`, read `skipped`, and no verdict comment named
+    that head.
+    The PR was not verdict-free, which is the sharper version of the trap:
+    the three verdicts it carries are all `NOT_CLEAN`, posted two days earlier
+    against three superseded commits, so a comment scan finds review activity
+    and the rollup reads `clean`, and neither says the current head is
+    unreviewed.
+    Read `skipped` there as unreviewed, which is the reading the value itself
+    will never prompt.
+  - **Do:** read the head's own `review / require-clean-verdict` conclusion
+    before reporting a PR clean, whoever pushed the head --- `skipped` is
+    unreviewed.
+  - **Do:** take the sender from the run's own `actor` field, not from a
+    table recording what a session's pushes looked like on an earlier day.
+  - **Don't:** read `mergeable_state: clean` as evidence a review ran; a
+    skipped gate and a passed gate produce the same value.
+  - **Don't:** assume a push from your own session carries a User identity
+    because a remote session's did once.
+    (Both `Do`s and the first `Don't` are measured above.
+    The second `Don't` is inferred: what was measured is that the identity
+    differs between sessions, not which harness produces which.)
 - **Write accurate `workflow_dispatch` comments when adapting the upstream
   `claude-code-review.yml` template.** The upstream template says "workflow_dispatch is
   fired by claude.yml" — but that's only true when the repo's `claude.yml` actually
@@ -1037,3 +1102,58 @@ Read at face value, a SHA you did not author appearing as "current head" is indi
 - **Don't:** treat a SHA in review prose as evidence that your branch moved.
 - **Don't:** infer the mechanism from the comment;
   it is already documented, and guessing it produced a false claim in the first draft of this very note.
+
+## The bot-sender gate is on the actor, so commenting is not a way around it
+
+This repo's review workflows skip when the event's **actor** is a bot, and that
+gate is keyed on the actor rather than on the event type.
+Measured 2026-09-17/18 from a Claude Code project thread, whose GitHub token is
+the `claude[bot]` App identity:
+
+- A **push** from the thread runs `claude-review.yml` on `pull_request`, and
+  every `review /` job skips, `require-clean-verdict` included.
+  GitHub counts a skipped required check as satisfied, so the PR reads
+  `mergeable_state: clean` while carrying no verdict at all.
+  Tracked as ai-config#3743.
+- An **`@claude review` comment** from the same identity fires
+  `claude-bot.yml` on `issue_comment` and skips as well.
+  In run `35311218322` the `claude / mention-filter` job itself skipped, ahead
+  of the `claude / claude` job, so the gate rejects the event before any agent
+  starts.
+  `GET actions/runs?event=issue_comment` reports `actor=claude[bot]` and
+  `triggering_actor=claude[bot]` on every such run.
+- That one comment skipped **Antigravity Code Review** and **Jules PR Review**
+  in the same second, so this is not one reviewer's own gate.
+
+A comment from a bot identity therefore never reaches the agent.
+The `workflow_dispatch` fallback is a separate story, and a coarse reading of
+it is wrong in both directions.
+Three dispatches were observed on 2026-09-18 between 05:43 and 05:53:
+
+| run | bound ref | outcome |
+| --- | --- | --- |
+| `35311949751` | `d36a6a62`, PR #3762's own head | all seven `review /` jobs succeeded; posted a real verdict |
+| `35312346178` | `aa32a3c1`, `main` | `claude-review` short-circuited; posted the gha#543 caution **onto #3762** |
+| `35312509759` | `26fd21fb`, PR #3763's own head | short-circuited too, with the right ref |
+
+So binding to the wrong ref (gha#368) and the action exiting without an
+execution result are **two independent failures**, and neither is universal:
+a dispatch can bind correctly and still short-circuit, and one of the three
+did neither and produced a usable verdict.
+
+Two consequences worth holding on to.
+A dispatch bound to `main` attaches its red check runs to `main`, so the PR it
+posted a caution onto still reads green on its own head --- the caution and
+the check state disagree by construction, and only the caution is about that
+PR.
+And the caution's wording, "this PR has **not** been reviewed", is a claim
+about *its own run*, not about the PR: an earlier run on the same head may
+already have posted a verdict, as happened on #3762.
+
+- **Do:** have a human push, or post `@claude review`, from their own account.
+  A User-actor event passes the filter.
+- **Don't:** read "a comment fires a different event" as implying it meets a
+  different gate.
+  The event differs; the actor does not.
+- **Don't:** spend one comment per PR re-measuring this.
+  A single run's `mention-filter` conclusion settles it for the whole repo.

@@ -1037,3 +1037,58 @@ Read at face value, a SHA you did not author appearing as "current head" is indi
 - **Don't:** treat a SHA in review prose as evidence that your branch moved.
 - **Don't:** infer the mechanism from the comment;
   it is already documented, and guessing it produced a false claim in the first draft of this very note.
+
+## The bot-sender gate is on the actor, so commenting is not a way around it
+
+This repo's review workflows skip when the event's **actor** is a bot, and that
+gate is keyed on the actor rather than on the event type.
+Measured 2026-09-17/18 from a Claude Code project thread, whose GitHub token is
+the `claude[bot]` App identity:
+
+- A **push** from the thread runs `claude-review.yml` on `pull_request`, and
+  every `review /` job skips, `require-clean-verdict` included.
+  GitHub counts a skipped required check as satisfied, so the PR reads
+  `mergeable_state: clean` while carrying no verdict at all.
+  Tracked as ai-config#3743.
+- An **`@claude review` comment** from the same identity fires
+  `claude-bot.yml` on `issue_comment` and skips as well.
+  In run `35311218322` the `claude / mention-filter` job itself skipped, ahead
+  of the `claude / claude` job, so the gate rejects the event before any agent
+  starts.
+  `GET actions/runs?event=issue_comment` reports `actor=claude[bot]` and
+  `triggering_actor=claude[bot]` on every such run.
+- That one comment skipped **Antigravity Code Review** and **Jules PR Review**
+  in the same second, so this is not one reviewer's own gate.
+
+A comment from a bot identity therefore never reaches the agent.
+The `workflow_dispatch` fallback is a separate story, and a coarse reading of
+it is wrong in both directions.
+Three dispatches were observed on 2026-09-18 between 05:43 and 05:53:
+
+| run | bound ref | outcome |
+| --- | --- | --- |
+| `35311949751` | `d36a6a62`, PR #3762's own head | all seven `review /` jobs succeeded; posted a real verdict |
+| `35312346178` | `aa32a3c1`, `main` | `claude-review` short-circuited; posted the gha#543 caution **onto #3762** |
+| `35312509759` | `26fd21fb`, PR #3763's own head | short-circuited too, with the right ref |
+
+So binding to the wrong ref (gha#368) and the action exiting without an
+execution result are **two independent failures**, and neither is universal:
+a dispatch can bind correctly and still short-circuit, and one of the three
+did neither and produced a usable verdict.
+
+Two consequences worth holding on to.
+A dispatch bound to `main` attaches its red check runs to `main`, so the PR it
+posted a caution onto still reads green on its own head --- the caution and
+the check state disagree by construction, and only the caution is about that
+PR.
+And the caution's wording, "this PR has **not** been reviewed", is a claim
+about *its own run*, not about the PR: an earlier run on the same head may
+already have posted a verdict, as happened on #3762.
+
+- **Do:** have a human push, or post `@claude review`, from their own account.
+  A User-actor event passes the filter.
+- **Don't:** read "a comment fires a different event" as implying it meets a
+  different gate.
+  The event differs; the actor does not.
+- **Don't:** spend one comment per PR re-measuring this.
+  A single run's `mention-filter` conclusion settles it for the whole repo.

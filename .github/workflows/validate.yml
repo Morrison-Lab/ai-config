@@ -28,6 +28,11 @@ jobs:
       - name: Run check-links tests
         # ai-config#2881: CommonMark autolinks and relative link verification.
         run: python3 scripts/test_check_links.py
+      - name: Check markdown table column counts (MD056)
+        # ai-config#3764: pure-Python detector for table column count mismatches and unescaped pipes.
+        run: python3 scripts/check-md056-table-columns.py
+      - name: Run check-md056-table-columns tests
+        run: python3 scripts/test_check_md056_table_columns.py
       - name: Run resolve-equation-anchors tests
         # The page-side script numbers unlabeled display equations by
         # position, so a cited `#eq-anchor-N` silently renames when an

@@ -723,6 +723,13 @@
             "timeout": 20,
             "script": "warn-partial-validation-before-push.py",
             "why": "memories/preferences.md takes the local check list from .github/workflows/validate.yml rather than from memory, and scripts/run-local-validation.py IS that derivation. The rule is read at session start and broken at push time. The observed shape is not a session that skipped checking but one that checked repeatedly with whichever checkers the first round needed, never widening the set while the diff moved on -- measured twice in one session on ai-config#3629 and #3696, the second time on a checker the session did not know existed. Warns and never blocks: the full sweep takes minutes, and there are legitimate pushes that should not wait for it."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unmeasured-digest.py\"",
+            "timeout": 10,
+            "script": "flag-unmeasured-digest.py",
+            "why": "CLAUDE.md 'Timestamp recaps in local time' / deterministic-tools, generalized from a clock time to a digest (ai-config#3779; measured 2026-09-18: an issue body cited `3e2b9e10...` as the md5 of two files, which no command in the session had produced -- the real value `fc967f3e60b170150f3bd94158cc776a` was measured three tool calls later and the issue had to be edited). A digest is a measured value exactly as a clock time is: it is read out of a command's output or it is invented, and the two are indistinguishable once written. Warns, never blocks, when a body about to leave through `gh`/`glab` (a comment, or an issue or PR being created or edited) carries a digest-shaped token -- 7 to 64 hex characters with at least one a-f, that is a canonical length (32/40/64), or truncated with an ellipsis, or preceded within 48 characters by a digest word -- and no prior tool result or user message in the transcript contains a hex run having that token as a prefix. The prefix rule keeps a legitimate abbreviation quiet, so a short SHA quoted from `git log` discharges and one typed from memory does not. Body extraction is imported from flag-unmeasured-timestamp.py and flag-uncited-rebuttal.py so the guards agree on what posts a body. Warns because a digest quoted from an upstream advisory, a lockfile, or a vendor release page is legitimate and not distinguishable by the body alone."
           }
         ]
       },
@@ -900,6 +907,13 @@
             "timeout": 10,
             "script": "flag-unread-commit-citation.py",
             "why": "The MCP half of the Bash entry above, following require-agent-disclosure.py's and flag-unmeasured-timestamp.py's precedent. A remote/web session has no `gh` on PATH, so an mcp__github__ comment tool is the only way it posts, and hooks.json matches by tool name, so the Bash entry never sees it. Same script, same warn-only behaviour, reading tool_input.body directly. ai-config#3471."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unmeasured-digest.py\"",
+            "timeout": 10,
+            "script": "flag-unmeasured-digest.py",
+            "why": "The MCP half of the Bash entry above, following flag-unmeasured-timestamp.py's precedent. hooks.json matches by tool name, so the Bash entry never sees a body posted through mcp__github__add_issue_comment from a remote session with no `gh` on PATH. Same script, same warn-only behaviour (ai-config#3779)."
           }
         ]
       },

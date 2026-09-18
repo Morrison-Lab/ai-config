@@ -1037,3 +1037,37 @@ Read at face value, a SHA you did not author appearing as "current head" is indi
 - **Don't:** treat a SHA in review prose as evidence that your branch moved.
 - **Don't:** infer the mechanism from the comment;
   it is already documented, and guessing it produced a false claim in the first draft of this very note.
+
+## The bot-sender gate is on the actor, so commenting is not a way around it
+
+This repo's review workflows skip when the event's **actor** is a bot, and that
+gate is keyed on the actor rather than on the event type.
+Measured 2026-09-17/18 from a Claude Code project thread, whose GitHub token is
+the `claude[bot]` App identity:
+
+- A **push** from the thread runs `claude-review.yml` on `pull_request`, and
+  every `review /` job skips, `require-clean-verdict` included.
+  GitHub counts a skipped required check as satisfied, so the PR reads
+  `mergeable_state: clean` while carrying no verdict at all.
+  Tracked as ai-config#3743.
+- An **`@claude review` comment** from the same identity fires
+  `claude-bot.yml` on `issue_comment` and skips as well.
+  In run `35311218322` the `claude / mention-filter` job itself skipped, ahead
+  of the `claude / claude` job, so the gate rejects the event before any agent
+  starts.
+  `GET actions/runs?event=issue_comment` reports `actor=claude[bot]` and
+  `triggering_actor=claude[bot]` on every such run.
+- That one comment skipped **Antigravity Code Review** and **Jules PR Review**
+  in the same second, so this is not one reviewer's own gate.
+
+Both documented fallbacks therefore fail from a bot identity:
+`workflow_dispatch` binds its check runs to the dispatched ref rather than the
+PR head and short-circuits (gha#368), and a comment never reaches the agent.
+
+- **Do:** have a human push, or post `@claude review`, from their own account.
+  A User-actor event passes the filter.
+- **Don't:** read "a comment fires a different event" as implying it meets a
+  different gate.
+  The event differs; the actor does not.
+- **Don't:** spend one comment per PR re-measuring this.
+  A single run's `mention-filter` conclusion settles it for the whole repo.

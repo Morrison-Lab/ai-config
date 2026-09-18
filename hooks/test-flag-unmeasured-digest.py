@@ -159,6 +159,103 @@ CASES = [
          "Renamed the deadbeef fixture.\n\n" + MARKER), False,
      "a hex-looking WORD with no digest keyword and no canonical length is silent"),
 
+    # --- the shape the guard was BUILT for, which it originally missed -------
+    # This corpus's own convention for a backtick-safe body writes the file with
+    # a heredoc in the same Bash call and passes it by an unexpanded variable,
+    # so at PreToolUse time no file exists to read. The first version of this
+    # hook was silent on its own motivating command; these pin that it is not.
+    ([PROMPT],
+     bash("SC=/tmp/scratch\n"
+          "cat > \"$SC/issue-ex04.md\" <<'BODY'\n"
+          + body_with(INVENTED + "...") + "\n"
+          "BODY\n"
+          "gh issue create --repo Morrison-Lab/mlg --title \"t\" "
+          "--body-file \"$SC/issue-ex04.md\""),
+     True,
+     "#3779 verbatim: a heredoc body passed by an unexpanded $VAR warns"),
+    ([PROMPT, MD5_RUN],
+     bash("cat > \"$SC/b.md\" <<'BODY'\n" + body_with(REAL_MD5) + "\nBODY\n"
+          "gh issue create -R o/r -t T --body-file \"$SC/b.md\""),
+     False,
+     "the same heredoc shape carrying a MEASURED digest stays quiet"),
+    ([PROMPT],
+     bash('gh issue create -R o/r -t T -b "md5 ' + INVENTED + 'aabbcc here"'), True,
+     "gh issue create -b: the short literal flag the comment surface already read"),
+    ([PROMPT],
+     bash('gh pr create -b "md5 ' + INVENTED + 'aabbcc here"'), True,
+     "gh pr create -b warns, so the pr arm of RX_CREATE_POST is pinned"),
+    ([PROMPT],
+     bash('gh issue edit 3 -R o/r -b "md5 ' + INVENTED + 'aabbcc here"'), True,
+     "gh issue edit -b warns, so the edit arm of RX_CREATE_POST is pinned"),
+    ([PROMPT],
+     bash('glab issue create -d "md5 ' + INVENTED + 'aabbcc here"'), True,
+     "glab spells the body -d/--description, which no gh-shaped regex matches"),
+    ([PROMPT],
+     bash('glab mr create --description "md5 ' + INVENTED + 'aabbcc here"'), True,
+     "glab mr create --description warns, so the mr arm is pinned"),
+
+    # --- ordinary prose must not supply the digest keyword -------------------
+    ([PROMPT],
+     mcp("mcp__github__add_issue_comment",
+         "We shall keep the cafebabe1 fixture.\n\n" + MARKER), False,
+     "'shall' must not match the `sha` keyword -- unanchored, it did"),
+    ([PROMPT],
+     mcp("mcp__github__add_issue_comment",
+         "See shared/coding/ascii.md and deadbeef1 here.\n\n" + MARKER), False,
+     "'shared/' must not match `sha`; this corpus writes it constantly"),
+    ([PROMPT],
+     mcp("mcp__github__add_issue_comment",
+         "Avoid using 1234abcd as the seed.\n\n" + MARKER), False,
+     "'Avoid' must not match the `oid` keyword"),
+
+    # --- the URL exemption must survive a realistic path length -------------
+    ([PROMPT],
+     mcp("mcp__github__add_issue_comment",
+         "See https://raw.githubusercontent.com/Morrison-Lab/ai-config/"
+         "40b91d4488b33cd3eb9b8172c21a1d5cf902f0bf/hooks/x.py\n\n" + MARKER), False,
+     "a permalink whose path exceeds KEYWORD_WINDOW keeps the URL exemption"),
+    ([PROMPT],
+     mcp("mcp__github__add_issue_comment",
+         "See https://gitlab.com/morrison-lab/teaching/ai-config/-/commit/"
+         "40b91d4488b33cd3eb9b8172c21a1d5cf902f0bf\n\n" + MARKER), False,
+     "a nested-group GitLab commit URL keeps it too"),
+
+    # --- a 40-character sha1 is the commonest digest in a git workflow -------
+    ([PROMPT],
+     mcp("mcp__github__add_issue_comment",
+         "Reverted 40b91d4488b33cd3eb9b8172c21a1d5cf902f0bf.\n\n" + MARKER), True,
+     "a bare 40-character sha1 warns on canonical length alone"),
+    ([PROMPT, tool_result("HEAD is 40b91d4488b33cd3eb9b8172c21a1d5cf902f0bf")],
+     mcp("mcp__github__add_issue_comment",
+         "Reverted 40b91d4488b33cd3eb9b8172c21a1d5cf902f0bf.\n\n" + MARKER), False,
+     "the same sha1, measured, is silent"),
+
+    # --- the transcript's real record shape ---------------------------------
+    ([PROMPT, {"type": "user", "toolUseResult": {"stdout": f"MD5 = {REAL_MD5}"},
+               "message": {"content": [{"type": "tool_result", "content": "(truncated)"}]}}],
+     mcp("mcp__github__add_issue_comment", body_with(REAL_MD5)), False,
+     "a value present only in toolUseResult.stdout still discharges"),
+
+    # --- the three bounds, each pinned by a case only it decides ------------
+    ([PROMPT],
+     mcp("mcp__github__add_issue_comment",
+         "The md5 column of the table is described at length in the section "
+         "below, which also covers provenance and retention, and cafebabe1 is "
+         "the fixture name." + MARKER), False,
+     "a digest word more than KEYWORD_WINDOW characters before the token does "
+     "not reach it -- widening the window would make this a hit"),
+    ([PROMPT],
+     mcp("mcp__github__add_issue_comment",
+         "The blob is " + "a1" * 60 + " in full." + MARKER), False,
+     "a hex run longer than MAX_HEX is not a digest shape -- raising the cap "
+     "would make an arbitrary long hex dump a hit"),
+    ([PROMPT],
+     mcp("mcp__github__add_issue_comment",
+         "See https://example.com/x and then md5 " + INVENTED + "aabbcc here." + MARKER),
+     True,
+     "a URL EARLIER on the line does not exempt a token outside it -- without "
+     "the $ anchor the exemption would swallow this"),
+
     # --- out of scope ---------------------------------------------------------
     ([PROMPT],
      bash("git log --oneline -5"), False,
@@ -244,6 +341,27 @@ def check_unreadable_transcript_is_silent():
     return 0 if ok else 1
 
 
+def check_dry_run_warns():
+    """`--dry-run '<command>'` must be able to warn, or the affordance is inert.
+
+    It supplies no transcript, so a fail-open reading of "no transcript" makes
+    the flag silent under every input -- which is what the first version did.
+    """
+    import subprocess
+    ok = True
+    for cmd, want in (
+            ('gh issue create -R o/r --body "md5 3e2b9e10aabbcc"', True),
+            ('gh issue create -R o/r --body "Canvas assignment 10134103"', False)):
+        r = subprocess.run([sys.executable, HOOK, '--dry-run', cmd],
+                           capture_output=True, text=True)
+        out = json.loads(r.stdout) if r.stdout.strip() else {}
+        fired = bool((out.get('hookSpecificOutput') or {}).get('additionalContext'))
+        ok = ok and (fired == want)
+    print(f"{'ok  ' if ok else 'FAIL'}  --dry-run warns on an unmeasured digest "
+          f"and stays quiet on a decimal id")
+    return 0 if ok else 1
+
+
 def main():
     failures = 0
     for events, payload, should_fire, label in CASES:
@@ -255,11 +373,12 @@ def main():
               f"[{'fire ' if should_fire else 'quiet'}] {label}")
     failures += check_output_shape()
     failures += check_unreadable_transcript_is_silent()
+    failures += check_dry_run_warns()
     if SHAPE_ERRORS:
         failures += 1
         print(f"FAIL  {len(SHAPE_ERRORS)} payload(s) had no surfacing field: "
               f"{SHAPE_ERRORS}")
-    print(f"\n{len(CASES) + 2} checks, {failures} failure(s)")
+    print(f"\n{len(CASES) + 3} checks, {failures} failure(s)")
     return 1 if failures else 0
 
 

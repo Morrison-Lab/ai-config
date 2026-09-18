@@ -4,8 +4,16 @@
 A digest is a *measured* value, exactly as a clock time is. It cannot be
 recalled, inferred, or approximated -- it is either read out of a command's
 output or it is invented. `flag-unmeasured-timestamp.py` is this guard's
-sibling and its model: same shape, same surfaces, same fail-open contract, a
-different class of unmeasurable value.
+sibling and its model: same shape, same fail-open contract, a different class
+of unmeasurable value.
+
+Not the same *surfaces*, though. That hook is registered on `Write`, `Edit` and
+`NotebookEdit` as well as `Bash` and the MCP comment tools; this one is
+registered on `Bash` and the MCP tools only, because a digest written into a
+file is not yet a claim to anyone. One asymmetry falls out of reusing its body
+extraction: a `cat >>` append to a session notebook reaches the notebook branch
+and warns, while the same edit through the `Write` tool does not, since nothing
+registers this hook there.
 
 THE MEASUREMENT (2026-09-18, ai-config#3779)
 --------------------------------------------
@@ -43,8 +51,9 @@ purely lexical -- is this hex string anywhere in the transcript?
 
 WHAT IT CHECKS
 --------------
-    the outgoing body (a forge comment / issue / PR body, or an edit to a
-        tracked file) contains a digest-shaped token, meaning a run of 7 to 64
+    the outgoing body (a forge comment, an issue or PR body being created or
+        edited, or an append to a session notebook or memory file) contains a
+        digest-shaped token, meaning a run of 7 to 64
         hex characters that contains at least one of `a`-`f`, and that is
         EITHER
             exactly 32, 40, or 64 characters (md5, sha1, sha256),
@@ -76,9 +85,17 @@ changed) is a different defect with a different remedy. This guard answers one
 question -- was this value ever observed in this session -- and a `yes` is not
 a verdict that the value is right.
 
-It also does not fire on a hex token the session read in *this* turn and is
-now quoting, which is the overwhelmingly common case and the one a noisier
-guard would make unbearable.
+A token the session measured at any point discharges, not only one measured in
+the current turn. Unlike a clock reading, a hash does not expire: the digest of
+a file that has not changed is as true an hour later as it was when printed.
+
+RELATION TO `flag-unread-commit-citation.py`
+--------------------------------------------
+Both can fire on one body naming a commit SHA, and they answer different
+questions: that one asks whether you READ the commit you are citing, this one
+asks whether the value was ever OBSERVED. A SHA copied from `git log` satisfies
+this guard and not that one. The overlap is two warnings on one token, which is
+noise worth knowing about rather than a defect in either.
 
 CONTRACT
 --------
@@ -136,6 +153,13 @@ _rebuttal = _sibling("flag-uncited-rebuttal.py", "_sib_unmeasured_digest_rebutta
 # `--body-file` is read off disk, or which heredoc is the payload.
 _post_from_payload = getattr(_stamp, "_post_from_payload", None)
 _extract_body_text = getattr(_rebuttal, "extract_body_text", None)
+_short_flag_body = getattr(_stamp, "_short_flag_body", None)
+_extract_heredoc_bodies = getattr(_stamp, "_extract_heredoc_bodies", None)
+
+# glab spells the body `-d`/`--description`, which none of the `gh`-shaped
+# body regexes match. Without this the glab arm of RX_CREATE_POST is dead.
+RX_GLAB_DESCRIPTION = re.compile(
+    r"(?<![^\s])(?:-d|--description)[= ]+(?:\"((?:[^\"\\]|\\.)*)\"|'([^']*)')", re.S)
 
 # The sibling covers the surfaces that COMMENT on an existing thread. The
 # measurement behind this guard was an issue being CREATED, whose body never
@@ -150,20 +174,33 @@ RX_CREATE_POST = re.compile(
 )
 
 
-RX_HEX = re.compile(r"(?<![0-9a-zA-Z])([0-9a-fA-F]{%d,%d})(\.{3}|…)?" % (MIN_HEX, MAX_HEX))
+# Bounded on BOTH sides. Without the trailing lookahead MAX_HEX bounds
+# nothing: a 120-character hex dump still matches its first 64 characters
+# and reads as a canonical sha256.
+RX_HEX = re.compile(r"(?<![0-9a-zA-Z])([0-9a-fA-F]{%d,%d})(?![0-9a-fA-F])(\.{3}|…)?" % (MIN_HEX, MAX_HEX))
 
+# Each alternative is boundary-anchored. Without that, `sha` matches inside
+# "shall", "shared" and "shape", and `oid` inside "avoid" and "android" -- so
+# ordinary prose supplies the keyword for any hex-looking run near it, and a
+# corpus whose PR bodies say "shared/" constantly warns on nearly everything.
 RX_DIGEST_WORD = re.compile(
-    r"(?:md5|sha-?1|sha-?256|sha-?512|sha|hashe?[sd]?|digest|checksum|blob|oid|commit)",
+    r"(?<![A-Za-z])"
+    r"(?:md5|sha-?1|sha-?256|sha-?512|sha|hashe?[sd]?|digest|checksum|blob|oid|commit)"
+    r"(?![A-Za-z])",
     re.I,
 )
 
 # A hex run inside a URL path is almost always a link to something real (a
 # commit page, a gist, a raw blob), and the session may never have printed it.
-RX_URLISH = re.compile(r"[a-z]+://\S*$", re.I)
+# Matched against everything on the line before the token rather than against
+# the keyword window: a raw.githubusercontent.com permalink or a nested-group
+# GitLab commit URL puts far more than KEYWORD_WINDOW characters between the
+# scheme and the SHA, and losing the exemption there warns on an ordinary link.
+RX_URLISH = re.compile(r"[a-z][a-z0-9+.-]*://\S*$", re.I)
 
 NOTE = (
     "Unmeasured-digest reminder: this {surface} states `{token}`, which is "
-    "shaped like a {kind} and does not appear in any tool result or user "
+    "shaped like {kind} and does not appear in any tool result or user "
     "message in this session's transcript.\n\n"
     "A digest is a measured value -- it is read out of a command's output or "
     "it is invented, and the two are indistinguishable once written. Run the "
@@ -192,9 +229,10 @@ def _is_digest_shaped(body, match):
     if not re.search(r"[a-fA-F]", token):
         return False, None
     start = match.start(1)
-    before = body[max(0, start - KEYWORD_WINDOW):start]
-    if RX_URLISH.search(before):
+    line_start = body.rfind("\n", 0, start) + 1
+    if RX_URLISH.search(body[line_start:start]):
         return False, None
+    before = body[max(line_start, start - KEYWORD_WINDOW):start]
     if len(token) in CANONICAL_LENGTHS and not truncated:
         return True, {32: "an md5 digest", 40: "a sha1 digest",
                       64: "a sha256 digest"}[len(token)]
@@ -228,11 +266,17 @@ def _transcript_hex(transcript_path):
                 except Exception:
                     continue
                 role = (rec.get("type") or rec.get("role") or "")
-                # Tool results and user turns are the two places a real value
-                # can enter the session from outside the model.
-                if role not in ("user", "tool_result", "toolResult"):
+                # A tool result arrives as a `user` record whose message.content
+                # holds a block of type "tool_result"; no record carries a
+                # top-level type of "tool_result". `user` is therefore the whole
+                # of it, and it covers the user's own turns too -- the two places
+                # a value can enter the session from outside the model.
+                if role != "user":
                     continue
-                seen |= hex_tokens_in(json.dumps(rec.get("message", rec)))
+                # `toolUseResult` sits beside `message` and can hold the whole
+                # stdout where `message.content` was truncated, so read both.
+                seen |= hex_tokens_in(json.dumps(rec.get("message", "")))
+                seen |= hex_tokens_in(json.dumps(rec.get("toolUseResult", "")))
     except Exception:
         return None
     return seen
@@ -247,15 +291,25 @@ def _measured(token, seen):
     return False
 
 
-def unmeasured_digest(body, transcript_path):
-    """(token, kind) for the first unmeasured digest-shaped token, else None."""
+def unmeasured_digest(body, transcript_path, assume_unmeasured=False):
+    """(token, kind) for the first unmeasured digest-shaped token, else None.
+
+    `assume_unmeasured` is for `--dry-run`, where the caller is probing the
+    body shape and supplies no transcript. Treating "no transcript" as fail-open
+    there makes the affordance inert under every input, which is a reused
+    construct whose purpose did not transfer: the sibling's dry-run warns
+    because its check does not depend on transcript *contents*.
+    """
     if not isinstance(body, str) or not body.strip():
         return None
     seen = _transcript_hex(transcript_path)
     if seen is None:
-        # No readable transcript means no evidence either way. Fail open
-        # rather than warn on every digest in a session we cannot inspect.
-        return None
+        if not assume_unmeasured:
+            # In a live hook invocation, no readable transcript means no
+            # evidence either way. Fail open rather than warn on every digest
+            # in a session we cannot inspect.
+            return None
+        seen = set()
     for m in RX_HEX.finditer(body):
         is_digest, kind = _is_digest_shaped(body, m)
         if not is_digest:
@@ -278,11 +332,54 @@ def _create_post(tool_name, tool_input, cwd):
                or tool_input.get("cmd") or tool_input.get("script"))
     if not isinstance(command, str) or not RX_CREATE_POST.search(command):
         return None, None, None
-    body = _extract_body_text(command, cwd)
+    body = _resolve_body(command, cwd)
     if not isinstance(body, str) or not body.strip():
         return None, None, None
     noun = "issue" if re.search(r"\bissue\b", command, re.I) else "pull request"
     return "body", body, f"{noun} body"
+
+
+def _resolve_body(command, cwd):
+    """The body this create/edit would post, from whichever form carries it.
+
+    Four forms, tried in order, because the measured case defeated the first
+    one on its own. `flag-uncited-rebuttal.py`'s `extract_body_text` assumes
+    "the file is always written before the `gh` call -- so it already exists by
+    the time this hook runs". That is false for this corpus's own documented
+    convention for a backtick-safe body:
+
+        SC=/tmp/scratch
+        cat > "$SC/issue.md" <<'EOF'
+        ... body ...
+        EOF
+        gh issue create --body-file "$SC/issue.md"
+
+    The path keeps an unexpanded `$SC`, and the heredoc that writes it is in
+    the SAME Bash call, so at PreToolUse time no file exists under any
+    resolution. Reading the heredoc body straight out of the command text is
+    what reaches it -- and that shape is the common case here, not a corner.
+    """
+    for get in (lambda: _extract_body_text(command, cwd),
+                lambda: _short_flag_body(command, cwd) if _short_flag_body else None):
+        try:
+            body = get()
+        except Exception:
+            body = None
+        if isinstance(body, str) and body.strip():
+            return body
+    m = RX_GLAB_DESCRIPTION.search(command)
+    if m:
+        got = m.group(1) if m.group(1) is not None else m.group(2)
+        if got and got.strip():
+            return got
+    if _extract_heredoc_bodies:
+        try:
+            joined = "\n".join(_extract_heredoc_bodies(command))
+        except Exception:
+            joined = ""
+        if joined.strip():
+            return joined
+    return None
 
 
 def _read_payload():
@@ -323,7 +420,7 @@ def main() -> int:
         if kind != "body" or not body:
             return 0
 
-        found = unmeasured_digest(body, tpath)
+        found = unmeasured_digest(body, tpath, assume_unmeasured=is_dry_run)
         if not found:
             if is_dry_run:
                 print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))

@@ -6,6 +6,7 @@ No count is written here on purpose: it moves whenever any hook-adding PR merges
 This document describes those hooks --- their lifecycle events, triggering conditions, verification mechanisms, and rules for **proactive compliance** so agents can satisfy requirements naturally without tripping guards.
 The registry is the authority;
 the tables below are still catching up, and two registered hooks have no row yet: `flag-config-deletion-without-ref-check.py` and `warn-stale-review-diff-base.py`.
+Add the row in the same PR that registers a hook, rather than leaving it to a later sweep that nothing schedules.
 The gap survives because `scripts/check-hook-catalog.py` compares the registry against README.md rather than against this file.
 
 For agents operating in this repository or consuming its skills, proactive compliance means following these rules by default rather than waiting for a hook to fire or block.
@@ -126,6 +127,7 @@ Blocking hooks prevent the turn from ending until the missing artifact or requir
 | [`no-placeholder-reply.py`](../hooks/no-placeholder-reply.py) | **Block** | Blocks placeholder replies (`N/A`, `No response requested.`, bare acknowledgments). | Always provide substantive, informative recaps explaining completed work and current state. | None. |
 | [`flag-cop-out-offer.py`](../hooks/flag-cop-out-offer.py) | Warn | Warns when a response closes with a passive offer on already-authorized work ("let me know if you'd like me to..."). | Execute in-scope authorized tasks directly. If a genuine decision is required, present concrete options accompanied by an explicit recommendation. | None. |
 | [`no-misattributed-quote.py`](../hooks/no-misattributed-quote.py) | **Block** | Blocks attributing a quote to a main rule file when the text resides in a `.rationale.md` or `.cases.md` companion file. | Confirm the exact file path where quoted passages reside before citing them. | None. |
+| [`no-unchecked-empty-pr-claim.py`](../hooks/no-unchecked-empty-pr-claim.py) | Warn | Warns when a reply characterizes a pull request as abandoned, or as empty and disposable, near a pull-request number, and no commit-list QUERY naming that number was issued this session. Evidence comes from an allowlist of query-bearing tool calls, never from a message body, a file read, or a tool result, and never from the mergeability query that returns the field. | Read the commit list (`pull_request_read` with `get_commits`, `pulls/<n>/commits`, `build-pr-payload.py`, or `git log origin/main..origin/<branch>`) and the pull request's body before calling it empty --- `pr-on-claim` opens pull requests against an empty commit on purpose, so `changed_files: 0` is also what a live claim reads. A reply naming the convention is exempt, and a close whose own sentence states another basis is exempt for that close. | None. |
 | [`require-stopping-point.py`](../hooks/require-stopping-point.py) | **Block** | Blocks final completion replies lacking an explicit stopping-point declaration. | Conclude summaries with an explicit stopping-point statement: `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point --- [reason]`. | None. |
 
 ### 3.1 A documented workaround for one guard can arm another
@@ -273,6 +275,65 @@ Resolved by restoring the permissive skip-loop and documenting the trade-off.)
 
 ---
 
+## 4.7 A guard's discharge condition is where it dies silently
+
+Warn-only buys tolerance for false **positives** --- noise a reader dismisses.
+It buys nothing for a false **discharge**, which makes the hook indistinguishable from one that never ran.
+So the trigger gets the attention and the discharge gets the defect, because a guard that fires too often is visible and a guard that has quietly disarmed itself is not.
+
+Five failures, all measured on drafts of [`no-unchecked-empty-pr-claim.py`](../hooks/no-unchecked-empty-pr-claim.py) (ai-config#3755, review rounds 1 to 3), and all invisible to a passing test suite.
+
+**The query that produces the defect is not evidence against it.**
+The guard warns when a pull request is called empty without its commit list being read, and its first draft accepted the mergeability query --- the very query that returns `changed_files` --- as that read.
+So performing the misreading discharged the guard against the misreading, and it was silent on the incident its own registry entry cited as its measurement.
+Ask of every accepted read: could this read be the one that caused the error?
+
+**An unscoped discharge is satisfied by the wrong subject.**
+That same draft asked whether a commit-list read appeared anywhere in the session rather than whether one appeared for *the pull request the claim was about*, and a triage sweep reads many.
+Scoping it per number is not enough either: returning on the first number that has evidence silences a batch close because one of its pull requests was checked.
+Require evidence for **each** subject the claim names.
+
+**Evidence must be a query, and a tool call is not automatically one.**
+The second draft drew the line at calls versus results, reasoning that results carry file content while calls carry a query.
+That distinction does not hold.
+A `Bash` call carries a path, and a `reply`, `update_status` or `add_issue_comment` call carries the agent's own prose --- so writing "I have not run `get_commits` for #3737" into a comment discharged the guard, which is the first draft's failure with the direction reversed.
+Allowlist the tools whose input is a query, and reject a command carrying a message body.
+
+**A serialized blob is not the text the pattern was written for.**
+The third draft read evidence from `json.dumps(tool_input)`, which encodes a newline as the two characters backslash and `n`.
+So `[^\n]` never terminated at a line, and a window meant to span one command spanned the whole script --- discharging the guard from a `git log` two lines away from an unrelated PR number.
+The mirror case is a `\b` before a command name, defeated by the `n` that escaping glues to it, so a genuine `gh api .../commits` read at the start of a later line was rejected and its author warned to do what they had just done.
+Both were found on the real transcript rather than on a fixture.
+The same call's free-prose `description` field rode into the blob beside its command, so a PR number mentioned there discharged the guard as though a query had named it.
+Extract the field you mean, and match it as text rather than as its serialization.
+
+**An exemption needs a scope as much as a trigger does.**
+The claim was windowed to 240 characters and the "this close is justified" exemption was searched over the whole message, so one correctly-justified close in a batch recap exempted every unjustified one beside it.
+Scope a per-item exemption to the item --- here, to the sentence.
+
+None of this is caught by the test suite, because a fixture transcript contains only what the case needs.
+The session that produces the defect contains everything else, which is what [`fixtures-are-not-evidence`](../shared/workflow/fixtures-are-not-evidence.md) is about.
+Two things follow.
+Run a new transcript-reading hook against a real transcript truncated at the message it is meant to catch, before believing a green suite.
+And take the tool mix from that transcript rather than from intuition: the measured session ran 323 `Bash` calls, 44 `update_status`, 39 `pull_request_read` and 23 `reply`, and **zero** `Read`, `Grep` or `Glob` --- so a denylist naming the file tools excluded nothing at all while the two families that defeat it were most of the traffic.
+
+A measurement quoted in the lesson has to be the measurement.
+The first version of this section said an unscoped test "was discharged by the 39 unrelated reads the real session had already issued".
+Both halves were wrong: the 39 were all the pull-request reads, of which 13 (method `get`) plus one REST call actually matched, and **zero** were commit-list reads of any kind.
+The causal claim was wrong too --- the silence came from accepting the mergeability query, and either narrowing alone would have fixed it.
+`shared/workflow/metacognitive-monitoring.md`'s rule for a cause claim, ask what else explains the same observation, is the check that was skipped.
+
+- **Do:** exclude the query whose misreading is the defect.
+- **Do:** require evidence for every subject the claim names.
+- **Do:** allowlist query-bearing tools, and derive the mix from a real transcript.
+- **Do:** scope a per-item exemption to the item.
+- **Do:** replay a real transcript at the offending message as the last check.
+- **Don't:** accept a session-global "did this token appear anywhere" test.
+- **Don't:** assume a tool call carries a query --- most of them carry prose or a path.
+- **Don't:** read a passing fixture suite as evidence the guard fires in a real session.
+
+---
+
 ## 5. Adding & Modifying Hooks: Checklist
 
 When authoring a new hook:
@@ -296,6 +357,11 @@ When authoring a new hook:
    ```
    The third is the gate a new hook trips most easily: resolve the hook's own path with `os.path.realpath(__file__)`, never `abspath`.
    See [Resolve a hook's own directory with `realpath`, never lexical `abspath`](#resolve-a-hooks-own-directory-with-realpath-never-lexical-abspath).
+   Add `python3 scripts/check-leadin-counts.py` whenever the change touches prose, since a bold-header paragraph added to an enumerated section moves a count stated several lines above it.
+7. Run every gate again after the LAST edit to any file in the change, and read a reading taken before that edit as expired.
+   A formatter is an edit: `scripts/semantic-line-breaks.py --write` reflowed a paragraph in this file after the gates had been run and turned its first line into a bold header, which broke `check-leadin-counts.py` on a branch already reported green (measured 2026-09-17, ai-config#3755, review round 3).
+   The failure is not carelessness about running checks --- the checks were run --- but the same stale-reading class `hooks/no-stale-pr-status.py` guards for a PR's check state, applied to a local gate.
+   It reads as finished precisely because the work of checking was genuinely done.
 
 ## 5.5 A hook test that invokes the real hook is not hermetic against live git state
 

@@ -1451,6 +1451,17 @@ same weight as the other modularity checks above.
 <!-- Not yet shared with the lab manual; edit shared/coding/regex-backtracking-pitfalls.md, not here. -->
 [`shared/coding/regex-backtracking-pitfalls.md`](shared/coding/regex-backtracking-pitfalls.md)
 
+## Coding: a test harness reading embedded script from a YAML block scalar must not re-strip indentation
+
+<!-- Not yet shared with the lab manual; edit shared/coding/yaml-embedded-script-double-dedent.md, not here. -->
+[`shared/coding/yaml-embedded-script-double-dedent.md`](shared/coding/yaml-embedded-script-double-dedent.md)
+
+`yaml.safe_load` already dedents a `run: |` block relative to its own first
+content line; a harness that also strips a fixed number of leading spaces on
+top of that double-dedents, corrupting any line shallower than the fixed
+width and producing an `IndentationError` that reads as a bug in the
+workflow file rather than in the harness.
+
 ## Writing style: plain, direct prose
 
 <!-- Shared with the lab manual; edit shared/writing/plain-prose.md, not here. -->

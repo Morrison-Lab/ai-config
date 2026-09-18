@@ -1131,12 +1131,13 @@ git add <path> && git commit -F - <<'MSGEOF' 2>&1 | tail -3
 ...message...
 MSGEOF
 echo "next thing"
-git push ...
 ```
 
 `git log` still showed the previous commit and `git status` still showed the file as ` M`.
 No error surfaced, because the pipeline's output was displaced by the commands that followed it in the same call.
 A compound command whose later stages print plenty is precisely where a missing commit looks like a successful one.
+Whatever ran after it --- a push, most damagingly --- then operated on a tree the commit never reached.
+That trailing push is deliberately not written into the block above, because `scripts/check-chained-commit-push-in-fences.py` denies a commit chained into a later push inside one fence, and this fragment's subject is `-F -` rather than the chaining, so the anti-example loses nothing by naming the consequence in prose instead.
 
 The reliable form worked immediately:
 

@@ -830,3 +830,22 @@ a set named for a behaviour has a membership test by construction, so derive the
 
 (Tracked as [#2981](https://github.com/Morrison-Lab/ai-config/issues/2981).
 An earlier wave's snapshot branch `fix/2981-self-review-guard-sibling-import` treated it as a missing install and added a `.git`-rooted fallback search, which is why the root cause is stated here rather than only the remedy.)
+
+## Evaluating multiple declare phrases across a message (#3761)
+
+A guard scanning for terminal claims (`no-incomplete-check-enumeration.py`) must evaluate all claim phrases (`finditer`),
+not only the first match:
+
+- **Iterate all claims rather than stopping at the first:**
+  A multi-sentence recap often covers several PRs sequentially.
+  Stopping at the first match allows later unverified claims to slip past unchecked.
+- **Enforce canonical BLOCK precedence across all hits:**
+  If any claim in the message warrants a block (e.g. core declare vocabulary backed only by a short CI surface without a subagent or complete check),
+  block the turn regardless of whether other claims in the message warn or are clean.
+- **Union uncovered PRs across claims:**
+  Collect missing PRs across all evaluated claim hits so the warning accurately enumerates the full set of unverified PRs.
+- **Mutation testing for window bounds:**
+  To ensure label windows (`_LABEL_WINDOW`) cannot be silently inflated to whole-message scope,
+  test a message containing a covered claim followed by an unrelated PR mention (without a claim phrase) well outside the window.
+  If the window is inflated,
+  the unrelated PR is falsely swept into the claim's scope and triggers a coverage mismatch.

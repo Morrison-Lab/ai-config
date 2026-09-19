@@ -66,13 +66,9 @@ all. #3485 warns specifically against fixing this by tightening: a guard that
 reads every unparsed argument as a mismatch fires on every session whose
 extraction misses, which is how this hook got silenced once already.
 
-One limit is accepted and NOT closed here, because it is on the other axis and
-predates this change. `hit` resolves only the FIRST declare-phrase in a
-message, and `claim_pr_refs` is windowed around that one hit, so a recap whose
-second, separately-worded "#200 is fully clean too" sits more than
-`_LABEL_WINDOW` from the first declaration is never evaluated at all. This
-change is about the READ's subject; that one is about the CLAIM's, and
-widening `hit` to every declare-phrase match is its own diff.
+Closed in ai-config#3761: `_find_all_claims` iterates all declare-phrases and
+anchored merge-ready matches across the message, evaluating coverage per hit
+and warning on the union of uncovered PRs rather than stopping at the first.
 
 EXTENSION -- two gaps measured 2026-09-09, written up in ai-config#3472
 -------------------------------------------------------------------------------
@@ -195,16 +191,36 @@ RX_PR_ANCHOR = re.compile(
 _ANCHOR_WINDOW = 80
 
 
-def _anchored_merge_ready(text):
-    """Return the first RX_DECLARE_MERGE_READY match that has a PR/git
-    anchor within _ANCHOR_WINDOW characters, or None.
+def _anchored_merge_ready_hits(text):
+    """Yield all RX_DECLARE_MERGE_READY matches that have a PR/git
+    anchor within _ANCHOR_WINDOW characters.
     """
     for m in RX_DECLARE_MERGE_READY.finditer(text):
         lo = max(0, m.start() - _ANCHOR_WINDOW)
         hi = m.end() + _ANCHOR_WINDOW
         if RX_PR_ANCHOR.search(text[lo:hi]):
-            return m
-    return None
+            yield m
+
+
+def _anchored_merge_ready(text):
+    """Return the first RX_DECLARE_MERGE_READY match that has a PR/git
+    anchor within _ANCHOR_WINDOW characters, or None.
+    """
+    return next(_anchored_merge_ready_hits(text), None)
+
+
+def _find_all_claims(text):
+    """Return sorted list of all declare and anchored merge-ready claim matches.
+
+    Each entry is a tuple: (match, is_core)
+    """
+    matches = []
+    for m in RX_DECLARE.finditer(text):
+        matches.append((m.start(), m, True))
+    for m in _anchored_merge_ready_hits(text):
+        matches.append((m.start(), m, False))
+    matches.sort(key=lambda t: t[0])
+    return [(m, is_core) for _, m, is_core in matches]
 
 # Incomplete instruments for a terminal clean claim.
 # `gh pr checks` can omit runs (bcs#651); `statusCheckRollup` is a short
@@ -474,6 +490,130 @@ def _relevant_last_subagent(subagent_events, last_partial, claim_pr_refs):
     return relevant, timed
 
 
+def _format_coverage_warning(hit, read_prs, missing_prs):
+    read = ", ".join(sorted(read_prs))
+    missing = ", ".join(sorted(missing_prs))
+    return (
+        "Your message makes a terminal merge-readiness claim -- "
+        f"\"{hit.group(0).strip()}\" -- and the only complete instrument read in this "
+        f"transcript is of {read}. Nothing in this transcript names {missing}.\n\n"
+        "A complete read is the right KIND of evidence about the "
+        "wrong THING, which is why nothing else catches it: the "
+        "instrument ran, it exited cleanly, and its output says "
+        "nothing whatever about the other PRs. Measured 2026-09-17 on "
+        "Morrison-Lab/ai-config: one PR was scored and five were "
+        "reported as sharing its blocker; rescoring each separately "
+        "showed two different blockers, and two of the five were "
+        "failing on a verdict two days older than their own head.\n\n"
+        "Score each PR the claim covers, and report each one from its "
+        "own exit status:\n\n"
+        "    python3 scripts/check-pr-fully-clean.py <PR> -R "
+        "<owner>/<repo>\n\n"
+        "If you have not run it against a PR in this transcript, you "
+        "have no evidence about that PR -- say so rather than "
+        "extending a neighbour's reading to cover it."
+    )
+
+
+def _format_warn_claim(hit, is_core, pr_label, last_subagent, subagent_on_topic,
+                       last_partial, last_push, last_complete):
+    evidence = [
+        (last_subagent, "subagent"),
+        (last_partial, "partial"),
+        (last_push, "push"),
+        (last_complete, "complete"),
+    ]
+    newest = max(v for v, _ in evidence)
+    kinds = {k for v, k in evidence if v == newest and v >= 0}
+
+    reasons = []
+    if "complete" in kinds:
+        reasons.append(
+            "A complete instrument read and the push (or subagent report) it "
+            "would have to postdate are in the SAME turn, so the transcript "
+            "cannot say which came first. Re-run the instrument in a turn of "
+            "its own, so the reading is unambiguously the later one."
+        )
+    else:
+        if "subagent" in kinds and not subagent_on_topic:
+            reasons.append(
+                "A dispatched subagent's report in this transcript concerns a PR "
+                "mentioned alongside this claim. Whether it is what this claim "
+                "rests on is not something the transcript settles -- but if it "
+                "is, note that a subagent's report is a claim rather than an "
+                "instrument, and it is stale by construction: the agent stops, "
+                "and then reviews and checks keep landing."
+            )
+        elif "subagent" in kinds:
+            reasons.append(
+                "The most recent evidence in this transcript for that claim is a "
+                "dispatched subagent's OWN report, not a reading you ran yourself. "
+                "A subagent's report is a claim, not an instrument, and it is stale "
+                "by construction: the agent stops, and then reviews and checks keep "
+                "landing. Measured 2026-09-09 (write-up: ai-config#3472; the false "
+                "claim itself was made in chat on Morrison-Lab/ai-config#3468, not a "
+                "write-up): a subagent reported \"status: CLEAN / MERGEABLE\", and "
+                "`check-pr-fully-clean.py` later exited 1 because a verdict-bearing "
+                "review landed AFTER the subagent finished."
+            )
+        if "partial" in kinds:
+            reasons.append(
+                "The most recent reading in this transcript is a SHORT CI surface -- "
+                "`gh pr checks`, `statusCheckRollup`, a paginated check-runs "
+                "read. A short list and a clean list look identical, and none of "
+                "them carries a review verdict at all, so none can authorize a "
+                "terminal claim."
+            )
+        if "push" in kinds and last_complete >= 0:
+            reasons.append(
+                "A complete instrument read is in this transcript, but a "
+                "`git push` landed after it, so it describes a head that is "
+                "no longer this PR's. A verdict covers the commit it named; "
+                "re-run the instrument against what you just pushed."
+            )
+        if "push" in kinds and last_complete < 0:
+            reasons.append(
+                "A `git push` is the newest thing in this transcript, and no "
+                "complete instrument read appears anywhere in it -- only a "
+                "short CI surface, which the push has now outdated as well. "
+                "Run the instrument against the head you just pushed."
+            )
+    if not is_core:
+        reasons.append(
+            "This phrasing (\"awaiting merge\", \"good to merge\", \"just needs "
+            "your merge\", ...) asserts the same terminal fact as \"ready to "
+            "merge\" -- nothing left to check, go ahead -- without the vocabulary "
+            "this guard originally keyed on. Measured 2026-09-09 (write-up: "
+            "ai-config#3472; the claim itself was made in chat on "
+            "d-morrison/macros#87, not a write-up): \"green, awaiting your "
+            "merge\" was repeated across four separate messages, and "
+            "`check-pr-fully-clean.py` found no automated review had ever run "
+            "on the PR at all."
+        )
+    if not reasons:
+        reasons.append(
+            "No reading in this transcript postdates the evidence this claim "
+            "rests on. Run the instrument and report from its exit status."
+        )
+    source_note = "\n\n".join(reasons)
+
+    return (
+        f"Your message makes a terminal merge-readiness claim about {pr_label} "
+        f"-- \"{hit.group(0).strip()}\" -- with no `check-pr-fully-clean.py` run "
+        "in this transcript that postdates the most recent push or subagent "
+        "report.\n\n"
+        f"{source_note}\n\n"
+        f"Before relaying this, run and read the instrument yourself:\n\n"
+        f"    python3 scripts/check-pr-fully-clean.py <PR> -R <owner>/<repo>\n\n"
+        "reading its EXIT STATUS: 0 clean, 1 a verdict of not-clean (confirm "
+        "the output has `  - ` finding bullets, since an unhandled exception "
+        "also exits 1), anything else the check having failed to answer.\n\n"
+        "If this is a progress report rather than a terminal claim, say the "
+        "counts without the merge-readiness phrasing -- \"13 pass, 5 pending\" "
+        "trips nothing."
+    )
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -485,134 +625,57 @@ def main() -> int:
 
     if not text:
         return 0
-    hit_core = RX_DECLARE.search(text)
-    hit_merge_ready = _anchored_merge_ready(text)
-    hit = hit_core or hit_merge_ready
-    if not hit:
+    all_claims = _find_all_claims(text)
+    if not all_claims:
         return 0
 
-    # The claim's subject, resolved ONCE and used everywhere. Taking every
-    # `#N` in the message here while `_pr_label` used a window around the
-    # claim gave the two a different idea of what the claim is about, and
-    # the disagreement was exploitable: a status recap naming #100 and then
-    # claiming #651 let a #100 subagent count as evidence for #651, which
-    # downgraded the canonical BLOCK case to a WARN -- the same regression
-    # the docstring says was fixed once already (#3475 round 7).
-    pr_label = _pr_label(text, hit)
-    claim_pr_refs = {r for r in _claim_window_refs(text, hit)}
-    # Two answers, because the two consumers must not share one.
-    #
-    # `last_subagent` is PERMISSIVE -- any subagent this claim plausibly
-    # rests on. It feeds the reasons and `reading_needed_since`, whose only
-    # consequence is a WARN, and this hook family accepts noise over
-    # silence. Narrowing it to the single labelled PR silenced the guard
-    # entirely on "#500: implemented in #501 ... it's fully clean", where
-    # the subagent genuinely was the evidence (#3475 round 8).
-    #
-    # `subagent_timed` is OBJECTIVE -- landed after the CI reading, no text
-    # heuristic involved -- and is the only thing allowed to suppress the
-    # BLOCK. Free-text subject attribution is not reliably decidable, so it
-    # must not decide whether the canonical case blocks: routing the BLOCK
-    # through `matches_target` is what let a passing mention of #100
-    # downgrade a #651 claim (#3475 round 7).
-    last_subagent, subagent_timed = _relevant_last_subagent(
-        subagent_events, last_partial, claim_pr_refs)
+    # Evaluate each claim in the message.
+    # A message may make multiple claims (e.g. multi-PR status recap);
+    # iterate all hits rather than resolving only the first (ai-config#3761).
+    block_claims = []
+    coverage_warnings = []
+    warn_claims = []
 
-    # A complete enumeration after BOTH the last push AND the last subagent
-    # report covers the claim -- a subagent's report is an event that can
-    # move the ground out from under an earlier complete read exactly the
-    # way a push does (a review can land after the subagent stops).
-    # Did the newest relevant subagent actually work on the PR this claim
-    # names, or did it only match some other reference sitting nearby? The
-    # second is a reason to look, not a fact about the claim's evidence,
-    # and asserting it produced a false sentence on "#100 was closed as a
-    # duplicate. #200 is fully clean." (#3475 round 9).
-    # Topic only. Ordering is deliberately NOT a disjunct here: landing
-    # after the CI reading settles WHEN a report arrived and nothing about
-    # WHAT it concerns, so admitting it asserted the round-9 false sentence
-    # again through the timing arm -- an "#9999, nothing to do with 651"
-    # subagent named as the evidence for a #651 claim (#3475 round 10).
-    subagent_on_topic = any(
-        idx == last_subagent and pr_label in refs
-        for idx, refs in subagent_events)
+    for hit, is_core in all_claims:
+        pr_label = _pr_label(text, hit)
+        claim_pr_refs = {r for r in _claim_window_refs(text, hit)}
+        last_subagent, subagent_timed = _relevant_last_subagent(
+            subagent_events, last_partial, claim_pr_refs)
+        subagent_on_topic = any(
+            idx == last_subagent and pr_label in refs
+            for idx, refs in subagent_events)
+        reading_needed_since = max(last_push, last_subagent)
 
-    reading_needed_since = max(last_push, last_subagent)
+        fresh_complete_refs = set()
+        for idx, refs in complete_events:
+            if idx > reading_needed_since:
+                fresh_complete_refs |= refs
 
-    # Which PRs the fresh complete reads were actually ABOUT. A read taken
-    # before the push or subagent report it would have to postdate is not
-    # evidence for anything here, so it does not contribute a subject.
-    fresh_complete_refs = set()
-    for idx, refs in complete_events:
-        if idx > reading_needed_since:
-            fresh_complete_refs |= refs
+        uncovered = sorted(r for r in claim_pr_refs if r not in fresh_complete_refs)
+        if last_complete > reading_needed_since:
+            # Fail open when the read's subject could not be recovered at all --
+            # an MCP-shaped call, a wrapper script, a number the lookarounds
+            # rightly refused (#3485).
+            if not fresh_complete_refs:
+                continue
+            if uncovered:
+                coverage_warnings.append((hit, pr_label, fresh_complete_refs, uncovered))
+        else:
+            is_original_ci_case = (
+                bool(is_core) and subagent_timed < 0 and last_partial >= 0)
+            if is_original_ci_case:
+                block_claims.append((hit, pr_label))
+            elif last_partial >= 0 or last_subagent >= 0:
+                warn_claims.append((hit, is_core, pr_label, last_subagent, subagent_on_topic))
 
-    uncovered = sorted(r for r in claim_pr_refs if r not in fresh_complete_refs)
-    if last_complete > reading_needed_since:
-        # Fail open when the read's subject could not be recovered at all --
-        # an MCP-shaped call, a wrapper script, a number the lookarounds
-        # rightly refused. #3485 warns against fixing this by tightening
-        # alone: a hook that treats every unparsed argument as a mismatch
-        # fires on every session whose extraction misses, which is how the
-        # guard got silenced once already.
-        if not fresh_complete_refs:
-            return 0
-        if not uncovered:
-            return 0
+    # Priority 1: Canonical BLOCK. If any claim in the message is backed only
+    # by a short CI surface without a subagent or complete read, block.
+    if block_claims:
         if already_fired(text):
             return 0
-        read = ", ".join(sorted(fresh_complete_refs))
-        missing = ", ".join(uncovered)
-        print(json.dumps({
-            "systemMessage": (
-                "Your message makes a terminal merge-readiness claim -- "
-                "\"%s\" -- and the only complete instrument read in this "
-                "transcript is of %s. Nothing in this transcript names %s.\n\n"
-                "A complete read is the right KIND of evidence about the "
-                "wrong THING, which is why nothing else catches it: the "
-                "instrument ran, it exited cleanly, and its output says "
-                "nothing whatever about the other PRs. Measured 2026-09-17 on "
-                "Morrison-Lab/ai-config: one PR was scored and five were "
-                "reported as sharing its blocker; rescoring each separately "
-                "showed two different blockers, and two of the five were "
-                "failing on a verdict two days older than their own head.\n\n"
-                "Score each PR the claim covers, and report each one from its "
-                "own exit status:\n\n"
-                "    python3 scripts/check-pr-fully-clean.py <PR> -R "
-                "<owner>/<repo>\n\n"
-                "If you have not run it against a PR in this transcript, you "
-                "have no evidence about that PR -- say so rather than "
-                "extending a neighbour's reading to cover it."
-            ) % (hit.group(0).strip(), read, missing),
-        }))
-        return 0
-
-    # Nothing to warn about: no partial CI reading, and no subagent report
-    # either -- the claim rests on neither a short CI list nor a dispatched
-    # agent's say-so.
-    if last_partial < 0 and last_subagent < 0:
-        return 0
-
-    if already_fired(text):
-        return 0
-
-    # BLOCK only the narrow, original case this hook has always covered:
-    # original clean-claim vocabulary, a partial CI reading in play, no
-    # subagent involved. Everything the 2026-09-09 extension added --
-    # broader merge-readiness vocabulary, or a subagent's report as the
-    # only evidence -- WARNS instead. See the module docstring's EXTENSION
-    # section for why.
-    # `last_partial >= 0` is implied here: the guard above returned when
-    # both were negative, so `last_subagent < 0` already forces it.
-    # `last_partial >= 0` is back, and its history is the point. Round 4
-    # proved it inert -- and it was, while this line read `last_subagent < 0`
-    # and the early return above guaranteed the implication. Keying on
-    # `subagent_timed` breaks that implication, so a conjunct that really was
-    # dead becomes load-bearing again. An inertness proof is a statement about
-    # the surrounding guards, not about the conjunct.
-    is_original_ci_case = (
-        bool(hit_core) and subagent_timed < 0 and last_partial >= 0)
-
-    if is_original_ci_case:
+        hit, pr_label = block_claims[0]
+        named_prs = sorted({pr for _, pr in block_claims if pr != "the PR you named"})
+        label = ", ".join(named_prs) if named_prs else pr_label
         print(json.dumps({
             "decision": "block",
             "reason": (
@@ -630,7 +693,7 @@ def main() -> int:
                 "(2026-08-26) it matched the endpoint (8==8), but a Ready-for-merge claim "
                 "still rested on it instead of `check-pr-fully-clean.py`, which exited 1 "
                 "for missing automated review.\n\n"
-                f"Run an instrument that can authorize the claim about {pr_label}, then "
+                f"Run an instrument that can authorize the claim about {label}, then "
                 "report from it:\n\n"
                 "    python3 scripts/check-pr-fully-clean.py <PR> -R <owner>/<repo>\n\n"
                 "reading its EXIT STATUS three ways -- 0 clean, 1 a verdict of not-clean "
@@ -652,135 +715,43 @@ def main() -> int:
         }))
         return 0
 
-    # WARN path: broader vocabulary and/or a subagent's report as the
-    # evidence, per the 2026-09-09 extension (ai-config#3472). Derive the
-    # explanation from the condition that ACTUALLY fired -- not from an
-    # independent predicate that can disagree with it (finding 2): we are
-    # here only because `is_original_ci_case` was False, which by
-    # construction means `(not hit_core) or (last_subagent >= 0)`, so at
-    # least one of the two branches below always applies, and both apply
-    # when both reasons are in play.
-    # Derive the explanation TOTALLY, from which evidence is actually the
-    # newest, rather than from independent predicates. Three review rounds
-    # of #3475 each found another transcript where the independent form
-    # emitted a false sentence or no sentence at all: a push blamed on a
-    # subagent, a tie yielding an empty note, and a fresher partial reading
-    # while the message still blamed the subagent. An argmax cannot have
-    # that shape -- every reachable state names the evidence it found.
-    evidence = [
-        (last_subagent, "subagent"),
-        (last_partial, "partial"),
-        (last_push, "push"),
-        (last_complete, "complete"),
-    ]
-    newest = max(v for v, _ in evidence)
-    kinds = {k for v, k in evidence if v == newest and v >= 0}
+    system_messages = []
 
-    reasons = []
-    # `complete` can never be the SOLE newest kind here: the early return
-    # above fires when it strictly exceeds both push and subagent, so
-    # reaching this line with `complete` newest means it is tied with
-    # something. A `len(kinds) > 1` conjunct would be inert -- confirmed by
-    # exhaustive enumeration over the 920 reachable states (#3475 round 4).
-    if "complete" in kinds:
-        # A complete read shares the newest index with something it would
-        # have to postdate. Same turn, so the transcript cannot order them.
-        reasons.append(
-            "A complete instrument read and the push (or subagent report) it "
-            "would have to postdate are in the SAME turn, so the transcript "
-            "cannot say which came first. Re-run the instrument in a turn of "
-            "its own, so the reading is unambiguously the later one."
-        )
-    else:
-        if "subagent" in kinds and not subagent_on_topic:
-            # Matched by PROXIMITY, not by ordering: the report concerns a PR
-            # mentioned near this claim, which is a reason to look rather than
-            # a fact about what the claim rests on. Asserting otherwise was a
-            # false narrative sentence on "#100 was closed as a duplicate.
-            # #200 is fully clean." (#3475 round 9).
-            reasons.append(
-                "A dispatched subagent's report in this transcript concerns a PR "
-                "mentioned alongside this claim. Whether it is what this claim "
-                "rests on is not something the transcript settles -- but if it "
-                "is, note that a subagent's report is a claim rather than an "
-                "instrument, and it is stale by construction: the agent stops, "
-                "and then reviews and checks keep landing."
-            )
-        elif "subagent" in kinds:
-            reasons.append(
-                "The most recent evidence in this transcript for that claim is a "
-            "dispatched subagent's OWN report, not a reading you ran yourself. "
-            "A subagent's report is a claim, not an instrument, and it is stale "
-            "by construction: the agent stops, and then reviews and checks keep "
-            "landing. Measured 2026-09-09 (write-up: ai-config#3472; the false "
-            "claim itself was made in chat on Morrison-Lab/ai-config#3468, not a "
-            "write-up): a subagent reported \"status: CLEAN / MERGEABLE\", and "
-            "`check-pr-fully-clean.py` later exited 1 because a verdict-bearing "
-            "review landed AFTER the subagent finished."
-            )
-        if "partial" in kinds:
-            reasons.append(
-                "The most recent reading in this transcript is a SHORT CI surface -- "
-            "`gh pr checks`, `statusCheckRollup`, a paginated check-runs "
-            "read. A short list and a clean list look identical, and none of "
-            "them carries a review verdict at all, so none can authorize a "
-            "terminal claim."
-            )
-        if "push" in kinds and last_complete >= 0:
-            reasons.append(
-                "A complete instrument read is in this transcript, but a "
-            "`git push` landed after it, so it describes a head that is "
-            "no longer this PR's. A verdict covers the commit it named; "
-            "re-run the instrument against what you just pushed."
-            )
-        if "push" in kinds and last_complete < 0:
-            reasons.append(
-                "A `git push` is the newest thing in this transcript, and no "
-                "complete instrument read appears anywhere in it -- only a "
-                "short CI surface, which the push has now outdated as well. "
-                "Run the instrument against the head you just pushed."
-            )
-    if not hit_core:
-        reasons.append(
-            "This phrasing (\"awaiting merge\", \"good to merge\", \"just needs "
-            "your merge\", ...) asserts the same terminal fact as \"ready to "
-            "merge\" -- nothing left to check, go ahead -- without the vocabulary "
-            "this guard originally keyed on. Measured 2026-09-09 (write-up: "
-            "ai-config#3472; the claim itself was made in chat on "
-            "d-morrison/macros#87, not a write-up): \"green, awaiting your "
-            "merge\" was repeated across four separate messages, and "
-            "`check-pr-fully-clean.py` found no automated review had ever run "
-            "on the PR at all."
-        )
-    if not reasons:
-        # Unreachable by the argmax above (the guard earlier guarantees at
-        # least one of last_partial / last_subagent is non-negative), but a
-        # guard against a claim with no stated basis is cheaper than the
-        # empty explanation #3475 round 2 shipped.
-        reasons.append(
-            "No reading in this transcript postdates the evidence this claim "
-            "rests on. Run the instrument and report from its exit status."
-        )
-    source_note = "\n\n".join(reasons)
+    # Coverage warning: A complete instrument read ran, but did not
+    # cover all PRs claimed clean across the message (ai-config#3485, #3761).
+    if coverage_warnings:
+        all_fresh_complete_refs = set()
+        all_uncovered = set()
+        for hit, pr_label, fresh_refs, uncov in coverage_warnings:
+            all_fresh_complete_refs |= fresh_refs
+            all_uncovered |= set(uncov)
+        if all_fresh_complete_refs and all_uncovered:
+            first_hit = coverage_warnings[0][0]
+            system_messages.append(_format_coverage_warning(
+                first_hit, all_fresh_complete_refs, all_uncovered))
 
-    print(json.dumps({
-        "systemMessage": (
-            f"Your message makes a terminal merge-readiness claim about {pr_label} "
-            f"-- \"{hit.group(0).strip()}\" -- with no `check-pr-fully-clean.py` run "
-            "in this transcript that postdates the most recent push or subagent "
-            "report.\n\n"
-            f"{source_note}\n\n"
-            f"Before relaying this, run and read the instrument yourself:\n\n"
-            f"    python3 scripts/check-pr-fully-clean.py <PR> -R <owner>/<repo>\n\n"
-            "reading its EXIT STATUS: 0 clean, 1 a verdict of not-clean (confirm "
-            "the output has `  - ` finding bullets, since an unhandled exception "
-            "also exits 1), anything else the check having failed to answer.\n\n"
-            "If this is a progress report rather than a terminal claim, say the "
-            "counts without the merge-readiness phrasing -- \"13 pass, 5 pending\" "
-            "trips nothing."
-        ),
-    }))
+    # Timing / subagent / partial reading / merge-readiness warning (ai-config#3472, #3761).
+    # Do not let coverage_warnings suppress warn_claims, and do not drop later
+    # warn_claims: report all distinct unverified claims across the message.
+    if warn_claims:
+        seen_warn_prs = set()
+        for hit, is_core, pr_label, last_subagent, subagent_on_topic in warn_claims:
+            if pr_label != "the PR you named":
+                if pr_label in seen_warn_prs:
+                    continue
+                seen_warn_prs.add(pr_label)
+            system_messages.append(_format_warn_claim(
+                hit, is_core, pr_label, last_subagent, subagent_on_topic,
+                last_partial, last_push, last_complete))
+
+    if system_messages:
+        if already_fired(text):
+            return 0
+        print(json.dumps({"systemMessage": "\n\n---\n\n".join(system_messages)}))
+        return 0
+
     return 0
+
 
 
 if __name__ == "__main__":

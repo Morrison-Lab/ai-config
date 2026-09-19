@@ -285,17 +285,19 @@ There is no changelog-fragment exemption in either job's globs or paths-ignore.
   - **Don't:** write a changelog bullet as one unbroken line on the reasoning that it is "just a changelog" and outside the line-break convention's scope.
   (Measured 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826).)
 
-- **`check-new-line-breaks` does not see a sentence that opens with a digit or an opening parenthesis, so a two-sentence line passes silently whenever the second sentence starts with either.**
-  Its `_SENT_BREAK_RE` lookahead class is `` [A-Z"'`*\[] ``, which admits an uppercase letter or a markup character --- and neither a digit nor `(`.
-  This corpus opens sentences with derived counts constantly, because `CLAUDE.md` asks for numbers derived rather than recalled --- "19 sites across ...", "308 cases passed ..." --- so the blind spot sits exactly where the prose most often lands.
-  It is a false negative, so nothing reports it: the check goes green and the author reads that as the line being fine.
-  - **Do:** scan added prose lines yourself for a second sentence when the gate passes a long line, particularly one whose next sentence is a count.
-  - **Don't:** read a green `new-line-breaks` as evidence that a long added line carries only one sentence.
+- **Historically, `check-new-line-breaks` did not see a sentence that opens with a digit or an opening parenthesis, so a two-sentence line passed silently.**
+  Its `_SENT_BREAK_RE` lookahead class was `` [A-Z"'`*\[] ``, which admitted an uppercase letter or a markup character --- and neither a digit nor `(`.
+  This corpus opens sentences with derived counts constantly, because `CLAUDE.md` asks for numbers derived rather than recalled --- "19 sites across ...", "308 cases passed ..." --- so the blind spot sat exactly where the prose most often lands.
+  It was a false negative, so nothing reported it: the check went green and the author read that as the line being fine.
+  - **Do:** break before sentences opening with digits, parens, or underscore emphasis;
+    the widened lookahead now actively enforces these boundaries.
+  - **Don't:** assume a sentence opening with a digit or paren is invisible to `new-line-breaks`.
   (Measured 2026-09-13 on a `Morrison-Lab/ai-config` branch: two added lines each carrying two sentences passed green, and a matcher differing only by `0-9` in the lookahead flagged both.
   A later line on the same branch opened its second sentence with `(` and passed green too --- and the `0-9` widening does NOT catch it, so the fix is the wider class rather than the digit alone.
   Measured against the shipped regex: digit `False`, paren `False`, uppercase `True`.
-  With `0-9` added: digit `True`, paren still `False`.
-  Filed as [gha#878](https://github.com/Morrison-Lab/gha/issues/878).)
+  Filed as [gha#878](https://github.com/Morrison-Lab/gha/issues/878).
+  Resolved 2026-09-19: [Morrison-Lab/gha#884](https://github.com/Morrison-Lab/gha/pull/884) widened `_SENT_BREAK_RE` to `(?=[A-Z0-9\"'`*\[(_])`,
+  and [Morrison-Lab/ai-config#3789](https://github.com/Morrison-Lab/ai-config/issues/3789) vendored the update.)
 
 - **A `changelog.d/<slug>.<category>.md` fragment is also linted by markdownlint-cli2 and fails on multiple trailing blanks (MD012).**
   In Morrison-Lab/gha, `selftest` runs `lint-markdown` over all tracked markdown files using `.markdownlint.default.jsonc`.

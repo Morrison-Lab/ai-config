@@ -50,6 +50,14 @@ CHECKER_87 = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "python3 scripts/check-pr-fully-clean.py 87 "
                    "-R d-morrison/macros"}}]}}
+CHECKER_100 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 100 "
+                   "-R Morrison-Lab/ai-config"}}]}}
+CHECKER_200 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 200 "
+                   "-R Morrison-Lab/ai-config"}}]}}
 CHECKER_3760 = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "python3 scripts/check-pr-fully-clean.py 3760 "
@@ -125,6 +133,16 @@ AGENT_100_DISPATCH = {"type": "assistant", "message": {"content": [
      "input": {"prompt": "drive #100 to clean"}}]}}
 AGENT_100_REPORT = {"type": "user", "message": {"content": [
     {"type": "tool_result", "tool_use_id": "a100", "content": "#100 done"}]}}
+AGENT_200_DISPATCH = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "a200", "name": "Agent",
+     "input": {"prompt": "drive #200 to clean"}}]}}
+AGENT_200_REPORT = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "a200", "content": "#200 done"}]}}
+AGENT_300_DISPATCH = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "a300", "name": "Agent",
+     "input": {"prompt": "drive #300 to clean"}}]}}
+AGENT_300_REPORT = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "a300", "content": "#300 done"}]}}
 ENDPOINT = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "gh api repos/ucdavis/bcs/commits/a5f4f3f2/check-runs?per_page=100 --paginate"}}]}}
@@ -381,6 +399,38 @@ CASES = [
      "no CI reading anywhere: an unrelated dispatch must not make a claim "
      "about a different PR look subagent-sourced (there is no window to be "
      "inside when last_partial is -1)"),
+
+    # --- ai-config#3761: evaluate ALL claim phrases across the message,
+    # not only the first hit ---
+    ([CHECKER_100,
+      say("#100 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #200 is fully clean too.")],
+     "warn",
+     "#3761: second claim uncovered when first claim is covered"),
+    ([CHECKER_100, CHECKER_200,
+      say("#100 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #200 is fully clean too.")],
+     "allow",
+     "#3761: both claims covered by respective complete reads"),
+    ([CHECKER_100,
+      say("#100 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #200 is fully clean too.\n\n" +
+          "y" * 400 + "\n\nAlso, #300 is ready for merge.")],
+     "warn",
+     "#3761: multiple uncovered claims unioned"),
+    ([CHECKER_100,
+      say("#100 is fully clean.\n\n" + "x" * 400 + "\n\nEarlier we closed #200 as duplicate.")],
+     "allow",
+     "#3761 window check: mention of #200 outside claim window without claim phrase must not warn"),
+    ([PARTIAL,
+      say("#100 is awaiting merge.\n\n" + "x" * 400 + "\n\nSeparately, #651 is fully clean.")],
+     "block",
+     "#3761: second claim is canonical block even when first claim is warn-only"),
+    ([CHECKER, AGENT_200_DISPATCH, AGENT_200_REPORT,
+      say("#100 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #200 is fully clean too.")],
+     "warn",
+     "#3761: cross-bucket coverage warning and subagent warning both fire"),
+    ([AGENT_200_DISPATCH, AGENT_200_REPORT, AGENT_300_DISPATCH, AGENT_300_REPORT,
+      say("#200 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #300 is fully clean too.")],
+     "warn",
+     "#3761: multiple independent subagent-warn claims both fire"),
 ]
 
 # (events, must_contain, must_not_contain, label). The WARN explanation must
@@ -465,6 +515,32 @@ CONTENT_CASES = [
      "a partial reading AFTER the subagent's report is the newest evidence, "
      "so the message must name the short CI surface and must not claim the "
      "subagent's report is the most recent thing in the transcript"),
+    ([CHECKER_100,
+      say("#100 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #200 is fully clean too.\n\n" +
+          "y" * 400 + "\n\nAlso, #300 is ready for merge.")],
+     "Nothing in this transcript names #200, #300",
+     "Nothing in this transcript names #100",
+     "#3761: warning names union of all uncovered PRs and not the covered PR"),
+    ([CHECKER, AGENT_200_DISPATCH, AGENT_200_REPORT,
+      say("#100 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #200 is fully clean too.")],
+     "Nothing in this transcript names #100",
+     "Nothing in this transcript names #200",
+     "#3761: coverage warning fires for #100 and subagent warning fires for #200"),
+    ([CHECKER, AGENT_200_DISPATCH, AGENT_200_REPORT,
+      say("#100 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #200 is fully clean too.")],
+     "claim about #200",
+     "claim about #100",
+     "#3761: subagent warning properly names #200 alongside coverage warning for #100"),
+    ([AGENT_200_DISPATCH, AGENT_200_REPORT, AGENT_300_DISPATCH, AGENT_300_REPORT,
+      say("#200 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #300 is fully clean too.")],
+     "claim about #200",
+     "claim about #100",
+     "#3761: multiple warn_claims names #200"),
+    ([AGENT_200_DISPATCH, AGENT_200_REPORT, AGENT_300_DISPATCH, AGENT_300_REPORT,
+      say("#200 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #300 is fully clean too.")],
+     "claim about #300",
+     "claim about #100",
+     "#3761: multiple warn_claims names #300"),
 ]
 
 

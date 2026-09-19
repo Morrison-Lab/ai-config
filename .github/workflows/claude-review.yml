@@ -6,7 +6,7 @@
 #   - a `/review` comment on a PR (see dispatch-on-comment below) -- an
 #     on-demand review, and the only pathway available to an agent session,
 #     which the automatic path's sender gate excludes.
-#   - workflow_dispatch with a pr_number -- manual, and the path claude.yml
+#   - workflow_dispatch with a pr_number -- manual, and the path claude-bot.yml
 #     re-dispatches on an @claude run or trusted @claude review comment.
 name: Claude Code Review
 
@@ -74,6 +74,11 @@ jobs:
     permissions:
       actions: write        # dispatch this workflow via `gh workflow run`
       issues: write         # acknowledge the /review comment
+      # Read the PR's head branch and changed files below. An explicit
+      # permissions: block denies every unlisted scope rather than
+      # defaulting it, so this is required even though a public repo's
+      # PR metadata is readable by an under-scoped token (gha#612).
+      pull-requests: read
     steps:
       - name: Dispatch a review for the commented PR
         env:

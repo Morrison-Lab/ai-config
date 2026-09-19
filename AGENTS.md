@@ -148,6 +148,17 @@ obvious objective and complete every safe, authorized, relevant step. Do not
 reduce an instruction to the smallest literal action when its context makes a
 larger in-scope outcome clear.
 
+## "Or" always means "and/or", not xor, unless xor is explicitly specified
+
+In instructions, prompts, specifications, issue descriptions, and checklists, treat "or" as inclusive ("and/or") unless exclusive choice is explicitly stated (e.g., "either A or B, but not both", "mutually exclusive", or "xor").
+Never treat an unadorned "or" as an exclusive disjunction (XOR) that excuses ignoring or dropping one of the alternatives when both can or should apply.
+When an instruction says "do X or Y", address both X and Y if both are applicable, relevant, or needed to achieve the objective.
+See [`shared/principles/or-means-and-or.md`](shared/principles/or-means-and-or.md).
+
+- **Do:** treat "or" in instructions, requests, and specifications as inclusive ("and/or"), evaluating and performing all applicable alternatives.
+- **Do:** explicitly specify mutual exclusivity (e.g. "either X or Y, but not both") when authoring instructions intended as exclusive choices.
+- **Don't:** treat an unadorned "or" as an exclusive disjunction (XOR) that licenses dropping, ignoring, or omitting one of the alternatives.
+
 ## Always give recommendations with questions
 
 Whenever asking the user a question or presenting options for a genuine decision,

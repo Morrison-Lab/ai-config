@@ -365,6 +365,14 @@ Operationalized by:
 [`specific-beats-general`](specific-beats-general.md),
 and the `clean` / `simplify` review passes.
 
+## "Or" always means "and/or" (inclusive or)
+
+In instructions, requirements, prompts, checklists, and specifications, treat "or" as inclusive ("and/or") unless exclusive choice is explicitly stated.
+Never interpret an unadorned "or" as an exclusive disjunction (XOR) that excuses dropping, ignoring, or omitting one of the alternatives when both apply.
+
+Full statement: [`or-means-and-or`](or-means-and-or.md).
+Operationalized by: the instruction interpretation rules in `AGENTS.md`, [`specific-beats-general`](specific-beats-general.md), and [`prefer-optionality-over-removal`](prefer-optionality-over-removal.md).
+
 ## Think outside the box --- distinguish real from artificial limitations
 
 Do not make unnecessary assumptions about structural limitations;
@@ -520,6 +528,9 @@ it resolves conflicts between layers by establishing that explicit user
 instructions outrank repository defaults, scoped subsystem configs
 outrank top-level policies, and specific types and handlers outrank
 generic fallbacks in code.
+
+Or-means-and-or governs semantic interpretation of compound instructions: it resolves natural-language disjunctions by establishing that "or" is inclusive ("and/or") unless mutual exclusivity is explicitly specified.
+It works alongside interpret-instructions-broadly by ensuring agents satisfy all applicable parts of an instruction rather than arbitrarily dropping alternatives.
 
 Dead-code-is-tech-debt and prefer-optionality-over-removal draw the boundary
 between code deletion and preservation:

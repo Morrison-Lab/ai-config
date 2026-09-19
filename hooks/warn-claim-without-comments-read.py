@@ -304,7 +304,7 @@ def _positional_number(rest):
 def find_claim_targets(command):
     """Yield (number, kind, text, end_pos) for each comment-post command
     position in `command` -- `kind` is "gh" or "glab", `text` is the
-    heredoc-stripped command, and `end_pos` is where the issue number ends
+    heredoc-stripped command, and `end_pos` is where the command verb ends
     (so the caller can read the rest of that command's own flags)."""
     text = strip_heredocs(command)
     if _command_rest is None:

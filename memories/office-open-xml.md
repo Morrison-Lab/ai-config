@@ -1,10 +1,52 @@
-# Office Open XML (`.docx` / `.xlsx`): editing committed and redlined documents
+# Office Open XML (`.docx` / `.xlsx` / `.pptx`): editing and auditing committed and redlined documents
 
 Satellite of [`tools.md`](tools.md), split at the 1250-line gate (ai-config#694 pattern).
 
-`.docx`/`.xlsx` are zip archives, so every entry here is about editing the XML inside one directly.
+`.docx`/`.xlsx`/`.pptx` are zip archives, so every entry here is about editing or reading the XML inside one directly.
 The `docx` skill's helper scripts are the other route,
 and several entries below are about where those helpers and their documentation diverge from what the files actually do.
+
+## A per-file hash proves FIDELITY, not content, and a container format is opaque to it
+
+Reconciling a bulk copy or import by hashing every file at the source against its counterpart at the destination is a real check, and it answers exactly one question: **did the bytes arrive intact.**
+It says nothing about what the bytes contain.
+Treating a clean reconciliation as evidence the imported material is *appropriate* for where it landed substitutes fidelity for content.
+
+For these formats the gap is structural rather than a matter of degree.
+Each file is a zip archive of XML parts (`.ipynb` is the JSON-envelope equivalent of the same problem), so a digest covers the envelope and no per-file digest can report on anything inside it.
+The same applies to a plain `grep` over the file: the payload is deflated, so a search for a string that is plainly present in the deck returns nothing, with no error to notice.
+Unzip first, then scan the parts.
+
+**Two further blind spots sit inside the archive, and they have different causes, so clearing one says nothing about the other.**
+
+**A slide can be hidden.**
+`<p:sld show="0">` marks a slide not to be shown when the deck is presented.
+It is still in the file, still in `ppt/slides/`, and still fully readable --- but it is absent from a presented run-through and easy to miss in any view that renders rather than parses.
+
+**Drawn content carries no text runs.**
+Text in a slide lives in DrawingML `<a:t>` elements.
+Content that was drawn, pasted as a picture, or imported as a graphic has geometry instead, so a text extractor returns nothing for a slide a human reads without difficulty.
+A text-extraction sweep's silence is therefore not evidence the slide is empty.
+
+```bash
+unzip -o deck.pptx -d deck_x
+grep -l 'show="0"' deck_x/ppt/slides/slide*.xml          # hidden slides
+grep -o '<a:t>[^<]*</a:t>' deck_x/ppt/slides/slide7.xml  # the text runs, if any
+```
+
+- **Do:** unzip a container format and scan its parts, rather than scanning or grepping the file itself.
+- **Do:** enumerate hidden slides (`show="0"`) explicitly, since neither a presented deck nor a rendered preview shows them.
+- **Don't:** report a hash or `cmp` reconciliation as evidence about content --- it is evidence about fidelity, and the two questions come apart completely.
+- **Don't:** read a text extractor's empty result for a slide as the slide being empty.
+  Drawn or pasted content has no `<a:t>` runs to find.
+
+(Measured 2026-09-18, importing course material from a OneDrive folder into `Morrison-Lab/mln` (student-facing, intended to become public) and `Morrison-Lab/mlg` (private grading).
+Every file was verified byte-identical between source and destination, and that was reported as strong evidence the import was correct.
+An adversarial review round then found a slide hidden with `show="0"`, titled `Exercise Solution:`, carrying worked answers to a graded exercise, in the repo intended to go public.
+Its answers were drawn as vector paths with no text runs, so a text-extraction pass over the same deck was blind to it as well.
+The general shape --- reading the right artifact and asserting the wrong property of it --- is
+[`shared/workflow/verify-the-right-artifact.md`](../shared/workflow/verify-the-right-artifact.md)'s sixth shape;
+what is specific here is that a container format makes the substitution unavoidable rather than merely tempting.)
 
 ## Editing committed content
 

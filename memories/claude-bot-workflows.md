@@ -1160,9 +1160,9 @@ but it is a correlation with the `claude-review` **job**, not with the run's
 conclusion.
 All four `claude[bot]` dispatches (`35312509759`, `35312346178`,
 `35268075963`, `35267489584`) concluded `failure` with that job short-circuited.
-Of the nine `github-actions[bot]` dispatches in the same window, two concluded
-`failure` and one `cancelled`.
-Those three are not counter-examples, and reading them as counter-examples is
+Of the ten `github-actions[bot]` dispatches in the same window as of
+2026-09-19T19:22Z, three concluded `failure` and one `cancelled`.
+Those four are not counter-examples, and reading them as counter-examples is
 the trap: on `35317602132`, the one read job-by-job, `claude-review` and
 `require-review` both succeeded and only `require-clean-verdict` failed, which
 is the action reviewing and returning a verdict of "not clean".

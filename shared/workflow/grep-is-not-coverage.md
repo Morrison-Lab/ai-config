@@ -920,7 +920,8 @@ git stash && grep -rc <term> <paths> && git stash pop
 
 ```bash
 # or against the commit the original query saw, leaving your tree alone
-git worktree add /tmp/base <base-sha> && grep -rc <term> /tmp/base/<paths>
+git worktree add /tmp/base <base-sha> &&
+  (cd /tmp/base && grep -rc <term> <paths>)
 ```
 
 - **Do:** name the commit a re-derived count was taken against, and take it

@@ -133,6 +133,16 @@ AGENT_100_DISPATCH = {"type": "assistant", "message": {"content": [
      "input": {"prompt": "drive #100 to clean"}}]}}
 AGENT_100_REPORT = {"type": "user", "message": {"content": [
     {"type": "tool_result", "tool_use_id": "a100", "content": "#100 done"}]}}
+AGENT_200_DISPATCH = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "a200", "name": "Agent",
+     "input": {"prompt": "drive #200 to clean"}}]}}
+AGENT_200_REPORT = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "a200", "content": "#200 done"}]}}
+AGENT_300_DISPATCH = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "a300", "name": "Agent",
+     "input": {"prompt": "drive #300 to clean"}}]}}
+AGENT_300_REPORT = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "a300", "content": "#300 done"}]}}
 ENDPOINT = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "gh api repos/ucdavis/bcs/commits/a5f4f3f2/check-runs?per_page=100 --paginate"}}]}}
@@ -413,6 +423,14 @@ CASES = [
       say("#100 is awaiting merge.\n\n" + "x" * 400 + "\n\nSeparately, #651 is fully clean.")],
      "block",
      "#3761: second claim is canonical block even when first claim is warn-only"),
+    ([CHECKER, AGENT_200_DISPATCH, AGENT_200_REPORT,
+      say("#100 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #200 is fully clean too.")],
+     "warn",
+     "#3761: cross-bucket coverage warning and subagent warning both fire"),
+    ([AGENT_200_DISPATCH, AGENT_200_REPORT, AGENT_300_DISPATCH, AGENT_300_REPORT,
+      say("#200 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #300 is fully clean too.")],
+     "warn",
+     "#3761: multiple independent subagent-warn claims both fire"),
 ]
 
 # (events, must_contain, must_not_contain, label). The WARN explanation must
@@ -503,6 +521,26 @@ CONTENT_CASES = [
      "Nothing in this transcript names #200, #300",
      "Nothing in this transcript names #100",
      "#3761: warning names union of all uncovered PRs and not the covered PR"),
+    ([CHECKER, AGENT_200_DISPATCH, AGENT_200_REPORT,
+      say("#100 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #200 is fully clean too.")],
+     "Nothing in this transcript names #100",
+     "Nothing in this transcript names #200",
+     "#3761: coverage warning fires for #100 and subagent warning fires for #200"),
+    ([CHECKER, AGENT_200_DISPATCH, AGENT_200_REPORT,
+      say("#100 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #200 is fully clean too.")],
+     "claim about #200",
+     "claim about #100",
+     "#3761: subagent warning properly names #200 alongside coverage warning for #100"),
+    ([AGENT_200_DISPATCH, AGENT_200_REPORT, AGENT_300_DISPATCH, AGENT_300_REPORT,
+      say("#200 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #300 is fully clean too.")],
+     "claim about #200",
+     "claim about #100",
+     "#3761: multiple warn_claims names #200"),
+    ([AGENT_200_DISPATCH, AGENT_200_REPORT, AGENT_300_DISPATCH, AGENT_300_REPORT,
+      say("#200 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #300 is fully clean too.")],
+     "claim about #300",
+     "claim about #100",
+     "#3761: multiple warn_claims names #300"),
 ]
 
 

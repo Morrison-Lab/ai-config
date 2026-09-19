@@ -849,3 +849,7 @@ not only the first match:
   test a message containing a covered claim followed by an unrelated PR mention (without a claim phrase) well outside the window.
   If the window is inflated,
   the unrelated PR is falsely swept into the claim's scope and triggers a coverage mismatch.
+- **Compose multi-bucket warnings without cross-suppression:**
+  When multiple claims in a message have distinct warning needs (e.g. coverage mismatch on one PR and subagent-only evidence on another),
+  do not let one warning bucket suppress another or stop at the first entry.
+  Compose all warning notices into the emitted `systemMessage` so every unverified claim is surfaced.

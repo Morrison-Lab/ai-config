@@ -320,10 +320,19 @@ RX_GLAB_ISSUE_VIEW = re.compile(
 # endpoint path; either is common enough on a plain comments-read that
 # requiring the path to follow `gh api` immediately would miss it, the same
 # gap the trigger-side fix above closes for `-R`/`--repo`.
+#
+# The tolerated `-X` value is deliberately restricted to GET (case-
+# insensitively, via the compiled flags below), not `-X\s+\S+` matching any
+# verb -- an earlier revision of this line accepted any value, which let
+# `gh api -X POST repos/o/r/issues/N/comments --input body.json` (a comment
+# POST, not a read) be misclassified as a discharging GET, since the
+# body-flag deny-list a few lines down only recognizes the `gh issue
+# comment`-shaped body flags reused from flag-uncited-rebuttal.py, not `gh
+# api`'s own `--input`/`--input -`. Caught in review.
 RX_GH_API_ISSUE_COMMENTS_GET = re.compile(
     r"(?:^|[;&|\n])\s*"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
-    r"gh\s+api\s+(?:(?:--paginate|-X\s+\S+)\s+)*\S*issues/(\d+)/comments\b",
+    r"gh\s+api\s+(?:(?:--paginate|-X\s+GET)\s+)*\S*issues/(\d+)/comments\b",
     re.I | re.M,
 )
 RX_COMMENTS_FLAG = re.compile(r"(?<![A-Za-z0-9-])--comments\b")

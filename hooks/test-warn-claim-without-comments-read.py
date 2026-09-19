@@ -225,6 +225,26 @@ check("gh api --paginate before the endpoint still discharges",
       hook.command_reads_comments(
           "gh api --paginate repos/o/r/issues/1544/comments", "1544"),
       True)
+check("gh api -X GET before the endpoint discharges",
+      hook.command_reads_comments(
+          "gh api -X GET repos/o/r/issues/1544/comments", "1544"),
+      True)
+check("gh api -X GET is case-insensitive (gh itself accepts lowercase)",
+      hook.command_reads_comments(
+          "gh api -X get repos/o/r/issues/1544/comments", "1544"),
+      True)
+# ai-config review: an earlier revision tolerated ANY -X value, so
+# `gh api -X POST ... --input body.json` (a comment POST, not a read) was
+# misread as a discharging GET. -X is now scoped to GET only.
+check("gh api -X POST does NOT discharge (that's a write, not a read)",
+      hook.command_reads_comments(
+          "gh api -X POST repos/o/r/issues/1544/comments --input body.json",
+          "1544"),
+      False)
+check("gh api -X DELETE does NOT discharge",
+      hook.command_reads_comments(
+          "gh api -X DELETE repos/o/r/issues/1544/comments/999", "1544"),
+      False)
 check("prose quoting the qualifying view does not discharge",
       hook.command_reads_comments(
           "echo 'run gh issue view 1544 --comments first'", "1544"),
@@ -347,6 +367,56 @@ check("end-to-end silent for glab when comments were read",
 check("end-to-end silent on a non-claim glab comment even with no prior read",
       run_hook(f'glab issue note 1544 --message "{NON_CLAIM_BODY}"', no_read),
       "")
+
+# ------------------------------------------------- end-to-end: -R / --repo
+
+check("end-to-end fires for a -R-qualified claim with no prior read",
+      bool(run_hook(
+          f'gh issue comment -R owner/repo 1544 --body "{CLAIM_BODY}"',
+          no_read)),
+      True)
+with_r_qualified_comments = write_transcript(
+    ["gh issue view -R owner/repo 1544 --comments"])
+check("end-to-end silent for a -R-qualified claim once a -R-qualified "
+      "read of the SAME issue happened",
+      run_hook(f'gh issue comment -R owner/repo 1544 --body "{CLAIM_BODY}"',
+               with_r_qualified_comments),
+      "")
+os.unlink(with_r_qualified_comments)
+
+# --------------------------------------------- end-to-end: multi-target
+
+# The commit that fixed the -R/--repo gap also claims multi-target coverage
+# for the notes.append(...)/"\n\n".join(notes) aggregation in main() -- not
+# just that find_claim_targets() identifies both, but that BOTH warnings
+# actually reach stdout from one Bash call.
+multi_fires = run_hook(
+    f'gh issue comment 1544 --body "{CLAIM_BODY}" && '
+    f'glab issue note 999 --message "{CLAIM_BODY}"',
+    no_read)
+check("end-to-end: two claim-posts chained in one command both fire",
+      bool(multi_fires), True)
+if multi_fires:
+    try:
+        payload = json.loads(multi_fires)
+        ctx = payload["hookSpecificOutput"]["additionalContext"]
+        check("multi-target warning names the first issue", "#1544" in ctx, True)
+        check("multi-target warning names the second issue", "#999" in ctx, True)
+    except (ValueError, KeyError) as exc:
+        failures.append(f"multi-target end-to-end output not well-formed: {exc}")
+
+with_both_read = write_transcript([
+    "gh issue view 1544 --comments",
+    "glab issue view 999 --comments",
+])
+check("end-to-end: two claim-posts chained in one command, both discharged, "
+      "silent",
+      run_hook(
+          f'gh issue comment 1544 --body "{CLAIM_BODY}" && '
+          f'glab issue note 999 --message "{CLAIM_BODY}"',
+          with_both_read),
+      "")
+os.unlink(with_both_read)
 
 # --------------------------------------------------------- unreadable body
 

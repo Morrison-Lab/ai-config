@@ -1640,3 +1640,48 @@ The orchestrator restored it, arguing the coverage was real.
 A reviewer then showed the argument was false in two ways at once: the allowlist that case exercised is keyed by a body fingerprint, so two identical blocks share one key and it cannot distinguish them, and the body the fixture wrote was not allowlisted at all, so the first copy alone already produced the asserted exit code.
 The case could not fail.
 It was deleted again, along with the fixture lines that existed only to feed it, two review rounds after the agent had it right.)
+
+## A PR body's "checks I ran" section is a scope claim, and reads as a report
+
+The scope-claim rule above fires on a sentence that quantifies over a population.
+A "checks run" paragraph does exactly that and never presents as a claim at all --- it reads as a report of work performed, so it collects none of the scrutiny a claim collects, and its author is the one person who already believes it.
+
+Measured 2026-09-17 on [ai-config#3763](https://github.com/Morrison-Lab/ai-config/pull/3763).
+The PR body said `check-ambiguous-referents.py`'s hits were "all pre-existing `CLAUDE.md` sentences, none from this diff".
+Review caught it as a false state claim.
+It was true of `CLAUDE.md` and false of the other touched file: re-derived against the PR head, the checker flags 34 sentences in `shared/workflow/restructure-for-efficiency.md`, **8 of them lines the diff adds**.
+
+"None from this diff" quantifies over every touched file and every flagged sentence.
+Running the checker on file A and generalizing to the diff is the same shape as scoring one pull request and characterizing the queue.
+
+- **Do:** derive the intersection rather than eyeballing it --- dump the checker's flagged sentences, dump `git diff origin/<default>...HEAD -- <file>` added lines, and count the overlap.
+  Report the count, not an impression.
+- **Do:** report per file when a checker ran on more than one, or state the aggregate as a derived number.
+- **Do:** fix the **body** rather than the diff when a claim of this kind is false.
+  An advisory checker exiting 0 needs no code change;
+  correcting the body in place does not reset a review, and one reply on the thread carries the derivation.
+- **Don't:** write a whole-diff claim from one file's output.
+- **Don't:** type a placeholder clock time into a correction paragraph and patch it afterwards --- take a fresh `TZ=America/Los_Angeles date` reading in the same command that writes the paragraph.
+
+**The set of checks you ran is the same claim one level up, and a derivation is what disguises it.**
+The section above quantifies over the **files** a checker touched.
+Its mirror quantifies over the **checkers**: "every check this workflow runs passed locally" is a claim about that workflow's jobs, and a list built by grepping it for script invocations is not that population.
+
+Measured 2026-09-18 on [ai-config#3778](https://github.com/Morrison-Lab/ai-config/pull/3778).
+A local sweep was derived by grepping `.github/workflows/validate.yml` for `scripts/*.py`, every one of those scripts exited 0, and the PR comment said so.
+That sentence was true and read as something wider.
+Three of that file's jobs invoke no local script at all --- two call a reusable workflow, and `new-line-breaks` runs a pinned composite action as its only step --- so the grep could not reach them by construction.
+`new-line-breaks` failed on the next push, and a `PreToolUse` hook rather than the sweep is what named the offending line.
+
+A derivation is what makes this invisible, and that is the opposite of the usual reading: deriving a list beats enumerating one precisely because it cannot go stale, so a derived population feels settled.
+The derivation was sound and ran over the wrong set.
+So state what the deriving query matched, rather than what you take it to stand for, and prefer a population the CI configuration itself defines --- the job list --- over one a pattern happens to select out of it.
+
+This entry's own first draft asserted that `new-line-breaks` was a separate workflow, which is why the grep had missed it.
+Reading `validate.yml` refuted that assertion before the commit: the job is in the same file, and how it invokes its check is what put it outside the pattern.
+
+- **Do:** state the query a locally-derived check list came from, so the set it examined is on the record.
+- **Do:** derive the population from the jobs a workflow declares when the claim is about that workflow passing.
+- **Don't:** read "every script this workflow runs passed" as "this workflow will pass" --- a job that shells out to nothing local is outside that set.
+- **Don't:** treat a mechanical derivation as evidence about coverage;
+  it fixes staleness and says nothing about scope.

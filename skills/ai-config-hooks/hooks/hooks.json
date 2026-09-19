@@ -716,6 +716,13 @@
             "timeout": 20,
             "script": "warn-partial-validation-before-push.py",
             "why": "memories/preferences.md takes the local check list from .github/workflows/validate.yml rather than from memory, and scripts/run-local-validation.py IS that derivation. The rule is read at session start and broken at push time. The observed shape is not a session that skipped checking but one that checked repeatedly with whichever checkers the first round needed, never widening the set while the diff moved on -- measured twice in one session on ai-config#3629 and #3696, the second time on a checker the session did not know existed. Warns and never blocks: the full sweep takes minutes, and there are legitimate pushes that should not wait for it."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/flag-unmeasured-digest.py\"'",
+            "timeout": 10,
+            "script": "flag-unmeasured-digest.py",
+            "why": "CLAUDE.md 'Timestamp recaps in local time' / deterministic-tools, generalized from a clock time to a digest (ai-config#3779; measured 2026-09-18: an issue body cited `3e2b9e10...` as the md5 of two files, which no command in the session had produced). Warns, never blocks, when a body about to leave through `gh` (a comment, or an issue or PR being created or edited) or `glab` (whose body is `-d`/`--description`) carries a digest-shaped token -- 7 to 64 hex characters bounded on both sides with at least one a-f, that is a canonical length (32/40/64), or truncated with an ellipsis, or preceded within 48 characters by a boundary-anchored digest word -- and no prior `user` transcript record (message or toolUseResult) contains a hex run having that token as a prefix. The prefix rule keeps a legitimate abbreviation quiet, so a short SHA quoted from `git log` discharges and one typed from memory does not. The body is read from `--body-file`, `-b`, `-F`, `-d`, or -- the case the first version missed -- a heredoc in the same command, which is this corpus's own convention for a backtick-safe body and leaves no file on disk at PreToolUse time. Because body extraction is imported from flag-unmeasured-timestamp.py, a `cat >>` append to a session notebook or memory file reaches its notebook branch and warns too. Warns because a digest quoted from an upstream advisory, a lockfile, or a vendor release page is legitimate and not distinguishable by the body alone."
           }
         ]
       },
@@ -893,6 +900,13 @@
             "timeout": 10,
             "script": "flag-unread-commit-citation.py",
             "why": "The MCP half of the Bash entry above, following require-agent-disclosure.py's and flag-unmeasured-timestamp.py's precedent. A remote/web session has no `gh` on PATH, so an mcp__github__ comment tool is the only way it posts, and hooks.json matches by tool name, so the Bash entry never sees it. Same script, same warn-only behaviour, reading tool_input.body directly. ai-config#3471."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/flag-unmeasured-digest.py\"'",
+            "timeout": 10,
+            "script": "flag-unmeasured-digest.py",
+            "why": "The MCP half of the Bash entry above, for a remote session with no `gh` on PATH. NOT full parity: it inherits MCP_POST_TOOLS from require-agent-disclosure.py, which covers the comment and review tools, so an issue or PR CREATED through mcp__github__issue_write or mcp__github__create_pull_request is not seen. That is the very case the Bash entry exists for, and closing it means widening the shared tool tuple rather than this hook's own list (ai-config#3779)."
           }
         ]
       },
@@ -1337,6 +1351,13 @@
             "timeout": 10,
             "script": "no-clean-stop-with-live-agent.py",
             "why": "flag-session-boundaries -- blocks a CLEAN stopping-point declaration when a subagent was dispatched and no liveness check followed the last task-notification or the last dispatch, whichever came later (ai-config#3689)."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-unchecked-empty-pr-claim.py\"'",
+            "timeout": 10,
+            "script": "no-unchecked-empty-pr-claim.py",
+            "why": "memories/github.md 'Close empty PRs' -- warns, never blocks, when a reply characterizes a pull request as abandoned, or as empty and disposable, near a pull-request number, and no commit-list QUERY naming that number was issued this session. pr-on-claim has this repo open pull requests against an empty commit on purpose, so changed_files: 0 reads the same on a live claim, on a thread whose commits cannot be pushed (#3739 / #3743), and on a dead branch; only the last is closeable. Four narrowings, each a draft got wrong and each producing SILENCE rather than noise (#3755, review rounds 1 and 2): the mergeability query that returns the field is not evidence, evidence must name every pull request the claim names, evidence comes from an allowlist of query-bearing tools rather than from any tool call (a reply or a comment body carries prose, and 323 of the measured session's 553 calls were Bash), and a per-close exemption is scoped to its sentence. Warn-only because abandonment is partly a judgment. Measured on #3737, 2026-09-17, against the real transcript, where the guard fires and the first draft did not."
           }
         ]
       }

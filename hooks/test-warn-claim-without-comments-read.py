@@ -562,6 +562,39 @@ check("a -b claim with no comments read warns, end to end",
 check("a -b NON-claim body does not warn, end to end",
       run_hook(f'gh issue comment 1544 -b "{NON_CLAIM_BODY}"', no_read), "")
 
+# ------------------------------------------- escaped quotes inside a body
+#
+# RX_TOKEN's double-quoted branch has to be escape-aware, like the body-literal
+# patterns beside it. A naive [^"]* stops at an escaped quote and mis-splits the
+# rest of the command, which measured two ways: a real claim went unrecognized,
+# and -- worse -- a number quoted INSIDE the body was adopted as the target.
+
+check("an escaped quote in the body does not hide the claim",
+      [t[0] for t in hook.find_claim_targets(
+          'gh issue comment --body "Per note \\"see comment 1600\\" above, claiming this" 1544')],
+      ["1544"])
+check("a number quoted inside the body is not adopted as the target",
+      [t[0] for t in hook.find_claim_targets(
+          'gh issue comment --body "See \\" 1600 for context" 1544')],
+      ["1544"])
+check("an unterminated quote still yields the positional, without raising",
+      [t[0] for t in hook.find_claim_targets(
+          'gh issue comment --body "oops 1544')],
+      ["1544"])
+
+# ------------------------------------------- glab pagination flags take values
+#
+# glab issue view/show paginates. With -p treated as boolean, its page number
+# stood where the positional issue number belongs, so a real --comments read of
+# the right issue went uncredited.
+
+check("glab -p before the number still discharges",
+      hook.command_reads_comments("glab issue view -p 2 --comments 1544", "1544"), True)
+check("glab --per-page before the number still discharges",
+      hook.command_reads_comments("glab issue view --per-page 50 --comments 1544", "1544"), True)
+check("the page number itself is not read as the issue",
+      hook._positional_number(" -p 2 --comments 1544"), "1544")
+
 for path in (no_read, with_comments, with_json_comments, with_glab_comments,
              with_api_get, with_wrong_number, with_mcp_comments,
              with_mcp_plain_view, prose_comments):

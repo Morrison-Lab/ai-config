@@ -45,9 +45,11 @@ Fires only when ALL of these hold:
      this matcher entirely (caught in review); `_positional_number` is the
      shared fragment that admits it, on both the trigger side here and the
      view/api discharge regexes below.
-  2. The comment's body -- read from `--body`/`--body-file`/`-f body=`/
-     `-F body=@file` for `gh`, or `--message`/`-m`/`-F file`/`--file file`
-     for `glab` -- carries CLAIM vocabulary: "claiming"/"claim this", "is
+  2. The comment's body -- read from `--body`/`-b`/`--body-file`/`-f body=`/
+     `-F body=@file` for `gh`, or `--message`/`-m` for `glab` (the file-based
+     forms `-F file`/`--file file` are also accepted, though `glab issue
+     note`'s own flag set may not offer them -- see the note on
+     `extract_glab_note_body`) -- carries CLAIM vocabulary: "claiming"/"claim this", "is
      working on this", "picking this up", "grabbing this", "taking this",
      "please hold off". This is what keeps the hook from firing on every
      issue comment -- an ordinary status update or a closing note is not a
@@ -250,7 +252,12 @@ RX_GLAB_ISSUE_NOTE = re.compile(
 )
 
 # One shell token: a quoted run, or a bare run of non-space.
-RX_TOKEN = re.compile(r"\"[^\"]*\"|'[^']*'|\S+")
+# Escape-aware on the double-quoted branch, like RX_BODY_LITERAL and
+# RX_B_BODY_LITERAL above. A naive [^"]* stops at a backslash-escaped quote
+# inside a body, which mis-splits the rest of the command: measured, it made
+# a real claim invisible, and in one shape made _positional_number adopt a
+# number quoted INSIDE the body as the target issue. Caught in review.
+RX_TOKEN = re.compile(r"\"(?:[^\"\\]|\\.)*\"|'[^']*'|\S+")
 
 # Flags whose VALUE is the following token, so that token is not the
 # positional issue number. Anything not listed is treated as boolean,
@@ -263,6 +270,10 @@ VALUE_TAKING_FLAGS = frozenset({
     "-b", "--body", "-F", "--body-file", "--file",
     "-m", "--message",
     "--json", "-q", "--jq", "-t", "--template",
+    # glab issue view/show paginates; -p 2 left the page number standing where
+    # the positional issue number belongs, so a real --comments read of the
+    # right issue went uncredited. Caught in review.
+    "-p", "--page", "-P", "--per-page",
 })
 
 
@@ -325,7 +336,15 @@ def _first_group(m):
 
 def extract_glab_note_body(rest, cwd):
     """The body `glab issue note` would post, read from `rest` (this
-    command's own flags), or None if it cannot be determined."""
+    command's own flags), or None if it cannot be determined.
+
+    The `-F`/`--file` branch below was carried over from `glab mr note`'s
+    shape. Whether `glab issue note` itself accepts those flags is NOT
+    verified here -- no `glab` binary was available to check, and a review
+    round reported that its only body flag is `-m`/`--message`. The branch
+    is left in place because it is inert either way: a flag glab rejects
+    never reaches this hook, and the reader is told not to trust the
+    inference rather than being shown a claim that may be wrong."""
     m = RX_GLAB_FILE.search(rest)
     if m:
         rel = _first_group(m)

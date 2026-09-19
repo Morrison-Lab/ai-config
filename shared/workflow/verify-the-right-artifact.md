@@ -495,6 +495,40 @@ the fix here is a stricter version of the same falsifying-question test, aimed a
 The Pandoc-bypass and the empty-submodule-baseline are also written up in that PR's own thread and in d-morrison/rme#1154's "Two instrument traps" section;
 the bypass produced a wrong "fix" and two issues filed on the false "math does not compile" premise, one of them d-morrison/macros#85, closed not-planned once the Pandoc-expansion mistake was found.)
 
+## A sweep's PREDICATE is a choice too, and a named standard can stand in for the policy actually being applied
+
+The section above keeps the predicate and narrows the scope: the right question was asked of too little.
+This one inverts that.
+The scope is complete --- every file read, every one of them scanned --- and the *question* is somebody else's.
+
+The evidence is unusually strong here, which is the whole problem.
+A sweep that visits every file and returns zero is a true statement about the predicate the sweep ran, and that predicate was exhaustively applied.
+Nothing is missing from the coverage, so none of the width remedies above fire, and none of the emptiness remedies fire either --- a negative control would have confirmed the pattern works, because the pattern *does* work.
+It answers a different question than the decision needed.
+
+**The tell is that the sweep's terms came from a named standard rather than from the decision in hand.**
+FERPA, HIPAA, PII, GDPR, an SPDX license list, a secrets-scanner ruleset: each is real, externally validated, and thorough about its own subject, so completing one reads as diligence in a way an improvised list never does.
+That authority is exactly what suppresses the next question.
+A standard is written for *its* decision, so its predicate and yours overlap rather than coincide, and the residue --- everything your policy forbids that the standard never contemplated --- is invisible by construction.
+
+The check is one sentence, written before any pattern is typed: **state the predicate the decision actually turns on**, in the policy's own terms.
+Then derive each search term from a clause of that sentence, and report which clause each pattern discharges.
+A clause with no pattern beside it is the gap, and it is visible in the report rather than in the material.
+The named standard then appears where it belongs --- as one clause among several, not as the sweep.
+
+- **Do:** write the deciding policy's predicate as a sentence first, and derive every pattern from a clause of it.
+- **Do:** report the clause each pattern discharges, so a clause nothing searched for shows up as a blank row rather than as silence.
+- **Don't:** let a named compliance standard's checklist stand in for the policy's predicate --- it was written for a different decision and only overlaps yours.
+- **Don't:** read a thorough, externally validated checklist's zero as clearing a decision that checklist was not written to make.
+
+(Measured 2026-09-18, importing course material from a OneDrive folder into two sibling repos --- `Morrison-Lab/mln`, student-facing and intended to become public, and `Morrison-Lab/mlg`, private grading.
+The decision being made was *which repo each file goes in*, whose predicate is "does this reveal anything a student is to be graded on".
+The sweep that ran scanned every imported file for PII and for health keywords, found nothing, and reported the material clean.
+It never searched for `Exercise Solution`, `answer`, or `solution`.
+An adversarial review round then found a PowerPoint slide hidden with `show="0"`, titled `Exercise Solution:`, carrying worked answers to a graded exercise, in the repo intended to go public.
+Both sweeps were sound.
+Only one of them was about the decision.)
+
 ## A reviewer's counter-measurement needs the same check the claim it rebuts would have needed
 
 The section above is about the same artifact measured at a narrower scope than the claim names.

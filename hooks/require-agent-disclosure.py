@@ -61,6 +61,7 @@ Fails OPEN: any parse problem returns 0 with no output.
 """
 import json
 import os
+import pathlib
 import re
 import sys
 
@@ -706,6 +707,78 @@ def discloses(text):
     return bool(re.fullmatch(r"[.\s_*'\"`)\]]*", after))
 
 
+# The UNREADABLE causes are not equivalent, and lumping them together is what
+# made the recommended way to post a body the way this check stops working.
+# `--editor` and `--web` describe text that does not exist yet, and `$VAR` and
+# `--body-file -` name no path on disk -- but `--body-file <literal path>` is a
+# file already written, so it is readable here. CLAUDE.md's PowerShell-safety
+# section pushes authors to `--body-file` precisely to survive backtick and
+# escaping corruption, which is why this shape is the common one.
+# A quoted path may contain spaces, so the quoted alternatives are matched to
+# their closing quote rather than to the first space. A bare `[^\s]+` capture
+# truncated `--body-file "my notes.md"` at the space, which degrades to the
+# advisory rather than misreporting -- but silently, and on a perfectly ordinary
+# filename.
+def _path_alts(extra=""):
+    return (r"(?:\"([^\"" + extra + r"]+)\"|'([^'" + extra + r"]+)'"
+            r"|([^\s\"'" + extra + r"]+))")
+
+
+BODY_FILE_RE = re.compile(
+    r"(?:--body-file|--description-file)[\s=]+" + _path_alts()
+    # `gh api` spells it `-F body=@<path>`; `--form` and `--raw-field` alias it.
+    # The quote may sit outside the whole value (`body="@p"`) or around the path
+    # alone (`body=@"p"`), so both placements are spelled out.
+    # Every spelling is listed rather than approximated: an `@?` shortcut here
+    # matched `body="@p"` while capturing the `@` INTO the path, which then
+    # failed `is_file()` and reported "cannot read" over a file that was right
+    # there. A permissive alternative that matches and mis-captures is worse
+    # than one that does not match at all, because the fallback is silent.
+    + r"|(?:-F|--field|--form|--raw-field)[\s=]+"
+      r"(?:\"body=@([^\"]+)\""
+      r"|'body=@([^']+)'"
+      r"|body=\"@([^\"]+)\""
+      r"|body='@([^']+)'"
+      r"|body=@\"([^\"]+)\""
+      r"|body=@'([^']+)'"
+      r"|body=@([^\s\"']+))"
+    # `-F <path>` is `gh pr comment`'s own body-file shorthand, a different flag
+    # spelled alike. Excluding `=` from the token keeps `-F "in_reply_to=5"` out.
+    + r"|(?<!-)-F\s+" + _path_alts("=") + r"(?:\s|$)"
+)
+
+# A comment body is prose. Anything larger is not one, and reading it would
+# trade a cheap check for an expensive one on a file that cannot be the body.
+MAX_BODY_FILE_BYTES = 1 << 20
+
+
+def file_body(segment):
+    """Return the text of a literal `--body-file` path, or None.
+
+    None means "not resolvable here", never "carries no marker". Every failure
+    path -- a variable in the path, stdin, a glob, a missing file, an oversized
+    one, an unreadable one -- falls back to the caller's existing UNREADABLE
+    advisory rather than asserting anything about text this never read.
+    """
+    for match in BODY_FILE_RE.finditer(segment):
+        path = next((group for group in match.groups() if group), None)
+        if not path or path == "-":
+            continue
+        # A path this cannot resolve statically is exactly the unreadable case.
+        if any(ch in path for ch in "$*?~"):
+            continue
+        try:
+            candidate = pathlib.Path(path)
+            if not candidate.is_file():
+                continue
+            if candidate.stat().st_size > MAX_BODY_FILE_BYTES:
+                continue
+            return candidate.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+    return None
+
+
 def judge_segment(segment, extra):
     """Return a warning for one command-position segment, or None.
 
@@ -742,6 +815,16 @@ def judge_segment(segment, extra):
     # is the heredoc, and reporting "cannot read" over a body just read is the
     # same misdiagnosis the `-F <file>` case produced.
     if extra:
+        return MISSING
+    # A body-file we can actually open settles it on the same terms as an
+    # inline body, for the same reason the heredoc branch above does: the text
+    # is in hand, so "cannot read" would be a false statement about it.
+    from_file = file_body(segment)
+    if from_file is not None:
+        if discloses(from_file):
+            return None
+        if EMOJI_DISCLOSURE_RE.search(from_file):
+            return EMOJI
         return MISSING
     # `inline_body` is the single authority on whether a body is readable, and
     # `HAS_INLINE_BODY_RE` is consulted only for the shapes it cannot parse.

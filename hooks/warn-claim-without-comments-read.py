@@ -37,7 +37,14 @@ Fires only when ALL of these hold:
      anchoring follows `warn-pr-create-without-dupe-check.py`: this corpus
      quotes both commands constantly, in fragments and in this file's own
      docstring, and an unanchored matcher would fire on prose that merely
-     mentions them.)
+     mentions them.) An optional `-R`/`--repo owner/repo` may sit between the
+     verb and the number -- an ordinary way to target an issue outside the
+     working tree's own repo, and exactly the shape a worktree-rooted session
+     reaches for. Requiring the number immediately after the verb, with
+     nothing tolerated in between, made a `-R`-qualified claim invisible to
+     this matcher entirely (caught in review); `RX_REPO_FLAG_GAP` is the
+     shared fragment that admits it, on both the trigger side here and the
+     view/api discharge regexes below.
   2. The comment's body -- read from `--body`/`--body-file`/`-f body=`/
      `-F body=@file` for `gh`, or `--message`/`-m`/`-F file`/`--file file`
      for `glab` -- carries CLAIM vocabulary: "claiming"/"claim this", "is
@@ -97,6 +104,14 @@ sessions actually use ("claiming this", "picking this up", "grabbing this",
 ordinary prose and slips through unflagged; a false positive costs one
 ignorable reminder on a comment that happens to use claim-adjacent words
 without being a claim.
+
+The cue list carries no negation handling: "not claiming this fixes the root
+cause" and "I'll take this offline" both match, neither is a claim. Accepted
+deliberately, on the same asymmetry as the sibling `DISPUTE_CUE` in
+`flag-uncited-rebuttal.py`, which carries the identical gap for the same
+reason -- a warn-only reminder that occasionally fires on a rebuttal or an
+aside costs one ignorable line, while teaching the cue list to parse negation
+buys precision this hook does not need.
 
 UNREADABLE BODY
 ----------------
@@ -162,7 +177,6 @@ _rebuttal = _sibling("flag-uncited-rebuttal.py", "_sib_claim_rebuttal")
 # helper, and the transcript tool_use walker, reused verbatim so this hook
 # agrees with its closest sibling about what a command position and a
 # transcript entry are.
-_NEVER_STR = staticmethod(lambda command: command)
 strip_heredocs = getattr(_dupe, "strip_heredocs", (lambda command: command))
 _command_rest = getattr(_dupe, "_command_rest", None)
 _tool_uses = getattr(_dupe, "_tool_uses", None)
@@ -190,16 +204,25 @@ BASH_TOOL_NAMES = ("Bash", "bash", "run_command", "execute_command", "terminal",
 # routinely wrapped for its stdout, so the narrower class is enough and
 # stays consistent with that sibling's own choice for the same kind of
 # action.
+#
+# `-R`/`--repo owner/repo` may sit between the verb and the issue number --
+# an ordinary, common way to target an issue outside the working tree's own
+# repo (exactly the shape a worktree-rooted session reaches for). Requiring
+# the number immediately after the verb, with nothing tolerated in between,
+# made a `-R`-qualified claim invisible to this matcher entirely -- caught in
+# review. The same gap applies to the discharge-side view/api regexes below,
+# so the fragment is shared.
+RX_REPO_FLAG_GAP = r"(?:(?:-R|--repo)\s+\S+\s+)?"
 RX_GH_ISSUE_COMMENT = re.compile(
     r"(?:^|[;&|\n])\s*"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
-    r"gh\s+issue\s+comment\s+(\d+)\b",
+    r"gh\s+issue\s+comment\s+" + RX_REPO_FLAG_GAP + r"(\d+)\b",
     re.I | re.M,
 )
 RX_GLAB_ISSUE_NOTE = re.compile(
     r"(?:^|[;&|\n])\s*"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
-    r"glab\s+issue\s+note\s+(\d+)\b",
+    r"glab\s+issue\s+note\s+" + RX_REPO_FLAG_GAP + r"(\d+)\b",
     re.I | re.M,
 )
 
@@ -263,12 +286,11 @@ def extract_glab_note_body(rest, cwd):
 CLAIM_CUE = re.compile(
     r"""(
         claim(?:ing|ed)?\s+this
-      | is\s+working\s+on\s+this
       | working\s+on\s+this\s+(?:issue|one)?
       | pick(?:ing|ed)?\s+this\s+up
       | grab(?:bing|bed)?\s+this
       | taking\s+this\s+(?:one|issue|up)?
-      | I['’]?ll\s+(?:take|work\s+on)\s+this
+      | I['\u2019]?ll\s+(?:take|work\s+on)\s+this
       | please\s+hold\s+off
     )""",
     re.I | re.X,
@@ -283,7 +305,7 @@ CLAIM_CUE = re.compile(
 RX_GH_ISSUE_VIEW = re.compile(
     r"(?:^|[;&|\n])\s*"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
-    r"gh\s+issue\s+view\s+(\d+)\b",
+    r"gh\s+issue\s+view\s+" + RX_REPO_FLAG_GAP + r"(\d+)\b",
     re.I | re.M,
 )
 # "show" is glab's documented alias for "view" (gitlab-org/cli), matching
@@ -291,13 +313,17 @@ RX_GH_ISSUE_VIEW = re.compile(
 RX_GLAB_ISSUE_VIEW = re.compile(
     r"(?:^|[;&|\n])\s*"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
-    r"glab\s+issue\s+(?:view|show)\s+(\d+)\b",
+    r"glab\s+issue\s+(?:view|show)\s+" + RX_REPO_FLAG_GAP + r"(\d+)\b",
     re.I | re.M,
 )
+# `gh api` accepts `--paginate` and an explicit `-X GET` ahead of the
+# endpoint path; either is common enough on a plain comments-read that
+# requiring the path to follow `gh api` immediately would miss it, the same
+# gap the trigger-side fix above closes for `-R`/`--repo`.
 RX_GH_API_ISSUE_COMMENTS_GET = re.compile(
     r"(?:^|[;&|\n])\s*"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
-    r"gh\s+api\s+\S*issues/(\d+)/comments\b",
+    r"gh\s+api\s+(?:(?:--paginate|-X\s+\S+)\s+)*\S*issues/(\d+)/comments\b",
     re.I | re.M,
 )
 RX_COMMENTS_FLAG = re.compile(r"(?<![A-Za-z0-9-])--comments\b")

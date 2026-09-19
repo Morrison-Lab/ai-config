@@ -100,6 +100,22 @@ check("issue comment as substring of another word does not match",
       list(hook.find_claim_targets("gh issue commentfoo 5")), [])
 check("no number present does not match",
       list(hook.find_claim_targets('gh issue comment "$N" --body x')), [])
+check("-R owner/repo between the verb and the number still matches",
+      [t[:2] for t in hook.find_claim_targets(
+          'gh issue comment -R owner/repo 1544 --body "hi"')],
+      [("1544", "gh")])
+check("--repo owner/repo between the verb and the number still matches",
+      [t[:2] for t in hook.find_claim_targets(
+          'gh issue comment --repo owner/repo 1544 --body "hi"')],
+      [("1544", "gh")])
+check("glab -R owner/repo between the verb and the number still matches",
+      [t[:2] for t in hook.find_claim_targets(
+          'glab issue note -R owner/repo 1544 --message "hi"')],
+      [("1544", "glab")])
+check("two claim-posts in one chained command both surface",
+      [t[:2] for t in hook.find_claim_targets(
+          'gh issue comment 1544 --body "x" && glab issue note 999 --message "y"')],
+      [("1544", "gh"), ("999", "glab")])
 
 # ------------------------------------------------------------- CLAIM_CUE
 
@@ -196,6 +212,19 @@ check("gh api .../issues/N/comments with a body flag does NOT discharge "
       hook.command_reads_comments(
           'gh api repos/o/r/issues/1544/comments -f body="hi"', "1544"),
       False)
+check("-R owner/repo between gh issue view and the number still discharges",
+      hook.command_reads_comments(
+          "gh issue view -R owner/repo 1544 --comments", "1544"),
+      True)
+check("--repo owner/repo between glab issue view and the number still "
+      "discharges",
+      hook.command_reads_comments(
+          "glab issue view --repo owner/repo 1544 --comments", "1544"),
+      True)
+check("gh api --paginate before the endpoint still discharges",
+      hook.command_reads_comments(
+          "gh api --paginate repos/o/r/issues/1544/comments", "1544"),
+      True)
 check("prose quoting the qualifying view does not discharge",
       hook.command_reads_comments(
           "echo 'run gh issue view 1544 --comments first'", "1544"),

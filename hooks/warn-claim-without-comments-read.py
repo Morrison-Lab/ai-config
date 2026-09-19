@@ -42,7 +42,7 @@ Fires only when ALL of these hold:
      working tree's own repo, and exactly the shape a worktree-rooted session
      reaches for. Requiring the number immediately after the verb, with
      nothing tolerated in between, made a `-R`-qualified claim invisible to
-     this matcher entirely (caught in review); `RX_REPO_FLAG_GAP` is the
+     this matcher entirely (caught in review); `_positional_number` is the
      shared fragment that admits it, on both the trigger side here and the
      view/api discharge regexes below.
   2. The comment's body -- read from `--body`/`--body-file`/`-f body=`/
@@ -192,6 +192,14 @@ RX_BODY_FILE = getattr(_rebuttal, "RX_BODY_FILE", re.compile(r"(?!)"))
 RX_F_BODY_FILE = getattr(_rebuttal, "RX_F_BODY_FILE", re.compile(r"(?!)"))
 RX_F_BODY_LITERAL = getattr(_rebuttal, "RX_F_BODY_LITERAL", re.compile(r"(?!)"))
 RX_BODY_LITERAL = getattr(_rebuttal, "RX_BODY_LITERAL", re.compile(r"(?!)"))
+# `-b` is gh's documented short form of `--body` (`gh issue comment
+# --help`). The shared extractor above knows only the long form, so a
+# `-b` body read as UNREADABLE and sent the conservative-warn path off on
+# ordinary, non-claim comments purely from flag spelling -- a false
+# positive worse than the ones the cue list knowingly accepts, because it
+# does not even depend on what the comment says. Caught in review.
+RX_B_BODY_LITERAL = re.compile(
+    r"(?:^|\s)-b\s+(?:\"((?:[^\"\\]|\\.)*)\"|'([^']*)')", re.S)
 
 BASH_TOOL_NAMES = ("Bash", "bash", "run_command", "execute_command", "terminal", "shell")
 
@@ -213,19 +221,73 @@ BASH_TOOL_NAMES = ("Bash", "bash", "run_command", "execute_command", "terminal",
 # made a `-R`-qualified claim invisible to this matcher entirely -- caught in
 # review. The same gap applies to the discharge-side view/api regexes below,
 # so the fragment is shared.
-RX_REPO_FLAG_GAP = r"(?:(?:-R|--repo)\s+\S+\s+)?"
+# The issue number is a POSITIONAL argument, and gh/glab are cobra/pflag
+# programs whose flag sets are interspersed by default -- so any flag may
+# legally precede it (`gh issue comment --body "..." 1544`). Earlier
+# revisions matched the number immediately after the verb and then bolted
+# on one tolerated flag at a time (`-R`/`--repo`, then `gh api`'s
+# `-X GET`); that never generalizes, because the tolerated set is
+# unbounded. Both directions failed: a claim written flags-first was
+# invisible to clause 1, and a comments read written flags-first did not
+# discharge clause 3.
+#
+# So the two regexes below match the VERB only, and _positional_number
+# walks that command's own tokens. The token scan is a flat alternation
+# with no nested optional quantifier, so it stays linear rather than
+# backtracking catastrophically the way a "flag with an optional value,
+# repeated" pattern would.
 RX_GH_ISSUE_COMMENT = re.compile(
     r"(?:^|[;&|\n])\s*"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
-    r"gh\s+issue\s+comment\s+" + RX_REPO_FLAG_GAP + r"(\d+)\b",
+    r"gh\s+issue\s+comment\b",
     re.I | re.M,
 )
 RX_GLAB_ISSUE_NOTE = re.compile(
     r"(?:^|[;&|\n])\s*"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
-    r"glab\s+issue\s+note\s+" + RX_REPO_FLAG_GAP + r"(\d+)\b",
+    r"glab\s+issue\s+note\b",
     re.I | re.M,
 )
+
+# One shell token: a quoted run, or a bare run of non-space.
+RX_TOKEN = re.compile(r"\"[^\"]*\"|'[^']*'|\S+")
+
+# Flags whose VALUE is the following token, so that token is not the
+# positional issue number. Anything not listed is treated as boolean,
+# which is the safe default here: mistaking a boolean flag for a
+# value-taking one would swallow the number and silence the hook, while
+# the reverse merely reads one more token, finds it is not all digits,
+# and stops.
+VALUE_TAKING_FLAGS = frozenset({
+    "-R", "--repo",
+    "-b", "--body", "-F", "--body-file", "--file",
+    "-m", "--message",
+    "--json", "-q", "--jq", "-t", "--template",
+})
+
+
+def _positional_number(rest):
+    """The first positional all-digit argument in `rest` -- one command's
+    own tokens, taken after its verb -- or None.
+
+    Returns None at the first positional that is not all digits, rather
+    than scanning on. The URL form (`gh issue comment
+    https://github.com/o/r/issues/1544`) is a documented gap this hook
+    fails open on, and stopping at it also keeps some later, unrelated
+    number in the same command from being read as this command's target.
+    """
+    expect_value = False
+    for match in RX_TOKEN.finditer(rest):
+        token = match.group(0)
+        if expect_value:
+            expect_value = False
+            continue
+        if token.startswith("-") and token != "-":
+            if "=" not in token and token in VALUE_TAKING_FLAGS:
+                expect_value = True
+            continue
+        return token if token.isdigit() else None
+    return None
 
 
 def find_claim_targets(command):
@@ -234,10 +296,14 @@ def find_claim_targets(command):
     heredoc-stripped command, and `end_pos` is where the issue number ends
     (so the caller can read the rest of that command's own flags)."""
     text = strip_heredocs(command)
-    for m in RX_GH_ISSUE_COMMENT.finditer(text):
-        yield m.group(1), "gh", text, m.end()
-    for m in RX_GLAB_ISSUE_NOTE.finditer(text):
-        yield m.group(1), "glab", text, m.end()
+    if _command_rest is None:
+        return
+    for rx, kind in ((RX_GH_ISSUE_COMMENT, "gh"), (RX_GLAB_ISSUE_NOTE, "glab")):
+        for m in rx.finditer(text):
+            rest = _command_rest(text, m.end())
+            number = _positional_number(rest)
+            if number is not None:
+                yield number, kind, text, m.end()
 
 
 # --------------------------------------------------------------------------
@@ -306,7 +372,7 @@ CLAIM_CUE = re.compile(
 RX_GH_ISSUE_VIEW = re.compile(
     r"(?:^|[;&|\n])\s*"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
-    r"gh\s+issue\s+view\s+" + RX_REPO_FLAG_GAP + r"(\d+)\b",
+    r"gh\s+issue\s+view\b",
     re.I | re.M,
 )
 # "show" is glab's documented alias for "view" (gitlab-org/cli), matching
@@ -314,7 +380,7 @@ RX_GH_ISSUE_VIEW = re.compile(
 RX_GLAB_ISSUE_VIEW = re.compile(
     r"(?:^|[;&|\n])\s*"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
-    r"glab\s+issue\s+(?:view|show)\s+" + RX_REPO_FLAG_GAP + r"(\d+)\b",
+    r"glab\s+issue\s+(?:view|show)\b",
     re.I | re.M,
 )
 # `gh api` accepts `--paginate` and an explicit `-X GET` ahead of the
@@ -368,15 +434,15 @@ def command_reads_comments(command, number):
     if _command_rest is None:
         return False
     for m in RX_GH_ISSUE_VIEW.finditer(text):
-        if m.group(1) != number:
-            continue
         rest = _command_rest(text, m.end())
+        if _positional_number(rest) != number:
+            continue
         if RX_COMMENTS_FLAG.search(rest) or _json_includes_comments(rest):
             return True
     for m in RX_GLAB_ISSUE_VIEW.finditer(text):
-        if m.group(1) != number:
-            continue
         rest = _command_rest(text, m.end())
+        if _positional_number(rest) != number:
+            continue
         if RX_COMMENTS_FLAG.search(rest):
             return True
     for m in RX_GH_API_ISSUE_COMMENTS_GET.finditer(text):
@@ -387,7 +453,8 @@ def command_reads_comments(command, number):
         # a POST (the comment-post this hook is about, or an unrelated one),
         # not the GET that reads existing comments.
         if any(rx.search(rest) for rx in
-               (RX_BODY_FILE, RX_F_BODY_FILE, RX_F_BODY_LITERAL, RX_BODY_LITERAL)):
+               (RX_BODY_FILE, RX_F_BODY_FILE, RX_F_BODY_LITERAL, RX_BODY_LITERAL,
+                RX_B_BODY_LITERAL)):
             continue
         return True
     return False
@@ -549,6 +616,11 @@ def main():
 
             if kind == "gh" and extract_body_text is not None:
                 body = extract_body_text(rest, cwd)
+                if body is None:
+                    # The shared extractor does not know gh's `-b` short form.
+                    m_b = RX_B_BODY_LITERAL.search(rest)
+                    if m_b:
+                        body = _first_group(m_b)
             elif kind == "glab":
                 body = extract_glab_note_body(rest, cwd)
             else:

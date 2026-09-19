@@ -483,6 +483,85 @@ for literal in ("123", "null", "[1,2]", '"a string"'):
     check(f"non-dict payload {literal} prints no traceback",
           "Traceback" in proc.stderr, False)
 
+# ------------------------------------------- interspersed flags (pflag default)
+#
+# gh/glab are cobra/pflag programs whose flag sets are interspersed, so a flag
+# may legally precede the positional issue number. Matching the number right
+# after the verb missed a real claim in one direction and failed to credit a
+# real comments-read in the other. Both are pinned here because a regression
+# would be silent: the hook would simply say nothing.
+
+check("a claim with --body BEFORE the number is still found",
+      [t[0] for t in hook.find_claim_targets(
+          'gh issue comment --body "claiming this one" 1544')],
+      ["1544"])
+check("a glab note with -m BEFORE the number is still found",
+      [t[0] for t in hook.find_claim_targets(
+          'glab issue note -m "claiming this one" 77')],
+      ["77"])
+check("a comments read with --comments BEFORE the number discharges",
+      hook.command_reads_comments("gh issue view --comments 1544", "1544"), True)
+check("a comments read with --json BEFORE the number discharges",
+      hook.command_reads_comments("gh issue view --json comments 1544", "1544"), True)
+check("a glab read with -c BEFORE the number discharges",
+      hook.command_reads_comments("glab issue view -c 77", "77"), True)
+
+# The core case, restated against the new tokenizer: reading only the BODY
+# must still not discharge, however the flags are ordered.
+check("a plain view with a flag before the number still does not discharge",
+      hook.command_reads_comments("gh issue view --json title,state 1544", "1544"),
+      False)
+
+# _positional_number's own contract.
+check("a boolean flag is not mistaken for a value-taking one",
+      hook._positional_number(" --comments 1544"), "1544")
+check("a value-taking flag's value is skipped",
+      hook._positional_number(' --body "1234" 1544'), "1544")
+check("an =-joined flag carries its own value",
+      hook._positional_number(" --repo=owner/name 1544"), "1544")
+check("a non-digit positional stops the scan",
+      hook._positional_number(" https://github.com/o/r/issues/1544"), None)
+# The stop has to be a STOP, not a skip: a number later in the same command
+# (a flag value, another argument) must not be adopted as the target. Without
+# a trailing number this case passes whether the scan stops or continues.
+check("a number AFTER a non-digit positional is not adopted",
+      hook._positional_number(' https://github.com/o/r/issues/1544 --body "x" 999'),
+      None)
+check("no positional at all yields None",
+      hook._positional_number(" --comments"), None)
+
+# --------------------------------------------------------------- -b body form
+#
+# `-b` is gh's documented short form of `--body`. The shared extractor knows
+# only the long form, so without the local fallback a `-b` body read as
+# UNREADABLE and warned on ordinary, non-claim comments purely from flag
+# spelling -- a false positive independent of what the comment says.
+
+check("a -b body that is NOT a claim is read, so nothing fires",
+      bool(hook.CLAIM_CUE.search(
+          hook._first_group(hook.RX_B_BODY_LITERAL.search(
+              ' -b "Duplicate of an earlier report; closing."')))),
+      False)
+check("a -b body that IS a claim is read as one",
+      bool(hook.CLAIM_CUE.search(
+          hook._first_group(hook.RX_B_BODY_LITERAL.search(
+              ' -b "Claiming this, please hold off."')))),
+      True)
+check("a single-quoted -b body is read too",
+      hook._first_group(hook.RX_B_BODY_LITERAL.search(" -b 'claiming this'")),
+      "claiming this")
+check("-b inside a longer word is not read as the flag",
+      hook.RX_B_BODY_LITERAL.search(' --verb "x"'), None)
+
+# End-to-end, so the fallback's WIRING into main() is covered and not just the
+# pattern: exercising the regex alone left "drop the -b fallback" surviving
+# mutation. A -b claim with no comments read must warn; a -b non-claim must
+# not (before the fallback it warned, as an unreadable body).
+check("a -b claim with no comments read warns, end to end",
+      bool(run_hook(f'gh issue comment 1544 -b "{CLAIM_BODY}"', no_read)), True)
+check("a -b NON-claim body does not warn, end to end",
+      run_hook(f'gh issue comment 1544 -b "{NON_CLAIM_BODY}"', no_read), "")
+
 for path in (no_read, with_comments, with_json_comments, with_glab_comments,
              with_api_get, with_wrong_number, with_mcp_comments,
              with_mcp_plain_view, prose_comments):

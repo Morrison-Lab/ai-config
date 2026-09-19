@@ -58,10 +58,11 @@ WHAT DISCHARGES IT
 -------------------
 A qualifying read, for the SAME issue number as the comment-post:
 
-    gh issue view <N> --comments
+    gh issue view <N> --comments        (or its documented short form, -c)
     gh issue view <N> --json <fields including "comments">
-    glab issue view <N> --comments   (glab issue show <N> --comments too --
-                                       "show" is glab's documented alias)
+    glab issue view <N> --comments      (or -c; glab issue show <N> --comments
+                                          too -- "show" is glab's documented
+                                          alias)
     gh api repos/<owner>/<repo>/issues/<N>/comments      (a GET; a body-write
                                                             flag on that same
                                                             shape is the POST
@@ -335,7 +336,15 @@ RX_GH_API_ISSUE_COMMENTS_GET = re.compile(
     r"gh\s+api\s+(?:(?:--paginate|-X\s+GET)\s+)*\S*issues/(\d+)/comments\b",
     re.I | re.M,
 )
-RX_COMMENTS_FLAG = re.compile(r"(?<![A-Za-z0-9-])--comments\b")
+# `-c` is the documented short form of `--comments` on BOTH `gh issue view`
+# (`gh issue view --help`: "-c, --comments  View issue comments") and `glab
+# issue view`/`show` (docs.gitlab.com/cli/issue/view: "-c, --comments").
+# Missing it left a compliant `gh issue view <N> -c` read invisible to this
+# matcher -- the identical under-acceptance shape review already caught
+# twice on this file (`-R`/`--repo`, then `gh api -X`), on a line neither
+# prior round touched.
+RX_COMMENTS_FLAG = re.compile(
+    r"(?<![A-Za-z0-9-])(?:--comments\b|-c\b)")
 RX_JSON_FLAG = re.compile(r"--json[\s=]+(?:\"([^\"]+)\"|'([^']+)'|(\S+))")
 
 

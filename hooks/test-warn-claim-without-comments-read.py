@@ -194,12 +194,19 @@ check("gh issue view --json state does NOT discharge",
 check("gh issue view for a DIFFERENT issue number does not discharge",
       hook.command_reads_comments("gh issue view 999 --comments", "1544"),
       False)
+# ai-config review: `-c` is the documented short form of `--comments` on
+# both gh and glab (`gh issue view --help`, docs.gitlab.com/cli/issue/view).
+# A regex recognizing only the long form left this compliant read invisible.
+check("gh issue view -c (short form) discharges",
+      hook.command_reads_comments("gh issue view 1544 -c", "1544"), True)
 check("glab issue view --comments discharges",
       hook.command_reads_comments("glab issue view 1544 --comments", "1544"),
       True)
 check("glab issue show --comments discharges (documented alias)",
       hook.command_reads_comments("glab issue show 1544 --comments", "1544"),
       True)
+check("glab issue view -c (short form) discharges",
+      hook.command_reads_comments("glab issue view 1544 -c", "1544"), True)
 check("glab issue view with no --comments does NOT discharge",
       hook.command_reads_comments("glab issue view 1544", "1544"),
       False)

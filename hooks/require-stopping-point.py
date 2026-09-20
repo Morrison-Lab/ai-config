@@ -79,6 +79,35 @@ def last_text(path: str) -> str:
                     event = json.loads(line)
                 except Exception:
                     continue
+                etype = event.get("type") or event.get("role") or ""
+                source = event.get("source") or ""
+                if (
+                    etype == "user"
+                    or etype == "USER_INPUT"
+                    or source == "USER_EXPLICIT"
+                ) and not event.get("isSidechain"):
+                    blocks = (
+                        (event.get("message") or {}).get("content")
+                        or event.get("content")
+                        or []
+                    )
+                    is_tool_result = (
+                        event.get("type") == "tool_result"
+                        or (
+                            isinstance(blocks, list)
+                            and any(
+                                isinstance(b, dict) and b.get("type") == "tool_result"
+                                for b in blocks
+                            )
+                        )
+                    )
+                    if not is_tool_result:
+                        last_text_val = ""
+                        last_reply = ""
+                        saw_reply_tool = False
+                    continue
+                if event.get("isSidechain"):
+                    continue
                 if event.get("type") == "assistant" or event.get("role") == "assistant":
                     blocks = (
                         (event.get("message") or {}).get("content")

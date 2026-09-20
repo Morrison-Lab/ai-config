@@ -223,4 +223,91 @@ for payload, expected, label in direct_cases:
         print(f"FAIL {label} (expected block={expected}, got {got})")
         failed += 1
 
+def multi_turn_transcript(turn1_reply, turn2_text):
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(json.dumps({"type": "user", "message": {"content": "do turn 1"}}) + "\n")
+        f.write(json.dumps({
+            "type": "assistant",
+            "message": {"content": [{
+                "type": "tool_use",
+                "name": "mcp__hearthbot__reply",
+                "input": {"text": turn1_reply},
+            }]},
+        }) + "\n")
+        f.write(json.dumps({"type": "user", "message": {"content": "do turn 2"}}) + "\n")
+        f.write(json.dumps({
+            "type": "assistant",
+            "message": {"content": [{"type": "text", "text": turn2_text}]},
+        }) + "\n")
+    tmpdir = tempfile.mkdtemp()
+    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
+    res = subprocess.run(
+        [sys.executable, HOOK],
+        input=json.dumps({"transcript_path": path}),
+        text=True,
+        capture_output=True,
+        env=env,
+    )
+    os.unlink(path)
+    assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
+    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
+
+# Multi-turn test: turn 1 reply-tool state must not leak into turn 2 plain-text
+if not multi_turn_transcript(CLEAN_DECL, MISSING_DECL):
+    print("FAIL: turn 2 plain-text missing stopping point did not block after turn 1 used reply-tool")
+    failed += 1
+else:
+    print("PASS: turn 2 plain-text missing stopping point blocks after turn 1 reply-tool")
+
+if multi_turn_transcript(MISSING_DECL, CLEAN_DECL):
+    print("FAIL: turn 2 plain-text clean stopping point blocked because turn 1 reply-tool lacked declaration")
+    failed += 1
+else:
+    print("PASS: turn 2 plain-text clean stopping point passes despite turn 1 reply-tool lacking declaration")
+
+
+def tool_result_transcript(reply_text):
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(json.dumps({"type": "user", "message": {"content": "do task"}}) + "\n")
+        f.write(json.dumps({
+            "type": "assistant",
+            "message": {"content": [{
+                "type": "tool_use",
+                "name": "mcp__hearthbot__reply",
+                "input": {"text": reply_text},
+            }]},
+        }) + "\n")
+        f.write(json.dumps({
+            "type": "user",
+            "message": {"content": [{"type": "tool_result", "tool_use_id": "call_1", "content": "delivered"}]},
+        }) + "\n")
+    tmpdir = tempfile.mkdtemp()
+    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
+    res = subprocess.run(
+        [sys.executable, HOOK],
+        input=json.dumps({"transcript_path": path}),
+        text=True,
+        capture_output=True,
+        env=env,
+    )
+    os.unlink(path)
+    assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
+    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
+
+
+if not tool_result_transcript(MISSING_DECL):
+    print("FAIL: reply-tool followed by tool_result did not block when declaration was missing")
+    failed += 1
+else:
+    print("PASS: reply-tool followed by tool_result blocks when declaration is missing")
+
+if tool_result_transcript(CLEAN_DECL):
+    print("FAIL: reply-tool followed by tool_result blocked despite clean declaration")
+    failed += 1
+else:
+    print("PASS: reply-tool followed by tool_result passes when declaration is present")
+
 raise SystemExit(bool(failed))
+

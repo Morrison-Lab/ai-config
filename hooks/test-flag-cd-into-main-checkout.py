@@ -83,6 +83,7 @@ NOT_A_WORKTREE = [
 # into an explicit failure rather than a summary line that overstates what the
 # suite exercised. The constant is derived against, not merely asserted.
 DELIVERY_CASES = 8
+MALFORMED_CASES = 4
 
 
 def run_hook(command: str, cwd: str, antigravity: bool = False):
@@ -214,6 +215,29 @@ def check_delivery():
     return failures, ran
 
 
+def check_malformed_input():
+    """Verify non-dict tool_input degrades silently (ai-config#3772)."""
+    failures = 0
+    ran = 0
+    for val in ("not-a-dict", 42, ["a", "b"], None):
+        payload = {"tool_name": "Bash", "tool_input": val, "cwd": WT}
+        proc = subprocess.run(
+            [sys.executable, str(HOOK)],
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True,
+        )
+        ran += 1
+        if proc.returncode != 0 or proc.stderr.strip():
+            print(f"::error::non-dict tool_input {val!r} crashed; "
+                  f"rc={proc.returncode} stderr={proc.stderr!r}",
+                  file=sys.stderr)
+            failures += 1
+        else:
+            print(f"OK   non-dict tool_input: {type(val).__name__} degrades silently")
+    return failures, ran
+
+
 def main() -> int:
     failures = 0
 
@@ -255,7 +279,14 @@ def main() -> int:
               "have overstated what it exercised", file=sys.stderr)
         failures += 1
 
-    total = len(FIRES) + len(QUIET) + len(NOT_A_WORKTREE) + DELIVERY_CASES
+    malformed_failures, malformed_ran = check_malformed_input()
+    failures += malformed_failures
+    if malformed_ran != MALFORMED_CASES:
+        print(f"::error::check_malformed_input ran {malformed_ran} case(s), but "
+              f"MALFORMED_CASES says {MALFORMED_CASES}", file=sys.stderr)
+        failures += 1
+
+    total = len(FIRES) + len(QUIET) + len(NOT_A_WORKTREE) + DELIVERY_CASES + MALFORMED_CASES
     if failures:
         print(f"::error::{failures} of {total} case(s) failed", file=sys.stderr)
         return 1

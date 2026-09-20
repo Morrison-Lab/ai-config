@@ -166,7 +166,7 @@ def main() -> int:
         if not isinstance(command, str) or not command.strip():
             return 0
 
-        cwd = payload.get("cwd") or (payload.get("tool_input") or {}).get("cwd") or os.getcwd()
+        cwd = payload.get("cwd") or tool_input.get("cwd") or os.getcwd()
         if should_warn(command, cwd=cwd):
             _emit(NOTE)
     except Exception:

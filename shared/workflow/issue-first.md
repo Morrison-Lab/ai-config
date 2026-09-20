@@ -18,7 +18,9 @@ A closed match is not a skip: surface it and confirm before re-doing the work.
 
 `gh issue list --state all --limit N` (or `--search` with no `--limit`, whose
 own default is 30) applies the row cap to the OPEN+CLOSED population
-together, sorted by creation/update time rather than by state.
+together, without ever sorting by state --- the plain listing orders by
+creation/update time, and the `--search` form orders by relevance, but
+neither puts every open issue ahead of every closed one.
 A repo with many closed issues can fill the entire cap with closed rows,
 leaving barely any of the currently open ones visible --- and a truncated
 result is indistinguishable from "no duplicate exists", the same shape of
@@ -82,13 +84,24 @@ state crowding it out.
   the returned rows by state afterward.
 - **Do:** treat a returned row count equal to the limit (or the unset default
   of 30) as a truncation signal, not a total, and re-run with a wider limit
-  or a narrower, state-scoped query before concluding "no duplicate".
+  or a narrower, state-scoped query before concluding "no duplicate" --- the
+  general form of this check is already in
+  [`metacognitive-monitoring`](metacognitive-monitoring.md) ("Don't: read a
+  query returning exactly `--limit N` rows as a complete answer") and
+  [`grep-is-not-coverage`](grep-is-not-coverage.md) ("a capped result whose
+  hit count equals the cap is a truncated result"); this section is that
+  rule applied to `gh issue list`'s specific mixed-state cap.
 - **Don't:** read `--state all`'s inclusion of closed issues as the defect
   --- it is deliberate and correct; the defect is capping the mixed result
   and trusting a client-side state filter over it.
 - **Don't:** switch to `--state open` alone to dodge the truncation --- that
   reintroduces the exact closed-duplicate blind spot this file's opening
   section already rules out.
+
+A related but distinct pitfall: [`memories/gh-cli.md`](../../memories/gh-cli.md)
+documents `gh pr list --state merged` plus a low `--limit` missing a recent
+merge because the page is not sorted by merge time at all --- a single-state,
+sort-order failure rather than this section's mixed-state, cap-position one.
 
 (Morrison-Lab/ai-config#3808, 2026-09-19: measured independently against
 `Lacaedemon/sparta` as part of a proactive UMS pass, reproducing the

@@ -62,41 +62,65 @@ The trap is in *how* the mixed listing gets read afterward: capping a
 combined population and filtering by state client-side is what hides the
 open rows, not the decision to include closed ones.
 
-**The fix pushes the state predicate into the server-side query instead of
-filtering the result afterward.**
-Adding `is:open`/`is:closed` to the `--search` string (or passing
-`--state open`/`--state closed` alongside `--search`) filters before the cap
-applies, so the row budget is spent on the state being asked about rather
-than shared with the other one:
+**The fix keeps the same `--state all --search` shape and just stops trusting
+a capped result.**
+Raise `--limit` well past any plausible match count and re-run the identical
+query --- the row budget then covers both states at once, with nothing to
+crowd out:
+
+```
+gh issue list --repo Lacaedemon/sparta --state all --search "fix" --limit 300 --json number --jq 'length'
+# -> 256 (12 open + 244 closed --- well under the new 300 cap, so this run is
+# no longer truncated; a returned count that still equals the limit means
+# raise it again)
+```
+
+This is deliberately the least surprising fix, because it stays inside the
+exact command shape `hooks/warn-pr-create-without-dupe-check.py` already
+requires for its own discharge check (`--state all` plus a non-empty
+`--search` value, no `is:`/`state:` qualifier) --- so raising the limit is a
+compatible repair, and switching to a state-scoped query is not: a query
+carrying `is:open`/`is:closed`, or an explicit `--state open`/`--state
+closed`, is exactly what that hook's `RX_OPEN_CLOSED_QUALIFIER` treats as
+*disqualifying* a search from counting as the required all-state check, on
+the same reasoning this file's opening section already states --- a
+state-scoped search cannot see the other state's duplicate, so it cannot
+discharge a check whose whole point is seeing both.
+
+A state-scoped `is:open`/`is:closed` query still has a legitimate, narrower
+use: confirming, after a capped `--state all` result looked suspicious,
+whether the truncation specifically ate an *open* match:
 
 ```
 gh issue list --repo Lacaedemon/sparta --search "fix is:open" --json number --jq 'length'
 # -> 12 (matches the uncapped ground truth)
 ```
 
-Run it once scoped to `is:open` and once to `is:closed` rather than once
-unscoped --- that keeps both halves of the original rule (surface a closed
-duplicate, don't miss an open one) while each half stays immune to the other
-state crowding it out.
+Treat that as a diagnostic step, not a replacement --- it does not by itself
+satisfy the dupe-check requirement above, so keep (or repeat, at a wider
+limit) the `--state all --search` form as well.
 
-- **Do:** scope a duplicate-check search by state in the query itself
-  (`is:open`, `is:closed`) rather than requesting `--state all` and filtering
-  the returned rows by state afterward.
 - **Do:** treat a returned row count equal to the limit (or the unset default
-  of 30) as a truncation signal, not a total, and re-run with a wider limit
-  or a narrower, state-scoped query before concluding "no duplicate" --- the
-  general form of this check is already in
+  of 30) as a truncation signal, not a total, and re-run the same
+  `--state all --search` query at a wider limit before concluding "no
+  duplicate" --- the general form of this check is already in
   [`metacognitive-monitoring`](metacognitive-monitoring.md) ("Don't: read a
   query returning exactly `--limit N` rows as a complete answer") and
   [`grep-is-not-coverage`](grep-is-not-coverage.md) ("a capped result whose
   hit count equals the cap is a truncated result"); this section is that
   rule applied to `gh issue list`'s specific mixed-state cap.
+- **Do:** use a state-scoped `is:open`/`is:closed` query only to diagnose a
+  suspected truncation, alongside the required all-state search, never in
+  place of it.
 - **Don't:** read `--state all`'s inclusion of closed issues as the defect
   --- it is deliberate and correct; the defect is capping the mixed result
   and trusting a client-side state filter over it.
-- **Don't:** switch to `--state open` alone to dodge the truncation --- that
+- **Don't:** switch a duplicate-check search to `is:open`/`is:closed` or
+  `--state open`/`--state closed` to dodge the truncation --- that both
   reintroduces the exact closed-duplicate blind spot this file's opening
-  section already rules out.
+  section already rules out, and stops satisfying
+  `hooks/warn-pr-create-without-dupe-check.py`'s own discharge check, which
+  requires exactly the all-state shape this fix preserves.
 
 A related but distinct pitfall: [`memories/gh-cli.md`](../../memories/gh-cli.md)
 documents `gh pr list --state merged` plus a low `--limit` missing a recent

@@ -17,10 +17,11 @@ These instructions define standardized operating rules for Antigravity operating
 5. **Resume every non-clean pause:** Arm a wake mechanism or schedule whenever work remains at a pause.
 6. **Prefer optionality over removal:** Never remove existing functionality outright when you can add an opt-in/opt-out configuration or parameter.
 7. **Research existing solutions before implementing (DRW):** Check existing libraries and upstream packages before hand-rolling custom code.
-8. **Always give recommendations with questions:** Whenever asking a question or presenting choices, provide a concrete recommended option.
-9. **Status and diagnostic requests are not report-only:** Diagnose and repair issues immediately in the same turn rather than waiting for follow-up prompts.
-10. **Run UMS proactively:** Run UMS when scrutinized and before pausing when learnings have accumulated.
-11. **Timestamp recaps in local time:** Use Pacific Time (`TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
+8. **"Or" means "and/or":** "Or" always means "and/or", not xor, unless xor or mutual exclusivity is explicitly specified.
+9. **Always give recommendations with questions:** Whenever asking a question or presenting choices, provide a concrete recommended option.
+10. **Status and diagnostic requests are not report-only:** Diagnose and repair issues immediately in the same turn rather than waiting for follow-up prompts.
+11. **Run UMS proactively:** Run UMS when scrutinized and before pausing when learnings have accumulated.
+12. **Timestamp recaps in local time:** Use Pacific Time (`TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
 
 ## Antigravity Workflow Conventions
 

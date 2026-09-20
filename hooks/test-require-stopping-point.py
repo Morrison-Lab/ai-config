@@ -7,11 +7,11 @@ import tempfile
 HOOK = sys.argv[1]
 
 
-def run(text, tmpdir=None, raw_lines=None):
+def run(text, tmpdir=None, raw_lines=None, key_name="transcript_path"):
     if tmpdir is None:
         tmpdir = tempfile.mkdtemp()
-    fd, path = tempfile.mkstemp()
-    with os.fdopen(fd, "w") as f:
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
         if raw_lines is not None:
             for l in raw_lines:
                 f.write(l + "\n")
@@ -25,7 +25,52 @@ def run(text, tmpdir=None, raw_lines=None):
                 )
                 + "\n"
             )
-    env = dict(os.environ, TMPDIR=tmpdir)
+    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
+    res = subprocess.run(
+        [sys.executable, HOOK],
+        input=json.dumps({key_name: path}),
+        text=True,
+        capture_output=True,
+        env=env,
+    )
+    os.unlink(path)
+    assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
+    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
+
+
+def run_direct_payload(payload):
+    tmpdir = tempfile.mkdtemp()
+    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
+    res = subprocess.run(
+        [sys.executable, HOOK],
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        env=env,
+    )
+    assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
+    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
+
+
+def reply_transcript(reply_text, narration_text=None):
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        blocks = []
+        if narration_text:
+            blocks.append({"type": "text", "text": narration_text})
+        blocks.append(
+            {
+                "type": "tool_use",
+                "name": "mcp__hearthbot__reply",
+                "input": {"text": reply_text},
+            }
+        )
+        f.write(
+            json.dumps({"type": "assistant", "message": {"content": blocks}})
+            + "\n"
+        )
+    tmpdir = tempfile.mkdtemp()
+    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
     res = subprocess.run(
         [sys.executable, HOOK],
         input=json.dumps({"transcript_path": path}),
@@ -35,7 +80,7 @@ def run(text, tmpdir=None, raw_lines=None):
     )
     os.unlink(path)
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
-    return '"decision": "block"' in res.stdout
+    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
 
 
 cases = [
@@ -54,6 +99,10 @@ cases = [
     ("To open a fence type ``` on its own line.\n\n**Stopping Point**: Clean stopping point reached\n\n```\ncode\n```", False),
     ("Don't write a bare declaration like this:\n```\n**Stopping Point**: Clean stopping point reached\n```\nI have not actually finished; more work remains.\n\nAlso, here's a separate unrelated snippet I was about to show:\n```\n", True),
     ("```\n**Stopping Point**: Clean stopping point reached\n```\n```\n", True),
+    # ai-config#3748: unterminated fence must not swallow subsequent declaration
+    ("Snippet below:\n```python\nprint(1)\n\n**Stopping Point**: Clean stopping point reached.", False),
+    # ai-config#3748: 4-backtick fence wrapping 3-backtick fence
+    ("Code sample:\n````markdown\n```\n**Stopping Point**: Clean stopping point reached\n```\n````\nStill working.", True),
 ]
 
 failed = 0
@@ -86,5 +135,92 @@ if not (blocked_first is True and blocked_second is False):
     failed += 1
 else:
     print("PASS sentinel retry allows next attempt")
+
+# Alternative transcript payload keys
+for key in ("transcriptPath", "transcript", "history_file"):
+    got = run("Missing declaration.", key_name=key)
+    if got:
+        print(f"PASS payload key '{key}' resolves transcript correctly")
+    else:
+        print(f"FAIL payload key '{key}' failed to trigger block")
+        failed += 1
+
+# Reply-tool visibility tests (ai-config#3798 / #3804)
+CLEAN_DECL = "**Stopping Point**: Clean stopping point reached."
+MISSING_DECL = "Completed the task successfully without a stopping point."
+
+if reply_transcript(CLEAN_DECL):
+    print("FAIL: reply-tool payload with clean stopping point blocked")
+    failed += 1
+else:
+    print("PASS: reply-tool payload with clean stopping point passes")
+
+if not reply_transcript(MISSING_DECL):
+    print("FAIL: reply-tool payload missing stopping point did not block")
+    failed += 1
+else:
+    print("PASS: reply-tool payload missing stopping point blocks")
+
+if reply_transcript(CLEAN_DECL, narration_text=MISSING_DECL):
+    print("FAIL: clean reply-tool payload blocked when narration lacked stopping point")
+    failed += 1
+else:
+    print("PASS: delivered clean reply-tool wins over narration missing stopping point")
+
+if not reply_transcript(MISSING_DECL, narration_text=CLEAN_DECL):
+    print("FAIL: reply-tool missing stopping point did not block when narration had clean declaration")
+    failed += 1
+else:
+    print("PASS: undelivered narration with stopping point does not save missing reply-tool declaration")
+
+# Direct payload tests
+direct_cases = [
+    ({"reply": CLEAN_DECL}, False, "direct reply field with clean stopping point passes"),
+    ({"reply": MISSING_DECL}, True, "direct reply field missing stopping point blocks"),
+    ({"last_assistant_message": CLEAN_DECL}, False, "direct last_assistant_message field passes"),
+    ({"last_assistant_message": MISSING_DECL}, True, "direct last_assistant_message field missing blocks"),
+    (
+        {"message": {"content": [{"type": "text", "text": CLEAN_DECL}]}},
+        False,
+        "direct message object with text passes",
+    ),
+    (
+        {"message": {"content": [{"type": "text", "text": MISSING_DECL}]}},
+        True,
+        "direct message object with missing text blocks",
+    ),
+    (
+        {
+            "message": {
+                "content": [
+                    {"type": "text", "text": MISSING_DECL},
+                    {"type": "tool_use", "name": "mcp__hearthbot__reply", "input": {"text": CLEAN_DECL}},
+                ]
+            }
+        },
+        False,
+        "direct message narration missing + clean reply-tool passes",
+    ),
+    (
+        {
+            "message": {
+                "content": [
+                    {"type": "text", "text": CLEAN_DECL},
+                    {"type": "tool_use", "name": "mcp__hearthbot__reply", "input": {"text": MISSING_DECL}},
+                ]
+            }
+        },
+        True,
+        "direct message narration clean + missing reply-tool blocks",
+    ),
+]
+
+for payload, expected, label in direct_cases:
+    got = run_direct_payload(payload)
+    if got == expected:
+        print(f"PASS {label}")
+    else:
+        print(f"FAIL {label} (expected block={expected}, got {got})")
+        failed += 1
 
 raise SystemExit(bool(failed))

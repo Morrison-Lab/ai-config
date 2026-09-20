@@ -26,10 +26,15 @@ spot-check against `Lacaedemon/sparta` on 2026-09-19 only because that repo
 had just two open PRs total, both recent enough to survive the cap --- so the
 absence of a live miss there is a property of that repo's PR count, not
 evidence the risk is smaller for PRs than for issues.
-Apply the same fix: scope with `is:open`/`is:closed` in the `--search`
-string (or `--state open`/`--state closed` alongside `--search`), and read a
-returned row count equal to the limit as a truncation signal rather than a
-total, before trusting an empty or thin result.
+Apply the same fix, and for the same reason `is:open`/`is:closed` is wrong
+for the issue case: don't scope this search by state either --- a
+`--state open` or `is:open` PR search is exactly the case "Both checks come
+back empty when the work is already DONE" below warns about, since it makes
+a merged, already-closed duplicate PR invisible again.
+Keep `--state all --search`, raise `--limit` well past any plausible match
+count, and re-run the identical query; read a returned row count equal to
+the limit as a truncation signal rather than a total, before trusting an
+empty or thin result.
 
 In a remote/web session without `gh`, use the GitHub MCP equivalent
 (`mcp__github__list_pull_requests` / `mcp__github__search_pull_requests` —

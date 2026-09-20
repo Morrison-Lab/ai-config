@@ -853,3 +853,27 @@ not only the first match:
   When multiple claims in a message have distinct warning needs (e.g. coverage mismatch on one PR and subagent-only evidence on another),
   do not let one warning bucket suppress another or stop at the first entry.
   Compose all warning notices into the emitted `systemMessage` so every unverified claim is surfaced.
+
+## A fixture's own padding can push its trigger outside the window under test (PR #3799)
+
+`flag-cop-out-offer.py` scans only the last `TAIL_CHARS` (400) of a reply, and that bound creates two hazards rather than one.
+The production side is already documented in the hook, in the comment above `STOPPING_POINT_RX` rather than beside the constant itself: a long stopping-point declaration displaces the real closing move, so the hook goes blind (ai-config#3694).
+The two rounds that followed corrected the remedy rather than the mechanism, one for over-firing and one for a new blind spot (ai-config#3695).
+The test side shares the mechanism and inverts the author.
+
+Measured 2026-09-19 on this file's own PR, ai-config#3799.
+A fixture written to exercise a different property --- which output channel the hook reads --- appended filler after its offer phrase, putting that phrase past the 400-character tail.
+The case asserted "no warning", got one for the wrong reason, and so passed against the exact commit it had been written to catch.
+
+Nothing about the fixture looked wrong.
+Re-reading it confirms the offer is present and the expectation is right.
+Only running it against the pre-fix version separates a case that detects the defect from one that cannot reach it.
+
+The general shape: **when the code under test bounds what it examines --- a tail window, a line cap, a first-N-matches scan, a time window --- a fixture's own bulk is part of its input.**
+Padding added for realism can move the trigger out of scope, and every verdict that follows is the expected one.
+
+- **Do:** put a fixture's trigger where the bound actually reaches, and prefer the shortest fixture that exercises the property.
+- **Do:** run every new case against the version it was written to catch, and read a pass there as the case being vacuous rather than as the fix being unnecessary.
+- **Don't:** read a green suite as evidence a new case is sound --- a case that cannot reach the defect is green for the same reason a correct one is.
+- **Don't:** widen the bound to make a fixture fit;
+  that re-admits whatever the bound excludes, which is the production-side fix this hook already rejected.

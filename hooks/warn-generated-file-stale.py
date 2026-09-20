@@ -78,7 +78,9 @@ def main() -> int:
     except Exception:
         return 0
 
-    cmd = (payload.get("tool_input") or {}).get("command") or ""
+    inp = payload.get("tool_input")
+    inp = inp if isinstance(inp, dict) else {}
+    cmd = inp.get("command") or ""
     if not PUSH.search(cmd):
         return 0
 

@@ -410,7 +410,10 @@ def main() -> int:
             return 0
 
         tool_name = payload.get("tool_name") or payload.get("toolName") or ""
-        tool_input = payload.get("tool_input") or payload.get("toolInput") or {}
+        ti = payload.get("tool_input")
+        if not isinstance(ti, dict):
+            ti = payload.get("toolInput")
+        tool_input = ti if isinstance(ti, dict) else {}
         cwd = payload.get("cwd") or os.getcwd()
         tpath = payload.get("transcript_path") or payload.get("transcriptPath") or ""
 

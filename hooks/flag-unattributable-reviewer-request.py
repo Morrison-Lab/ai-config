@@ -126,7 +126,9 @@ def unattributable(payload: dict) -> list:
     """Reviewer requests in this Bash command that no discharge can credit."""
     if payload.get("tool_name") != "Bash":
         return []
-    command = (payload.get("tool_input") or {}).get("command")
+    inp = payload.get("tool_input")
+    inp = inp if isinstance(inp, dict) else {}
+    command = inp.get("command")
     if not isinstance(command, str) or not command.strip():
         return []
     mod = _load_sibling()

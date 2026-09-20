@@ -401,7 +401,10 @@ def indirect_gnu_grep(payload):
     tool = payload.get("tool_name") or payload.get("toolName") or ""
     if tool != "Bash":
         return None
-    tin = payload.get("tool_input") or payload.get("toolInput") or {}
+    tin = payload.get("tool_input")
+    if not isinstance(tin, dict):
+        tin = payload.get("toolInput")
+    tin = tin if isinstance(tin, dict) else {}
     command = (tin.get("command") or "").strip()
     if not command:
         return None

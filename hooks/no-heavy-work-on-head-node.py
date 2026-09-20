@@ -22,6 +22,7 @@ unreachable, it allows everything.
 """
 import json
 import os
+import platform
 import re
 import subprocess
 import sys
@@ -140,7 +141,8 @@ def main() -> int:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
-    inp = payload.get("tool_input") or {}
+    inp = payload.get("tool_input")
+    inp = inp if isinstance(inp, dict) else {}
     command = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or ""
 
     # Cheap test first: the sinfo call below only runs for a command that would
@@ -158,7 +160,7 @@ def main() -> int:
         else:
             return 0
 
-    host = os.uname().nodename.split(".")[0]
+    host = platform.node().split(".")[0]
     if host in nodes and not os.environ.get("SIMULATE_HEAD_NODE"):
         if is_dry_run:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))

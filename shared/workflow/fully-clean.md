@@ -1886,7 +1886,7 @@ A clean verdict landed at 18:20:12Z, and at 18:25:44Z the maintainer asked why t
 It had been reported blocked several times, each report repeated rather than re-derived.
 The scorer exited 0 the moment it was actually run, and the PR merged.)
 
-## A pending review request is a second, independent blocker, and it lives in a field a hand-check does not read
+## A pending review request is a second, independent blocker
 
 `scripts/check-pr-fully-clean.py` prints the pending-request blocker on its
 **own line**, separate from the verdict line:
@@ -1896,16 +1896,25 @@ A PR can carry a standing not-clean verdict and a pending request at once, so
 clearing the verdict clears one blocker and the scorer still exits 1 ---
 which reads as the verdict fix having failed.
 
-The trap is where the request is recorded.
-Measured 2026-09-19 on ai-config#3775: the PR object's own
-`requested_reviewers` came back **empty**, while
-`scripts/build-pr-payload.py` recorded the same request at `pr.reviewRequests`
-and the scorer reported it.
-So the obvious hand-check --- reading `requested_reviewers` on the PR --- says
-there is no request, and it disagrees with the instrument for reasons that
-have nothing to do with the PR's state.
-Read the scorer's own line, or `pr.reviewRequests` in the payload it consumed,
-rather than the field whose name matches the concept.
+**A hand-check of the PR object and the scorer can disagree, and the cause is
+staleness rather than the field.**
+An earlier revision of this entry claimed the two fields themselves
+disagree.
+They cannot: `scripts/build-pr-payload.py` builds `reviewRequests` from
+`requested_reviewers` and `requested_teams` off the same
+`GET /repos/{owner}/{repo}/pulls/{n}` response, so one fetch can never
+produce both an empty hand-check and a populated payload.
+What separates them is *when* each was read.
+A request is added and removed repeatedly over a PR's life --- ai-config#3778
+carries three `review_requested` and three `review_request_removed` events
+between 2026-09-18T18:48:11Z and 2026-09-20T00:09:17Z --- so a payload built
+minutes before a hand-check describes a different moment, and neither reading
+is wrong about the moment it took.
+
+The remedy is the same one this file applies to verdicts: re-derive rather
+than compare two readings taken at different times.
+Take the pending request from the scorer's own output, or from the payload
+that same run consumed, rather than from a separate fetch made alongside it.
 
 Only the named reviewer clears it, by reviewing or by being un-requested.
 Where the request was created in error --- by a session requesting human
@@ -1917,9 +1926,9 @@ See
 "Undo it yourself, the moment you notice it".
 
 - **Do:** read every blocker line the scorer prints, not the first one.
-- **Do:** take a pending request from `pr.reviewRequests` or from the scorer's
-  own output.
-- **Don't:** read an empty `requested_reviewers` as evidence that no request
-  is pending.
+- **Do:** take a pending request from the scorer's own output, or from the
+  payload that run consumed.
+- **Don't:** compare a hand-fetched `requested_reviewers` against a payload
+  built at another moment and read the difference as a field asymmetry.
 - **Don't:** read a still-failing exit after a verdict fix as the fix having
   failed --- check whether a second blocker line is doing it.

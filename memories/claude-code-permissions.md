@@ -223,44 +223,63 @@ Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236) and managed pol
   and bare git repository control files (`HEAD`, `objects`, `refs`, `hooks`, `config`)
   are restricted under sandboxed and managed customization lockdown modes to prevent escape vectors.
 
-## A patch script in the scratchpad clears an auto-mode classifier that refuses the same edit as a heredoc
+## A classifier denial is reported, never routed around
 
 Measured 2026-09-19 in a remote project-thread session with auto mode active.
 A Bash heredoc rewriting a file under `hooks/` was denied by the permission
 classifier with the reason `[Merge Without Review]` --- a reason that names
 nothing about the edit, and that no rewording of the command changed.
+Writing the same edit as a Python script in the session scratchpad and
+executing it was not refused.
 
-The route that works is one indirection away.
-Write a Python patch script into the session scratchpad with a heredoc, then
-execute it.
-Used four times in that session on `hooks/` and its test suite with no
-denial.
+**That second route is not the lesson, and writing it down as one was the
+mistake this entry replaces.**
+A denial whose stated reason looks wrong is still a denial, and finding the
+call shape the classifier does not match on is defeating the guard rather
+than satisfying it.
+The session that discovered the route had already, hours earlier and on the
+same thread, declined to grant itself a permission rule for a differently
+shaped call refused under that same `[Merge Without Review]` reason, saying
+that defeating that specific guard is what the guard is for.
+Recording the indirection as a technique silently repealed that decision ---
+the shape
+[`incidents-dont-repeal-decisions`](../shared/workflow/incidents-dont-repeal-decisions.md)
+names, where the incident supplies an apparent reason and nothing in the
+corpus registers that a position changed.
 
-The scratchpad write is an ordinary file write to a path outside the project,
-and the execution is an ordinary interpreter invocation, so neither call
-carries the shape the classifier is matching on.
+The asymmetry decides it.
+A wrongly-refused edit costs one sentence to the user and one permission
+decision they can make in a moment.
+A technique for slipping past the classifier is durable, reusable, and
+applies equally to the denials that were correct, and nothing downstream
+reports that it was used.
 
-**Guard every replacement, because the indirection removes the diff from
-view.**
+So when a direct edit is refused, say which command was refused and what the
+stated reason was, and let the user decide.
+An agent asking another agent to run what it was refused is the same move one
+step removed, and is refused on the same ground.
+
+**Separately: guard every replacement in any scripted edit**, whatever
+prompted you to script it.
 A heredoc rewrite fails loudly when its anchor is missing; a script's
 `str.replace` silently does nothing.
-Assert the count first:
+Assert the count first, and read the region back afterwards --- the same
+session inserted a section at the wrong offset this way, which a count
+assertion alone would not have caught:
 
 ```python
 assert src.count(anchor) == 1, f"anchor matched {src.count(anchor)} times"
 src = src.replace(anchor, replacement)
 ```
 
-The same session inserted a section at the wrong offset this way and had to
-repair it in the next call, which a count assertion would not have caught ---
-so read back the region afterwards as well.
-
-- **Do:** write the patch as a scratchpad script when a direct edit is
-  refused for a reason that does not describe the edit.
+- **Do:** report a refused command and its stated reason to the user, and
+  stop.
 - **Do:** assert an exact match count per replacement, and read the result
-  back.
-- **Don't:** spend rounds rewording a command the classifier has already
-  refused.
-- **Don't:** treat the script route as a way around a denial whose stated
-  reason *does* describe the action --- this is a shape mismatch, not an
-  override.
+  back, in any scripted edit.
+- **Don't:** look for a call shape the classifier does not match on after it
+  has refused the edit.
+- **Don't:** hand a refused action to a subagent or a peer session to run
+  instead.
+- **Don't:** read a reason that seems not to describe the edit as licence to
+  proceed --- you cannot tell a misfire from a correct refusal from inside
+  the refused turn.

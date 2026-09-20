@@ -344,19 +344,34 @@ rather than resolved by hand;
 
 Measured 2026-09-19 withdrawing a review request without `gh` on `PATH`.
 `DELETE /repos/{owner}/{repo}/pulls/{n}/requested_reviewers` takes its
-`reviewers` array in the request body, and curl sends a body on DELETE
-without guessing a media type, so the call returned `415 Unsupported Media
-Type`.
+`reviewers` array in the request body, and the call returned
+`415 Unsupported Media Type`.
 Adding `-H "Content-Type: application/json"` returned 200 and the pending
 reviewer list came back empty.
 
+**The cause is a wrong default media type, not a missing one**, which an
+earlier revision of this entry had backwards.
+Reproduced 2026-09-19 against a local listener: `curl -X DELETE -d ...` and
+`curl -X POST -d ...` both send
+`Content-Type: application/x-www-form-urlencoded`, so curl does guess, and
+guesses the same thing whatever the method.
+The API rejects a form-urlencoded body where it expects JSON.
+
+That also means the method is not the discriminator.
+POST and PATCH are equally exposed with raw curl and rarely surface it only
+because those calls usually go through `gh api` or a client library that
+sets JSON for them --- so read this as a raw-curl rule rather than a
+DELETE rule.
+
 The failure reads as a permissions or endpoint problem rather than a header
 problem, which is what makes it worth recording: 415 on a route you are
-authorized for is almost always the missing header.
-POST and PATCH rarely hit it because the surrounding tooling usually sets the
-header for them; DELETE-with-a-body is the shape nothing sets it for.
+authorized for is almost always the media type.
 
-- **Do:** pass `-H "Content-Type: application/json"` on every curl DELETE that
-  carries a body.
+- **Do:** pass `-H "Content-Type: application/json"` on every curl call that
+  sends a JSON body with `-d`, whatever the method.
+- **Do:** check what curl actually put on the wire, with a local listener or
+  `-v`, before writing down why a request was rejected.
 - **Don't:** read a 415 as evidence the token lacks scope or the path is
   wrong.
+- **Don't:** assume an absent header when a wrong one produces the identical
+  status.

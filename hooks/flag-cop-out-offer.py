@@ -61,7 +61,8 @@ TAIL_CHARS = 400
 
 # In a project-thread session every user-visible sentence is the `text` input
 # of an `mcp__hearthbot__reply` tool call, never an assistant text block --
-# the harness says so itself ("Text you emit directly is not delivered"). So a
+# that tool's own description says "This is the ONLY way to message the user
+# in a thread - your normal text output is not shown". So a
 # reader that only walks `type == "text"` blocks is blind to the whole reply,
 # which is exactly where a closing offer lives. Measured 2026-09-19: this hook
 # did not fire on a cop-out offer whose phrase is in OFFERS, sits well inside
@@ -88,15 +89,19 @@ def _reply_payload(block):
 
 
 def last_visible_texts(path):
-    """Every channel the user could have read the last message through.
+    """The last message as the user actually read it.
 
-    Returns the last reply-tool payload and the last assistant text block,
-    in that order, dropping empties. Both are checked because a session may
-    speak through either one, and a hook that picks only the shape it expects
-    is the failure this function exists to close.
+    A transcript carrying any reply-tool call is a project-thread session,
+    where a plain text block is never delivered -- so the reply payload is
+    the only channel, and checking the text block too would warn about a
+    sentence nobody saw. A transcript with no reply-tool call anywhere is an
+    ordinary CLI session, where the text block is the delivered channel.
+
+    Returns a one-element list, or an empty one when neither channel spoke.
     """
     last_text = ""
     last_reply = ""
+    saw_reply_tool = False
     try:
         with open(path, errors="ignore") as fh:
             for line in fh:
@@ -114,6 +119,12 @@ def last_visible_texts(path):
                         if txt.strip():
                             last_text = txt
                         for b in blocks:
+                            if isinstance(b, dict) and b.get(
+                                "type"
+                            ) == "tool_use" and REPLY_TOOL_RX.search(
+                                b.get("name") or ""
+                            ):
+                                saw_reply_tool = True
                             payload = _reply_payload(b)
                             if payload.strip():
                                 last_reply = payload
@@ -134,7 +145,12 @@ def last_visible_texts(path):
                             last_text = txt
     except Exception:
         return []
-    return [t for t in (last_reply, last_text) if t.strip()]
+    # The reply tool having been *called* is what identifies the harness, not
+    # whether its payload was non-empty -- so a thread session whose last turn
+    # spoke only through an empty or absent reply payload yields nothing here
+    # rather than falling back to narration the user never saw.
+    chosen = last_reply if saw_reply_tool else last_text
+    return [chosen] if chosen.strip() else []
 
 
 # `flag-session-boundaries` requires every reply to end with a stopping-point
@@ -202,8 +218,9 @@ def main() -> int:
     if not phrase:
         return 0
 
-    # Joining keeps the key identical for a single-text transcript, so the
-    # once-per-distinct-message sentinel behaves exactly as before.
+    # `last_visible_texts` returns at most one string, so the sentinel hashes
+    # exactly what earlier revisions hashed and the once-per-distinct-message
+    # behaviour is unchanged.
     key = hashlib.sha256("|".join(texts).encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-copout-{key}")
     if os.path.exists(sentinel):

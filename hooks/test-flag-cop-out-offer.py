@@ -33,6 +33,18 @@ def say(text):
         {"type": "text", "text": text}]}}
 
 
+def narrate_and_reply(narration, text):
+    """One turn speaking on both channels at once.
+
+    Only `text` reaches the user; `narration` is a plain assistant text block,
+    which a project-thread harness does not deliver.
+    """
+    return {"type": "assistant", "message": {"content": [
+        {"type": "text", "text": narration},
+        {"type": "tool_use", "name": "mcp__hearthbot__reply",
+         "input": {"text": text}}]}}
+
+
 def reply(text):
     """A project-thread reply: the user-visible text lives in a TOOL payload.
 
@@ -122,6 +134,20 @@ CASES = [
     ([TOOL, reply("Withdrew the review request; the scorer exited 0 on "
                   "1755bc6.")], False,
      "a reply-tool payload with no offer stays silent"),
+
+    # The other direction, and the one a both-channels reader gets wrong.
+    # Narration is not delivered in this harness, so an offer sitting there
+    # is a sentence nobody read -- warning about it quotes the user back
+    # something they were never shown.
+    ([TOOL, narrate_and_reply(
+        "Internal note: the scorer exited 0, so this qualifies. "
+        "Want me to go ahead and merge it now?",
+        "Merged and pushed as f6a21ad2.")], False,
+     "an offer in undelivered narration does not warn when a reply spoke"),
+    ([TOOL, narrate_and_reply(
+        "Internal note: the merge landed cleanly.",
+        "Done. Say the word and I'll open the follow-up PR.")], True,
+     "an offer in the reply wins over clean narration"),
 ]
 
 

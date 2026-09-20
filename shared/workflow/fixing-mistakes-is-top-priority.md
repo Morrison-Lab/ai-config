@@ -55,8 +55,19 @@ undoing.
 
 (Directive from the user, 2026-09-19: "cai: always fix your own mistakes as
 soon as you notice them".
-It followed a thread that requested a human review on its own PR 61 seconds
-after its first commit, against this corpus's own rule to request human
-review only after an AI verdict or a deadlock, then reported that request as
-the blocker holding the PR and asked permission to withdraw it.
-One API call removed it.)
+It followed a thread that requested a human review on its own PR against
+this corpus's own rule to request human review only after an AI verdict or a
+deadlock, then reported that request as the blocker holding the PR and asked
+permission to withdraw it.
+One API call removed it.
+
+Name the PR whenever an entry like this one cites an interval, because an
+unnamed incident sends a later reader to whichever PR looks closest and the
+figure then refutes itself against the wrong timeline.
+Measured on [ai-config#3778](https://github.com/Morrison-Lab/ai-config/pull/3778):
+first commit `98ecdde2` at 2026-09-18T18:47:10Z, first `review_requested`
+at 2026-09-18T18:48:11Z, 61 seconds later and 9 seconds after the PR itself
+was opened.
+The request was re-added and removed twice more before the last
+`review_request_removed` at 2026-09-20T00:09:17Z, so the single call cleared
+the standing request rather than the whole sequence.)

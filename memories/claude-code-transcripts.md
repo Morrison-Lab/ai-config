@@ -198,9 +198,26 @@ as a third option neither guard currently models.
 
 In a Claude-in-Projects thread session every sentence the user reads is the
 `text` input of an `mcp__hearthbot__reply` `tool_use` block.
-The harness says so itself, in its `UserPromptSubmit` injection: "Text you
-emit directly is not delivered --- only `mcp__hearthbot__*` tool calls reach
-the user."
+Two sources say so, and only one of them is checkable from outside that
+harness.
+
+The `mcp__hearthbot__reply` tool description is the portable one: "This is
+the ONLY way to message the user in a thread - your normal text output is not
+shown."
+Any session holding that tool can read it.
+
+The session's own `UserPromptSubmit` injection says it more directly ---
+"Text you emit directly is not delivered", followed by a clause naming
+`mcp__hearthbot__*` tool calls as what reaches the user.
+That string exists only in a live project-thread session's context, so it is
+**not greppable in this repository** and a reader who tries will conclude it
+was invented.
+The dash in the original is an em-dash, transliterated here under this
+repo's ASCII-punctuation rule, so the quoted form is not byte-identical
+either.
+
+Cite the tool description when the claim has to be checkable, and treat the
+injection as corroboration rather than as the evidence.
 
 So a transcript reader that walks only blocks where `block.get("type") ==
 "text"` sees an empty turn for every turn the user actually read.

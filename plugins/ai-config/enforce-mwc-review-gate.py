@@ -909,11 +909,26 @@ def evaluate(cmd, pr_data):
     status_rollup = pr_data.get("statusCheckRollup") or []
     # CheckRun entries carry conclusion/status; classic StatusContext
     # entries carry only state (FAILURE/ERROR/PENDING/EXPECTED/SUCCESS).
+    # Concurrency `cancel-in-progress` leaves a superseded run `cancelled` beside
+    # a later success with the same job name on the same SHA (ai-config#2277, #3800).
+    successful = {
+        check.get("name") or check.get("context") for check in status_rollup
+        if (check.get("conclusion") or "").upper() == "SUCCESS"
+        or (check.get("state") or "").upper() == "SUCCESS"
+    }
     failures = [
         check.get("name") or check.get("context") for check in status_rollup
-        if (check.get("conclusion") or "").upper() in BLOCKED_CI_CONCLUSIONS
-        or (check.get("status") or "").upper() in PENDING_CI_STATUSES
-        or (check.get("state") or "").upper() in BLOCKED_STATUS_STATES
+        if (
+            (
+                (check.get("conclusion") or "").upper() in BLOCKED_CI_CONCLUSIONS
+                and not (
+                    (check.get("conclusion") or "").upper() == "CANCELLED"
+                    and (check.get("name") or check.get("context")) in successful
+                )
+            )
+            or (check.get("status") or "").upper() in PENDING_CI_STATUSES
+            or (check.get("state") or "").upper() in BLOCKED_STATUS_STATES
+        )
     ]
     failures = list(dict.fromkeys(failures))
     if failures:

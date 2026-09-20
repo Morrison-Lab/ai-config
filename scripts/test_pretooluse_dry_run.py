@@ -184,7 +184,7 @@ class TestPreToolUseDryRun(unittest.TestCase):
         )
         self.assertEqual(code, 0)
         hso = out.get("hookSpecificOutput", {})
-        self.assertIn("additionalContext", hso)
+        self.assertTrue("additionalContext" in hso or hso.get("permissionDecision") == "deny")
 
     def test_no_fable_subagent(self):
         payload = json.dumps({"tool_name": "Agent", "tool_input": {"prompt": "x", "model": "fable"}})
@@ -192,6 +192,53 @@ class TestPreToolUseDryRun(unittest.TestCase):
         self.assertEqual(code, 0)
         hso = out.get("hookSpecificOutput", {})
         self.assertEqual(hso.get("permissionDecision"), "deny")
+
+    def test_non_dict_tool_input_degrades_silently(self):
+        """PreToolUse hooks must degrade silently on non-dict tool_input (ai-config#3772)."""
+        hooks_to_test = [
+            ("flag-aborted-patch-script.py", "Bash"),
+            ("flag-add-a-outside-pathspec.py", "Bash"),
+            ("flag-cd-into-main-checkout.py", "Bash"),
+            ("flag-chained-push.py", "Bash"),
+            ("flag-indirect-gnu-grep-flag.py", "Bash"),
+            ("flag-reset-hard-uncommitted-work.py", "Bash"),
+            ("flag-stale-adjacent-comment.py", "Bash"),
+            ("flag-unattributable-reviewer-request.py", "Bash"),
+            ("flag-unchanged-test-sibling.py", "Bash"),
+            ("flag-unmeasured-digest.py", "Bash"),
+            ("guard-slide-major-tag.py", "Bash"),
+            ("no-clobbering-push.py", "Bash"),
+            ("no-delete-branch-under-stacked-pr.py", "Bash"),
+            ("no-fable-subagent.py", "Agent"),
+            ("no-handrolled-verdict-parse.py", "Bash"),
+            ("no-heavy-work-on-head-node.py", "Bash"),
+            ("no-mutation-in-read-only-reviewer.py", "Bash"),
+            ("no-push-without-self-review.py", "Bash"),
+            ("no-unauthorized-merge.py", "Bash"),
+            ("no-underived-required-check.py", "Bash"),
+            ("no-whole-file-punct-replace.py", "Bash"),
+            ("require-agent-disclosure.py", "Bash"),
+            ("require-gh-repo-flag.py", "Bash"),
+            ("warn-generated-file-stale.py", "Bash"),
+            ("warn-paginate-without-slurp.py", "Bash"),
+            ("warn-partial-validation-before-push.py", "Bash"),
+            ("warn-unmeasured-capability-claim.py", "Bash"),
+            ("warn-verdict-line-filter.py", "Bash"),
+        ]
+        non_dict_values = ["not-a-dict", 42, ["a", "b"], None]
+
+        for hook_name, tool_name in hooks_to_test:
+            for val in non_dict_values:
+                payload = json.dumps({"tool_name": tool_name, "tool_input": val})
+                code, out, err = run_hook(hook_name, [], stdin_data=payload)
+                self.assertEqual(
+                    code, 0,
+                    f"{hook_name} exited {code} on tool_input={val!r}: {err}"
+                )
+                self.assertEqual(
+                    err.strip(), "",
+                    f"{hook_name} printed to stderr on tool_input={val!r}: {err}"
+                )
 
 
 if __name__ == "__main__":

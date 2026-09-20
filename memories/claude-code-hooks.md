@@ -417,6 +417,19 @@ Measured 2026-09-14/15 on `hooks/no-unauthorized-merge.py`: widening a tuple lef
 - **Do:** read the exit status and stderr in any hand-written hook probe, and fail the probe loudly on a non-zero exit rather than classifying it as a verdict.
 - **Don't:** treat empty stdout as an allow --- a crashed guard produces the same bytes, and the harness lets that call through too.
 
+## Guard `tool_input` against non-dict truthy values before calling `.get()`
+
+The pattern `inp = payload.get("tool_input") or {}` only falls back to `{}` when `tool_input` is falsy (`None`, `""`, `0`, missing).
+A truthy non-dict value (a string, an int, a list) passes through untouched,
+so a subsequent `.get(...)` raises `AttributeError: 'str' object has no attribute 'get'`
+and crashes the hook with exit code 1 (ai-config#3772).
+Every warn-only hook's contract is to degrade silently on malformed input, never crash.
+
+- **Do:** ensure `tool_input` is a dictionary before calling `.get()` on it:
+  `inp = payload.get("tool_input"); inp = inp if isinstance(inp, dict) else {}`
+  (or `if not isinstance(inp, dict): return 0`).
+- **Don't:** write `inp = payload.get("tool_input") or {}` assuming `or {}` protects against non-dict values.
+
 ## Complete hook lifecycle catalog (27 events)
 
 Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236).

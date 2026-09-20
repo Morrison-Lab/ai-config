@@ -577,7 +577,8 @@ def main() -> int:
 
     if payload.get("tool_name") != "Bash":
         return 0
-    ti = payload.get("tool_input") or {}
+    ti = payload.get("tool_input")
+    ti = ti if isinstance(ti, dict) else {}
     cmd = str(ti.get("command") or ti.get("CommandLine") or ti.get("cmd")
               or ti.get("script") or "")
     # The same substring prefilter `scan()` uses before its own parse, and

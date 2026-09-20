@@ -129,7 +129,9 @@ def main():
         return 0
     if (payload.get("tool_name") or "") != "Bash":
         return 0
-    command = ((payload.get("tool_input") or {}).get("command")) or ""
+    inp = payload.get("tool_input")
+    inp = inp if isinstance(inp, dict) else {}
+    command = inp.get("command") or ""
     if not command:
         return 0
     try:

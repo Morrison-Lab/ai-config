@@ -521,7 +521,8 @@ def main() -> int:
         "Bash", "bash", "run_command", "execute_command", "terminal", "shell",
     ):
         return 0
-    inp = payload.get("tool_input") or {}
+    inp = payload.get("tool_input")
+    inp = inp if isinstance(inp, dict) else {}
     command = (
         inp.get("command") or inp.get("CommandLine") or inp.get("cmd")
         or inp.get("script")

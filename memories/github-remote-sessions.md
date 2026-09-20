@@ -289,6 +289,53 @@ asymmetry working the useful way round.
   gate;
   it is subject to the same gate as a push.
 
+**The gate binds one reviewer, and reading it as binding review itself is the
+error that costs a verdict.**
+Everything above asks how to make the `@claude` reviewer run.
+None of it asks which reviewers exist, so a session that reads this section,
+finds every route gated, and concludes that no AI verdict is reachable has
+drawn a conclusion about the whole category from one member of it.
+
+Copilot is a second AI reviewer, requested per-PR rather than dispatched by a
+workflow, so the sender gate does not reach it: it is not one of the six
+`review /` jobs and nothing about a `claude[bot]` push silences it.
+That makes it the reviewer to request when #3743 blocks the other one, and
+[`copilot-review-before-human`](../shared/vendored/copilot-review-before-human.md)
+already says to get an AI verdict before a human one --- so requesting it is
+the step the standing rule asks for rather than an escape hatch.
+`mcp__github__request_copilot_review` is the call in a remote session.
+
+Measured 2026-09-19 on
+[ai-config#3799](https://github.com/Morrison-Lab/ai-config/pull/3799):
+the session reported to the user, twice, that a verdict required their own
+account, having never requested Copilot at any point.
+A push guard named the omission.
+The request was then issued and **could not be confirmed** --- the MCP call
+returned no output, `get_reviews` stayed empty, and the
+`requested_reviewers` endpoint was refused by the session's own permission
+classifier --- so whether it registered is unknown as of that date.
+The lesson is the unasked question rather than the outcome, which is why an
+unconfirmed request still records it.
+
+The general shape is worth separating from this gate.
+A blocked instance of a category invites a claim about the category, because
+the investigation that established the block is real work and feels like it
+answered the question.
+It answered a narrower one.
+Before reporting that something is unavailable, enumerate the category and
+say which members were checked --- which is
+[`metacognitive-monitoring`](../shared/workflow/metacognitive-monitoring.md)'s
+scope-claim rule applied to capabilities rather than to files.
+
+- **Do:** request Copilot when the `@claude` reviewer is gated, and say
+  whether the request was confirmed.
+- **Do:** name the members you checked when reporting a capability
+  unavailable, so the claim's scope is visible.
+- **Don't:** read "this reviewer is blocked" as "no review is reachable"
+  without enumerating the reviewers.
+- **Don't:** report a request as landed on the strength of having issued it;
+  this one could not be verified from the session that made it.
+
 ## The classifier also refuses a COMMIT on a branch this session does not own
 
 The section above is about the merge call.

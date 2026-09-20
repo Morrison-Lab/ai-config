@@ -992,30 +992,6 @@ nothing on record to paste over the guard's retained report in that case.
   observed incident and a code reading; file it for someone to trace with an
   actual resumed-session transcript before hardening the guard against it.
 
-**Switching a worktree's checked-out branch while a dispatched reviewer is
-still reading files in it corrupts that reviewer's run**, in one observed
-case --- the reviewer's own tool calls began returning content from whatever
-the worktree now held rather than the commit it was briefed to review.
-This is a general hazard of sharing a worktree between the orchestrating
-session and a reviewer it dispatched into the same directory, not specific
-to this guard's global-slot behaviour, and it was not independently
-reproduced here either.
-The narrower, verifiable fact underneath it: `git push origin <branch>`
-ships that branch's current tip **without checking it out**, so a
-dispatched review does not require (and should not be given cause for) a
-branch switch in a worktree anything else might still be reading.
-
-- **Do:** dispatch a reviewer into its own worktree (per
-  [`subagent-worktrees`](../../memories/subagent-worktrees.md)), or otherwise
-  avoid switching a shared worktree's branch while a reviewer may still be
-  reading from it.
-- **Do:** push a reviewed branch with `git push origin <local-branch>`
-  (or `<local-branch>:<remote-branch>`) rather than checking it out first ---
-  the push does not need the worktree to be sitting on that branch.
-- **Don't:** treat "the reviewer's run looked corrupted" as necessarily this
-  guard's fault; a shared worktree switched out from under a running
-  reviewer is a distinct failure named here for completeness.
-
 **The harness appends an `agentId:` trailer to a subagent's report, sometimes as its own block and sometimes concatenated onto the last line.**
 Which of those is common is the question this section could not settle, and an earlier draft asserted an answer to it by generalizing from the two dispatches it happened to watch.
 
@@ -1638,6 +1614,7 @@ On the reviewer's side, pin the target to a commit and read `git show <sha>:<pat
 
 - **Do:** treat "don't touch the tree under review" as covering every write to it, an edit and a `git add` and a formatter run alike.
 - **Do:** have the reviewer read a pinned commit, so a dispatcher's slip degrades into a stale review rather than an incoherent one.
+- **Do:** push a reviewed branch with `git push origin <local-branch>`, which ships that branch's tip without checking it out, so shipping a review's result never needs a branch switch in a tree something else may be reading.
 - **Don't:** assume a live reviewer is safe from ordinary editing because no branch switch occurred.
 - **Don't:** start fixing a round's findings before that round has reported.
 

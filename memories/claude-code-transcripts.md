@@ -193,3 +193,47 @@ as a third option neither guard currently models.
 - **Don't:** cite this file's override remedy for a refusal that is accurate
   --- that remedy is for the record shown to be wrong, not for every
   deadlock between two guards.
+
+## A project-thread session's user-visible prose lives in a tool payload, never in an assistant text block
+
+In a Claude-in-Projects thread session every sentence the user reads is the
+`text` input of an `mcp__hearthbot__reply` `tool_use` block.
+The harness says so itself, in its `UserPromptSubmit` injection: "Text you
+emit directly is not delivered --- only `mcp__hearthbot__*` tool calls reach
+the user."
+
+So a transcript reader that walks only blocks where `block.get("type") ==
+"text"` sees an empty turn for every turn the user actually read.
+That is not a rare shape in this harness.
+It is every turn.
+
+Measured 2026-09-19 on ai-config#3778.
+`hooks/flag-cop-out-offer.py` did not fire on a closing cop-out offer whose
+phrase is in its own `OFFERS` list, sat well inside its 400-character tail
+window, and would have matched had the text been reachable.
+The pattern was not the gap; the channel was.
+A `Stop` guard in this harness can therefore read as well-tested and
+well-maintained while being, in practice, disabled.
+
+**The reader is copied per hook, so fixing one fixes one.**
+There is no shared library: each hook carries its own `last_assistant_text`.
+Derived 2026-09-19 with `grep -ln 'def last_assistant_text' hooks/*.py`,
+which returned six after `flag-cop-out-offer.py` was fixed ---
+`flag-config-deletion-without-ref-check.py`, `no-misattributed-quote.py`,
+`no-offer-to-file.py`, `no-placeholder-reply.py`, `no-unshipped-commit.py`,
+and `warn-bash-command-for-powershell-user.py`.
+The last of those accumulates the whole turn rather than taking the last
+message, and is blind for the same reason: its list branch still tests
+`block.get("type") == "text"`.
+
+The fix `flag-cop-out-offer.py` now carries returns **both** channels --- the
+last reply-tool payload and the last assistant text block --- rather than
+switching to the payload, because a session may speak through either and a
+reader that picks only the shape it expects is the failure being closed.
+
+- **Do:** read the reply-tool payload as well as the text blocks in any hook
+  meant to inspect what the user saw.
+- **Do:** re-derive the affected set with the grep above rather than trusting
+  a remembered count.
+- **Don't:** read a green hook test suite as evidence the hook fires in this
+  harness --- every fixture in it was an assistant text block.

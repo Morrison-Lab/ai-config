@@ -339,3 +339,24 @@ rather than resolved by hand;
   statement about the diff --- split the command and see what the second
   refusal names.
 - **Don't:** leave a prepared resolution in a worktree as the deliverable.
+
+## A DELETE carrying a JSON body needs an explicit `Content-Type`, or the API answers 415
+
+Measured 2026-09-19 withdrawing a review request without `gh` on `PATH`.
+`DELETE /repos/{owner}/{repo}/pulls/{n}/requested_reviewers` takes its
+`reviewers` array in the request body, and curl sends a body on DELETE
+without guessing a media type, so the call returned `415 Unsupported Media
+Type`.
+Adding `-H "Content-Type: application/json"` returned 200 and the pending
+reviewer list came back empty.
+
+The failure reads as a permissions or endpoint problem rather than a header
+problem, which is what makes it worth recording: 415 on a route you are
+authorized for is almost always the missing header.
+POST and PATCH rarely hit it because the surrounding tooling usually sets the
+header for them; DELETE-with-a-body is the shape nothing sets it for.
+
+- **Do:** pass `-H "Content-Type: application/json"` on every curl DELETE that
+  carries a body.
+- **Don't:** read a 415 as evidence the token lacks scope or the path is
+  wrong.

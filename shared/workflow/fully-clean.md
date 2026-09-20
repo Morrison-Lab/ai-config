@@ -1885,3 +1885,41 @@ That is [`verify-the-right-artifact`](verify-the-right-artifact.md)'s substituti
 A clean verdict landed at 18:20:12Z, and at 18:25:44Z the maintainer asked why the PR had not merged under this repository's standing `mwc` grant.
 It had been reported blocked several times, each report repeated rather than re-derived.
 The scorer exited 0 the moment it was actually run, and the PR merged.)
+
+## A pending review request is a second, independent blocker, and it lives in a field a hand-check does not read
+
+`scripts/check-pr-fully-clean.py` prints the pending-request blocker on its
+**own line**, separate from the verdict line:
+`PR has pending review request(s) still in flight: <login>`.
+The two coexist.
+A PR can carry a standing not-clean verdict and a pending request at once, so
+clearing the verdict clears one blocker and the scorer still exits 1 ---
+which reads as the verdict fix having failed.
+
+The trap is where the request is recorded.
+Measured 2026-09-19 on ai-config#3775: the PR object's own
+`requested_reviewers` came back **empty**, while
+`scripts/build-pr-payload.py` recorded the same request at `pr.reviewRequests`
+and the scorer reported it.
+So the obvious hand-check --- reading `requested_reviewers` on the PR --- says
+there is no request, and it disagrees with the instrument for reasons that
+have nothing to do with the PR's state.
+Read the scorer's own line, or `pr.reviewRequests` in the payload it consumed,
+rather than the field whose name matches the concept.
+
+Only the named reviewer clears it, by reviewing or by being un-requested.
+Where the request was created in error --- by a session requesting human
+review before any AI verdict, against this corpus's own ordering rule ---
+withdrawing it is repair rather than gaming the gate, and the
+review workflow restores only what it stashed, so the withdrawal is durable.
+See
+[`fixing-mistakes-is-top-priority`](fixing-mistakes-is-top-priority.md)'s
+"Undo it yourself, the moment you notice it".
+
+- **Do:** read every blocker line the scorer prints, not the first one.
+- **Do:** take a pending request from `pr.reviewRequests` or from the scorer's
+  own output.
+- **Don't:** read an empty `requested_reviewers` as evidence that no request
+  is pending.
+- **Don't:** read a still-failing exit after a verdict fix as the fix having
+  failed --- check whether a second blocker line is doing it.

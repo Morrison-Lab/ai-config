@@ -258,6 +258,108 @@ class TestCLIAndModes(unittest.TestCase):
         self.assertEqual(data["violations"][0]["line"], 3)
         self.assertEqual(data["violations"][0]["first_dont_line"], 2)
 
+    def test_ignored_directories_skipped(self):
+        # Create files in various ignored directory paths
+        dirs_to_create = [
+            self.tmp_path / ".worktrees" / "branch1",
+            self.tmp_path / ".claude" / "worktrees" / "branch2",
+            self.tmp_path / "_site",
+            self.tmp_path / ".quarto",
+            self.tmp_path / "node_modules" / "pkg",
+            self.tmp_path / ".git" / "refs",
+            self.tmp_path / "docs" / "valid",
+        ]
+        for d in dirs_to_create:
+            d.mkdir(parents=True, exist_ok=True)
+            (d / "sample.md").write_text("- **Do:** foo.\n", encoding="utf-8")
+
+        discovered = checker.discover_files(self.tmp_path, [])
+        rel_discovered = [p.relative_to(self.tmp_path).as_posix() for p in discovered]
+        self.assertEqual(rel_discovered, ["docs/valid/sample.md"])
+
+    def test_diff_scoped_filtering(self):
+        # Set up a mini git repository
+        git_dir = self.tmp_path / "repo"
+        git_dir.mkdir()
+        subprocess.run(["git", "init", "-b", "main"], cwd=git_dir, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.name", "Test Agent"],
+            cwd=git_dir,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.email", "agent@test.local"],
+            cwd=git_dir,
+            check=True,
+            capture_output=True,
+        )
+
+        f1 = git_dir / "f1.md"
+        f2 = git_dir / "f2.md"
+        f1.write_text("- **Do:** base 1.\n- **Don't:** base 2.\n", encoding="utf-8")
+        f2.write_text("- **Don't:** bad.\n- **Do:** bad.\n", encoding="utf-8")
+
+        subprocess.run(["git", "add", "."], cwd=git_dir, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "initial commit"],
+            cwd=git_dir,
+            check=True,
+            capture_output=True,
+        )
+
+        # Modify only f1.md with clean bullets
+        f1.write_text("- **Do:** clean 1.\n- **Do:** clean 2.\n", encoding="utf-8")
+        subprocess.run(["git", "add", "f1.md"], cwd=git_dir, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "edit f1"],
+            cwd=git_dir,
+            check=True,
+            capture_output=True,
+        )
+
+        # In diff-scoped mode against HEAD~1, f2.md (which has a violation) should be skipped
+        report = checker.run_check(git_dir, [], base_ref="HEAD~1")
+        self.assertEqual(report["files_examined"], 1)
+        self.assertEqual(report["bad_blocks_count"], 0)
+
+        # In full scan mode, f2.md violation is reported and both files examined
+        report_full = checker.run_check(git_dir, [])
+        self.assertEqual(report_full["files_examined"], 2)
+        self.assertEqual(report_full["bad_blocks_count"], 1)
+
+    def test_invalid_base_ref_falls_back(self):
+        git_dir = self.tmp_path / "repo2"
+        git_dir.mkdir()
+        subprocess.run(["git", "init", "-b", "main"], cwd=git_dir, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.name", "Test Agent"],
+            cwd=git_dir,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.email", "agent@test.local"],
+            cwd=git_dir,
+            check=True,
+            capture_output=True,
+        )
+
+        f = git_dir / "file.md"
+        f.write_text("- **Don't:** bad.\n- **Do:** bad.\n", encoding="utf-8")
+        subprocess.run(["git", "add", "."], cwd=git_dir, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "initial"],
+            cwd=git_dir,
+            check=True,
+            capture_output=True,
+        )
+
+        # Supplying an unresolvable base-ref falls back to full scan rather than 0 files examined
+        report = checker.run_check(git_dir, [], base_ref="invalid-ref-does-not-exist")
+        self.assertEqual(report["files_examined"], 1)
+        self.assertEqual(report["bad_blocks_count"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

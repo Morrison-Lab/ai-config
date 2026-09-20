@@ -48,8 +48,36 @@ import subprocess
 import sys
 from typing import NamedTuple
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+try:
+    from lib.fences import find_fence_spans
+except ImportError:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from lib.fences import find_fence_spans
+
 DO_DONT_BULLET_RE = re.compile(r"^- \*\*(Do|Don't):\*\*")
-FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+
+IGNORED_DIRS = {
+    ".git",
+    ".venv",
+    "venv",
+    "node_modules",
+    "__pycache__",
+    ".pytest_cache",
+    ".quarto",
+    "_site",
+    "site",
+    "dist",
+    "build",
+    ".gemini",
+    ".cursor",
+    "worktrees",
+    ".worktrees",
+}
 
 
 class Bullet(NamedTuple):
@@ -84,37 +112,18 @@ def extract_blocks_from_text(content: str) -> list[Block]:
 
     Ignores lines inside code fences. Indented lines continue the current bullet.
     """
+    fenced_lines, _, _ = find_fence_spans(content, swallow_unclosed=True)
     blocks: list[Block] = []
     cur_bullets: list[Bullet] = []
     block_start = 0
 
-    in_fence = False
-    fence_char = ""
-    fence_len = 0
-
     lines = content.splitlines()
     for idx, line in enumerate(lines, 1):
-        # Code fence tracking
-        m_fence = FENCE_RE.match(line)
-        if m_fence:
-            marker = m_fence.group(1)
-            char = marker[0]
-            length = len(marker)
-            if not in_fence:
-                in_fence = True
-                fence_char = char
-                fence_len = length
-                if cur_bullets:
-                    blocks.append(Block(block_start, idx - 1, cur_bullets))
-                    cur_bullets = []
-                continue
-            elif char == fence_char and length >= fence_len:
-                in_fence = False
-                fence_char = ""
-                fence_len = 0
-                continue
-
-        if in_fence:
+        # 1-based line idx corresponds to 0-based index idx - 1
+        if (idx - 1) in fenced_lines:
+            if cur_bullets:
+                blocks.append(Block(block_start, idx - 1, cur_bullets))
+                cur_bullets = []
             continue
 
         m_bullet = DO_DONT_BULLET_RE.match(line)
@@ -161,16 +170,22 @@ def check_block(file_rel_path: str, block: Block) -> list[Violation]:
     return violations
 
 
-def get_diff_changed_lines(root: Path, base_ref: str) -> dict[str, set[int]]:
-    """Return a mapping of file_path -> set of added/modified line numbers since base_ref."""
+def get_diff_changed_lines(root: Path, base_ref: str) -> dict[str, set[int]] | None:
+    """Return a mapping of file_path -> set of added/modified line numbers since base_ref.
+
+    Returns None if git diff failed (e.g. unresolvable ref or shallow clone).
+    """
     cmd = ["git", "diff", "--unified=0", base_ref, "HEAD", "--", "*.md", "*.qmd"]
     try:
         proc = subprocess.run(
             cmd, cwd=root, capture_output=True, text=True, check=True
         )
-    except subprocess.CalledProcessError as err:
-        print(f"check-do-dont-order: git diff failed ({err})", file=sys.stderr)
-        return {}
+    except (subprocess.CalledProcessError, FileNotFoundError) as err:
+        print(
+            f"check-do-dont-order: warning: git diff against {base_ref} failed ({err}); falling back to full scan",
+            file=sys.stderr,
+        )
+        return None
 
     changed_lines: dict[str, set[int]] = {}
     cur_file: str | None = None
@@ -192,6 +207,18 @@ def get_diff_changed_lines(root: Path, base_ref: str) -> dict[str, set[int]]:
     return changed_lines
 
 
+def is_ignored_path(p: Path, root: Path) -> bool:
+    """Check if path falls under an ignored or worktree directory."""
+    try:
+        rel = p.relative_to(root)
+    except ValueError:
+        return False
+    for part in rel.parts[:-1]:
+        if part in IGNORED_DIRS:
+            return True
+    return False
+
+
 def discover_files(root: Path, paths: list[str]) -> list[Path]:
     """Discover markdown and Quarto files to inspect."""
     if paths:
@@ -201,27 +228,21 @@ def discover_files(root: Path, paths: list[str]) -> list[Path]:
             if not p.is_absolute():
                 p = root / p
             if p.is_file():
-                if p.suffix in (".md", ".qmd"):
+                if p.suffix in (".md", ".qmd") and not is_ignored_path(p, root):
                     collected.append(p)
             elif p.is_dir():
                 for ext in ("*.md", "*.qmd"):
-                    collected.extend(p.rglob(ext))
+                    for child in p.rglob(ext):
+                        if not is_ignored_path(child, root):
+                            collected.append(child)
         return sorted(set(collected))
 
-    # Whole repo discovery, skipping internal git and worktree directories
+    # Whole repo discovery, skipping internal git, build, and worktree directories
     collected = []
     for ext in ("*.md", "*.qmd"):
         for p in root.rglob(ext):
-            rel = p.relative_to(root).as_posix()
-            if (
-                rel.startswith(".git/")
-                or "/.git/" in rel
-                or rel.startswith(".claude/worktrees/")
-                or rel.startswith(".gemini/antigravity/worktrees/")
-                or "/node_modules/" in rel
-            ):
-                continue
-            collected.append(p)
+            if not is_ignored_path(p, root):
+                collected.append(p)
 
     return sorted(collected)
 
@@ -238,6 +259,7 @@ def run_check(
     target_files = discover_files(root, paths)
     diff_lines = get_diff_changed_lines(root, base_ref) if base_ref else None
 
+    files_examined = 0
     files_with_blocks = 0
     total_blocks = 0
     bad_blocks_count = 0
@@ -252,6 +274,8 @@ def run_check(
         # If base_ref was requested and file was not touched in diff, skip
         if diff_lines is not None and rel_str not in diff_lines:
             continue
+
+        files_examined += 1
 
         try:
             content = file_path.read_text(encoding="utf-8", errors="replace")
@@ -283,7 +307,7 @@ def run_check(
             files_with_blocks += 1
 
     return {
-        "files_examined": len(target_files),
+        "files_examined": files_examined,
         "files_with_blocks": files_with_blocks,
         "blocks_examined": total_blocks,
         "bad_blocks_count": bad_blocks_count,

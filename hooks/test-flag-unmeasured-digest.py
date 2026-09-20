@@ -64,6 +64,27 @@ def assistant_says_hash(value):
 MD5_RUN = tool_result(f"MD5 (ex04_math.pdf) = {REAL_MD5}\n"
                       f"MD5 (ex05_linear_regression.pdf) = {REAL_MD5}")
 
+# The pin surface (ai-config#3392), from the 2026-09-20 recurrence on
+# Lacaedemon/sparta#1615. `REAL_HEAD` is that PR's actual head; `PADDED_HEAD`
+# shares its first 8 characters and is invented past them -- the exact shape of
+# a value built by padding out the abbreviation a gate printed.
+REAL_HEAD = "d46910953d5ea64ee58a295dd56a6f2b1ac55d80"
+PADDED_HEAD = "d46910959e3d84fd1e5b8b0e6b2ad5e0b1d5a2f9"
+assert REAL_HEAD[:8] == PADDED_HEAD[:8], "the padded fixture must share a prefix"
+assert REAL_HEAD != PADDED_HEAD
+
+# Only the ABBREVIATION reaches the transcript, which is the whole setup: the
+# session has seen `d4691095` and has never seen the full forty characters.
+HEAD_RUN = tool_result(
+    "PR #1615 (feat/621-far-tier-winner-pursuit): HEAD=d4691095\n"
+    "FULLY CLEAN on HEAD d4691095!")
+
+# The corrected reading: the full forty characters, as `--json headRefOid`
+# returns them. Kept separate from HEAD_RUN deliberately -- a case that means
+# "the session read the whole value" must not be fed the abbreviation-only
+# fixture, or it would pass for the wrong reason.
+HEAD_FULL_RUN = tool_result(f"head={REAL_HEAD}")
+
 
 def bash(command):
     return {"tool_name": "Bash", "tool_input": {"command": command}}
@@ -275,6 +296,57 @@ CASES = [
     ([PROMPT],
      bash("gh pr review 5 -R Morrison-Lab/mlg --approve"), False,
      "a review with no body flag posts no prose"),
+
+    # --- the pin surface (ai-config#3392) -------------------------------------
+    # The 2026-09-20 recurrence on Lacaedemon/sparta#1615: the gate printed the
+    # abbreviated head, and a 40-character value was padded out from it.
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh api -X PUT repos/L/s/pulls/1615/update-branch "
+          f"-f expected_head_sha={PADDED_HEAD}"), True,
+     "#3392: a pin padded out from an abbreviation the gate printed warns"),
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr merge 1615 -R L/s --squash --match-head-commit {PADDED_HEAD}"),
+     True,
+     "the same fabrication through --match-head-commit warns"),
+    ([PROMPT],
+     bash(f"gh api -X PUT repos/L/s/pulls/1/update-branch "
+          f"-f expected_head_sha={'b' * 40}"), True,
+     "a pin invented outright, with no observed prefix, warns"),
+    ([PROMPT, HEAD_RUN],
+     {"tool_name": "mcp__github__update_pull_request_branch",
+      "tool_input": {"owner": "L", "repo": "s", "pullNumber": 1,
+                     "expectedHeadSha": PADDED_HEAD}}, True,
+     "the MCP spelling carries the pin as a named parameter and warns"),
+
+    # A correctly-read pin must stay silent, or the guard gets switched off.
+    ([PROMPT, HEAD_FULL_RUN],
+     bash(f"gh api -X PUT repos/L/s/pulls/1615/update-branch "
+          f"-f expected_head_sha={REAL_HEAD}"), False,
+     "the full head the session actually read is silent"),
+    ([PROMPT, HEAD_FULL_RUN],
+     bash(f"gh pr merge 1615 -R L/s --squash --match-head-commit {REAL_HEAD}"),
+     False,
+     "the same real value through --match-head-commit is silent"),
+    ([PROMPT, tool_result(f"head={REAL_HEAD} base=main state=OPEN")],
+     bash(f"gh pr merge 1 -R L/s --squash --match-head-commit {REAL_HEAD}"),
+     False,
+     "a head read as part of a wider --jq line still discharges the pin"),
+    ([PROMPT, {"type": "user", "message": {"content":
+      f"merge it, the head is {REAL_HEAD}"}}],
+     bash(f"gh pr merge 1 -R L/s --squash --match-head-commit {REAL_HEAD}"),
+     False,
+     "a head the USER supplied is measured -- it entered from outside the model"),
+    ([PROMPT, assistant_says_hash(REAL_HEAD)],
+     bash(f"gh pr merge 1 -R L/s --squash --match-head-commit {REAL_HEAD}"),
+     True,
+     "the model's OWN prior assertion does not discharge a pin either"),
+    ([PROMPT, HEAD_RUN],
+     bash("gh api -X PUT repos/L/s/pulls/1/update-branch "
+          "-f expected_head_sha=\"$PINNED\""), False,
+     "a pin passed via a shell variable carries no literal SHA to check"),
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr view 1615 -R L/s --json headRefOid"), False,
+     "a command that merely READS the head is not a pin"),
 ]
 
 
@@ -340,6 +412,30 @@ def check_output_shape():
     return 0 if ok else 1
 
 
+def check_pin_warning_distinguishes_padding():
+    """The pin warning must say WHICH failure it is, not merely that one occurred.
+
+    Fire-or-quiet cannot reach this: padded and invented-outright both fire, so
+    a mutation that collapses the two changes no verdict and every case above
+    still passes. The distinction is the actionable half -- "you padded
+    `d4691095`" names the remedy, "this is unmeasured" does not -- so it gets
+    an assertion of its own.
+    """
+    padded = run([PROMPT, HEAD_RUN],
+                 bash(f"gh pr merge 1 -R L/s --match-head-commit {PADDED_HEAD}"))
+    invented = run([PROMPT, HEAD_RUN],
+                   bash(f"gh pr merge 1 -R L/s --match-head-commit {'b' * 40}"))
+    pctx = (padded.get("hookSpecificOutput") or {}).get("additionalContext") or ""
+    ictx = (invented.get("hookSpecificOutput") or {}).get("additionalContext") or ""
+    ok = ("d4691095" in pctx and "padded" in pctx.lower()
+          and "padded" not in ictx.lower()
+          # The misdiagnosis is the reason this surface warrants its own note.
+          and "422" in pctx and "concurrent writer" in pctx)
+    print(f"{'ok  ' if ok else 'FAIL'}  the pin warning names the padded "
+          f"prefix, and says so ONLY when a prefix was observed")
+    return 0 if ok else 1
+
+
 def check_unreadable_transcript_is_silent():
     """No readable transcript means no evidence either way: fail open.
 
@@ -384,6 +480,7 @@ def main():
         print(f"{'ok  ' if ok else 'FAIL'}  "
               f"[{'fire ' if should_fire else 'quiet'}] {label}")
     failures += check_output_shape()
+    failures += check_pin_warning_distinguishes_padding()
     failures += check_unreadable_transcript_is_silent()
     failures += check_dry_run_warns()
     if SHAPE_ERRORS:

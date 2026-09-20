@@ -89,6 +89,38 @@ A token the session measured at any point discharges, not only one measured in
 the current turn. Unlike a clock reading, a hash does not expire: the digest of
 a file that has not changed is as true an hour later as it was when printed.
 
+THE SECOND SURFACE: A PINNING ARGUMENT (2026-09-20, ai-config#3392)
+--------------------------------------------------------------------
+Everything above is about a value written into a *body*. A commit SHA passed
+as a *command argument* is the same class of unmeasurable value reaching the
+same kind of harm by a different route, and no body extractor sees it:
+
+    gh api -X PUT repos/O/R/pulls/N/update-branch -f expected_head_sha=<sha>
+    gh pr merge N -R O/R --squash --match-head-commit <sha>
+
+#3392 specified this check on 2026-09-09, after a sweep padded the
+abbreviation `4d443b7a` out to forty plausible characters. It was not built,
+and on 2026-09-20 the identical mistake recurred on `Lacaedemon/sparta#1615`:
+`check-pr-fully-clean.py` prints the head abbreviated, so the full value has
+to be re-read, and instead it was invented past the eighth character.
+
+This surface needs none of the digest-shaping heuristics above. The flag name
+already establishes that the value is a commit SHA, so the only question left
+is whether the session ever observed it -- which makes the check strictly
+sharper here than on a prose body.
+
+It is also the surface where the consequence is worst, because the failure is
+MISDIAGNOSED rather than merely wrong. A fabricated pin is refused with
+`422 expected head sha didn't match current head ref.` (or
+`Head branch was modified` on a merge), byte-identical to what a genuine
+concurrent writer produces -- and `skills/mwc`, `skills/chores`,
+`skills/merge-it` and `shared/workflow/fully-clean.md` all tell the reader
+that this error means another writer moved the head, routing to "settle
+ownership". So the documented diagnosis sends you into a concurrency
+investigation over your own typo. The warning therefore names the remedy
+(re-read `--json headRefOid`) and, when the fabricated value's leading
+characters WERE observed, says outright that an abbreviation was padded.
+
 RELATION TO `flag-unread-commit-citation.py`
 --------------------------------------------
 Both can fire on one body naming a commit SHA, and they answer different
@@ -211,6 +243,45 @@ NOTE = (
     "This is a reminder, not a refusal."
 )
 
+# The pin surface (ai-config#3392). A flag that pins an operation to a head
+# commit takes the FULL 40 characters, and the value can only have been read --
+# from `--json headRefOid`, from `git rev-parse`, or from the user. There is no
+# derivation, so unlike the body surface this needs no length/keyword heuristic:
+# any hex passed here that the session never observed is fabricated.
+#
+# Both `=` and whitespace separate a flag from its value, and the MCP spelling
+# `expectedHeadSha` arrives as a JSON key, so a colon is a separator too.
+RX_PIN_ARG = re.compile(
+    r"(?<![A-Za-z0-9_-])"
+    r"(expected_head_sha|--match-head-commit|expectedHeadSha)"
+    r"[\"']?\s*[=:]?\s*[\"']?"
+    r"([0-9a-fA-F]{7,40})"
+    r"(?![0-9a-zA-Z])"
+)
+
+PIN_NOTE = (
+    "Unmeasured-pin reminder: this command pins `{flag}` to `{token}`, which "
+    "never appeared in any tool result or user message in this session's "
+    "transcript.{padded}\n\n"
+    "A pinning SHA is a measured value. Read it at the point of use --\n"
+    "    gh pr view <N> --json headRefOid --jq .headRefOid\n"
+    "-- rather than constructing it from an abbreviation.\n\n"
+    "This matters more than an ordinary unmeasured value, because the failure "
+    "is misdiagnosed rather than merely wrong: a fabricated pin is refused "
+    "with `422 expected head sha didn't match current head ref.` (or "
+    "`Head branch was modified` on a merge), which is byte-identical to what "
+    "a genuine concurrent writer produces. The corpus tells you that error "
+    "means another writer moved the head and routes you to settle ownership, "
+    "so following it sends you into a concurrency investigation over your own "
+    "typo. Re-read the head and compare before investigating anything.\n\n"
+    "This is a reminder, not a refusal."
+)
+
+PADDED_NOTE = (
+    " Its leading `{prefix}` DID appear, so an abbreviation was padded out to "
+    "40 characters rather than the full value being read."
+)
+
 
 def hex_tokens_in(text):
     """Every hex run in `text`, lowercased, as a set. Used for the transcript side."""
@@ -321,6 +392,68 @@ def unmeasured_digest(body, transcript_path, assume_unmeasured=False):
     return None
 
 
+def _longest_observed_prefix(token, seen):
+    """The longest observed hex run that is a strict prefix of `token`, else None.
+
+    This is what separates "padded an abbreviation" from "invented outright".
+    `_measured` asks whether an observed run *starts with* the token (a short
+    citation of a long known SHA, which is fine); this asks the mirror question,
+    whether the token starts with an observed run (a long value built out of a
+    short known one, which is the fabrication).
+    """
+    token = token.lower()
+    best = None
+    for obs in seen:
+        if len(obs) < len(token) and token.startswith(obs) and len(obs) >= 7:
+            if best is None or len(obs) > len(best):
+                best = obs
+    return best
+
+
+def unmeasured_pin(command, transcript_path, assume_unmeasured=False):
+    """(flag, token, padded_prefix) for an unmeasured pinning SHA, else None.
+
+    Deliberately not routed through `unmeasured_digest`: that applies
+    digest-shaping heuristics (canonical lengths, a nearby keyword, a URL
+    exemption) which exist to keep an ordinary prose body from warning on every
+    hex run. None of that judgment is wanted here. The flag name already
+    establishes that the value is a commit SHA, so the only question left is
+    whether the session ever saw it.
+    """
+    if not isinstance(command, str) or not command.strip():
+        return None
+    m = RX_PIN_ARG.search(command)
+    if not m:
+        return None
+    flag, token = m.group(1), m.group(2)
+    seen = _transcript_hex(transcript_path)
+    if seen is None:
+        if not assume_unmeasured:
+            # Live invocation with no readable transcript: no evidence either
+            # way, so fail open rather than warn on every pinned command.
+            return None
+        seen = set()
+    if _measured(token, seen):
+        return None
+    return flag, token, _longest_observed_prefix(token, seen)
+
+
+def _pin_command(tool_name, tool_input):
+    """The shell command for a Bash tool call, or the serialized MCP pin args."""
+    bash_names = getattr(_stamp, "BASH_TOOL_NAMES", {"Bash"})
+    if tool_name in bash_names:
+        cmd = tool_input.get("command")
+        return cmd if isinstance(cmd, str) else None
+    # The MCP merge/update tools carry the pin as a named parameter rather than
+    # in a command string; serializing the input lets one regex cover both.
+    if isinstance(tool_name, str) and tool_name.startswith("mcp__"):
+        for key in ("expectedHeadSha", "expected_head_sha"):
+            val = tool_input.get(key)
+            if isinstance(val, str) and val:
+                return "{}={}".format(key, val)
+    return None
+
+
 def _create_post(tool_name, tool_input, cwd):
     """(kind, body, surface) for an issue/PR CREATE or EDIT the sibling misses."""
     if _extract_body_text is None:
@@ -416,6 +549,30 @@ def main() -> int:
         tool_input = ti if isinstance(ti, dict) else {}
         cwd = payload.get("cwd") or os.getcwd()
         tpath = payload.get("transcript_path") or payload.get("transcriptPath") or ""
+
+        # The pin surface runs first: a command can both pin a SHA and post a
+        # body, and the pin is the sharper signal of the two.
+        pin_cmd = _pin_command(tool_name, tool_input)
+        if pin_cmd:
+            hit = unmeasured_pin(pin_cmd, tpath, assume_unmeasured=is_dry_run)
+            if hit:
+                flag, token, prefix = hit
+                padded = PADDED_NOTE.format(prefix=prefix) if prefix else ""
+                context = PIN_NOTE.format(flag=flag, token=token, padded=padded)
+                out = {
+                    "hookSpecificOutput": {
+                        "hookEventName": "PreToolUse",
+                        "additionalContext": context,
+                    },
+                }
+                if not os.environ.get("ANTIGRAVITY_AGENT"):
+                    out["systemMessage"] = (
+                        f"Unmeasured-pin reminder: `{flag}` is pinned to "
+                        f"`{token}`, which never appeared in this session's "
+                        f"transcript. Re-read it with "
+                        f"`gh pr view <N> --json headRefOid --jq .headRefOid`.")
+                print(json.dumps(out))
+                return 0
 
         kind, body, surface, _is_notebook = _post_from_payload(tool_name, tool_input, cwd)
         if kind != "body" or not body:

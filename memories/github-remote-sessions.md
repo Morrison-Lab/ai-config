@@ -214,10 +214,11 @@ live text), the byte-identical message a genuine concurrent-writer collision
 returns.
 [`fully-clean`](../shared/workflow/fully-clean.md), [`mwc`](../skills/mwc/SKILL.md),
 and [`merge-it`](../skills/merge-it/SKILL.md) each route that message to
-"settle ownership"; [`chores`](../skills/chores/SKILL.md) routes it to
-re-reading before touching the branch and restarting from its own step 2
-instead --- either way, do that only after re-reading the live `headRefOid`
-and confirming it actually differs from the SHA you pinned.
+settling who owns the branch; [`chores`](../skills/chores/SKILL.md) routes it
+to re-reading before touching the branch, per the same restart-from-step-2
+procedure the skill already uses elsewhere for a replaced head --- either
+way, do that only after re-reading the live `headRefOid` and confirming it
+actually differs from the SHA you pinned.
 Measured 2026-09-20 on
 [Lacaedemon/sparta#1615](https://github.com/Lacaedemon/sparta/pull/1615): an
 8-character abbreviation printed by `check-pr-fully-clean.py` (`d4691095`)

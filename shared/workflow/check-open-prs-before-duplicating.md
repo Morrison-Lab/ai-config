@@ -16,6 +16,21 @@ the work is already DONE" below for why.
 The prescribed query has to carry the fix as well as the prose, or a reader
 who copies the command never reaches the explanation.
 
+**That command has no `--limit`, so it defaults to 30 rows across the
+combined open+closed population --- the same mixed-population row cap
+[`issue-first`](issue-first.md)'s "A capped `--state all` listing can hide
+most OPEN issues behind closed ones" section measures for `gh issue list`.**
+The mechanism is identical (`--search` still applies a row cap to a
+state-mixed, non-state-sorted result), though it did not visibly bite in a
+spot-check against `Lacaedemon/sparta` on 2026-09-19 only because that repo
+had just two open PRs total, both recent enough to survive the cap --- so the
+absence of a live miss there is a property of that repo's PR count, not
+evidence the risk is smaller for PRs than for issues.
+Apply the same fix: scope with `is:open`/`is:closed` in the `--search`
+string (or `--state open`/`--state closed` alongside `--search`), and read a
+returned row count equal to the limit as a truncation signal rather than a
+total, before trusting an empty or thin result.
+
 In a remote/web session without `gh`, use the GitHub MCP equivalent
 (`mcp__github__list_pull_requests` / `mcp__github__search_pull_requests` —
 see `tool-mappings.md`).

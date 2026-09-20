@@ -14,6 +14,86 @@ The issue is the durable record of intent, scope, and "done" criteria --- it giv
 Skip only when the task is already tracked by an open issue.
 A closed match is not a skip: surface it and confirm before re-doing the work.
 
+## A capped `--state all` listing can hide most OPEN issues behind closed ones
+
+`gh issue list --state all --limit N` (or `--search` with no `--limit`, whose
+own default is 30) applies the row cap to the OPEN+CLOSED population
+together, sorted by creation/update time rather than by state.
+A repo with many closed issues can fill the entire cap with closed rows,
+leaving barely any of the currently open ones visible --- and a truncated
+result is indistinguishable from "no duplicate exists", the same shape of
+failure [`recheck-review-findings`](recheck-review-findings.md) already names
+for a review filtered by author login.
+
+Measured on `Lacaedemon/sparta`, 2026-09-19:
+
+```
+gh issue list --repo Lacaedemon/sparta --state all --limit 200 --json number,state --jq '[.[]|select(.state=="OPEN")]|length'
+# -> 13
+gh issue list --repo Lacaedemon/sparta --state all --limit 200 --json number --jq 'length'
+# -> 200
+gh issue list --repo Lacaedemon/sparta --state open --limit 300 --json number --jq 'length'
+# -> 62
+```
+
+200 rows returned 13 open issues while 62 were actually open --- 49 open
+issues invisible to the capped listing.
+
+**The literal command this file prescribes reproduces the same gap, no
+synthetic example needed:**
+
+```
+gh issue list --repo Lacaedemon/sparta --state all --search "fix" --json number,state --jq 'length'
+# -> 30 (the default cap; no --limit was given)
+gh issue list --repo Lacaedemon/sparta --state all --search "fix" --json number,state --jq '[.[]|select(.state=="OPEN")]|length'
+# -> 10
+gh issue list --repo Lacaedemon/sparta --state open --search "fix" --limit 300 --json number --jq 'length'
+# -> 12
+```
+
+Two open issues matching "fix" never made it into the 30-row window.
+
+**`--state all` is still correct, and this is not an argument against it.**
+A closed duplicate is exactly the case `--state all` exists to catch, per the
+paragraph above it in this file.
+The trap is in *how* the mixed listing gets read afterward: capping a
+combined population and filtering by state client-side is what hides the
+open rows, not the decision to include closed ones.
+
+**The fix pushes the state predicate into the server-side query instead of
+filtering the result afterward.**
+Adding `is:open`/`is:closed` to the `--search` string (or passing
+`--state open`/`--state closed` alongside `--search`) filters before the cap
+applies, so the row budget is spent on the state being asked about rather
+than shared with the other one:
+
+```
+gh issue list --repo Lacaedemon/sparta --search "fix is:open" --json number --jq 'length'
+# -> 12 (matches the uncapped ground truth)
+```
+
+Run it once scoped to `is:open` and once to `is:closed` rather than once
+unscoped --- that keeps both halves of the original rule (surface a closed
+duplicate, don't miss an open one) while each half stays immune to the other
+state crowding it out.
+
+- **Do:** scope a duplicate-check search by state in the query itself
+  (`is:open`, `is:closed`) rather than requesting `--state all` and filtering
+  the returned rows by state afterward.
+- **Do:** treat a returned row count equal to the limit (or the unset default
+  of 30) as a truncation signal, not a total, and re-run with a wider limit
+  or a narrower, state-scoped query before concluding "no duplicate".
+- **Don't:** read `--state all`'s inclusion of closed issues as the defect
+  --- it is deliberate and correct; the defect is capping the mixed result
+  and trusting a client-side state filter over it.
+- **Don't:** switch to `--state open` alone to dodge the truncation --- that
+  reintroduces the exact closed-duplicate blind spot this file's opening
+  section already rules out.
+
+(Morrison-Lab/ai-config#3808, 2026-09-19: measured independently against
+`Lacaedemon/sparta` as part of a proactive UMS pass, reproducing the
+originating session's numbers rather than taking them on trust.)
+
 This rule settles *whether* something is tracked, not *where* it goes.
 An item whose deliverable is a decision rather than a diff belongs on the
 discussion board instead, per

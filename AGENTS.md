@@ -123,6 +123,19 @@ and preserve the legacy or alternative behavior behind an explicit, documented o
 environment variable, or configuration toggle.
 See [`shared/principles/prefer-optionality-over-removal.md`](shared/principles/prefer-optionality-over-removal.md).
 
+## Prefer systemic solutions over one-off fixes
+
+When addressing a defect, failure, edge case, or recurring mistake, prefer systemic, structural solutions over one-off, ad-hoc patches.
+Fix the underlying mechanism that allowed the error to occur, and install an automated guard, type constraint, or architectural invariant that prevents the entire class of defects from recurring.
+Audit the repository for other instances of the same defect in the same turn.
+See [`shared/principles/prefer-systemic-solutions-over-one-off-fixes.md`](shared/principles/prefer-systemic-solutions-over-one-off-fixes.md).
+
+- **Do:** diagnose the root cause of failures and fix the underlying mechanism.
+- **Do:** install automated, deterministic checks or structural invariants that prevent recurrence of the defect class.
+- **Do:** audit the repository for other instances of the same flaw when a bug is identified.
+- **Don't:** settle for a one-off patch that leaves the defect class open to recur elsewhere.
+- **Don't:** rely on human memory, agent discipline, or review vigilance when a mechanical check can enforce the rule.
+
 ## Research existing solutions before implementing (DRW)
 
 Before writing custom code or hand-rolling functions and helpers,

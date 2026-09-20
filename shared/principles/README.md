@@ -322,6 +322,14 @@ mechanical), and
 [`skill-checklists`](../workflow/skill-checklists.md) (the pause-point
 instrument where no script can decide).
 
+## Prefer systemic solutions over one-off fixes
+
+When addressing a defect, failure, edge case, or recurring mistake, prefer systemic, structural solutions over one-off, ad-hoc patches.
+Fix the underlying mechanism that allowed the error to occur, and install an automated guard, type constraint, or architectural invariant that prevents the entire class of defects from recurring.
+
+Full statement: [`prefer-systemic-solutions-over-one-off-fixes`](prefer-systemic-solutions-over-one-off-fixes.md).
+Operationalized by: [`algorithmatize-checks`](../workflow/algorithmatize-checks.md), [`deterministic-tools`](deterministic-tools.md), and [`fail-fast`](fail-fast.md).
+
 ## Don't use LLMs for algorithmic thinking --- use validated algorithmic software
 
 Never use probabilistic language models for algorithmic operations:
@@ -522,6 +530,8 @@ The goal half fires only on the third occurrence, by which point
 recurrence is observed rather than predicted.
 Feeling both at once usually means the count is one or two, and the way
 out is to wait rather than to argue.
+
+Prefer-systemic-solutions-over-one-off-fixes completes that family on the remediation axis: where algorithmatize-checks and deterministic-tools build instruments and automation, prefer-systemic-solutions directs that engineering at the root defect class rather than papering over individual symptoms or recurring review findings with manual patches.
 
 Specific-beats-general governs precedence across the entire catalog:
 it resolves conflicts between layers by establishing that explicit user

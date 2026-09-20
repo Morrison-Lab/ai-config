@@ -392,6 +392,39 @@ def unmeasured_digest(body, transcript_path, assume_unmeasured=False):
     return None
 
 
+def _executable_text(command):
+    """`command` with heredoc payloads and shell comments removed.
+
+    The pin flags are matched as literal text, so any occurrence in a command
+    that merely WRITES documentation -- a heredoc authoring a skill file that
+    shows `gh pr merge --match-head-commit <sha>` as an example, or a
+    commented-out earlier attempt -- would otherwise warn about a command that
+    never runs. This corpus documents its own invocations constantly, so that
+    false positive is routine rather than contrived, and a guard that warns on
+    a legitimate case is one that gets switched off.
+
+    `strip_heredocs` is the sibling's, reused so this guard and the body
+    surface cannot disagree about where a heredoc ends.
+    """
+    if not isinstance(command, str):
+        return ""
+    strip = getattr(_stamp, "strip_heredocs", None) or getattr(
+        _rebuttal, "strip_heredocs", None)
+    if strip is not None:
+        try:
+            command = strip(command)
+        except Exception:
+            pass
+    out = []
+    for line in command.splitlines():
+        # A `#` that opens a comment is either at the start of the line or
+        # preceded by whitespace; `#` inside a word (a URL fragment, an
+        # issue reference like `-R o/r#1`) is not a comment introducer.
+        stripped = re.sub(r"(?:(?<=\s)|^)#.*$", "", line)
+        out.append(stripped)
+    return "\n".join(out)
+
+
 def _longest_observed_prefix(token, seen):
     """The longest observed hex run that is a strict prefix of `token`, else None.
 
@@ -422,10 +455,9 @@ def unmeasured_pin(command, transcript_path, assume_unmeasured=False):
     """
     if not isinstance(command, str) or not command.strip():
         return None
-    m = RX_PIN_ARG.search(command)
-    if not m:
+    scannable = _executable_text(command)
+    if not RX_PIN_ARG.search(scannable):
         return None
-    flag, token = m.group(1), m.group(2)
     seen = _transcript_hex(transcript_path)
     if seen is None:
         if not assume_unmeasured:
@@ -433,9 +465,14 @@ def unmeasured_pin(command, transcript_path, assume_unmeasured=False):
             # way, so fail open rather than warn on every pinned command.
             return None
         seen = set()
-    if _measured(token, seen):
-        return None
-    return flag, token, _longest_observed_prefix(token, seen)
+    # Every pin in the command, not just the first. A chained call can carry
+    # two, and a measured one first must not mask a fabricated one after it.
+    for m in RX_PIN_ARG.finditer(scannable):
+        flag, token = m.group(1), m.group(2)
+        if _measured(token, seen):
+            continue
+        return flag, token, _longest_observed_prefix(token, seen)
+    return None
 
 
 def _pin_command(tool_name, tool_input):
@@ -536,10 +573,43 @@ def _read_payload():
         return {}, is_dry_run
 
 
+def _pin_context(pin_hit):
+    """(context, one_line_summary) for a pin hit."""
+    flag, token, prefix = pin_hit
+    padded = PADDED_NOTE.format(prefix=prefix) if prefix else ""
+    context = PIN_NOTE.format(flag=flag, token=token, padded=padded)
+    summary = (
+        f"Unmeasured-pin reminder: `{flag}` is pinned to `{token}`, which "
+        f"never appeared in this session's transcript. Re-read it with "
+        f"`gh pr view <N> --json headRefOid --jq .headRefOid`.")
+    return context, summary
+
+
+def _emit_pin(pin_hit):
+    """Print the pin warning on its own.
+
+    Deliberately NO fire-once sentinel, unlike the body path below. A quoted
+    digest can legitimately come from outside the session, so re-warning about
+    the same body is noise; a pinning SHA cannot, so a value unmeasured on one
+    attempt is still unmeasured on a retry, and the retry is exactly when the
+    reminder is wanted.
+    """
+    context, summary = _pin_context(pin_hit)
+    out = {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "additionalContext": context,
+        },
+    }
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = summary
+    print(json.dumps(out))
+
+
 def main() -> int:
     try:
         payload, is_dry_run = _read_payload()
-        if not payload or _post_from_payload is None:
+        if not payload:
             return 0
 
         tool_name = payload.get("tool_name") or payload.get("toolName") or ""
@@ -550,39 +620,35 @@ def main() -> int:
         cwd = payload.get("cwd") or os.getcwd()
         tpath = payload.get("transcript_path") or payload.get("transcriptPath") or ""
 
-        # The pin surface runs first: a command can both pin a SHA and post a
-        # body, and the pin is the sharper signal of the two.
+        # The pin surface is evaluated BEFORE the `_post_from_payload is None`
+        # gate below, because it does not depend on the sibling's body
+        # extraction -- only on `BASH_TOOL_NAMES`, which has its own fallback.
+        # Ordering it after that gate would have made the fallback dead code
+        # and silently disabled this whole surface whenever the sibling import
+        # failed.
+        pin_hit = None
         pin_cmd = _pin_command(tool_name, tool_input)
         if pin_cmd:
-            hit = unmeasured_pin(pin_cmd, tpath, assume_unmeasured=is_dry_run)
-            if hit:
-                flag, token, prefix = hit
-                padded = PADDED_NOTE.format(prefix=prefix) if prefix else ""
-                context = PIN_NOTE.format(flag=flag, token=token, padded=padded)
-                out = {
-                    "hookSpecificOutput": {
-                        "hookEventName": "PreToolUse",
-                        "additionalContext": context,
-                    },
-                }
-                if not os.environ.get("ANTIGRAVITY_AGENT"):
-                    out["systemMessage"] = (
-                        f"Unmeasured-pin reminder: `{flag}` is pinned to "
-                        f"`{token}`, which never appeared in this session's "
-                        f"transcript. Re-read it with "
-                        f"`gh pr view <N> --json headRefOid --jq .headRefOid`.")
-                print(json.dumps(out))
-                return 0
+            pin_hit = unmeasured_pin(pin_cmd, tpath, assume_unmeasured=is_dry_run)
+
+        if _post_from_payload is None:
+            if pin_hit:
+                _emit_pin(pin_hit)
+            return 0
 
         kind, body, surface, _is_notebook = _post_from_payload(tool_name, tool_input, cwd)
         if kind != "body" or not body:
             kind, body, surface = _create_post(tool_name, tool_input, cwd)
         if kind != "body" or not body:
+            if pin_hit:
+                _emit_pin(pin_hit)
             return 0
 
         found = unmeasured_digest(body, tpath, assume_unmeasured=is_dry_run)
         if not found:
-            if is_dry_run:
+            if pin_hit:
+                _emit_pin(pin_hit)
+            elif is_dry_run:
                 print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
             return 0
         token, kind_desc = found
@@ -595,6 +661,10 @@ def main() -> int:
             sentinel = os.path.join(
                 tempfile.gettempdir(), f".claude-unmeasured-digest-{key}")
             if os.path.exists(sentinel):
+                # The body warning is spent for this value, but the pin
+                # warning has no sentinel and is still owed.
+                if pin_hit:
+                    _emit_pin(pin_hit)
                 return 0
             try:
                 open(sentinel, "w").close()
@@ -603,6 +673,19 @@ def main() -> int:
 
         surface_desc = surface or "comment body"
         context = NOTE.format(surface=surface_desc, token=token, kind=kind_desc)
+        summary = (
+            f"Unmeasured-digest reminder: this {surface_desc} states "
+            f"`{token}`, which never appeared in this session's transcript. "
+            f"Run the command that produces it and paste what it returned.")
+        # A command can both pin a SHA and post a body -- `gh pr merge` takes
+        # `--match-head-commit` and `--body` together, and a chained call can
+        # do both. They are independent findings with different remedies, so
+        # neither is allowed to suppress the other.
+        if pin_hit:
+            pin_ctx, pin_summary = _pin_context(pin_hit)
+            context = pin_ctx + "\n\n----\n\n" + context
+            summary = pin_summary + " (A separate unmeasured digest is also "
+            summary += "flagged in this command's body.)"
         out = {
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
@@ -610,10 +693,7 @@ def main() -> int:
             },
         }
         if not os.environ.get("ANTIGRAVITY_AGENT"):
-            out["systemMessage"] = (
-                f"Unmeasured-digest reminder: this {surface_desc} states "
-                f"`{token}`, which never appeared in this session's transcript. "
-                f"Run the command that produces it and paste what it returned.")
+            out["systemMessage"] = summary
         print(json.dumps(out))
     except Exception:
         return 0

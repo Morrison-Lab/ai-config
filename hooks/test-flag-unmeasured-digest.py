@@ -347,6 +347,26 @@ CASES = [
     ([PROMPT, HEAD_RUN],
      bash(f"gh pr view 1615 -R L/s --json headRefOid"), False,
      "a command that merely READS the head is not a pin"),
+
+    # --- pin regressions found by adversarial review -------------------------
+    ([PROMPT, HEAD_FULL_RUN],
+     bash(f"gh pr merge 100 -R o/r --match-head-commit {REAL_HEAD} && "
+          f"gh pr merge 200 -R o/r --match-head-commit {'b' * 40}"), True,
+     "a MEASURED pin first must not mask a fabricated one after it -- "
+     "`search` stops at the first match where `finditer` does not"),
+    ([PROMPT, HEAD_RUN],
+     bash(f"# old attempt: gh pr merge 5 -R o/r --match-head-commit {'b' * 40}\n"
+          f"echo done"), False,
+     "a commented-out command never runs and must not warn"),
+    ([PROMPT, HEAD_RUN],
+     bash("cat > skills/example/SKILL.md <<'EOF'\n"
+          f"Example: `gh pr merge N --match-head-commit {'b' * 40}`\n"
+          "EOF"), False,
+     "a heredoc DOCUMENTING the command is prose, not an invocation -- this "
+     "corpus writes such examples constantly"),
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr merge 1 -R o/r#1 --match-head-commit {'b' * 40}"), True,
+     "a `#` inside a word is not a comment introducer and must not blind the scan"),
 ]
 
 
@@ -436,6 +456,35 @@ def check_pin_warning_distinguishes_padding():
     return 0 if ok else 1
 
 
+def check_pin_does_not_suppress_body_finding():
+    """A pin and a body digest in one command are independent findings.
+
+    The first implementation returned as soon as the pin fired, so a chained
+    call carrying both reported only the pin -- and the body finding, which
+    has a different remedy, was silently dropped. Fire-or-quiet cannot reach
+    this either: the call fires either way.
+    """
+    out = run([PROMPT, HEAD_RUN],
+              bash(f"gh api -X PUT repos/o/r/pulls/1/update-branch "
+                   f"-f expected_head_sha={PADDED_HEAD} && "
+                   f'gh issue create -R o/r --body "commit {INVENTED}... fixed it"'))
+    ctx = (out.get("hookSpecificOutput") or {}).get("additionalContext") or ""
+    ok = PADDED_HEAD in ctx and INVENTED in ctx
+    print(f"{'ok  ' if ok else 'FAIL'}  a pin finding does not suppress an "
+          f"unmeasured digest in the same command's body")
+    return 0 if ok else 1
+
+
+def check_dry_run_warns_on_pin():
+    """`--dry-run` must reach the pin surface, or the affordance is inert there."""
+    out = run([], bash(f"gh pr merge 1 -R o/r --match-head-commit {'b' * 40}"),
+              extra_args=("--dry-run",))
+    ctx = (out.get("hookSpecificOutput") or {}).get("additionalContext") or ""
+    ok = "b" * 40 in ctx and "pin" in ctx.lower()
+    print(f"{'ok  ' if ok else 'FAIL'}  --dry-run warns on an unmeasured pin")
+    return 0 if ok else 1
+
+
 def check_unreadable_transcript_is_silent():
     """No readable transcript means no evidence either way: fail open.
 
@@ -479,15 +528,24 @@ def main():
         failures += 0 if ok else 1
         print(f"{'ok  ' if ok else 'FAIL'}  "
               f"[{'fire ' if should_fire else 'quiet'}] {label}")
-    failures += check_output_shape()
-    failures += check_pin_warning_distinguishes_padding()
-    failures += check_unreadable_transcript_is_silent()
-    failures += check_dry_run_warns()
+    # Derived, not hand-maintained: the previous `len(CASES) + 3` constant went
+    # stale the moment a fourth check was added, and the suite then under-
+    # reported its own size. A list cannot drift from the calls it holds.
+    ADHOC = [
+        check_output_shape,
+        check_pin_warning_distinguishes_padding,
+        check_pin_does_not_suppress_body_finding,
+        check_dry_run_warns_on_pin,
+        check_unreadable_transcript_is_silent,
+        check_dry_run_warns,
+    ]
+    for check in ADHOC:
+        failures += check()
     if SHAPE_ERRORS:
         failures += 1
         print(f"FAIL  {len(SHAPE_ERRORS)} payload(s) had no surfacing field: "
               f"{SHAPE_ERRORS}")
-    print(f"\n{len(CASES) + 3} checks, {failures} failure(s)")
+    print(f"\n{len(CASES) + len(ADHOC)} checks, {failures} failure(s)")
     return 1 if failures else 0
 
 

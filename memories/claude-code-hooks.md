@@ -1084,7 +1084,7 @@ A new symptom is a comment on ai-config#3287, not a new issue.)
 In a Claude-in-Projects thread session, every sentence the user reads is the `text` input of an `mcp__hearthbot__reply` `tool_use` block, never a direct assistant `text` block.
 The harness states: "Text you emit directly is not delivered --- only `mcp__hearthbot__*` tool calls reach the user."
 
-A `Stop` hook that only inspects `block.get("type") == "text"` returns an empty string for every turn the user actually read, making the hook completely blind to the reply in project-thread sessions (ai-config#3798).
+A `Stop` hook that only inspects `block.get("type") == "text"` returns an empty string for every turn the user actually read, making the hook completely blind to the reply in project-thread sessions (ai-config#3798, #3804).
 
 Extract reply payloads via `REPLY_TOOL_RX = re.compile(r"(^|__)(reply|post_message|update_message)$", re.I)`.
 When any record in the transcript invokes a reply tool (`saw_reply_tool = True`), the delivered reply channel takes strict precedence over assistant text blocks (`last_reply if saw_reply_tool else last_text`).
@@ -1093,8 +1093,19 @@ Do not fall back to assistant text narration if `saw_reply_tool` is True, becaus
 - **Do:** extract user-visible text from reply tools matching `REPLY_TOOL_RX` when inspecting transcript prose.
 - **Do:** give delivered reply payloads strict preference over undelivered assistant text blocks when a reply tool was invoked.
 - **Do:** enforce `saw_reply_tool` precedence over narration text in direct-payload fallback readers.
-- **Do:** reset `saw_reply_tool` alongside turn accumulation buffers on each user record when tracking turn-scoped assistant text.
+- **Do:** reset `saw_reply_tool` alongside turn accumulation buffers on each human user prompt record (exempting `tool_result` events, which also arrive under `type: "user"` in Claude Code transcripts).
 - **Don't:** walk only `type == "text"` blocks when inspecting the last assistant message.
 - **Don't:** fall back to assistant text blocks if a reply tool was used with empty text --- internal narration was never delivered to the user.
 - **Don't:** return concatenated text blocks in direct payload fallbacks before checking for reply-tool calls in the same content list.
 - **Don't:** leak session-wide `saw_reply_tool` state into turn-scoped readers, which silences later plain-text turns.
+- **Don't:** treat `tool_result` events as user turn boundaries, which clears reply-tool state and produces false passes or false blocks.
+
+## Strip code fences and spans using shared `scripts/lib/fences.py` with `swallow_unclosed=False`
+
+Hand-rolled fence matchers (`FENCE_OPEN_RX` / `FENCE_CLOSE_RX`) miss multi-backtick spans and can get permanently stuck in fence mode if an unclosed code block occurs, causing subsequent prose or declarations to be swallowed and falsely flagged (ai-config#3748).
+Always import `strip_code` or `strip_fences` from `scripts/lib/fences.py` and pass `swallow_unclosed=False` explicitly.
+
+- **Do:** reuse `scripts/lib/fences.py` (`strip_code` / `strip_fences`) instead of hand-rolling regex fence trackers.
+- **Do:** specify `swallow_unclosed=False` when stripping fences to preserve declarations written below unterminated code blocks.
+- **Don't:** hand-roll fence opening and closing regexes that let an unclosed fence swallow the rest of the message.
+

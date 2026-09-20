@@ -1663,8 +1663,9 @@ Merge synchronously, right after the check, with the merge command pinned.
   Measured 2026-09-02 (Pacific) on [#2989](https://github.com/Morrison-Lab/ai-config/pull/2989): a deliberately wrong `expected_head_sha` returned `422` with a message reading "expected head sha didn't match current head ref." (curly apostrophe in the live text) and changed nothing.
   Measured 2026-09-20 on [Lacaedemon/sparta#1615](https://github.com/Lacaedemon/sparta/pull/1615): a 40-character SHA constructed by padding the 8-character abbreviation `check-pr-fully-clean.py` had printed (`d4691095`) returned the identical `422`, with no other writer involved --- the padded string was never a real commit on the PR.
   - **Do:** re-read the live `headRefOid` and compare it to the SHA you pinned before concluding a writer moved the head.
-  - **Do:** read the full SHA from the API or `git rev-parse` at the point of use; never construct or pad a full SHA from an abbreviation printed by a script or a checker.
+  - **Do:** read the full SHA from the API or `git rev-parse` at the point of use.
   - **Don't:** read the `422` message alone as proof of a concurrent writer.
+  - **Don't:** construct or pad a full SHA from an abbreviation printed by a script or a checker.
   Then poll `headRefOid` until it changes, with a deadline (five minutes is generous for a merge commit GitHub has accepted), and treat expiry as a failed update to stop on and report, since a `202` can be returned without a new head ever appearing.
   Once it changes, record that SHA, rerun the base-currency check on it, and only then rerun the gate, pinned to that SHA.
   The gate itself takes minutes, so the base can advance again while it runs, and so can the head: a concurrent push that already contains the current base passes a currency-only recheck while the gate's verdict belongs to the earlier SHA ([`github`](../../memories/github.md) records that unpinned-head race).

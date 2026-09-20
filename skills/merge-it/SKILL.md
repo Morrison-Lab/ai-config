@@ -77,7 +77,7 @@ standing yes (see `preferences.md`).
   When it fails on a direct merge, update the branch pinned to the recorded head.
   Locally: `gh api -X PUT "repos/<owner>/<repo>/pulls/<N>/update-branch" -f expected_head_sha="<pinned-sha>"`.
   Remotely: `update_pull_request_branch` with `expectedHeadSha`.
-  A `422` whose message names an expected-head mismatch is the another-writer signal, so settle ownership rather than retrying unpinned.
+  A `422` whose message names an expected-head mismatch is the another-writer signal only when the live `headRefOid` has actually changed from `<pinned-sha>` --- re-read it and compare before settling ownership, since a correctly-lengthed but wrong-content SHA (guessed or padded from an abbreviation instead of read in full) produces the byte-identical message with no other writer involved.
   Match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show.
   Any other `422` is a failed update to stop on.
   Then wait until `headRefOid` changes (the update answers `202 Accepted` before the merge lands), with a deadline of a few minutes, treating expiry as a failed update to stop on and report,

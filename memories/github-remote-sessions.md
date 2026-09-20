@@ -203,6 +203,35 @@ PRs the scorer had just passed:
   abbreviated one is refused with "The sha parameter must be exactly 40
   characters".
 
+**A correctly-lengthed but wrong-content `expected_head_sha` is a different
+failure from the one above, and it is NOT self-diagnosing.**
+The abbreviated-SHA refusal just above names its own cause in plain English.
+A 40-character SHA that is merely *wrong* --- built by padding or guessing
+from an abbreviation instead of read in full --- returns the REST
+`update-branch` endpoint's ordinary `422`
+("expected head sha didn't match current head ref.", curly apostrophe in the
+live text), the byte-identical message a genuine concurrent-writer collision
+returns.
+[`fully-clean`](../shared/workflow/fully-clean.md), [`mwc`](../skills/mwc/SKILL.md),
+[`chores`](../skills/chores/SKILL.md), and [`merge-it`](../skills/merge-it/SKILL.md)
+each route that message to "settle ownership" --- do that only after
+re-reading the live `headRefOid` and confirming it actually differs from the
+SHA you pinned.
+Measured 2026-09-20 on
+[Lacaedemon/sparta#1615](https://github.com/Lacaedemon/sparta/pull/1615): an
+8-character abbreviation printed by `check-pr-fully-clean.py` (`d4691095`)
+was padded into a 40-character guess and returned the identical `422`, with
+no other writer involved --- the padded string was never a real commit on
+the PR.
+
+- **Do:** re-read the full SHA from the API (`headRefOid`) or `git
+  rev-parse` at the point of use; never construct a full SHA from an
+  abbreviation.
+- **Do:** compare the live head to your pin before concluding a writer
+  moved it.
+- **Don't:** treat an `expected_head_sha`/`expectedHeadSha` `422` as proof
+  of a concurrent writer on the message text alone.
+
 **`mergeable` and `mergeable_state` are cached, and a merge to the base
 invalidates them.**
 Immediately after three merges landed, an open PR read

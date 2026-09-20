@@ -30,6 +30,37 @@ def say(text):
     }
 
 
+def reply(text):
+    return {
+        "type": "assistant",
+        "message": {
+            "content": [
+                {
+                    "type": "tool_use",
+                    "name": "mcp__hearthbot__reply",
+                    "input": {"text": text},
+                }
+            ]
+        },
+    }
+
+
+def narrate_and_reply(narration, text):
+    return {
+        "type": "assistant",
+        "message": {
+            "content": [
+                {"type": "text", "text": narration},
+                {
+                    "type": "tool_use",
+                    "name": "mcp__hearthbot__reply",
+                    "input": {"text": text},
+                },
+            ]
+        },
+    }
+
+
 CASES = [
     # True positives: direct offers in prose
     ([TOOL, say("Want me to file an issue for this?")], True, "want me to file blocks"),
@@ -94,6 +125,40 @@ CASES = [
         ],
         False,
         "antigravity format non-offer does not block",
+    ),
+
+    # Reply-tool visibility cases (project threads)
+    (
+        [TOOL, reply("Want me to file an issue for this?")],
+        True,
+        "reply-tool payload offer blocks",
+    ),
+    (
+        [TOOL, reply("Filed as [#1948](https://github.com/Morrison-Lab/ai-config/issues/1948).")],
+        False,
+        "reply-tool payload non-offer does not block",
+    ),
+    (
+        [
+            TOOL,
+            narrate_and_reply(
+                "Want me to file an issue for this?",
+                "Filed as [#1948](https://github.com/Morrison-Lab/ai-config/issues/1948).",
+            ),
+        ],
+        False,
+        "undelivered narration offer does not block when reply spoke",
+    ),
+    (
+        [
+            TOOL,
+            narrate_and_reply(
+                "Filed as [#1948](https://github.com/Morrison-Lab/ai-config/issues/1948).",
+                "Want me to file an issue for this?",
+            ),
+        ],
+        True,
+        "reply-tool offer wins over clean narration",
     ),
 ]
 

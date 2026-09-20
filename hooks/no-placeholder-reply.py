@@ -56,10 +56,32 @@ RX = re.compile(r"(?:%s)[.!]*" % "|".join(PLACEHOLDERS), re.I)
 DRESSING = " \t\r\n*_`()[]\"'"
 
 
+# In a project-thread session every user-visible sentence is the `text` input
+# of an `mcp__hearthbot__reply` tool call, never an assistant text block.
+# Measured on ai-config#3798: a reader that only walks `type == "text"` blocks
+# is blind to the whole reply.
+REPLY_TOOL_RX = re.compile(r"(^|__)(reply|post_message|update_message)$", re.I)
+
+
+def _reply_payload(block):
+    """The user-visible text of a reply-tool call, or '' for any other block."""
+    if not isinstance(block, dict) or block.get("type") != "tool_use":
+        return ""
+    if not REPLY_TOOL_RX.search(block.get("name") or ""):
+        return ""
+    inp = block.get("input")
+    if not isinstance(inp, dict):
+        return ""
+    txt = inp.get("text")
+    return txt if isinstance(txt, str) else ""
+
+
 def last_assistant_text(path):
     if not path or not os.path.exists(path):
         return ""
-    last = ""
+    last_text = ""
+    last_reply = ""
+    saw_reply_tool = False
     try:
         with open(path, encoding="utf-8", errors="ignore") as fh:
             for line in fh:
@@ -78,23 +100,34 @@ def last_assistant_text(path):
                             if isinstance(b, dict) and b.get("type") == "text"
                         )
                         if txt.strip():
-                            last = txt
+                            last_text = txt
+                        for b in blocks:
+                            if isinstance(b, dict) and b.get(
+                                "type"
+                            ) == "tool_use" and REPLY_TOOL_RX.search(
+                                b.get("name") or ""
+                            ):
+                                saw_reply_tool = True
+                            payload = _reply_payload(b)
+                            if payload.strip():
+                                last_reply = payload
                     elif isinstance(blocks, str) and blocks.strip():
-                        last = blocks
+                        last_text = blocks
                 elif m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
                     content = m.get("content")
                     if isinstance(content, str) and content.strip():
-                        last = content
+                        last_text = content
                     elif isinstance(content, list):
                         txt = "".join(
                             (b.get("text", "") if isinstance(b, dict) else str(b))
                             for b in content
                         )
                         if txt.strip():
-                            last = txt
+                            last_text = txt
     except Exception:
         return ""
-    return last
+    chosen = last_reply if saw_reply_tool else last_text
+    return chosen if chosen.strip() else ""
 
 
 def is_placeholder(text):
@@ -135,6 +168,10 @@ def extract_text_from_payload(payload):
                 )
                 if txt.strip():
                     return txt
+                for b in content:
+                    payload_txt = _reply_payload(b)
+                    if payload_txt.strip():
+                        return payload_txt
         if isinstance(val, list):
             txt = "".join(
                 b.get("text", "") for b in val
@@ -142,6 +179,10 @@ def extract_text_from_payload(payload):
             )
             if txt.strip():
                 return txt
+            for b in val:
+                payload_txt = _reply_payload(b)
+                if payload_txt.strip():
+                    return payload_txt
     return ""
 
 

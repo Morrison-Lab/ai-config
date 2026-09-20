@@ -117,12 +117,38 @@ class TestEvaluate(unittest.TestCase):
         state = pr(
             comments=[CLEAN_VERDICT],
             checks=[
-                {"name": "validate", "conclusion": "CANCELLED", "status": "COMPLETED"},
-                {"name": "validate", "conclusion": "SUCCESS", "status": "COMPLETED"},
+                {"name": "validate", "workflowName": "CI", "conclusion": "CANCELLED", "status": "COMPLETED", "completedAt": "2026-09-19T10:00:00Z"},
+                {"name": "validate", "workflowName": "CI", "conclusion": "SUCCESS", "status": "COMPLETED", "completedAt": "2026-09-19T10:05:00Z"},
             ],
         )
         decision = gate.evaluate(MERGE_CMD, state)
         self.assertEqual(decision["decision"], "allow")
+
+    def test_ci_cancelled_after_earlier_success_denies(self):
+        """A cancelled CI check that ran after an earlier success denies merge."""
+        state = pr(
+            comments=[CLEAN_VERDICT],
+            checks=[
+                {"name": "validate", "workflowName": "CI", "conclusion": "SUCCESS", "status": "COMPLETED", "completedAt": "2026-09-19T10:00:00Z"},
+                {"name": "validate", "workflowName": "CI", "conclusion": "CANCELLED", "status": "COMPLETED", "completedAt": "2026-09-19T10:05:00Z"},
+            ],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("Cannot merge with failing or incomplete CI checks: validate", decision["reason"])
+
+    def test_ci_cancelled_in_different_workflow_denies(self):
+        """A cancelled CI check is not superseded by a success in a different workflow."""
+        state = pr(
+            comments=[CLEAN_VERDICT],
+            checks=[
+                {"name": "test", "workflowName": "Lint", "conclusion": "SUCCESS", "status": "COMPLETED", "completedAt": "2026-09-19T10:05:00Z"},
+                {"name": "test", "workflowName": "Unit Tests", "conclusion": "CANCELLED", "status": "COMPLETED", "completedAt": "2026-09-19T10:00:00Z"},
+            ],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("Cannot merge with failing or incomplete CI checks: test", decision["reason"])
 
     def test_ci_failure_beside_success_still_denies(self):
         """A genuine failure beside a success still denies."""

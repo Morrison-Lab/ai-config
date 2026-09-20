@@ -910,26 +910,38 @@ def evaluate(cmd, pr_data):
     # CheckRun entries carry conclusion/status; classic StatusContext
     # entries carry only state (FAILURE/ERROR/PENDING/EXPECTED/SUCCESS).
     # Concurrency `cancel-in-progress` leaves a superseded run `cancelled` beside
-    # a later success with the same job name on the same SHA (ai-config#2277, #3800).
-    successful = {
-        check.get("name") or check.get("context") for check in status_rollup
-        if (check.get("conclusion") or "").upper() == "SUCCESS"
-        or (check.get("state") or "").upper() == "SUCCESS"
-    }
-    failures = [
-        check.get("name") or check.get("context") for check in status_rollup
-        if (
-            (
-                (check.get("conclusion") or "").upper() in BLOCKED_CI_CONCLUSIONS
-                and not (
-                    (check.get("conclusion") or "").upper() == "CANCELLED"
-                    and (check.get("name") or check.get("context")) in successful
-                )
-            )
-            or (check.get("status") or "").upper() in PENDING_CI_STATUSES
-            or (check.get("state") or "").upper() in BLOCKED_STATUS_STATES
-        )
-    ]
+    # a later success with the same job name and workflow on the same SHA (ai-config#1697, #3343, #3800).
+    latest_success = {}
+    for idx, check in enumerate(status_rollup):
+        conc = (check.get("conclusion") or "").upper()
+        st = (check.get("state") or "").upper()
+        if conc == "SUCCESS" or st == "SUCCESS":
+            name = check.get("name") or check.get("context") or ""
+            workflow = check.get("workflowName") or ""
+            key = (name, workflow)
+            ts = check.get("completedAt") or check.get("startedAt") or check.get("createdAt") or ""
+            cand = (ts, idx)
+            if cand > latest_success.get(key, ("", -1)):
+                latest_success[key] = cand
+
+    failures = []
+    for idx, check in enumerate(status_rollup):
+        conc = (check.get("conclusion") or "").upper()
+        status = (check.get("status") or "").upper()
+        st = (check.get("state") or "").upper()
+        name = check.get("name") or check.get("context") or ""
+        workflow = check.get("workflowName") or ""
+        key = (name, workflow)
+        ts = check.get("completedAt") or check.get("startedAt") or check.get("createdAt") or ""
+        cand = (ts, idx)
+
+        if conc in BLOCKED_CI_CONCLUSIONS:
+            if conc == "CANCELLED" and latest_success.get(key, ("", -1)) > cand:
+                continue
+            failures.append(name)
+        elif status in PENDING_CI_STATUSES or st in BLOCKED_STATUS_STATES:
+            failures.append(name)
+
     failures = list(dict.fromkeys(failures))
     if failures:
         return deny(

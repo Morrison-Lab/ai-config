@@ -138,6 +138,27 @@ def is_placeholder(text):
     return RX.fullmatch(stripped) is not None
 
 
+def _extract_from_blocks(blocks):
+    """Extract assistant text from a list of blocks respecting reply-tool precedence."""
+    last_text = ""
+    last_reply = ""
+    saw_reply_tool = False
+    for b in blocks:
+        if not isinstance(b, dict):
+            continue
+        if b.get("type") == "text":
+            txt = b.get("text") or ""
+            if txt.strip():
+                last_text = txt
+        if b.get("type") == "tool_use" and REPLY_TOOL_RX.search(b.get("name") or ""):
+            saw_reply_tool = True
+        payload = _reply_payload(b)
+        if payload.strip():
+            last_reply = payload
+    chosen = last_reply if saw_reply_tool else last_text
+    return chosen if chosen.strip() else ""
+
+
 def extract_text_from_payload(payload):
     """Extract last assistant text from payload transcript path or direct payload fields."""
     tpath = (
@@ -162,27 +183,13 @@ def extract_text_from_payload(payload):
             if isinstance(content, str) and content.strip():
                 return content
             if isinstance(content, list):
-                txt = "".join(
-                    b.get("text", "") for b in content
-                    if isinstance(b, dict) and b.get("type") == "text"
-                )
-                if txt.strip():
-                    return txt
-                for b in content:
-                    payload_txt = _reply_payload(b)
-                    if payload_txt.strip():
-                        return payload_txt
+                res = _extract_from_blocks(content)
+                if res:
+                    return res
         if isinstance(val, list):
-            txt = "".join(
-                b.get("text", "") for b in val
-                if isinstance(b, dict) and b.get("type") == "text"
-            )
-            if txt.strip():
-                return txt
-            for b in val:
-                payload_txt = _reply_payload(b)
-                if payload_txt.strip():
-                    return payload_txt
+            res = _extract_from_blocks(val)
+            if res:
+                return res
     return ""
 
 

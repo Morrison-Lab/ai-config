@@ -628,6 +628,37 @@ if verdict(HOOK, reply_transcript(safe_cmd, narration_text=bash_cmd)):
 if not verdict(HOOK, reply_transcript(bash_cmd, narration_text=safe_cmd)):
     failures.append("reply-tool payload with bash command did not warn over safe narration")
 
+# Multi-turn test: saw_reply_tool must be reset per user turn
+def multi_turn_transcript(turn1_reply, turn2_text, brief=BRIEF_PS):
+    _n[0] += 1
+    path = os.path.join(TMP, f"t_multiturn_{_n[0]}.jsonl")
+    with open(path, "w", encoding="utf-8") as fh:
+        if brief is not None:
+            fh.write(json.dumps({
+                "type": "attachment",
+                "rendered": [{"content": brief}],
+            }) + "\n")
+        fh.write(json.dumps({"type": "user", "message": {"content": "do turn 1"}}) + "\n")
+        fh.write(json.dumps({
+            "type": "assistant",
+            "message": {"content": [{
+                "type": "tool_use",
+                "name": "mcp__hearthbot__reply",
+                "input": {"text": turn1_reply},
+            }]},
+        }) + "\n")
+        fh.write(json.dumps({"type": "user", "message": {"content": "do turn 2"}}) + "\n")
+        fh.write(json.dumps({
+            "type": "assistant",
+            "message": {"content": [{"type": "text", "text": turn2_text}]},
+        }) + "\n")
+    return {"transcript_path": path}
+
+if not verdict(HOOK, multi_turn_transcript("Turn 1 safe reply.", bash_cmd)):
+    failures.append("turn 2 plain text bash command did not warn after turn 1 used reply tool")
+if verdict(HOOK, multi_turn_transcript(bash_cmd, safe_cmd)):
+    failures.append("turn 2 safe plain text warned because turn 1 had bash command in reply tool")
+
 if failures or mutation_wrong:
     print("FAILED:")
     for line in failures:

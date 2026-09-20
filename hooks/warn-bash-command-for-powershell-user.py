@@ -410,6 +410,7 @@ def last_assistant_text(transcript_path):
         if etype == "user" and not entry.get("isSidechain"):
             turn = []
             turn_replies = []
+            saw_reply_tool = False
             continue
         if entry.get("isSidechain"):
             continue

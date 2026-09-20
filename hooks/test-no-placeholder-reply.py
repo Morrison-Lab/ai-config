@@ -192,7 +192,18 @@ def main():
         ({"reply": "No response requested."}, True, "direct reply field blocks"),
         ({"last_assistant_message": "No response requested."}, True, "direct last_assistant_message field blocks"),
         ({"message": {"content": [{"type": "text", "text": "No response requested."}]}}, True, "direct message object blocks"),
-        ({"content": "No response requested."}, True, "direct content string blocks"),
+        ({"message": {"content": [
+            {"type": "text", "text": "Completed task successfully."},
+            {"type": "tool_use", "name": "mcp__hearthbot__reply", "input": {"text": "No response requested."}},
+        ]}}, True, "direct message with narration + reply-tool placeholder blocks"),
+        ({"message": {"content": [
+            {"type": "text", "text": "No response requested."},
+            {"type": "tool_use", "name": "mcp__hearthbot__reply", "input": {"text": "Completed task successfully."}},
+        ]}}, False, "direct message with placeholder narration + substantive reply does not block"),
+        ({"content": [
+            {"type": "text", "text": "Task finished."},
+            {"type": "tool_use", "name": "mcp__hearthbot__reply", "input": {"text": "No response requested."}},
+        ]}, True, "direct content list with narration + reply-tool placeholder blocks"),
         ({"reply": "Completed wave-1 review and tests passed."}, False, "direct reply substantive does not block"),
     ]
     for payload, expected, label in direct_cases:

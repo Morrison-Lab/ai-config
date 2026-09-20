@@ -1092,5 +1092,9 @@ Do not fall back to assistant text narration if `saw_reply_tool` is True, becaus
 
 - **Do:** extract user-visible text from reply tools matching `REPLY_TOOL_RX` when inspecting transcript prose.
 - **Do:** give delivered reply payloads strict preference over undelivered assistant text blocks when a reply tool was invoked.
+- **Do:** enforce `saw_reply_tool` precedence over narration text in direct-payload fallback readers.
+- **Do:** reset `saw_reply_tool` alongside turn accumulation buffers on each user record when tracking turn-scoped assistant text.
 - **Don't:** walk only `type == "text"` blocks when inspecting the last assistant message.
 - **Don't:** fall back to assistant text blocks if a reply tool was used with empty text --- internal narration was never delivered to the user.
+- **Don't:** return concatenated text blocks in direct payload fallbacks before checking for reply-tool calls in the same content list.
+- **Don't:** leak session-wide `saw_reply_tool` state into turn-scoped readers, which silences later plain-text turns.

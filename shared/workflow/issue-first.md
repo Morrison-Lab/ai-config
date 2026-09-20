@@ -53,7 +53,7 @@ gh issue list --repo Lacaedemon/sparta --state open --search "fix" --limit 300 -
 # -> 12
 ```
 
-Two open issues matching "fix" never made it into the 30-row window.
+The 30-row window therefore hid two of the twelve open matches for "fix".
 
 **`--state all` is still correct, and this is not an argument against it.**
 A closed duplicate is exactly the case `--state all` exists to catch, per the

@@ -1078,3 +1078,19 @@ An argument that the condition *is* decidable but is already mechanized elsewher
 
 (Known and tracked: ai-config#3287 --- it re-fires on the reply reporting the mechanism --- plus ai-config#3411, where explaining it re-arms it, and ai-config#3632, where a non-hook instrument cannot clear it.
 A new symptom is a comment on ai-config#3287, not a new issue.)
+
+## Stop hooks reading transcript text must inspect reply tools in project threads
+
+In a Claude-in-Projects thread session, every sentence the user reads is the `text` input of an `mcp__hearthbot__reply` `tool_use` block, never a direct assistant `text` block.
+The harness states: "Text you emit directly is not delivered --- only `mcp__hearthbot__*` tool calls reach the user."
+
+A `Stop` hook that only inspects `block.get("type") == "text"` returns an empty string for every turn the user actually read, making the hook completely blind to the reply in project-thread sessions (ai-config#3798).
+
+Extract reply payloads via `REPLY_TOOL_RX = re.compile(r"(^|__)(reply|post_message|update_message)$", re.I)`.
+When any record in the transcript invokes a reply tool (`saw_reply_tool = True`), the delivered reply channel takes strict precedence over assistant text blocks (`last_reply if saw_reply_tool else last_text`).
+Do not fall back to assistant text narration if `saw_reply_tool` is True, because assistant narration was never delivered to the user in that harness.
+
+- **Do:** extract user-visible text from reply tools matching `REPLY_TOOL_RX` when inspecting transcript prose.
+- **Do:** give delivered reply payloads strict preference over undelivered assistant text blocks when a reply tool was invoked.
+- **Don't:** walk only `type == "text"` blocks when inspecting the last assistant message.
+- **Don't:** fall back to assistant text blocks if a reply tool was used with empty text --- internal narration was never delivered to the user.

@@ -118,7 +118,8 @@ def is_fable(model):
 def decide(payload):
     """(decision, text): decision in {"deny", "warn", None}."""
     tool = payload.get("tool_name") or ""
-    inp = payload.get("tool_input") or {}
+    inp = payload.get("tool_input")
+    inp = inp if isinstance(inp, dict) else {}
     if tool in AGENT_TOOLS:
         model = inp.get("model")
         if isinstance(model, str) and model.strip():

@@ -413,8 +413,10 @@ def main() -> int:
 
     try:
         tool_name = payload.get("tool_name") or ""
-        body, surface = _extract_body(tool_name, payload.get("tool_input") or {},
-                                     payload.get("cwd") or "")
+        ti = payload.get("tool_input")
+        ti = ti if isinstance(ti, dict) else {}
+        body, surface = _extract_body(tool_name, ti,
+                                      payload.get("cwd") or "")
         if not body:
             return 0
 

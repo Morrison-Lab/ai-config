@@ -512,7 +512,8 @@ def main() -> int:
     try:
         if (payload.get("tool_name") or "") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
             return 0
-        inp = payload.get("tool_input") or {}
+        inp = payload.get("tool_input")
+        inp = inp if isinstance(inp, dict) else {}
         cmd = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or ""
         if not cmd:
             if is_dry_run:
@@ -525,7 +526,7 @@ def main() -> int:
                 print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
             return 0
         # 1 + 2: a verdict phrase in a matching position.
-        cwd = payload.get("cwd") or (payload.get("tool_input") or {}).get("cwd") or os.getcwd()
+        cwd = payload.get("cwd") or inp.get("cwd") or os.getcwd()
         phrase = phrase_in_matcher_position(cmd, cwd=cwd)
         if not phrase:
             if is_dry_run:

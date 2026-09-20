@@ -192,7 +192,9 @@ def main() -> int:
     except (json.JSONDecodeError, ValueError):
         return 0
 
-    command = (payload.get("tool_input") or {}).get("command", "")
+    inp = payload.get("tool_input")
+    inp = inp if isinstance(inp, dict) else {}
+    command = inp.get("command", "")
     if not isinstance(command, str) or not is_git_commit(command):
         if is_dry_run:
             print(json.dumps(

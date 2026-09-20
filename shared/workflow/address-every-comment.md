@@ -251,10 +251,23 @@ already in front of you.**
 **A fix's own placement can be scoped narrower than the claim it corrects,
 independently of how wide the search was --- and each way this goes wrong
 looks like a fresh oversight rather than the same recurring one.**
-This extends the section above on deriving the class, which covers the
-*search* being too narrow;
-what follows is about the *correction* being too narrow, which survives a
-perfectly wide search.
+This is the correction-side member of a family the corpus states elsewhere
+about evidence.
+[`verify-the-right-artifact`](verify-the-right-artifact.md)'s "A measurement
+of the right artifact can still be scoped narrower than the claim made from
+it" is the same shape with a measurement in place of a fix, and
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "A sound
+measurement does not license the claim standing next to it" is its general
+form.
+Read those for the evidence case and this for the repair case;
+the axis-naming remedy is common to all three.
+
+Within this file it extends the section above on deriving the class, which
+covers the *search* being too narrow, and sits alongside the enumerated-in-
+more-than-one-place section, whose remedy of consolidating into one
+definition every site consumes is the structural answer where one exists.
+What follows is about the *correction* being too narrow, which survives a
+perfectly wide search and a correctly derived class alike.
 A search that finds every restatement is necessary and not sufficient: the
 correction you write to fix them can itself be attached to one place --- a
 single section of a multi-section document, say --- that a sibling section's

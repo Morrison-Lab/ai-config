@@ -373,11 +373,71 @@ def main() -> int:
             else:
                 print("canary: the real incident reproduces against the real corpus")
 
+    # 5. Reply-tool visibility tests (project-thread sessions)
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        hook = root / "hook.py"
+        hook.write_text(SUBJECT.read_text(encoding="utf-8"), encoding="utf-8")
+        (root / "shared" / "workflow").mkdir(parents=True)
+        (root / "shared" / "workflow" / "pr-on-claim.md").write_text(BASE, encoding="utf-8")
+        (root / "shared" / "workflow" / "pr-on-claim.rationale.md").write_text(RATIONALE, encoding="utf-8")
+
+        incident_text = CASES_SPEC[0][3]
+        safe_text = CASES_SPEC[1][3]
+
+        def run_reply(reply_txt, narration_txt=""):
+            tdir = Path(tempfile.mkdtemp())
+            tpath = tdir / "t.jsonl"
+            blocks = []
+            if narration_txt:
+                blocks.append({"type": "text", "text": narration_txt})
+            blocks.append({
+                "type": "tool_use",
+                "name": "mcp__hearthbot__reply",
+                "input": {"text": reply_txt},
+            })
+            tpath.write_text(json.dumps({
+                "type": "assistant",
+                "message": {"content": blocks},
+            }) + "\n", encoding="utf-8")
+            env = dict(os.environ)
+            env["CLAUDE_PLUGIN_ROOT"] = str(root)
+            env["TMPDIR"] = str(tdir / ".tmp")
+            env["TEMP"] = env["TMP"] = env["TMPDIR"]
+            Path(env["TMPDIR"]).mkdir(parents=True, exist_ok=True)
+            proc = subprocess.run(
+                [sys.executable, str(hook)],
+                input=json.dumps({"transcript_path": str(tpath)}),
+                capture_output=True, text=True, cwd=str(root), env=env)
+            shutil.rmtree(tdir, ignore_errors=True)
+            out = proc.stdout.strip()
+            return json.loads(out).get("reason") if out else None
+
+        if not run_reply(incident_text):
+            failures.append("reply-tool payload containing misattributed quote did not block")
+        else:
+            print("reply-tool: incident in reply-tool payload blocks")
+
+        if run_reply(safe_text):
+            failures.append("reply-tool payload with safe text blocked")
+        else:
+            print("reply-tool: safe reply-tool payload passes")
+
+        if run_reply(safe_text, narration_txt=incident_text):
+            failures.append("undelivered narration containing misattributed quote blocked when clean reply spoke")
+        else:
+            print("reply-tool: undelivered narration stays silent when clean reply spoke")
+
+        if not run_reply(incident_text, narration_txt=safe_text):
+            failures.append("reply-tool misattributed quote did not block when narration was safe")
+        else:
+            print("reply-tool: reply-tool quote wins over safe narration")
+
     if failures:
         for f in failures:
             print(f"FAIL: {f}")
         return 1
-    print(f"OK -- {len(CASES_SPEC)} cases, {len(MUTATIONS)} clause mutations")
+    print(f"OK -- {len(CASES_SPEC)} cases, {len(MUTATIONS)} clause mutations, 4 reply-tool tests")
     return 0
 
 

@@ -709,3 +709,26 @@ A scratch copy is the right instrument only when it is a copy of the *tree*, not
 
 - **Do:** re-derive a sidecar's headline measurement in the checkout before acting on it, especially a baseline it reports in passing.
 - **Don't:** accept a count of pre-existing failures from a run whose working directory you did not establish.
+
+**The scratchpad is shared by every agent in the session, so a leftover directory from an earlier sidecar can alias the checkout it was copied from.**
+
+The rule above tells a deliberately unisolated sidecar to copy anything it wants to mutate into the scratchpad first, and that reads as achieving isolation.
+It does not, when a sibling already owns the path it picks.
+
+Measured 2026-09-17 in a project-thread session on `Morrison-Lab/ai-config`.
+A sidecar created `<scratchpad>/base` at 19:38.
+A later reviewer at 21:36 copied `hooks/` and `scripts/` into that same `base`, and `cp` reported **170 files** as "are the same file".
+A redirect into what that reviewer believed was its own scratch copy wrote through into `hooks/test-no-push-without-self-review.py` in the live checkout.
+
+The aliasing is invisible to the agent doing the copying --- `cp`'s own message is the only signal, and it scrolls past --- and it is absent on a session's first run, so the pattern passes until it doesn't.
+
+- **Do:** prefer `isolation: "worktree"` on any `Agent` call that will copy or run repo files;
+  it costs nothing for a read-only reviewer and removes the class.
+- **Do:** use a freshly created uniquely-named directory (`mktemp -d`) when copying anyway, never a fixed `base` or `head`, and `cp -rL`.
+- **Do:** check `git status --porcelain <path>` before repairing a clobbered file with `git show HEAD:<path> > <path>` --- that restore destroys uncommitted work, and "restored, status clean" is what it looks like either way.
+- **Do:** verify the tree independently after any such incident (suite count, mutation discrimination, all expected content present) rather than trusting the repair's own report.
+- **Don't:** read "I copied it to the scratchpad" as isolation --- the scratchpad is per session, not per agent.
+- **Don't:** reuse a scratchpad subdirectory another agent created, however idle it looks.
+
+(Filed as [ai-config#3753](https://github.com/Morrison-Lab/ai-config/issues/3753).
+This is the same `mktemp -d`-per-run discipline `memories/claude-code-hooks.md` prescribes for mutation-testing a guard, arrived at from the opposite direction: there the hazard is two batteries corrupting one copy, here it is two agents sharing one path.)

@@ -1923,3 +1923,25 @@ When it is not, say the claim is unverified and name what would settle it.
   caveat beside a confident claim is read as rigour, not as doubt.
 - **Don't:** treat unanimous surviving evidence as strong when the blocked
   check was the only thing that could have disagreed.
+
+## A local test run is not the CI job's conclusion
+
+This is the "a checkout for the run" substitution in its most available form, and the one least likely to register as a substitution: the local run is faster, it is under your hand, and it tests the same code.
+
+Measured 2026-09-18 on [`Morrison-Lab/gha`](https://github.com/Morrison-Lab/gha) PR 883.
+A session ran `python3 -m unittest discover -s antigravity-review/tests` at head `dd243dc`, got 42 of 42, and reported the `antigravity-tests` job green.
+The check-runs query in that same turn reported the job `in_progress`.
+It did conclude `success` a minute later --- so the conclusion was right and the evidence for it did not exist yet, which is the dangerous case, because nothing corrects it.
+
+`hooks/no-stale-pr-status.py` caught it: it compares a clean-state assertion against the most recent status query in the transcript, so the gap was visible to an instrument even though the claim turned out true.
+
+The two artifacts genuinely differ.
+A CI job can diverge on runner OS, tool versions, steps wrapped around the suite, and inputs the job's own `with:` block overrides --- `gha`'s `CLAUDE.md` records `PHI_DETECTORS` and `NLB_GLOBS` doing exactly that, so a local run of the same script exercises a different configuration from the one CI runs.
+
+- **Do:** use a local run to decide whether to push, never to report a job's state.
+- **Do:** report a job by its `conclusion` field, and name the job id so the claim is checkable.
+- **Do:** read `status` before `conclusion` --- `in_progress` has no conclusion, and an absent conclusion is not a pass.
+- **Do:** read the job's own `with:` block before trusting a local invocation of the script it calls.
+- **Don't:** characterize the PR when some checks are still running;
+  say which jobs concluded and that others are in flight.
+  A whole-PR claim is a scope claim over every check.

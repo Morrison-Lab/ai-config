@@ -338,6 +338,30 @@ revert, for the reason
 [`revert-premature-merge`](../../shared/workflow/revert-premature-merge.md)
 now records.)
 
+### `ListAgents` does not reach a project-thread session, and the author field cannot tell you whose PR it is
+
+Both mechanics above assume a peer you can enumerate and a PR you can attribute.
+In a Claude Code **project thread** session neither holds, and both fail quietly rather than erroring.
+
+**`ListAgents` names in-process subagents and local peer sessions, and returns nothing for a sibling thread session in the same project.**
+So the "ask the session directly" step reads as unavailable when it is merely being asked through the wrong tool, and a session that stops there falls straight to comment-and-wait for no reason.
+The route that does reach them is `mcp__hearthbot__list_thread_sessions` to enumerate, then `mcp__claude-code-remote__send_message` to the returned `session_id`.
+
+**Every thread session posts as `claude[bot]`, so the PR's `user.login` is the same for yours and the peer's.**
+The author arm of the scope test is satisfied by all of them at once, which makes it useless for telling them apart.
+The `head.ref` does distinguish: a thread's own branch is `claude/project-thread-<slug>`, and a named feature branch belongs to whoever cut it.
+
+- **Do:** enumerate peers with `list_thread_sessions` and message them with `send_message` before falling back to comment-and-wait.
+- **Do:** compare the PR's `head.ref` against your own branch to decide whether a PR is yours.
+- **Don't:** read an empty `ListAgents` in a thread session as "no peer is reachable".
+- **Don't:** use the PR's author to decide whose PR it is under a shared bot identity.
+
+(Measured 2026-09-18 on [ai-config#3737](https://github.com/Morrison-Lab/ai-config/pull/3737), as a violation of the rule above rather than an application of it.
+A thread session merged that peer-owned PR nine minutes after its clean verdict landed, with no hold-off comment and no message to the session driving it.
+Nothing was lost --- the PR was fully clean and the maintainer had told that session to merge when ready --- but its own merge call had failed with a `409 Head branch was modified` seconds earlier, so it was actively working the PR at the moment it was taken.
+The scorer is what made this feel authorized: `check-pr-fully-clean.py` answers *is this PR mergeable*, which is a different question from *is this PR mine to merge*, and nothing in it knows the second --- so a clean exit reads as complete authorization when it is half of it.
+A clean scorer exit is not the hold-off, and neither is a standing merge grant.)
+
 ## The standing per-repository grant
 
 One repository carries the grant **standing**, with no session step at all:

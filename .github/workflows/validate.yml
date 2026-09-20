@@ -582,6 +582,14 @@ jobs:
         # a fragment once and then names it bare is the miss this corpus
         # states in prose and, before this step, had no instrument for.
         run: python3 scripts/check-bare-fragment-mentions.py
+      - name: Check Do/Don't bullet ordering (advisory)
+        # ai-config#3751: in any contiguous block of guidance bullets, all
+        # `- **Do:**` bullets must appear before any `- **Don't:**` bullets.
+        # Advisory: reports examined blocks and violations, exiting 0 until
+        # historical violations are cleaned up in a separate sweep PR.
+        run: python3 scripts/check-do-dont-order.py
+      - name: Run check-do-dont-order tests
+        run: python3 scripts/test_check_do_dont_order.py
       - name: Check for chained commit-and-push in fenced blocks
         # ai-config#3199: a fenced bash block is a recipe a reader pastes, so
         # pasted whole it is ONE Bash call. A block whose lines commit and then

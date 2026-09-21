@@ -429,8 +429,10 @@ because re-running it after a correct hand-break restored the violation.
 - **Do:** treat a `.` before a lowercased package or brand name (`opencode`,
   `renv`) opening a sentence as a boundary the gate will split; the
   reformatter now splits it the same way.
-- **Do:** still reword an opener that is a digit or an opening parenthesis,
-  which neither the gate nor the reformatter treats as a sentence start.
+- **Do:** break before a sentence opening with a digit,
+  open parenthesis,
+  or underscore emphasis (e.g. count, parenthetical citation, or measurement);
+  both the gate and the reformatter recognize and split there (gha#884, ai-config#3789).
 - **Don't:** hand-reimplement `_SENT_BREAK_LOWER_RE` in the reformatter ---
   that is the second-implementation drift #2085 retired.
 - **Don't:** read a historical rejoin of a lowercase-follower break as current
@@ -447,55 +449,39 @@ into one.
 Re-verified 2026-08-26 after #2085: the same `reformat()` call keeps the
 break.)
 
-**The durable fix at a boundary neither tool sees is to break the line AND
-give the opener a form the gate recognizes.**
-Choosing the opener retires a prohibition that would otherwise depend on
-habit.
+**A boundary opening with a digit, opening parenthesis, or underscore emphasis
+previously required rewording before gha#884 / ai-config#3789.**
+Prior to that fix, choosing a recognized opener was the only way to keep the
+break from being rejoined.
 
-The gate's sentence regexes --- which the reformatter now imports --- accept
-an opener in ``[A-Z"'`*\[]`` on the uppercase branch and a lowercase letter
-on `_SENT_BREAK_LOWER_RE`.
-A digit or an opening parenthesis is in neither class.
-That third case is the one worth naming, because both instruments go quiet
-at once.
-Nothing reports the violation and nothing preserves a hand-break there, so
-a line packing two sentences survives every check this section describes.
-Choose an opener from the first class rather than leaving the gate to catch
-the mistake.
+The gate's sentence regexes originally accepted an opener in ``[A-Z"'`*\[]`` on
+the uppercase branch and a lowercase letter on `_SENT_BREAK_LOWER_RE`.
+A digit (`0-9`), an opening parenthesis (`(`), or an underscore (`_`) was in
+neither class, so both instruments went quiet at once.
+Nothing reported the violation and nothing preserved a hand-break there, so a
+line packing two sentences survived every check.
+Upstream Morrison-Lab/gha#884 (closing gha#878) widened `_SENT_BREAK_RE` to
+``(?=[A-Z0-9"'`*\[(_])``, and ai-config#3789 vendored the updated checker.
+Both the gate and the reformatter now recognize these boundaries directly and
+preserve them under `--write`.
 
-Bold and a bracketed link both qualify and are ordinary in this corpus, so the
-edit is often free.
-`gha's README names ...` can become `` `gha`'s README names ... ``, which keeps
-the possessive, or `The gha README names ...`, which drops it.
+- **Do:** break at sentence boundaries when the next sentence opens with a
+  digit, an opening parenthesis, or underscore emphasis; both the gate and the
+  reformatter now split and enforce those boundaries (gha#884, ai-config#3789).
+- **Do:** keep abbreviation protections in mind (`Fig. 1`, `No. 2`), which
+  remain protected and do not trigger a false split.
+- **Don't:** reword a natural sentence-opening digit or parenthetical sentence
+  solely to evade an imagined checker blind spot; the gate now catches and splits
+  both.
+- **Don't:** expect a digit or parenthesis opener to rejoin under `--write`;
+  the reformatter splits them the same way the gate does.
 
-- **Do:** break at the period, then start the next line with a capital letter or
-  with markup --- a backtick, bold, or a link --- when the natural opener is a
-  digit or a parenthesis.
-- **Do:** confirm the break survived by re-running the reformatter and checking
-  that the two sentences still land on separate output lines, since its preview
-  is non-empty either way.
-- **Don't:** rely on the gate to catch an unbroken two-sentence line --- it is
-  silent when the second sentence opens with a digit or a parenthesis.
-- **Don't:** expect a lowercase opener to rejoin under `--write` any longer;
-  that was the pre-#2085 trap, and the reformatter now uses the gate's lower
-  branch.
-
-(Measured 2026-08-24 against `Morrison-Lab/gha` at `9ad1cde` and this repo's
-then-local `scripts/semantic-line-breaks.py`.
-`classify_line` returns `sentence` for the unbroken line under a lowercase
-opener and under all six forms in the lookahead class, and `None` under a digit
-or an opening parenthesis.
-Calling `reformat()` on the broken pair rejoined it under a lowercase, digit, or
-parenthesis opener, and left it alone under all six of the class's forms.
-After #2085, the lowercase rejoin is gone; the digit and parenthesis rejoins
-remain, because the gate itself does not split those.
-The case is
-[ai-config#2127](https://github.com/Morrison-Lab/ai-config/pull/2127), where
-`shared/workflow/upgrade-to-gha.md:64` at `7f352648` was flagged
-`Line packs more than one sentence`, and the fix at `7f352648` -> `d70465f5`
-both broke the line and reworded the opener to `The gha README names`.
-That file has since moved on, so read both line numbers against `7f352648`
-rather than against the current tree.)
+(Measured 2026-08-24 against `Morrison-Lab/gha` at `9ad1cde` when digits and
+parentheses passed silently.
+Resolved 2026-09-19 by [Morrison-Lab/gha#884](https://github.com/Morrison-Lab/gha/pull/884)
+and [Morrison-Lab/ai-config#3789](https://github.com/Morrison-Lab/ai-config/issues/3789):
+detected multi-sentence lines rose across `ai-config` from 21,807 to 24,682
+(+13.2%), and the blind spot was closed across both the gate and reformatter.)
 
 **That check WAS advisory --- it warned and exited 0 --- and stopped being so
 on 2026-08-18.**

@@ -2895,3 +2895,46 @@ to one interpreter bucket while the total counted rows.
 A genuinely dropped row would have moved that number by one against a
 baseline shortfall already in the dozens --- invisible in exactly the way
 the line was added to prevent.)
+
+## Widening a matcher that gates evidence is the unsafe direction, and a suite that gains only a positive case proves nothing about it
+
+The negative-control sections above are about an instrument's *first* run.
+This one is about its *repair*, which is where the control is likeliest to be skipped: a fix aimed at a reported false negative arrives with a case attached, that case passes, the suite stays green, and nothing in the run looks at the direction the fix opened.
+
+Measured 2026-09-18 on [ai-config#3760](https://github.com/Morrison-Lab/ai-config/pull/3760), twice in one hour, on eight lines of change.
+
+`RX_QUERY_COMMAND` in `hooks/no-unchecked-empty-pr-claim.py` decides whether a Bash line counts as a **query at all** --- it is the recognizer for the evidence that discharges the guard.
+The reported defect was real: the alternation was spelled `https?ie`, which matches only the literal `httpie`, so a genuine `urllib.request.urlopen('https://.../pulls/N/commits')` read was invisible and the guard over-warned.
+The posted fix widened it to `https?`.
+The positive case was added, mutation-proved a real control, every gate ran green, and it was pushed.
+
+The widening was wrong.
+A bare scheme is satisfied by any line *mentioning* a URL, so `echo "see https://api.github.com/.../pulls/3737/commits -- not read yet"` followed by "PR #3737 is empty, so I closed it" left the guard **silent**, where the pre-fix code fires.
+A silent discharge --- which the commit message accompanying the fix had named as the intolerable direction one paragraph earlier.
+The correct fix recognizes the **call** that performs the read (`urlopen|urllib|requests\.(?:get|post)`) rather than the scheme, leaving `http` at its pre-fix spelling, since it is HTTPie's command name and `\b` already stops it matching inside `https`.
+
+**Widening and narrowing are not symmetric for a recognizer that gates evidence.**
+Narrowing it produces a false positive: the guard fires when it should not, which is noisy and visible and gets reported.
+Widening it produces a false negative: the guard stays silent, which is invisible and *is* the failure the guard exists to prevent.
+So for anything of the form "does this count as evidence", ask what a **wider** pattern now admits before asking what a narrower one excludes.
+
+**The second half is the more transferable one.**
+A suite that gains only a positive case is evidence about that positive case.
+This one passed 50 cases and 11 mutations, and the added case was a genuine mutation-proved control --- for the direction it tested.
+Nothing in it could see the direction the change broke, so green meant nothing about the defect.
+The repo's own `BASH_CAT_PATH` fixture ("a path resembling the endpoint is not a query") was the missing counterpart, sitting one screen up in the same file and unpaired.
+
+- **Do:** write the negative control in the same commit as the widening, and mutation-check it against the pattern you are replacing **and** the one you are adding --- two controls, two mutations.
+- **Do:** look for an existing negative fixture beside the one you are extending;
+  its absence for your new alternative is the tell.
+- **Do:** enumerate what else a new alternation branch matches before adding it.
+  `https?` is not "the urllib line", it is every URL in every string.
+- **Do:** state in the code any pre-existing hole you are not closing, rather than narrowing scope silently.
+  Here `echo "curl .../commits"` still reads as a query under every pattern, and that is now a comment.
+- **Don't:** read a green suite as covering more than it exercises.
+  Ask which added case would fail if the change were wrong;
+  if none would, the suite proves nothing about the risk.
+- **Don't:** treat an eight-line diff as too small to dispatch an adversarial review on.
+  This one found a defect that three gates, a 50-case suite and the author's own reading had all passed.
+- **Don't:** post a fix recipe for another session to apply and call it validated on a positive case alone.
+  A recipe carries the same standard as a push and is harder to retract --- here a peer session committed it before the adversarial pass caught it, and the correction landed on `9fd7e424`.

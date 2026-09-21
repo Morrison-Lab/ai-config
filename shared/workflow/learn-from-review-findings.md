@@ -190,8 +190,50 @@ What this finding has no room for is a hook.
 (Morrison-Lab/ai-config#1959, from rounds 2 and 4 of review on #1947.
 All three instances landed in one PR, each inside the fix for the round before it, and each was found by the reviewer rather than by the sweep that had just run.)
 
+The same population extends **backwards**, into work you already finished earlier in the same session.
+The section above asks where the *next* instance of the class will be and answers that it is the fix.
+This asks where a *prior* one already is, and answers that it is whatever else you built this session that does the same kind of thing.
+
+Nothing prompts the backward look, and the reason is structural rather than a matter of care.
+Fixing a class feels terminal: you found it, you wrote the test, you wrote the prose explaining it, and the class is closed.
+The artifact that shares the defect is finished, frequently already delivered, and above all it is **not in the diff** --- so every sweep the rules around here prescribe is scoped to a population that cannot contain it.
+There is no moment at which the earlier artifact comes back into view, because nothing about completing a fix re-opens anything.
+
+**Match on the mechanism, not on the subject matter**, since the subject matter is what hides the pair.
+A hook and a one-off shell sweep are different kinds of object, written for different purposes, in different languages, an hour apart;
+nothing about holding one in mind suggests looking at the other.
+Their *mechanism* can be identical, and that is the only key that retrieves them together.
+
+**The cost is worse here than in the forward direction**, because the earlier artifact's output has usually already been reported as fact.
+A defect in the fix is caught by the next review round.
+A defect in something you finished and moved on from is caught by nobody, and whatever it asserted is by now load-bearing for someone else's decision.
+
+The population is the session's own transcript, which is short, so the sweep costs a minute.
+
+**Two neighbours bound this, and neither covers it.**
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "A claim written to SUPPORT an argument gets checked less" section ends with the *forward* form --- hours of practice catching a class in other people's work is no protection against writing a fresh instance yourself in the same sitting.
+That governs what you write next.
+[`ardi`](ardi.md)'s "Run that check over your own fix, too" and the section above govern the fix's own new lines.
+Neither reaches an artifact that was complete before the class was ever named.
+
+- **Do:** ask, when you close a defect class, what else this session produced that shares the class's **mechanism**, and re-run the check against it.
+- **Do:** retract or correct whatever the earlier artifact asserted, since its output has usually already been reported as fact.
+- **Do:** describe the class by its mechanism when you write it down, so a later reader can match it against an artifact of a completely different kind.
+- **Don't:** treat writing the fix, its tests, and its explanation as having discharged the class --- those are all confined to the artifact that prompted them.
+- **Don't:** scope the sweep by artifact type, language, or purpose;
+  those are exactly the dimensions along which the matching pair differs.
+
+The "not algorithmatizable in general" reasoning above applies here unchanged, and for the same reason: deciding this needs the class, the class lives in prose, and it differs every time.
+What differs is that the population is enumerable even though the predicate is not --- the session's own outputs are a list you can write down, which is why this is worth asking rather than merely regretting.
+
+(Measured 2026-09-18.
+A session fixed a hook's false positives caused by unanchored keyword matching --- `sha` matching inside "shared", `oid` inside "avoid" --- and wrote both tests and prose about how a keyword scan finds the word rather than the concept.
+Roughly an hour earlier, the same session had written a PowerPoint sweep carrying the identical defect, matching "solution" inside ordinary prose such as "to find solution (i.e. a hyperplane)", and had published that sweep's output as a factual claim that a slide was an answer key.
+The sweep was never re-examined after the hook was fixed.
+Every artifact of a completed fix existed --- a diagnosed cause, a narrowed matcher, passing tests, written prose --- and none of them pointed at the other file.)
+
 A review series that stops finding defects has narrowed its search, not finished it.
-The three sections above each fire inside a single round --- a finding accepted, a class recurring, a fix carrying the next instance of the class it just closed.
+Three of the sections above each fire inside a single round --- a finding accepted, a class recurring, a fix carrying the next instance of the class it just closed.
 This one fires on the shape of the whole **series**, and it fires at the moment the series ends, which is the moment nothing else is looking.
 
 **A reviewer's exhaustion is a scope claim about the family it searched, not about the class.**

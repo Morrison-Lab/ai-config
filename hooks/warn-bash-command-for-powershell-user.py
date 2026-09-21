@@ -368,6 +368,26 @@ def user_shell_is_powershell(transcript_path):
     return False
 
 
+# In a project-thread session every user-visible sentence is the `text` input
+# of an `mcp__hearthbot__reply` tool call, never an assistant text block.
+# Measured on ai-config#3798: a reader that only walks `type == "text"` blocks
+# is blind to the whole reply.
+REPLY_TOOL_RX = re.compile(r"(^|__)(reply|post_message|update_message)$", re.I)
+
+
+def _reply_payload(block):
+    """The user-visible text of a reply-tool call, or '' for any other block."""
+    if not isinstance(block, dict) or block.get("type") != "tool_use":
+        return ""
+    if not REPLY_TOOL_RX.search(block.get("name") or ""):
+        return ""
+    inp = block.get("input")
+    if not isinstance(inp, dict):
+        return ""
+    txt = inp.get("text")
+    return txt if isinstance(txt, str) else ""
+
+
 def last_assistant_text(transcript_path):
     """All assistant text of the CURRENT turn -- everything since the last
     user record.
@@ -382,11 +402,15 @@ def last_assistant_text(transcript_path):
     assistant record carries it, and this hook is bound to `Stop` in the main
     session only.
     """
+    saw_reply_tool = False
+    turn_replies = []
     turn = []
     for entry in _records(transcript_path):
         etype = entry.get("type") or entry.get("role")
         if etype == "user" and not entry.get("isSidechain"):
             turn = []
+            turn_replies = []
+            saw_reply_tool = False
             continue
         if entry.get("isSidechain"):
             continue
@@ -404,7 +428,17 @@ def last_assistant_text(transcript_path):
                     piece = block.get("text") or ""
                     if piece.strip():
                         turn.append(piece)
-    return "\n".join(turn)
+                if isinstance(block, dict) and block.get(
+                    "type"
+                ) == "tool_use" and REPLY_TOOL_RX.search(
+                    block.get("name") or ""
+                ):
+                    saw_reply_tool = True
+                payload = _reply_payload(block)
+                if payload.strip():
+                    turn_replies.append(payload)
+    chosen = turn_replies if saw_reply_tool else turn
+    return "\n".join(chosen)
 
 
 def main() -> int:

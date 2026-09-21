@@ -644,3 +644,37 @@ table so the next round did not re-derive it.
 - **Don't:** treat a reviewer sandbox's failure as a reproduction of the CI
   run, or push a fix for it without saying which container it reproduces
   in.
+
+## The review workflow stashes and restores requested reviewers, so it never creates a request from nothing
+
+Read 2026-09-19 from `Morrison-Lab/gha/.github/workflows/claude-code-review.yml`
+at the `v2` commit this repo pins.
+Its "Stash and clear reviewers" step fetches
+`repos/$REPO/pulls/$PR_NUMBER/requested_reviewers`, splits the result into
+`USERS`, `TEAMS`, and `AI_USERS`, and then DELETEs them so the model does not
+review under a pending request.
+The restore step afterwards re-POSTs whatever the stash captured, reading
+`USERS_BEFORE` and `TEAMS_BEFORE`, and its own final branch prints "No human
+reviewers, AI reviewers, or team reviewers to restore; leaving reviewers
+cleared."
+
+That last line is the whole point.
+An empty stash restores nothing, so **withdrawing a review request is
+durable**: the workflow can only put back a request that was already there
+when it started.
+
+This matters because the observable pattern looks like the opposite.
+A request is removed when each review starts and re-added a few seconds after
+each one finishes, so a session watching the PR timeline sees the workflow
+apparently generating requests on its own, and concludes that withdrawing one
+would be undone on the next round.
+The timeline shows a cycle; the source shows a round trip.
+Corroborated by the merged PRs #3737, #3745, and #3760, none of which carries
+a review-request event.
+
+- **Do:** read the workflow's own stash and restore steps before inferring a
+  mechanism from a PR's timeline.
+- **Do:** withdraw a review request you should not have made, and expect it to
+  stay withdrawn.
+- **Don't:** read "removed then re-added" as the workflow creating requests
+  --- it is restoring what it cleared.

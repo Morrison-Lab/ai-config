@@ -582,6 +582,14 @@ jobs:
         # a fragment once and then names it bare is the miss this corpus
         # states in prose and, before this step, had no instrument for.
         run: python3 scripts/check-bare-fragment-mentions.py
+      - name: Check Do/Don't bullet ordering (advisory)
+        # ai-config#3751: in any contiguous block of guidance bullets, all
+        # `- **Do:**` bullets must appear before any `- **Don't:**` bullets.
+        # Advisory: reports examined blocks and violations, exiting 0 until
+        # historical violations are cleaned up in a separate sweep PR.
+        run: python3 scripts/check-do-dont-order.py
+      - name: Run check-do-dont-order tests
+        run: python3 scripts/test_check_do_dont_order.py
       - name: Check for chained commit-and-push in fenced blocks
         # ai-config#3199: a fenced bash block is a recipe a reader pastes, so
         # pasted whole it is ONE Bash call. A block whose lines commit and then
@@ -666,7 +674,7 @@ jobs:
           # the gate vacuous without turning anything red.
           fetch-depth: 0
       - name: Check new markdown lines for missing semantic breaks
-        uses: Morrison-Lab/gha/check-new-line-breaks@b91ecffc4db85baa2065c4ab2f0e7d25db74460f # v2, gha#826
+        uses: Morrison-Lab/gha/check-new-line-breaks@5e3525b38287aee0d397ffcde642caa7871ea56a # v2, gha#884
         with:
           # This value is a git pathspec, not a shell glob: `*.md` already
           # matches at any depth (CLAUDE.md and shared/**/foo.md alike), while

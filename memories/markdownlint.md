@@ -122,5 +122,19 @@ Split out of [`tools.md`](tools.md) on 2026-09-01 when that file crossed the 125
   When authoring or updating `.qmd` documents (such as `agents.qmd`), wrap prose lines to <= 80 characters, and take care when editing wrapped lines to avoid truncating mid-sentence clauses across line boundaries.
   (Morrison-Lab/ai-config#3619, 2026-09-12.)
 
+- **Do/Don't guidance bullet ordering within contiguous blocks (ai-config#3751).**
+  The corpus convention across guidance blocks is that in any contiguous run of guidance bullets,
+  all `- **Do:**` bullets appear before any `- **Don't:**` bullets.
+  A block is a contiguous run of top-level `- **Do:**` and `- **Don't:**` bullets.
+  A blank line, intervening prose, a heading, or a code fence ends the block,
+  and indented lines continue the current bullet.
+  Interleaving a Do bullet after a Don't bullet breaks visual scanning and convention consistency.
+  `scripts/check-do-dont-order.py` provides an automated checker reporting examined blocks alongside flagged blocks.
+  It runs advisory in `validate.yml` and pre-commit until historical blocks are addressed in a dedicated sweep.
+  - **Do:** place every `- **Do:**` bullet before any `- **Don't:**` bullet in a guidance block.
+  - **Do:** run `python3 scripts/check-do-dont-order.py` locally to verify guidance block bullet order.
+  - **Don't:** interleave `- **Do:**` bullets after `- **Don't:**` bullets within the same contiguous guidance block.
+  (Morrison-Lab/ai-config#3751, 2026-09-17.)
+
 (Recovered 2026-07-30 from `a739c69`, an orphaned commit on `ums/ardi-review-link-handling`: it landed about 30 minutes after its own PR [#650](https://github.com/Morrison-Lab/ai-config/pull/650) merged, so it never reached `main` and sat unnoticed for a week.
 Both rules were first learned on [#645](https://github.com/Morrison-Lab/ai-config/pull/645).)

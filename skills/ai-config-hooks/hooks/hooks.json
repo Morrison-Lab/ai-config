@@ -499,6 +499,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-claim-without-comments-read.py\"'",
+            "timeout": 10,
+            "script": "warn-claim-without-comments-read.py",
+            "why": "Measured on Lacaedemon/sparta#1544 (2026-09-18): a session posted a claim comment on an issue after reading only its BODY. The body posed a diagnostic question; the issue's COMMENTS -- two above the one posted -- recorded that the diagnosis had already merged (PR #1553) and the residual had been escalated elsewhere. Wasted a claim, a draft PR (#1608, closed as obsolete), and drew a public correction. Warns, never blocks, when `gh issue comment <N>` or `glab issue note <N>` posts a body carrying claim vocabulary ('claiming', 'is working on this', 'picking this up', 'grabbing this', 'please hold off') and no earlier command in the transcript read that same issue's comments (`gh issue view <N> --comments`/`--json comments`, `glab issue view|show <N> --comments`, `gh api .../issues/<N>/comments` GET, or a GitHub MCP issue_read with method=get_comments) -- a plain `gh issue view <N>` with no comments flag does NOT discharge it, since reading the body alone is exactly the failure measured."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/require-agent-disclosure.py\"'",
             "timeout": 10,
             "script": "require-agent-disclosure.py",

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Stop-hook guard: require a stopping-point declaration in each final reply."""
+from __future__ import annotations
+
 import hashlib
 import json
 import os
@@ -7,64 +9,209 @@ import re
 import sys
 import tempfile
 
-FENCE_OPEN_RX = re.compile(r"^\s{0,3}(`{3,}|~{3,})(?:[a-zA-Z0-9_-]+)?\s*$")
-FENCE_CLOSE_RX = re.compile(r"^\s{0,3}(`{3,}|~{3,})\s*$")
+_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+
+try:
+    from fences import strip_code, strip_fences
+except Exception:
+    strip_code = strip_fences = None
+
+# In a project-thread session every user-visible sentence is the `text` input
+# of an `mcp__hearthbot__reply` tool call, never an assistant text block.
+# Measured on ai-config#3798/#3804: a reader that only walks `type == "text"` blocks
+# is blind to the whole reply.
+REPLY_TOOL_RX = re.compile(r"(^|__)(reply|post_message|update_message)$", re.I)
+
 RX_LINE = re.compile(
     r"^\s*(?:[-*]\s+|\d+\.\s+|#{1,6}\s+)?(?:\*\*)?Stopping Point:?(?:\*\*)?:?\s*(?:Clean\b|Not (?:a )?clean\b)",
     re.IGNORECASE,
 )
+RX_INDENTED_CODE = re.compile(r"^(?: {4,}|\t)(?![-*]\s+|\d+\.\s+)")
 INLINE_CODE_RX = re.compile(r"`[^`\n]+`")
+
+
+def _reply_payload(block):
+    """The user-visible text of a reply-tool call, or '' for any other block."""
+    if not isinstance(block, dict) or block.get("type") != "tool_use":
+        return ""
+    if not REPLY_TOOL_RX.search(block.get("name") or ""):
+        return ""
+    inp = block.get("input")
+    if not isinstance(inp, dict):
+        return ""
+    txt = inp.get("text")
+    return txt if isinstance(txt, str) else ""
 
 
 def has_stopping_point_declaration(text: str) -> bool:
     if not text:
         return False
-    in_fence = False
-    fence_char = ""
-    fence_len = 0
-
-    for line in text.splitlines():
-        if not in_fence:
-            m = FENCE_OPEN_RX.match(line)
-            if m:
-                in_fence = True
-                fence_char = m.group(1)[0]
-                fence_len = len(m.group(1))
-            else:
-                stripped = INLINE_CODE_RX.sub("", line)
-                if RX_LINE.search(stripped):
-                    return True
-        else:
-            m = FENCE_CLOSE_RX.match(line)
-            if m and m.group(1)[0] == fence_char and len(m.group(1)) >= fence_len:
-                in_fence = False
+    if strip_code is not None:
+        stripped = strip_code(text, swallow_unclosed=False)
+    elif strip_fences is not None:
+        stripped = strip_fences(text, swallow_unclosed=False)
+    else:
+        stripped = text
+    for line in stripped.splitlines():
+        if RX_INDENTED_CODE.match(line):
+            continue
+        line_no_inline = INLINE_CODE_RX.sub("", line)
+        if RX_LINE.search(line_no_inline):
+            return True
     return False
 
 
 def last_text(path: str) -> str:
-    last = ""
+    last_text_val = ""
+    last_reply = ""
+    saw_reply_tool = False
     try:
-        f = open(path, errors="ignore")
+        with open(path, encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    event = json.loads(line)
+                except Exception:
+                    continue
+                etype = event.get("type") or event.get("role") or ""
+                source = event.get("source") or ""
+                if (
+                    etype == "user"
+                    or etype == "USER_INPUT"
+                    or source == "USER_EXPLICIT"
+                ) and not event.get("isSidechain"):
+                    blocks = (
+                        (event.get("message") or {}).get("content")
+                        or event.get("content")
+                        or []
+                    )
+                    is_tool_result = (
+                        event.get("type") == "tool_result"
+                        or (
+                            isinstance(blocks, list)
+                            and any(
+                                isinstance(b, dict) and b.get("type") == "tool_result"
+                                for b in blocks
+                            )
+                        )
+                    )
+                    if not is_tool_result:
+                        last_text_val = ""
+                        last_reply = ""
+                        saw_reply_tool = False
+                    continue
+                if event.get("isSidechain"):
+                    continue
+                if event.get("type") == "assistant" or event.get("role") == "assistant":
+                    blocks = (
+                        (event.get("message") or {}).get("content")
+                        or event.get("content")
+                        or []
+                    )
+                    if isinstance(blocks, list):
+                        text = "".join(
+                            b.get("text", "")
+                            for b in blocks
+                            if isinstance(b, dict) and b.get("type") == "text"
+                        )
+                        if text.strip():
+                            last_text_val = text
+                        for b in blocks:
+                            if (
+                                isinstance(b, dict)
+                                and b.get("type") == "tool_use"
+                                and REPLY_TOOL_RX.search(b.get("name") or "")
+                            ):
+                                saw_reply_tool = True
+                            payload = _reply_payload(b)
+                            if payload.strip():
+                                last_reply = payload
+                    elif isinstance(blocks, str) and blocks.strip():
+                        last_text_val = blocks
+                elif (
+                    event.get("type") in {"PLANNER_RESPONSE", "GENERIC"}
+                    or event.get("source") == "MODEL"
+                ):
+                    content = event.get("content")
+                    if isinstance(content, str) and content.strip():
+                        last_text_val = content
+                    elif isinstance(content, list):
+                        text = "".join(
+                            (b.get("text", "") if isinstance(b, dict) else str(b))
+                            for b in content
+                        )
+                        if text.strip():
+                            last_text_val = text
     except Exception:
         return ""
-    with f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                event = json.loads(line)
-            except Exception:
-                continue
-            if event.get("type") == "assistant":
-                text = "".join(
-                    block.get("text", "")
-                    for block in (event.get("message") or {}).get("content", [])
-                    if isinstance(block, dict)
-                )
-                if text.strip():
-                    last = text
-    return last
+    chosen = last_reply if saw_reply_tool else last_text_val
+    return chosen if chosen.strip() else ""
+
+
+def _extract_from_blocks(blocks):
+    """Extract assistant text from a list of blocks respecting reply-tool precedence."""
+    last_text_val = ""
+    last_reply = ""
+    saw_reply_tool = False
+    for b in blocks:
+        if not isinstance(b, dict):
+            continue
+        if b.get("type") == "text":
+            txt = b.get("text") or ""
+            if txt.strip():
+                last_text_val = txt
+        if b.get("type") == "tool_use" and REPLY_TOOL_RX.search(b.get("name") or ""):
+            saw_reply_tool = True
+        payload = _reply_payload(b)
+        if payload.strip():
+            last_reply = payload
+    chosen = last_reply if saw_reply_tool else last_text_val
+    return chosen if chosen.strip() else ""
+
+
+def extract_text_from_payload(payload):
+    """Extract last assistant text from payload transcript path or direct payload fields."""
+    if not isinstance(payload, dict):
+        return ""
+    tpath = (
+        payload.get("transcript_path")
+        or payload.get("transcriptPath")
+        or payload.get("transcript")
+        or payload.get("history_file")
+        or ""
+    )
+    if tpath:
+        text = last_text(tpath)
+        if text:
+            return text
+
+    # Fallback to direct payload fields if transcript is not provided or empty
+    for key in ("reply", "last_assistant_message", "message", "content", "text"):
+        val = payload.get(key)
+        if isinstance(val, str) and val.strip():
+            return val
+        if isinstance(val, dict):
+            content = val.get("content")
+            if isinstance(content, str) and content.strip():
+                return content
+            if isinstance(content, list):
+                res = _extract_from_blocks(content)
+                if res:
+                    return res
+            txt = val.get("text")
+            if isinstance(txt, str) and txt.strip():
+                return txt
+        if isinstance(val, list):
+            res = _extract_from_blocks(val)
+            if res:
+                return res
+    return ""
 
 
 def main() -> int:
@@ -72,7 +219,7 @@ def main() -> int:
         payload = json.load(sys.stdin)
     except Exception:
         return 0
-    text = last_text(payload.get("transcript_path", ""))
+    text = extract_text_from_payload(payload)
     if not text or has_stopping_point_declaration(text):
         return 0
     key = hashlib.sha256(text.encode()).hexdigest()[:16]

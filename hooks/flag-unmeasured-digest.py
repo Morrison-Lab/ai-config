@@ -89,6 +89,38 @@ A token the session measured at any point discharges, not only one measured in
 the current turn. Unlike a clock reading, a hash does not expire: the digest of
 a file that has not changed is as true an hour later as it was when printed.
 
+THE SECOND SURFACE: A PINNING ARGUMENT (2026-09-20, ai-config#3392)
+--------------------------------------------------------------------
+Everything above is about a value written into a *body*. A commit SHA passed
+as a *command argument* is the same class of unmeasurable value reaching the
+same kind of harm by a different route, and no body extractor sees it:
+
+    gh api -X PUT repos/O/R/pulls/N/update-branch -f expected_head_sha=<sha>
+    gh pr merge N -R O/R --squash --match-head-commit <sha>
+
+#3392 specified this check on 2026-09-09, after a sweep padded the
+abbreviation `4d443b7a` out to forty plausible characters. It was not built,
+and on 2026-09-20 the identical mistake recurred on `Lacaedemon/sparta#1615`:
+`check-pr-fully-clean.py` prints the head abbreviated, so the full value has
+to be re-read, and instead it was invented past the eighth character.
+
+This surface needs none of the digest-shaping heuristics above. The flag name
+already establishes that the value is a commit SHA, so the only question left
+is whether the session ever observed it -- which makes the check strictly
+sharper here than on a prose body.
+
+It is also the surface where the consequence is worst, because the failure is
+MISDIAGNOSED rather than merely wrong. A fabricated pin is refused with
+`422 expected head sha didn't match current head ref.` (or
+`Head branch was modified` on a merge), byte-identical to what a genuine
+concurrent writer produces -- and `skills/mwc`, `skills/chores`,
+`skills/merge-it` and `shared/workflow/fully-clean.md` all tell the reader
+that this error means another writer moved the head, routing to "settle
+ownership". So the documented diagnosis sends you into a concurrency
+investigation over your own typo. The warning therefore names the remedy
+(re-read `--json headRefOid`) and, when the fabricated value's leading
+characters WERE observed, says outright that an abbreviation was padded.
+
 RELATION TO `flag-unread-commit-citation.py`
 --------------------------------------------
 Both can fire on one body naming a commit SHA, and they answer different
@@ -211,6 +243,57 @@ NOTE = (
     "This is a reminder, not a refusal."
 )
 
+# The pin surface (ai-config#3392). A flag that pins an operation to a head
+# commit takes the FULL 40 characters, and the value can only have been read --
+# from `--json headRefOid`, from `git rev-parse`, or from the user. There is no
+# derivation, so unlike the body surface this needs no length/keyword heuristic:
+# any hex passed here that the session never observed is fabricated.
+#
+# Both `=` and whitespace separate a flag from its value, and the MCP spelling
+# `expectedHeadSha` arrives as a JSON key, so a colon is a separator too.
+# Anchored at the START of a shell word (see `_pins_in`). `(?:=|:)?` covers the
+# attached spellings; an empty group 2 means the value is the following word.
+#
+# The hex run is NOT capped at 40. A cap plus a trailing boundary silently
+# SKIPS anything longer -- a SHA-256 repository's 64-character head, or a value
+# mistakenly concatenated with something else -- since no backtracked length
+# can satisfy the boundary. Skipping is the one outcome a guard must not have,
+# so the run is open-ended and the length is simply not this check's business.
+RX_PIN_WORD = re.compile(
+    r"(expected_head_sha|expectedHeadSha|--match-head-commit)"
+    r"(?:[=:]([0-9a-fA-F]{7,}))?$"
+)
+
+RX_BARE_SHA = re.compile(r"^[0-9a-fA-F]{7,}$")
+
+# Shell metacharacters that end a word regardless of adjacent whitespace.
+# Redirections are included: `--match-head-commit <sha>>log` is a pin plus a
+# redirect to `sh`, so the value must not absorb the `>`.
+SHELL_OPERATORS = frozenset(";&|()<>")
+
+PIN_NOTE = (
+    "Unmeasured-pin reminder: this command pins `{flag}` to `{token}`, which "
+    "never appeared in any tool result or user message in this session's "
+    "transcript.{padded}\n\n"
+    "A pinning SHA is a measured value. Read it at the point of use --\n"
+    "    gh pr view <N> --json headRefOid --jq .headRefOid\n"
+    "-- rather than constructing it from an abbreviation.\n\n"
+    "This matters more than an ordinary unmeasured value, because the failure "
+    "is misdiagnosed rather than merely wrong: a fabricated pin is refused "
+    "with `422 expected head sha didn't match current head ref.` (or "
+    "`Head branch was modified` on a merge), which is byte-identical to what "
+    "a genuine concurrent writer produces. The corpus tells you that error "
+    "means another writer moved the head and routes you to settle ownership, "
+    "so following it sends you into a concurrency investigation over your own "
+    "typo. Re-read the head and compare before investigating anything.\n\n"
+    "This is a reminder, not a refusal."
+)
+
+PADDED_NOTE = (
+    " Its leading `{prefix}` DID appear, so an abbreviation was padded out to "
+    "40 characters rather than the full value being read."
+)
+
 
 def hex_tokens_in(text):
     """Every hex run in `text`, lowercased, as a set. Used for the transcript side."""
@@ -321,6 +404,261 @@ def unmeasured_digest(body, transcript_path, assume_unmeasured=False):
     return None
 
 
+def _executable_text(command):
+    """`command` with heredoc payloads and shell comments removed.
+
+    The pin flags are matched as literal text, so any occurrence in a command
+    that merely WRITES documentation -- a heredoc authoring a skill file that
+    shows `gh pr merge --match-head-commit <sha>` as an example, or a
+    commented-out earlier attempt -- would otherwise warn about a command that
+    never runs. This corpus documents its own invocations constantly, so that
+    false positive is routine rather than contrived, and a guard that warns on
+    a legitimate case is one that gets switched off.
+
+    `strip_heredocs` is the sibling's, reused so this guard and the body
+    surface cannot disagree about where a heredoc ends.
+    """
+    if not isinstance(command, str):
+        return ""
+    strip = getattr(_stamp, "strip_heredocs", None) or getattr(
+        _rebuttal, "strip_heredocs", None)
+    if strip is not None:
+        try:
+            command = strip(command)
+        except Exception:
+            pass
+    return _strip_comments(command)
+
+
+def _strip_comments(command):
+    """`command` with shell comments removed, quote state carried throughout.
+
+    ONE character stream, not a line at a time. That distinction is the whole
+    of round 5: a quoted argument may legitimately span physical lines --
+
+        gh pr merge 1 -R o/r --body "first line
+        second line #still inside the quote --match-head-commit <sha>" --squash
+
+    -- and a per-line scanner starts each line with `quote = None`, so it reads
+    that second `#` as opening a comment, truncates the line, and discards the
+    pin flag that follows it. Silent under-detection, on the surface this guard
+    exists for. Scanning the whole string carries the open quote across the
+    newline, where it belongs.
+
+    Why a scanner rather than a regex at all: quoting is context-sensitive --
+    whether a character is quoted depends on unbounded text to its left -- so
+    no regex over the text can decide it. Three earlier attempts each passed
+    their own tests and failed the next shape:
+
+      - `#.*$` per line read `--body "Closes #123"` as a comment and dropped
+        everything after it.
+      - Blanking quoted regions first mis-paired delimiters: a contraction
+        (`don't`) paired with the opening quote of an unrelated quoted region
+        later in the line and swallowed a real `#` between them.
+      - A per-line scanner fixed both and still could not see across a
+        newline.
+
+    On an UNBALANCED quote it follows `sh`: the string runs on, so no later
+    `#` is a comment. That errs toward scanning too much rather than too
+    little, which is the safe direction -- a spurious warning costs a glance,
+    a missed pin costs the thing this guard is for.
+
+    Self-contained on purpose: an earlier version delegated to a sibling and
+    silently reverted to the bug whenever that import failed.
+    """
+    out = []
+    quote = None
+    i = 0
+    n = len(command)
+    while i < n:
+        c = command[i]
+        if quote is None:
+            if c == "\\":
+                out.append(command[i:i + 2])
+                i += 2
+                continue
+            if c in ('"', "'"):
+                quote = c
+            elif c == "#" and (i == 0 or command[i - 1].isspace()):
+                # Drop to end of line, keeping the newline so line structure
+                # (and any following command) survives.
+                j = command.find("\n", i)
+                if j == -1:
+                    break
+                i = j
+                continue
+        elif c == quote:
+            quote = None
+        elif c == "\\" and quote == '"':
+            # Backslash escapes inside double quotes only; inside single
+            # quotes `sh` treats it literally and nothing escapes the closer.
+            out.append(command[i:i + 2])
+            i += 2
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
+
+
+def _shell_words(command):
+    """`command` split into shell words, quote characters consumed.
+
+    The pin flags must be matched against WORDS, not against raw text, and the
+    difference is a real false positive rather than a nicety. Scanning raw text
+    cannot tell
+
+        gh pr merge 1 -R o/r --match-head-commit <sha>
+
+    from a command whose `--body` argument merely QUOTES that shape as prose:
+
+        gh issue create -R o/r --body "a sweep padded it out via
+                                       -f expected_head_sha=<sha> and it failed"
+
+    The second pins nothing -- it files a bug report -- and this corpus writes
+    exactly that prose constantly, including in the issue this hook implements.
+    Split into words, the body is ONE word that merely contains the flag text,
+    while a real pin flag BEGINS its word, so anchoring the match at word start
+    separates them with no heuristic.
+
+    Quote characters are consumed, so `--match-head-commit "<sha>"` yields the
+    bare sha as its own word, and `-f 'expected_head_sha=<sha>'` yields one word
+    beginning with the flag -- both still match, which is why this is a
+    precision fix rather than a narrowing one.
+    """
+    words = []
+    cur = []
+    quote = None
+    i = 0
+    n = len(command)
+    while i < n:
+        c = command[i]
+        if quote is None:
+            if c == "\\":
+                cur.append(command[i + 1:i + 2])
+                i += 2
+                continue
+            if c in ('"', "'"):
+                quote = c
+            elif c.isspace() or c in SHELL_OPERATORS:
+                # A shell metacharacter ends a word whether or not whitespace
+                # surrounds it, so `<sha>&&echo done` is three words to `sh`
+                # and must be three here. Splitting on whitespace alone glues
+                # the operator onto the value, `RX_BARE_SHA`'s whole-word
+                # anchor then rejects it, and the pin is SKIPPED -- which this
+                # module's own docstring calls the one outcome a guard must
+                # not have. Found by review of the word-splitting round.
+                if cur:
+                    words.append("".join(cur))
+                    cur = []
+            else:
+                cur.append(c)
+        elif c == quote:
+            quote = None
+        elif c == "\\" and quote == '"':
+            cur.append(command[i + 1:i + 2])
+            i += 2
+            continue
+        else:
+            cur.append(c)
+        i += 1
+    if cur:
+        words.append("".join(cur))
+    return words
+
+
+def _longest_observed_prefix(token, seen):
+    """The longest observed hex run that is a strict prefix of `token`, else None.
+
+    This is what separates "padded an abbreviation" from "invented outright".
+    `_measured` asks whether an observed run *starts with* the token (a short
+    citation of a long known SHA, which is fine); this asks the mirror question,
+    whether the token starts with an observed run (a long value built out of a
+    short known one, which is the fabrication).
+    """
+    token = token.lower()
+    best = None
+    for obs in seen:
+        if len(obs) < len(token) and token.startswith(obs) and len(obs) >= 7:
+            if best is None or len(obs) > len(best):
+                best = obs
+    return best
+
+
+def unmeasured_pin(command, transcript_path, assume_unmeasured=False):
+    """(flag, token, padded_prefix) for an unmeasured pinning SHA, else None.
+
+    Deliberately not routed through `unmeasured_digest`: that applies
+    digest-shaping heuristics (canonical lengths, a nearby keyword, a URL
+    exemption) which exist to keep an ordinary prose body from warning on every
+    hex run. None of that judgment is wanted here. The flag name already
+    establishes that the value is a commit SHA, so the only question left is
+    whether the session ever saw it.
+    """
+    if not isinstance(command, str) or not command.strip():
+        return None
+    pins = _pins_in(_shell_words(_executable_text(command)))
+    if not pins:
+        return None
+    seen = _transcript_hex(transcript_path)
+    if seen is None:
+        if not assume_unmeasured:
+            # Live invocation with no readable transcript: no evidence either
+            # way, so fail open rather than warn on every pinned command.
+            return None
+        seen = set()
+    # Every pin in the command, not just the first. A chained call can carry
+    # two, and a measured one first must not mask a fabricated one after it.
+    for flag, token in pins:
+        if _measured(token, seen):
+            continue
+        return flag, token, _longest_observed_prefix(token, seen)
+    return None
+
+
+def _pins_in(words):
+    """[(flag, sha)] for every pinning argument among `words`.
+
+    Anchored at word start, which is the whole of the prose exemption: a real
+    pin flag BEGINS its word, while a `--body` argument quoting one is a single
+    word that merely contains it.
+
+    Two spellings, because both occur: the value attached to the flag
+    (`expected_head_sha=<sha>`, `--match-head-commit=<sha>`) and the value as
+    the following word (`--match-head-commit <sha>`).
+    """
+    found = []
+    for idx, word in enumerate(words):
+        m = RX_PIN_WORD.match(word)
+        if not m:
+            continue
+        flag, attached = m.group(1), m.group(2)
+        if attached:
+            found.append((flag, attached))
+            continue
+        # Value as the next word. Only a bare flag takes one, and only a
+        # hex-shaped next word is its value -- anything else means the flag
+        # was named without a value (a `--help` listing, a quoted mention).
+        if idx + 1 < len(words) and RX_BARE_SHA.match(words[idx + 1]):
+            found.append((flag, words[idx + 1]))
+    return found
+
+
+def _pin_command(tool_name, tool_input):
+    """The shell command for a Bash tool call, or the serialized MCP pin args."""
+    bash_names = getattr(_stamp, "BASH_TOOL_NAMES", {"Bash"})
+    if tool_name in bash_names:
+        cmd = tool_input.get("command")
+        return cmd if isinstance(cmd, str) else None
+    # The MCP merge/update tools carry the pin as a named parameter rather than
+    # in a command string; serializing the input lets one regex cover both.
+    if isinstance(tool_name, str) and tool_name.startswith("mcp__"):
+        for key in ("expectedHeadSha", "expected_head_sha"):
+            val = tool_input.get(key)
+            if isinstance(val, str) and val:
+                return "{}={}".format(key, val)
+    return None
+
+
 def _create_post(tool_name, tool_input, cwd):
     """(kind, body, surface) for an issue/PR CREATE or EDIT the sibling misses."""
     if _extract_body_text is None:
@@ -403,26 +741,82 @@ def _read_payload():
         return {}, is_dry_run
 
 
+def _pin_context(pin_hit):
+    """(context, one_line_summary) for a pin hit."""
+    flag, token, prefix = pin_hit
+    padded = PADDED_NOTE.format(prefix=prefix) if prefix else ""
+    context = PIN_NOTE.format(flag=flag, token=token, padded=padded)
+    summary = (
+        f"Unmeasured-pin reminder: `{flag}` is pinned to `{token}`, which "
+        f"never appeared in this session's transcript. Re-read it with "
+        f"`gh pr view <N> --json headRefOid --jq .headRefOid`.")
+    return context, summary
+
+
+def _emit_pin(pin_hit):
+    """Print the pin warning on its own.
+
+    Deliberately NO fire-once sentinel, unlike the body path below. A quoted
+    digest can legitimately come from outside the session, so re-warning about
+    the same body is noise; a pinning SHA cannot, so a value unmeasured on one
+    attempt is still unmeasured on a retry, and the retry is exactly when the
+    reminder is wanted.
+    """
+    context, summary = _pin_context(pin_hit)
+    out = {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "additionalContext": context,
+        },
+    }
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = summary
+    print(json.dumps(out))
+
+
 def main() -> int:
     try:
         payload, is_dry_run = _read_payload()
-        if not payload or _post_from_payload is None:
+        if not payload:
             return 0
 
         tool_name = payload.get("tool_name") or payload.get("toolName") or ""
-        tool_input = payload.get("tool_input") or payload.get("toolInput") or {}
+        ti = payload.get("tool_input")
+        if not isinstance(ti, dict):
+            ti = payload.get("toolInput")
+        tool_input = ti if isinstance(ti, dict) else {}
         cwd = payload.get("cwd") or os.getcwd()
         tpath = payload.get("transcript_path") or payload.get("transcriptPath") or ""
+
+        # The pin surface is evaluated BEFORE the `_post_from_payload is None`
+        # gate below, because it does not depend on the sibling's body
+        # extraction -- only on `BASH_TOOL_NAMES`, which has its own fallback.
+        # Ordering it after that gate would have made the fallback dead code
+        # and silently disabled this whole surface whenever the sibling import
+        # failed.
+        pin_hit = None
+        pin_cmd = _pin_command(tool_name, tool_input)
+        if pin_cmd:
+            pin_hit = unmeasured_pin(pin_cmd, tpath, assume_unmeasured=is_dry_run)
+
+        if _post_from_payload is None:
+            if pin_hit:
+                _emit_pin(pin_hit)
+            return 0
 
         kind, body, surface, _is_notebook = _post_from_payload(tool_name, tool_input, cwd)
         if kind != "body" or not body:
             kind, body, surface = _create_post(tool_name, tool_input, cwd)
         if kind != "body" or not body:
+            if pin_hit:
+                _emit_pin(pin_hit)
             return 0
 
         found = unmeasured_digest(body, tpath, assume_unmeasured=is_dry_run)
         if not found:
-            if is_dry_run:
+            if pin_hit:
+                _emit_pin(pin_hit)
+            elif is_dry_run:
                 print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
             return 0
         token, kind_desc = found
@@ -435,6 +829,10 @@ def main() -> int:
             sentinel = os.path.join(
                 tempfile.gettempdir(), f".claude-unmeasured-digest-{key}")
             if os.path.exists(sentinel):
+                # The body warning is spent for this value, but the pin
+                # warning has no sentinel and is still owed.
+                if pin_hit:
+                    _emit_pin(pin_hit)
                 return 0
             try:
                 open(sentinel, "w").close()
@@ -443,6 +841,19 @@ def main() -> int:
 
         surface_desc = surface or "comment body"
         context = NOTE.format(surface=surface_desc, token=token, kind=kind_desc)
+        summary = (
+            f"Unmeasured-digest reminder: this {surface_desc} states "
+            f"`{token}`, which never appeared in this session's transcript. "
+            f"Run the command that produces it and paste what it returned.")
+        # A command can both pin a SHA and post a body -- `gh pr merge` takes
+        # `--match-head-commit` and `--body` together, and a chained call can
+        # do both. They are independent findings with different remedies, so
+        # neither is allowed to suppress the other.
+        if pin_hit:
+            pin_ctx, pin_summary = _pin_context(pin_hit)
+            context = pin_ctx + "\n\n----\n\n" + context
+            summary = pin_summary + " (A separate unmeasured digest is also "
+            summary += "flagged in this command's body.)"
         out = {
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
@@ -450,10 +861,7 @@ def main() -> int:
             },
         }
         if not os.environ.get("ANTIGRAVITY_AGENT"):
-            out["systemMessage"] = (
-                f"Unmeasured-digest reminder: this {surface_desc} states "
-                f"`{token}`, which never appeared in this session's transcript. "
-                f"Run the command that produces it and paste what it returned.")
+            out["systemMessage"] = summary
         print(json.dumps(out))
     except Exception:
         return 0

@@ -412,8 +412,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">contents</span><span class="kw">:</span><span class="at"> read</span></span>
 <span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">pull-requests</span><span class="kw">:</span><span class="at"> write</span></span>
 <span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">issues</span><span class="kw">:</span><span class="at"> write</span></span>
-<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">id-token</span><span class="kw">:</span><span class="at"> write</span></span>
-<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">actions</span><span class="kw">:</span><span class="at"> read</span></span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">actions</span><span class="kw">:</span><span class="at"> read</span></span>
+<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">checks</span><span class="kw">:</span><span class="at"> read</span></span>
 <span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2</span></span>
 <span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">secrets</span><span class="kw">:</span><span class="at"> inherit</span></span>
 <span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">with</span><span class="kw">:</span></span>
@@ -446,7 +446,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <ol type="1">
 <li>Confirm <code>CLAUDE_CODE_OAUTH_TOKEN</code> secret exists in repo/org secrets (<code>gh secret list</code>).</li>
 <li>Add the caller stub at <code>.github/workflows/claude-code-review.yml</code>.</li>
-<li>Ensure required permissions (<code>contents: read</code>, <code>pull-requests: write</code>, <code>issues: write</code>, <code>id-token: write</code>, <code>actions: read</code>) are declared on the caller job.</li>
+<li>Ensure required permissions (<code>contents: read</code>, <code>pull-requests: write</code>, <code>issues: write</code>, <code>actions: read</code>, <code>checks: read</code>) are declared on the caller job.</li>
 <li>Pass any project-specific guidance via <code>prompt-addendum</code>.</li>
 </ol>
 </section>

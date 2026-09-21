@@ -49,8 +49,8 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
-      id-token: write
       actions: read
+      checks: read
     uses: Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2
     secrets: inherit
     with:
@@ -80,7 +80,7 @@ By delegating to `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2`,
 
 1.  Confirm `CLAUDE_CODE_OAUTH_TOKEN` secret exists in repo/org secrets (`gh secret list`).
 2.  Add the caller stub at `.github/workflows/claude-code-review.yml`.
-3.  Ensure required permissions (`contents: read`, `pull-requests: write`, `issues: write`, `id-token: write`, `actions: read`) are declared on the caller job.
+3.  Ensure required permissions (`contents: read`, `pull-requests: write`, `issues: write`, `actions: read`, `checks: read`) are declared on the caller job.
 4.  Pass any project-specific guidance via `prompt-addendum`.
 
 ## Relationship to other skills

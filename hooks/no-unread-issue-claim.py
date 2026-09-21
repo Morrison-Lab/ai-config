@@ -56,6 +56,35 @@ The number must match. Reading #12's comments says nothing about #34, and a
 guard that accepted any comment read anywhere would pass the moment a session
 looked at one unrelated issue.
 
+WHAT IT DOES NOT SEE
+--------------------
+Only the FINAL assistant text block of the turn. A claim made earlier in the
+same turn, followed by an unrelated closing line, is invisible to it. That is
+a real gap rather than a design choice, kept because the alternative -- every
+assistant block in the turn -- multiplies the false-positive surface this
+guard is most at risk from, and the final recap is where escalations to the
+user actually land.
+
+Several natural phrasings trip no cue: "can wait for now", "I have paused
+work on it", "stays as-is until you say otherwise". The cue list is
+deliberately narrow, on the standing argument that a guard which warns on
+legitimate cases gets switched off and takes the real ones with it.
+
+ON BUILDING THIS AT THE SECOND OCCURRENCE
+------------------------------------------
+`shared/principles/deterministic-tools.md` sets the bar at the third
+occurrence, and ai-config#3823 -- this guard's own issue -- recorded the
+decision to FILE rather than build, explicitly because two is not three.
+
+Building it anyway reverses that, so the reversal is recorded here rather
+than left silent, per `shared/workflow/incidents-dont-repeal-decisions.md`.
+The reason is not a third occurrence: it is that `no-mistake-without-a-hook`
+does not accept a filed issue as discharging a mistake, and the session had
+by then filed three mechanism proposals against one built mechanism, which is
+the shape of filing becoming an escape rather than a schedule. A reader who
+thinks the third-occurrence bar should have held is disagreeing with a
+judgment that was made knowingly, not catching an oversight.
+
 CONTRACT
 --------
 Warns, never blocks. An issue can legitimately BE blocked, and saying so is
@@ -95,7 +124,25 @@ def visible_prose(text):
 RX_ISSUE = re.compile(
     r"(?<![A-Za-z0-9])(?<!pull/)#(\d{1,7})(?![0-9])"
 )
-RX_PR_PREFIX = re.compile(r"(?:\bPR|\bpull request|\bpull)\s*$", re.I)
+# A PR reference, or a clause whose subject is the PR rather than the issue.
+# `PR #12` is the obvious form; `the PR for #12` and `the fix for #12` are the
+# ones that matter, because there the number IS an issue and the cue
+# ("awaiting review") describes the pull request, not the issue.
+RX_PR_PREFIX = re.compile(
+    r"(?:\bPR|\bpull request|\bpull|"
+    r"\b(?:PR|pull request|fix|patch|branch)\s+(?:for|that\s+\w+|closing))"
+    r"\s*$",
+    re.I,
+)
+
+# A sentence boundary. `.!?` and a NEWLINE both end one, and the newline must
+# end it with or without following whitespace: a markdown bullet (`\n- item`)
+# has none, so a `\s+`-anchored split treats a whole bulleted recap as ONE
+# sentence. That is this corpus's default reporting shape, and it made an
+# unrelated "pending" in one bullet attach to an issue reported as closed in
+# another. A semicolon splits for the same reason -- "several PRs pending;
+# #12 is an example" is two clauses, not one claim.
+RX_SENTENCE = re.compile(r"(?<=[.!?;])\s+|\n+")
 
 # Asserting that the issue still needs something. Deliberately narrow: an
 # ordinary mention of an issue number is not a claim about its state, and a
@@ -125,8 +172,11 @@ RX_CUE = re.compile("|".join(CUES), re.I)
 # all three occur in this corpus.
 READS = [
     # gh/glab issue view <N> ... with a comments flag, in either order.
-    r"issue\s+view\s+[\"']?#?(\d{1,7})[\"']?[^\n|;&]*?(?:--comments|--json[^\n|;&]*comments)",
-    r"issue\s+view\s+[\"']?#?(\d{1,7})[\"']?[^\n|;&]*?-c\b",
+    # The bound excludes `;` and `&` (a new command) but NOT `|`: a `--jq`
+    # filter legitimately contains a pipe, and stopping there missed
+    # `--jq '.comments[] | .body' --json comments`.
+    r"issue\s+view\s+[\"']?#?(\d{1,7})[\"']?[^\n;&]*?(?:--comments|--json[^\n;&]*comments)",
+    r"issue\s+view\s+[\"']?#?(\d{1,7})[\"']?[^\n;&]*?-c\b",
     # REST: .../issues/<N>/comments
     r"issues/(\d{1,7})/comments",
     # MCP issue read naming comments in the same call.
@@ -175,10 +225,20 @@ def comments_read(transcript_path):
                 if isinstance(blocks, list):
                     for b in blocks:
                         if isinstance(b, dict) and b.get("type") == "tool_use":
-                            blobs.append(json.dumps(b.get("input") or {}))
+                            # The tool NAME must be in the blob: the MCP
+                            # discharge patterns key on `issue_read`, which is
+                            # part of the tool name and never appears in the
+                            # input. Serializing input alone made those two
+                            # patterns dead code, so every remote session --
+                            # where `tool-mappings.md` routes this work to MCP
+                            # precisely because `gh` is absent -- would have
+                            # been told it never read comments it had read.
+                            blobs.append((b.get("name") or "") + " "
+                                         + json.dumps(b.get("input") or {}))
                 for tc in rec.get("tool_calls") or []:
                     if isinstance(tc, dict):
-                        blobs.append(json.dumps(tc.get("args") or tc.get("input") or {}))
+                        blobs.append((tc.get("name") or "") + " " + json.dumps(
+                            tc.get("args") or tc.get("input") or {}))
                 for blob in blobs:
                     for rx in RX_READS:
                         for m in rx.finditer(blob):
@@ -226,7 +286,7 @@ def asserted_issues(text):
     """
     out = []
     prose = visible_prose(text)
-    for sentence in re.split(r"(?<=[.!?\n])\s+", prose):
+    for sentence in RX_SENTENCE.split(prose):
         if not RX_CUE.search(sentence):
             continue
         for m in RX_ISSUE.finditer(sentence):

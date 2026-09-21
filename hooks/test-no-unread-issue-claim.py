@@ -99,6 +99,47 @@ CASES = [
       say("The guard fires when a message says `#1566 awaits your decision`.")],
      False,
      "a trigger phrase inside a CODE SPAN is a quotation, not an assertion"),
+
+    # --- defects found by adversarial review ---------------------------------
+    # The MCP discharge path was DEAD: the patterns key on `issue_read`, which
+    # lives in the tool NAME, and only `input` was being searched. Remote
+    # sessions have no `gh`, so this was a systematic false positive exactly
+    # where the MCP route is mandatory.
+    ([PROMPT,
+      tool("mcp__github__issue_read",
+           {"method": "get_comments", "owner": "o", "repo": "r",
+            "issue_number": 1566}),
+      say(CLAIM)], False,
+     "an MCP issue_read for comments discharges it -- the tool NAME carries "
+     "the match, so searching only `input` made this path dead code"),
+
+    # A bulleted recap is this corpus's default reporting shape. A `\n- item`
+    # has no whitespace after the newline, so a `\s+`-anchored split treated
+    # the whole recap as ONE sentence and attached an unrelated cue to an
+    # issue reported as closed.
+    ([PROMPT, say("Progress notes:\n"
+                  "- Investigated flaky CI, still pending a fix upstream\n"
+                  "- Closed #1622 after merging the associated PR")], False,
+     "an unrelated cue in ANOTHER bullet must not attach to an issue "
+     "reported as closed"),
+    ([PROMPT, say("I have several PRs pending; #1622 is one example.")], False,
+     "a semicolon separates clauses -- the cue must not reach across it"),
+
+    # The cue describes the PR, not the issue.
+    ([PROMPT, READ_BODY_ONLY,
+      say("The PR for #1622 is awaiting review.")], False,
+     "'the PR for #N' attributes the cue to the PR, not to issue #N"),
+
+    # A --jq filter legitimately contains a pipe.
+    ([PROMPT,
+      bash("gh issue view 1566 -R o/r --jq '.comments[] | .body' --json comments"),
+      say(CLAIM)], False,
+     "a --jq pipe before the comments flag must not break the discharge match"),
+
+    # Mixed state: one discharged, one not. The undischarged one must win.
+    ([PROMPT, READ_COMMENTS,
+      say("#1566 is settled. But #1544 still needs your call.")], True,
+     "a discharged issue in the same message does not excuse an undischarged one"),
 ]
 
 

@@ -100,6 +100,29 @@ list it governs begins and ends, and whether the issue it names is the
 subject or merely background -- which is discourse structure rather than
 lexis.
 
+A single letter and a period opens `J. Smith reviewed it` exactly as it opens
+`a. the migration script`, and admitting both shapes as boundaries was
+measured to split a real claim away from its own issue number across a
+semantic line break. The two are separated by CASE rather than by
+punctuation: an initial is capitalised and is neutralised before the split,
+while a lowercase lettered item still ends a sentence. A capitalised lettered
+list (`A. first item`) is therefore not a boundary, and a lowercase initial
+(`e. coli`) is one. Both are rare, and neither can be told from its twin
+without knowing whether a list is in progress.
+
+The same rule declines to neutralise a period that itself follows a period,
+so a dotted abbreviation ending a sentence (`... in the U.S. Now ...`) still
+ends it. The cost is a double initial written closed up: `J.R. Smith` keeps
+`R.` as a terminator and can split a claim there. That shape was never
+handled, and admitting it would reopen the abbreviation case, which is the
+worse of the two -- it merges sentences rather than splitting them, and a
+merge is what produces a warning naming the wrong issue.
+
+An unclosed fence leaves the rest of the message as prose rather than
+swallowing it, which is `fences.strip_code`'s default and is the right
+direction here: swallowing would let one stray backtick run silence every
+claim after it.
+
 ON BUILDING THIS AT THE SECOND OCCURRENCE
 ------------------------------------------
 `shared/principles/deterministic-tools.md` sets the bar at the third
@@ -162,8 +185,38 @@ import sys
 # Code regions are quoted material, not assertions. A recap explaining THIS
 # guard cites its own trigger phrases, and every such citation is an assertion
 # in form and a quotation in fact.
-BLOCK = re.compile(r"```.*?```|^[ \t]*>[^\n]*$", re.S | re.M)
-TICK = re.compile(r"`[^`\n]*`")
+#
+# The shared stripper in `scripts/lib/fences.py` does the work rather than a
+# local regex, for the reason its own docstring gives: a whole-document
+# backtick-run pattern pairs runs across the file, so a four-backtick fence
+# wrapping a three-backtick example throws every later region out of phase and
+# the quoted text reads back as prose. That shape is not hypothetical for THIS
+# guard, since documenting it means quoting its own trigger phrases inside a
+# nested fence.
+_HERE = os.path.dirname(os.path.realpath(__file__))
+try:
+    _LIB = os.path.join(os.path.dirname(_HERE), "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from fences import strip_code  # type: ignore
+except Exception:  # pragma: no cover - only where the shared library is absent
+    strip_code = None
+
+if strip_code is None:
+    def strip_code(text, fence_replacement=" ", span_replacement=" "):
+        """Fallback for a checkout without the shared library.
+
+        It carries the nesting bug described above. That is deliberate: a
+        degraded stripper still removes the common single-fence case, and
+        failing open is this file's contract.
+        """
+        text = re.sub(r"```[\s\S]*?```", fence_replacement, text)
+        return re.sub(r"`[^`\n]*`", span_replacement, text)
+
+
+# A blockquote line. `fences.strip_code` does not cover these, and a quoted
+# recap is quoted material by exactly the argument a fenced one is.
+QUOTE = re.compile(r"(?m)^[ \t]*>[^\n]*$")
 
 
 def visible_prose(text):
@@ -175,16 +228,35 @@ def visible_prose(text):
     """
     if not isinstance(text, str):
         return ""
-    text = BLOCK.sub(".", text)
-    return TICK.sub(".", text)
+    text = strip_code(text, fence_replacement=".", span_replacement=".")
+    return QUOTE.sub(".", text)
 
 
-# An issue reference. `PR #12` and a pull URL are excluded: this guard is
-# about issues, and a PR's comments are a different question with its own
-# guards.
+# An issue reference. This guard is about issues, and a PR's comments are a
+# different question with its own guards, so `PR #12` is excluded -- by
+# `RX_PR_PREFIX` below, which reads what precedes the number, and not here.
+#
+# A `(?<!pull/)` lookbehind used to sit in this pattern, and the comment above
+# it credited the exclusion of pull URLs to it. It never did any work: a pull
+# URL is `.../pull/1622` with no `#` at all, so nothing in a real URL puts
+# `pull/` immediately before a `#`, and the test that was written to justify
+# the lookbehind passes with it deleted because its fixture contains no `#`.
+# The remaining lookbehind is load-bearing -- it keeps `abc#12` from matching.
 RX_ISSUE = re.compile(
-    r"(?<![A-Za-z0-9])(?<!pull/)#(\d{1,7})(?![0-9])"
+    r"(?<![A-Za-z0-9])#(\d{1,7})(?![0-9])"
 )
+
+
+def issue_key(number):
+    """Canonicalise an issue number so both sides of the check compare equal.
+
+    The assertion and the discharging command are matched as strings, and
+    nothing forces them to be written the same way: `#0012` in a recap against
+    `issue view 12 --comments` in the transcript are the same issue and are
+    not the same string. Comparing the raw captures reports a read issue as
+    unread, which is the misattributing warning this file rates worst.
+    """
+    return number.lstrip("0") or "0"
 # A PR reference immediately before the number: `PR #12`, `pull request #12`.
 #
 # `for` is admitted ONLY directly after a PR-referring noun, which is the
@@ -250,15 +322,37 @@ RX_PR_PREFIX = re.compile(
 # rather than a sentence end.
 RX_ENUMERATOR = re.compile(r"(?m)^([ \t]*\d+)[.)](?=\s)")
 
-# A paragraph: the unit a list and its lead-in share. Used only to find the
-# lead-in, never to attach a cue by itself.
-RX_PARAGRAPH = re.compile(r"\n\s*\n")
+# A personal initial: one letter, standing alone, before a capitalised word.
+# Its period is punctuation inside a name rather than a sentence end, and
+# treating it as a terminator was measured to cut a claim off from its own
+# issue number -- `#12 is outstanding, per J. Smith's review, and it still
+# needs your call` split at `J.` and left the cue in a sentence with no
+# number in it.
+#
+# The lookbehind excludes a preceding PERIOD as well as a letter, and the
+# period is the half that was missing. Excluding a letter keeps an acronym
+# ending a real sentence (`... opened the PR. It still needs your call`)
+# splitting normally. Without the period, the LAST letter of a dotted
+# abbreviation matched instead: in `#12 is closed in the U.S. Now #34 needs
+# your call`, the `S` is preceded by a period rather than a letter, and an
+# English sentence after such an abbreviation ordinarily begins with a
+# capital, so the lookahead matched too. The terminator was deleted, the two
+# sentences merged, and the guard warned about #12 -- which the message says
+# is CLOSED -- while the real claim about #34 went unnamed. That is
+# misattribution, which this file rates worse than a miss. `P.S.`, `E.U.`,
+# `U.K.`, `D.C.` and `U.N.` all reproduce it.
+#
+# The cost is a double initial written with no space: `J.R. Smith` keeps
+# `R.` as a terminator. `J.` does not match there either, since no space
+# follows it, so the shape was never handled and this does not regress it.
+RX_INITIAL = re.compile(r"(?<![A-Za-z.])([A-Z])\.(?=\s+[A-Z])")
 
-# A list item of any marker style this file recognises, including the bare
-# numeric form that `RX_ENUMERATOR` has already stripped punctuation from.
-RX_LIST_ITEM = re.compile(
-    r"^[ \t]*(?:[-*+•‣◦]|[A-Za-z][.)]|[ivxIVX]+[.)]|\d+[.)]?)\s")
-
+# `J. Smith` opens a wrapped line in the same shape `a. first item` does, and
+# the letter form below cannot tell them apart. It does not have to: the
+# initial's period is removed by `RX_INITIAL` before this pattern ever runs,
+# so what reaches here is `J Smith` and no marker matches. The division is by
+# CASE rather than by punctuation, which is why both stay simple -- an
+# initial is capitalised and a lettered list item conventionally is not.
 RX_SENTENCE = re.compile(
     r"(?<=[.!?;])\s+"                    # a terminator, then any whitespace
     r"|\n\s*\n"                          # a blank line: paragraph boundary
@@ -364,7 +458,7 @@ def comments_read(transcript_path):
                 for blob in blobs:
                     for rx in RX_READS:
                         for m in rx.finditer(blob):
-                            seen.add(m.group(1))
+                            seen.add(issue_key(m.group(1)))
     except Exception:
         return None
     return seen
@@ -414,13 +508,14 @@ def asserted_issues(text):
     # the list-marker branch above deliberately avoids. Neutralize the
     # marker's punctuation first so only real sentence ends split.
     prose = RX_ENUMERATOR.sub(r"\1 ", prose)
+    prose = RX_INITIAL.sub(r"\1", prose)
     for sentence in RX_SENTENCE.split(prose):
         if not RX_CUE.search(sentence):
             continue
         for m in RX_ISSUE.finditer(sentence):
             if RX_PR_PREFIX.search(sentence[:m.start()]):
                 continue
-            out.append(m.group(1))
+            out.append(issue_key(m.group(1)))
     return out
 
 

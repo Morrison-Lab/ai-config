@@ -221,6 +221,100 @@ CASES = [
     ([PROMPT, READ_COMMENTS,
       say("#1566 is settled. But #1544 still needs your call.")], True,
      "a discharged issue in the same message does not excuse an undischarged one"),
+
+    # --- round 6 -------------------------------------------------------------
+    # A NESTED fence. Documenting this guard means quoting its own trigger
+    # phrases, and the natural way to quote a fenced example is a wider fence
+    # around it. A whole-document backtick-run regex pairs the runs wrongly
+    # and hands the quoted claim back as prose.
+    ([PROMPT, READ_BODY_ONLY,
+      say("Here is how the guard documents itself:\n"
+          "````\n"
+          "Example transcript:\n"
+          "```\n"
+          "#1566 still needs your call.\n"
+          "```\n"
+          "That is the trigger shape.\n"
+          "````\n"
+          "Everything else is done.")], False,
+     "a nested fence is quoted material, not an assertion"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("> #1566 still needs your call.\n\nThat was last week's recap.")],
+     False,
+     "a blockquote is quoted material too"),
+
+    # A personal initial is not a sentence end. Both the terminator rule and
+    # the list-marker rule used to cut the claim in two here, leaving the cue
+    # in a sentence carrying no issue number -- the silent miss this file
+    # rates worst.
+    ([PROMPT, READ_BODY_ONLY,
+      say("#1566 is the one item outstanding, per\n"
+          "J. Smith's review, and it\n"
+          "still needs your final call.")], True,
+     "an initial mid-claim does not split the claim from its issue"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("I opened the PR. It still needs your call on #1566.")], True,
+     "an acronym ending a real sentence still splits, so the cue stays with "
+     "the number that follows it"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("Closed #1622 after merging the PR. "
+          "Separately, CI is still blocked on the runner image.")], False,
+     "an acronym ending a real sentence still splits, so a LATER cue does not "
+     "reach back to the number"),
+
+    # A DOTTED abbreviation ends a sentence, and the next one ordinarily
+    # begins with a capital -- so the initial rule matched its last letter
+    # and deleted a real terminator, merging two sentences and attributing
+    # the second's cue to the first's issue. The issue named there is stated
+    # as CLOSED, which is what makes the resulting warning misdirection
+    # rather than noise.
+    # Each of these puts the NUMBER in the first sentence, the CUE in the
+    # second, the abbreviation on the boundary between them, and leaves the
+    # issue undischarged -- so a merged boundary fires and names an issue the
+    # message says is closed. A fixture that discharges the issue, or that
+    # keeps cue and number on the same side, stays quiet either way and
+    # asserts nothing.
+    ([PROMPT, READ_BODY_ONLY,
+      say("#1622 is closed in the U.S. Now the runner image still needs "
+          "your call.")], False,
+     "a dotted abbreviation ending a sentence still splits"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("#1622 shipped to the E.U. P.S. The runner image is blocked on "
+          "your review.")], False,
+     "a run of dotted abbreviations does not swallow the boundary either"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("Everything shipped in the E.U. But #1566 still needs your call.")],
+     True,
+     "and an abbreviation does not silence a claim in the sentence after it"),
+
+    # `pending` alone. Deleting this cue left the suite green, which meant the
+    # cue was carried by the code and asserted by nothing.
+    ([PROMPT, READ_BODY_ONLY,
+      say("#1566 is pending a decision from you.")], True,
+     "'pending' alone is a cue"),
+
+    # A blank line ends a sentence even where the paragraph before it carries
+    # no terminal punctuation. Deleting that alternative also left the suite
+    # green, because every multi-paragraph fixture happened to end its first
+    # paragraph with a period.
+    ([PROMPT, READ_BODY_ONLY,
+      say("Blocked on the runner image\n\n#1566 was closed as complete.")],
+     False,
+     "a blank line separates paragraphs even with no terminator before it"),
+
+    # Both sides of the check are matched as strings, so a zero-padded
+    # reference and a bare command argument have to be canonicalised or an
+    # issue whose comments WERE read gets reported as unread.
+    ([PROMPT, READ_COMMENTS,
+      say("#01566 still needs your call.")], False,
+     "a zero-padded reference is the same issue as the one whose comments "
+     "were read"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("#01566 still needs your call.")], True,
+     "and zero-padding does not excuse an undischarged issue either"),
+    ([PROMPT, bash("gh issue view 01566 -R o/r --comments"),
+      say("#1566 still needs your call.")], False,
+     "the canonicalisation runs on the COMMAND side too, not only the claim"),
 ]
 
 

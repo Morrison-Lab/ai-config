@@ -476,6 +476,10 @@ CASES = [
       say("#1031 is fully clean.")],
      "block",
      "#3838: unrecoverable push and partial read blocks claim as safe fallback"),
+    ([PARTIAL_1034,
+      say("#1031 is fully clean.")],
+     "allow",
+     "#3838: unrelated partial read does not cause warn on unread claim for #1031"),
 ]
 
 # (events, must_contain, must_not_contain, label). The WARN explanation must
@@ -586,6 +590,11 @@ CONTENT_CASES = [
      "claim about #300",
      "claim about #100",
      "#3761: multiple warn_claims names #300"),
+    ([AGENT_200_DISPATCH, AGENT_200_REPORT, PUSH_1034,
+      say("#200 is fully clean.")],
+     "dispatched subagent's OWN report",
+     "a `git push` landed after it",
+     "#3838: push to unrelated PR does not make subagent report stale for #200"),
 ]
 
 

@@ -41,6 +41,9 @@ def run_hook_command(cmd, claude_payload, cwd, timeout_val):
     # there only block via an explicit exit-code-2 (or JSON deny) response,
     # never via failing to answer at all.
     try:
+        kwargs = {}
+        if os.name == "nt":
+            kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
         result = subprocess.run(
             cmd, 
             shell=True, 
@@ -49,7 +52,8 @@ def run_hook_command(cmd, claude_payload, cwd, timeout_val):
             capture_output=True,
             env=os.environ,
             cwd=cwd,
-            timeout=timeout_val
+            timeout=timeout_val,
+            **kwargs
         )
         if result.returncode != 0:
             err_msg = result.stderr.strip() if result.stderr else f"process exited with code {result.returncode}"
@@ -116,6 +120,16 @@ def parse_timeout(val):
 # runnable command.
 DEFAULT_HOOK_TIMEOUT = 30.0
 
+def find_windows_bash():
+    for candidate in (
+        r"C:\Program Files\Git\bin\bash.exe",
+        r"C:\Program Files\Git\usr\bin\bash.exe",
+        r"C:\Program Files (x86)\Git\bin\bash.exe",
+    ):
+        if os.path.isfile(candidate):
+            return candidate
+    return "bash"
+
 def resolve_cmd_and_timeout(hook, repo_root):
     """Extract the runnable command and effective timeout from a single
     hook entry, or return None when the entry has nothing runnable to skip
@@ -132,6 +146,22 @@ def resolve_cmd_and_timeout(hook, repo_root):
     if not cmd:
         return None
     cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
+    if os.name == "nt":
+        stripped = cmd.strip()
+        if stripped.startswith('"'):
+            end_quote = stripped.find('"', 1)
+            if end_quote != -1:
+                prog = stripped[1:end_quote]
+                rest = stripped[end_quote + 1:].strip()
+                if prog.lower().endswith(".sh"):
+                    bash_bin = find_windows_bash()
+                    cmd = f'"{bash_bin}" "{prog}" {rest}'.strip()
+        else:
+            parts = stripped.split(None, 1)
+            if parts and parts[0].lower().endswith(".sh"):
+                bash_bin = find_windows_bash()
+                rest = parts[1] if len(parts) > 1 else ""
+                cmd = f'"{bash_bin}" "{parts[0]}" {rest}'.strip()
     timeout_val = parse_timeout(hook.get("timeout"))
     if timeout_val is None:
         timeout_val = DEFAULT_HOOK_TIMEOUT

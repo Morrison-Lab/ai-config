@@ -379,9 +379,12 @@ def ensure():
     if alive(read_state().get("pid")):
         return True
     try:
+        kwargs = {}
+        if IS_WINDOWS:
+            kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
         process = subprocess.Popen([sys.executable, os.path.realpath(__file__), "--monitor"],
                                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                   stderr=subprocess.DEVNULL, start_new_session=True)
+                                   stderr=subprocess.DEVNULL, start_new_session=True, **kwargs)
     except OSError:
         return False
     state = read_state()

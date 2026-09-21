@@ -166,8 +166,23 @@ def stop_stale_daemon(state_path=None, stale_seconds=None, wait_seconds=5.0):
     return pid
 
 
+def resolve_windows_interpreter(python3):
+    """On Windows, prefer pythonw.exe over python.exe/python3.exe for background
+    scheduled tasks to prevent console/terminal windows from flashing or popping up."""
+    p = Path(python3)
+    sibling = p.with_name("pythonw.exe")
+    if sibling.is_file():
+        return str(sibling)
+    if p.suffix.lower() in (".bat", ".cmd"):
+        found = shutil.which("pythonw")
+        if found:
+            return found
+    return python3
+
+
 def windows_task_command(python3):
-    return f'"{python3}" "{INSTALLED_HOOK}" --monitor'
+    interp = resolve_windows_interpreter(python3)
+    return f'"{interp}" "{INSTALLED_HOOK}" --monitor'
 
 
 def install_windows(python3):

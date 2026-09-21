@@ -10,9 +10,10 @@ THE MEASUREMENT (2026-09-21, ai-config#3823)
 ---------------------------------------------
 Twice on `Lacaedemon/sparta`, and the second time is what this guard is for.
 
-  1. 2026-09-19, #1544. A session claimed the issue from its body alone and
-     proposed a state dump that had already merged in #1553. It self-corrected
-     within the hour.
+  1. 2026-09-18, #1544. A session claimed the issue from its body alone and
+     proposed a state dump that had already merged in #1553. It cost a wasted
+     claim, a draft PR opened and closed as obsolete (#1608), and a public
+     correction. `warn-claim-without-comments-read.py` was built for it.
   2. 2026-09-21, #1566. A session read the body down to its `## Options`
      heading and stopped, then told the user across many turns that the issue
      needed THEIR decision, and that two P2 issues were blocked behind it. The
@@ -21,13 +22,20 @@ Twice on `Lacaedemon/sparta`, and the second time is what this guard is for.
      the repository's recent history. It surfaced only when the user asked
      "what do I need to do on 1566?".
 
-WHY THE SECOND SHAPE NEEDS AN INSTRUMENT AND THE FIRST DID NOT
----------------------------------------------------------------
-They fail in opposite directions, which is why one prose memory covered the
-first and did not reach the second.
+WHY THE SECOND SHAPE NEEDS ITS OWN INSTRUMENT
+----------------------------------------------
+The first shape already has one. `warn-claim-without-comments-read.py` is
+registered and fires on a CLAIM posted without the comments read, and an
+earlier draft of this paragraph said a prose memory had covered it --- which
+is wrong twice over, since no memory entry about #1544 exists and the thing
+that covers it is a merged sibling hook.
+
+The two shapes fail in opposite directions, and that is what leaves a gap
+between the guards rather than an overlap.
 
 Claiming an issue and redoing merged work COLLIDES with reality quickly: you
-open the file and the change is already there, so the mistake reports itself.
+open the file and the change is already there, so the mistake reports itself
+even when nothing catches it first.
 
 Escalating -- saying an issue is blocked, or awaits a human -- produces
 nothing that can collide. It reads as diligence, it survives recap after

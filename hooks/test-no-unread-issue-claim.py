@@ -77,6 +77,14 @@ CASES = [
     # --- not a state claim ----------------------------------------------------
     ([PROMPT, say("Merged #1566 as 7100f687.")], False,
      "reporting a merge is not a claim that the issue is open"),
+    # `RX_ISSUE`'s lookbehind and lookahead are both called load-bearing and
+    # neither was exercised: deleting either left the suite green.
+    ([PROMPT, READ_BODY_ONLY,
+      say("The branch feat#1566 still needs your call.")], False,
+     "a number glued to a word is not an issue reference"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("Ticket #123456789 still needs your call.")], False,
+     "a digit run longer than an issue number is not one"),
     ([PROMPT, say("Filed #1621 for the terrain overlay.")], False,
      "filing an issue is not a claim that it is blocked"),
     ([PROMPT, say("Closed #1566 as completed.")], False,
@@ -370,6 +378,22 @@ CASES = [
     ([PROMPT, READ_BODY_ONLY,
       say("The pull" + " " * 12 + "request #1566 is awaiting review.")], True,
      "the run between `pull` and `request` is bounded like the others"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("The pull" + " " * 8 + "request for #1566 is awaiting review.")],
+     False,
+     "the pull/request run at exactly its bound is still excluded"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("The pull" + " " * 9 + "request for #1566 is awaiting review.")],
+     True,
+     "and one character past it is not"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("The pull request for" + " " * 8 + "#1566 is awaiting review.")],
+     False,
+     "the trailing run after `for` at exactly its bound is still excluded"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("The pull request for" + " " * 9 + "#1566 is awaiting review.")],
+     True,
+     "and one character past THAT one is not either"),
 
     # A prefix at the pattern's full maximum length, which is what pins
     # `PREFIX_WINDOW`'s floor. Every window down to 20 passed the suite

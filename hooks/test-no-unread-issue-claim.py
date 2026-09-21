@@ -109,6 +109,33 @@ CASES = [
     ([PROMPT, bash("gh issue view 1566 -R o/r -c"), say(CLAIM)], False,
      "the `-c` shorthand discharges it too"),
 
+    # The ANTIGRAVITY record shape. Fifteen-odd hooks in this repo parse
+    # `tool_calls`, and a round deleted this file's handling of it on the
+    # claim that no transcript format emits it -- in a file whose last nine
+    # lines special-case Antigravity.
+    ([PROMPT,
+      {"type": "PLANNER_RESPONSE", "tool_calls": [
+          {"name": "run_command",
+           "args": {"command": "gh issue view 1566 -R o/r --comments"}}]},
+      say(CLAIM)], False,
+     "an Antigravity `tool_calls` record discharges it"),
+    ([PROMPT,
+      {"type": "PLANNER_RESPONSE", "tool_calls": [
+          {"function": {"name": "run_command",
+                        "arguments": "{\"command\": \"gh issue view 1566 "
+                                     "-R o/r --comments\"}"}}]},
+      say(CLAIM)], False,
+     "and so does the function/arguments spelling of the same shape"),
+
+    # The command extractor is name-agnostic. Matching the literal tool name
+    # `Bash` made a lowercase-named runner invisible.
+    ([PROMPT, tool("bash", {"command": "gh issue view 1566 -R o/r -c"}),
+      say(CLAIM)], False,
+     "a lowercase tool name carrying the same command discharges it"),
+    ([PROMPT, tool("Shell", {"cmd": "gh issue view 1566 -R o/r -c"}),
+      say(CLAIM)], False,
+     "so does a `cmd` key under a differently-named tool"),
+
     # FALSE DISCHARGE, the worst outcome this guard has: staying silent on a
     # claim whose evidence was never gathered. Both shapes were accepted by
     # a proximity-matching reimplementation of the sibling hook's checks.
@@ -590,11 +617,27 @@ def check_missing_sibling_fails_open():
     spec = importlib.util.spec_from_file_location("h_open", HOOK)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
+    uses = [("Bash", {"command": "echo hi"})]
     mod.command_reads_comments = None
     mod.mcp_reads_comments = None
-    ok = mod.comments_were_read("1566", [("Bash", {"command": "echo hi"})])
-    print(f"{'ok  ' if ok else 'FAIL'}  a missing sibling fails OPEN, so the "
-          f"guard stays silent rather than warning on everything")
+    ok = mod.comments_were_read("1566", uses)
+
+    # A sibling that is PRESENT but whose signature moved raises instead of
+    # returning None, and catching that per call would answer False for
+    # every issue in every session -- a universal spurious warning with no
+    # diagnostic. Same direction, different route in.
+    spec = importlib.util.spec_from_file_location("h_raise", HOOK)
+    raising = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(raising)
+
+    def boom(*args, **kwargs):
+        raise TypeError("signature moved")
+
+    raising.command_reads_comments = boom
+    raising.mcp_reads_comments = boom
+    ok = ok and raising.comments_were_read("1566", uses)
+    print(f"{'ok  ' if ok else 'FAIL'}  a missing OR raising sibling fails "
+          f"OPEN, so the guard stays silent rather than warning on everything")
     return 0 if ok else 1
 
 
@@ -610,8 +653,20 @@ def check_role_keyed_string_record():
     events = [PROMPT,
               {"role": "assistant", "content": "#1566 still needs your call."}]
     ok = fired(run(events))
+    # The `assistant` sub-condition on each branch matters on its own: a USER
+    # turn quoting a claim is not the assistant asserting it, and dropping
+    # just that clause left every case green.
+    quiet = [PROMPT,
+             {"role": "assistant", "content": "All clear."},
+             {"role": "user", "content": "#1566 still needs your call."}]
+    ok = ok and not fired(run(quiet))
+    blocks = [PROMPT,
+              say("All clear."),
+              {"type": "user", "message": {"content": [
+                  {"type": "text", "text": "#1566 still needs your call."}]}}]
+    ok = ok and not fired(run(blocks))
     print(f"{'ok  ' if ok else 'FAIL'}  a `role`-keyed record with string "
-          f"content is read")
+          f"content is read, and a USER turn is not read as an assertion")
     return 0 if ok else 1
 
 
@@ -679,7 +734,21 @@ def check_scan_cost_stays_linear():
     ok = len(found) == 8000 and elapsed < 2.0
     print(f"{'ok  ' if ok else 'FAIL'}  a 130 KB single-sentence recap scans "
           f"in well under the hook's timeout ({elapsed:.2f}s)")
-    return 0 if ok else 1
+
+    # The discharge check is O(issues x tool calls) and was untested at
+    # scale. A long session with many issues asserted at once multiplies,
+    # which is the same shape as the quadratic prose scan this check was
+    # first written for.
+    uses = [("Bash", {"command": f"git log --oneline -{i}"})
+            for i in range(2000)]
+    numbers = [str(1500 + i) for i in range(30)]
+    start = time.time()
+    missing = [n for n in numbers if not mod.comments_were_read(n, uses)]
+    elapsed = time.time() - start
+    ok2 = len(missing) == 30 and elapsed < 3.0
+    print(f"{'ok  ' if ok2 else 'FAIL'}  30 issues against 2000 tool calls "
+          f"checks in well under the hook's timeout ({elapsed:.2f}s)")
+    return 0 if (ok and ok2) else 1
 
 
 def main():

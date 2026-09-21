@@ -470,6 +470,16 @@ def _sibling(name, key):
 _claim = _sibling("warn-claim-without-comments-read.py", "_sib_unread_claim")
 command_reads_comments = getattr(_claim, "command_reads_comments", None)
 mcp_reads_comments = getattr(_claim, "mcp_reads_comments", None)
+# The transcript walker and the command extractor come from the same place,
+# for the same reason. `_tool_uses` reads the Antigravity `tool_calls` shape
+# as well as the block-list one, and `_payload_commands` yields a command
+# from `command`, `cmd` or `CommandLine` whatever the tool is NAMED. An
+# earlier version of this file walked only block lists and matched the tool
+# name `Bash` exactly, which made a genuine comments read invisible in an
+# Antigravity transcript -- in a file that special-cases Antigravity nine
+# lines from the end.
+_tool_uses = getattr(_claim, "_tool_uses", None)
+_payload_commands = getattr(_claim, "_payload_commands", None)
 
 NOTE = (
     "Unread-issue reminder: this message reports issue #{n} as open, blocked, "
@@ -513,11 +523,10 @@ def tool_uses(transcript_path):
                     rec = json.loads(line)
                 except Exception:
                     continue
-                blocks = (rec.get("message") or {}).get("content") or rec.get("content") or []
-                if isinstance(blocks, list):
-                    for b in blocks:
-                        if isinstance(b, dict) and b.get("type") == "tool_use":
-                            out.append((b.get("name") or "", b.get("input") or {}))
+                if _tool_uses is None:
+                    return None
+                for name, payload in _tool_uses(rec):
+                    out.append((name, payload))
     except Exception:
         return None
     return out
@@ -531,17 +540,22 @@ def comments_were_read(number, uses):
     warning: a guard that cannot tell whether the evidence was gathered must
     not assert that it was not.
     """
-    if command_reads_comments is None or mcp_reads_comments is None:
+    if None in (command_reads_comments, mcp_reads_comments, _payload_commands):
         return True
-    for name, inp in uses:
-        try:
-            if name == "Bash" and isinstance(inp, dict):
-                if command_reads_comments(inp.get("command") or "", number):
+    try:
+        for name, inp in uses:
+            for command in _payload_commands(inp):
+                if command_reads_comments(command, number):
                     return True
             if mcp_reads_comments(name, inp, number):
                 return True
-        except Exception:
-            continue
+    except Exception:
+        # A borrowed function that raises means this hook can no longer tell
+        # a read from an unread issue. Catching per call and carrying on
+        # would answer False for every issue in every session -- a universal
+        # spurious warning with no diagnostic. Fail open instead, on the same
+        # argument as the missing-import case above.
+        return True
     return False
 
 

@@ -265,7 +265,8 @@ The tell is having to construct contrived input to kill the mutant: where the on
 So ask the discriminating question before writing the test --- does another change in this same diff already handle the input this mutant should have broken?
 The situation that produces it is ordinary rather than exotic: two fixes landed in one round for one review finding, which is how a review round usually goes.
 
-Measured 2026-09-21 on `scripts/check-hook-delivery.py` ([ai-config#3833](https://github.com/Morrison-Lab/ai-config/pull/3833)), where commit `83bafbef` records the survivor and `472408f8` records what it was worth.
+Measured 2026-09-21 on `scripts/check-hook-delivery.py` ([ai-config#3833](https://github.com/Morrison-Lab/ai-config/pull/3833)), where [`83bafbef`](https://github.com/Morrison-Lab/ai-config/commit/83bafbef) records the survivor and [`472408f8`](https://github.com/Morrison-Lab/ai-config/commit/472408f8) records what it was worth.
+Both are pre-merge commits on that PR's branch, linked by SHA because a squash merge will leave neither reachable from `main` --- which is this paragraph's own caution applied to itself.
 A review finding about a crash on a malformed records file drew a type filter that dropped every non-string `installPath` at read time, upstream of the `Path().resolve()` that consumed it.
 Mutating the filter failed a test.
 Widening the `except` around that `resolve()` past `OSError` survived, because the filter had already removed the input that would have reached it, so the narrow catch shipped with a comment stating which exceptions were unreachable and why.
@@ -275,9 +276,11 @@ Widening the `except` around that `resolve()` past `OSError` survived, because t
 `ValueError` was not: an embedded NUL raises it on POSIX and returns quietly on Windows, where the mutation run happened, and CI runs on Linux.
 So the survivor was a true reading of an incomplete experiment, the next round widened the catch back, and what had shipped in between was a crash in the environment the code actually runs in.
 
-A caution about reading this example from the history, which applies to every measurement of this kind: the widening and the narrowing both happened inside one uncommitted round, so the diffs do not show them.
-What the history carries is the commit messages --- `83bafbef` saying the widened catch "would have been a branch no input can take, which is what mutation testing reported when it survived", and `472408f8` correcting it.
-An intermediate state that was never committed is not evidence anyone else can check, so say which artifact carries the claim rather than citing the PR and leaving a reader to look for a diff that does not exist.
+A caution about reading this example from the history, which applies to every measurement of this kind.
+The later widening is committed and visible in `472408f8`.
+The **mutation experiment** is not: widening the catch and reverting it happened inside the authoring of `83bafbef`, whose diff therefore shows a catch that was narrow before and narrow after.
+So the survivor that motivated the whole thing is carried by that commit's *message* --- "A widened catch would have been a branch no input can take, which is what mutation testing reported when it survived" --- and by nothing else.
+An experiment nobody committed is not evidence anyone else can check, so name the artifact that carries the claim rather than citing the PR and leaving a reader to look for a diff that does not exist.
 
 A survivor is therefore evidence about redundancy only across the conditions the run covered.
 Before deleting, ask what the mutation run did not vary --- platform, locale, Python version, filesystem --- and whether the branch could be reachable there.
@@ -297,9 +300,14 @@ A sibling that **enforces the same property independently** is defence in depth,
 And a branch with **no sibling at all** is not redundant in any sense: its mutant survived because the suite lacks the input, which is the coverage hole this section's first reading names.
 
 That third answer is the one most easily assumed away, because a branch can look like a duplicate of a neighbour without being one.
-[`dead-code-is-tech-debt`](../principles/dead-code-is-tech-debt.md)'s worked example (ai-config#3707) is exactly that: a `transcript_path and` conjunct, structurally identical to two genuinely dead siblings in the same function, was read as dead by analogy with them.
-The two siblings were dead because an earlier `return` guaranteed them false; this one had no such guarantee and was the only guard the call site had.
-Establish what makes a neighbour's branch dead before transferring the verdict to this one --- which is [`check-purpose-before-reusing`](../workflow/check-purpose-before-reusing.md)'s question asked about a diagnosis rather than about a template.
+[`dead-code-is-tech-debt`](../principles/dead-code-is-tech-debt.md)'s worked example (ai-config#3707) is exactly that: a `transcript_path and` conjunct, structurally identical to inert siblings a few lines away in the same function, was read as inert by analogy with them.
+Those siblings were inert because the statement above them guaranteed the operand truthy.
+This one sat where nothing did, and dropping it would have turned `os.path.exists(None)`'s `TypeError` into a silent allow through the caller's blanket `except`.
+
+That case is the sharpest available statement of this section's limit, and it is worth reading in full rather than summarised.
+A mutation run over the existing suite reported both conjuncts safe to remove, for **opposite** reasons --- one because nothing could observe its removal, the other because no test passed the input it existed for.
+The remedy there was neither a test for the inert pair nor a deletion of the live one: it was to exercise the `None` input directly and measure the guard with and without it.
+So establish what makes a neighbour's branch dead before transferring the verdict, which is [`check-purpose-before-reusing`](../workflow/check-purpose-before-reusing.md)'s question asked about a diagnosis rather than about a template.
 
 - **Do:** write the members as literals in the test, and assert separately that the constant contains them.
 - **Do:** ask whether a sibling change in the same diff already covers a genuine survivor's input, before writing a test for it.

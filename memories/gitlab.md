@@ -58,8 +58,9 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   other platforms use their own config-dir convention.
 - **`glab api` has no `--jq` flag**, unlike `gh api`: passing one errors with `Unknown flag: --jq`.
   Pipe the raw JSON to `jq` separately instead: `glab api "projects/<id>" | jq '.default_branch'`.
-  **2nd occurrence (2026-09-14, HACtions !56; 1st: 2026-08-06):**
-  A pipeline-monitoring loop repeated the same unsupported flag until stopped and rewritten with a pipe.
+  **3rd occurrence (2026-09-21, abridge !103; 2nd: 2026-09-14,
+  HACtions !56; 1st: 2026-08-06):**
+  A diagnostic query retried the unsupported flag once before switching to raw JSON output.
 - **Use the paginated MR notes endpoint as the authoritative unresolved-inline-comment sweep.**
   `GET /projects/:id/merge_requests/:iid/notes` can return resolvable unresolved `DiffNote`s that a Discussions API sweep does not expose as an unresolved discussion.
   Filter every page on `.resolvable == true and .resolved == false`, then use the Discussions API only to locate and resolve the corresponding thread.
@@ -172,3 +173,11 @@ HACtions added a new script dependency to `templates/claude.yml`'s
 (`allow_failure: true`) started failing to fetch the script, and the
 pipeline stayed green throughout --- the MR simply stopped getting
 reviewed, with no failed check anywhere to notice.)
+
+(Measured 2026-09-21, `health-analytics-core/abridge` !103, pipeline 9236:
+the allowed-to-fail manual `claude-manual` job 39259 failed before review
+because `claude-review.sh` referenced the missing
+`.gitlab/scripts/lib/review-tools.sh`; the pipeline remained successful with
+a warning.
+Inspect the review job's own trace when the review product matters,
+not only the pipeline status.)

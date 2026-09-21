@@ -33,7 +33,8 @@
 - **Always answer the user as soon as you have the answer to their question**:
   When the user asks a direct question or diagnostic inquiry ("why did X happen?", "what is happening?", "session done?"), state the direct answer immediately in the very next turn as soon as the facts are known.
   Do not delay the answer by chaining further internal investigations or running downstream tasks silently before answering the question.
-  State the findings clearly first, then proceed with the remaining authorized actions. (User directive, 2026-09-21.)
+  State the findings clearly first, then proceed with the remaining authorized actions.
+  (User directive, 2026-09-21.)
 - **Do:** use hosted/cloud models for delegated work and adversarial review; if
   hosted quota is unavailable, report the blocker or use deterministic checks instead.
 - **Don't:** run Ollama, LM Studio, llama.cpp, or any other local/on-device model.

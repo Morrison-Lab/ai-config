@@ -7,9 +7,12 @@ import subprocess
 def main():
     script = os.path.join(os.path.dirname(os.path.realpath(__file__)), "monitor-open-prs.py")
     try:
+        kwargs = {}
+        if os.name == "nt":
+            kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
         subprocess.run(["python3", script], stdin=subprocess.DEVNULL,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                       timeout=10, check=True)
+                       timeout=10, check=True, **kwargs)
     except (OSError, subprocess.SubprocessError):
         return
 

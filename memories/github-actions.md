@@ -1039,6 +1039,16 @@ Filed the checker-side fix as
 flagging a line as added --- but until that lands, the workaround above is
 the only path to a green check on a split.)
 
+## How an agent session requests a review
+
+An agent session cannot reach the Claude reviewer the way a person does: the
+automatic `pull_request` path skips a Bot sender, and a `workflow_dispatch` it
+issues itself starts a run that `claude-code-action` short-circuits at zero
+cost.
+It posts a `/review` comment instead.
+[`agent-review-requests.md`](agent-review-requests.md) carries the measurement
+and the mechanism.
+
 ## `check-new-line-breaks` has no local teeth in a repo that only consumes the reusable workflow
 
 A repo can enforce semantic line breaks in CI while having **no local copy** of the checker script at all --- the called workflow brings its own copy of `Morrison-Lab/gha` at run time, and nothing requires the consumer to vendor one.

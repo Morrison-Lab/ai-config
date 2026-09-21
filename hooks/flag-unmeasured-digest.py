@@ -415,30 +415,62 @@ def _executable_text(command):
             command = strip(command)
         except Exception:
             pass
-    blank = getattr(_stamp, "_blank_quotes", None)
-    out = []
-    for line in command.splitlines():
-        # A `#` that opens a comment is either at the start of the line or
-        # preceded by whitespace; `#` inside a word (a URL fragment, an
-        # issue reference like `-R o/r#1`) is not a comment introducer.
-        #
-        # The cut POSITION is found against a quote-blanked copy, then applied
-        # to the original. Both halves of that are load-bearing:
-        #
-        #   - Searching the raw line reads `--body "Closes #123"` as opening a
-        #     comment and discards the rest of the line, including any
-        #     `--match-head-commit` after it. That is this corpus's own
-        #     canonical merge invocation, so the guard would fall silent on
-        #     precisely the command it exists for.
-        #   - Scanning the blanked copy INSTEAD would lose a quoted pin, since
-        #     `--match-head-commit "<sha>"` carries its value inside quotes.
-        #
-        # `_blank_quotes` preserves offsets, so an index found in the copy
-        # addresses the same character in the original.
-        probe = blank(line) if blank is not None else line
-        m = re.search(r"(?:(?<=\s)|^)#", probe)
-        out.append(line[:m.start()] if m else line)
-    return "\n".join(out)
+    return "\n".join(_strip_comment(l) for l in command.splitlines())
+
+
+def _strip_comment(line):
+    """`line` truncated at the `#` that opens a shell comment, if any.
+
+    A left-to-right scanner that tracks quote state, rather than a regex.
+    Three rounds of adversarial review pushed this from a regex to a
+    quote-blanking regex to this, and the scanner is what the problem
+    actually needs -- quoting is a stateful property of the text to the LEFT
+    of a character, which no single regex over the line can decide.
+
+    What each earlier attempt got wrong, so nobody re-derives them:
+
+      - Matching `#.*$` on the raw line treats `--body "Closes #123"` as a
+        comment and discards the rest of the line, hiding a pin that follows.
+      - Blanking quoted regions first mis-pairs delimiters. `_blank_quotes`
+        finds the NEXT matching quote character, not the scope-correct one,
+        so an ordinary contraction (`don't`) pairs with the opening quote of
+        an unrelated quoted region later on the line and swallows every
+        character between them -- a real `#` included.
+
+    A scanner cannot cross-pair, because it never looks ahead for a partner.
+    It also handles the unbalanced case the way `sh` does: an unmatched quote
+    opens a string that runs to end of line, so no `#` after it is a comment.
+    That errs toward scanning too much rather than too little, which is the
+    safe direction here: the cost is a spurious warning on a commented-out
+    pin, where the other direction silently misses a real one.
+
+    Self-contained on purpose. The previous version degraded to the raw-line
+    bug whenever the sibling module was unavailable, silently losing
+    quote-awareness in exactly the import-failure case the pin surface is
+    built to survive.
+    """
+    quote = None
+    i = 0
+    n = len(line)
+    while i < n:
+        c = line[i]
+        if quote is None:
+            if c == "\\":
+                i += 2
+                continue
+            if c in ('"', "'"):
+                quote = c
+            elif c == "#" and (i == 0 or line[i - 1].isspace()):
+                return line[:i]
+        elif c == quote:
+            quote = None
+        elif c == "\\" and quote == '"':
+            # Backslash escapes inside double quotes only; inside single
+            # quotes `sh` treats it literally and nothing escapes the closer.
+            i += 2
+            continue
+        i += 1
+    return line
 
 
 def _longest_observed_prefix(token, seen):

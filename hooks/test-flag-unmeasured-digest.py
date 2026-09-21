@@ -379,16 +379,35 @@ CASES = [
      bash(f"gh pr merge 1 -R o/r --body 'closes #123' "
           f"--match-head-commit {'b' * 40}"), True,
      "the same with single quotes"),
-    # The mirror: blanking quoted content to find the comment would destroy a
-    # QUOTED pin, which is how the corpus actually writes the flag.
+    # A quoted pin must still be scanned. (This one does not exercise the
+    # comment scanner -- there is no `#` on the line -- it just covers the
+    # quoted-pin shape, which round 1 never tested.)
     ([PROMPT, HEAD_RUN],
      bash(f'gh pr merge 1 -R o/r --squash --match-head-commit "{"b" * 40}"'),
      True,
-     "a QUOTED pin is still scanned -- blanking quotes outright would lose it"),
+     "a QUOTED pin is scanned like an unquoted one"),
     ([PROMPT, HEAD_FULL_RUN],
      bash(f'gh pr merge 1 -R o/r --body "Closes #7" '
           f'--match-head-commit "{REAL_HEAD}"'), False,
-     "and a quoted, correctly-read pin beside a quoted `#` stays silent"),
+     "a quoted, correctly-read pin beside a quoted `#` stays silent"),
+    # The realistic contraction: an apostrophe INSIDE a double-quoted string,
+    # which is balanced. A blanking approach cross-pairs it with the later
+    # quoted region and swallows the real `#`; the scanner closes the double
+    # quote correctly and strips the comment.
+    ([PROMPT, HEAD_RUN],
+     bash(f'echo "don\'t merge yet" '
+          f"# old: gh pr merge 5 --match-head-commit {'b' * 40} 'x'"), False,
+     "an apostrophe inside a quoted string must not cross-pair with a later "
+     "quoted region and expose a commented-out pin"),
+    # A genuinely UNBALANCED quote is a shell syntax error, and the scanner
+    # deliberately errs toward scanning too much there: it treats the string
+    # as running to end of line, so a later `#` is not a comment and the pin
+    # is still examined. A spurious warning is the safe direction; silently
+    # missing a real pin is not.
+    ([PROMPT, HEAD_RUN],
+     bash(f"echo don't # old: gh pr merge 5 --match-head-commit {'b' * 40}"),
+     True,
+     "an UNBALANCED quote errs toward scanning, not toward silence"),
 ]
 
 
@@ -507,6 +526,52 @@ def check_dry_run_warns_on_pin():
     return 0 if ok else 1
 
 
+def check_comment_scanner_directly():
+    """Unit-test `_strip_comment`, which fire/quiet cases cannot pin down.
+
+    A boolean fire/quiet result conflates "the pin was found and judged
+    measured" with "the pin was never seen at all", so it is a weak guard for
+    a text transform. These assert the transform's actual output.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("_hook_under_test", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    f = mod._strip_comment
+    cases = [
+        ("echo hi # note", "echo hi ", "a plain trailing comment is cut"),
+        ("echo hi", "echo hi", "a line with no comment is untouched"),
+        ("gh pr merge -R o/r#1 --squash", "gh pr merge -R o/r#1 --squash",
+         "`#` inside a word is not a comment"),
+        ('gh pr merge --body "Closes #1" --match-head-commit abc',
+         'gh pr merge --body "Closes #1" --match-head-commit abc',
+         "`#` inside double quotes is not a comment"),
+        ("gh pr merge --body 'Closes #1' --squash",
+         "gh pr merge --body 'Closes #1' --squash",
+         "`#` inside single quotes is not a comment"),
+        ('echo "don\'t" # note', 'echo "don\'t" ',
+         "an apostrophe inside double quotes does not swallow a later comment"),
+        ('echo "a # b" # note', 'echo "a # b" ',
+         "the FIRST unquoted `#` is the cut, not the quoted one"),
+        ("# whole line", "", "a full-line comment cuts to empty"),
+        ("echo don't # note", "echo don't # note",
+         "an unbalanced quote runs to end of line, so nothing is cut"),
+        ('echo "he said \'hi #1\'" # note', 'echo "he said \'hi #1\'" ',
+         "nested quoting does not confuse the scanner"),
+    ]
+    bad = []
+    for line, want, why in cases:
+        got = f(line)
+        if got != want:
+            bad.append(f"{why}: {line!r} -> {got!r}, wanted {want!r}")
+    ok = not bad
+    print(f"{'ok  ' if ok else 'FAIL'}  _strip_comment handles quoting, "
+          f"nesting, word-internal `#`, and unbalanced quotes")
+    for b in bad:
+        print(f"        {b}")
+    return 0 if ok else 1
+
+
 def check_unreadable_transcript_is_silent():
     """No readable transcript means no evidence either way: fail open.
 
@@ -556,6 +621,7 @@ def main():
     ADHOC = [
         check_output_shape,
         check_pin_warning_distinguishes_padding,
+        check_comment_scanner_directly,
         check_pin_does_not_suppress_body_finding,
         check_dry_run_warns_on_pin,
         check_unreadable_transcript_is_silent,

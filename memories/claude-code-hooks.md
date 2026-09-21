@@ -417,6 +417,19 @@ Measured 2026-09-14/15 on `hooks/no-unauthorized-merge.py`: widening a tuple lef
 - **Do:** read the exit status and stderr in any hand-written hook probe, and fail the probe loudly on a non-zero exit rather than classifying it as a verdict.
 - **Don't:** treat empty stdout as an allow --- a crashed guard produces the same bytes, and the harness lets that call through too.
 
+## Guard `tool_input` against non-dict truthy values before calling `.get()`
+
+The pattern `inp = payload.get("tool_input") or {}` only falls back to `{}` when `tool_input` is falsy (`None`, `""`, `0`, missing).
+A truthy non-dict value (a string, an int, a list) passes through untouched,
+so a subsequent `.get(...)` raises `AttributeError: 'str' object has no attribute 'get'`
+and crashes the hook with exit code 1 (ai-config#3772).
+Every warn-only hook's contract is to degrade silently on malformed input, never crash.
+
+- **Do:** ensure `tool_input` is a dictionary before calling `.get()` on it:
+  `inp = payload.get("tool_input"); inp = inp if isinstance(inp, dict) else {}`
+  (or `if not isinstance(inp, dict): return 0`).
+- **Don't:** write `inp = payload.get("tool_input") or {}` assuming `or {}` protects against non-dict values.
+
 ## Complete hook lifecycle catalog (27 events)
 
 Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236).
@@ -938,3 +951,161 @@ The two look identical from the refusal message, so check which one you did befo
 - **Do:** use `SendMessage` freely for a reviewer you are not about to push behind --- to ask a question, or to have it verify its own earlier claim.
 - **Don't:** read a clean verdict that arrived by task notification as one the guard can see.
 - **Don't:** override on this --- re-dispatching costs one call and leaves a verdict the guard and a later reader both accept.
+
+## All four paths `no-push-without-self-review.py` reads a verdict from are unreachable in a project-thread session
+
+The entry above says a verdict arriving by task notification is one the guard cannot see, and prescribes a fresh foreground `Agent` call.
+That remedy has a precondition it does not state: that *some* dispatch shape reaches the guard.
+In a Claude Code **project-thread** session none does, and knowing which of the four admitting paths failed is what separates "dispatch it differently" from "no dispatch will work".
+
+Measured 2026-09-17 against one such session's own transcript, on `Morrison-Lab/ai-config`.
+The guard admits a verdict from exactly four shapes:
+
+1. **An OMO paired result** --- not this harness's transcript shape at all.
+2. **An attributed record, via `_is_reviewer_record`** --- needs a transcript record carrying a persona key.
+   The main transcript held **0** `isSidechain` records;
+   a subagent's records live only in `tasks/<agentId>.output`, which the guard never reads.
+3. **A native `tool_result` matched through `reviewer_call_ids`** --- the dispatch's tool result carries only `agentId: <id>` and the words "report was delivered to you as a message".
+   No verdict text.
+4. **A task notification matched through `reviewer_task_ids`** --- the producing regex was then `task[-_ ]?id|conversationId`, which `agentId` does not match;
+   and the `task-notification` record's whole `origin` is `{"kind": "task-notification"}` with `sender: null`.
+
+Two claims worth keeping, because both were asserted confidently before being measured.
+Foreground dispatch is **not** unavailable: `run_in_background: false` does run synchronously (16.3s measured).
+What is missing either way is the verdict in the *tool result*, so the dispatch mode was never the variable.
+And the linkage does exist, on a record nobody had looked at: the hand-back arrives as an `attachment` whose `origin` is `{"kind": "peer", "from": "<agentId>", "senderTaskId": "<agentId>"}`.
+The guard gates on `origin.kind in ("task-notification", "task_notification")` and reads neither `agentId` nor `senderTaskId`.
+
+**The fix has two independent halves, and only their conjunction is dangerous.**
+The **producer** half --- adding `agentId` to `TASK_ID_KEYS` and to the text registrar regex --- is safe alone: applied to a scratch copy and re-run against that session's real transcript, the guard still denied on the same branch.
+That half **shipped in ai-config#3737** (rounds 6/7/9, merged 2026-09-18T07:15:19Z), so `TASK_ID_KEYS_SPECIFIC` and the `tid_match` regex both carry `agentId` today and bullet 4's quoted pattern is the pre-#3737 one.
+Path 4 is still unreachable, because the `origin`/`sender: null` obstacle in that bullet is untouched by the widening --- a conclusion drawn from the measurement rather than from a re-run against the shipped guard.
+The **consumer** half --- reading the `peer` origin plus `senderTaskId` as a verdict source --- is the one that would authorize the editing session's own push, so it needs a human decision and a different session's review before it ships.
+An earlier version of this finding said the whole fix self-authorizes;
+that was wrong for one of the halves, and the correction is the reason the split is recorded rather than the conclusion.
+
+- **Do:** name which of the four paths failed before proposing a different dispatch shape.
+- **Do:** treat the producer and consumer halves as separate changes, and never ship the consumer half from the session it would unblock.
+- **Don't:** spend a round trying to make a reviewer "report differently" --- no reporting style reaches any of the four paths.
+- **Don't:** read a foreground dispatch's `agentId`-only tool result as evidence that foreground dispatch did not happen.
+
+(ai-config#3737 shipped the producer half;
+ai-config#3739 carries the remaining guard side, ai-config#3754 the Stop-hook side.
+Measured against a scratch copy of `hooks/` rather than the live directory, so a mutant could not leak into the session's own guard.)
+
+## A project-thread session can reach a push deadlock whose layers are each behaving as designed
+
+Measured live 2026-09-17 on `Morrison-Lab/ai-config`, with 23 unpushed commits and a clean fast-forward available.
+Two layers deny in sequence and neither yields:
+
+1. `git push` is denied by `hooks/no-push-without-self-review.py`, for the reason the section above enumerates.
+2. `ALLOW_UNREVIEWED_PUSH=1 git push` is denied by the Claude Code auto-mode classifier, with reason **`[Safety Bypass Flag]`**.
+   The classifier's own text says to stop and explain, and that the user can add a Bash permission rule.
+
+Meanwhile `hooks/no-unshipped-commit.py` blocks the `Stop` hook on every turn, so the session cannot legally end either, and `hooks/require-stopping-point.py` blocks until a declaration is emitted.
+
+**`run_in_background: false` is not honored while a sibling agent is in flight**, which is what makes the first layer's printed remedy untestable.
+Measured twice the same day with opposite results: an `Agent` dispatch with `run_in_background: false` ran synchronously (16.3s) with nothing else running, and the same parameter on a later dispatch returned an agent id immediately while a sibling review was still going.
+So a session that reads the remedy, follows it, and gets an agent id back cannot tell which of the two failure modes it hit.
+
+**Why this is worth recognizing early rather than re-deriving:** each layer is correct in isolation and their intersection is empty, so there is nothing to debug.
+A session that does not name the deadlock re-tests the same two commands every turn under `Stop`-hook pressure, and is pushed toward a genuinely bad workaround.
+
+- **Do:** re-test both commands once per session for a fresh reading, then stop --- both denials are stable.
+- **Do:** emit the `**Stopping Point**: Not a clean stopping point` declaration and name the deadlock plainly;
+  the classifier explicitly instructs this.
+- **Don't:** route around it with MCP GitHub write tools (`push_files`, `create_or_update_file`) --- that is the documented guard gap ai-config#1929, not a remedy.
+- **Don't:** soft-reset to zero the unshipped count, and never edit the blocking hook to silence it.
+
+(Only the maintainer clears it: a Bash permission rule, a push from their own account, or authorizing the consumer-half guard change above.
+An earlier record of this named the classifier's reason as `[Auto-Mode Bypass]`;
+the measured string is `[Safety Bypass Flag]`.
+`memories/claude-code-transcripts.md` records one session where the inline `ALLOW_UNREVIEWED_PUSH=1 git push` form was denied and `env ALLOW_UNREVIEWED_PUSH=1 git push` succeeded, so the alternate form is worth the one attempt it costs before concluding the deadlock.)
+
+## Mutation-testing a guard when you may not write into the live `hooks/` directory
+
+The section above prescribes placing the mutant **inside** `hooks/`, or setting `PYTHONPATH` as a fallback.
+Both assume you may write there.
+This is the case where you may not --- a concurrent session holding a file-scope lock, or any checkout you must not touch.
+
+Copy `hooks/` and `scripts/` **together**, preserving their sibling layout, into one fresh `mktemp -d`:
+
+```bash
+T=$(mktemp -d)
+cp -r hooks "$T/" && cp -r scripts "$T/"
+```
+
+**Together, not `hooks/` alone.**
+`hooks/no-push-without-self-review.py` and its siblings resolve `scripts/lib` two directories up from their own `os.path.realpath(__file__)`, which is the same mechanism the section above describes.
+A copy of `hooks/` by itself denies for a missing-sibling reason, and that denial reads exactly like a behavioural one --- nothing in the guard's output distinguishes "the guard correctly said no" from "the guard's import broke and it said no for an unrelated reason".
+
+**Run a negative control first.**
+Run the unmodified copy against the real transcript and confirm it reproduces the same verdict the live guard gives.
+Only then apply the candidate change and re-run.
+Skipping the control is exactly how a broken-import denial gets recorded as a confirmed behavioural one.
+
+- **Do:** copy `hooks/` and `scripts/` together into one fresh `mktemp -d`, never `hooks/` alone, and never a fixed path a sibling agent may already own.
+- **Do:** run the unmodified copy as a negative control before mutating it.
+- **Don't:** read a denial from a `hooks/`-only copy as evidence about the guard's real behaviour.
+
+(Applied 2026-09-17 to decide whether the producer half of the two-part fix above would self-authorize a push.
+The negative control matched the live denial, and the mutated copy still denied on the same branch --- which is the measurement that made the split safe to state.)
+
+## `no-mistake-without-a-hook.py` discharges on record INDEX, so report-then-work is the only order that clears it
+
+`hooks/no-mistake-without-a-hook.py` discharges on `done_at >= admit_at`, where both are **transcript record indices**, and its `HOOK_WORK` pattern requires the `hooks/` prefix (`hooks/[\w.-]+\.py|hooks\.json|install-hooks\.py|PreToolUse|UserPromptSubmit|\bStop\s+hook\b`).
+
+Measured 2026-09-17: three consecutive `Stop` blocks in one session while the hook work was already finished.
+The tool calls carrying `hooks/no-incomplete-check-enumeration.py` sit at indices *below* the closing prose, so an admission phrase in the final recap always reads as unmet.
+
+**The dischargeable order is report-then-work, and this corpus tells you to report a mechanism in the past tense** --- so the order a compliant session naturally writes is the order that always fires.
+The `>=` is what makes a single message that both admits and names the work the discharging case.
+
+**Write the `hooks/<name>.py` path UNBACKTICKED.**
+`visible_prose()` strips code spans before the scan, so a path inside backticks is invisible to `HOOK_WORK` and the guard re-fires against an unchanged message, with no signal that the discharge text was stripped.
+Measured 2026-09-18 by loading the hook and calling `visible_prose` on both forms: backticked gives `HOOK_WORK=False`, plain gives `True`.
+This **inverts** the hazard `CLAUDE.md`'s "an example of a checked pattern is itself checked" describes, where backticks shield nothing from a line-oriented scanner;
+this scanner is structure-aware, so they shield everything.
+
+`NOT_HOOKABLE` is the other escape and needs one of the literal shapes `not mechaniz...`, `no decidable condition`, or `cannot be caught by a hook`.
+An argument that the condition *is* decidable but is already mechanized elsewhere matches none of them.
+
+- **Do:** write the full hooks/<name>.py path, unbackticked, in the same message as the admission.
+- **Do:** use one of the literal `NOT_HOOKABLE` phrasings rather than a paraphrase when that is the honest answer.
+- **Don't:** write a bare basename --- how README.md and memories/hooks.md refer to hooks --- which matches nothing.
+- **Don't:** file a new guard on the strength of this reminder without searching the tracker first;
+  the 2026-09-17 instance turned out to be ai-config#3485, an already-filed defect in an existing hook, so the right output was a fix rather than a second guard.
+
+(Known and tracked: ai-config#3287 --- it re-fires on the reply reporting the mechanism --- plus ai-config#3411, where explaining it re-arms it, and ai-config#3632, where a non-hook instrument cannot clear it.
+A new symptom is a comment on ai-config#3287, not a new issue.)
+
+## Stop hooks reading transcript text must inspect reply tools in project threads
+
+In a Claude-in-Projects thread session, every sentence the user reads is the `text` input of an `mcp__hearthbot__reply` `tool_use` block, never a direct assistant `text` block.
+The harness states: "Text you emit directly is not delivered --- only `mcp__hearthbot__*` tool calls reach the user."
+
+A `Stop` hook that only inspects `block.get("type") == "text"` returns an empty string for every turn the user actually read, making the hook completely blind to the reply in project-thread sessions (ai-config#3798, #3804).
+
+Extract reply payloads via `REPLY_TOOL_RX = re.compile(r"(^|__)(reply|post_message|update_message)$", re.I)`.
+When any record in the transcript invokes a reply tool (`saw_reply_tool = True`), the delivered reply channel takes strict precedence over assistant text blocks (`last_reply if saw_reply_tool else last_text`).
+Do not fall back to assistant text narration if `saw_reply_tool` is True, because assistant narration was never delivered to the user in that harness.
+
+- **Do:** extract user-visible text from reply tools matching `REPLY_TOOL_RX` when inspecting transcript prose.
+- **Do:** give delivered reply payloads strict preference over undelivered assistant text blocks when a reply tool was invoked.
+- **Do:** enforce `saw_reply_tool` precedence over narration text in direct-payload fallback readers.
+- **Do:** reset `saw_reply_tool` alongside turn accumulation buffers on each human user prompt record (exempting `tool_result` events, which also arrive under `type: "user"` in Claude Code transcripts).
+- **Don't:** walk only `type == "text"` blocks when inspecting the last assistant message.
+- **Don't:** fall back to assistant text blocks if a reply tool was used with empty text --- internal narration was never delivered to the user.
+- **Don't:** return concatenated text blocks in direct payload fallbacks before checking for reply-tool calls in the same content list.
+- **Don't:** leak session-wide `saw_reply_tool` state into turn-scoped readers, which silences later plain-text turns.
+- **Don't:** treat `tool_result` events as user turn boundaries, which clears reply-tool state and produces false passes or false blocks.
+
+## Strip code fences and spans using shared `scripts/lib/fences.py` with `swallow_unclosed=False`
+
+Hand-rolled fence matchers (`FENCE_OPEN_RX` / `FENCE_CLOSE_RX`) miss multi-backtick spans and can get permanently stuck in fence mode if an unclosed code block occurs, causing subsequent prose or declarations to be swallowed and falsely flagged (ai-config#3748).
+Always import `strip_code` or `strip_fences` from `scripts/lib/fences.py` and pass `swallow_unclosed=False` explicitly.
+
+- **Do:** reuse `scripts/lib/fences.py` (`strip_code` / `strip_fences`) instead of hand-rolling regex fence trackers.
+- **Do:** specify `swallow_unclosed=False` when stripping fences to preserve declarations written below unterminated code blocks.
+- **Don't:** hand-roll fence opening and closing regexes that let an unclosed fence swallow the rest of the message.
+

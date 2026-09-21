@@ -367,7 +367,9 @@ def main() -> int:
     if tool and tool not in SHELL_TOOLS:
         return 0
 
-    tool_input = payload.get("tool_input") or payload.get("toolInput") or {}
+    tool_input = payload.get("tool_input")
+    if not isinstance(tool_input, dict):
+        tool_input = payload.get("toolInput")
     if not isinstance(tool_input, dict):
         return 0
     command = (

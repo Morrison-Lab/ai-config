@@ -92,7 +92,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 
 | Hook Script | Type | Trigger / Purpose | Proactive Compliance Rule |
 |---|---|---|---|
-| [`no-unauthorized-merge.py`](../hooks/no-unauthorized-merge.py) | **Block** | Blocks `merge_pull_request` MCP calls without authorization. | Do not invoke MCP merge tools without explicit permission or active `/mwc`. |
+| [`no-unauthorized-merge.py`](../hooks/no-unauthorized-merge.py) | **Block** | Blocks `merge_pull_request` and the `enable`/`disable_auto_merge` tools, under any `mcp__<server>__` prefix, without authorization. `check_mcp_merge` reads `owner`/`repo` out of `tool_input` and clears the call on an `allow_merge` override, an active `mwc` grant, or a target in `STANDING_MERGE_GRANT_REPOS` --- the same three grounds the shell path uses. | Do not invoke MCP merge tools without explicit permission or an active `/mwc`; a target carrying the standing per-repository grant needs neither. |
 | [`warn-pr-create-without-dupe-check.py`](../hooks/warn-pr-create-without-dupe-check.py) | Warn | Warns when creating PRs/issues via MCP without a prior search query. | Run `search_issues` or `search_pull_requests` before creating items via MCP tools. |
 | [`warn-unlabelled-agent-issue.py`](../hooks/warn-unlabelled-agent-issue.py) | Warn | Warns when `mcp__github__issue_write` (`method: create`) files an issue with no `ai-authored` label. | Pass `labels: ["ai-authored", "model:<model-id>"]` on the create call. |
 | [`require-agent-disclosure.py`](../hooks/require-agent-disclosure.py) | Warn | Warns when posting comments via MCP without the disclosure trailer. | Include `\n\n_Posted by <Agent Name> (AI agent) --- not written by a human._` in the `body` argument of MCP comment tools. |
@@ -830,3 +830,50 @@ a set named for a behaviour has a membership test by construction, so derive the
 
 (Tracked as [#2981](https://github.com/Morrison-Lab/ai-config/issues/2981).
 An earlier wave's snapshot branch `fix/2981-self-review-guard-sibling-import` treated it as a missing install and added a `.git`-rooted fallback search, which is why the root cause is stated here rather than only the remedy.)
+
+## Evaluating multiple declare phrases across a message (#3761)
+
+A guard scanning for terminal claims (`no-incomplete-check-enumeration.py`) must evaluate all claim phrases (`finditer`),
+not only the first match:
+
+- **Iterate all claims rather than stopping at the first:**
+  A multi-sentence recap often covers several PRs sequentially.
+  Stopping at the first match allows later unverified claims to slip past unchecked.
+- **Enforce canonical BLOCK precedence across all hits:**
+  If any claim in the message warrants a block (e.g. core declare vocabulary backed only by a short CI surface without a subagent or complete check),
+  block the turn regardless of whether other claims in the message warn or are clean.
+- **Union uncovered PRs across claims:**
+  Collect missing PRs across all evaluated claim hits so the warning accurately enumerates the full set of unverified PRs.
+- **Mutation testing for window bounds:**
+  To ensure label windows (`_LABEL_WINDOW`) cannot be silently inflated to whole-message scope,
+  test a message containing a covered claim followed by an unrelated PR mention (without a claim phrase) well outside the window.
+  If the window is inflated,
+  the unrelated PR is falsely swept into the claim's scope and triggers a coverage mismatch.
+- **Compose multi-bucket warnings without cross-suppression:**
+  When multiple claims in a message have distinct warning needs (e.g. coverage mismatch on one PR and subagent-only evidence on another),
+  do not let one warning bucket suppress another or stop at the first entry.
+  Compose all warning notices into the emitted `systemMessage` so every unverified claim is surfaced.
+
+## A fixture's own padding can push its trigger outside the window under test (PR #3799)
+
+`flag-cop-out-offer.py` scans only the last `TAIL_CHARS` (400) of a reply, and that bound creates two hazards rather than one.
+The production side is already documented in the hook, in the comment above `STOPPING_POINT_RX` rather than beside the constant itself: a long stopping-point declaration displaces the real closing move, so the hook goes blind (ai-config#3694).
+The two rounds that followed corrected the remedy rather than the mechanism, one for over-firing and one for a new blind spot (ai-config#3695).
+The test side shares the mechanism and inverts the author.
+
+Measured 2026-09-19 on this file's own PR, ai-config#3799.
+A fixture written to exercise a different property --- which output channel the hook reads --- appended filler after its offer phrase, putting that phrase past the 400-character tail.
+The case asserted "no warning", got one for the wrong reason, and so passed against the exact commit it had been written to catch.
+
+Nothing about the fixture looked wrong.
+Re-reading it confirms the offer is present and the expectation is right.
+Only running it against the pre-fix version separates a case that detects the defect from one that cannot reach it.
+
+The general shape: **when the code under test bounds what it examines --- a tail window, a line cap, a first-N-matches scan, a time window --- a fixture's own bulk is part of its input.**
+Padding added for realism can move the trigger out of scope, and every verdict that follows is the expected one.
+
+- **Do:** put a fixture's trigger where the bound actually reaches, and prefer the shortest fixture that exercises the property.
+- **Do:** run every new case against the version it was written to catch, and read a pass there as the case being vacuous rather than as the fix being unnecessary.
+- **Don't:** read a green suite as evidence a new case is sound --- a case that cannot reach the defect is green for the same reason a correct one is.
+- **Don't:** widen the bound to make a fixture fit;
+  that re-admits whatever the bound excludes, which is the production-side fix this hook already rejected.

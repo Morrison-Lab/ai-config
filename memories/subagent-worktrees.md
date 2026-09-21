@@ -91,6 +91,44 @@ and reached opposite, both wrong, conclusions.
 That is the tell that the evidence does not discriminate: it produced "quiet
 but alive" and "quiet and abandoned" from the identical two facts.
 
+**A `pgrep` for a dispatched subagent's id is the one detector here that cannot produce a true positive, and it reads as the strongest.**
+The evidence above fails to *discriminate*: a clean `git status` or an absent `ListAgents` entry is at least capable of describing a live agent and a dead one differently.
+A process-table query keyed on the agent id is not.
+What was measured is that `pgrep -f <agentId>` returned empty while the agent was demonstrably still working, so the empty result is not evidence of anything.
+Two explanations fit --- the agent runs in the dispatching process and owns no process of its own, or it owns one whose command line never carries the id --- and **this session did not establish which**.
+The practical conclusion is the same under both, which is why the detector can be ruled out without settling the mechanism: it returns empty mid-run and equally empty an hour after the agent finished.
+The negative carries no information whatever, and a process table feels like ground truth in a way a status field does not --- which is what makes the reading confident rather than tentative.
+
+Note the mirror with [`shell.md`](shell.md)'s self-match deadlock, since the two point opposite ways and the remedy differs.
+There `pgrep -f` matches **too much**, including the waiter itself, and reports a false "still running".
+Here it matches **nothing that ever existed**, and reports a false "stopped".
+Anchoring the pattern fixes the first and does nothing for the second.
+
+**The transcript's modification time does settle it**, without spending an agent spin-up on a question a file stat answers.
+An agent writes to its own transcript as it works, so a recent mtime is positive evidence of life.
+
+```bash
+ls -laL "$transcript"; date "+%H:%M:%S"
+```
+
+Two details, both measured rather than assumed.
+Take the clock reading in the **same command**, per `CLAUDE.md`'s timestamp rule, since "recent" is a comparison and the second half of it expires.
+And pass `-L`, or resolve the path first: the harness's `tasks/<agentId>.output` entry is a **symlink** into the projects directory, and a bare `ls -la` on a symlink reports the link's own mtime rather than the transcript's.
+
+Never read the transcript's **contents** to check liveness.
+It is the full subagent JSONL and reading it overflows the reader's context, which is a far larger cost than the question is worth.
+
+- **Do:** stat the transcript (`ls -laL`) and take a clock reading in the same command, when you want liveness without messaging the agent.
+- **Do:** ask the agent directly when the mtime is old, since an old mtime is a snapshot again and lands back in the non-discriminating class above.
+- **Don't:** read an empty `pgrep -f <agentId>` as the agent having stopped --- it returns empty either way, so it is not a finding.
+- **Don't:** `ls` the `tasks/` path without `-L` and read the result as the transcript's mtime.
+- **Don't:** read the transcript itself to find out whether the agent is alive.
+
+(Measured 2026-09-18.
+A session dispatched an adversarial reviewer, then armed a wait loop keyed on `pgrep -f <agentId>` and emitted "review agent process no longer running" on the empty result.
+The agent was running: its transcript was 2.2 MB and had been appended to in the same minute the check was made, and it went on working afterwards.
+The empty `pgrep` was correct about the process table and said nothing about the agent.)
+
 **A harness-reported failure is not a snapshot, and there the question is what
 to salvage rather than whether the agent is alive.**
 Everything above concerns evidence that cannot discriminate --- a quiet
@@ -709,3 +747,26 @@ A scratch copy is the right instrument only when it is a copy of the *tree*, not
 
 - **Do:** re-derive a sidecar's headline measurement in the checkout before acting on it, especially a baseline it reports in passing.
 - **Don't:** accept a count of pre-existing failures from a run whose working directory you did not establish.
+
+**The scratchpad is shared by every agent in the session, so a leftover directory from an earlier sidecar can alias the checkout it was copied from.**
+
+The rule above tells a deliberately unisolated sidecar to copy anything it wants to mutate into the scratchpad first, and that reads as achieving isolation.
+It does not, when a sibling already owns the path it picks.
+
+Measured 2026-09-17 in a project-thread session on `Morrison-Lab/ai-config`.
+A sidecar created `<scratchpad>/base` at 19:38.
+A later reviewer at 21:36 copied `hooks/` and `scripts/` into that same `base`, and `cp` reported **170 files** as "are the same file".
+A redirect into what that reviewer believed was its own scratch copy wrote through into `hooks/test-no-push-without-self-review.py` in the live checkout.
+
+The aliasing is invisible to the agent doing the copying --- `cp`'s own message is the only signal, and it scrolls past --- and it is absent on a session's first run, so the pattern passes until it doesn't.
+
+- **Do:** prefer `isolation: "worktree"` on any `Agent` call that will copy or run repo files;
+  it costs nothing for a read-only reviewer and removes the class.
+- **Do:** use a freshly created uniquely-named directory (`mktemp -d`) when copying anyway, never a fixed `base` or `head`, and `cp -rL`.
+- **Do:** check `git status --porcelain <path>` before repairing a clobbered file with `git show HEAD:<path> > <path>` --- that restore destroys uncommitted work, and "restored, status clean" is what it looks like either way.
+- **Do:** verify the tree independently after any such incident (suite count, mutation discrimination, all expected content present) rather than trusting the repair's own report.
+- **Don't:** read "I copied it to the scratchpad" as isolation --- the scratchpad is per session, not per agent.
+- **Don't:** reuse a scratchpad subdirectory another agent created, however idle it looks.
+
+(Filed as [ai-config#3753](https://github.com/Morrison-Lab/ai-config/issues/3753).
+This is the same `mktemp -d`-per-run discipline `memories/claude-code-hooks.md` prescribes for mutation-testing a guard, arrived at from the opposite direction: there the hazard is two batteries corrupting one copy, here it is two agents sharing one path.)

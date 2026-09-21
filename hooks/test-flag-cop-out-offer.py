@@ -33,6 +33,29 @@ def say(text):
         {"type": "text", "text": text}]}}
 
 
+def narrate_and_reply(narration, text):
+    """One turn speaking on both channels at once.
+
+    Only `text` reaches the user; `narration` is a plain assistant text block,
+    which a project-thread harness does not deliver.
+    """
+    return {"type": "assistant", "message": {"content": [
+        {"type": "text", "text": narration},
+        {"type": "tool_use", "name": "mcp__hearthbot__reply",
+         "input": {"text": text}}]}}
+
+
+def reply(text):
+    """A project-thread reply: the user-visible text lives in a TOOL payload.
+
+    The harness delivers a thread session's prose this way and no other way,
+    so a transcript from one carries no assistant text block at all.
+    """
+    return {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "mcp__hearthbot__reply",
+         "input": {"text": text}}]}}
+
+
 LONG = ("Setup job 143472 completed in 19m32s and the array is running. " * 12)
 
 CASES = [
@@ -99,6 +122,32 @@ CASES = [
     ([TOOL], False, "a turn with no assistant prose does not warn"),
     ([TOOL, say("Nothing changed since the last poll.")], False,
      "a no-change tick does not warn"),
+
+    # The reply-tool payload. In a project-thread session this is the ONLY
+    # channel the user reads, so a reader that walks assistant text blocks
+    # alone sees an empty turn and the guard never fires. Measured
+    # 2026-09-19: a closing offer whose phrase is in OFFERS, well inside
+    # TAIL_CHARS, went unflagged for exactly this reason.
+    ([TOOL, reply("The request is withdrawn and the PR is unblocked. "
+                  "Say the word and I'll merge it.")], True,
+     "an offer inside a reply-tool payload warns"),
+    ([TOOL, reply("Withdrew the review request; the scorer exited 0 on "
+                  "1755bc6.")], False,
+     "a reply-tool payload with no offer stays silent"),
+
+    # The other direction, and the one a both-channels reader gets wrong.
+    # Narration is not delivered in this harness, so an offer sitting there
+    # is a sentence nobody read -- warning about it quotes the user back
+    # something they were never shown.
+    ([TOOL, narrate_and_reply(
+        "Internal note: the scorer exited 0, so this qualifies. "
+        "Want me to go ahead and merge it now?",
+        "Merged and pushed as f6a21ad2.")], False,
+     "an offer in undelivered narration does not warn when a reply spoke"),
+    ([TOOL, narrate_and_reply(
+        "Internal note: the merge landed cleanly.",
+        "Done. Say the word and I'll open the follow-up PR.")], True,
+     "an offer in the reply wins over clean narration"),
 ]
 
 

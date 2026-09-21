@@ -1116,3 +1116,40 @@ mid-session with no self-review yet dispatched, and `git push --dry-run
 --repo=/nonexistent origin main` was the fallback that measured git's `--repo`
 precedence without a real push or the override.)
 
+## `git commit -F -` in a compound command can make no commit and report nothing
+
+The backtick rule above pushes you toward `-F` in the first place.
+`-F <file>` is the safe half of that;
+`-F -` is not, and its failure is silent in exactly the situation that hides it.
+
+Measured 2026-09-17 in `Morrison-Lab/ai-config`.
+This shape made no commit:
+
+```bash
+git add <path> && git commit -F - <<'MSGEOF' 2>&1 | tail -3
+...message...
+MSGEOF
+echo "next thing"
+```
+
+`git log` still showed the previous commit and `git status` still showed the file as ` M`.
+No error surfaced, because the pipeline's output was displaced by the commands that followed it in the same call.
+A compound command whose later stages print plenty is precisely where a missing commit looks like a successful one.
+Whatever ran after it --- a push, most damagingly --- then operated on a tree the commit never reached.
+That trailing push is deliberately not written into the block above, because `scripts/check-chained-commit-push-in-fences.py` denies a commit chained into a later push inside one fence, and this fragment's subject is `-F -` rather than the chaining, so the anti-example loses nothing by naming the consequence in prose instead.
+
+The reliable form worked immediately:
+
+```bash
+cat > <scratchpad>/msg.txt <<'MSGEOF'
+...message...
+MSGEOF
+git add <path>
+git commit -F <scratchpad>/msg.txt
+echo "rc=$?"
+```
+
+- **Do:** write the message to a scratchpad file and pass that path to `git commit -F`.
+- **Do:** print `rc=$?` on the commit's own line, and confirm with `git log --oneline -1` plus `git status --short` before reporting a commit as made.
+- **Don't:** feed `git commit -F -` from a heredoc inside a compound command.
+- **Don't:** report a commit landed on the strength of having issued the command.

@@ -344,7 +344,8 @@ def main():
     ):
         return 0
 
-    tool_input = payload.get("tool_input") or {}
+    tool_input = payload.get("tool_input")
+    tool_input = tool_input if isinstance(tool_input, dict) else {}
     command = (
         tool_input.get("command")
         or tool_input.get("CommandLine")

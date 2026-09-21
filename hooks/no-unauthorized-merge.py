@@ -1720,7 +1720,8 @@ def is_mcp_merge_tool(tool_name: str) -> bool:
 
 
 def check_mcp_merge(payload: dict) -> tuple[str, str] | None:
-    tool_input = payload.get("tool_input") or {}
+    tool_input = payload.get("tool_input")
+    tool_input = tool_input if isinstance(tool_input, dict) else {}
     tool_name = payload.get("tool_name") or "mcp__github__merge_pull_request"
 
     if tool_input.get("allow_merge") in (1, "1", True) or tool_input.get("ALLOW_MERGE") in (1, "1", True):
@@ -1786,7 +1787,8 @@ def main() -> int:
     hit = None
 
     if tool_name in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
-        inp = payload.get("tool_input") or {}
+        inp = payload.get("tool_input")
+        inp = inp if isinstance(inp, dict) else {}
         command = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or ""
         hit = offending(command, payload)
     elif is_mcp_merge_tool(tool_name):

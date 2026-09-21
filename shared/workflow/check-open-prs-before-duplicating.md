@@ -8,13 +8,37 @@ opened a PR for. Check both this repo's and (when the corpus spans repos, as
 `Morrison-Lab/ai-config`'s skills do) any sibling repos in scope:
 
 ```bash
-gh pr list --state all --search "<keywords> in:title,body"
+gh pr list --state all --search "<keywords> in:title,body" --limit 300
 ```
 
 **`--state all`, not `--state open`** --- see "Both checks come back empty when
 the work is already DONE" below for why.
 The prescribed query has to carry the fix as well as the prose, or a reader
-who copies the command never reaches the explanation.
+who copies the command never reaches the explanation --- which is also why
+the `--limit 300` above is part of the command itself, not just a paragraph
+about it: the default is 30 rows across the combined open+closed population,
+the same mixed-population row cap
+[`issue-first`](issue-first.md)'s "A capped `--state all` listing can hide
+most OPEN issues behind closed ones" section measures for `gh issue list`.
+The mechanism is identical (`--search` still applies a row cap to a
+state-mixed, non-state-sorted result), though it did not visibly bite in a
+spot-check against `Lacaedemon/sparta` on 2026-09-19 only because that repo
+had just two open PRs total, both recent enough to survive the cap --- so the
+absence of a live miss there is a property of that repo's PR count, not
+evidence the risk is smaller for PRs than for issues.
+
+Scoping this search to `is:open`/`is:closed`, or to `--state open`/`--state
+closed`, is not the fix here either, for the same reason
+[`issue-first`](issue-first.md) gives for the issue case: it can serve as a
+secondary diagnostic once a capped result looks suspicious, but it cannot
+replace the all-state search, since a `--state open`/`is:open` PR search is
+exactly the case "Both checks come back empty when the work is already DONE"
+below warns about --- it makes a merged, already-closed duplicate PR
+invisible again.
+Keep `--state all --search`, raise `--limit` well past any plausible match
+count, and re-run the identical query; read a returned row count equal to
+the limit as a truncation signal rather than a total, before trusting an
+empty or thin result.
 
 In a remote/web session without `gh`, use the GitHub MCP equivalent
 (`mcp__github__list_pull_requests` / `mcp__github__search_pull_requests` —
@@ -54,8 +78,8 @@ the opposite error merely prompts a redundant check.
 Name the whole population rather than the live slice:
 
 ```bash
-gh pr list --state all --search "<keywords> in:title,body"   # did anyone already do this?
-gh pr list --state all --head "<branch>"                     # did this branch ever have a PR?
+gh pr list --state all --search "<keywords> in:title,body" --limit 300   # did anyone already do this?
+gh pr list --state all --head "<branch>"                                 # did this branch ever have a PR?
 ```
 
 **Do not predict the branch name either.**

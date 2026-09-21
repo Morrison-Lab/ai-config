@@ -59,8 +59,49 @@ RX = re.compile("|".join(OFFERS), re.I)
 TAIL_CHARS = 400
 
 
-def last_assistant_text(path):
-    last = ""
+# In a project-thread session every user-visible sentence is the `text` input
+# of an `mcp__hearthbot__reply` tool call, never an assistant text block --
+# that tool's own description says "This is the ONLY way to message the user
+# in a thread - your normal text output is not shown". So a
+# reader that only walks `type == "text"` blocks is blind to the whole reply,
+# which is exactly where a closing offer lives. Measured 2026-09-19: this hook
+# did not fire on a cop-out offer whose phrase is in OFFERS, sits well inside
+# TAIL_CHARS, and would have matched had the text been reachable.
+REPLY_TOOL_RX = re.compile(r"(^|__)(reply|post_message|update_message)$", re.I)
+
+
+def _blocks(msg):
+    blocks = (msg.get("message") or {}).get("content") or msg.get("content") or []
+    return blocks if isinstance(blocks, list) else []
+
+
+def _reply_payload(block):
+    """The user-visible text of a reply-tool call, or '' for any other block."""
+    if not isinstance(block, dict) or block.get("type") != "tool_use":
+        return ""
+    if not REPLY_TOOL_RX.search(block.get("name") or ""):
+        return ""
+    inp = block.get("input")
+    if not isinstance(inp, dict):
+        return ""
+    txt = inp.get("text")
+    return txt if isinstance(txt, str) else ""
+
+
+def last_visible_texts(path):
+    """The last message as the user actually read it.
+
+    A transcript carrying any reply-tool call is a project-thread session,
+    where a plain text block is never delivered -- so the reply payload is
+    the only channel, and checking the text block too would warn about a
+    sentence nobody saw. A transcript with no reply-tool call anywhere is an
+    ordinary CLI session, where the text block is the delivered channel.
+
+    Returns a one-element list, or an empty one when neither channel spoke.
+    """
+    last_text = ""
+    last_reply = ""
+    saw_reply_tool = False
     try:
         with open(path, errors="ignore") as fh:
             for line in fh:
@@ -69,30 +110,47 @@ def last_assistant_text(path):
                 except Exception:
                     continue
                 if m.get("type") == "assistant" or m.get("role") == "assistant":
-                    blocks = (m.get("message") or {}).get("content") or m.get("content") or []
-                    if isinstance(blocks, list):
+                    blocks = _blocks(m)
+                    if blocks:
                         txt = "".join(
                             b.get("text", "") for b in blocks
                             if isinstance(b, dict) and b.get("type") == "text"
                         )
                         if txt.strip():
-                            last = txt
-                    elif isinstance(blocks, str) and blocks.strip():
-                        last = blocks
+                            last_text = txt
+                        for b in blocks:
+                            if isinstance(b, dict) and b.get(
+                                "type"
+                            ) == "tool_use" and REPLY_TOOL_RX.search(
+                                b.get("name") or ""
+                            ):
+                                saw_reply_tool = True
+                            payload = _reply_payload(b)
+                            if payload.strip():
+                                last_reply = payload
+                    else:
+                        raw = (m.get("message") or {}).get("content") or m.get("content")
+                        if isinstance(raw, str) and raw.strip():
+                            last_text = raw
                 elif m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
                     content = m.get("content")
                     if isinstance(content, str) and content.strip():
-                        last = content
+                        last_text = content
                     elif isinstance(content, list):
                         txt = "".join(
                             (b.get("text", "") if isinstance(b, dict) else str(b))
                             for b in content
                         )
                         if txt.strip():
-                            last = txt
+                            last_text = txt
     except Exception:
-        return ""
-    return last
+        return []
+    # The reply tool having been *called* is what identifies the harness, not
+    # whether its payload was non-empty -- so a thread session whose last turn
+    # spoke only through an empty or absent reply payload yields nothing here
+    # rather than falling back to narration the user never saw.
+    chosen = last_reply if saw_reply_tool else last_text
+    return [chosen] if chosen.strip() else []
 
 
 # `flag-session-boundaries` requires every reply to end with a stopping-point
@@ -153,14 +211,17 @@ def main() -> int:
     except Exception:
         return 0
 
-    text = last_assistant_text(payload.get("transcript_path") or "")
-    if not text:
+    texts = last_visible_texts(payload.get("transcript_path") or "")
+    if not texts:
         return 0
-    phrase = find_offer(text)
+    phrase = next((p for p in (find_offer(t) for t in texts) if p), None)
     if not phrase:
         return 0
 
-    key = hashlib.sha256(text.encode()).hexdigest()[:16]
+    # `last_visible_texts` returns at most one string, so the sentinel hashes
+    # exactly what earlier revisions hashed and the once-per-distinct-message
+    # behaviour is unchanged.
+    key = hashlib.sha256("|".join(texts).encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-copout-{key}")
     if os.path.exists(sentinel):
         return 0

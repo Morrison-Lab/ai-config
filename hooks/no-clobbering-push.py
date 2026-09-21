@@ -1632,7 +1632,8 @@ def main() -> int:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
-    inp = payload.get("tool_input") or {}
+    inp = payload.get("tool_input")
+    inp = inp if isinstance(inp, dict) else {}
     command = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script")
     if not isinstance(command, str) or not command.strip():
         if is_dry_run:

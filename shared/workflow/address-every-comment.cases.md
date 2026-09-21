@@ -72,6 +72,57 @@ still said the agents were read-only "by definition".
 Those were corrected to the harness's declared read-only role, and both review
 threads were resolved.)
 
+## "A fix scoped narrower than the claim it corrects keeps leaking"
+
+(`Lacaedemon/sparta` PR #1613, 2026-09-20: a design-doc historicization pass
+hit the same defect shape six times across the review lifecycle, and each
+occurrence read as a fresh oversight.
+
+Commit `ed08d7d0` fixed a Pacific/UTC timezone mismatch by "grepping every
+merge-date claim across the changed files" -- four sites, two of which
+needed the correction (the other two were already identical in both
+zones, and the commit says so rather than assuming).
+The next commit, `08fec55d`, found a fourth: "that grep looked for *merge*
+dates, so an issue-reopen event fell outside the set by construction.
+Deriving a set is only as good as the pattern that defines it, and the
+pattern was narrower than the claim it was meant to cover."
+Its own fix -- stating the Pacific convention once, in each document's
+"Implementation status" section -- was itself too narrow: commit `6addf670`
+found the same reopen date restated "under Phase plan and under
+Relationship to existing issues," neither of which reads the
+Implementation-status note.
+That commit's own message names the general form: "a fix scoped narrower
+than the claim it covers will keep leaking, and each round the leak looks
+like a fresh oversight rather than the same one.
+Scope the fix to the claim."
+The note was moved to each document's opening status block, scoped to the
+whole document rather than to one section.
+
+One round later, commit `05856dc4` found a sixth instance -- inside the very
+commit (`6addf670`) whose own fix to the status line claimed it now read
+"not shipped, matching the table and every other section."
+`05856dc4` reads that phrase as an assertion of completeness ("asserted it
+had matched 'every other section'") and shows it false: a "related design
+threads" list still called the very phase `6addf670` had just relabelled
+not-shipped "disputed," contradicting what that commit's own message had
+just claimed.
+Its remedy: "Derived the occurrences this time rather than fixing the one
+the reviewer named.
+Grepping the whole changed file set for the word returns five hits: this
+one, and four ... about an unresolved scholarly dispute ..., which are
+unrelated and stay" -- deriving by the word, then reading each hit to
+separate the two unrelated senses, rather than trusting a claim of
+completeness.
+
+The compounding lesson: two different remedies -- widen the grep; centralize
+the note -- each fixed the failure they were built for and left the next one
+standing, because each still bounded its scope by something narrower than
+the claim itself: first a spelling of the claim, then a section of a
+document.
+Only deriving the population by the claim's *effect* -- any place asserting
+a translated or disputed fact -- and rechecking that population inside the
+commit that claims to have finished catches all three.)
+
 ## "The PR description is on that list"
 
 (ai-config#829, 2026-07-29: a review nit led to correcting a gha#350
@@ -963,6 +1014,64 @@ Reproducing at HEAD rather than at the reviewed commit is
 [`verify-the-right-artifact`](verify-the-right-artifact.md)'s "a checkout for
 the run" substitution --- the artifact in hand was real, was read carefully,
 and was not the one the claim was about.
+
+## A hex-prefix finding closed by fixing a length bug on the same line
+
+Measured 2026-09-18, on a digest-detecting hook in this repository.
+
+The reviewer's finding quoted one concrete input:
+`DEADBEEFDEADBEEFDEADBEEFDEADBEEFXYZ`, a canonical-length hex **prefix** of a
+longer alphanumeric identifier, flagged as though it were a standalone md5.
+
+Reading the flagged regex line turned up a real and different defect: a pure
+hex run longer than `MAX_HEX` matched its own first 64 characters.
+That defect was fixed, tests were written for it, and the finding was reported
+closed.
+
+The next round re-ran the reviewer's own input verbatim and the hook still
+fired on it.
+The trailing lookahead shipped was `(?![0-9a-fA-F])`, which excludes a
+following hex **digit**.
+The reported case needs `(?![0-9a-zA-Z])`, which excludes any following
+alphanumeric --- and `X` is not a hex digit, so the lookahead the fix installed
+was satisfied by exactly the input the finding was about.
+
+Three things make this worth recording rather than filing as ordinary
+carelessness.
+
+**Every artifact of a completed Address was present.**
+A real bug was found and fixed, on the exact line the reviewer pointed at, with
+tests that pass.
+[`ard`](../../skills/ard/SKILL.md)'s round-close checklist asks that each
+Address row point to a pushed commit SHA, and it did.
+Nothing in the round was skipped;
+what was skipped was one execution nobody's checklist asked for.
+
+**The tests could not have caught it.**
+They were written from the same reading of the finding that produced the fix,
+so they encode the hex-run case and not the alphanumeric-suffix case.
+A suite derived from your own restatement agrees with your own fix by
+construction --- the negative-control problem
+[`verify-the-right-artifact`](verify-the-right-artifact.md) names, arriving
+through a test rather than through a measurement.
+
+**The shared line supplied the false confirmation.**
+Both defects lived in one regex, so the diff showed the flagged line visibly
+changed, which is the tell
+[`address-every-comment`](address-every-comment.md)'s enumeration bullet warns
+about at the scale of several artifacts, here at the scale of one.
+
+The reviewer's input was a runnable acceptance criterion sitting in the finding
+the whole time, and running it cost one command.
+
+The decidable-condition half --- a finding's quoted input with no matching
+execution before the fixed claim --- is filed as
+[ai-config#3784](https://github.com/Morrison-Lab/ai-config/issues/3784),
+modelled on `hooks/warn-stale-test-claim.py`'s claim-versus-execution
+comparison.
+It is occurrence one, so the issue records the design rather than asserting
+the recurrence bar in
+[`deterministic-tools`](../principles/deterministic-tools.md) is met.
 
 ## "A peer's edge cases raised against a different implementation"
 

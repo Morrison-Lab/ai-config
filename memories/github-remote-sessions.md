@@ -203,6 +203,39 @@ PRs the scorer had just passed:
   abbreviated one is refused with "The sha parameter must be exactly 40
   characters".
 
+**A correctly-lengthed but wrong-content `expected_head_sha` is a different
+failure from the one above, and it is NOT self-diagnosing.**
+The abbreviated-SHA refusal just above names its own cause in plain English.
+A 40-character SHA that is merely *wrong* --- built by padding or guessing
+from an abbreviation instead of read in full --- returns the REST
+`update-branch` endpoint's ordinary `422`
+("expected head sha didn't match current head ref.", curly apostrophe in the
+live text), the byte-identical message a genuine concurrent-writer collision
+returns.
+Before routing to either remedy, re-read the live `headRefOid` and confirm
+it actually differs from the SHA you pinned: only a head that has actually
+changed licenses the ownership-settling step that
+[`fully-clean`](../shared/workflow/fully-clean.md), [`mwc`](../skills/mwc/SKILL.md),
+and [`merge-it`](../skills/merge-it/SKILL.md) each route to, or
+[`chores`](../skills/chores/SKILL.md)'s parallel remedy (per the same
+restart-from-step-2 procedure the skill already uses elsewhere for a
+replaced head).
+Measured 2026-09-20 on
+[Lacaedemon/sparta#1615](https://github.com/Lacaedemon/sparta/pull/1615): an
+8-character abbreviation printed by `check-pr-fully-clean.py` (`d4691095`)
+was padded into a 40-character guess and returned the identical `422`, with
+no other writer involved --- the padded string was never a real commit on
+the PR.
+
+- **Do:** re-read the full SHA from the API (`headRefOid`) or resolve it
+  with `git rev-parse` at the point of use.
+- **Do:** compare the live head to your pin before concluding a writer
+  moved it.
+- **Don't:** construct or pad a full SHA from an abbreviation printed by a
+  script or a checker.
+- **Don't:** treat an `expected_head_sha`/`expectedHeadSha` `422` as proof
+  of a concurrent writer on the message text alone.
+
 **`mergeable` and `mergeable_state` are cached, and a merge to the base
 invalidates them.**
 Immediately after three merges landed, an open PR read
@@ -289,6 +322,53 @@ asymmetry working the useful way round.
   gate;
   it is subject to the same gate as a push.
 
+**The gate binds one reviewer, and reading it as binding review itself is the
+error that costs a verdict.**
+Everything above asks how to make the `@claude` reviewer run.
+None of it asks which reviewers exist, so a session that reads this section,
+finds every route gated, and concludes that no AI verdict is reachable has
+drawn a conclusion about the whole category from one member of it.
+
+Copilot is a second AI reviewer, requested per-PR rather than dispatched by a
+workflow, so the sender gate does not reach it: it is not one of the six
+`review /` jobs and nothing about a `claude[bot]` push silences it.
+That makes it the reviewer to request when #3743 blocks the other one, and
+[`copilot-review-before-human`](../shared/vendored/copilot-review-before-human.md)
+already says to get an AI verdict before a human one --- so requesting it is
+the step the standing rule asks for rather than an escape hatch.
+`mcp__github__request_copilot_review` is the call in a remote session.
+
+Measured 2026-09-19 on
+[ai-config#3799](https://github.com/Morrison-Lab/ai-config/pull/3799):
+the session reported to the user, twice, that a verdict required their own
+account, having never requested Copilot at any point.
+A push guard named the omission.
+The request was then issued and **could not be confirmed** --- the MCP call
+returned no output, `get_reviews` stayed empty, and the
+`requested_reviewers` endpoint was refused by the session's own permission
+classifier --- so whether it registered is unknown as of that date.
+The lesson is the unasked question rather than the outcome, which is why an
+unconfirmed request still records it.
+
+The general shape is worth separating from this gate.
+A blocked instance of a category invites a claim about the category, because
+the investigation that established the block is real work and feels like it
+answered the question.
+It answered a narrower one.
+Before reporting that something is unavailable, enumerate the category and
+say which members were checked --- which is
+[`metacognitive-monitoring`](../shared/workflow/metacognitive-monitoring.md)'s
+scope-claim rule applied to capabilities rather than to files.
+
+- **Do:** request Copilot when the `@claude` reviewer is gated, and say
+  whether the request was confirmed.
+- **Do:** name the members you checked when reporting a capability
+  unavailable, so the claim's scope is visible.
+- **Don't:** read "this reviewer is blocked" as "no review is reachable"
+  without enumerating the reviewers.
+- **Don't:** report a request as landed on the strength of having issued it;
+  this one could not be verified from the session that made it.
+
 ## The classifier also refuses a COMMIT on a branch this session does not own
 
 The section above is about the merge call.
@@ -339,3 +419,39 @@ rather than resolved by hand;
   statement about the diff --- split the command and see what the second
   refusal names.
 - **Don't:** leave a prepared resolution in a worktree as the deliverable.
+
+## A DELETE carrying a JSON body needs an explicit `Content-Type`, or the API answers 415
+
+Measured 2026-09-19 withdrawing a review request without `gh` on `PATH`.
+`DELETE /repos/{owner}/{repo}/pulls/{n}/requested_reviewers` takes its
+`reviewers` array in the request body, and the call returned
+`415 Unsupported Media Type`.
+Adding `-H "Content-Type: application/json"` returned 200 and the pending
+reviewer list came back empty.
+
+**The cause is a wrong default media type, not a missing one**, which an
+earlier revision of this entry had backwards.
+Reproduced 2026-09-19 against a local listener: `curl -X DELETE -d ...` and
+`curl -X POST -d ...` both send
+`Content-Type: application/x-www-form-urlencoded`, so curl does guess, and
+guesses the same thing whatever the method.
+The API rejects a form-urlencoded body where it expects JSON.
+
+That also means the method is not the discriminator.
+POST and PATCH are equally exposed with raw curl and rarely surface it only
+because those calls usually go through `gh api` or a client library that
+sets JSON for them --- so read this as a raw-curl rule rather than a
+DELETE rule.
+
+The failure reads as a permissions or endpoint problem rather than a header
+problem, which is what makes it worth recording: 415 on a route you are
+authorized for is almost always the media type.
+
+- **Do:** pass `-H "Content-Type: application/json"` on every curl call that
+  sends a JSON body with `-d`, whatever the method.
+- **Do:** check what curl actually put on the wire, with a local listener or
+  `-v`, before writing down why a request was rejected.
+- **Don't:** read a 415 as evidence the token lacks scope or the path is
+  wrong.
+- **Don't:** assume an absent header when a wrong one produces the identical
+  status.

@@ -322,6 +322,14 @@ mechanical), and
 [`skill-checklists`](../workflow/skill-checklists.md) (the pause-point
 instrument where no script can decide).
 
+## Prefer systemic solutions over one-off fixes
+
+When addressing a defect, failure, edge case, or recurring mistake, prefer systemic, structural solutions over one-off, ad-hoc patches.
+Fix the underlying mechanism that allowed the error to occur, and install an automated guard, type constraint, or architectural invariant that prevents the entire class of defects from recurring.
+
+Full statement: [`prefer-systemic-solutions-over-one-off-fixes`](prefer-systemic-solutions-over-one-off-fixes.md).
+Operationalized by: [`algorithmatize-checks`](../workflow/algorithmatize-checks.md), [`deterministic-tools`](deterministic-tools.md), and [`fail-fast`](fail-fast.md).
+
 ## Don't use LLMs for algorithmic thinking --- use validated algorithmic software
 
 Never use probabilistic language models for algorithmic operations:
@@ -364,6 +372,14 @@ Operationalized by:
 [`configurable-parameters`](../coding/configurable-parameters.md) (expose variations as parameters/toggles),
 [`specific-beats-general`](specific-beats-general.md),
 and the `clean` / `simplify` review passes.
+
+## "Or" always means "and/or" (inclusive or)
+
+In instructions, requirements, prompts, checklists, and specifications, treat "or" as inclusive ("and/or") unless exclusive choice is explicitly stated.
+Never interpret an unadorned "or" as an exclusive disjunction (XOR) that excuses dropping, ignoring, or omitting one of the alternatives when both apply.
+
+Full statement: [`or-means-and-or`](or-means-and-or.md).
+Operationalized by: the instruction interpretation rules in `AGENTS.md`, [`specific-beats-general`](specific-beats-general.md), and [`prefer-optionality-over-removal`](prefer-optionality-over-removal.md).
 
 ## Think outside the box --- distinguish real from artificial limitations
 
@@ -515,11 +531,16 @@ recurrence is observed rather than predicted.
 Feeling both at once usually means the count is one or two, and the way
 out is to wait rather than to argue.
 
+Prefer-systemic-solutions-over-one-off-fixes completes that family on the remediation axis: where algorithmatize-checks and deterministic-tools build instruments and automation, prefer-systemic-solutions directs that engineering at the root defect class rather than papering over individual symptoms or recurring review findings with manual patches.
+
 Specific-beats-general governs precedence across the entire catalog:
 it resolves conflicts between layers by establishing that explicit user
 instructions outrank repository defaults, scoped subsystem configs
 outrank top-level policies, and specific types and handlers outrank
 generic fallbacks in code.
+
+Or-means-and-or governs semantic interpretation of compound instructions: it resolves natural-language disjunctions by establishing that "or" is inclusive ("and/or") unless mutual exclusivity is explicitly specified.
+It works alongside interpret-instructions-broadly by ensuring agents satisfy all applicable parts of an instruction rather than arbitrarily dropping alternatives.
 
 Dead-code-is-tech-debt and prefer-optionality-over-removal draw the boundary
 between code deletion and preservation:

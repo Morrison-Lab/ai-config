@@ -274,14 +274,22 @@ def issue_key(number):
 #
 # Anchoring `for` to the PR noun excludes the first without reaching the
 # second, because "fix"/"patch"/"branch" never precede it here.
-# The whitespace runs are BOUNDED, which is what makes the lookback window
-# below sound. With `\s*` the pattern's longest possible match has no limit,
-# so no finite window can be proved not to change a verdict -- padding the
-# gap between the noun and the number past the window silently turns the
-# exclusion off, and the earlier version of this comment asserted the
-# opposite. Eight is far past any real spacing, including a line wrap.
+# EVERY whitespace run is bounded, which is what makes the lookback window
+# below sound. With `\s*` or `\s+` the pattern's longest possible match has
+# no limit, so no finite window can be proved not to change a verdict --
+# padding a gap past the window silently turns the exclusion off.
+#
+# Two rounds were needed to get this right, and the second is the instructive
+# one: the first bounded the two obvious runs and left `pull\s+request`
+# unbounded, then asserted an exact maximum computed as though it had been
+# bounded too. The arithmetic was right about the runs it counted. Bounding
+# "the whitespace" is not a thing you can check by rereading the sentence you
+# just wrote; it is a thing you check by counting the quantifiers.
+#
+# Eight is past any real spacing, including a line wrap and a nested list
+# indent, and is pinned in both directions by test cases at 8 and at 9.
 RX_PR_PREFIX = re.compile(
-    r"(?:\bPR|\bpull\s+request|\bpull)\b\s{0,8}(?:for\s{0,8})?$", re.I)
+    r"(?:\bPR|\bpull\s{0,8}request|\bpull)\b\s{0,8}(?:for\s{0,8})?$", re.I)
 
 # How far back of an issue reference the PR prefix is looked for.
 #
@@ -293,11 +301,17 @@ RX_PR_PREFIX = re.compile(
 # legitimate recap silently turned the guard off, on exactly the transcript it
 # was written for.
 #
-# The window is derived from the pattern rather than chosen: the longest
-# match it can now produce is `pull request` + 8 + `for` + 8 = 31 characters,
-# and the window is comfortably past that. A `PREFIX_WINDOW` smaller than
-# that bound would drop real exclusions, which is what the test asserts.
-PREFIX_WINDOW = 64
+# The window is derived from the pattern rather than chosen. Summing the
+# longest alternative and every bounded run gives
+# `pull` + 8 + `request` + 8 + `for` + 8 = 38 characters, and the window is
+# past that with room to spare.
+#
+# A test exercises a prefix at that full length, so the floor is pinned by a
+# case rather than by this arithmetic. The previous comment claimed the suite
+# asserted a floor it did not: every window down to 20 passed, because no
+# case came near the maximum. A derivation nothing exercises is a guess with
+# a sum next to it.
+PREFIX_WINDOW = 48
 
 # A sentence boundary.
 #

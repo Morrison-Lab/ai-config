@@ -351,11 +351,34 @@ CASES = [
     ([PROMPT, READ_BODY_ONLY,
       say("The pull request for\n#1566 is awaiting review.")], False,
      "and a PR prefix broken across a line wrap is still excluded"),
+    # The bound itself, from both sides, one character apart. Without these
+    # the `{0,8}` could be any value from 8 to 39 and the suite would not
+    # notice, which is what a review measured.
     ([PROMPT, READ_BODY_ONLY,
-      say("The pull request" + " " * 40 + "for #1566 is awaiting review.")],
+      say("The pull request" + " " * 8 + "for #1566 is awaiting review.")],
+     False,
+     "a gap exactly AT the pattern's bound is still excluded"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("The pull request" + " " * 9 + "for #1566 is awaiting review.")],
      True,
-     "DOCUMENTED BOUND: a gap padded past the pattern's own limit is no "
-     "longer read as a PR prefix, so the claim is treated as an issue claim"),
+     "DOCUMENTED BOUND: one character past it, the text is no longer read as "
+     "a PR prefix, so the claim is treated as an issue claim"),
+
+    # The run INSIDE `pull request`, which a round bounded the other two
+    # without noticing. Nothing distinguished a bounded one from `\s+` here
+    # until this case existed.
+    ([PROMPT, READ_BODY_ONLY,
+      say("The pull" + " " * 12 + "request #1566 is awaiting review.")], True,
+     "the run between `pull` and `request` is bounded like the others"),
+
+    # A prefix at the pattern's full maximum length, which is what pins
+    # `PREFIX_WINDOW`'s floor. Every window down to 20 passed the suite
+    # before this case existed, because nothing came near the maximum.
+    ([PROMPT, READ_BODY_ONLY,
+      say("The pull" + " " * 8 + "request" + " " * 8 + "for" + " " * 8
+          + "#1566 is awaiting review.")], False,
+     "a prefix at the pattern's longest possible match still fits the "
+     "lookback window"),
 
     # An UNCLOSED fence leaves the rest as prose rather than swallowing it,
     # so one stray backtick run cannot silence every later claim.

@@ -569,11 +569,11 @@ Amending the commit message to carry the three-row table above did both jobs at 
 A durable artifact that states its own discriminator is [`quotable-findings`](quotable-findings.md)'s standard turned around --- a claim that names the exact measurement that would falsify it is the one nobody can plausibly misread.
 
 - **Do:** treat a reviewer's own counter-test as a claim requiring the same re-derivation any other claim does, whichever side of the finding you are on.
-- **Don't:** read "the reviewer ran a command" as equivalent to "the reviewer ran the command that could have shown the claim false" --- a command that cannot exhibit the failure mode has not tested the claim, however real its output is.
 - **Do:** when rebutting a finding, name the precondition the original claim relied on and confirm the counter-test carried it.
+- **Do:** write the discriminating measurement --- including the null case that shows what a non-discriminating test looks like --- into the durable artifact (commit message, PR body) rather than only into a comment thread.
+- **Don't:** read "the reviewer ran a command" as equivalent to "the reviewer ran the command that could have shown the claim false" --- a command that cannot exhibit the failure mode has not tested the claim, however real its output is.
 - **Don't:** rebut by re-asserting the original claim against the counter-test's bare output;
   that answers confidence with confidence and settles nothing --- name the specific precondition the counter-test dropped.
-- **Do:** write the discriminating measurement --- including the null case that shows what a non-discriminating test looks like --- into the durable artifact (commit message, PR body) rather than only into a comment thread.
 - **Don't:** leave a verification claim as a bare tool invocation ("verified through X") with no stated discriminator;
   that vagueness is what makes a plausible-but-wrong counter-finding possible in the first place.
 

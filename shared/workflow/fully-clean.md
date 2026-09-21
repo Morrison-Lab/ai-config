@@ -1373,11 +1373,11 @@ esac
 - **Do:** re-verify the agent and the head yourself before reporting ready,
   since the exit status is necessary and this file's own SHA-surface caveats
   still apply.
-- **Don't:** grep a purpose-built checker's output for a phrase --- its prose
-  is a human-facing report, not an API.
 - **Do:** pass `-R OWNER/REPO` from any poller or script, since the repo comes
   from the working directory otherwise and a background loop inherits whatever
   cwd the session happened to be in.
+- **Don't:** grep a purpose-built checker's output for a phrase --- its prose
+  is a human-facing report, not an API.
 - **Don't:** collapse the status to a boolean either; `rc != 0` reports a
   broken check as a regressed PR, which is the same conflation wearing the
   remedy's clothes.

@@ -415,62 +415,77 @@ def _executable_text(command):
             command = strip(command)
         except Exception:
             pass
-    return "\n".join(_strip_comment(l) for l in command.splitlines())
+    return _strip_comments(command)
 
 
-def _strip_comment(line):
-    """`line` truncated at the `#` that opens a shell comment, if any.
+def _strip_comments(command):
+    """`command` with shell comments removed, quote state carried throughout.
 
-    A left-to-right scanner that tracks quote state, rather than a regex.
-    Three rounds of adversarial review pushed this from a regex to a
-    quote-blanking regex to this, and the scanner is what the problem
-    actually needs -- quoting is a stateful property of the text to the LEFT
-    of a character, which no single regex over the line can decide.
+    ONE character stream, not a line at a time. That distinction is the whole
+    of round 5: a quoted argument may legitimately span physical lines --
 
-    What each earlier attempt got wrong, so nobody re-derives them:
+        gh pr merge 1 -R o/r --body "first line
+        second line #still inside the quote --match-head-commit <sha>" --squash
 
-      - Matching `#.*$` on the raw line treats `--body "Closes #123"` as a
-        comment and discards the rest of the line, hiding a pin that follows.
-      - Blanking quoted regions first mis-pairs delimiters. `_blank_quotes`
-        finds the NEXT matching quote character, not the scope-correct one,
-        so an ordinary contraction (`don't`) pairs with the opening quote of
-        an unrelated quoted region later on the line and swallows every
-        character between them -- a real `#` included.
+    -- and a per-line scanner starts each line with `quote = None`, so it reads
+    that second `#` as opening a comment, truncates the line, and discards the
+    pin flag that follows it. Silent under-detection, on the surface this guard
+    exists for. Scanning the whole string carries the open quote across the
+    newline, where it belongs.
 
-    A scanner cannot cross-pair, because it never looks ahead for a partner.
-    It also handles the unbalanced case the way `sh` does: an unmatched quote
-    opens a string that runs to end of line, so no `#` after it is a comment.
-    That errs toward scanning too much rather than too little, which is the
-    safe direction here: the cost is a spurious warning on a commented-out
-    pin, where the other direction silently misses a real one.
+    Why a scanner rather than a regex at all: quoting is context-sensitive --
+    whether a character is quoted depends on unbounded text to its left -- so
+    no regex over the text can decide it. Three earlier attempts each passed
+    their own tests and failed the next shape:
 
-    Self-contained on purpose. The previous version degraded to the raw-line
-    bug whenever the sibling module was unavailable, silently losing
-    quote-awareness in exactly the import-failure case the pin surface is
-    built to survive.
+      - `#.*$` per line read `--body "Closes #123"` as a comment and dropped
+        everything after it.
+      - Blanking quoted regions first mis-paired delimiters: a contraction
+        (`don't`) paired with the opening quote of an unrelated quoted region
+        later in the line and swallowed a real `#` between them.
+      - A per-line scanner fixed both and still could not see across a
+        newline.
+
+    On an UNBALANCED quote it follows `sh`: the string runs on, so no later
+    `#` is a comment. That errs toward scanning too much rather than too
+    little, which is the safe direction -- a spurious warning costs a glance,
+    a missed pin costs the thing this guard is for.
+
+    Self-contained on purpose: an earlier version delegated to a sibling and
+    silently reverted to the bug whenever that import failed.
     """
+    out = []
     quote = None
     i = 0
-    n = len(line)
+    n = len(command)
     while i < n:
-        c = line[i]
+        c = command[i]
         if quote is None:
             if c == "\\":
+                out.append(command[i:i + 2])
                 i += 2
                 continue
             if c in ('"', "'"):
                 quote = c
-            elif c == "#" and (i == 0 or line[i - 1].isspace()):
-                return line[:i]
+            elif c == "#" and (i == 0 or command[i - 1].isspace()):
+                # Drop to end of line, keeping the newline so line structure
+                # (and any following command) survives.
+                j = command.find("\n", i)
+                if j == -1:
+                    break
+                i = j
+                continue
         elif c == quote:
             quote = None
         elif c == "\\" and quote == '"':
             # Backslash escapes inside double quotes only; inside single
             # quotes `sh` treats it literally and nothing escapes the closer.
+            out.append(command[i:i + 2])
             i += 2
             continue
+        out.append(c)
         i += 1
-    return line
+    return "".join(out)
 
 
 def _longest_observed_prefix(token, seen):

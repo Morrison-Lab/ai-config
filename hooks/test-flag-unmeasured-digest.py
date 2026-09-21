@@ -408,6 +408,14 @@ CASES = [
      bash(f"echo don't # old: gh pr merge 5 --match-head-commit {'b' * 40}"),
      True,
      "an UNBALANCED quote errs toward scanning, not toward silence"),
+    # Round 5: a quoted --body spanning physical lines, with a `#` on the
+    # continuation line. A per-line scanner reads that `#` as a comment and
+    # drops the pin after it -- silent under-detection.
+    ([PROMPT, HEAD_RUN],
+     bash(f'gh pr merge 1 -R o/r --body "first line\n'
+          f'second line #not a comment --match-head-commit {"b" * 40}" '
+          f"--squash"), True,
+     "a pin inside a MULTI-LINE quoted argument is still found"),
 ]
 
 
@@ -537,8 +545,17 @@ def check_comment_scanner_directly():
     spec = importlib.util.spec_from_file_location("_hook_under_test", HOOK)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    f = mod._strip_comment
+    f = mod._strip_comments
     cases = [
+        # Round 5: quote state must survive a newline. A per-line scanner
+        # starts each line with no quote open, reads the `#` on the
+        # continuation line as a comment, and drops the pin after it.
+        ('gh pr merge --body "line one\nline two #inside --match-head-commit abc"',
+         'gh pr merge --body "line one\nline two #inside --match-head-commit abc"',
+         "an open quote carries across a newline, so a `#` there is not a comment"),
+        ("echo one # note\necho two --match-head-commit abc",
+         "echo one \necho two --match-head-commit abc",
+         "a comment ends at the newline; the next line survives intact"),
         ("echo hi # note", "echo hi ", "a plain trailing comment is cut"),
         ("echo hi", "echo hi", "a line with no comment is untouched"),
         ("gh pr merge -R o/r#1 --squash", "gh pr merge -R o/r#1 --squash",
@@ -565,8 +582,8 @@ def check_comment_scanner_directly():
         if got != want:
             bad.append(f"{why}: {line!r} -> {got!r}, wanted {want!r}")
     ok = not bad
-    print(f"{'ok  ' if ok else 'FAIL'}  _strip_comment handles quoting, "
-          f"nesting, word-internal `#`, and unbalanced quotes")
+    print(f"{'ok  ' if ok else 'FAIL'}  _strip_comments handles quoting across "
+          f"newlines, nesting, word-internal `#`, and unbalanced quotes")
     for b in bad:
         print(f"        {b}")
     return 0 if ok else 1

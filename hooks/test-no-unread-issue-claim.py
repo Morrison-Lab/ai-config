@@ -109,6 +109,26 @@ CASES = [
     ([PROMPT, bash("gh issue view 1566 -R o/r -c"), say(CLAIM)], False,
      "the `-c` shorthand discharges it too"),
 
+    # FALSE DISCHARGE, the worst outcome this guard has: staying silent on a
+    # claim whose evidence was never gathered. Both shapes were accepted by
+    # a proximity-matching reimplementation of the sibling hook's checks.
+    ([PROMPT,
+      tool("mcp__github__issue_read",
+           {"issue_number": 1566, "method": "get_labels",
+            "include_comments": False}),
+      say(CLAIM)], True,
+     "a KEY NAME containing 'comments' does not discharge -- the method "
+     "field decides"),
+    ([PROMPT,
+      bash("gh issue view 1566 -R o/r --json title,body  "
+           "# will check comments next"),
+      say(CLAIM)], True,
+     "and the word 'comments' in a shell comment does not either -- the "
+     "--json field list decides"),
+    ([PROMPT, bash("gh issue view 1566 -R o/r --json bodyComments"),
+      say(CLAIM)], True,
+     "nor a --json field that merely CONTAINS the token"),
+
     # The MCP call with `issue_number` BEFORE the comments method, which is
     # a separate pattern from the one the existing MCP case exercises.
     ([PROMPT,
@@ -462,9 +482,16 @@ CASES = [
     ([PROMPT, READ_BODY_ONLY,
       say("#01566 still needs your call.")], True,
      "and zero-padding does not excuse an undischarged issue either"),
+    # The canonicalisation is CLAIM-side only. Command parsing belongs to
+    # `warn-claim-without-comments-read.py`, which compares the positional
+    # number literally, so a zero-padded argument reads as a different issue.
+    # That asymmetry is deliberate: the alternative is a second command
+    # parser here, and the duplication of the first one is what produced two
+    # false discharges.
     ([PROMPT, bash("gh issue view 01566 -R o/r --comments"),
-      say("#1566 still needs your call.")], False,
-     "the canonicalisation runs on the COMMAND side too, not only the claim"),
+      say("#1566 still needs your call.")], True,
+     "KNOWN ASYMMETRY: a zero-padded COMMAND argument does not discharge, "
+     "because the shared command parser matches the number literally"),
 ]
 
 
@@ -547,6 +574,71 @@ def check_unreadable_transcript_is_silent():
     return 0 if ok else 1
 
 
+def check_missing_sibling_fails_open():
+    """Without the sibling's checks, the guard must stay SILENT.
+
+    It borrows `command_reads_comments`/`mcp_reads_comments` from
+    `warn-claim-without-comments-read.py`. If that import ever fails the
+    hook cannot tell a read from an unread issue, and the two directions are
+    not symmetric: warning on every issue mention in every session is how a
+    guard gets switched off, taking the real case with it.
+
+    The suite cannot reach this by running the hook, because the sibling is
+    always present beside it -- so the check substitutes the two borrowed
+    names in-process instead.
+    """
+    spec = importlib.util.spec_from_file_location("h_open", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    mod.command_reads_comments = None
+    mod.mcp_reads_comments = None
+    ok = mod.comments_were_read("1566", [("Bash", {"command": "echo hi"})])
+    print(f"{'ok  ' if ok else 'FAIL'}  a missing sibling fails OPEN, so the "
+          f"guard stays silent rather than warning on everything")
+    return 0 if ok else 1
+
+
+def check_role_keyed_string_record():
+    """A record keyed `role` with a bare string body is still read.
+
+    `last_assistant_text` accepts two shapes this suite's helpers never
+    build: a `role` key instead of `type`, and `content` as a plain string
+    rather than a block list. Both were deletable with every case green,
+    which makes them indistinguishable from dead code until something
+    asserts them.
+    """
+    events = [PROMPT,
+              {"role": "assistant", "content": "#1566 still needs your call."}]
+    ok = fired(run(events))
+    print(f"{'ok  ' if ok else 'FAIL'}  a `role`-keyed record with string "
+          f"content is read")
+    return 0 if ok else 1
+
+
+def check_antigravity_suppresses_the_system_message():
+    """Antigravity renders `systemMessage` poorly, so it is omitted there.
+
+    The suite's own `run()` pops the variable before every invocation, so
+    nothing exercised the suppression: replacing the guard with `if True`
+    left every case green.
+    """
+    tpath = write_transcript([PROMPT, READ_BODY_ONLY, say(CLAIM)])
+    try:
+        env = dict(os.environ)
+        env["ANTIGRAVITY_AGENT"] = "1"
+        r = subprocess.run([sys.executable, HOOK],
+                           input=json.dumps({"transcript_path": tpath}),
+                           capture_output=True, text=True, env=env)
+        out = json.loads(r.stdout) if r.stdout.strip() else {}
+    finally:
+        os.unlink(tpath)
+    ok = (bool((out.get("hookSpecificOutput") or {}).get("additionalContext"))
+          and "systemMessage" not in out)
+    print(f"{'ok  ' if ok else 'FAIL'}  ANTIGRAVITY_AGENT suppresses the "
+          f"systemMessage and keeps the context")
+    return 0 if ok else 1
+
+
 def check_two_undischarged_names_the_first():
     """With more than one issue outstanding, the warning names one of them.
 
@@ -601,6 +693,9 @@ def main():
     adhoc = [check_message_names_the_number,
              check_mixed_state_names_the_undischarged_issue,
              check_unreadable_transcript_is_silent,
+             check_missing_sibling_fails_open,
+             check_role_keyed_string_record,
+             check_antigravity_suppresses_the_system_message,
              check_two_undischarged_names_the_first,
              check_scan_cost_stays_linear]
     for check in adhoc:

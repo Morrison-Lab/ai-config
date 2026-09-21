@@ -432,22 +432,44 @@ CUES = [
 ]
 RX_CUE = re.compile("|".join(CUES), re.I)
 
-# Reading an issue's COMMENTS, capturing the number. Three surfaces, because
-# all three occur in this corpus.
-READS = [
-    # gh/glab issue view <N> ... with a comments flag, in either order.
-    # The bound excludes `;` and `&` (a new command) but NOT `|`: a `--jq`
-    # filter legitimately contains a pipe, and stopping there missed
-    # `--jq '.comments[] | .body' --json comments`.
-    r"issue\s+view\s+[\"']?#?(\d{1,7})[\"']?[^\n;&]*?(?:--comments|--json[^\n;&]*comments)",
-    r"issue\s+view\s+[\"']?#?(\d{1,7})[\"']?[^\n;&]*?-c\b",
-    # REST: .../issues/<N>/comments
-    r"issues/(\d{1,7})/comments",
-    # MCP issue read naming comments in the same call.
-    r"issue_read[^\n]*?[\"']issue_number[\"']\s*:\s*(\d{1,7})[^\n]*?comments",
-    r"issue_read[^\n]*?comments[^\n]*?[\"']issue_number[\"']\s*:\s*(\d{1,7})",
-]
-RX_READS = [re.compile(p, re.I) for p in READS]
+# "Did something read issue N's comments?" is `warn-claim-without-comments-read.py`'s
+# question, already answered there, and this file asks it about the same
+# surfaces. Reimplementing it was a mistake with a measured cost.
+#
+# The reimplementation matched by PROXIMITY over a serialized blob: an
+# `issue_read` call with the number somewhere near the substring `comments`,
+# or an `issue view` whose `--json` value was followed eventually by the word
+# `comments`. Both accept things that did not read any comments --
+# `{"method": "get_labels", "include_comments": false}` discharges on the key
+# name, and `--json title,body  # will check comments next` discharges on a
+# shell comment. A false discharge is the worst outcome available here: the
+# guard goes silent on exactly the claim it exists to catch, and nothing
+# reports that it did.
+#
+# The sibling's versions are structural. `mcp_reads_comments` compares
+# `tool_input["method"]` to `get_comments`; `_json_includes_comments` splits
+# the `--json` value on commas and tests for the exact token. Borrowing them
+# fixes both, keeps the two guards agreeing about what a read IS, and means a
+# fix to either reaches both.
+_HOOKS_DIR = os.path.dirname(os.path.realpath(__file__))
+
+
+def _sibling(name, key):
+    """Import a hyphenated sibling module, or None. Fails open, as ever."""
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            key, os.path.join(_HOOKS_DIR, name))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    except Exception:
+        return None
+
+
+_claim = _sibling("warn-claim-without-comments-read.py", "_sib_unread_claim")
+command_reads_comments = getattr(_claim, "command_reads_comments", None)
+mcp_reads_comments = getattr(_claim, "mcp_reads_comments", None)
 
 NOTE = (
     "Unread-issue reminder: this message reports issue #{n} as open, blocked, "
@@ -469,9 +491,16 @@ NOTE = (
 )
 
 
-def comments_read(transcript_path):
-    """Set of issue numbers whose comments some command in the session read."""
-    seen = set()
+def tool_uses(transcript_path):
+    """Every `(name, input)` tool call in the transcript, or None.
+
+    The tool NAME is carried alongside the input because the MCP check keys
+    on it: `issue_read` is part of the name and never appears in the input,
+    so an earlier version that looked only at the input made that whole
+    discharge path dead code -- silently, and in exactly the remote sessions
+    where `tool-mappings.md` routes this work to MCP because `gh` is absent.
+    """
+    out = []
     if not transcript_path or not os.path.exists(transcript_path):
         return None
     try:
@@ -485,31 +514,35 @@ def comments_read(transcript_path):
                 except Exception:
                     continue
                 blocks = (rec.get("message") or {}).get("content") or rec.get("content") or []
-                blobs = []
                 if isinstance(blocks, list):
                     for b in blocks:
                         if isinstance(b, dict) and b.get("type") == "tool_use":
-                            # The tool NAME must be in the blob: the MCP
-                            # discharge patterns key on `issue_read`, which is
-                            # part of the tool name and never appears in the
-                            # input. Serializing input alone made those two
-                            # patterns dead code, so every remote session --
-                            # where `tool-mappings.md` routes this work to MCP
-                            # precisely because `gh` is absent -- would have
-                            # been told it never read comments it had read.
-                            blobs.append((b.get("name") or "") + " "
-                                         + json.dumps(b.get("input") or {}))
-                for tc in rec.get("tool_calls") or []:
-                    if isinstance(tc, dict):
-                        blobs.append((tc.get("name") or "") + " " + json.dumps(
-                            tc.get("args") or tc.get("input") or {}))
-                for blob in blobs:
-                    for rx in RX_READS:
-                        for m in rx.finditer(blob):
-                            seen.add(issue_key(m.group(1)))
+                            out.append((b.get("name") or "", b.get("input") or {}))
     except Exception:
         return None
-    return seen
+    return out
+
+
+def comments_were_read(number, uses):
+    """True when some tool call in `uses` read issue `number`'s comments.
+
+    Both checks come from `warn-claim-without-comments-read.py`. Where that
+    sibling cannot be imported the answer is True, which suppresses the
+    warning: a guard that cannot tell whether the evidence was gathered must
+    not assert that it was not.
+    """
+    if command_reads_comments is None or mcp_reads_comments is None:
+        return True
+    for name, inp in uses:
+        try:
+            if name == "Bash" and isinstance(inp, dict):
+                if command_reads_comments(inp.get("command") or "", number):
+                    return True
+            if mcp_reads_comments(name, inp, number):
+                return True
+        except Exception:
+            continue
+    return False
 
 
 def last_assistant_text(transcript_path):
@@ -578,13 +611,13 @@ def main() -> int:
         numbers = asserted_issues(text)
         if not numbers:
             return 0
-        seen = comments_read(tpath)
-        if seen is None:
+        uses = tool_uses(tpath)
+        if uses is None:
             # No readable transcript means no evidence either way. Fail open
             # rather than warn on every issue mention in a session we cannot
             # inspect.
             return 0
-        missing = [n for n in numbers if n not in seen]
+        missing = [n for n in numbers if not comments_were_read(n, uses)]
         if not missing:
             return 0
         n = missing[0]

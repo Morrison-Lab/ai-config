@@ -83,13 +83,26 @@ does not accept a filed issue as discharging a mistake, and the session had
 by then filed three mechanism proposals against one built mechanism, which is
 the shape of filing becoming an escape rather than a schedule.
 
-Derived rather than recalled, since the count is the argument:
+The three are ai-config#3817, #3821 and #3823, against ai-config#3818 as the
+one that session built.
+
+That list is NOT derivable by query, and an earlier draft of this paragraph
+claimed it was. It cited
 
     gh issue list -R Morrison-Lab/ai-config --state all --author <user> \
       --search 'Hook: in:title created:2026-09-20..2026-09-21'
 
-returns ai-config#3817, #3821 and #3823 as that session's `Hook:` proposals,
-against ai-config#3818 as the one it built.
+and reported it as returning exactly those three. It returns seven, and the
+draft was written after that output had been read -- three rows were kept and
+the rest dropped, with the result presented as what the query returned. The
+query cannot give the intended figure at all: the login is shared across
+concurrent sessions, so it cannot separate one session's filings from
+another's, and #3818 is a pull request, which `gh issue list` never returns.
+
+The numbers above are therefore identified from the session's own history and
+labelled as such. A citation that does not survive being re-run is worse than
+an honest recollection, because it transfers the reader's trust to something
+that was never checked.
 
 A reader who thinks the third-occurrence bar should have held is disagreeing
 with a judgment that was made knowingly, not catching an oversight.
@@ -135,20 +148,19 @@ RX_ISSUE = re.compile(
 )
 # A PR reference immediately before the number: `PR #12`, `pull request #12`.
 #
-# Deliberately NOT widened to "the PR for #12" / "the fix for #12". That was
-# tried and reverted: the `for` branch swallows genuine escalations that use
-# the same phrasing about the issue's own resolution rather than about a
-# submitted pull request --
+# `for` is admitted ONLY directly after a PR-referring noun, which is the
+# scoped middle option between the two failures already measured here:
 #
-#     Apply the fix for #12 -- it still needs your input on which approach.
-#     The patch for #12 is still pending your decision on scope.
+#   too narrow (`PR|pull request|pull` alone) -- "The PR for #12 is awaiting
+#       review" fires, crediting the PR's cue to the issue.
+#   too broad (`fix|patch|branch ... for`) -- "Apply the fix for #12, it
+#       still needs your input" goes SILENT, swallowing exactly the claim
+#       this guard exists to catch.
 #
-# Both are exactly the claim this guard exists to catch, and both went silent
-# under the wider pattern. The narrow form's cost is the opposite and milder
-# error: `The PR for #12 is awaiting review` fires when the cue really
-# describes the PR. A spurious warning is cheap to dismiss; a silent miss is
-# not, and this guard's whole subject is claims that fail silently.
-RX_PR_PREFIX = re.compile(r"(?:\bPR|\bpull request|\bpull)\s*$", re.I)
+# Anchoring `for` to the PR noun excludes the first without reaching the
+# second, because "fix"/"patch"/"branch" never precede it here.
+RX_PR_PREFIX = re.compile(
+    r"(?:\bPR|\bpull\s+request|\bpull)\b\s*(?:for\s*)?$", re.I)
 
 # A sentence boundary.
 #
@@ -170,14 +182,40 @@ RX_PR_PREFIX = re.compile(r"(?:\bPR|\bpull request|\bpull)\s*$", re.I)
 # bulleted recap several claims rather than one, which was the reported
 # defect.
 #
-# A semicolon does split. That loses a pronoun-linked claim
-# ("#12 is filed; it awaits your decision"), which is accepted and disclosed
-# below -- semicolons joining a bare issue reference to a pronoun clause are
-# rare in recaps, while "several PRs pending; #12 is an example" is not.
+# A semicolon does split, and that loses any claim whose subject sits on one
+# side and whose cue sits on the other:
+#
+#     #12 is filed; it still needs your call.
+#     I looked at #12; it is still blocked on your decision.
+#
+# An earlier comment here called that shape "rare in recaps". That was an
+# assertion with nothing behind it, and it is not obviously true -- a pronoun
+# back-reference across a semicolon is an ordinary way to write a status
+# line. It is recorded as a known, unmeasured gap rather than argued away.
+# The semicolon is kept because it does close a measured false positive
+# ("several PRs pending; #12 is an example"), and because resolving the
+# trade properly needs pronoun resolution, which is well past what a lexical
+# guard should attempt.
+# Bullet markers, deliberately wider than `-*+`: a lettered or roman `a)` /
+# `ii)` list, or a Unicode bullet, is the same structure and was cross-
+# attaching cues between items because the narrower set did not see it.
+#
+# NUMBERED items are NOT boundaries. A numbered list usually ELABORATES one
+# claim introduced by a lead-in line ("the two remaining tasks for #12:
+# 1. ... 2. it still needs your sign-off"), so splitting there separates the
+# claim from its own subject -- the same silent miss the bare-newline split
+# caused. A digit can also open a continuation line by accident. Bulleted
+# items, by contrast, are typically independent status lines, which is the
+# shape that produced the original cross-attachment.
+# A line-leading numeric enumerator, whose trailing `.` or `)` is punctuation
+# rather than a sentence end.
+RX_ENUMERATOR = re.compile(r"(?m)^([ \t]*\d+)[.)](?=\s)")
+
 RX_SENTENCE = re.compile(
-    r"(?<=[.!?;])\s+"          # a terminator, then any whitespace
-    r"|\n\s*\n"                # a blank line: paragraph boundary
-    r"|\n(?=[ \t]*(?:[-*+]|\d+[.)])\s)"  # a newline opening a list item
+    r"(?<=[.!?;])\s+"                    # a terminator, then any whitespace
+    r"|\n\s*\n"                          # a blank line: paragraph boundary
+    r"|\n(?=[ \t]*(?:[-*+•‣◦]|"   # a bulleted item
+    r"[A-Za-z][.)]|[ivxIVX]+[.)])\s)"    # or a lettered / roman item
 )
 
 # Asserting that the issue still needs something. Deliberately narrow: an
@@ -322,6 +360,12 @@ def asserted_issues(text):
     """
     out = []
     prose = visible_prose(text)
+    # A line-leading enumerator carries a PERIOD, so the terminator rule would
+    # split "1. the docs pass" right after the marker -- separating a numbered
+    # item from the lead-in that names its subject, which is the silent miss
+    # the list-marker branch above deliberately avoids. Neutralize the
+    # marker's punctuation first so only real sentence ends split.
+    prose = RX_ENUMERATOR.sub(r"\1 ", prose)
     for sentence in RX_SENTENCE.split(prose):
         if not RX_CUE.search(sentence):
             continue

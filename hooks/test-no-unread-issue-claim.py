@@ -48,7 +48,6 @@ READ_OTHER_COMMENTS = bash("gh issue view 999 -R o/r --comments")
 # The measured claim, near-verbatim.
 CLAIM = ("#1566's deliverable is a decision with a genuine do-nothing option, "
          "so it is yours rather than mine.")
-CLAIM_BLOCKED = "Both #1544 and #1546 are blocked on discussion #1597."
 
 # (events, should_fire, label)
 CASES = [
@@ -144,12 +143,39 @@ CASES = [
       say("The decision on #1566\nis still yours to make.")], True,
      "wrapped between the number and the cue still fires"),
 
-    # The narrow PR prefix fires here, and that is the accepted trade: the
-    # widened form swallowed genuine escalations phrased "the fix for #N ...
-    # still needs your input", which is a silent miss.
+    # The scoped PR prefix gets BOTH directions: `for` is admitted only
+    # directly after a PR noun.
     ([PROMPT, READ_BODY_ONLY,
       say("Apply the fix for #1566 -- it still needs your input.")], True,
      "a genuine escalation phrased 'the fix for #N' is NOT swallowed"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("The PR for #1566 is awaiting review.")], False,
+     "'the PR for #N' IS excluded -- the cue describes the pull request"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("The pull request for #1566 is awaiting review.")], False,
+     "the spelled-out form is excluded too"),
+
+    # A NUMBERED list usually elaborates one claim introduced by a lead-in,
+    # so splitting there separates a claim from its own subject.
+    ([PROMPT, READ_BODY_ONLY,
+      say("The two remaining tasks for #1566:\n"
+          "1. the docs pass is done\n"
+          "2. it still needs your final sign-off")], True,
+     "a numbered list ELABORATING one claim is not split away from its subject"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("The naming question in #1566 is basically settled --\n"
+          "2. more voices are wanted, so it remains open.")], True,
+     "a continuation line that happens to start with a digit is not a boundary"),
+
+    # Lettered, roman and Unicode bullets are the same structure as `-*+`.
+    ([PROMPT, say("Progress notes:\n"
+                  "a) Investigated flaky CI, still pending a fix upstream\n"
+                  "b) Closed #1622 after merging the associated PR")], False,
+     "a lettered list splits, so a cue in item a) does not reach item b)"),
+    ([PROMPT, say("Notes:\n"
+                  "• CI is still pending upstream\n"
+                  "• Closed #1622 after merging")], False,
+     "a Unicode bullet list splits too"),
 
     # A --jq filter legitimately contains a pipe.
     ([PROMPT,

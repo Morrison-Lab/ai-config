@@ -70,6 +70,36 @@ work on it", "stays as-is until you say otherwise". The cue list is
 deliberately narrow, on the standing argument that a guard which warns on
 legitimate cases gets switched off and takes the real ones with it.
 
+A cue and its issue must share a SENTENCE, so a list whose lead-in names the
+subject is missed:
+
+    Remaining on #12:
+    - a written migration script
+    - your decision on rollout timing
+
+This is a known gap, and it was closed once and then deliberately reopened.
+A `_list_subject` discriminator attached an item's cue to a colon-terminated
+lead-in naming exactly one issue. Review found four ways it mis-attached:
+two lead-ins in one paragraph sent the second issue's claim to the FIRST and
+left the real one unnamed; a blank line between lead-in and list -- the
+idiomatic Markdown form -- defeated it entirely; `J. Smith said` read as a
+list item; and an issue named only in passing ("while #12 was building in
+CI:") captured a list about something else.
+
+The first is why it is gone rather than refined. This file argues throughout
+that a silent miss is worse than a spurious warning, and that is right as far
+as it goes -- but it assumed those were the only two outcomes.
+MISATTRIBUTION is a third, and it is worse than both: the guard names an
+issue whose comments WERE read, while the issue that actually went unread is
+never mentioned. A reader acting on that warning is actively misdirected and
+the real claim still escapes. A guard is allowed to miss things; it is not
+allowed to point somewhere false.
+
+Closing this properly needs the lead-in's SCOPE to be decidable -- where the
+list it governs begins and ends, and whether the issue it names is the
+subject or merely background -- which is discourse structure rather than
+lexis.
+
 ON BUILDING THIS AT THE SECOND OCCURRENCE
 ------------------------------------------
 `shared/principles/deterministic-tools.md` sets the bar at the third
@@ -83,8 +113,17 @@ does not accept a filed issue as discharging a mistake, and the session had
 by then filed three mechanism proposals against one built mechanism, which is
 the shape of filing becoming an escape rather than a schedule.
 
-The three are ai-config#3817, #3821 and #3823, against ai-config#3818 as the
-one that session built.
+The three were ai-config#3817, #3821 and #3823, against ai-config#3818 as the
+one that session had built **at the moment the decision was taken**.
+
+That qualifier is load-bearing and was missing. #3821 was itself built and
+merged at 09:31 PT the same morning, half an hour before this file's round-5
+commit, so by then the ratio was two built against two filed rather than one
+against three. The condition the argument rests on flipped inside the same
+session -- which is exactly what
+`shared/writing/timestamp-volatile-claims.md` exists for: a built-versus-filed
+count is a claim about a moment, not a standing fact. The judgment still
+stands on the reasoning above it; the arithmetic it cited does not.
 
 That list is NOT derivable by query, and an earlier draft of this paragraph
 claimed it was. It cited
@@ -375,58 +414,14 @@ def asserted_issues(text):
     # the list-marker branch above deliberately avoids. Neutralize the
     # marker's punctuation first so only real sentence ends split.
     prose = RX_ENUMERATOR.sub(r"\1 ", prose)
-    for block in RX_PARAGRAPH.split(prose):
-        scoped = _list_subject(block)
-        for sentence in RX_SENTENCE.split(block):
-            hit = RX_CUE.search(sentence)
-            if not hit:
+    for sentence in RX_SENTENCE.split(prose):
+        if not RX_CUE.search(sentence):
+            continue
+        for m in RX_ISSUE.finditer(sentence):
+            if RX_PR_PREFIX.search(sentence[:m.start()]):
                 continue
-            found = False
-            for m in RX_ISSUE.finditer(sentence):
-                if RX_PR_PREFIX.search(sentence[:m.start()]):
-                    continue
-                out.append(m.group(1))
-                found = True
-            # A list whose LEAD-IN names an issue is elaborating that issue,
-            # so a cue in an item belongs to it even though the item carries
-            # no reference of its own.
-            if not found and scoped is not None:
-                out.append(scoped)
+            out.append(m.group(1))
     return out
-
-
-def _list_subject(block):
-    """The single issue a colon-terminated lead-in scopes its list to, else None.
-
-    This is the discriminator round 4 showed was needed, and it is a signal
-    present in the text rather than another boundary heuristic:
-
-        Remaining on #1566:          <- lead-in NAMES an issue; the items
-        - a written migration script    below elaborate IT, so "your decision"
-        - your decision on rollout      in an item is a claim about #1566
-
-        Progress notes:              <- lead-in names none; the items are
-        - CI is still pending           independent status lines, so
-        - Closed #1622                  "pending" must NOT reach #1622
-
-    Both are lists, so no segmentation rule separates them; what separates
-    them is whether the lead-in supplies a subject.
-
-    Requires EXACTLY one reference. A lead-in naming two issues does not say
-    which an item's cue belongs to, and guessing would attach a claim to an
-    issue nobody made it about.
-    """
-    lines = [l for l in block.splitlines() if l.strip()]
-    if len(lines) < 2:
-        return None
-    head = lines[0].rstrip()
-    if not head.endswith(":"):
-        return None
-    if not RX_LIST_ITEM.match(lines[1]):
-        return None
-    nums = [m.group(1) for m in RX_ISSUE.finditer(head)
-            if not RX_PR_PREFIX.search(head[:m.start()])]
-    return nums[0] if len(nums) == 1 else None
 
 
 def main() -> int:

@@ -177,15 +177,24 @@ CASES = [
                   "• Closed #1622 after merging")], False,
      "a Unicode bullet list splits too"),
 
-    # --- the lead-in scope (round 4) -----------------------------------------
-    # Both of these are lists, so NO segmentation rule separates them. What
-    # separates them is whether the lead-in supplies a subject.
+    # --- the lead-in gap, and why it stays open (rounds 4 and 5) -------------
+    # KNOWN GAP, asserted so it cannot change silently. A `_list_subject`
+    # discriminator closed this and was reverted: review found four ways it
+    # mis-attached, the worst sending a second issue's claim to the FIRST
+    # issue in the paragraph while the genuinely unread one went unnamed.
+    # Misattribution is worse than a miss -- see the docstring.
     ([PROMPT, READ_BODY_ONLY,
       say("Remaining on #1566:\n"
           "- a written migration script\n"
-          "- your decision on rollout timing")], True,
-     "a list whose LEAD-IN names an issue elaborates it, so an item's cue "
-     "attaches even with no reference in the item"),
+          "- your decision on rollout timing")], False,
+     "KNOWN GAP: a cue in a list item does not reach the lead-in's issue"),
+    # The shape that made the discriminator unacceptable. If a future attempt
+    # reintroduces scoping, it must not name #1566 (whose comments WERE read)
+    # while #1544's claim goes unflagged.
+    ([PROMPT, READ_COMMENTS,
+      say("Notes for #1566:\n- item one is fine\n"
+          "Notes for #1544:\n- still needs your review")], False,
+     "two lead-ins must not misattribute the second issue's claim to the first"),
     ([PROMPT, say("Progress notes:\n"
                   "- Investigated flaky CI, still pending a fix upstream\n"
                   "- Closed #1622 after merging")], False,

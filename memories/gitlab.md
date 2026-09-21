@@ -178,10 +178,8 @@ HACtions added a new script dependency to `templates/claude.yml`'s
 pipeline stayed green throughout --- the MR simply stopped getting
 reviewed, with no failed check anywhere to notice.)
 
-## An allowed-to-fail review job can fail before posting a verdict
-
-(Measured 2026-09-21, [abridge !103](https://hc2-gitlab.ucdmc.ucdavis.edu/health-analytics-core/abridge/-/merge_requests/103), pipeline 9236:
+(Measured 2026-09-21, [abridge !103](https://hc2-gitlab.ucdmc.ucdavis.edu/health-analytics-core/abridge/-/merge_requests/103), pipeline 9236; 2nd occurrence:
 the allowed-to-fail manual `claude-manual` job 39259 failed before review
 because `claude-review.sh` referenced the missing
-`.gitlab/scripts/lib/review-tools.sh`; the pipeline remained successful with
-a warning.)
+`.gitlab/scripts/lib/review-tools.sh`; as in the first occurrence, the
+pipeline remained successful with a warning.)

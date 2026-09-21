@@ -1365,6 +1365,13 @@
             "timeout": 10,
             "script": "no-unchecked-empty-pr-claim.py",
             "why": "memories/github.md 'Close empty PRs' -- warns, never blocks, when a reply characterizes a pull request as abandoned, or as empty and disposable, near a pull-request number, and no commit-list QUERY naming that number was issued this session. pr-on-claim has this repo open pull requests against an empty commit on purpose, so changed_files: 0 reads the same on a live claim, on a thread whose commits cannot be pushed (#3739 / #3743), and on a dead branch; only the last is closeable. Four narrowings, each a draft got wrong and each producing SILENCE rather than noise (#3755, review rounds 1 and 2): the mergeability query that returns the field is not evidence, evidence must name every pull request the claim names, evidence comes from an allowlist of query-bearing tools rather than from any tool call (a reply or a comment body carries prose, and 323 of the measured session's 553 calls were Bash), and a per-close exemption is scoped to its sentence. Warn-only because abandonment is partly a judgment. Measured on #3737, 2026-09-17, against the real transcript, where the guard fires and the first draft did not."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-unread-issue-claim.py\"'",
+            "timeout": 10,
+            "script": "no-unread-issue-claim.py",
+            "why": "An issue's body is frozen at filing time; its comments carry the measurement that already ran, the PR that already shipped half of it, and the decision that was already taken. Warns when the final message reports an issue as open, blocked, or awaiting a decision and nothing in the session read that issue's comments -- a body-only read does not discharge it. Measured twice on Lacaedemon/sparta (ai-config#3823); the second time a decision already taken and documented was reported to the user as theirs to make, across several turns, with two unrelated issues described as blocked behind it. Warns and never blocks: an issue can legitimately be blocked, and the guard can only see that the cheapest supporting evidence was never gathered."
           }
         ]
       }

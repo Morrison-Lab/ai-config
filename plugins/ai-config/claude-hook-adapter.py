@@ -43,7 +43,7 @@ def run_hook_command(cmd, claude_payload, cwd, timeout_val):
     try:
         kwargs = {}
         if os.name == "nt":
-            kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+            kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
         result = subprocess.run(
             cmd, 
             shell=True, 

@@ -2477,7 +2477,7 @@ class TestAgyHookAdapter(unittest.TestCase):
             adapter.run_hook_command("echo test", {}, os.getcwd(), 10.0)
             mock_run.assert_called_once()
             _, kwargs = mock_run.call_args
-            self.assertEqual(kwargs.get("creationflags"), subprocess.CREATE_NO_WINDOW)
+            self.assertEqual(kwargs.get("creationflags"), 0x08000000)
 
 if __name__ == "__main__":
     unittest.main()

@@ -381,7 +381,7 @@ def ensure():
     try:
         kwargs = {}
         if IS_WINDOWS:
-            kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+            kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
         process = subprocess.Popen([sys.executable, os.path.realpath(__file__), "--monitor"],
                                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                    stderr=subprocess.DEVNULL, start_new_session=True, **kwargs)

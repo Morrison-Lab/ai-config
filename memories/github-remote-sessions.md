@@ -214,11 +214,12 @@ live text), the byte-identical message a genuine concurrent-writer collision
 returns.
 Before routing to either remedy, re-read the live `headRefOid` and confirm
 it actually differs from the SHA you pinned: only a head that has actually
-changed licenses [`fully-clean`](../shared/workflow/fully-clean.md),
-[`mwc`](../skills/mwc/SKILL.md), and [`merge-it`](../skills/merge-it/SKILL.md)'s
-step of settling who owns the branch, or [`chores`](../skills/chores/SKILL.md)'s
-parallel remedy (per the same restart-from-step-2 procedure the skill
-already uses elsewhere for a replaced head).
+changed licenses the ownership-settling step that
+[`fully-clean`](../shared/workflow/fully-clean.md), [`mwc`](../skills/mwc/SKILL.md),
+and [`merge-it`](../skills/merge-it/SKILL.md) each route to, or
+[`chores`](../skills/chores/SKILL.md)'s parallel remedy (per the same
+restart-from-step-2 procedure the skill already uses elsewhere for a
+replaced head).
 Measured 2026-09-20 on
 [Lacaedemon/sparta#1615](https://github.com/Lacaedemon/sparta/pull/1615): an
 8-character abbreviation printed by `check-pr-fully-clean.py` (`d4691095`)

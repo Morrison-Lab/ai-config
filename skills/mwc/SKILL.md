@@ -78,7 +78,7 @@ without asking confirmation before every merge.
   recorded head (`PUT .../pulls/<N>/update-branch` with
   `expected_head_sha`, or the MCP tool's `expectedHeadSha`; a `422`
   whose message names an expected-head mismatch (match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show)
-  means another writer moved the head ONLY IF the live `headRefOid` no longer
+  means another writer moved the head only if the live `headRefOid` no longer
   equals the SHA you pinned --- re-read it and compare before settling
   ownership, since a correctly-lengthed but wrong-content SHA (most often one
   guessed or padded from an abbreviation instead of read in full) produces

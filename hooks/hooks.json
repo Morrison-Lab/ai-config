@@ -1207,6 +1207,18 @@
             "why": "memories/preferences.md 'Partition a deletion choice by BLAST RADIUS' -- warns, never blocks, when an AskUserQuestion option's LABEL promises reversibility (cache/temp/regenerable/safe-to-delete) while the option names something irreplaceable (a VM or WSL disk image by extension, ext4, a named docker volume, pgdata, a home directory, or uncommitted work -- the one entry that is not storage). The label is what carries consent, so a bundle like that yields an uninformed approval. Keyed on disk-image extensions and volumes, never on the bare word docker, so 'clear the Docker build cache' stays silent; polarity is checked per sentence, so an option naming an item in order to say it is safe is silent too."
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-binary-file-read.py\"",
+            "timeout": 10,
+            "script": "no-binary-file-read.py",
+            "why": "Warns when `cat`/`head`/`tail`/`less`/`more` is applied to a path that exists on disk and whose first ~8KB contain a NUL byte -- a whole-file read of a binary file, which dumps raw bytes into the conversation for no benefit (ai-config#3771). `strings` is deliberately not flagged, and `head -c N`/`tail -c N` are exempt as an already-bounded read."
+          }
+        ]
       }
     ],
     "Stop": [

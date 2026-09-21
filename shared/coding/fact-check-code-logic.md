@@ -255,31 +255,55 @@ The pass count is routinely quoted in commit messages and reviews as evidence of
 **A GENUINE survivor then forks again, and only one branch of that fork is about the tests.**
 The hazards above separate a real survivor from a mutant that never ran.
 Once the survivor is real, it means either that the suite has a coverage hole, or that the mutated code is **redundant** --- something else in the same diff already handles the input the mutant should have broken.
-The two runs are indistinguishable: the mutant applies, the baseline pass count reproduces, nothing fails.
+Nothing in the run separates the two readings: the mutant applies, the baseline pass count reproduces, nothing fails.
 Only the second is a finding about production code, and it is the one nothing prompts, because every other survivor in this section resolves by adding a test.
 
 Reaching for a test is the worse default when the reading is redundancy.
 It locks the redundant branch in behind an assertion, so the next reader treats it as load-bearing --- the shape [`dead-code-is-tech-debt`](../principles/dead-code-is-tech-debt.md) is about, arrived at through a step that felt like improving coverage.
-The tell is having to construct contrived input to kill the mutant: where the only prose reaching a branch is prose nobody writes, the branch covers nothing.
+The tell is having to construct contrived input to kill the mutant: where the only input reaching a branch is input nobody produces, the branch covers nothing.
 
 So ask the discriminating question before writing the test --- does another change in this same diff already handle the input this mutant should have broken?
 The situation that produces it is ordinary rather than exotic: two fixes landed in one round for one review finding, which is how a review round usually goes.
 
-Measured 2026-09-21 on `hooks/no-unread-issue-claim.py` ([ai-config#3826](https://github.com/Morrison-Lab/ai-config/pull/3826)).
-A finding that a personal initial split a claim away from its own issue number drew two fixes at once: a sentence-boundary pattern narrowed so a single letter plus a period stopped reading as a list marker, and a substitution deleting an initial's period before the split ran.
-Mutating the substitution failed a test.
-Mutating the narrowing did not, because with the period already gone no marker could match.
-Deleting the narrowing also simplified the explanation around it, since the two shapes turned out to be separated by case --- an initial is capitalised and a lettered list item conventionally is not --- rather than by punctuation.
+Measured 2026-09-21 on `scripts/check-hook-delivery.py` ([ai-config#3833](https://github.com/Morrison-Lab/ai-config/pull/3833)).
+A review finding about a crash on a malformed records file drew two fixes at once: a type filter dropping every non-string `installPath` at read time, and a widened `except (OSError, TypeError, ValueError)` around the `Path().resolve()` that consumed it.
+Mutating the filter failed a test.
+Mutating the widened catch back to `OSError` alone did not, because the filter had already removed the input that would reach it.
+The catch was narrowed to `OSError` and the comment beside it was rewritten to say which exceptions were unreachable and why --- which is the deletion this section is arguing for, and the point at which the example stops being a clean one.
+
+**The narrowing was half wrong, and the reason is worth more than the rule it illustrates.**
+`TypeError` really was unreachable.
+`ValueError` was not: an embedded NUL raises it on POSIX and returns quietly on Windows, where the mutation run happened, and CI runs on Linux.
+So the survivor was a true reading of an incomplete experiment, and deleting on it shipped a crash into the environment the code actually runs in.
+
+A survivor is therefore evidence about redundancy only across the conditions the run covered.
+Before deleting, ask what the mutation run did not vary --- platform, locale, Python version, filesystem --- and whether the branch could be reachable there.
+[`admitting-vs-branching-site`](../principles/admitting-vs-branching-site.md) is the same question asked structurally rather than empirically, and it is the cheaper of the two: it asks where a value is admitted rather than where it branches, which a single-platform run cannot answer at all.
+
+### The boundary with deliberate redundancy
+
+Not every unkillable branch is redundant in this sense, and two places in this corpus say so about cases that look identical from the mutation run.
+
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s "tenth outcome" covers a property enforced at more than one site: each site's mutant survives because the other still enforces it, and the remedy there is to keep both and document the pair rather than to delete either.
+[`simplify`](../../skills/simplify/SKILL.md) treats a duplicate constraint as belt-and-braces worth keeping.
+[`dead-code-is-tech-debt`](../principles/dead-code-is-tech-debt.md)'s own worked example (ai-config#3707) is a conjunct that looked redundant, survived mutation, and was load-bearing.
+
+The discriminator is whether the sibling that covers the input is a **second enforcement of the same property** or a **change that removes the input entirely**.
+Two enforcing sites are defence in depth and both stay.
+A filter that deletes a value before it can reach a branch leaves that branch with nothing to do, and it goes.
 
 - **Do:** write the members as literals in the test, and assert separately that the constant contains them.
 - **Do:** ask whether a sibling change in the same diff already covers a genuine survivor's input, before writing a test for it.
 - **Do:** delete the redundant branch instead, and check whether its removal simplifies the explanation around it.
+- **Do:** name what the mutation run did not vary --- platform above all --- before reading a survivor as proof that a branch is unreachable.
+- **Do:** keep both sites when the sibling ENFORCES the same property, and delete only when the sibling removes the input.
 - **Do:** compare each mutation run's PASS count against the baseline's, and treat a run that reports no count at all as "mutant not applied".
 - **Do:** count skips separately, so a weakened run and a full one differ in the totals.
 - **Do:** have the check runner refuse a name it has already seen (`ai-config#2725`'s suggested fix), turning a silent duplicate into an immediate failure rather than an inflated count.
 - **Don't:** discriminate on exit status --- a malformed mutant and a real failure both exit 1, so it cannot separate them.
 - **Don't:** read every genuine survivor as a coverage hole --- that is the reading that adds code rather than removing it.
 - **Don't:** construct contrived input to kill a mutant; needing to is the evidence that the branch is redundant.
+- **Don't:** write "unreachable" into a comment on the strength of one platform's run --- that is a survivor promoted to an assertion a later reader will trust instead of re-measuring.
 - **Don't:** generate a test's cases from the value under test --- the DRY form is the defective one here.
 - **Don't:** record a skip with `check(..., True)`; that is a pass asserting nothing.
 - **Don't:** treat a rising pass count as evidence of rising coverage without a name registry (or an equivalent dedup check) backing it.

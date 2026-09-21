@@ -78,7 +78,11 @@ without asking confirmation before every merge.
   recorded head (`PUT .../pulls/<N>/update-branch` with
   `expected_head_sha`, or the MCP tool's `expectedHeadSha`; a `422`
   whose message names an expected-head mismatch (match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show)
-  means another writer moved the head, so settle ownership instead,
+  means another writer moved the head only if the live `headRefOid` no longer
+  equals the SHA you pinned --- re-read it and compare before settling
+  ownership, since a correctly-lengthed but wrong-content SHA (most often one
+  guessed or padded from an abbreviation instead of read in full) produces
+  the byte-identical message with no other writer involved,
   and any other `422` is a failed update to stop on),
   a wait of a few minutes at most until `headRefOid` changes (the update is
   asynchronous; expiry is a failed update to stop on and report),

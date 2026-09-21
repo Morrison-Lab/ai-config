@@ -265,38 +265,47 @@ The tell is having to construct contrived input to kill the mutant: where the on
 So ask the discriminating question before writing the test --- does another change in this same diff already handle the input this mutant should have broken?
 The situation that produces it is ordinary rather than exotic: two fixes landed in one round for one review finding, which is how a review round usually goes.
 
-Measured 2026-09-21 on `scripts/check-hook-delivery.py` ([ai-config#3833](https://github.com/Morrison-Lab/ai-config/pull/3833)).
-A review finding about a crash on a malformed records file drew two fixes at once: a type filter dropping every non-string `installPath` at read time, and a widened `except (OSError, TypeError, ValueError)` around the `Path().resolve()` that consumed it.
+Measured 2026-09-21 on `scripts/check-hook-delivery.py` ([ai-config#3833](https://github.com/Morrison-Lab/ai-config/pull/3833)), where commit `83bafbef` records the survivor and `472408f8` records what it was worth.
+A review finding about a crash on a malformed records file drew a type filter that dropped every non-string `installPath` at read time, upstream of the `Path().resolve()` that consumed it.
 Mutating the filter failed a test.
-Mutating the widened catch back to `OSError` alone did not, because the filter had already removed the input that would reach it.
-The catch was narrowed to `OSError` and the comment beside it was rewritten to say which exceptions were unreachable and why --- which is the deletion this section is arguing for, and the point at which the example stops being a clean one.
+Widening the `except` around that `resolve()` past `OSError` survived, because the filter had already removed the input that would have reached it, so the narrow catch shipped with a comment stating which exceptions were unreachable and why.
 
-**The narrowing was half wrong, and the reason is worth more than the rule it illustrates.**
+**That comment was half wrong, and the reason is worth more than the rule it illustrates.**
 `TypeError` really was unreachable.
 `ValueError` was not: an embedded NUL raises it on POSIX and returns quietly on Windows, where the mutation run happened, and CI runs on Linux.
-So the survivor was a true reading of an incomplete experiment, and deleting on it shipped a crash into the environment the code actually runs in.
+So the survivor was a true reading of an incomplete experiment, the next round widened the catch back, and what had shipped in between was a crash in the environment the code actually runs in.
+
+A caution about reading this example from the history, which applies to every measurement of this kind: the widening and the narrowing both happened inside one uncommitted round, so the diffs do not show them.
+What the history carries is the commit messages --- `83bafbef` saying the widened catch "would have been a branch no input can take, which is what mutation testing reported when it survived", and `472408f8` correcting it.
+An intermediate state that was never committed is not evidence anyone else can check, so say which artifact carries the claim rather than citing the PR and leaving a reader to look for a diff that does not exist.
 
 A survivor is therefore evidence about redundancy only across the conditions the run covered.
 Before deleting, ask what the mutation run did not vary --- platform, locale, Python version, filesystem --- and whether the branch could be reachable there.
-[`admitting-vs-branching-site`](../principles/admitting-vs-branching-site.md) is the same question asked structurally rather than empirically, and it is the cheaper of the two: it asks where a value is admitted rather than where it branches, which a single-platform run cannot answer at all.
+[`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md)'s falsifying question is the tool for it: ask what would have to be true for "this branch is unreachable" to be FALSE, and whether the run you have could show you that.
+A run on one platform cannot, which is decidable before the run rather than after it.
 
 ### The boundary with deliberate redundancy
 
 Not every unkillable branch is redundant in this sense, and two places in this corpus say so about cases that look identical from the mutation run.
 
 [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s "tenth outcome" covers a property enforced at more than one site: each site's mutant survives because the other still enforces it, and the remedy there is to keep both and document the pair rather than to delete either.
-[`simplify`](../../skills/simplify/SKILL.md) treats a duplicate constraint as belt-and-braces worth keeping.
-[`dead-code-is-tech-debt`](../principles/dead-code-is-tech-debt.md)'s own worked example (ai-config#3707) is a conjunct that looked redundant, survived mutation, and was load-bearing.
+[`simplify`](../../skills/simplify/SKILL.md) treats a duplicate constraint as belt-and-suspenders worth keeping.
 
-The discriminator is whether the sibling that covers the input is a **second enforcement of the same property** or a **change that removes the input entirely**.
-Two enforcing sites are defence in depth and both stay.
-A filter that deletes a value before it can reach a branch leaves that branch with nothing to do, and it goes.
+So the question is what the sibling actually does to the input, and there are three answers rather than two.
+A sibling that **removes** the input --- a filter upstream of the branch --- leaves that branch nothing to do, and it goes.
+A sibling that **enforces the same property independently** is defence in depth, and both sites stay.
+And a branch with **no sibling at all** is not redundant in any sense: its mutant survived because the suite lacks the input, which is the coverage hole this section's first reading names.
+
+That third answer is the one most easily assumed away, because a branch can look like a duplicate of a neighbour without being one.
+[`dead-code-is-tech-debt`](../principles/dead-code-is-tech-debt.md)'s worked example (ai-config#3707) is exactly that: a `transcript_path and` conjunct, structurally identical to two genuinely dead siblings in the same function, was read as dead by analogy with them.
+The two siblings were dead because an earlier `return` guaranteed them false; this one had no such guarantee and was the only guard the call site had.
+Establish what makes a neighbour's branch dead before transferring the verdict to this one --- which is [`check-purpose-before-reusing`](../workflow/check-purpose-before-reusing.md)'s question asked about a diagnosis rather than about a template.
 
 - **Do:** write the members as literals in the test, and assert separately that the constant contains them.
 - **Do:** ask whether a sibling change in the same diff already covers a genuine survivor's input, before writing a test for it.
-- **Do:** delete the redundant branch instead, and check whether its removal simplifies the explanation around it.
+- **Do:** delete the redundant branch instead, but only where the sibling REMOVES the input rather than independently enforcing the same property.
 - **Do:** name what the mutation run did not vary --- platform above all --- before reading a survivor as proof that a branch is unreachable.
-- **Do:** keep both sites when the sibling ENFORCES the same property, and delete only when the sibling removes the input.
+- **Do:** establish that a neighbouring branch is dead for a reason that also applies here, before transferring the verdict to this one.
 - **Do:** compare each mutation run's PASS count against the baseline's, and treat a run that reports no count at all as "mutant not applied".
 - **Do:** count skips separately, so a weakened run and a full one differ in the totals.
 - **Do:** have the check runner refuse a name it has already seen (`ai-config#2725`'s suggested fix), turning a silent duplicate into an immediate failure rather than an inflated count.

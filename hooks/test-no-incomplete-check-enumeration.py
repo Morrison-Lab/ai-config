@@ -58,6 +58,25 @@ CHECKER_200 = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "python3 scripts/check-pr-fully-clean.py 200 "
                    "-R Morrison-Lab/ai-config"}}]}}
+CHECKER_1031 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 1031 "
+                   "-R ucdavis/bcs"}}]}}
+CHECKER_1032 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 1032 "
+                   "-R ucdavis/bcs"}}]}}
+CHECKER_1034 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 1034 "
+                   "-R ucdavis/bcs"}}]}}
+PUSH_1034 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "git push origin feat/1034"}}]}}
+PARTIAL_1034 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "gh pr checks 1034"}}]}}
+PARTIAL_CHECK_RUNS_1034 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "gh api repos/ucdavis/bcs/commits/a5f4f3f2/check-runs?per_page=100 --paginate # inspect #1034"}}]}}
 CHECKER_3760 = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "python3 scripts/check-pr-fully-clean.py 3760 "
@@ -431,6 +450,32 @@ CASES = [
       say("#200 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #300 is fully clean too.")],
      "warn",
      "#3761: multiple independent subagent-warn claims both fire"),
+
+    # --- ai-config#3838: scope partial reads and pushes to target PR ---
+    ([CHECKER_1031, CHECKER_1032, CHECKER_1034, PARTIAL_1034,
+      say("#1031 and #1032 are fully clean.")],
+     "allow",
+     "#3838: complete read of #1031 and #1032 not invalidated by partial read of #1034"),
+    ([CHECKER_1031, CHECKER_1032, CHECKER_1034, PARTIAL_CHECK_RUNS_1034,
+      say("#1031 and #1032 are fully clean.")],
+     "allow",
+     "#3838: check-runs read for #1034 does not invalidate complete read of #1031 and #1032"),
+    ([CHECKER_1031, PUSH_1034, PARTIAL_1034,
+      say("#1031 is fully clean.")],
+     "allow",
+     "#3838: push to #1034 does not invalidate complete read of #1031"),
+    ([CHECKER_1031, CHECKER_1034, PUSH_1034, PARTIAL_1034,
+      say("#1034 is fully clean.")],
+     "block",
+     "#3838: claim for #1034 after push to #1034 with only partial read blocks"),
+    ([CHECKER_1031, PUSH_1034, PARTIAL_1034,
+      say("#1031 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #1034 is fully clean too.")],
+     "block",
+     "#3838: multi-claim message blocks when #1034 lacks complete read after push"),
+    ([CHECKER_1031, PUSH, ENDPOINT,
+      say("#1031 is fully clean.")],
+     "block",
+     "#3838: unrecoverable push and partial read blocks claim as safe fallback"),
 ]
 
 # (events, must_contain, must_not_contain, label). The WARN explanation must

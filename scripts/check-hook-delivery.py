@@ -60,11 +60,24 @@ EXIT STATUS
     (or no pins were found, which is not a failure -- a machine may
     legitimately have no plugin install)
 1   at least one NAMED pin is missing at least one hook
+2   `--repo` names a directory with no `hooks/` in it
 
-A gap in an ORPHAN pin -- one no install record names -- is reported and does
-not set the status. Such a pin is a garbage-collectable leftover, so failing
-on it would make the instrument red on machines where nothing is wrong, which
-is the fastest way to get a check ignored.
+A gap in an ORPHAN pin -- one the install records were READ and found not to
+name -- is reported and does not set the status. Such a pin is a
+garbage-collectable leftover, so failing on it would make the instrument red
+on machines where nothing is wrong, which is the fastest way to get a check
+ignored.
+
+That downgrade is conditioned on the records having been readable, and the
+condition is the load-bearing half. An unreadable file yields zero records
+and would otherwise make every pin look orphaned, turning a completely broken
+install into an exit 0 -- a regression this script shipped for one round and
+which a test now pins. Where the file cannot be read, the labels are
+advisory and any gap fails, exactly as before pins were labelled at all.
+
+Status 2 exists for the same reason: a `--repo` with no `hooks/` used to
+yield an empty set, which compares clean against every pin, so a typo'd path
+reported success having examined nothing.
 """
 
 import argparse
@@ -77,11 +90,21 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 
 
+class NoHooksDir(Exception):
+    """`--repo` names a directory with no `hooks/` in it.
+
+    Raised rather than returned as an empty set, because an empty set compares
+    clean against every pin: a typo'd `--repo`, or one aimed at the wrong
+    worktree, otherwise reports success having examined nothing. A detector
+    that cannot fail is the failure mode this script exists to report.
+    """
+
+
 def repo_hooks(repo):
     """Hook scripts in the checkout, excluding tests and helpers."""
     d = repo / "hooks"
     if not d.is_dir():
-        return set()
+        raise NoHooksDir(str(d))
     out = set()
     for p in sorted(d.iterdir()):
         if p.suffix not in (".py", ".sh"):
@@ -103,22 +126,28 @@ def cache_roots():
 
 
 def install_entries():
-    """Installed-plugin records for this marketplace, or [] if unreadable.
+    """`(records, readable)` for this marketplace's installs.
 
     `~/.claude/plugins/installed_plugins.json` is the harness's own record of
     what it installed and from where. Reading it is what turns a list of cache
     directories into an answer about the pin a session is actually served,
     which is the question ai-config#2439 posed and could not answer by hand.
+
+    The second element is the whole reason this returns a pair. An unreadable
+    file and a file that genuinely names no pin both yield zero records, and
+    they must not have the same consequence: labelling every pin ORPHAN on
+    absence of evidence would downgrade every real gap to "not counted" and
+    exit 0 on a completely broken install.
     """
     path = Path.home() / ".claude" / "plugins" / "installed_plugins.json"
     try:
         with open(path, encoding="utf-8") as fh:
             data = json.load(fh)
     except Exception:
-        return []
-    plugins = data.get("plugins")
+        return [], False
+    plugins = data.get("plugins") if isinstance(data, dict) else None
     if not isinstance(plugins, dict):
-        return []
+        return [], False
     out = []
     for key, entries in plugins.items():
         if "ai-config" not in key:
@@ -126,27 +155,37 @@ def install_entries():
         for e in entries or []:
             if isinstance(e, dict) and e.get("installPath"):
                 out.append(e)
-    return out
+    return out, True
 
 
-def entries_for(pin, entries):
-    """The install records naming this pin, exactly as the harness wrote them.
+def entries_for(pin, entries, warn=None):
+    """The install records naming this pin.
 
-    Matching is on the resolved path rather than the string, because the
-    record carries a Windows path with backslashes while `pin` comes from a
-    directory walk.
+    Paths are resolved rather than compared as strings so the match does not
+    depend on the harness having written `installPath` in canonical form --
+    case, a trailing separator, or a `.` component would otherwise defeat it.
+    On Windows both sides already render with backslashes, so separator style
+    is NOT what this is for; an earlier comment here said it was, and that was
+    wrong.
+
+    A record that cannot be resolved is reported through `warn` rather than
+    dropped silently, because a dropped record that was the only one naming
+    this pin turns an INSTALLED pin into an ORPHAN -- which now suppresses a
+    real failure instead of merely mislabelling it.
     """
     try:
         target = pin.resolve()
-    except Exception:
+    except OSError:
         target = pin
     out = []
     for e in entries:
         try:
             if Path(e["installPath"]).resolve() == target:
                 out.append(e)
-        except Exception:
-            continue
+        except OSError as exc:
+            if warn:
+                warn(f"  ! could not resolve installPath "
+                     f"{e.get('installPath')!r}: {exc}")
     return out
 
 
@@ -157,12 +196,18 @@ def describe_entries(entries, project):
     mine = [e for e in entries
             if e.get("projectPath") and _same_path(e["projectPath"], project)]
     user = [e for e in entries if e.get("scope") == "user"]
+    # The residual is computed as a set difference rather than by subtracting
+    # two lengths. One record can satisfy both predicates -- a user-scoped
+    # entry that also carries a matching `projectPath` -- and the arithmetic
+    # form then counts it twice, hiding a genuinely different project's
+    # install and, with enough overlap, going negative.
+    claimed = [e for e in entries if e in mine or e in user]
+    others = len(entries) - len(claimed)
     bits = []
     if mine:
         bits.append("INSTALLED for THIS project")
     if user:
         bits.append("INSTALLED at user scope")
-    others = len(entries) - len(mine) - len(user)
     if others > 0:
         bits.append(f"{others} other project install(s)")
     return "; ".join(bits) if bits else f"{len(entries)} install record(s)"
@@ -171,7 +216,7 @@ def describe_entries(entries, project):
 def _same_path(a, b):
     try:
         return Path(a).resolve() == Path(b).resolve()
-    except Exception:
+    except (OSError, TypeError, ValueError):
         return False
 
 
@@ -197,14 +242,21 @@ def main():
     ap.add_argument("--repo", default=str(REPO),
                     help="repository checkout to compare against")
     ap.add_argument("--project", default=os.getcwd(),
-                    help="project path whose install record to call out "
-                         "(default: the current directory)")
+                    help="project path whose install record to call out. It "
+                         "must EQUAL a registered projectPath, not merely sit "
+                         "under one (default: the current directory)")
     args = ap.parse_args()
     repo = Path(args.repo).resolve()
 
-    have = repo_hooks(repo)
+    try:
+        have = repo_hooks(repo)
+    except NoHooksDir as exc:
+        print(f"no hooks directory at {exc}", file=sys.stderr)
+        print("Nothing to compare: --repo must name an ai-config checkout.",
+              file=sys.stderr)
+        return 2
     pins = cache_roots()
-    entries = install_entries()
+    entries, readable = install_entries()
 
     print(f"checkout: {repo}")
     print(f"  {len(have)} hook script(s); {checkout_position(repo)}")
@@ -222,12 +274,19 @@ def main():
                      if p.suffix in (".py", ".sh") and not p.name.startswith("test-")}
         missing = sorted(have - installed)
         extra = sorted(installed - have)
-        records = entries_for(pin, entries)
+        warnings = []
+        records = entries_for(pin, entries, warn=warnings.append)
         named += 1 if records else 0
         label = describe_entries(records, args.project)
         print(f"\npin {pin.name}  ({len(installed)} installed) -- {label}")
+        for w in warnings:
+            print(w)
         if missing:
-            if records:
+            # An ORPHAN downgrade is only sound when the records were READ and
+            # genuinely name no pin. Where they could not be read, every pin
+            # looks orphaned, so the old unconditional rule stands and a gap
+            # still fails.
+            if records or not readable:
                 worst = 1
             else:
                 orphan_gaps += 1
@@ -249,11 +308,14 @@ def main():
 
     print(f"\ncompared {len(have)} checkout hook(s) against {len(pins)} pin(s), "
           f"{named} of them named by an install record")
-    if not entries:
-        print("No install records were readable, so every pin above is "
-              "labelled ORPHAN on absence of evidence rather than evidence of "
-              "absence. Re-run after checking "
-              "~/.claude/plugins/installed_plugins.json exists.")
+    if not readable:
+        print("~/.claude/plugins/installed_plugins.json could not be read, so "
+              "every pin above is labelled ORPHAN on absence of evidence "
+              "rather than evidence of absence. Any gap therefore still "
+              "fails, exactly as it did before pins were labelled at all.")
+    elif not entries:
+        print("The install records were read and name no ai-config pin at "
+              "all, which is what an uninstalled plugin looks like.")
     if worst:
         print("At least one INSTALLED pin is missing a hook that exists in "
               "the checkout.")

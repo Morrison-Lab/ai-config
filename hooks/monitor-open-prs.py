@@ -375,6 +375,21 @@ def monitor():
         time.sleep(POLL_SECONDS)
 
 
+def resolve_interpreter():
+    interpreter = sys.executable or "python3"
+    if IS_WINDOWS:
+        from pathlib import Path
+
+        p = Path(interpreter)
+        sibling = p.with_name("pythonw.exe")
+        if sibling.is_file():
+            return str(sibling)
+        found = shutil.which("pythonw")
+        if found:
+            return found
+    return interpreter
+
+
 def ensure():
     if alive(read_state().get("pid")):
         return True
@@ -382,7 +397,8 @@ def ensure():
         kwargs = {}
         if IS_WINDOWS:
             kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
-        process = subprocess.Popen([sys.executable, os.path.realpath(__file__), "--monitor"],
+        interpreter = resolve_interpreter()
+        process = subprocess.Popen([interpreter, os.path.realpath(__file__), "--monitor"],
                                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                    stderr=subprocess.DEVNULL, start_new_session=True, **kwargs)
     except OSError:

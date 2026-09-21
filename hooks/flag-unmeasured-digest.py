@@ -251,13 +251,20 @@ NOTE = (
 #
 # Both `=` and whitespace separate a flag from its value, and the MCP spelling
 # `expectedHeadSha` arrives as a JSON key, so a colon is a separator too.
-RX_PIN_ARG = re.compile(
-    r"(?<![A-Za-z0-9_-])"
-    r"(expected_head_sha|--match-head-commit|expectedHeadSha)"
-    r"[\"']?\s*[=:]?\s*[\"']?"
-    r"([0-9a-fA-F]{7,40})"
-    r"(?![0-9a-zA-Z])"
+# Anchored at the START of a shell word (see `_pins_in`). `(?:=|:)?` covers the
+# attached spellings; an empty group 2 means the value is the following word.
+#
+# The hex run is NOT capped at 40. A cap plus a trailing boundary silently
+# SKIPS anything longer -- a SHA-256 repository's 64-character head, or a value
+# mistakenly concatenated with something else -- since no backtracked length
+# can satisfy the boundary. Skipping is the one outcome a guard must not have,
+# so the run is open-ended and the length is simply not this check's business.
+RX_PIN_WORD = re.compile(
+    r"(expected_head_sha|expectedHeadSha|--match-head-commit)"
+    r"(?:[=:]([0-9a-fA-F]{7,}))?$"
 )
+
+RX_BARE_SHA = re.compile(r"^[0-9a-fA-F]{7,}$")
 
 PIN_NOTE = (
     "Unmeasured-pin reminder: this command pins `{flag}` to `{token}`, which "
@@ -488,6 +495,65 @@ def _strip_comments(command):
     return "".join(out)
 
 
+def _shell_words(command):
+    """`command` split into shell words, quote characters consumed.
+
+    The pin flags must be matched against WORDS, not against raw text, and the
+    difference is a real false positive rather than a nicety. Scanning raw text
+    cannot tell
+
+        gh pr merge 1 -R o/r --match-head-commit <sha>
+
+    from a command whose `--body` argument merely QUOTES that shape as prose:
+
+        gh issue create -R o/r --body "a sweep padded it out via
+                                       -f expected_head_sha=<sha> and it failed"
+
+    The second pins nothing -- it files a bug report -- and this corpus writes
+    exactly that prose constantly, including in the issue this hook implements.
+    Split into words, the body is ONE word that merely contains the flag text,
+    while a real pin flag BEGINS its word, so anchoring the match at word start
+    separates them with no heuristic.
+
+    Quote characters are consumed, so `--match-head-commit "<sha>"` yields the
+    bare sha as its own word, and `-f 'expected_head_sha=<sha>'` yields one word
+    beginning with the flag -- both still match, which is why this is a
+    precision fix rather than a narrowing one.
+    """
+    words = []
+    cur = []
+    quote = None
+    i = 0
+    n = len(command)
+    while i < n:
+        c = command[i]
+        if quote is None:
+            if c == "\\":
+                cur.append(command[i + 1:i + 2])
+                i += 2
+                continue
+            if c in ('"', "'"):
+                quote = c
+            elif c.isspace():
+                if cur:
+                    words.append("".join(cur))
+                    cur = []
+            else:
+                cur.append(c)
+        elif c == quote:
+            quote = None
+        elif c == "\\" and quote == '"':
+            cur.append(command[i + 1:i + 2])
+            i += 2
+            continue
+        else:
+            cur.append(c)
+        i += 1
+    if cur:
+        words.append("".join(cur))
+    return words
+
+
 def _longest_observed_prefix(token, seen):
     """The longest observed hex run that is a strict prefix of `token`, else None.
 
@@ -518,8 +584,8 @@ def unmeasured_pin(command, transcript_path, assume_unmeasured=False):
     """
     if not isinstance(command, str) or not command.strip():
         return None
-    scannable = _executable_text(command)
-    if not RX_PIN_ARG.search(scannable):
+    pins = _pins_in(_shell_words(_executable_text(command)))
+    if not pins:
         return None
     seen = _transcript_hex(transcript_path)
     if seen is None:
@@ -530,12 +596,39 @@ def unmeasured_pin(command, transcript_path, assume_unmeasured=False):
         seen = set()
     # Every pin in the command, not just the first. A chained call can carry
     # two, and a measured one first must not mask a fabricated one after it.
-    for m in RX_PIN_ARG.finditer(scannable):
-        flag, token = m.group(1), m.group(2)
+    for flag, token in pins:
         if _measured(token, seen):
             continue
         return flag, token, _longest_observed_prefix(token, seen)
     return None
+
+
+def _pins_in(words):
+    """[(flag, sha)] for every pinning argument among `words`.
+
+    Anchored at word start, which is the whole of the prose exemption: a real
+    pin flag BEGINS its word, while a `--body` argument quoting one is a single
+    word that merely contains it.
+
+    Two spellings, because both occur: the value attached to the flag
+    (`expected_head_sha=<sha>`, `--match-head-commit=<sha>`) and the value as
+    the following word (`--match-head-commit <sha>`).
+    """
+    found = []
+    for idx, word in enumerate(words):
+        m = RX_PIN_WORD.match(word)
+        if not m:
+            continue
+        flag, attached = m.group(1), m.group(2)
+        if attached:
+            found.append((flag, attached))
+            continue
+        # Value as the next word. Only a bare flag takes one, and only a
+        # hex-shaped next word is its value -- anything else means the flag
+        # was named without a value (a `--help` listing, a quoted mention).
+        if idx + 1 < len(words) and RX_BARE_SHA.match(words[idx + 1]):
+            found.append((flag, words[idx + 1]))
+    return found
 
 
 def _pin_command(tool_name, tool_input):

@@ -406,16 +406,31 @@ CASES = [
     # missing a real pin is not.
     ([PROMPT, HEAD_RUN],
      bash(f"echo don't # old: gh pr merge 5 --match-head-commit {'b' * 40}"),
-     True,
-     "an UNBALANCED quote errs toward scanning, not toward silence"),
-    # Round 5: a quoted --body spanning physical lines, with a `#` on the
-    # continuation line. A per-line scanner reads that `#` as a comment and
-    # drops the pin after it -- silent under-detection.
+     False,
+     "an unbalanced quote absorbs the commented text into one word, so no "
+     "word-initial pin flag remains -- and it was a comment anyway"),
+
+    # --- prose is not a pin (CI review of #3818) -----------------------------
+    # The finding that forced word splitting. A --body argument QUOTING a pin
+    # is one word that merely contains the flag text; only a real pin flag
+    # BEGINS its word. Both of these once reported the command as pinning a
+    # merge, which this corpus would hit constantly -- filing #3392 itself
+    # does exactly this.
     ([PROMPT, HEAD_RUN],
      bash(f'gh pr merge 1 -R o/r --body "first line\n'
-          f'second line #not a comment --match-head-commit {"b" * 40}" '
-          f"--squash"), True,
-     "a pin inside a MULTI-LINE quoted argument is still found"),
+          f'second line --match-head-commit {"b" * 40}" --squash'), False,
+     "a pin quoted inside a MULTI-LINE --body is prose, not a pin"),
+    # --- and a real pin still fires in every spelling ------------------------
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh api -X PUT repos/o/r/pulls/1/update-branch "
+          f"-f 'expected_head_sha={'b' * 40}'"), True,
+     "a wholly quoted pin ARGUMENT still begins its word, so it still fires"),
+    ([PROMPT, HEAD_RUN],
+     bash(f'gh pr merge 1 -R o/r --match-head-commit="{"b" * 40}"'), True,
+     "the attached --flag=value spelling fires"),
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr merge 1 -R o/r --match-head-commit {'b' * 64}"), True,
+     "a 64-character SHA-256 head is not silently skipped by a length cap"),
 ]
 
 
@@ -589,6 +604,38 @@ def check_comment_scanner_directly():
     return 0 if ok else 1
 
 
+def check_prose_quoting_a_pin_is_not_a_pin():
+    """The CI review's blocking finding, asserted on the PIN surface directly.
+
+    A fire/quiet CASE cannot express this: the same command's --body also
+    carries an unmeasured hex, so the DIGEST surface fires on it legitimately
+    and the boolean result is True either way. Only `unmeasured_pin` returning
+    None shows the command is no longer misreported as pinning a merge.
+
+    The repro is the reviewer's own, and is not hypothetical -- filing #3392,
+    whose body quotes a fabricated `expected_head_sha=...`, does exactly this.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("_hook_pin_prose", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    tpath = write_transcript([PROMPT, HEAD_RUN])
+    try:
+        sha = "4d443b7ac57e8b09a7a3e9a41c2c8e2f9a1b0c3d"
+        prose = (f'gh issue create -R o/r --title "pin bug" --body '
+                 f'"a sweep padded it out via -f expected_head_sha={sha} '
+                 f'and it failed."')
+        real = f"gh api -X PUT repos/o/r/pulls/1/update-branch -f expected_head_sha={sha}"
+        prose_hit = mod.unmeasured_pin(prose, tpath)
+        real_hit = mod.unmeasured_pin(real, tpath)
+        ok = prose_hit is None and real_hit is not None
+    finally:
+        os.unlink(tpath)
+    print(f"{'ok  ' if ok else 'FAIL'}  a --body QUOTING a pin is not read as "
+          f"pinning, while the same flag as a real argument still is")
+    return 0 if ok else 1
+
+
 def check_unreadable_transcript_is_silent():
     """No readable transcript means no evidence either way: fail open.
 
@@ -639,6 +686,7 @@ def main():
         check_output_shape,
         check_pin_warning_distinguishes_padding,
         check_comment_scanner_directly,
+        check_prose_quoting_a_pin_is_not_a_pin,
         check_pin_does_not_suppress_body_finding,
         check_dry_run_warns_on_pin,
         check_unreadable_transcript_is_silent,

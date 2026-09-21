@@ -254,11 +254,11 @@ The pass count is routinely quoted in commit messages and reviews as evidence of
 
 - **Do:** write the members as literals in the test, and assert separately that the constant contains them.
 - **Do:** compare each mutation run's PASS count against the baseline's, and treat a run that reports no count at all as "mutant not applied".
-- **Don't:** discriminate on exit status --- a malformed mutant and a real failure both exit 1, so it cannot separate them.
 - **Do:** count skips separately, so a weakened run and a full one differ in the totals.
+- **Do:** have the check runner refuse a name it has already seen (`ai-config#2725`'s suggested fix), turning a silent duplicate into an immediate failure rather than an inflated count.
+- **Don't:** discriminate on exit status --- a malformed mutant and a real failure both exit 1, so it cannot separate them.
 - **Don't:** generate a test's cases from the value under test --- the DRY form is the defective one here.
 - **Don't:** record a skip with `check(..., True)`; that is a pass asserting nothing.
-- **Do:** have the check runner refuse a name it has already seen (`ai-config#2725`'s suggested fix), turning a silent duplicate into an immediate failure rather than an inflated count.
 - **Don't:** treat a rising pass count as evidence of rising coverage without a name registry (or an equivalent dedup check) backing it.
 
 (Measured 2026-08-28 on [ai-config#2539](https://github.com/Morrison-Lab/ai-config/pull/2539), where it occurred **twice in one file** against two different constants, the second after the first had been fixed --- which is why it is written down rather than noted.
@@ -579,6 +579,9 @@ The total reads as coverage of "the fix" when it is coverage of one of its two c
   from the implementation's,
   since the two paths agree on every fixture that shares it.
 - **Do:** when a fix touches two parallel code paths, mutate (revert) each path's own copy separately and confirm a case fails for that specific reversion --- run the mutation once per path, not once for the suite.
+- **Do:** for an expected value about a third-party tool's own behaviour,
+  derive it from that tool's documentation or a fresh measurement,
+  never from what the implementation under test already returns.
 - **Don't:** read a single aggregate PASS total as having pinned every path a fix touches;
   a suite concentrated on one shape can stay green with the other shape's half of the fix reverted out entirely.
 - **Don't:** accept a test because it mentions the helper that changed,
@@ -589,9 +592,6 @@ The total reads as coverage of "the fix" when it is coverage of one of its two c
 - **Don't:** read a representative fixture as a discriminating one ---
   representativeness is a claim about typical inputs,
   and a guard needs an input the two candidate behaviours disagree on.
-- **Do:** for an expected value about a third-party tool's own behaviour,
-  derive it from that tool's documentation or a fresh measurement,
-  never from what the implementation under test already returns.
 - **Don't:** trust agreement between a test and its implementation as evidence either is right ---
   when both were written from the same mental model,
   agreement is exactly what a **Mirrored misunderstanding** produces.

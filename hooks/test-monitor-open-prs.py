@@ -592,6 +592,22 @@ assert subject.alive(2 ** 30) is False
 if os.name == "nt":
     assert subject._alive_windows(os.getpid()) is True
 
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+
+with tempfile.TemporaryDirectory() as pydir:
+    py_exe = Path(pydir) / "python.exe"
+    pyw_exe = Path(pydir) / "pythonw.exe"
+    py_exe.touch()
+    pyw_exe.touch()
+    with patch.object(subject, "IS_WINDOWS", True), patch.object(sys, "executable", str(py_exe)):
+        resolved = subject.resolve_interpreter()
+        assert resolved == str(pyw_exe), f"expected {pyw_exe}, got {resolved}"
+    with patch.object(subject, "IS_WINDOWS", False), patch.object(sys, "executable", str(py_exe)):
+        resolved = subject.resolve_interpreter()
+        assert resolved == str(py_exe), f"expected {py_exe}, got {resolved}"
+
 print("PASS: GitHub and GitLab CLIs are resolved or refused at startup; "
       "the GitHub search covers the opened, assigned, and workflow-bot arms; "
       "failures accumulate an error streak that success resets")

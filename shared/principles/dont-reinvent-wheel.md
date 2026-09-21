@@ -386,11 +386,11 @@ documented, verified, and yours.
   same sentence whether it is external or self-imposed.
 - **Do:** relax a self-imposed constraint --- add the dependency, fix the CI
   job --- and re-run the DRW comparison against the relaxed environment.
-- **Don't:** cite an environment your own change or an earlier one of ours
-  chose as proof that an upstream package does not fit.
 - **Do:** open the upstream PR when the constraint lives in a repo we
   administrate, and hold the consumer until it lands, rather than shipping the
   compromise the constraint would force.
+- **Don't:** cite an environment your own change or an earlier one of ours
+  chose as proof that an upstream package does not fit.
 - **Don't:** classify a limit as external because it sits in another
   repository; ask who can merge a change to it.
 

@@ -177,6 +177,28 @@ CASES = [
                   "• Closed #1622 after merging")], False,
      "a Unicode bullet list splits too"),
 
+    # --- the lead-in scope (round 4) -----------------------------------------
+    # Both of these are lists, so NO segmentation rule separates them. What
+    # separates them is whether the lead-in supplies a subject.
+    ([PROMPT, READ_BODY_ONLY,
+      say("Remaining on #1566:\n"
+          "- a written migration script\n"
+          "- your decision on rollout timing")], True,
+     "a list whose LEAD-IN names an issue elaborates it, so an item's cue "
+     "attaches even with no reference in the item"),
+    ([PROMPT, say("Progress notes:\n"
+                  "- Investigated flaky CI, still pending a fix upstream\n"
+                  "- Closed #1622 after merging")], False,
+     "a list whose lead-in names NO issue keeps its items independent"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("Remaining on #1566 and #1544:\n"
+          "- your decision on rollout timing")], False,
+     "a lead-in naming TWO issues does not say which an item's cue is about, "
+     "so it attaches to neither"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("Remaining on #1566\n- your decision on rollout timing")], False,
+     "a lead-in without a colon is not a scope"),
+
     # A --jq filter legitimately contains a pipe.
     ([PROMPT,
       bash("gh issue view 1566 -R o/r --jq '.comments[] | .body' --json comments"),

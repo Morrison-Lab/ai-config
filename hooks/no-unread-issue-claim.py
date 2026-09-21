@@ -211,6 +211,15 @@ RX_PR_PREFIX = re.compile(
 # rather than a sentence end.
 RX_ENUMERATOR = re.compile(r"(?m)^([ \t]*\d+)[.)](?=\s)")
 
+# A paragraph: the unit a list and its lead-in share. Used only to find the
+# lead-in, never to attach a cue by itself.
+RX_PARAGRAPH = re.compile(r"\n\s*\n")
+
+# A list item of any marker style this file recognises, including the bare
+# numeric form that `RX_ENUMERATOR` has already stripped punctuation from.
+RX_LIST_ITEM = re.compile(
+    r"^[ \t]*(?:[-*+•‣◦]|[A-Za-z][.)]|[ivxIVX]+[.)]|\d+[.)]?)\s")
+
 RX_SENTENCE = re.compile(
     r"(?<=[.!?;])\s+"                    # a terminator, then any whitespace
     r"|\n\s*\n"                          # a blank line: paragraph boundary
@@ -366,14 +375,58 @@ def asserted_issues(text):
     # the list-marker branch above deliberately avoids. Neutralize the
     # marker's punctuation first so only real sentence ends split.
     prose = RX_ENUMERATOR.sub(r"\1 ", prose)
-    for sentence in RX_SENTENCE.split(prose):
-        if not RX_CUE.search(sentence):
-            continue
-        for m in RX_ISSUE.finditer(sentence):
-            if RX_PR_PREFIX.search(sentence[:m.start()]):
+    for block in RX_PARAGRAPH.split(prose):
+        scoped = _list_subject(block)
+        for sentence in RX_SENTENCE.split(block):
+            hit = RX_CUE.search(sentence)
+            if not hit:
                 continue
-            out.append(m.group(1))
+            found = False
+            for m in RX_ISSUE.finditer(sentence):
+                if RX_PR_PREFIX.search(sentence[:m.start()]):
+                    continue
+                out.append(m.group(1))
+                found = True
+            # A list whose LEAD-IN names an issue is elaborating that issue,
+            # so a cue in an item belongs to it even though the item carries
+            # no reference of its own.
+            if not found and scoped is not None:
+                out.append(scoped)
     return out
+
+
+def _list_subject(block):
+    """The single issue a colon-terminated lead-in scopes its list to, else None.
+
+    This is the discriminator round 4 showed was needed, and it is a signal
+    present in the text rather than another boundary heuristic:
+
+        Remaining on #1566:          <- lead-in NAMES an issue; the items
+        - a written migration script    below elaborate IT, so "your decision"
+        - your decision on rollout      in an item is a claim about #1566
+
+        Progress notes:              <- lead-in names none; the items are
+        - CI is still pending           independent status lines, so
+        - Closed #1622                  "pending" must NOT reach #1622
+
+    Both are lists, so no segmentation rule separates them; what separates
+    them is whether the lead-in supplies a subject.
+
+    Requires EXACTLY one reference. A lead-in naming two issues does not say
+    which an item's cue belongs to, and guessing would attach a claim to an
+    issue nobody made it about.
+    """
+    lines = [l for l in block.splitlines() if l.strip()]
+    if len(lines) < 2:
+        return None
+    head = lines[0].rstrip()
+    if not head.endswith(":"):
+        return None
+    if not RX_LIST_ITEM.match(lines[1]):
+        return None
+    nums = [m.group(1) for m in RX_ISSUE.finditer(head)
+            if not RX_PR_PREFIX.search(head[:m.start()])]
+    return nums[0] if len(nums) == 1 else None
 
 
 def main() -> int:

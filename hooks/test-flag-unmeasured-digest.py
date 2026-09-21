@@ -367,6 +367,28 @@ CASES = [
     ([PROMPT, HEAD_RUN],
      bash(f"gh pr merge 1 -R o/r#1 --match-head-commit {'b' * 40}"), True,
      "a `#` inside a word is not a comment introducer and must not blind the scan"),
+    # The corpus's own canonical merge shape: `Closes #N` inside a quoted
+    # --body, with the pin AFTER it on the same line. A quote-unaware comment
+    # stripper discards everything from that `#` onward and goes silent on
+    # exactly the command this guard exists for.
+    ([PROMPT, HEAD_RUN],
+     bash(f'gh pr merge 1 -R o/r --body "Closes #123" '
+          f"--match-head-commit {'b' * 40}"), True,
+     "a `#` INSIDE a quoted --body must not blind the scan to a pin after it"),
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr merge 1 -R o/r --body 'closes #123' "
+          f"--match-head-commit {'b' * 40}"), True,
+     "the same with single quotes"),
+    # The mirror: blanking quoted content to find the comment would destroy a
+    # QUOTED pin, which is how the corpus actually writes the flag.
+    ([PROMPT, HEAD_RUN],
+     bash(f'gh pr merge 1 -R o/r --squash --match-head-commit "{"b" * 40}"'),
+     True,
+     "a QUOTED pin is still scanned -- blanking quotes outright would lose it"),
+    ([PROMPT, HEAD_FULL_RUN],
+     bash(f'gh pr merge 1 -R o/r --body "Closes #7" '
+          f'--match-head-commit "{REAL_HEAD}"'), False,
+     "and a quoted, correctly-read pin beside a quoted `#` stays silent"),
 ]
 
 

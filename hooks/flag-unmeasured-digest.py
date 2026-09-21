@@ -415,13 +415,29 @@ def _executable_text(command):
             command = strip(command)
         except Exception:
             pass
+    blank = getattr(_stamp, "_blank_quotes", None)
     out = []
     for line in command.splitlines():
         # A `#` that opens a comment is either at the start of the line or
         # preceded by whitespace; `#` inside a word (a URL fragment, an
         # issue reference like `-R o/r#1`) is not a comment introducer.
-        stripped = re.sub(r"(?:(?<=\s)|^)#.*$", "", line)
-        out.append(stripped)
+        #
+        # The cut POSITION is found against a quote-blanked copy, then applied
+        # to the original. Both halves of that are load-bearing:
+        #
+        #   - Searching the raw line reads `--body "Closes #123"` as opening a
+        #     comment and discards the rest of the line, including any
+        #     `--match-head-commit` after it. That is this corpus's own
+        #     canonical merge invocation, so the guard would fall silent on
+        #     precisely the command it exists for.
+        #   - Scanning the blanked copy INSTEAD would lose a quoted pin, since
+        #     `--match-head-commit "<sha>"` carries its value inside quotes.
+        #
+        # `_blank_quotes` preserves offsets, so an index found in the copy
+        # addresses the same character in the original.
+        probe = blank(line) if blank is not None else line
+        m = re.search(r"(?:(?<=\s)|^)#", probe)
+        out.append(line[:m.start()] if m else line)
     return "\n".join(out)
 
 

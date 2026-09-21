@@ -252,11 +252,34 @@ A **duplicated block counted as two passes** inflates the total in the opposite 
 `Morrison-Lab/ai-config#2725` measured this directly on `scripts/test_check_pr_fully_clean.py`: two checks each ran twice on `main`, inflating the reported total by exactly the duplicate's size, and it was caught only because a reviewer diffed two line ranges byte for byte while porting tests in a later PR --- not a check anyone runs by habit.
 The pass count is routinely quoted in commit messages and reviews as evidence of coverage, which is exactly what makes a silently double-counted total worth naming as its own hazard alongside the two above.
 
+**A GENUINE survivor then forks again, and only one branch of that fork is about the tests.**
+The hazards above separate a real survivor from a mutant that never ran.
+Once the survivor is real, it means either that the suite has a coverage hole, or that the mutated code is **redundant** --- something else in the same diff already handles the input the mutant should have broken.
+The two runs are indistinguishable: the mutant applies, the baseline pass count reproduces, nothing fails.
+Only the second is a finding about production code, and it is the one nothing prompts, because every other survivor in this section resolves by adding a test.
+
+Reaching for a test is the worse default when the reading is redundancy.
+It locks the redundant branch in behind an assertion, so the next reader treats it as load-bearing --- the shape [`dead-code-is-tech-debt`](../principles/dead-code-is-tech-debt.md) is about, arrived at through a step that felt like improving coverage.
+The tell is having to construct contrived input to kill the mutant: where the only prose reaching a branch is prose nobody writes, the branch covers nothing.
+
+So ask the discriminating question before writing the test --- does another change in this same diff already handle the input this mutant should have broken?
+The situation that produces it is ordinary rather than exotic: two fixes landed in one round for one review finding, which is how a review round usually goes.
+
+Measured 2026-09-21 on `hooks/no-unread-issue-claim.py` ([ai-config#3826](https://github.com/Morrison-Lab/ai-config/pull/3826)).
+A finding that a personal initial split a claim away from its own issue number drew two fixes at once: a sentence-boundary pattern narrowed so a single letter plus a period stopped reading as a list marker, and a substitution deleting an initial's period before the split ran.
+Mutating the substitution failed a test.
+Mutating the narrowing did not, because with the period already gone no marker could match.
+Deleting the narrowing also simplified the explanation around it, since the two shapes turned out to be separated by case --- an initial is capitalised and a lettered list item conventionally is not --- rather than by punctuation.
+
 - **Do:** write the members as literals in the test, and assert separately that the constant contains them.
+- **Do:** ask whether a sibling change in the same diff already covers a genuine survivor's input, before writing a test for it.
+- **Do:** delete the redundant branch instead, and check whether its removal simplifies the explanation around it.
 - **Do:** compare each mutation run's PASS count against the baseline's, and treat a run that reports no count at all as "mutant not applied".
 - **Do:** count skips separately, so a weakened run and a full one differ in the totals.
 - **Do:** have the check runner refuse a name it has already seen (`ai-config#2725`'s suggested fix), turning a silent duplicate into an immediate failure rather than an inflated count.
 - **Don't:** discriminate on exit status --- a malformed mutant and a real failure both exit 1, so it cannot separate them.
+- **Don't:** read every genuine survivor as a coverage hole --- that is the reading that adds code rather than removing it.
+- **Don't:** construct contrived input to kill a mutant; needing to is the evidence that the branch is redundant.
 - **Don't:** generate a test's cases from the value under test --- the DRY form is the defective one here.
 - **Don't:** record a skip with `check(..., True)`; that is a pass asserting nothing.
 - **Don't:** treat a rising pass count as evidence of rising coverage without a name registry (or an equivalent dedup check) backing it.

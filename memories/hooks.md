@@ -877,3 +877,14 @@ Padding added for realism can move the trigger out of scope, and every verdict t
 - **Don't:** read a green suite as evidence a new case is sound --- a case that cannot reach the defect is green for the same reason a correct one is.
 - **Don't:** widen the bound to make a fixture fit;
   that re-admits whatever the bound excludes, which is the production-side fix this hook already rejected.
+
+## Target PR scoping for hook evidence and warning diagnostics (#3838)
+
+When a hook correlates transcript events (such as CI check readings, git pushes, or subagent reports) with claims made in assistant output:
+
+- **Scope evidence to target PRs consistently:**
+  If a claim targets a specific PR, all evidence variables (`rel_last_partial`, `rel_last_push`, `rel_last_complete`) must be resolved with respect to that target PR.
+  Falling back to global unscoped indexes (e.g. `last_partial >= 0` across all PRs) causes an unrelated PR's partial check to falsely convert a silent-allow claim into an unverified warning.
+- **Pass scoped variables to warning formatters:**
+  Ensure warning formatters receive the PR-scoped indices (`w_partial`, `w_push`) rather than global indices.
+  Otherwise, diagnostic messages will cite events (such as a recent `git push`) from unrelated PRs as reasons why a claim is stale or uncovered.

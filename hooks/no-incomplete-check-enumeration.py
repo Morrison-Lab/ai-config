@@ -741,7 +741,7 @@ def main() -> int:
                 coverage_warnings.append((hit, pr_label, fresh_complete_refs, uncovered))
         else:
             w_push = rel_last_push if rel_last_push >= 0 else (last_push if not claim_pr_refs else -1)
-            w_partial = rel_last_partial if rel_last_partial >= 0 else (last_partial if not is_core else -1)
+            w_partial = rel_last_partial if rel_last_partial >= 0 else (last_partial if not claim_pr_refs else -1)
             is_original_ci_case = (
                 bool(is_core) and subagent_timed < 0 and rel_last_partial >= 0)
             if is_original_ci_case:

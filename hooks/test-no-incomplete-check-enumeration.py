@@ -72,6 +72,14 @@ CHECKER_1034 = {"type": "assistant", "message": {"content": [
                    "-R ucdavis/bcs"}}]}}
 PUSH_1034 = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {"command": "git push origin feat/1034"}}]}}
+PARTIAL_87 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "gh pr checks 87 -R d-morrison/macros"}}]}}
+PARTIAL_100 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "gh pr checks 100 -R Morrison-Lab/ai-config"}}]}}
+PARTIAL_200 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "gh pr checks 200 -R Morrison-Lab/ai-config"}}]}}
+PARTIAL_3468 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "gh pr checks 3468 -R Morrison-Lab/ai-config"}}]}}
 PARTIAL_1034 = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {"command": "gh pr checks 1034"}}]}}
 PARTIAL_CHECK_RUNS_1034 = {"type": "assistant", "message": {"content": [
@@ -298,11 +306,11 @@ CASES = [
     ([AGENT_DISPATCH, UNRELATED_RESULT,
       say("#3468 is fully clean.")], "allow",
      "an unrelated tool_result (wrong id) is not a subagent report"),
-    ([PARTIAL, say("#87 is green, awaiting your merge.")], "warn",
+    ([PARTIAL_87, say("#87 is green, awaiting your merge.")], "warn",
      "d-morrison/macros#87: merge-readiness vocabulary outside the original set"),
     ([say("#87 is green, awaiting your merge.")], "allow",
      "merge-ready phrasing with no reading and no subagent -- nothing to warn about"),
-    ([PARTIAL, CHECKER_87, say("#87 is green, awaiting your merge.")], "allow",
+    ([PARTIAL_87, CHECKER_87, say("#87 is green, awaiting your merge.")], "allow",
      "checker ran last ON #87 -- the merge-ready phrasing is covered"),
 
     # --- ai-config#3485: the read's SUBJECT, not just its shape ---
@@ -372,7 +380,7 @@ CASES = [
      "same data-merge sentence, but 'branch' anchors it as PR-readiness "
      "vocabulary within the window"),
 
-    ([PARTIAL, say("#87 is yours now -- your call to merge.")], "warn",
+    ([PARTIAL_87, say("#87 is yours now -- your call to merge.")], "warn",
      "'your call to merge' is in the merge-ready vocabulary and was "
      "otherwise untested"),
 
@@ -480,6 +488,10 @@ CASES = [
       say("#1031 is fully clean.")],
      "allow",
      "#3838: unrelated partial read does not cause warn on unread claim for #1031"),
+    ([PARTIAL_1034,
+      say("#1031 is green, awaiting your merge.")],
+     "allow",
+     "#3838: unrelated partial read does not cause warn on unread second-vocabulary claim for #1031"),
 ]
 
 # (events, must_contain, must_not_contain, label). The WARN explanation must
@@ -544,20 +556,20 @@ CONTENT_CASES = [
      "a far-away reference the message itself calls unrelated must not be "
      "taken as the claim's subject -- an honest vague label beats a "
      "confident wrong one"),
-    ([PARTIAL,
+    ([PARTIAL_200,
       say("#100 was closed as a duplicate. #200 is green, awaiting your "
           "merge.")],
      "#200",
      "about #100",
      "a message naming two PRs must label the claim with the one the claim "
      "is about, not the first reference in the message"),
-    ([PARTIAL, PUSH,
+    ([PARTIAL_100, PUSH,
       say("#100 is good to merge whenever you're ready.")],
      "no complete instrument read appears anywhere",
      "A complete instrument read is in this transcript",
      "a push after a partial reading, with no complete read ever -- the "
      "message must not claim a complete read exists"),
-    ([AGENT_DISPATCH, AGENT_REPORT, PARTIAL,
+    ([AGENT_DISPATCH, AGENT_REPORT, PARTIAL_3468,
       say("#3468 is green, awaiting your merge.")],
      "SHORT CI surface",
      "dispatched subagent's OWN report",

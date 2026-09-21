@@ -85,6 +85,38 @@ CASES = [
     ([PROMPT, READ_BODY_ONLY,
       say("Ticket #123456789 still needs your call.")], False,
      "a digit run longer than an issue number is not one"),
+
+    # `RX_INITIAL` only neutralises a capital before ANOTHER capital. Weaken
+    # the lookahead to bare whitespace and a real sentence end after a lone
+    # capital is deleted, merging two sentences and naming a closed issue --
+    # the misattribution this file rates worst.
+    ([PROMPT, READ_COMMENTS,
+      say("#1622 is closed, reported by J. now #1566 still needs your call.")],
+     False,
+     "an initial rule that fired before a LOWERCASE word would merge two "
+     "sentences and name the closed issue"),
+
+    # The fenced/span replacement is a period so the removed region acts as a
+    # sentence BOUNDARY. A space would join instead, which is only visible
+    # with the cue on one side of a span and the number on the other.
+    ([PROMPT, READ_BODY_ONLY,
+      say("This still needs your call `inline code here` #1566 is "
+          "unrelated.")], False,
+     "a code span SEPARATES a cue from a later number rather than joining "
+     "them"),
+
+    # The `-c` shorthand for `--comments`, which nothing exercised.
+    ([PROMPT, bash("gh issue view 1566 -R o/r -c"), say(CLAIM)], False,
+     "the `-c` shorthand discharges it too"),
+
+    # The MCP call with `issue_number` BEFORE the comments method, which is
+    # a separate pattern from the one the existing MCP case exercises.
+    ([PROMPT,
+      tool("mcp__github__issue_read",
+           {"issue_number": 1566, "owner": "o", "repo": "r",
+            "method": "get_comments"}),
+      say(CLAIM)], False,
+     "an MCP call naming the issue before the method discharges it as well"),
     ([PROMPT, say("Filed #1621 for the terrain overlay.")], False,
      "filing an issue is not a claim that it is blocked"),
     ([PROMPT, say("Closed #1566 as completed.")], False,
@@ -515,6 +547,22 @@ def check_unreadable_transcript_is_silent():
     return 0 if ok else 1
 
 
+def check_two_undischarged_names_the_first():
+    """With more than one issue outstanding, the warning names one of them.
+
+    Every other case leaves `missing` a single element, so `missing[0]` and
+    `missing[-1]` are the same value and the selection is unasserted. Both
+    choices name a genuinely undischarged issue, so this pins the documented
+    one rather than a correctness property.
+    """
+    out = run([PROMPT, say("#1544 is blocked on you, and so is #1566.")])
+    ctx = (out.get("hookSpecificOutput") or {}).get("additionalContext", "")
+    ok = "#1544" in ctx and "issue #1566 as open" not in ctx
+    print(f"{'ok  ' if ok else 'FAIL'}  two undischarged issues name the "
+          f"first, not the last")
+    return 0 if ok else 1
+
+
 def check_scan_cost_stays_linear():
     """A long recap must not scan quadratically and blow the hook's budget.
 
@@ -553,6 +601,7 @@ def main():
     adhoc = [check_message_names_the_number,
              check_mixed_state_names_the_undischarged_issue,
              check_unreadable_transcript_is_silent,
+             check_two_undischarged_names_the_first,
              check_scan_cost_stays_linear]
     for check in adhoc:
         failures += check()

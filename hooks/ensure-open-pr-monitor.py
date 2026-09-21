@@ -7,9 +7,12 @@ import sys
 from pathlib import Path
 
 
+IS_WINDOWS = os.name == "nt"
+
+
 def resolve_interpreter():
     interpreter = sys.executable or "python3"
-    if os.name == "nt":
+    if IS_WINDOWS:
         p = Path(interpreter)
         sibling = p.with_name("pythonw.exe")
         if sibling.is_file():
@@ -24,7 +27,7 @@ def main():
     script = os.path.join(os.path.dirname(os.path.realpath(__file__)), "monitor-open-prs.py")
     try:
         kwargs = {}
-        if os.name == "nt":
+        if IS_WINDOWS:
             kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
         interpreter = resolve_interpreter()
         subprocess.run([interpreter, script], stdin=subprocess.DEVNULL,

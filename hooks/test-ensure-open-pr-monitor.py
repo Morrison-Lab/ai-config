@@ -21,10 +21,10 @@ with tempfile.TemporaryDirectory() as pydir:
     pyw_exe = Path(pydir) / "pythonw.exe"
     py_exe.touch()
     pyw_exe.touch()
-    with patch("os.name", "nt"), patch.object(sys, "executable", str(py_exe)):
+    with patch.object(subject, "IS_WINDOWS", True), patch.object(sys, "executable", str(py_exe)):
         resolved = subject.resolve_interpreter()
         assert resolved == str(pyw_exe), f"expected {pyw_exe}, got {resolved}"
-    with patch("os.name", "posix"), patch.object(sys, "executable", str(py_exe)):
+    with patch.object(subject, "IS_WINDOWS", False), patch.object(sys, "executable", str(py_exe)):
         resolved = subject.resolve_interpreter()
         assert resolved == str(py_exe), f"expected {py_exe}, got {resolved}"
 

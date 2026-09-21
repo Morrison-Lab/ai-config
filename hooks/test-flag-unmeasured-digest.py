@@ -431,6 +431,21 @@ CASES = [
     ([PROMPT, HEAD_RUN],
      bash(f"gh pr merge 1 -R o/r --match-head-commit {'b' * 64}"), True,
      "a 64-character SHA-256 head is not silently skipped by a length cap"),
+    # A metacharacter ends a word in `sh` with or without surrounding space.
+    # Splitting on whitespace alone glues it to the value, whose whole-word
+    # hex anchor then rejects it -- a silent skip.
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr merge 1 -R o/r --match-head-commit {'b' * 40}&&echo done"),
+     True,
+     "a pin glued to `&&` with no space is still found"),
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr merge 1 -R o/r --match-head-commit {'b' * 40}>log.txt"),
+     True,
+     "a pin glued to a redirect is still found"),
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr merge 1 -R o/r --match-head-commit {'b' * 40};echo done"),
+     True,
+     "a pin glued to `;` is still found"),
 ]
 
 

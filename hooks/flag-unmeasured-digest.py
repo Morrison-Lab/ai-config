@@ -266,6 +266,11 @@ RX_PIN_WORD = re.compile(
 
 RX_BARE_SHA = re.compile(r"^[0-9a-fA-F]{7,}$")
 
+# Shell metacharacters that end a word regardless of adjacent whitespace.
+# Redirections are included: `--match-head-commit <sha>>log` is a pin plus a
+# redirect to `sh`, so the value must not absorb the `>`.
+SHELL_OPERATORS = frozenset(";&|()<>")
+
 PIN_NOTE = (
     "Unmeasured-pin reminder: this command pins `{flag}` to `{token}`, which "
     "never appeared in any tool result or user message in this session's "
@@ -534,7 +539,14 @@ def _shell_words(command):
                 continue
             if c in ('"', "'"):
                 quote = c
-            elif c.isspace():
+            elif c.isspace() or c in SHELL_OPERATORS:
+                # A shell metacharacter ends a word whether or not whitespace
+                # surrounds it, so `<sha>&&echo done` is three words to `sh`
+                # and must be three here. Splitting on whitespace alone glues
+                # the operator onto the value, `RX_BARE_SHA`'s whole-word
+                # anchor then rejects it, and the pin is SKIPPED -- which this
+                # module's own docstring calls the one outcome a guard must
+                # not have. Found by review of the word-splitting round.
                 if cur:
                     words.append("".join(cur))
                     cur = []

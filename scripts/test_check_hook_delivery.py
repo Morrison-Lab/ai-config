@@ -18,6 +18,15 @@ while having examined nothing: a `--repo` with no `hooks/` directory, and the
 overlapping-record arithmetic that used to hide a genuinely different
 project's install.
 
+Two cases are deliberately awkward, and both are awkward for the same reason
+-- a fixture that is easy to write does not distinguish the behaviour it is
+named after. The pin-count case needs TWO pins, because with one pin an
+unconditional counter and a conditional one print the same number. The
+`ValueError` case substitutes the module's `Path`, because a real NUL raises
+on POSIX and returns quietly on Windows, so a plain fixture asserts nothing
+on half the machines that run it -- including the half the bug was wrongly
+generalised from.
+
 Run: python3 scripts/test_check_hook_delivery.py
 """
 import json
@@ -216,8 +225,19 @@ def main():
               "ORPHAN" not in out, out)
         check("and its gap therefore fails as a NAMED pin",
               code == 1 and "INSTALLED pin is missing" in out, out)
-        check("the summary counts the pin as named",
-              "1 of them named by an install record" in out, out)
+        # TWO pins, one named and one not. A single-pin fixture cannot tell
+        # the conditional increment from an unconditional one, because the
+        # only pin present is the named one either way.
+        home = make_home(root / "h7d", {"named": ["a.py"], "loose": ["a.py"]})
+        cache = (root / "h7d" / "home" / ".claude" / "plugins" / "cache"
+                 / "Morrison-Lab" / "ai-config")
+        write(home / ".claude" / "plugins" / "installed_plugins.json",
+              json.dumps({"plugins": {"ai-config@Morrison-Lab": [
+                  pin_record(cache / "named", "project", repo)]}}))
+        code, out = run(home, repo)
+        check("the summary counts ONLY the pins a record names",
+              "against 2 pin(s), 1 of them named by an install record" in out,
+              out)
 
         # The mirror: the RECORD is canonical and the PIN is not, because the
         # home directory itself was spelled with a `.` component. Only
@@ -270,8 +290,32 @@ def main():
     check("fully overlapping records do not produce a negative residual",
           "other project install(s)" not in label, label)
 
-    check("a pin no record names is labelled ORPHAN",
-          "ORPHAN" in chd.describe_entries([], project))
+    label = chd.describe_entries([], project)
+    check("a pin no record names is labelled ORPHAN", "ORPHAN" in label, label)
+
+    # `Path.resolve()` on a string carrying a NUL raises ValueError on POSIX
+    # and returns quietly on Windows, so a fixture written as a real NUL only
+    # exercises the catch on one of the two platforms -- and the platform it
+    # skips is the one the fix was wrongly derived from. Substituting the
+    # module's own `Path` makes the case run identically everywhere.
+    class _Exploding(type(Path())):
+        def resolve(self, strict=False):
+            raise ValueError("embedded null character in path")
+
+    real_path, chd.Path = chd.Path, _Exploding
+    try:
+        warned = []
+        got = chd.entries_for(real_path("X"),
+                              [{"installPath": "a\0b", "scope": "user"}],
+                              warn=warned.append)
+        ok = got == [] and warned and "could not resolve" in warned[0]
+    except ValueError:
+        ok = False
+        warned = ["ValueError escaped entries_for"]
+    finally:
+        chd.Path = real_path
+    check("a ValueError from resolve() is warned about, not raised",
+          ok, "; ".join(warned) if warned else "no warning emitted")
 
     print(f"\n{CHECKS} checks, {len(FAILURES)} failure(s)")
     return 1 if FAILURES else 0

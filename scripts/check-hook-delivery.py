@@ -190,14 +190,21 @@ def entries_for(pin, entries, warn=None):
         try:
             if Path(e["installPath"]).resolve() == target:
                 out.append(e)
-        except OSError as exc:
-            # Deliberately narrow, and deliberately not widened to cover a
-            # malformed record: `install_entries` has already dropped every
-            # non-string `installPath`, so `Path()` cannot raise TypeError
-            # here, and an embedded NUL was measured not to raise either
-            # (`resolve()` is non-strict by default). Catching those would be
-            # a branch no input can reach. What remains is a genuine syscall
-            # failure on a path the OS refuses to walk.
+        except (OSError, ValueError) as exc:
+            # `ValueError` is here because an embedded NUL raises it on POSIX
+            # and not on Windows. An earlier version of this catch was
+            # narrowed to `OSError` on a measurement taken on Windows alone,
+            # and the comment asserted no input could reach the wider branch.
+            # CI runs on ubuntu-latest, where `Path("a\0b").resolve()` raises
+            # `ValueError: embedded null character` -- not an `OSError`, so
+            # the script crashed on exactly the malformed records file it
+            # exists to survive. JSON spells that byte as a unicode escape
+            # and `json` decodes it back, so the input is reachable from a
+            # syntactically valid records file.
+            #
+            # `TypeError` is still absent, and for a different reason:
+            # `install_entries` drops every non-string `installPath` before
+            # it gets here, so `Path()` has nothing to choke on.
             if warn:
                 warn(f"  ! could not resolve installPath "
                      f"{e.get('installPath')!r}: {exc}")

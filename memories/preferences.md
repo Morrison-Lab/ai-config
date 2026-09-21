@@ -1127,3 +1127,15 @@ safer/preferred choice merely because the repo has external consumers.
   - **Do:** Ship the accountability mechanism in the same turn you make a promise.
   - **Don't:** Make promises about future behavior without a mechanism.
   (Flagged 2026-08-29 in wai GIA session: two consecutive "will drive #146..." promises with no mechanism.)
+
+- **Never pause or stop early on wave boundaries; babysit in-flight PRs to completion.**
+  Reaching a wave boundary (e.g. 5/5 in `gii`) pauses *grabbing new issues*, but mandates actively babysitting all in-flight PRs to completion and clean merge.
+  Do not pause or exit the session while a PR in the wave remains unmerged.
+  - **Do:** Keep the session actively driving until every in-flight PR in the current wave is merged under MWC.
+  - **Don't:** Pause or exit at the wave boundary while a PR is still awaiting review or CI.
+
+- **Always answer user questions immediately in visible text as soon as the answer is known.**
+  When the user asks direct questions or inquiries, deliver the direct answer immediately in markdown text in that turn.
+  Do not defer answering behind tool calls, internal steps, or silent waiting loops.
+  - **Do:** State the direct answer to user questions at the top of the reply before initiating further actions.
+  - **Don't:** Defer answering or run background waiting loops without first delivering the answer.

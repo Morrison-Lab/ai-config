@@ -300,3 +300,24 @@ p.write_bytes(s.encode("utf-8"))
 - **Don't:** verify what `write_text` wrote by reading it back with `read_text` --- that round-trip normalizes the very bytes in question.
 - **Don't:** diagnose the resulting anchor-match failure as a wrong anchor string;
   print `repr()` of the file's bytes.
+
+## Mocking Windows paths in pathlib under Python 3.12+
+
+In Python 3.12+, patching `os.name = "nt"` on non-Windows systems causes `pathlib.Path` to instantiate `WindowsPath`, which raises `NotImplementedError: cannot instantiate 'WindowsPath' on your system` when methods like `.with_name()` or `.resolve()` are invoked.
+This breaks cross-platform unit tests that attempt to simulate Windows path handling on Linux CI runners.
+
+Gating Windows-specific code on a module-level boolean constant (`IS_WINDOWS = os.name == "nt"`) allows tests to patch `subject.IS_WINDOWS = True` without altering `os.name`, so `pathlib.Path` constructs normal `PosixPath` instances that exercise the branch logic cleanly.
+Learned 2026-09-21 on ai-config#3829 when patching `os.name` in `hooks/test-ensure-open-pr-monitor.py` crashed under Python 3.12 on Linux CI.
+
+- **Do:** branch on a module-level constant (`IS_WINDOWS = os.name == "nt"`) rather than reading `os.name` directly in functions manipulating `pathlib.Path`.
+- **Do:** patch `subject.IS_WINDOWS` in unit tests simulating Windows execution on Linux.
+- **Don't:** monkeypatch `os.name = "nt"` in tests where code calls `pathlib.Path` constructors or mutating methods on POSIX hosts.
+
+## Headless background execution on Windows requires pythonw
+
+On Windows 11 with Windows Terminal set as the default terminal emulator, launching `python3` via `subprocess.Popen` will flash a terminal window or open a terminal tab even when `CREATE_NO_WINDOW` (`0x08000000`) is passed, because Windows resolves `python3` through WindowsApps App Execution Aliases (`%LOCALAPPDATA%\Microsoft\WindowsApps\python3.exe`).
+To make background helper daemons or git hook controllers truly headless on Windows, resolve to sibling `pythonw.exe` (`IMAGE_SUBSYSTEM_WINDOWS_GUI`, which allocates no console window), falling back to `sys.executable`.
+Learned 2026-09-21 on ai-config#3827 and #3829.
+
+- **Do:** check for `Path(sys.executable).with_name("pythonw.exe")` or `shutil.which("pythonw")` when spawning background processes on Windows.
+- **Don't:** invoke bare `"python3"` in `subprocess.Popen` on Windows for background processes.

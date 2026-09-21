@@ -331,12 +331,31 @@ CASES = [
       say("#1566 is not yet decided.")], True,
      "'not yet decided' alone is a cue"),
 
-    # A blockquote at the very START of the message, where no preceding
-    # newline exists to form a boundary on its own -- the one position where
-    # the substituted period does work the empty string would not.
+    # A blockquote at the very START of the message. This pins that a leading
+    # blockquote is stripped AT ALL, which is what the mid-message case
+    # cannot show. It does not pin the substituted character: a differential
+    # sweep across blockquote positions found no input where the period and
+    # the empty string give different verdicts, which is why the hook
+    # substitutes the empty string and says so.
     ([PROMPT, READ_BODY_ONLY,
       say("> #1566 still needs your call.\nEverything else shipped.")], False,
      "a blockquote opening the message is quoted material"),
+
+    # The PR-prefix exclusion is now looked for in a bounded window, so the
+    # window has to be wider than the longest match the pattern can produce.
+    # Both directions: ordinary spacing is still excluded, and a gap padded
+    # past the pattern's own bound is deliberately no longer a PR prefix.
+    ([PROMPT, READ_BODY_ONLY,
+      say("The pull request  for  #1566 is awaiting review.")], False,
+     "a PR prefix with wider-than-usual spacing is still excluded"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("The pull request for\n#1566 is awaiting review.")], False,
+     "and a PR prefix broken across a line wrap is still excluded"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("The pull request" + " " * 40 + "for #1566 is awaiting review.")],
+     True,
+     "DOCUMENTED BOUND: a gap padded past the pattern's own limit is no "
+     "longer read as a PR prefix, so the claim is treated as an issue claim"),
 
     # An UNCLOSED fence leaves the rest as prose rather than swallowing it,
     # so one stray backtick run cannot silence every later claim.

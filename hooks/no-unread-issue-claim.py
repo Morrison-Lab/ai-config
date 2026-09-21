@@ -274,24 +274,30 @@ def issue_key(number):
 #
 # Anchoring `for` to the PR noun excludes the first without reaching the
 # second, because "fix"/"patch"/"branch" never precede it here.
+# The whitespace runs are BOUNDED, which is what makes the lookback window
+# below sound. With `\s*` the pattern's longest possible match has no limit,
+# so no finite window can be proved not to change a verdict -- padding the
+# gap between the noun and the number past the window silently turns the
+# exclusion off, and the earlier version of this comment asserted the
+# opposite. Eight is far past any real spacing, including a line wrap.
 RX_PR_PREFIX = re.compile(
-    r"(?:\bPR|\bpull\s+request|\bpull)\b\s*(?:for\s*)?$", re.I)
+    r"(?:\bPR|\bpull\s+request|\bpull)\b\s{0,8}(?:for\s{0,8})?$", re.I)
 
 # How far back of an issue reference the PR prefix is looked for.
 #
-# The pattern is right-anchored, so it only ever matches within a few
-# characters of the number -- `pull request for ` is 17. Scanning the whole
-# preceding text instead re-scanned from the start of the sentence for EVERY
-# match in it, and a bare newline is deliberately not a sentence boundary
-# here, so a recap of one `blocked on #N` line per issue stays a single
-# sentence. Measured: 136 KB of that shape took 10.05 seconds, against this
-# hook's own 10-second budget in `hooks.json` -- so a long enough legitimate
-# recap silently turned the guard off, on exactly the transcript it was
-# written for.
+# Scanning the whole preceding text instead re-scanned from the start of the
+# sentence for EVERY match in it, and a bare newline is deliberately not a
+# sentence boundary here, so a recap of one `blocked on #N` line per issue
+# stays a single sentence. Measured: 136 KB of that shape took 10.05 seconds,
+# against this hook's own 10-second budget in `hooks.json` -- so a long enough
+# legitimate recap silently turned the guard off, on exactly the transcript it
+# was written for.
 #
-# The window is wider than the longest literal so an unusual run of
-# whitespace inside the prefix still fits.
-PREFIX_WINDOW = 80
+# The window is derived from the pattern rather than chosen: the longest
+# match it can now produce is `pull request` + 8 + `for` + 8 = 31 characters,
+# and the window is comfortably past that. A `PREFIX_WINDOW` smaller than
+# that bound would drop real exclusions, which is what the test asserts.
+PREFIX_WINDOW = 64
 
 # A sentence boundary.
 #

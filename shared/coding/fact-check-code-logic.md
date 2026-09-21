@@ -274,13 +274,11 @@ Widening the `except` around that `resolve()` past `OSError` survived, because t
 **That comment was half wrong, and the reason is worth more than the rule it illustrates.**
 `TypeError` really was unreachable.
 `ValueError` was not: an embedded NUL raises it on POSIX and returns quietly on Windows, where the mutation run happened, and CI runs on Linux.
-So the survivor was a true reading of an incomplete experiment, the next round widened the catch back, and what had shipped in between was a crash in the environment the code actually runs in.
+So the survivor was a true reading of an incomplete experiment, and the next round widened the catch back.
+What the narrow catch would have let through, unexercised, is a crash in the environment the code actually runs in --- which no CI run ever observed, because that commit never stood as a head of its own.
 
-Reading this example from the history carries a caution that applies to every measurement of this kind, and it is why the two commits above are linked by SHA rather than named.
-The later widening is committed and visible in `472408f8`.
-The **mutation experiment** is not: widening the catch and reverting it happened inside the authoring of `83bafbef`, whose diff therefore shows a catch that was narrow before and narrow after.
-So the survivor that motivated the whole thing is carried by that commit's *message* --- "A widened catch would have been a branch no input can take, which is what mutation testing reported when it survived" --- and by nothing else.
-An experiment nobody committed is not evidence anyone else can check, so name the artifact that carries the claim rather than citing the PR and leaving a reader to look for a diff that does not exist.
+The mutation experiment itself is uncommitted --- widening the catch and reverting it happened inside `83bafbef`'s own authoring, so its diff shows a catch narrow before and narrow after --- and is carried only by that commit's message: "A widened catch would have been a branch no input can take, which is what mutation testing reported when it survived".
+An experiment nobody committed is not evidence anyone else can check, which is why both SHAs are cited directly rather than through the PR.
 
 A survivor is therefore evidence about redundancy only across the conditions the run covered.
 Before deleting, ask what the mutation run did not vary --- platform, locale, Python version, filesystem --- and whether the branch could be reachable there.
@@ -304,10 +302,13 @@ That third answer is the one most easily assumed away, because a branch can look
 Those siblings were inert because the statement above them guaranteed the operand truthy.
 This one sat where nothing did, and dropping it would have turned `os.path.exists(None)`'s `TypeError` into a silent allow through the caller's blanket `except`.
 
-That case is the sharpest available statement of this section's limit, and it is worth reading in full rather than summarised.
-Its own wording is counterfactual and should stay that way: a clean mutation run over that suite **could not have** told the two conjuncts apart, and **would have** reported both safe to remove, for opposite reasons --- one because nothing could observe its removal, the other because no test passed the input it existed for.
-No such run was ever made; the live conjunct was found by a same-file grep for the operand and settled by measuring the guard with and without it against a `None` input.
-That remedy is the one to copy, and it is neither a test for the inert pair nor a deletion of the live one.
+That case states this section's limit more sharply than anything else here, in its own words:
+
+> a clean mutation run over that suite could not have told the two cases apart --- it would have reported both as safe to remove, for opposite reasons.
+
+Keep that counterfactual as a counterfactual.
+No such run was ever made: the live conjunct was found by a same-file grep for the operand, and settled by measuring the guard with and without it against a `None` input.
+That measurement is the remedy to copy, and it is neither a test for the inert pair nor a deletion of the live one.
 So establish what makes a neighbour's branch dead before transferring the verdict, which is [`check-purpose-before-reusing`](../workflow/check-purpose-before-reusing.md)'s question asked about a diagnosis rather than about a template.
 
 - **Do:** write the members as literals in the test, and assert separately that the constant contains them.

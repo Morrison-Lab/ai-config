@@ -524,6 +524,12 @@ def _shell_words(command):
     bare sha as its own word, and `-f 'expected_head_sha=<sha>'` yields one word
     beginning with the flag -- both still match, which is why this is a
     precision fix rather than a narrowing one.
+
+    Line continuations (`\\<newline>` or `\\<return><newline>`) are spliced away
+    outside quotes and inside double quotes, matching `sh` semantics, so a flag
+    and its value separated across physical lines by a backslash continuation
+    become adjacent words. Inside single quotes, `sh` preserves backslash and
+    newline literally, so they are not spliced there.
     """
     words = []
     cur = []
@@ -534,6 +540,12 @@ def _shell_words(command):
         c = command[i]
         if quote is None:
             if c == "\\":
+                if i + 1 < n and command[i + 1] == "\n":
+                    i += 2
+                    continue
+                if i + 2 < n and command[i + 1:i + 3] == "\r\n":
+                    i += 3
+                    continue
                 cur.append(command[i + 1:i + 2])
                 i += 2
                 continue
@@ -555,6 +567,12 @@ def _shell_words(command):
         elif c == quote:
             quote = None
         elif c == "\\" and quote == '"':
+            if i + 1 < n and command[i + 1] == "\n":
+                i += 2
+                continue
+            if i + 2 < n and command[i + 1:i + 3] == "\r\n":
+                i += 3
+                continue
             cur.append(command[i + 1:i + 2])
             i += 2
             continue

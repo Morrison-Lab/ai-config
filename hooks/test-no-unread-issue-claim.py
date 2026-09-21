@@ -13,11 +13,13 @@ that gets switched off, taking the real case with it.
 
 Run: python3 hooks/test-no-unread-issue-claim.py hooks/no-unread-issue-claim.py
 """
+import importlib.util
 import json
 import os
 import subprocess
 import sys
 import tempfile
+import time
 
 HOOK = sys.argv[1]
 
@@ -287,11 +289,61 @@ CASES = [
      True,
      "and an abbreviation does not silence a claim in the sentence after it"),
 
-    # `pending` alone. Deleting this cue left the suite green, which meant the
-    # cue was carried by the code and asserted by nothing.
+    # One case per cue, each phrased so that cue is the ONLY one matching.
+    # `pending` got this treatment first, after deleting it left the suite
+    # green; a later mutation pass found eleven more in the same state, so
+    # the remedy is applied to the whole list rather than to the one that
+    # happened to be measured.
     ([PROMPT, READ_BODY_ONLY,
       say("#1566 is pending a decision from you.")], True,
      "'pending' alone is a cue"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("#1566 is blocked on the runner image.")], True,
+     "'blocked on' alone is a cue"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("#1566 awaits the maintainer review.")], True,
+     "'awaits' alone is a cue"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("#1566 is waiting on the upstream release.")], True,
+     "'waiting on' alone is a cue"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("#1566 needs a decision.")], True,
+     "'needs a decision' alone is a cue"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("#1566 sits until your call arrives.")], True,
+     "'your call' alone is a cue"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("#1566 stays yours for now.")], True,
+     "'stays yours' alone is a cue"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("#1566 is still outstanding.")], True,
+     "'still outstanding' alone is a cue"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("#1566 sits unanswered.")], True,
+     "'unanswered' alone is a cue"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("#1566 gates the Phase 3 work.")], True,
+     "'gates' alone is a cue"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("#1566 is the only open work left.")], True,
+     "'open work' alone is a cue"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("#1566 is not yet decided.")], True,
+     "'not yet decided' alone is a cue"),
+
+    # A blockquote at the very START of the message, where no preceding
+    # newline exists to form a boundary on its own -- the one position where
+    # the substituted period does work the empty string would not.
+    ([PROMPT, READ_BODY_ONLY,
+      say("> #1566 still needs your call.\nEverything else shipped.")], False,
+     "a blockquote opening the message is quoted material"),
+
+    # An UNCLOSED fence leaves the rest as prose rather than swallowing it,
+    # so one stray backtick run cannot silence every later claim.
+    ([PROMPT, READ_BODY_ONLY,
+      say("Here is the command:\n```\ngh pr list\n\n#1566 still needs your "
+          "call.")], True,
+     "an unclosed fence does not swallow the claims after it"),
 
     # A blank line ends a sentence even where the paragraph before it carries
     # no terminal punctuation. Deleting that alternative also left the suite
@@ -397,6 +449,33 @@ def check_unreadable_transcript_is_silent():
     return 0 if ok else 1
 
 
+def check_scan_cost_stays_linear():
+    """A long recap must not scan quadratically and blow the hook's budget.
+
+    A bare newline is deliberately not a sentence boundary here, so a recap
+    listing one `blocked on #N` line per issue is ONE sentence carrying
+    hundreds of matches. Re-scanning from the sentence's start for each match
+    made 136 KB of that shape take 10.05 seconds against a 10-second timeout
+    in `hooks.json` -- the guard silently switching itself off on the longest
+    transcripts, which are the ones most likely to carry a real claim.
+
+    The budget below is deliberately far above the measured 0.05s and far
+    below the timeout, so it fails on a return to quadratic scanning and not
+    on a slow machine.
+    """
+    spec = importlib.util.spec_from_file_location("h", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    text = "blocked on #1566 " * 8000
+    start = time.time()
+    found = mod.asserted_issues(text)
+    elapsed = time.time() - start
+    ok = len(found) == 8000 and elapsed < 2.0
+    print(f"{'ok  ' if ok else 'FAIL'}  a 130 KB single-sentence recap scans "
+          f"in well under the hook's timeout ({elapsed:.2f}s)")
+    return 0 if ok else 1
+
+
 def main():
     failures = 0
     for events, should_fire, label in CASES:
@@ -407,7 +486,8 @@ def main():
         print(f"{'ok  ' if ok else 'FAIL'}  [{tag}] {label}")
     adhoc = [check_message_names_the_number,
              check_mixed_state_names_the_undischarged_issue,
-             check_unreadable_transcript_is_silent]
+             check_unreadable_transcript_is_silent,
+             check_scan_cost_stays_linear]
     for check in adhoc:
         failures += check()
     print(f"\n{len(CASES) + len(adhoc)} checks, {failures} failure(s)")

@@ -229,7 +229,11 @@ def visible_prose(text):
     if not isinstance(text, str):
         return ""
     text = strip_code(text, fence_replacement=".", span_replacement=".")
-    return QUOTE.sub(".", text)
+    # `QUOTE` is line-anchored, so what replaces a blockquote line makes no
+    # difference: the newlines around it already separate what remains.
+    # Substituting a period here would read as load-bearing and is not --
+    # mutating it to the empty string leaves every case green.
+    return QUOTE.sub("", text)
 
 
 # An issue reference. This guard is about issues, and a PR's comments are a
@@ -272,6 +276,22 @@ def issue_key(number):
 # second, because "fix"/"patch"/"branch" never precede it here.
 RX_PR_PREFIX = re.compile(
     r"(?:\bPR|\bpull\s+request|\bpull)\b\s*(?:for\s*)?$", re.I)
+
+# How far back of an issue reference the PR prefix is looked for.
+#
+# The pattern is right-anchored, so it only ever matches within a few
+# characters of the number -- `pull request for ` is 17. Scanning the whole
+# preceding text instead re-scanned from the start of the sentence for EVERY
+# match in it, and a bare newline is deliberately not a sentence boundary
+# here, so a recap of one `blocked on #N` line per issue stays a single
+# sentence. Measured: 136 KB of that shape took 10.05 seconds, against this
+# hook's own 10-second budget in `hooks.json` -- so a long enough legitimate
+# recap silently turned the guard off, on exactly the transcript it was
+# written for.
+#
+# The window is wider than the longest literal so an unusual run of
+# whitespace inside the prefix still fits.
+PREFIX_WINDOW = 80
 
 # A sentence boundary.
 #
@@ -513,7 +533,8 @@ def asserted_issues(text):
         if not RX_CUE.search(sentence):
             continue
         for m in RX_ISSUE.finditer(sentence):
-            if RX_PR_PREFIX.search(sentence[:m.start()]):
+            if RX_PR_PREFIX.search(sentence[max(0, m.start() - PREFIX_WINDOW):
+                                           m.start()]):
                 continue
             out.append(issue_key(m.group(1)))
     return out

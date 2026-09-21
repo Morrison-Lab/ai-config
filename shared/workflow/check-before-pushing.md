@@ -277,6 +277,11 @@ An agent must never route around a push block by publishing through an alternati
 - **Do:** stop and report when a push is refused and no override is authorized, leaving unpushed commits in the local worktree for the orchestrator.
 - **Do:** use the sanctioned override (`ALLOW_UNREVIEWED_PUSH=1`) only when authorized, stating the exact reason on the record so the bypass is auditable.
 - **Do:** reconcile a divergence by fetching and reading it, and treat an object you cannot resolve locally as the stronger signal rather than the weaker.
+- **Do:** when `ls-remote` is empty, query
+  `gh pr list --state all --head <branch>` before treating the next push as a first publish.
+  MERGED means do not recreate.
+- **Do:** re-read a file before editing it whenever a checkout, pull, or
+  reset has happened since your last read of it.
 - **Don't:** treat an earlier fetch, sync, or green CI run as the check --- each was a reading of a moment that has passed.
 - **Don't:** read "I opened this branch and its PR" as evidence you are its only driver.
   That belief is what the check exists to test.
@@ -293,12 +298,7 @@ An agent must never route around a push block by publishing through an alternati
   It reports only that your remote-tracking ref no longer matches the remote, never why.
   `git ls-remote --heads origin <branch>` settles existence and nothing further.
   A non-empty result still needs the tip comparison above before you pick a remedy.
-- **Do:** when `ls-remote` is empty, query
-  `gh pr list --state all --head <branch>` before treating the next push as a first publish.
-  MERGED means do not recreate.
 - **Don't:** read empty `ls-remote` or a dry-run `* [new branch]` line as proof this is a new feature branch.
-- **Do:** re-read a file before editing it whenever a checkout, pull, or
-  reset has happened since your last read of it.
 - **Don't:** claim a fix in changelog or prose text that the pushed patch
   itself cannot show.
 

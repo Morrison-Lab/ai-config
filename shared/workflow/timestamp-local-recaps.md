@@ -33,8 +33,8 @@ A reading you cannot quote is not a reading, however honestly it was measured.
 
 - **Do:** run the clock command again immediately before typing a time into a forge comment, exactly as before a chat recap or a file edit.
 - **Do:** print the reading --- run the clock command on its own, so the value comes back in a tool result you can read and quote.
-- **Don't:** infer a clock time from the number of tool calls or actions taken since the last real reading.
 - **Do:** derive a time written into a file from a `date` read in the *same* command that writes it, so a heredoc heading cannot be typed from memory.
+- **Don't:** infer a clock time from the number of tool calls or actions taken since the last real reading.
 - **Don't:** treat a reading captured into a shell variable whose only destination is that file as a measurement for a chat or comment claim --- the session never observes it, so print it as well (`echo "$now"`) when the same reading will be quoted.
 
 See [`CLAUDE.cases.md`](../../CLAUDE.cases.md), "A notebook heading typed from the last reading, with the rule loaded".

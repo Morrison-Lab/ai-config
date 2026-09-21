@@ -358,15 +358,15 @@ See [`reorganize-prose.cases.md`](reorganize-prose.cases.md),
   reference, a duplicate, or a split between related content, as part of the
   prose edit already in front of you.
 - **Do:** run the self-reference and back-reference sweeps, the line-level checks, the asset migration check, and a bidirectional content-preservation diff on anything you relocate, and on any scripted whole-file rewrite (asserting file growth is a cheap pre-filter for an intended insertion, but the bidirectional word diff is the actual gate).
-- **Don't:** treat a section as anchored to its current file or position
-  merely because that is where it was originally drafted.
-- **Don't:** relocate content and stop at "the words are all still there somewhere" --- a move that breaks a self-reference, a count-based back-reference, or a cross-file crossref, or that widens a rule's scope or takes it out of loading, is a defect the move introduced, not a pre-existing one.
 - **Do:** run the directional sweep over both the companion and the fragment
   when a cap breach forces a `.cases.md` split, before opening the PR ---
   the failing check is the pause point, not a topic to remember.
 - **Do:** treat a single stranded reference a reviewer names as one member of
   a class, and derive the rest, per
   [`address-every-comment.md`](../workflow/address-every-comment.md).
+- **Don't:** treat a section as anchored to its current file or position
+  merely because that is where it was originally drafted.
+- **Don't:** relocate content and stop at "the words are all still there somewhere" --- a move that breaks a self-reference, a count-based back-reference, or a cross-file crossref, or that widens a rule's scope or takes it out of loading, is a defect the move introduced, not a pre-existing one.
 - **Don't:** rely on reading the diff to surface a stranded reference --- the
   moved line is in the diff and the content it refers to is not.
 - **Don't:** read a green `check-links.py` as covering this; the broken

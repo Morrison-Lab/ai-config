@@ -137,6 +137,9 @@ checkable by a reader, and a resolution to be thoughtful is not.
 - **Do:** re-derive a supplied measurement --- check the conditions under
   which it was taken --- rather than accepting the number and reasoning only
   from it.
+- **Do:** check a "why did you X" question's premise against the artifact X
+  names before answering why, whenever X is a claim about your own past
+  action.
 - **Don't:** work around a wrong brief silently --- delivering something that
   quietly repairs the instruction reads as competence and leaves the error in
   place for the next reader.
@@ -146,9 +149,6 @@ checkable by a reader, and a resolution to be thoughtful is not.
 - **Don't:** answer a choice as posed when its options share a false
   presupposition, and don't stall on the choice either --- say which
   presupposition fails and what follows.
-- **Do:** check a "why did you X" question's premise against the artifact X
-  names before answering why, whenever X is a claim about your own past
-  action.
 - **Don't:** supply reasons for an action the question asserts you took
   without first confirming you took it --- that is agreement with a false
   premise, not an answer.

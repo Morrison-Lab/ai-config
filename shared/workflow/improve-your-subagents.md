@@ -81,9 +81,6 @@ one concrete answer to "keep going, but change what you are asking for."
   exhaustive pass rather than dispatching the same brief again.
 - **Do:** give the reviewer a stated materiality bar, and require it to name
   a candidate finding it dropped for not clearing that bar.
-- **Don't:** read a string of small, individually-valid findings as evidence
-  the loop is converging on its own --- a trickle can be the brief's shape,
-  not the diff's.
 - **Do:** phrase any named checks as *additional* to the reviewer's standing
   checklist rather than as the checklist --- an enumerated brief reads as the
   more rigorous one and silently replaces
@@ -94,6 +91,9 @@ one concrete answer to "keep going, but change what you are asking for."
   `glab` claim while sibling claims in the same six lines sat unchecked, plus
   local adversarial rounds countable only from the session transcript.
   Every brief had named the claims to verify.)
+- **Don't:** read a string of small, individually-valid findings as evidence
+  the loop is converging on its own --- a trickle can be the brief's shape,
+  not the diff's.
 - **Don't:** hand over a bare list of things to verify.
   A reviewer reads an enumeration as the scope of the task, so the round comes
   back clean having checked your list and nothing else --- which is

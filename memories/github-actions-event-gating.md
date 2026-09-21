@@ -132,13 +132,6 @@ secrets under `pull_request`) has to be re-established explicitly.
   `commentId`, and the notifier that excludes that step will not fire.
 - **Do:** gate a wrap checker on the `node ... dist/index.js` invocation
   line, not a substring comments also contain.
-- **Don't:** spawn `env` from Python without `shutil.which("env")`.
-  Windows Python outside Git Bash has no `env` on PATH, so the call raises
-  `FileNotFoundError` before the suite can print its tally, and local
-  pre-commit goes red while ubuntu CI stays green.
-- **Don't:** set `INPUT_RULES_FILE` to a path and then comment that the
-  rules-file input is deliberately unused.
-  The empty string is the documented disable value.
 - **Do:** fetch a checker at the SHA the calling workflow **pins** when
   reproducing a diff-scoped CI gate locally, not the action's default branch.
   The first Do pins when *auditing* an action; the same applies when
@@ -155,6 +148,13 @@ secrets under `pull_request`) has to be re-established explicitly.
   unanswerable.
 - **Do:** re-derive any safety property the original event was providing for
   free, once the event is synthesized.
+- **Don't:** spawn `env` from Python without `shutil.which("env")`.
+  Windows Python outside Git Bash has no `env` on PATH, so the call raises
+  `FileNotFoundError` before the suite can print its tally, and local
+  pre-commit goes red while ubuntu CI stays green.
+- **Don't:** set `INPUT_RULES_FILE` to a path and then comment that the
+  rules-file input is deliberately unused.
+  The empty string is the documented disable value.
 - **Don't:** fork an action, or abandon the feature, on the strength of an
   `eventName` guard alone.
 - **Don't:** assume the API response is a drop-in payload without checking

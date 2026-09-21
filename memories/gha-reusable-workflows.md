@@ -364,3 +364,29 @@ the push to `main`.
 - **Do:** pair `tinytex: true` with `r-packages: any::tinytex` on `preview.yml`.
 - **Don't:** copy an empty `formats` across from a working `quarto-publish.yml` call.
 - **Don't:** read a green preview build as evidence the PDF path works on `main`.
+
+## Bundled repository suites (`check-*.yml`) and callee input verification
+
+Added in Morrison-Lab/gha#865 (2026-09-21):
+six bundled composite actions and reusable workflows consolidate standard check suites by repository type:
+`check-repo-hygiene.yml` (general repos / base suite),
+`check-quarto-website.yml` (websites),
+`check-quarto-book.yml` (books),
+`check-quarto-manuscript.yml` (manuscripts),
+`check-r-package.yml` (R packages), and
+`check-python-package.yml` (Python packages).
+
+- **Read-only permission boundary vs PR label inspection:**
+  All six bundled workflows declare and require only `contents: read`.
+  Governance checks inspecting live PR labels (`check-news.yml`, `version-check.yml`)
+  must remain dedicated standalone workflows
+  because querying live labels from the GitHub API requires `pull-requests: read`.
+  Inlining them into a read-only bundle breaks label bypasses (`no-changelog`, `no version increment`).
+- **Callee input parity:**
+  When composing higher-level composite actions from existing single-purpose composites (`Morrison-Lab/gha/<action>@v2`),
+  always verify each step's `with:` keys against the callee's declared `action.yml` inputs.
+  For example, `check-non-standard-chars` takes only `python-version` and `extensions`;
+  passing `paths` or `fail` causes silent parameter drops.
+  Contract tests (`run-bundle-repo-actions-tests.py`) should parse callee `action.yml` files
+  and statically assert zero undeclared inputs.
+

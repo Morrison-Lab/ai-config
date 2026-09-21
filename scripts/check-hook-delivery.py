@@ -152,8 +152,14 @@ def install_entries():
     for key, entries in plugins.items():
         if "ai-config" not in key:
             continue
-        for e in entries or []:
-            if isinstance(e, dict) and e.get("installPath"):
+        # `entries or []` would substitute for a falsy value and hand a truthy
+        # non-list straight to the loop, so a records file carrying an int
+        # there crashed the script before it printed anything -- the opposite
+        # of the degrade-to-unreadable behaviour this pair exists for.
+        if not isinstance(entries, list):
+            return [], False
+        for e in entries:
+            if isinstance(e, dict) and isinstance(e.get("installPath"), str):
                 out.append(e)
     return out, True
 
@@ -171,7 +177,9 @@ def entries_for(pin, entries, warn=None):
     A record that cannot be resolved is reported through `warn` rather than
     dropped silently, because a dropped record that was the only one naming
     this pin turns an INSTALLED pin into an ORPHAN -- which now suppresses a
-    real failure instead of merely mislabelling it.
+    real failure instead of merely mislabelling it. The catch stays narrow
+    enough to name what it expects and wide enough to cover a records file
+    whose `installPath` is not a path at all.
     """
     try:
         target = pin.resolve()
@@ -183,6 +191,13 @@ def entries_for(pin, entries, warn=None):
             if Path(e["installPath"]).resolve() == target:
                 out.append(e)
         except OSError as exc:
+            # Deliberately narrow, and deliberately not widened to cover a
+            # malformed record: `install_entries` has already dropped every
+            # non-string `installPath`, so `Path()` cannot raise TypeError
+            # here, and an embedded NUL was measured not to raise either
+            # (`resolve()` is non-strict by default). Catching those would be
+            # a branch no input can reach. What remains is a genuine syscall
+            # failure on a path the OS refuses to walk.
             if warn:
                 warn(f"  ! could not resolve installPath "
                      f"{e.get('installPath')!r}: {exc}")

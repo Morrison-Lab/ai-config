@@ -78,10 +78,22 @@ def make_home(root, pins, records=None, records_text=None):
     return home
 
 
-def run(home, repo, project=None):
+def run(home, repo, project=None, home_as=None):
+    """Run the script with `home` as the user's home directory.
+
+    `home_as` spells that same directory differently -- with a `..` component
+    -- so the pins the script builds from `Path.home()` are non-canonical
+    while the install records name the canonical form. That is the only case
+    in this suite where resolving the PIN side, rather than the record side,
+    is what makes the match succeed.
+
+    It must be `..` rather than `.`: `PurePath` normalises a `.` component
+    away at construction, so a path spelled that way compares equal without
+    any resolving and the case would pass for the wrong reason.
+    """
     env = dict(os.environ)
-    env["HOME"] = str(home)
-    env["USERPROFILE"] = str(home)          # Path.home() reads this on Windows
+    env["HOME"] = str(home_as or home)
+    env["USERPROFILE"] = str(home_as or home)   # Path.home() reads this on Windows
     env.pop("HOMEDRIVE", None)
     env.pop("HOMEPATH", None)
     cmd = [sys.executable, str(SCRIPT), "--repo", str(repo)]
@@ -154,6 +166,75 @@ def main():
         code, out = run(home, repo)
         check("a gap still exits 1 when the records have the wrong shape",
               code == 1, out)
+
+        # `entries or []` substitutes for a falsy value only, so a truthy
+        # non-list reached the loop and crashed before any output.
+        home = make_home(root / "h6b", {"orphan": ["a.py"]}, records_text=json.dumps(
+            {"plugins": {"ai-config@Morrison-Lab": 7}}))
+        code, out = run(home, repo)
+        check("a truthy non-list entries value degrades rather than crashing",
+              code == 1 and "Traceback" not in out, out)
+
+        # An installPath that is not a string is filtered before it can reach
+        # `Path()`, so the run stays clean rather than raising TypeError.
+        home = make_home(root / "h6c", {"orphan": ["a.py"]}, records_text=json.dumps(
+            {"plugins": {"ai-config@Morrison-Lab": [
+                {"installPath": ["not", "a", "string"], "scope": "user"}]}}))
+        code, out = run(home, repo)
+        check("a non-string installPath does not crash the run",
+              "Traceback" not in out, out)
+
+        # A string that is simply not a real path is dropped quietly rather
+        # than warned about: `Path().resolve()` is non-strict, so it returns
+        # a path for anything spellable. The warn branch in `entries_for`
+        # covers a genuine syscall failure, which no portable fixture can
+        # provoke -- it is asserted here only that such a record does not
+        # become a crash or a spurious match.
+        home = make_home(root / "h6d", {"orphan": ["a.py"]}, records_text=json.dumps(
+            {"plugins": {"ai-config@Morrison-Lab": [
+                {"installPath": "C:\\no\\such\\pin", "scope": "user"}]}}))
+        code, out = run(home, repo)
+        check("a record naming no existing pin leaves that pin an orphan",
+              "Traceback" not in out and "ORPHAN" in out, out)
+
+        # A non-canonical installPath is exactly what `.resolve()` is for, and
+        # nothing else in the suite distinguishes resolving from comparing raw.
+        home = make_home(root / "h7b", {"named": ["a.py"]})
+        cache = (root / "h7b" / "home" / ".claude" / "plugins" / "cache"
+                 / "Morrison-Lab" / "ai-config")
+        # A `.` component is normalised away by `PurePath` at construction,
+        # so it is NOT a non-canonical path as far as comparison goes. `..`
+        # is kept, which makes it the only spelling that actually exercises
+        # `.resolve()`.
+        noncanon = os.path.join(str(cache), "named", "..", "named")
+        write(home / ".claude" / "plugins" / "installed_plugins.json",
+              json.dumps({"plugins": {"ai-config@Morrison-Lab": [
+                  {"installPath": noncanon, "scope": "project",
+                   "projectPath": str(repo)}]}}))
+        code, out = run(home, repo)
+        check("a non-canonical installPath still names its pin",
+              "ORPHAN" not in out, out)
+        check("and its gap therefore fails as a NAMED pin",
+              code == 1 and "INSTALLED pin is missing" in out, out)
+        check("the summary counts the pin as named",
+              "1 of them named by an install record" in out, out)
+
+        # The mirror: the RECORD is canonical and the PIN is not, because the
+        # home directory itself was spelled with a `.` component. Only
+        # resolving the pin side matches these.
+        home = make_home(root / "h7c", {"named": ["a.py"]})
+        cache = (root / "h7c" / "home" / ".claude" / "plugins" / "cache"
+                 / "Morrison-Lab" / "ai-config")
+        write(home / ".claude" / "plugins" / "installed_plugins.json",
+              json.dumps({"plugins": {"ai-config@Morrison-Lab": [
+                  {"installPath": str((cache / "named").resolve()),
+                   "scope": "project", "projectPath": str(repo)}]}}))
+        (root / "h7c" / "side").mkdir(parents=True, exist_ok=True)
+        code, out = run(home, repo,
+                        home_as=Path(os.path.join(str(root / "h7c"), "side",
+                                                  "..", "home")))
+        check("a non-canonical HOME still matches its pin to the record",
+              "ORPHAN" not in out and code == 1, out)
 
         # --- a checkout with no hooks/ is not a vacuous pass ---------------
         bare = make_repo(root / "h7", [], with_dir=False)

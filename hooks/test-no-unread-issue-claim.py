@@ -125,10 +125,31 @@ CASES = [
     ([PROMPT, say("I have several PRs pending; #1622 is one example.")], False,
      "a semicolon separates clauses -- the cue must not reach across it"),
 
-    # The cue describes the PR, not the issue.
+    # A claim WRAPPED across a bare newline -- this repo's semantic-line-breaks
+    # house style. Splitting on every newline silently disabled the guard here,
+    # trading the bullet false positive for a false negative on its core
+    # function. Four shapes, because the regression was invisible to a suite
+    # whose every multi-line case was deliberately TWO claims.
     ([PROMPT, READ_BODY_ONLY,
-      say("The PR for #1622 is awaiting review.")], False,
-     "'the PR for #N' attributes the cue to the PR, not to issue #N"),
+      say("The naming question in #1566\nstill needs your decision.")], True,
+     "a claim wrapped at a bare newline still fires (cue after the number)"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("#1566 is the one item outstanding --\nit is yours to call.")], True,
+     "wrapped after an em-dash-style break still fires"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("Everything else shipped.\nOnly #1566\nremains blocked on you.")],
+     True,
+     "a claim wrapped TWICE still fires"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("The decision on #1566\nis still yours to make.")], True,
+     "wrapped between the number and the cue still fires"),
+
+    # The narrow PR prefix fires here, and that is the accepted trade: the
+    # widened form swallowed genuine escalations phrased "the fix for #N ...
+    # still needs your input", which is a silent miss.
+    ([PROMPT, READ_BODY_ONLY,
+      say("Apply the fix for #1566 -- it still needs your input.")], True,
+     "a genuine escalation phrased 'the fix for #N' is NOT swallowed"),
 
     # A --jq filter legitimately contains a pipe.
     ([PROMPT,
@@ -136,7 +157,10 @@ CASES = [
       say(CLAIM)], False,
      "a --jq pipe before the comments flag must not break the discharge match"),
 
-    # Mixed state: one discharged, one not. The undischarged one must win.
+    # Mixed state: one discharged, one not. That this FIRES is asserted here;
+    # that it names the RIGHT number is asserted in
+    # check_mixed_state_names_the_undischarged_issue, because a fire/quiet
+    # result cannot tell the two apart.
     ([PROMPT, READ_COMMENTS,
       say("#1566 is settled. But #1544 still needs your call.")], True,
      "a discharged issue in the same message does not excuse an undischarged one"),
@@ -187,6 +211,31 @@ def check_message_names_the_number():
     return 0 if ok else 1
 
 
+def check_mixed_state_names_the_undischarged_issue():
+    """The warning must name the issue that was NOT discharged.
+
+    Fire/quiet cannot reach this. Mutating `missing[0]` to `numbers[0]` --
+    report the first asserted number regardless of whether its comments were
+    read -- leaves every fire/quiet case passing, including the mixed-state
+    one, while the guard names the already-read issue and lets the real one
+    through silently.
+    """
+    # BOTH issues must be ASSERTED for this to discriminate. An earlier
+    # version said "#1566 is settled", which carries no cue -- so #1566 was
+    # never asserted, `numbers` held one element, and `numbers[0]` and
+    # `missing[0]` were the same value. The mutation was a no-op and the test
+    # passed for the wrong reason.
+    out = run([PROMPT, READ_COMMENTS,
+               say("#1566 still needs your call, "
+                   "and #1544 still needs your call too.")])
+    ctx = (out.get("hookSpecificOutput") or {}).get("additionalContext") or ""
+    msg = out.get("systemMessage") or ""
+    ok = "1544" in ctx and "1544" in msg and "1566" not in msg
+    print(f"{'ok  ' if ok else 'FAIL'}  the warning names the UNDISCHARGED "
+          f"issue, not the one whose comments were read")
+    return 0 if ok else 1
+
+
 def check_unreadable_transcript_is_silent():
     """No transcript means no evidence either way: fail open."""
     payload = {"transcript_path": "/nonexistent/path.jsonl"}
@@ -206,6 +255,7 @@ def main():
         tag = "fire " if should_fire else "quiet"
         print(f"{'ok  ' if ok else 'FAIL'}  [{tag}] {label}")
     adhoc = [check_message_names_the_number,
+             check_mixed_state_names_the_undischarged_issue,
              check_unreadable_transcript_is_silent]
     for check in adhoc:
         failures += check()

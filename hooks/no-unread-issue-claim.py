@@ -81,9 +81,18 @@ than left silent, per `shared/workflow/incidents-dont-repeal-decisions.md`.
 The reason is not a third occurrence: it is that `no-mistake-without-a-hook`
 does not accept a filed issue as discharging a mistake, and the session had
 by then filed three mechanism proposals against one built mechanism, which is
-the shape of filing becoming an escape rather than a schedule. A reader who
-thinks the third-occurrence bar should have held is disagreeing with a
-judgment that was made knowingly, not catching an oversight.
+the shape of filing becoming an escape rather than a schedule.
+
+Derived rather than recalled, since the count is the argument:
+
+    gh issue list -R Morrison-Lab/ai-config --state all --author <user> \
+      --search 'Hook: in:title created:2026-09-20..2026-09-21'
+
+returns ai-config#3817, #3821 and #3823 as that session's `Hook:` proposals,
+against ai-config#3818 as the one it built.
+
+A reader who thinks the third-occurrence bar should have held is disagreeing
+with a judgment that was made knowingly, not catching an oversight.
 
 CONTRACT
 --------
@@ -124,25 +133,52 @@ def visible_prose(text):
 RX_ISSUE = re.compile(
     r"(?<![A-Za-z0-9])(?<!pull/)#(\d{1,7})(?![0-9])"
 )
-# A PR reference, or a clause whose subject is the PR rather than the issue.
-# `PR #12` is the obvious form; `the PR for #12` and `the fix for #12` are the
-# ones that matter, because there the number IS an issue and the cue
-# ("awaiting review") describes the pull request, not the issue.
-RX_PR_PREFIX = re.compile(
-    r"(?:\bPR|\bpull request|\bpull|"
-    r"\b(?:PR|pull request|fix|patch|branch)\s+(?:for|that\s+\w+|closing))"
-    r"\s*$",
-    re.I,
-)
+# A PR reference immediately before the number: `PR #12`, `pull request #12`.
+#
+# Deliberately NOT widened to "the PR for #12" / "the fix for #12". That was
+# tried and reverted: the `for` branch swallows genuine escalations that use
+# the same phrasing about the issue's own resolution rather than about a
+# submitted pull request --
+#
+#     Apply the fix for #12 -- it still needs your input on which approach.
+#     The patch for #12 is still pending your decision on scope.
+#
+# Both are exactly the claim this guard exists to catch, and both went silent
+# under the wider pattern. The narrow form's cost is the opposite and milder
+# error: `The PR for #12 is awaiting review` fires when the cue really
+# describes the PR. A spurious warning is cheap to dismiss; a silent miss is
+# not, and this guard's whole subject is claims that fail silently.
+RX_PR_PREFIX = re.compile(r"(?:\bPR|\bpull request|\bpull)\s*$", re.I)
 
-# A sentence boundary. `.!?` and a NEWLINE both end one, and the newline must
-# end it with or without following whitespace: a markdown bullet (`\n- item`)
-# has none, so a `\s+`-anchored split treats a whole bulleted recap as ONE
-# sentence. That is this corpus's default reporting shape, and it made an
-# unrelated "pending" in one bullet attach to an issue reported as closed in
-# another. A semicolon splits for the same reason -- "several PRs pending;
-# #12 is an example" is two clauses, not one claim.
-RX_SENTENCE = re.compile(r"(?<=[.!?;])\s+|\n+")
+# A sentence boundary.
+#
+# A BARE newline must NOT split, and that is the whole subtlety. This repo
+# writes semantic line breaks, so an ordinary claim is routinely wrapped at a
+# clause boundary with no terminator:
+#
+#     The naming question in #12
+#     still needs your decision.
+#
+# Splitting there puts the cue and the number in different "sentences" and the
+# guard goes silent -- a false NEGATIVE on its core function, which is strictly
+# worse here than the false positive it would be trading away: a guard that
+# fails to fire collides with nothing and is falsified only when a person
+# reads it, which is the same asymmetry this file exists to police.
+#
+# So a newline ends a sentence only where it is a HARD boundary: a blank line
+# (paragraph), or the next line opening a list item. Those are what make a
+# bulleted recap several claims rather than one, which was the reported
+# defect.
+#
+# A semicolon does split. That loses a pronoun-linked claim
+# ("#12 is filed; it awaits your decision"), which is accepted and disclosed
+# below -- semicolons joining a bare issue reference to a pronoun clause are
+# rare in recaps, while "several PRs pending; #12 is an example" is not.
+RX_SENTENCE = re.compile(
+    r"(?<=[.!?;])\s+"          # a terminator, then any whitespace
+    r"|\n\s*\n"                # a blank line: paragraph boundary
+    r"|\n(?=[ \t]*(?:[-*+]|\d+[.)])\s)"  # a newline opening a list item
+)
 
 # Asserting that the issue still needs something. Deliberately narrow: an
 # ordinary mention of an issue number is not a claim about its state, and a

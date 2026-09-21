@@ -248,6 +248,53 @@ already in front of you.**
 - **Don't:** accept a search for the visible contradiction as proof that the
   retired claim itself is gone.
 
+**A fix's own placement can be scoped narrower than the claim it corrects,
+independently of how wide the search was --- and each way this goes wrong
+looks like a fresh oversight rather than the same recurring one.**
+This is the correction-side member of a family the corpus states elsewhere
+about evidence.
+[`verify-the-right-artifact`](verify-the-right-artifact.md)'s "A measurement
+of the right artifact can still be scoped narrower than the claim made from
+it" is the same shape with a measurement in place of a fix, and
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "A sound
+measurement does not license the claim standing next to it" is its general
+form.
+Read those for the evidence case and this for the repair case;
+the axis-naming remedy is common to all three.
+
+Within this file it extends the section above on deriving the class, which
+covers the *search* being too narrow, and sits alongside the enumerated-in-
+more-than-one-place section, whose remedy of consolidating into one
+definition every site consumes is the structural answer where one exists.
+What follows is about the *correction* being too narrow, which survives a
+perfectly wide search and a correctly derived class alike.
+A search that finds every restatement is necessary and not sufficient: the
+correction you write to fix them can itself be attached to one place --- a
+single section of a multi-section document, say --- that a sibling section's
+own restatement of the same fact never reads or cross-references.
+Widening the search closes the site-list gap; it does nothing about a
+correction mechanism whose own reach is narrower than the claim.
+And a claim of having derived the full set this time is not proof the
+*pattern* defining that set matched the claim rather than one wording of it
+--- a set derived by one spelling of the claim (a merge date) can still
+exclude another spelling of the very same claim (an issue-reopen date).
+
+- **Do:** scope a correcting note (a stated convention, a caveat, a
+  superseding fact) to the whole document the claim spans, not to the
+  section where you happened to fix it first.
+- **Do:** after believing every restatement is fixed, grep for the
+  underlying word or fact once more and treat a non-empty result as
+  informative --- even inside the commit whose own message claims
+  completeness.
+- **Don't:** assume a single per-section note discharges a claim restated in
+  other sections of the same file, even after a whole-file grep already
+  confirmed every wording variant of the search term.
+- **Don't:** read "I derived the full set this time" as ruling out that the
+  pattern defining the set was itself narrower than the claim.
+
+See [`address-every-comment.cases.md`](address-every-comment.cases.md),
+"A fix scoped narrower than the claim it corrects keeps leaking".
+
 **That same search settles a narrower question about placement: a correction
 written NEAR the flagged sentence reads as having replaced it, while the
 flagged sentence survives and the file then states both.**

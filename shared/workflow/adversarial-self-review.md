@@ -961,6 +961,37 @@ branch B then reviewed not-clean, was fixed, and re-reviewed clean;
 pushing A was then refused with "The clean verdict is for commit <B's sha>, but this push would ship <A's sha>", over a clean verdict for A's exact SHA that had been overwritten.
 The reverse happened earlier in the same session.)
 
+**A verdict from a resumed reviewer session may never reach the slot at
+all, which is a narrower and less certain claim than the section above.**
+The provenance chain `read_latest_review` walks is built from fresh
+`AGENT_TOOLS` dispatch tool_use/tool_result pairs (or a retrieval call whose
+`task_id` matches one such dispatch's own registered id) --- see the guard's
+own `_is_reviewer_dispatch` and `TASK_OUTPUT_TOOLS` handling in
+[`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py).
+A session that instead resumes an existing reviewer agent (sending it a
+follow-up message through a mechanism other than a fresh `Agent`/`Task`
+dispatch or a task-id-linked retrieval) is not obviously covered by that
+chain, and one observed session saw exactly the symptom this predicts: a
+resumed agent corrected its own previously-fabricated sha in its reply, and
+the guard's next push attempt still cited the old, wrong value.
+This half is **not** independently reproduced against the guard the way the
+overwrite mechanism above is --- it is recorded as consistent with reading
+the provenance code, and as matching one observed incident, rather than as
+a traced execution.
+This is a distinct failure from the overwrite above, so the sanctioned
+override does not answer it the same way: an overwritten slot still holds
+*a* genuine parsed verdict for a different commit, while a resumed-agent
+correction may never have been parsed into the slot at all, and there is
+nothing on record to paste over the guard's retained report in that case.
+
+- **Do:** treat a correction from a resumed reviewer as unconfirmed until a
+  fresh dispatch (or a push attempt) shows the guard picked it up.
+- **Do:** re-dispatch fresh rather than resuming, when a prior review needs
+  correcting and the correction must reach this guard.
+- **Don't:** treat this as a confirmed guard defect on the strength of one
+  observed incident and a code reading; file it for someone to trace with an
+  actual resumed-session transcript before hardening the guard against it.
+
 **The harness appends an `agentId:` trailer to a subagent's report, sometimes as its own block and sometimes concatenated onto the last line.**
 Which of those is common is the question this section could not settle, and an earlier draft asserted an answer to it by generalizing from the two dispatches it happened to watch.
 
@@ -1177,6 +1208,71 @@ on the brief-writer remembering to add it.
   proof its fingerprint is real; the two are independent, and a fabricated
   identifier can sit inside an accurate report undetected until something
   else (here, the guard) compares it.
+
+**A third occurrence, `Lacaedemon/sparta`, 2026-09-20 --- relayed from the
+session's own report rather than independently reconstructed (see the
+closing note below), and worth recording anyway because it repeats the
+FIRST occurrence's exact input mechanism after the fix aimed at the SECOND
+occurrence was already shipped.**
+A reviewer briefed with `d4691095` reported `Reviewed-Commit:
+d469109590de1c1f8b4a5b8e5b4a6b3f8a9e0d4f`.
+The real commit is `d46910953d5ea64ee58a295dd56a6f2b1ac55d80` --- the two
+strings agree on the first 8 characters and diverge for the remaining 32,
+matching the #3295 split above exactly (that occurrence's own abbreviated
+sha, with no derive instruction, produced a fabricated tail whose first 8
+characters matched the abbreviation and whose remaining 32 did not
+correspond to any real commit) and differing from the 2026-09-10 pair,
+which shares 7 characters and diverges for 33.
+So the input mechanism here is not new: a brief supplying only a short
+prefix is exactly what produced the very first occurrence, in violation of
+the "Don't abbreviate the sha in a review brief's template" bullet above.
+What is new is that it recurred after the OTHER remedy --- instructing the
+reviewer to derive its own fingerprint rather than trust the brief --- was
+already added to the persona file in response to the second occurrence.
+That fix addressed the reviewer's half of the contract and left the
+brief-writer's half exactly where the first occurrence found it: a persona
+told to derive its own fingerprint was evidently still willing to pad the
+one it was handed rather than discard it and run `git rev-parse`.
+
+- **Do:** treat a brief that abbreviates the sha as the first thing to fix,
+  before asking why the reviewer fabricated --- the derive-your-own
+  instruction is a second layer under the full-sha rule, not a replacement
+  for it, and this occurrence shows the first layer failing on its own.
+- **Don't:** read the persona-file fix from 2026-09-10 as closing this
+  failure mode; a brief-writer that abbreviates the sha is a distinct
+  recurring point of failure the persona file cannot reach.
+
+**A fourth failure shape, same session and relayed the same way (see the
+closing note below) rather than independently reconstructed, with no
+fabrication in it: the reviewer resolved a ref that had already moved.**
+A review resolved `origin/<branch>` for its fingerprint while the local
+branch already carried two commits not yet reflected in that remote ref, and
+reported a blocking finding that those two commits had already addressed.
+This is not the sha-fabrication failure above --- the fingerprint the
+reviewer reported was a real, correctly-transcribed commit, just not the one
+the push was about to ship.
+It is the `git rev-parse HEAD`-in-its-own-worktree instruction succeeding at
+exactly the wrong scope: `HEAD` in a worktree that has not fetched is a
+faithful answer to "what does this worktree currently point at," and a
+faithful answer to the wrong question.
+- **Do:** brief a reviewer to `git fetch` (or otherwise confirm its working
+  copy is current) before resolving its own fingerprint, not only to derive
+  the fingerprint from whatever ref is already checked out.
+- **Don't:** treat "the reviewer read its own `rev-parse` output" as
+  sufficient; a correctly-derived fingerprint for a stale ref reports a real
+  sha and a wrong verdict.
+- **Don't:** read a stale-ref finding as evidence the guard's sha-comparison
+  failed --- it did its job (the reported commit does not match what the
+  push ships); the miss is upstream, in what the reviewer resolved before it
+  ever wrote the fingerprint line.
+
+(Both measured on `Lacaedemon/sparta`, 2026-09-20, during a session driving
+several open PRs; the exact review transcripts were not preserved, so the
+narrative above is relayed from the session's own report rather than
+re-derived from a saved artifact.
+The real commit's identity is independently confirmed here: `git rev-parse
+d4691095` on that repository returns
+`d46910953d5ea64ee58a295dd56a6f2b1ac55d80`.)
 
 ## Structured review data (JSON payload)
 
@@ -1518,6 +1614,7 @@ On the reviewer's side, pin the target to a commit and read `git show <sha>:<pat
 
 - **Do:** treat "don't touch the tree under review" as covering every write to it, an edit and a `git add` and a formatter run alike.
 - **Do:** have the reviewer read a pinned commit, so a dispatcher's slip degrades into a stale review rather than an incoherent one.
+- **Do:** push a reviewed branch with `git push origin <local-branch>`, which ships that branch's tip without checking it out, so shipping a review's result never needs a branch switch in a tree something else may be reading.
 - **Don't:** assume a live reviewer is safe from ordinary editing because no branch switch occurred.
 - **Don't:** start fixing a round's findings before that round has reported.
 

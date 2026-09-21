@@ -72,6 +72,57 @@ still said the agents were read-only "by definition".
 Those were corrected to the harness's declared read-only role, and both review
 threads were resolved.)
 
+## "A fix scoped narrower than the claim it corrects keeps leaking"
+
+(`Lacaedemon/sparta` PR #1613, 2026-09-20: a design-doc historicization pass
+hit the same defect shape six times across the review lifecycle, and each
+occurrence read as a fresh oversight.
+
+Commit `ed08d7d0` fixed a Pacific/UTC timezone mismatch by "grepping every
+merge-date claim across the changed files" -- four sites, two of which
+needed the correction (the other two were already identical in both
+zones, and the commit says so rather than assuming).
+The next commit, `08fec55d`, found a fourth: "that grep looked for *merge*
+dates, so an issue-reopen event fell outside the set by construction.
+Deriving a set is only as good as the pattern that defines it, and the
+pattern was narrower than the claim it was meant to cover."
+Its own fix -- stating the Pacific convention once, in each document's
+"Implementation status" section -- was itself too narrow: commit `6addf670`
+found the same reopen date restated "under Phase plan and under
+Relationship to existing issues," neither of which reads the
+Implementation-status note.
+That commit's own message names the general form: "a fix scoped narrower
+than the claim it covers will keep leaking, and each round the leak looks
+like a fresh oversight rather than the same one.
+Scope the fix to the claim."
+The note was moved to each document's opening status block, scoped to the
+whole document rather than to one section.
+
+One round later, commit `05856dc4` found a sixth instance -- inside the very
+commit (`6addf670`) whose own fix to the status line claimed it now read
+"not shipped, matching the table and every other section."
+`05856dc4` reads that phrase as an assertion of completeness ("asserted it
+had matched 'every other section'") and shows it false: a "related design
+threads" list still called the very phase `6addf670` had just relabelled
+not-shipped "disputed," contradicting what that commit's own message had
+just claimed.
+Its remedy: "Derived the occurrences this time rather than fixing the one
+the reviewer named.
+Grepping the whole changed file set for the word returns five hits: this
+one, and four ... about an unresolved scholarly dispute ..., which are
+unrelated and stay" -- deriving by the word, then reading each hit to
+separate the two unrelated senses, rather than trusting a claim of
+completeness.
+
+The compounding lesson: two different remedies -- widen the grep; centralize
+the note -- each fixed the failure they were built for and left the next one
+standing, because each still bounded its scope by something narrower than
+the claim itself: first a spelling of the claim, then a section of a
+document.
+Only deriving the population by the claim's *effect* -- any place asserting
+a translated or disputed fact -- and rechecking that population inside the
+commit that claims to have finished catches all three.)
+
 ## "The PR description is on that list"
 
 (ai-config#829, 2026-07-29: a review nit led to correcting a gha#350

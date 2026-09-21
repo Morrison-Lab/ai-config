@@ -1015,6 +1015,64 @@ Reproducing at HEAD rather than at the reviewed commit is
 the run" substitution --- the artifact in hand was real, was read carefully,
 and was not the one the claim was about.
 
+## A hex-prefix finding closed by fixing a length bug on the same line
+
+Measured 2026-09-18, on a digest-detecting hook in this repository.
+
+The reviewer's finding quoted one concrete input:
+`DEADBEEFDEADBEEFDEADBEEFDEADBEEFXYZ`, a canonical-length hex **prefix** of a
+longer alphanumeric identifier, flagged as though it were a standalone md5.
+
+Reading the flagged regex line turned up a real and different defect: a pure
+hex run longer than `MAX_HEX` matched its own first 64 characters.
+That defect was fixed, tests were written for it, and the finding was reported
+closed.
+
+The next round re-ran the reviewer's own input verbatim and the hook still
+fired on it.
+The trailing lookahead shipped was `(?![0-9a-fA-F])`, which excludes a
+following hex **digit**.
+The reported case needs `(?![0-9a-zA-Z])`, which excludes any following
+alphanumeric --- and `X` is not a hex digit, so the lookahead the fix installed
+was satisfied by exactly the input the finding was about.
+
+Three things make this worth recording rather than filing as ordinary
+carelessness.
+
+**Every artifact of a completed Address was present.**
+A real bug was found and fixed, on the exact line the reviewer pointed at, with
+tests that pass.
+[`ard`](../../skills/ard/SKILL.md)'s round-close checklist asks that each
+Address row point to a pushed commit SHA, and it did.
+Nothing in the round was skipped;
+what was skipped was one execution nobody's checklist asked for.
+
+**The tests could not have caught it.**
+They were written from the same reading of the finding that produced the fix,
+so they encode the hex-run case and not the alphanumeric-suffix case.
+A suite derived from your own restatement agrees with your own fix by
+construction --- the negative-control problem
+[`verify-the-right-artifact`](verify-the-right-artifact.md) names, arriving
+through a test rather than through a measurement.
+
+**The shared line supplied the false confirmation.**
+Both defects lived in one regex, so the diff showed the flagged line visibly
+changed, which is the tell
+[`address-every-comment`](address-every-comment.md)'s enumeration bullet warns
+about at the scale of several artifacts, here at the scale of one.
+
+The reviewer's input was a runnable acceptance criterion sitting in the finding
+the whole time, and running it cost one command.
+
+The decidable-condition half --- a finding's quoted input with no matching
+execution before the fixed claim --- is filed as
+[ai-config#3784](https://github.com/Morrison-Lab/ai-config/issues/3784),
+modelled on `hooks/warn-stale-test-claim.py`'s claim-versus-execution
+comparison.
+It is occurrence one, so the issue records the design rather than asserting
+the recurrence bar in
+[`deterministic-tools`](../principles/deterministic-tools.md) is met.
+
 ## "A peer's edge cases raised against a different implementation"
 
 Measured 2026-09-02 PT, recorded 2026-09-03.

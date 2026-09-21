@@ -1384,6 +1384,13 @@
             "timeout": 10,
             "script": "no-unchecked-empty-pr-claim.py",
             "why": "memories/github.md 'Close empty PRs' -- warns, never blocks, when a reply characterizes a pull request as abandoned, or as empty and disposable, near a pull-request number, and no commit-list QUERY naming that number was issued this session. pr-on-claim has this repo open pull requests against an empty commit on purpose, so changed_files: 0 reads the same on a live claim, on a thread whose commits cannot be pushed (#3739 / #3743), and on a dead branch; only the last is closeable. Four narrowings, each a draft got wrong and each producing SILENCE rather than noise (#3755, review rounds 1 and 2): the mergeability query that returns the field is not evidence, evidence must name every pull request the claim names, evidence comes from an allowlist of query-bearing tools rather than from any tool call (a reply or a comment body carries prose, and 323 of the measured session's 553 calls were Bash), and a per-close exemption is scoped to its sentence. Warn-only because abandonment is partly a judgment. Measured on #3737, 2026-09-17, against the real transcript, where the guard fires and the first draft did not."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-stale-clean-tree-claim.py\"",
+            "timeout": 10,
+            "script": "flag-stale-clean-tree-claim.py",
+            "why": "ai-config#3821 -- warns, never blocks, when a message asserts a clean working tree or clean stopping point after a path-writing git command (`git checkout <ref> -- <path>`, `git restore`, `git stash pop`, `git apply`) ran without an intervening `git status` or `git diff` check."
           }
         ]
       }

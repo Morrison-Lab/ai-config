@@ -718,6 +718,7 @@ def main() -> int:
         claim_pr_refs = {r for r in _claim_window_refs(text, hit)}
         rel_last_partial = _relevant_last_event(partial_events, claim_pr_refs)
         rel_last_push = _relevant_last_event(push_events, claim_pr_refs)
+        rel_last_complete = _relevant_last_event(complete_events, claim_pr_refs)
         last_subagent, subagent_timed = _relevant_last_subagent(
             subagent_events, rel_last_partial, claim_pr_refs)
         subagent_on_topic = any(
@@ -742,13 +743,14 @@ def main() -> int:
         else:
             w_push = rel_last_push if rel_last_push >= 0 else (last_push if not claim_pr_refs else -1)
             w_partial = rel_last_partial if rel_last_partial >= 0 else (last_partial if not claim_pr_refs else -1)
+            w_complete = rel_last_complete if rel_last_complete >= 0 else (last_complete if not claim_pr_refs else -1)
             is_original_ci_case = (
                 bool(is_core) and subagent_timed < 0 and rel_last_partial >= 0)
             if is_original_ci_case:
                 block_claims.append((hit, pr_label))
             elif w_partial >= 0 or last_subagent >= 0:
                 warn_claims.append((hit, is_core, pr_label, last_subagent, subagent_on_topic,
-                                    w_partial, w_push))
+                                    w_partial, w_push, w_complete))
 
     # Priority 1: Canonical BLOCK. If any claim in the message is backed only
     # by a short CI surface without a subagent or complete read, block.
@@ -817,14 +819,14 @@ def main() -> int:
     # warn_claims: report all distinct unverified claims across the message.
     if warn_claims:
         seen_warn_prs = set()
-        for hit, is_core, pr_label, last_subagent, subagent_on_topic, w_partial, w_push in warn_claims:
+        for hit, is_core, pr_label, last_subagent, subagent_on_topic, w_partial, w_push, w_complete in warn_claims:
             if pr_label != "the PR you named":
                 if pr_label in seen_warn_prs:
                     continue
                 seen_warn_prs.add(pr_label)
             system_messages.append(_format_warn_claim(
                 hit, is_core, pr_label, last_subagent, subagent_on_topic,
-                w_partial, w_push, last_complete))
+                w_partial, w_push, w_complete))
 
     if system_messages:
         if already_fired(text):

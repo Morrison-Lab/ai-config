@@ -607,6 +607,11 @@ CONTENT_CASES = [
      "dispatched subagent's OWN report",
      "a `git push` landed after it",
      "#3838: push to unrelated PR does not make subagent report stale for #200"),
+    ([CHECKER, PARTIAL_100, PUSH,
+      say("#100 is good to merge whenever you're ready.")],
+     "no complete instrument read appears anywhere",
+     "A complete instrument read is in this transcript",
+     "#3838: complete read of unrelated PR does not make warn claim think complete read exists for #100"),
 ]
 
 

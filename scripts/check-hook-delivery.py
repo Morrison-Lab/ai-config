@@ -32,11 +32,22 @@ still absent from the thing that runs it.
 
 WHAT IT DELIBERATELY DOES NOT DO
 ---------------------------------
-It does not decide which cache pin is ACTIVE. That is chosen by the harness
-from `settings.json` and is not reliably derivable here, so reporting a pin
-as "the" one would be a guess presented as a finding. It reports every pin it
-finds and says what each is missing, leaving the reader to recognise a pin
-that is behind.
+It does not name a single ACTIVE pin, and an earlier draft of this paragraph
+said the active pin was "not reliably derivable here". That was wrong, and
+`shared/workflow/keep-checkouts-fresh.md` already documents the derivation:
+`~/.claude/plugins/installed_plugins.json` records one entry per install,
+each carrying a `scope`, a `projectPath` for a project-scoped one, and the
+`installPath` of the pin it is served from. Those install paths are read and
+each enumerated pin is labelled INSTALLED with the scopes and projects that
+name it, with the entry matching `--project` called out first.
+
+What remains genuinely underivable is narrower: which of several matching
+entries the harness prefers when a project-scoped and a user-scoped install
+both apply. So the labels report what the file records rather than asserting
+one pin executes, and a pin no entry names is labelled as an orphan -- a
+garbage-collectable snapshot rather than something to act on. That
+distinction is the whole point: reading the newest directory under the cache
+identifies nothing, because several pins routinely carry the same commit.
 
 It also does not fetch. It compares the working checkout against installed
 pins, so a checkout that is itself behind `origin/main` reports fewer missing
@@ -45,13 +56,19 @@ position against `origin/main` when git can answer cheaply.
 
 EXIT STATUS
 -----------
-0   every pin carries every hook in the checkout (or no pins were found,
-    which is not a failure -- a machine may legitimately have no plugin
-    install)
-1   at least one pin is missing at least one hook
+0   every pin an install record names carries every hook in the checkout
+    (or no pins were found, which is not a failure -- a machine may
+    legitimately have no plugin install)
+1   at least one NAMED pin is missing at least one hook
+
+A gap in an ORPHAN pin -- one no install record names -- is reported and does
+not set the status. Such a pin is a garbage-collectable leftover, so failing
+on it would make the instrument red on machines where nothing is wrong, which
+is the fastest way to get a check ignored.
 """
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -85,6 +102,79 @@ def cache_roots():
     return pins
 
 
+def install_entries():
+    """Installed-plugin records for this marketplace, or [] if unreadable.
+
+    `~/.claude/plugins/installed_plugins.json` is the harness's own record of
+    what it installed and from where. Reading it is what turns a list of cache
+    directories into an answer about the pin a session is actually served,
+    which is the question ai-config#2439 posed and could not answer by hand.
+    """
+    path = Path.home() / ".claude" / "plugins" / "installed_plugins.json"
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except Exception:
+        return []
+    plugins = data.get("plugins")
+    if not isinstance(plugins, dict):
+        return []
+    out = []
+    for key, entries in plugins.items():
+        if "ai-config" not in key:
+            continue
+        for e in entries or []:
+            if isinstance(e, dict) and e.get("installPath"):
+                out.append(e)
+    return out
+
+
+def entries_for(pin, entries):
+    """The install records naming this pin, exactly as the harness wrote them.
+
+    Matching is on the resolved path rather than the string, because the
+    record carries a Windows path with backslashes while `pin` comes from a
+    directory walk.
+    """
+    try:
+        target = pin.resolve()
+    except Exception:
+        target = pin
+    out = []
+    for e in entries:
+        try:
+            if Path(e["installPath"]).resolve() == target:
+                out.append(e)
+        except Exception:
+            continue
+    return out
+
+
+def describe_entries(entries, project):
+    """One label per pin: which scopes and projects the harness serves from it."""
+    if not entries:
+        return "ORPHAN -- no install record names this pin"
+    mine = [e for e in entries
+            if e.get("projectPath") and _same_path(e["projectPath"], project)]
+    user = [e for e in entries if e.get("scope") == "user"]
+    bits = []
+    if mine:
+        bits.append("INSTALLED for THIS project")
+    if user:
+        bits.append("INSTALLED at user scope")
+    others = len(entries) - len(mine) - len(user)
+    if others > 0:
+        bits.append(f"{others} other project install(s)")
+    return "; ".join(bits) if bits else f"{len(entries)} install record(s)"
+
+
+def _same_path(a, b):
+    try:
+        return Path(a).resolve() == Path(b).resolve()
+    except Exception:
+        return False
+
+
 def checkout_position(repo):
     """'behind N' against origin/main, or a note saying it could not be read."""
     try:
@@ -106,11 +196,15 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--repo", default=str(REPO),
                     help="repository checkout to compare against")
+    ap.add_argument("--project", default=os.getcwd(),
+                    help="project path whose install record to call out "
+                         "(default: the current directory)")
     args = ap.parse_args()
     repo = Path(args.repo).resolve()
 
     have = repo_hooks(repo)
     pins = cache_roots()
+    entries = install_entries()
 
     print(f"checkout: {repo}")
     print(f"  {len(have)} hook script(s); {checkout_position(repo)}")
@@ -121,14 +215,22 @@ def main():
         return 0
 
     worst = 0
+    orphan_gaps = 0
+    named = 0
     for pin in pins:
         installed = {p.name for p in (pin / "hooks").iterdir()
                      if p.suffix in (".py", ".sh") and not p.name.startswith("test-")}
         missing = sorted(have - installed)
         extra = sorted(installed - have)
-        print(f"\npin {pin.name}  ({len(installed)} installed)")
+        records = entries_for(pin, entries)
+        named += 1 if records else 0
+        label = describe_entries(records, args.project)
+        print(f"\npin {pin.name}  ({len(installed)} installed) -- {label}")
         if missing:
-            worst = 1
+            if records:
+                worst = 1
+            else:
+                orphan_gaps += 1
             print(f"  MISSING {len(missing)} hook(s) present in the checkout:")
             for m in missing:
                 print(f"    - {m}")
@@ -145,11 +247,21 @@ def main():
             if len(extra) > 5:
                 print(f"    ... and {len(extra) - 5} more")
 
-    print(f"\ncompared {len(have)} checkout hook(s) against {len(pins)} pin(s)")
+    print(f"\ncompared {len(have)} checkout hook(s) against {len(pins)} pin(s), "
+          f"{named} of them named by an install record")
+    if not entries:
+        print("No install records were readable, so every pin above is "
+              "labelled ORPHAN on absence of evidence rather than evidence of "
+              "absence. Re-run after checking "
+              "~/.claude/plugins/installed_plugins.json exists.")
     if worst:
-        print("At least one pin is missing a hook that exists in the checkout.")
+        print("At least one INSTALLED pin is missing a hook that exists in "
+              "the checkout.")
         print("A guard that is not installed cannot fire, and reports nothing "
               "when it does not (ai-config#2439).")
+    if orphan_gaps:
+        print(f"{orphan_gaps} orphan pin(s) are also missing hooks. Not "
+              "counted: no install record serves them.")
     return worst
 
 

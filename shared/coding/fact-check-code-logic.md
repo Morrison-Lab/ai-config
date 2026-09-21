@@ -266,7 +266,7 @@ So ask the discriminating question before writing the test --- does another chan
 The situation that produces it is ordinary rather than exotic: two fixes landed in one round for one review finding, which is how a review round usually goes.
 
 Measured 2026-09-21 on `scripts/check-hook-delivery.py` ([ai-config#3833](https://github.com/Morrison-Lab/ai-config/pull/3833)), where [`83bafbef`](https://github.com/Morrison-Lab/ai-config/commit/83bafbef) records the survivor and [`472408f8`](https://github.com/Morrison-Lab/ai-config/commit/472408f8) records what it was worth.
-Both are pre-merge commits on that PR's branch, linked by SHA because a squash merge will leave neither reachable from `main` --- which is this paragraph's own caution applied to itself.
+Both are pre-merge commits on that PR's branch, linked by SHA because a squash merge will leave neither reachable from `main`.
 A review finding about a crash on a malformed records file drew a type filter that dropped every non-string `installPath` at read time, upstream of the `Path().resolve()` that consumed it.
 Mutating the filter failed a test.
 Widening the `except` around that `resolve()` past `OSError` survived, because the filter had already removed the input that would have reached it, so the narrow catch shipped with a comment stating which exceptions were unreachable and why.
@@ -276,7 +276,7 @@ Widening the `except` around that `resolve()` past `OSError` survived, because t
 `ValueError` was not: an embedded NUL raises it on POSIX and returns quietly on Windows, where the mutation run happened, and CI runs on Linux.
 So the survivor was a true reading of an incomplete experiment, the next round widened the catch back, and what had shipped in between was a crash in the environment the code actually runs in.
 
-A caution about reading this example from the history, which applies to every measurement of this kind.
+Reading this example from the history carries a caution that applies to every measurement of this kind, and it is why the two commits above are linked by SHA rather than named.
 The later widening is committed and visible in `472408f8`.
 The **mutation experiment** is not: widening the catch and reverting it happened inside the authoring of `83bafbef`, whose diff therefore shows a catch that was narrow before and narrow after.
 So the survivor that motivated the whole thing is carried by that commit's *message* --- "A widened catch would have been a branch no input can take, which is what mutation testing reported when it survived" --- and by nothing else.
@@ -305,8 +305,9 @@ Those siblings were inert because the statement above them guaranteed the operan
 This one sat where nothing did, and dropping it would have turned `os.path.exists(None)`'s `TypeError` into a silent allow through the caller's blanket `except`.
 
 That case is the sharpest available statement of this section's limit, and it is worth reading in full rather than summarised.
-A mutation run over the existing suite reported both conjuncts safe to remove, for **opposite** reasons --- one because nothing could observe its removal, the other because no test passed the input it existed for.
-The remedy there was neither a test for the inert pair nor a deletion of the live one: it was to exercise the `None` input directly and measure the guard with and without it.
+Its own wording is counterfactual and should stay that way: a clean mutation run over that suite **could not have** told the two conjuncts apart, and **would have** reported both safe to remove, for opposite reasons --- one because nothing could observe its removal, the other because no test passed the input it existed for.
+No such run was ever made; the live conjunct was found by a same-file grep for the operand and settled by measuring the guard with and without it against a `None` input.
+That remedy is the one to copy, and it is neither a test for the inert pair nor a deletion of the live one.
 So establish what makes a neighbour's branch dead before transferring the verdict, which is [`check-purpose-before-reusing`](../workflow/check-purpose-before-reusing.md)'s question asked about a diagnosis rather than about a template.
 
 - **Do:** write the members as literals in the test, and assert separately that the constant contains them.

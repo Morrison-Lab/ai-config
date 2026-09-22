@@ -149,6 +149,33 @@ Use the system's own local clock (`datetime.datetime.now().astimezone()`) when t
 - **Don't:** assume `time.tzset()` exists, or that `zoneinfo.ZoneInfo("America/Los_Angeles")` succeeds out-of-the-box, on a Windows Python installation.
 - **Don't:** wrap a `ZoneInfo` call in `except ModuleNotFoundError`, or hard-code a fixed UTC offset for a DST-observing zone.
 
+## `Path(...).resolve()` silently tolerates an embedded NUL on Windows and raises on POSIX
+
+`pathlib.Path("a\0b").resolve()` returns quietly on Windows --- confirmed here, CPython 3.13.7: no exception, `WindowsPath('.../a\x00b')`.
+On POSIX (measured on `ubuntu-latest`, per the incident below), the same call raises `ValueError: embedded null character`, because the underlying `os.path.realpath`/`stat` syscalls reject a NUL in a path string outright.
+A code path that assumes the POSIX behaviour --- catching that `ValueError` to treat a NUL-containing path as invalid input --- is unreachable on Windows: the `except` clause never fires, and whatever the `try` block does with the tainted path executes instead.
+
+Measured directly on `Morrison-Lab/ai-config` PR [#3833](https://github.com/Morrison-Lab/ai-config/pull/3833): an earlier commit on that branch (`83bafbef`) narrowed a `try`/`except` in `entries_for` to catch only `OSError`.
+Its commit message states, with the one word capitalized, "an embedded NUL was MEASURED not to raise" --- but the source comment it actually committed reads, all lowercase and with no platform named, "an embedded NUL was measured not to raise either (`resolve()` is non-strict by default)."
+The emphasis lived only in the commit message, which a later reader of the file does not see;
+the artifact that persists --- the comment --- carried the same wrong generalisation with none of the shouting that might have prompted a second look.
+`472408f8`, the next commit on that branch, is where the crash surfaced: CI runs on `ubuntu-latest`, where the same construction raises `ValueError`, not `OSError`, so the script crashed with an uncaught traceback on exactly the malformed input it exists to survive --- JSON round-trips a NUL byte through its own escape, so the input is reachable from an otherwise syntactically valid file.
+The fix widened the catch to `(OSError, ValueError)`, and that commit records why a fixture cannot pin this on its own: a real NUL byte written into a test fixture would assert nothing on Windows, the platform the wrong generalisation came from, so the regression case has to substitute the module's own `Path` rather than write the byte literally --- a NUL fixture is green in exactly the environment where the original mistake was made.
+
+This is a second, independent instance of the class [`heredoc-backslash-collapse.md`](../shared/coding/heredoc-backslash-collapse.md) states generally --- "Scope it before relying on it: this is a property of the environment, not of [the mechanism you happened to be testing]" --- and of [ai-config#2158](https://github.com/Morrison-Lab/ai-config/issues/2158)'s `ls` exit-code case (BSD `ls` returns 1 for "no such file", GNU coreutils `ls` reserves 2 for it).
+Both of those are **shell command** behaviour;
+this one is a **standard library call**, which is exactly why a rule framed around shell transport or coreutils exit codes does not fire when the thing being measured is `pathlib`.
+The class is broader than either title suggests: any measured behaviour --- a shell command, a coreutils exit code, a stdlib function, an API response --- is scoped to the platform (and often the specific library version) it was measured on, and a comment or commit message that states the conclusion unconditionally turns a true observation into a wrong rule the moment it is read on a different platform.
+[`metacognitive-monitoring.md`](../shared/workflow/metacognitive-monitoring.md)'s **Inference** claim type already names the general check --- "state what the measurement establishes and what you are claiming as two sentences, and check the second is not wider than or beside the first" --- the platform is one axis the claim can silently widen along.
+
+- **Do:** name the platform (and interpreter/version where relevant) next to any claim about a stdlib call's exception behaviour, exactly as for a shell command's exit code.
+- **Do:** re-measure on the actual target platform (here: POSIX, since the code shipped into Linux CI) before writing "unreachable" into a comment or commit message, rather than trusting a measurement taken on whichever platform the session happened to be running on.
+- **Do:** put the platform-scoping caveat in the artifact a later reader actually encounters --- the source comment --- rather than only in the commit message that introduced it;
+  a commit message's emphasis (capitals, a flagged caveat) does not travel with the code.
+- **Don't:** write a code comment or commit message asserting a branch is unreachable based on a measurement taken on one platform when the code runs on another --- here the comment itself never named a platform at all, which is a stronger miss than an emphasized-but-scoped claim would have been.
+- **Don't:** assume the existing environment-scoping rule fires just because it exists --- it is stated narrowly (heredoc transport, `ls` exit codes) in both of its prior instances, so recognizing "this is the same class" for a stdlib call takes a deliberate generalization step, not pattern-matching on the rule's own title.
+- **Don't:** trust that a strongly-worded commit message (capitals, "MEASURED") carries its caution into the code --- the comment a maintainer reads six months later is the one written in the diff, not the one narrated about it.
+
 ## `itertools.islice` caps a generator by prefix, and the obvious integer stride collapses to it
 
 `itertools.islice(gen, n)` takes the **first** `n` items, not `n` items spread across what `gen` produces.

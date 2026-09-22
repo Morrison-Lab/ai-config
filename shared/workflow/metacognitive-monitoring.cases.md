@@ -924,3 +924,31 @@ the population it was silently generalized to was never listed.)
 - **Don't:** generalize a no-loss claim from a single checked shape to "a genuine [format]" when the format admits more than one paired-record layout --- name the shape actually measured instead.
 - **Don't:** treat a claim as safe because it is true of the case that prompted writing it;
   a no-loss claim's failure mode is the case nobody thought to name.
+
+## "All three whitespace runs are bounded now" was true of the source; "and the tests pin it" was checked by rereading, not by counting
+
+(`Morrison-Lab/ai-config` PR [#3826](https://github.com/Morrison-Lab/ai-config/pull/3826), commits `0388cdfa` and `f05793e8`, 2026-09-21.
+A regex in `hooks/no-unread-issue-claim.py` had three separate `\s*` runs;
+an earlier round bounded two of them and left the third unbounded, so the pattern's longest possible match was still unbounded end to end.
+`0388cdfa` bounded the third run too and stated, correctly, that the source now had all three bounded --- and added a second claim in the same commit message: "Four cases now pin what the comment claims --- a prefix at the full 38 characters, the bound at exactly 8, one character past it at 9, and a padded run inside `pull request` that only a bounded inner run rejects."
+
+The source claim was **Scope** over the regex's own three quantifiers and was true;
+a differential read of the pattern confirms all three are bounded.
+The test claim was **also Scope**, over the same three quantifiers, this time asking whether each has a case that fails if that specific bound is removed --- and it was false.
+`f05793e8`, one commit later: "The cases pinned ONE.
+Widening either of the other two by a single character, or reverting the trailing one to unbounded, left 72 of 72 green."
+Two of the three runs had no case that depended on their own bound at all;
+the suite was green regardless of what those two runs allowed.
+
+`0388cdfa`'s own commit message states the general form of the mistake it was about to make, one clause before making it: "the whitespace is bounded now" is not a claim you can check by rereading the sentence you just wrote.
+It is a claim you check by counting the quantifiers.
+That sentence is correct about the **source** claim it was defending and was never applied to the **test** claim two sentences later in the same message --- the general rule was stated and a different, structurally identical instance of the exact violation it names shipped in the same commit.
+
+Recognizing a claim as **Scope** ("all N of X now do Y") is not, by itself, the check.
+The check is deriving N and confirming each member independently --- here, one assertion per whitespace run, not a shared prefix-length case that happens to move if any of the three shrinks.
+A single passing case that is *consistent with* all three bounds holding is not evidence that all three are independently pinned, the same gap ["A parity comment justified a fix that only partly achieved the parity it named"](#a-parity-comment-justified-a-fix-that-only-partly-achieved-the-parity-it-named) above names for a different claim shape: a directional or aggregate check confirms movement toward a claim, not the claim's exact scope.)
+
+- **Do:** for a claim of the shape "all N of X now do Y," derive N (count the quantifiers, list the branches, enumerate the members) and confirm each one has its own independent check, rather than confirming the surrounding sentence reads correctly.
+- **Do:** treat "I already stated the general rule this violates, earlier in the same message" as no defense --- stating the rule and checking against it are different acts, and the first does not perform the second.
+- **Don't:** accept a single case that is consistent with several claimed properties as pinning all of them --- widen or revert each property independently and confirm the suite catches it.
+- **Don't:** read a source-level Scope claim ("all three runs are bounded") as carrying a test-level Scope claim ("and all three are independently tested") for free --- they are two different populations that happen to share a sentence.

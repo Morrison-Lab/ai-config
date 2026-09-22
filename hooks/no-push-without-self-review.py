@@ -896,6 +896,10 @@ def _resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
         # Unexpanded shell variables/substitutions cannot be resolved statically.
         return None
 
+    # Before `isabs`: on Windows under Python 3.13, `isabs("/c/Users/x")` is
+    # False, so a Git Bash drive path was joined onto `cur_dir` and then
+    # normalized into a drive-less path nothing downstream could repair.
+    target = _native_path(target)
     if os.path.isabs(target):
         return os.path.normpath(target)
     if cur_dir is not None:
@@ -1078,8 +1082,12 @@ def iter_pushes(command: str):
                 tok = rest[i]
                 if tok == "-C" and i + 1 < len(rest):
                     # Chained: each -C is relative to the accumulated path.
-                    directory = os.path.join(directory or "", rest[i + 1]) \
-                        if directory not in (None, REDIRECTED) else rest[i + 1]
+                    # Converted here, not only in `_run_git`: the join above
+                    # and the `isabs` test in the hint merge below both
+                    # misread a Git Bash drive path.
+                    value = _native_path(rest[i + 1])
+                    directory = os.path.join(directory or "", value) \
+                        if directory not in (None, REDIRECTED) else value
                     i += 2
                     continue
                 head = tok.partition("=")[0]

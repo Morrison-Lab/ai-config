@@ -1351,6 +1351,30 @@ def msys_path_cases() -> tuple[int, int]:
         mod.subprocess.run, mod._native_path = real_run, real_native
     check("_run_git hands git a native path for a Git Bash -C directory",
           seen and seen[0][:3] == ["git", "-C", "C:/Users/x/repo"])
+
+    # End to end through iter_pushes: the directory must be converted where it
+    # enters, not only where git is called. `_resolve_cd_target`'s `isabs` and
+    # the hint merge both ran on the raw `/c/...` form, and on Python 3.13
+    # `isabs` calls it relative, so `cd /c/Users/x && git push` resolved to a
+    # drive-less `\\c\\Users\\x` that `_run_git` could no longer repair.
+    mod._native_path = lambda path, is_windows=None: real_native(path, True)
+    try:
+        def directory_of(command):
+            pushes = list(mod.iter_pushes(command))
+            if len(pushes) != 1 or not isinstance(pushes[0][2], str):
+                return None
+            return pushes[0][2].replace(os.sep, "/")
+        by_cd = directory_of("cd /c/Users/x && git push origin main")
+        by_c = directory_of("git -C /c/Users/x push origin main")
+        both = directory_of("cd /c/Users/x && git -C sub push origin main")
+    finally:
+        mod._native_path = real_native
+    check(f"`cd /c/...` resolves to a native directory (got {by_cd!r})",
+          by_cd == "C:/Users/x")
+    check(f"`-C /c/...` resolves to a native directory (got {by_c!r})",
+          by_c == "C:/Users/x")
+    check(f"a relative -C after `cd /c/...` joins onto the native path (got {both!r})",
+          both == "C:/Users/x/sub")
     return failures, ran
 
 

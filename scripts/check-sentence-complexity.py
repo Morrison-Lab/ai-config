@@ -40,8 +40,12 @@ _ABBREVIATIONS = (
 )
 _ABBR_RE = re.compile(_ABBREVIATIONS, re.IGNORECASE)
 
-# Sentence boundary regex
-_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"'(\[])")
+# Sentence boundary regex: split on terminal punctuation followed by either:
+# 1) a newline (with optional surrounding whitespace), or
+# 2) whitespace followed by an alphanumeric character, quote, bracket, or paren.
+_SENTENCE_SPLIT_RE = re.compile(
+    r"(?<=[.!?])(?:\s*\n\s*|\s+(?=[A-Za-z0-9\"'(\[`]))"
+)
 
 # Subordinating conjunctions that introduce dependent clauses
 _SUBORDINATORS = (
@@ -76,16 +80,22 @@ _CLICHE_RE = re.compile(
 )
 
 
+def _unwrap_link(match: re.Match[str]) -> str:
+    anchor = match.group(1).strip()
+    return re.sub(r"`([^`\n]+)`", r"\1", anchor)
+
+
 def strip_markup(text: str) -> str:
     """Remove code blocks, inline code, comments, images, and unwrap links."""
     text = _FENCE_RE.sub("", text)
     text = _HTML_COMMENT_RE.sub("", text)
     text = _IMAGE_RE.sub("", text)
-    # Unwrap links before stripping inline code so [`code`](url) unwraps to `code`
-    text = _LINK_RE.sub(r"\1", text)
+    # Unwrap links before stripping standalone inline code so [`code`](url)
+    # unwraps to code (preserving anchor text as visible prose).
+    text = _LINK_RE.sub(_unwrap_link, text)
     text = _INLINE_CODE_RE.sub("", text)
     # Re-run link strip in case any empty-bracket links remained
-    text = _LINK_RE.sub(r"\1", text)
+    text = _LINK_RE.sub(_unwrap_link, text)
     return text
 
 
@@ -118,13 +128,9 @@ def split_sentences(text: str) -> list[str]:
     masked = _ABBR_RE.sub(_mask_abbr, block_text)
     sentences: list[str] = []
     for paragraph in masked.split("\n\n"):
-        para = " ".join(paragraph.split())
-        if not para:
-            continue
-        # Split on sentence terminals
-        parts = _SENTENCE_SPLIT_RE.split(para)
+        parts = _SENTENCE_SPLIT_RE.split(paragraph)
         for part in parts:
-            clean = part.replace("@@DOT@@", ".").strip()
+            clean = " ".join(part.replace("@@DOT@@", ".").split()).strip()
             # Strip any residual block or bullet marker from sentence start
             clean = re.sub(r"^(?:[-*+>]|\d+\.)\s+", "", clean).strip()
             if clean:
@@ -539,12 +545,26 @@ def run_self_test() -> int:
         and tight_sents[2] == "Third bullet item.",
     )
 
-    # Links containing inline code must unwrap without leaking raw URLs
+    # Links containing inline code must unwrap preserving anchor text without leaking raw URLs
     code_link = "Check [`use-preferred-style`](../../skills/use-preferred-style/SKILL.md) step 2."
     clean_link = strip_markup(code_link)
     check(
-        "link with inline code does not leak raw URL into text",
-        "SKILL.md" not in clean_link and "use-preferred-style" not in clean_link,
+        "link with inline code preserves anchor text and does not leak raw URL",
+        "SKILL.md" not in clean_link and "use-preferred-style" in clean_link,
+    )
+
+    # Sentence boundary across newline with link anchor starting with code identifier
+    two_sentences = (
+        "The underspecified reference narrows two rules that already exist.\n"
+        "[`use-preferred-style`](../../skills/use-preferred-style/SKILL.md) rule 8 and "
+        "ambiguous-reference both govern a demonstrative."
+    )
+    split_two = split_sentences(strip_markup(two_sentences))
+    check(
+        "sentence split across newline with code link opener produces 2 sentences",
+        len(split_two) == 2
+        and split_two[0] == "The underspecified reference narrows two rules that already exist."
+        and split_two[1].startswith("use-preferred-style rule 8"),
     )
 
     # Headings immediately followed by prose without a blank line must split

@@ -377,6 +377,9 @@
 - Never commit directly to a shared/multi-project CI-infra repo's `main` --- even when confident and already validated the fix live.
   Push to a branch and open an MR for review first.
   This applies going forward; it does not retroactively require undoing an already-validated fix already on main unless the user asks.
+- Across every session, project, and repository, the user grants standing authorization to non-force-push completed work and open or update its PR/MR as soon as it is ready.
+  Never ask for push or PR authorization again.
+  Force pushes and merges still require their separate safeguards and authorization.
 - After an iterate loop completes, ALWAYS create follow-up issues for every deferred/acknowledged item before reporting done.
   Never leave deferred items untracked.
 - When an MR/PR addresses multiple independent concerns, proactively offer to split it into separate MRs/PRs (one per concern).

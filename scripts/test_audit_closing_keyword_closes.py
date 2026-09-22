@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Regression tests for audit-closing-keyword-closes.py.
 
-Every fixture below is lifted from a real close on Lacaedemon/sparta, audited
-2026-09-22, so a failure names the misread it prevents. The classifier is pure
-over the GraphQL node shape, so these run offline with no `gh` call.
+The fixtures for #32, #603, #1154, and #1522 paraphrase real closer text
+from the 2026-09-22 audit of Lacaedemon/sparta (issue numbers kept for
+traceability; #1154 has since been re-closed as not planned, so a live run
+now skips it). The rest are constructed edge cases, and use issue numbers
+only as labels. The classifier is pure over the GraphQL node shape, so these
+run offline with no `gh` call.
 """
 import importlib.util
 import json
@@ -130,6 +133,24 @@ commit_node = {"number": 3, "title": "t", "stateReason": "COMPLETED",
                "timelineItems": {"nodes": [{"closer": {
                    "__typename": "Commit", "oid": "abc", "message": "fix: x\n\nFixes #3\n"}}]}}
 check("a commit closer is scanned", verdict(commit_node)["verdict"] == "deliberate")
+
+# parse_page: the two failures that would otherwise surface far from their cause.
+def raises_oserror(stdout):
+    try:
+        audit.parse_page(stdout)
+    except OSError:
+        return True
+    return False
+
+
+check("parse_page refuses a None stdout", raises_oserror(None))
+check("parse_page surfaces GraphQL errors",
+      raises_oserror(json.dumps({"data": None, "errors": [{"message": "rate limited"}]})))
+check("parse_page refuses a missing repository",
+      raises_oserror(json.dumps({"data": {"repository": None}})))
+page = {"nodes": [], "pageInfo": {"hasNextPage": False, "endCursor": None}}
+check("parse_page returns the issues connection",
+      audit.parse_page(json.dumps({"data": {"repository": {"issues": page}}})) == page)
 
 # End to end through main(): exit 1 when flagged, 0 when clean, 2 on error.
 with tempfile.TemporaryDirectory() as directory:

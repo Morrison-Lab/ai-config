@@ -216,6 +216,27 @@ def classify(node: dict, repo: str) -> dict:
             "references": references}
 
 
+def parse_page(stdout: str | None) -> dict:
+    """The `issues` connection from one GraphQL page, or a clear error.
+
+    Two failures would otherwise surface as a bare TypeError or KeyError
+    far from their cause, as pr-sweep.py also guards against: on Windows a
+    decode failure in subprocess's reader thread can leave stdout None with
+    exit 0, and GraphQL reports errors (rate limits, bad names) as HTTP 200
+    with `data` null.
+    """
+    if stdout is None:
+        raise OSError("gh api graphql returned no stdout -- an output decode "
+                      "failure in the environment, not an audit result")
+    payload = json.loads(stdout)
+    if payload.get("errors"):
+        raise OSError(f"GraphQL errors: {payload['errors']}")
+    repository = (payload.get("data") or {}).get("repository")
+    if repository is None:
+        raise OSError("GraphQL returned no repository (check --repo)")
+    return repository["issues"]
+
+
 def fetch_nodes(repo: str, limit: int | None) -> list[dict]:
     owner, name = repo.split("/", 1)
     nodes, after = [], None
@@ -231,7 +252,7 @@ def fetch_nodes(repo: str, limit: int | None) -> list[dict]:
         # error (exit 2) instead.
         result = subprocess.run(command, capture_output=True, text=True,
                                 encoding="utf-8", check=True)
-        issues = json.loads(result.stdout)["data"]["repository"]["issues"]
+        issues = parse_page(result.stdout)
         nodes.extend(issues["nodes"])
         if limit is not None and len(nodes) >= limit:
             return nodes[:limit]
@@ -290,8 +311,13 @@ def main(argv: list[str] | None = None) -> int:
             subprocess.CalledProcessError) as error:
         # AttributeError is a malformed node (a string where an object
         # belongs); without it the crash exits 1, which reads as "flagged".
-        detail = getattr(error, "stderr", "") or ""
-        print(f"ERROR: {error} {detail}".rstrip(), file=sys.stderr)
+        if isinstance(error, subprocess.CalledProcessError):
+            # The command text embeds the whole GraphQL query; gh's own
+            # stderr is the part that names the problem.
+            message = f"gh exited {error.returncode}: {(error.stderr or '').strip()}"
+        else:
+            message = str(error)
+        print(f"ERROR: {message}", file=sys.stderr)
         return 2
     if args.json:
         print(json.dumps(verdicts, indent=2))

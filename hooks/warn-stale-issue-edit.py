@@ -526,6 +526,26 @@ def mcp_views_issue(name, tool_input, issue, view_mcp):
         method = tool_input.get("method")
         if isinstance(method, str) and method != "get":
             return False
+        for key in ("issue_number", "issueNumber", "number"):
+            val = tool_input.get(key)
+            if val is not None and not isinstance(val, (dict, list)):
+                s = str(val).strip()
+                if s.isdigit():
+                    return s == str(issue["number"]).strip()
+        issue_val = tool_input.get("issue")
+        if issue_val is not None and not isinstance(issue_val, (dict, list)):
+            s = str(issue_val).strip()
+            if s.isdigit():
+                return s == str(issue["number"]).strip()
+            m = re.search(r"/issues/(\d+)\b", s)
+            if m:
+                return m.group(1) == str(issue["number"]).strip()
+        for key in ("url", "path"):
+            val = tool_input.get(key)
+            if isinstance(val, str):
+                m = re.search(r"/issues/(\d+)\b", val)
+                if m:
+                    return m.group(1) == str(issue["number"]).strip()
     blob = ""
     if isinstance(tool_input, dict):
         try:
@@ -534,7 +554,7 @@ def mcp_views_issue(name, tool_input, issue, view_mcp):
             blob = str(tool_input)
     elif isinstance(tool_input, str):
         blob = tool_input
-    number = re.escape(issue["number"])
+    number = re.escape(str(issue["number"]).strip())
     if re.search(rf"/issues/{number}\b", blob):
         return True
     # No whole-blob fallback beyond these two shapes: an issue_read of a

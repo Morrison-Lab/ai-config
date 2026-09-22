@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """Stop-hook guard: ordinary pushes and PRs do not need another permission ask.
 
-The standing grant in ``memories/preferences.md`` already authorizes ordinary,
-non-force pushes and opening or updating PRs/MRs.  It did not prevent a repeat
-authorization ask on 2026-09-22 after a redundant copy of that grant was
-removed, so the composition-time boundary needs its own guard.
+The standing grant in ``AGENTS.md`` and ``memories/preferences.md`` already
+authorizes ordinary, non-force pushes and opening or updating PRs/MRs.  It did
+not prevent a repeat authorization ask on 2026-09-22 after a redundant copy of
+that grant was removed, so the composition-time boundary needs its own guard.
 
 This is deliberately narrower than ``flag-cop-out-offer.py``.  That hook warns
 on many offers because authorization cannot be inferred from prose.  Here the
 action is decidable: ordinary ``git push`` and opening a pull or merge request
 are covered by the standing grant.  Merge and force-push questions are excluded
 because they need explicit authorization under the merge and push safeguards.
+An explicit request remains permitted when the transcript says the membership
+or access gate for an external repository is unverified: that gate is stricter
+than the ordinary standing grant.
 
 The reader is imported from ``no-offer-to-file.py`` so project-thread reply
 payloads, Antigravity transcripts, and code-fence stripping stay consistent.
@@ -52,6 +55,11 @@ PATTERNS = [
 ]
 RX = re.compile("|".join(PATTERNS), re.I)
 FORCE_PUSH = re.compile(r"\bforce[-\s]?push\b", re.I)
+UNVERIFIED_ACCESS = re.compile(
+    r"\b(?:membership|access)\b[^.?!]{0,60}\b(?:unknown|unverified|not\s+verified)\b|"
+    r"\b(?:unknown|unverified|not\s+verified)\b[^.?!]{0,60}\b(?:membership|access)\b",
+    re.I,
+)
 
 
 def main() -> int:
@@ -64,7 +72,7 @@ def main() -> int:
     if not text:
         return 0
     prose = strip_code(text)
-    if FORCE_PUSH.search(prose):
+    if FORCE_PUSH.search(prose) or UNVERIFIED_ACCESS.search(prose):
         return 0
     hit = RX.search(prose)
     if not hit:
@@ -87,7 +95,9 @@ def main() -> int:
             "non-force pushes and opening/updating PRs or MRs. Perform the work, "
             "then report it in the past tense.\n\n"
             "This guard intentionally does not cover merges or force-pushes; those "
-            "still require their separate authorization and safety checks."
+            "still require their separate authorization and safety checks. An "
+            "unverified external-repository membership or access gate is also an "
+            "intentional exception."
         ),
     }))
     return 0

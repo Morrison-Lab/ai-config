@@ -43,6 +43,8 @@ CASES = [
      "force-push authorization remains allowed"),
     ([TOOL, say("May I merge this PR now?")], False,
      "merge authorization remains allowed"),
+    ([TOOL, say("Membership is unverified for this external repository; may I push this branch?")], False,
+     "unverified external membership allows an explicit authorization request"),
     ([TOOL, say("Pushed 2cfcd37 and opened PR #3868.")], False,
      "past-tense completion does not block"),
     ([TOOL, say("The documented example is `May I push this branch?`.")], False,

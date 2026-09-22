@@ -402,11 +402,10 @@ def ensure():
     if alive(read_state().get("pid")):
         return True
     try:
-        kwargs = dict(NO_WINDOW)
         interpreter = resolve_interpreter()
         process = subprocess.Popen([interpreter, os.path.realpath(__file__), "--monitor"],
                                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                   stderr=subprocess.DEVNULL, start_new_session=True, **kwargs)
+                                   stderr=subprocess.DEVNULL, start_new_session=True, **NO_WINDOW)
     except OSError:
         return False
     state = read_state()

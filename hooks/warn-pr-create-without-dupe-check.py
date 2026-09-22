@@ -602,6 +602,9 @@ def _mcp_is_issue_search(name, payload):
     return True
 
 
+# Re-exported through `warn-claim-without-comments-read.py` and imported
+# from there by `no-unread-issue-claim.py`, two hops away -- so a change
+# here surfaces as a failure in that hook's suite.
 def _tool_uses(entry):
     """Yield (name, payload_dict) for each tool_use in a transcript entry."""
     message = entry.get("message")
@@ -633,6 +636,9 @@ def _tool_uses(entry):
                 yield name, payload
 
 
+# Re-exported through `warn-claim-without-comments-read.py` and imported
+# from there by `no-unread-issue-claim.py`, two hops away -- so a change
+# here surfaces as a failure in that hook's suite.
 def _payload_commands(payload):
     """Yield command-ish strings from a tool_use input dict."""
     for key in ("command", "cmd", "CommandLine"):

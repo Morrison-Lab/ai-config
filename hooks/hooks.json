@@ -1391,6 +1391,13 @@
             "timeout": 10,
             "script": "flag-stale-clean-tree-claim.py",
             "why": "ai-config#3821 -- warns, never blocks, when a message asserts a clean working tree or clean stopping point after a path-writing git command (`git checkout <ref> -- <path>`, `git restore`, `git stash pop`, `git apply`) ran without an intervening `git status` or `git diff` check."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unread-issue-claim.py\"",
+            "timeout": 10,
+            "script": "no-unread-issue-claim.py",
+            "why": "An issue's body is frozen at filing time; its comments carry the measurement that already ran, the PR that already shipped half of it, and the decision that was already taken. Warns when the final message reports an issue as open, blocked, or awaiting a decision and nothing in the session read that issue's comments -- a body-only read does not discharge it. Measured twice on Lacaedemon/sparta (ai-config#3823); the second time a decision already taken and documented was reported to the user as theirs to make, across several turns, with two unrelated issues described as blocked behind it. Warns and never blocks: an issue can legitimately be blocked, and the guard can only see that the cheapest supporting evidence was never gathered."
           }
         ]
       }

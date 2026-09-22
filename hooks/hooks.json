@@ -1233,6 +1233,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-redundant-push-pr-authorization.py\"",
+            "timeout": 10,
+            "script": "no-redundant-push-pr-authorization.py",
+            "why": "The standing authorization for ordinary, non-force pushes and opening/updating PRs or MRs was still re-asked after redundant prose was removed (2026-09-22), so blocks only those routine authorization asks. Merge and force-push questions remain outside this lexical guard because they require separate authorization."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-empty-promise.py\"",
             "timeout": 10,
             "script": "no-empty-promise.py",

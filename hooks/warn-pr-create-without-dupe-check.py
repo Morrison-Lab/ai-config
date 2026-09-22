@@ -636,6 +636,9 @@ def _tool_uses(entry):
                 yield name, payload
 
 
+# Re-exported through `warn-claim-without-comments-read.py` and imported
+# from there by `no-unread-issue-claim.py`, two hops away -- so a change
+# here surfaces as a failure in that hook's suite.
 def _payload_commands(payload):
     """Yield command-ish strings from a tool_use input dict."""
     for key in ("command", "cmd", "CommandLine"):

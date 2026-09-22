@@ -477,10 +477,13 @@ mcp_reads_comments = getattr(_claim, "mcp_reads_comments", None)
 # `main` below.
 #
 # That version deleted the `tool_calls` branch on the stated ground that no
-# transcript format emits it. `grep -rln '"tool_calls"' hooks/*.py` returns
-# 33 files, 24 of them not tests. The count is here because the claim it
-# replaces was made with no query behind it, in a commit message arguing for
-# rigour about exactly that.
+# transcript format emits it. Several dozen hooks in this directory parse it,
+# and the deriving query is a grep for that key across `hooks/*.py`.
+#
+# No number is written beside it, and the reason earns a line. The first
+# attempt named one and quoted the query verbatim -- which made THIS FILE
+# match that query, so the count was wrong by exactly one the moment it was
+# committed, in a comment added to stop a number being wrong.
 _tool_uses = getattr(_claim, "_tool_uses", None)
 _payload_commands = getattr(_claim, "_payload_commands", None)
 

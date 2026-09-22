@@ -110,9 +110,8 @@ CASES = [
      "the `-c` shorthand discharges it too"),
 
     # The ANTIGRAVITY record shape. A round deleted this file's handling of
-    # it on the claim that no transcript format emits it;
-    # `grep -rln '"tool_calls"' hooks/*.py` returns 33 files, 24 of them not
-    # tests.
+    # it on the claim that no transcript format emits it; several dozen hooks
+    # in this directory do.
     ([PROMPT,
       {"type": "PLANNER_RESPONSE", "tool_calls": [
           {"name": "run_command",

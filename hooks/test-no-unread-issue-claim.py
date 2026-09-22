@@ -85,6 +85,9 @@ CASES = [
     ([PROMPT, READ_BODY_ONLY,
       say("Ticket #123456789 still needs your call.")], False,
      "a digit run longer than an issue number is not one"),
+    ([PROMPT, READ_BODY_ONLY,
+      say("The tag #1566x still needs your call.")], False,
+     "a LETTER after the number is a boundary too, matching the lookbehind"),
 
     # `RX_INITIAL` only neutralises a capital before ANOTHER capital. Weaken
     # the lookahead to bare whitespace and a real sentence end after a lone

@@ -254,8 +254,14 @@ def visible_prose(text):
 # `pull/` immediately before a `#`, and the test that was written to justify
 # the lookbehind passes with it deleted because its fixture contains no `#`.
 # The remaining lookbehind is load-bearing -- it keeps `abc#12` from matching.
+#
+# The lookahead excludes a letter as well as a digit, and the asymmetry was a
+# defect: it read `#1566x` as issue 1566, while the lookbehind on the other
+# side correctly rejected `feat#1566`. A boundary check that holds on one
+# side of a token and not the other is the kind of thing a reader assumes
+# symmetric without testing it, which is why both directions now have a case.
 RX_ISSUE = re.compile(
-    r"(?<![A-Za-z0-9])#(\d{1,7})(?![0-9])"
+    r"(?<![A-Za-z0-9])#(\d{1,7})(?![0-9A-Za-z])"
 )
 
 

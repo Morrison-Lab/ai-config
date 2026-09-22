@@ -46,6 +46,19 @@ Nothing in the exit code, the stdout, or the summary distinguishes that from a s
 - **Do:** verify a dispatched `agy` run's claimed edits against `git status` or `git diff` before believing its summary.
 - **Don't:** read exit 0 plus a work summary as evidence that any file changed.
 
+### Background tasks and console window popups on Windows
+
+Measured 2026-09-21 in an Antigravity Windows session:
+Commands sent to the background by `run_command` (either by setting `WaitMsBeforeAsync` smaller than execution time or running `.cmd`/`.bat` scripts and `Start-Sleep`) spawn visible console windows (`conhost.exe` / `cmd.exe` / `powershell.exe`) that disrupt the user's workspace.
+The harness provides the `schedule` tool for non-blocking timers; running background sleep commands violates the universal rule "Never run a background 'sleep' command to set a timer, use this tool instead".
+To prevent unwanted command window popups on Windows:
+- Never run background sleep commands (`Start-Sleep` or `timeout`). Use `schedule` (one-shot timer) to wake up reactively.
+- Keep synchronous commands fast (< 10 seconds) with `WaitMsBeforeAsync: 10000` so they complete without falling into background execution.
+- Invoke executables directly (`python scripts/...`) rather than through `.cmd` or `.bat` batch wrappers.
+
+- **Do:** use `schedule(DurationSeconds=N, Prompt="...")` for all delayed checks and polling loops.
+- **Don't:** run `Start-Sleep` or long background commands that spawn visible console windows on Windows.
+
 ### Lifecycle events & payload mapping
 - **`PreToolUse`**: Passed `{"toolCall": {"name": "<tool_name>", "args": { ... }}}`.
   Returns `{"decision": "allow" | "deny" | "ask", "reason": "..."}`.

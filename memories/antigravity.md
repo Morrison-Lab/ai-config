@@ -55,14 +55,10 @@ or running `.cmd`/`.bat` scripts and `Start-Sleep`)
 spawn visible console windows (`conhost.exe` / `cmd.exe` / `powershell.exe`)
 that disrupt the user's workspace.
 The harness provides the `schedule` tool for non-blocking timers;
-avoid background sleep commands to poll or wait.
-To prevent unwanted command window popups on Windows:
-- Never run background sleep commands (`Start-Sleep` or `timeout`).
-  Use `schedule` (one-shot timer) to wake up reactively.
-- Keep synchronous commands fast (< 10 seconds) with `WaitMsBeforeAsync: 10000`
-  so they complete without falling into background execution.
-- Invoke executables directly (`python scripts/...`)
-  rather than through `.cmd` or `.bat` batch wrappers.
+keep synchronous commands fast (< 10 seconds) with `WaitMsBeforeAsync: 10000`
+so they complete without falling into background execution,
+and invoke executables directly (`python scripts/...`)
+rather than through `.cmd` or `.bat` batch wrappers.
 
 - **Do:** use `schedule(DurationSeconds=N, Prompt="...")` for all delayed checks and polling loops.
 - **Don't:** run `Start-Sleep` or long background commands that spawn visible console windows on Windows.

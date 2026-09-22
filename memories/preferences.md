@@ -18,8 +18,8 @@
   See [`shared/workflow/fully-clean.md`](../shared/workflow/fully-clean.md) and [`memories/mistake-patterns.md`](mistake-patterns.md) Pattern 5f. (User directive / CAI, 2026-08-31.)
 - **ARDI Loop Foreground Verification & Monitor Timers**: Run `python3 scripts/check-pr-fully-clean.py <pr>` synchronously in the foreground turn;
   see [`shared/workflow/ardi.md`](../shared/workflow/ardi.md) for foreground verification and turn-ending review monitor timer rules.
-- **Never pause without an armed wake mechanism and stopping point declaration**:
-  Whenever yielding a turn while tasks, tests, CI, or review checks remain incomplete, declare `**Stopping Point**: Not a clean stopping point / work remains queued: <details>` and arm a timer (`schedule`, `ScheduleWakeup`, `CronCreate`, or background monitor).
+- **Never pause without an armed wake mechanism**:
+  Whenever yielding a turn while tasks, tests, CI, or review checks remain incomplete, arm a timer (`schedule`, `ScheduleWakeup`, `CronCreate`, or background monitor) to resume the next concrete step.
   Never yield a turn claiming to wait on background tasks or external results without an armed wake mechanism;
   report the clock time in local time (Pacific Time) when the timer will fire.
   See [`shared/workflow/flag-session-boundaries.md`](../shared/workflow/flag-session-boundaries.md).

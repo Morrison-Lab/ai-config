@@ -446,6 +446,29 @@ CASES = [
      bash(f"gh pr merge 1 -R o/r --match-head-commit {'b' * 40};echo done"),
      True,
      "a pin glued to `;` is still found"),
+    # A line continuation (`\<newline>`) separates the flag and value onto
+    # separate physical lines, but `sh` splices it out before word splitting.
+    # The pin surface must splice it too, so the flag and value remain adjacent.
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr merge 1 -R o/r --squash --match-head-commit \\\n"
+          f"  {'b' * 40}"),
+     True,
+     "a pin separated from its flag by a line continuation warns"),
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr merge 1 -R o/r --squash --match-head-commit \\\r\n"
+          f"  {'b' * 40}"),
+     True,
+     "a CRLF line continuation separating a pin from its flag warns"),
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr merge 1 -R o/r --squash --match-head-commit=\\\n"
+          f"{'b' * 40}"),
+     True,
+     "an attached flag spliced to its value across a line continuation warns"),
+    ([PROMPT, HEAD_FULL_RUN],
+     bash(f"gh pr merge 1 -R o/r --squash --match-head-commit \\\n"
+          f"  {REAL_HEAD}"),
+     False,
+     "the same real value across a line continuation is silent"),
 ]
 
 
@@ -685,6 +708,47 @@ def check_dry_run_warns():
     return 0 if ok else 1
 
 
+def check_line_continuation_word_splitting_and_quoting():
+    """Line continuations must splice outside quotes and in double quotes, but NOT single quotes.
+
+    sh treats `\\<newline>` as line continuation and deletes it outside quotes
+    and inside double quotes. Inside single quotes, the backslash is literal
+    and the newline is preserved.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("_hook_words", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    f = mod._shell_words
+
+    cases = [
+        # Unquoted: line continuation spliced
+        ("echo foo\\\nbar", ["echo", "foobar"], "unquoted line continuation is spliced"),
+        ("echo foo\\\r\nbar", ["echo", "foobar"], "unquoted CRLF line continuation is spliced"),
+        # Double quotes: line continuation spliced
+        ('echo "foo\\\nbar"', ["echo", "foobar"], "double-quoted line continuation is spliced"),
+        ('echo "foo\\\r\nbar"', ["echo", "foobar"], "double-quoted CRLF line continuation is spliced"),
+        # Single quotes: backslash and newline are literal, MUST NOT be spliced
+        ("echo 'foo\\\nbar'", ["echo", "foo\\\nbar"], "single-quoted backslash-newline is preserved literally"),
+        ("echo 'foo\\\r\nbar'", ["echo", "foo\\\r\nbar"], "single-quoted CRLF backslash-newline is preserved literally"),
+        # Flag and value separated across line continuation
+        ("gh pr merge 1 -R o/r --squash --match-head-commit \\\n  abc",
+         ["gh", "pr", "merge", "1", "-R", "o/r", "--squash", "--match-head-commit", "abc"],
+         "flag and value across line continuation become adjacent words"),
+    ]
+    bad = []
+    for cmd, want, why in cases:
+        got = f(cmd)
+        if got != want:
+            bad.append(f"{why}: {cmd!r} -> {got!r}, wanted {want!r}")
+    ok = not bad
+    print(f"{'ok  ' if ok else 'FAIL'}  _shell_words splices line continuations "
+          f"outside and in double quotes, preserving literal single quotes")
+    for b in bad:
+        print(f"        {b}")
+    return 0 if ok else 1
+
+
 def main():
     failures = 0
     for events, payload, should_fire, label in CASES:
@@ -706,6 +770,7 @@ def main():
         check_dry_run_warns_on_pin,
         check_unreadable_transcript_is_silent,
         check_dry_run_warns,
+        check_line_continuation_word_splitting_and_quoting,
     ]
     for check in ADHOC:
         failures += check()

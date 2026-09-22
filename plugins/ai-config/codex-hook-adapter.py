@@ -91,11 +91,39 @@ def matcher_hits(matcher: str | None, tool_name: str) -> bool:
     return False
 
 
+def find_windows_bash() -> str:
+    for candidate in (
+        r"C:\Program Files\Git\bin\bash.exe",
+        r"C:\Program Files\Git\usr\bin\bash.exe",
+        r"C:\Program Files (x86)\Git\bin\bash.exe",
+    ):
+        if os.path.isfile(candidate):
+            return candidate
+    return "bash"
+
+
 def resolve_command(command: str) -> str:
-    return (
+    cmd = (
         command.replace("${CLAUDE_PLUGIN_ROOT}", str(ROOT))
         .replace("${PLUGIN_ROOT}", str(ROOT))
     )
+    if os.name == "nt":
+        stripped = cmd.strip()
+        if stripped.startswith('"'):
+            end_quote = stripped.find('"', 1)
+            if end_quote != -1:
+                prog = stripped[1:end_quote]
+                rest = stripped[end_quote + 1:].strip()
+                if prog.lower().endswith(".sh"):
+                    bash_bin = find_windows_bash()
+                    cmd = f'"{bash_bin}" "{prog}" {rest}'.strip()
+        else:
+            parts = stripped.split(None, 1)
+            if parts and parts[0].lower().endswith(".sh"):
+                bash_bin = find_windows_bash()
+                rest = parts[1] if len(parts) > 1 else ""
+                cmd = f'"{bash_bin}" "{parts[0]}" {rest}'.strip()
+    return cmd
 
 
 def run_entry(entry: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -106,17 +134,22 @@ def run_entry(entry: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any] 
         "PLUGIN_ROOT": str(ROOT),
     })
     cwd = payload.get("cwd") or str(ROOT)
+    run_kwargs: dict[str, Any] = {
+        "input": json.dumps(payload),
+        "text": True,
+        "capture_output": True,
+        "cwd": cwd,
+        "env": env,
+        "shell": True,
+        "timeout": float(entry["timeout"]),
+        "check": False,
+    }
+    if os.name == "nt":
+        run_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
     try:
         result = subprocess.run(
             resolve_command(entry["command"]),
-            input=json.dumps(payload),
-            text=True,
-            capture_output=True,
-            cwd=cwd,
-            env=env,
-            shell=True,
-            timeout=float(entry["timeout"]),
-            check=False,
+            **run_kwargs,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {"systemMessage": f"ai-config hook execution failed: {exc}"}
@@ -134,8 +167,12 @@ def run_entry(entry: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any] 
     try:
         parsed = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
+        if payload.get("hook_event_name") == "UserPromptSubmit":
+            return {"additionalContext": result.stdout.strip()}
         return {"systemMessage": f"ai-config hook returned invalid JSON: {exc}"}
     if not isinstance(parsed, dict):
+        if payload.get("hook_event_name") == "UserPromptSubmit":
+            return {"additionalContext": result.stdout.strip()}
         return {"systemMessage": "ai-config hook returned non-object JSON."}
     return parsed
 

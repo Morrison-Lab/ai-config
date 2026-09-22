@@ -508,10 +508,14 @@ Read it there rather than settling for the weaker "no deletions" reading,
 which a resolution that drops one line and adds another survives.
 
 **The no-reword rule is about prose neither branch wrote.**
-The `Don't` above rules out rewording a self-reference broken by a merge, on
-the ground that doing so edits prose neither branch authored.
-That reasoning scopes it, and the scope needs stating because the `Don't`
-reads absolutely and is the last thing a reader passes.
+One of this fragment's bullets rules out rewording a self-reference broken by
+a merge, on the ground that "rewording edits prose neither branch actually
+wrote".
+That reasoning scopes it, and the scope needs stating because the bullet reads
+absolutely.
+Quoting it beats pointing at it here.
+Another Do/Don't list now sits in between, which is the same broken-pointer
+failure this subsection is about.
 When the broken pointer sits in **your own** appended block, you wrote it.
 Rewriting it to name its subject outright is then editing your own prose, and
 it is the remedy the both-blocks-back-reference case above already reaches

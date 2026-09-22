@@ -140,27 +140,48 @@ corroborating detail, and it had moved in the same commit that added the
 skills.
 The next review round retracted the finding once `main` was merged in.)
 
-## A stale base ref defeats both range forms, and `...` is not the fix
+## A diff-scoped check's default base goes stale, and neither range form catches it
 
-The section above chooses between `..` and `...`, which is easy to read as
-the whole of what decides which commits a diff attributes to your branch.
-It is not.
-Both forms resolve `origin/main` through your **remote-tracking ref**, so an
-unfetched copy sends both of them to the same wrong place, and the merge base
-`...` computes is a merge base against that stale position.
+[`verify-the-right-artifact.md`](../shared/workflow/verify-the-right-artifact.md)'s
+"A comparison's base is an artifact too" section already carries the general
+rule: a base ref is a cached copy, the three-dot form computes its merge base
+from whatever ref you fed it, and a base behind its remote widens the diff
+with other people's already-merged work.
+Read the argument there.
+This section adds the range-form corollary the section above needs, and the
+one surface that rule's own instrument cannot reach.
 
-The distinction the section above teaches is structurally incapable of
-catching this, which is why reaching for `...` feels like having handled it.
-`...` exists for the case where the base ref carries commits your branch
-lacks.
+**The corollary.**
 A stale `origin/main` is *behind* the real one, so once you have merged main
-in it is an **ancestor** of your `HEAD` and carries no such commits --- and
-`..` and `...` are then identical by definition.
-Comparing the two forms therefore returns agreement in exactly the case where
-both are wrong.
+in it is an **ancestor** of your `HEAD`, where `A..B` and `A...B` are
+identical by definition.
+The two forms therefore agree under a stale base and a current one alike, so
+their agreement is uninformative about the base rather than reassuring, and no
+amount of care about which form to write reaches the question at all.
 
-Measured 2026-09-22 on this repo against the head of ai-config#3801,
-`244a0d61`, counting added-line markers per form:
+**The surface.**
+The rule above is written around a review diff, whose base you type or hand to
+a subagent, and `hooks/warn-stale-review-diff-base.py` enforces it lexically:
+a base token must name a remote-tracking ref.
+A diff-scoped **check** takes its base as a default, which defeats that guard
+twice over.
+The default lives inside the script, so it never appears in a command for a
+`PreToolUse` hook to read;
+and where it is passed explicitly it is already spelled `origin/main`, which
+is exactly what the hook asks for.
+`scripts/semantic-line-breaks.py` defaults `--base` to `origin/main`
+(line 591) and scopes its added-line set with
+`git diff --unified=0 f'{base}...HEAD'` (line 293), so a run against an
+unfetched checkout proposes reflowing paragraphs `main` already carries ---
+prose the branch never wrote, under a label reading
+`paragraphs with lines changed vs origin/main` (line 639) that is true only of
+the stale ref.
+Every other diff-scoped check inherits the same exposure;
+[`shared/writing/semantic-line-breaks.md`](../shared/writing/semantic-line-breaks.md)
+documents that scoping mechanism and the index-versus-content trap around it,
+and neither covers the ref being old.
+
+Measured 2026-09-22 against `244a0d61`, the head of ai-config#3801:
 
 ```bash
 F=memories/github-remote-sessions.md
@@ -173,51 +194,23 @@ git diff --unified=0 "$base..244a0d61"  -- "$F" | grep -c '^+[^+]'
 | `7d9607c`, the true tip | 60 | 60 |
 | `51ab28e8`, its parent, one commit stale | 132 | 132 |
 
-The two forms agree in both rows, and moving the base back by a single commit
-adds 72 lines to what the branch appears to have written.
-All 72 come from `7d9607c`, since it is the only commit between the two bases;
-`git show --stat` reports it inserting 83 lines in that file, the gap being
-lines `244a0d61` went on to rewrite, which `--unified=0` then accounts to the
-branch rather than counting twice.
+One commit of staleness adds 72 lines to what the branch appears to have
+written, identically under both forms.
+`git show --stat` reports `7d9607c` inserting 83 lines in that file;
+the 11-line gap is lines `244a0d61` went on to rewrite, which `--unified=0`
+accounts to the branch rather than counting twice.
+A base *ahead* of the merge point does not mis-attribute at all, which is what
+separates this from the two-dot failure the section above describes: on a
+throwaway branch cut at `3ec7ff3` that then merged `bd860bf`, both forms
+report zero added lines in that file against `bd860bf` and against the later
+`d112f37`, and 29 against `7a617bb`, one commit behind what the branch merged.
 
-A base ref *ahead* of the merge point does not do this, which is what
-separates the failure from the two-dot one the section above describes.
-Reproduced on a throwaway branch cut at `3ec7ff3` that then merged `bd860bf`:
-against `bd860bf` itself and against the later `d112f37`, both forms report
-zero added lines in that file, while against `7a617bb` --- one commit behind
-what the branch merged --- both report 29.
-Only a base behind the merge point mis-attributes, and it mis-attributes to
-both forms equally.
-
-It bites hardest where a **tool** takes the base as a default rather than
-where you type it.
-Nothing then prompts you to think about the ref at all.
-`scripts/semantic-line-breaks.py` defaults `--base` to `origin/main`
-(line 591) and scopes its added-line set with
-`git diff --unified=0 f'{base}...HEAD'` (line 293), so a run against an
-unfetched checkout proposes reflowing paragraphs `main` already carries ---
-prose the branch never wrote, offered under a label reading
-`paragraphs with lines changed vs origin/main` (line 639) that is true only
-of the stale ref.
-Any diff-scoped check inherits the same exposure;
-[`shared/writing/semantic-line-breaks.md`](../shared/writing/semantic-line-breaks.md)
-documents that scoping mechanism and the index-versus-content trap around it,
-and neither covers the ref being old.
-
-The remedy is one command, and it is not a range choice: `git fetch origin`
-before running anything that reads a base ref, and read
-`git rev-parse origin/main` rather than recalling where `main` was.
-
-- **Do:** fetch immediately before any diff-scoped check, and before any
-  claim about what your branch changed.
-- **Do:** print the base SHA the tool actually used, so a stale reading shows
-  up in the output instead of being inferred from the findings.
+- **Do:** fetch before running a diff-scoped check, not only before deriving a
+  review diff --- the check's default base is the same cached ref, and no hook
+  is watching this one.
 - **Don't:** read agreement between `..` and `...` as evidence the base is
-  current --- they agree under a stale ancestor base too, which is precisely
-  the failing case.
-- **Don't:** treat `...` as protection against upstream commits in general;
-  it protects against the tip having moved, not against your copy of the tip
-  being old.
+  current --- they agree whenever the base is an ancestor of `HEAD`, which a
+  stale base always is once main has been merged in.
 
 ## A merge commit's own content is visible to `git diff A...B` and invisible to `git log -p`
 

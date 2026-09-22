@@ -700,6 +700,15 @@
   That would make the response depend on *when* you ask rather than on how, and it fits both observations without either being wrong.
   It stays untested on purpose: probing consumes the per-user quota that is usually the actual reason Copilot is absent, so the experiment damages the thing it would explain.
 
+  **A third observation, on `Morrison-Lab/ai-config#3852` (2026-09-21), narrows what a `201` proves without resolving that disagreement.**
+  The POST returned `201`.
+  Afterwards `requested_reviewers` read `{"users":[],"teams":[]}`,
+  the issue timeline carried no `review_requested` event among its three events,
+  and `get_reviews` was still `[]`.
+  So a `201` is not evidence that a reviewer is now pending, and the timeline settles it where the status code cannot.
+  `mcp__github__request_copilot_review` returned no output and registered nothing on the same PR,
+  which is a second sighting of that silent result after #3799.
+
   The operational advice does not depend on resolving it.
   Don't spend a call on this endpoint either way while a `copilot-pull-request-reviewer` check run is queued or in progress on the head -- the ruleset already requested the review, and neither response tells you whether one is pending.
   A completed run on an unchanged head is no veto: after a Rebut/Defer-only round with no push, `skills/ardi/SKILL.md` requires a fresh request, and this endpoint is how to make it.

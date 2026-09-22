@@ -274,6 +274,26 @@ Recorded for that cluster in `ucdavis/bcs#592` / `#593`; the correction to
 the retracted figure and its retracted replacement were in different places on
 the page.)
 
+(A second case, of a different claim type, with the same shape: a
+reachability claim, not a numeric one, "corrected" by re-reading rather than
+by re-running the instrument.
+`Morrison-Lab/mln` PR #15 pushed filled notebooks and 32 lecture decks in
+commit `c98d5f450f`; later commits on the branch removed them, and an early
+write-up said the leak "reached mln".
+A later pass "corrected" that to "none was pushed, so nothing reached mln's
+history" by rereading the branch's final diff, rather than by fetching the
+PR's own refs and walking them.
+The correction was false: `refs/pull/15/head` and `refs/pull/15/merge` both
+still reach the commit, a non-admin user cannot delete those refs, and they
+survive the repository going public.
+It read as more careful than the claim it replaced, which is what let it pass
+two rounds of adversarial review and spread into a merged workflow-prompt
+addendum, two merged PR bodies, and a second repository's addendum before a
+fourth review round caught it.
+Full recipe and remedy in
+[`memories/git-branches.md`](../../memories/git-branches.md), "Scrubbing a
+later commit does not remove what an earlier commit already pushed".)
+
 ## A re-measurement with a different instrument
 
 (2026-08-12, `ucdavis/bcs#615`: a PHI-count figure was published as a

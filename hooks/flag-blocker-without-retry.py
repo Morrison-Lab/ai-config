@@ -43,7 +43,7 @@ classifier. Requiring it to sit near an explicit attribution ("denied by
 the classifier", "permission was denied") is what keeps the guard scoped to
 the actual incident shape: a handoff whose STATED REASON is a permission
 refusal, not any blocker whatsoever. See `ESCALATION_RX` / `ATTRIBUTION_RX`
-and `_find_pair` below.
+and `find_denial_escalation` below.
 
 WHY THIS WARNS RATHER THAN BLOCKS
 -----------------------------------

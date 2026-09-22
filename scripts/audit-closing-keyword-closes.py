@@ -15,7 +15,13 @@ closing references to the issue:
 
 - a reference that starts its line (`Closes #N`, optionally list-marked) or
   that sits in a sentence with no negation/deferral cue is DELIBERATE;
-- a reference inside a sentence carrying a cue is RISKY.
+- a `(closes #N ...)` tag -- the parenthesis opening on the keyword -- is
+  DELIBERATE unless a cue appears inside that same parenthesis; cues
+  elsewhere in its sentence do not count;
+- any other reference inside a sentence carrying a cue is RISKY.
+
+A "sentence" never extends past a list item, so one squashed commit's
+subject cannot taint the next.
 
 An issue is flagged when the closer references it riskily at all -- as
 "incidental" when that is its only reference, and as "contradicted" when the
@@ -119,6 +125,24 @@ def list_item_bounds(text: str, start: int) -> tuple[int, int]:
     return begin, end
 
 
+def tag_close(text: str, start: int) -> int:
+    """Index of the `)` that closes a parenthesis already open at START.
+
+    Nesting is counted, so `(closes #5 (see #3) but not verified)` ends at
+    the last `)`, not at the one after `#3`. An unclosed tag runs to the end
+    of the text, which only widens the span scanned for a cue.
+    """
+    depth = 1
+    for index in range(start, len(text)):
+        if text[index] == "(":
+            depth += 1
+        elif text[index] == ")":
+            depth -= 1
+            if depth == 0:
+                return index
+    return len(text)
+
+
 def closing_references(text: str, repo: str, number: int) -> list[dict]:
     """Every closing reference in TEXT that names issue NUMBER of REPO."""
     found = []
@@ -138,8 +162,7 @@ def closing_references(text: str, repo: str, number: int) -> list[dict]:
         # same parenthesis -- `(closes #N, not yet verified)` -- still does.
         tagged = False
         if text[:match.start()].endswith("("):
-            closing = text.find(")", match.end())
-            inside = text[match.end():closing if closing >= 0 else len(text)]
+            inside = text[match.end():tag_close(text, match.end())]
             tagged = not hook.RX_CUE.search(inside)
         risky = (not tagged
                  and not hook.begins_line(text, match.start())
@@ -202,8 +225,12 @@ def fetch_nodes(repo: str, limit: int | None) -> list[dict]:
                    "-F", f"size={PAGE_SIZE}"]
         if after:
             command += ["-F", f"after={after}"]
+        # Strict UTF-8, as check-pr-fully-clean.py and pr-sweep.py decode:
+        # a replacement character next to a cue word or a parenthesis would
+        # change a verdict with no sign anything was lost. A bad byte is an
+        # error (exit 2) instead.
         result = subprocess.run(command, capture_output=True, text=True,
-                                encoding="utf-8", errors="replace", check=True)
+                                encoding="utf-8", check=True)
         issues = json.loads(result.stdout)["data"]["repository"]["issues"]
         nodes.extend(issues["nodes"])
         if limit is not None and len(nodes) >= limit:

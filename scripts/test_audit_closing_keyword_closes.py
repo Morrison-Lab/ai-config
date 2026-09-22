@@ -110,6 +110,10 @@ v = verdict(pr_node(100, "", "* start: tidy (closes #100, not yet verified)"))
 check("a cue inside the close tag's own parenthesis still makes it risky",
       v["verdict"] == "flagged")
 
+v = verdict(pr_node(5, "", "* start: x (closes #5 (originally reported in #3) but not verified)"))
+check("a nested parenthesis does not end the tag's cue scan early",
+      v["verdict"] == "flagged")
+
 v = verdict(pr_node(
     435, "This must not auto-close https://github.com/Lacaedemon/sparta/issues/435 yet."))
 check("a full issue URL for this repo is recognised", v["verdict"] == "flagged")

@@ -1519,8 +1519,15 @@ since an instruction that says where *not* to look is a scope claim the reviewer
 ([`Morrison-Lab/mln#25`](https://github.com/Morrison-Lab/mln/pull/25), 2026-09-21:
 nine false or misleading claims in the review workflows merged in `mln#23`,
 found by an adversarial review of the sibling `mlg#5`.
-The addendum said three disclosure leaks "reached this repository",
-when nothing had been pushed and `main`'s history held none of the files;
-the accurate version was in the PR body and the false one in the file that steers reviews.
-It also carried the unhedged "material arriving is safe"
-in the sentence telling the reviewer where not to look.)
+It carried the unhedged "material arriving is safe"
+in the sentence telling the reviewer where not to look.
+
+That round also "corrected" the addendum's claim that three disclosure leaks
+"reached this repository" to say nothing had been pushed,
+on the evidence that `main`'s history held none of the files.
+**That correction was itself false**, and is the worked example
+in [`git-branches`](../../memories/git-branches.md)'s
+"Scrubbing a later commit does not remove what an earlier commit already pushed" section:
+the material was pushed on a pull-request branch and stays reachable through that PR's refs,
+so a clean `main` was the wrong artifact to check.
+The original claim was right, and a round of review replaced it with a wrong one.)

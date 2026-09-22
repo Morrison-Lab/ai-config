@@ -292,7 +292,8 @@ addendum, two merged PR bodies, and a second repository's addendum before a
 fourth review round caught it.
 Full recipe and remedy in
 [`memories/git-branches.md`](../../memories/git-branches.md), "Scrubbing a
-later commit does not remove what an earlier commit already pushed".)
+later commit does not remove what an earlier commit already pushed -- PR refs
+keep it reachable".)
 
 ## A re-measurement with a different instrument
 

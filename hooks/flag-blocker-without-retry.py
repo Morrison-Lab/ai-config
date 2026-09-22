@@ -94,6 +94,13 @@ Two mitigations, matching the conventions `no-unread-issue-claim.py` and
     regex fallback), so a reply that quotes the classifier's own denial text
     in backticks while explaining what happened does not self-trigger.
 
+This mitigation is PARTIAL BY DESIGN, the same tradeoff
+`flag-unfiled-issue.py` names for its own lexical matching: a reply that
+pastes this repo's own prose about the pattern in PLAIN text, with no
+backticks at all (quoting a whole memory-file paragraph, say), still pairs.
+That is judged acceptable for a WARNING in a way it would not be for a
+block, per the same reasoning `flag-cop-out-offer.py` gives.
+
 Fires once per distinct final message (sentinel keyed by a content hash),
 and fails OPEN and SILENT on any parse trouble: this file's own contract, and
 every hook's, per README's "A hook that misfires is worse than a missing
@@ -129,10 +136,10 @@ def _sibling(name):
 # fix: in a project-thread session the user-visible text is the payload of a
 # reply-tool call (`mcp__hearthbot__reply` and similar), never a plain
 # assistant text block, and a reader that only walks text blocks is blind to
-# the whole reply -- measured on ai-config#(flag-cop-out-offer's own case),
-# 2026-09-19. A plain-text-only fallback is kept for a checkout where that
-# sibling is missing or has changed shape, on the same fail-open contract
-# every hook here carries.
+# the whole reply -- measured against `flag-cop-out-offer.py` itself on
+# 2026-09-19 (see that file's own docstring). A plain-text-only fallback is
+# kept for a checkout where that sibling is missing or has changed shape, on
+# the same fail-open contract every hook here carries.
 _copout = _sibling("flag-cop-out-offer.py")
 _last_visible_texts = getattr(_copout, "last_visible_texts", None)
 

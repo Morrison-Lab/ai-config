@@ -31,7 +31,7 @@ from pathlib import Path
 _FENCE_RE = re.compile(r"```.*?```", re.DOTALL)
 _INLINE_CODE_RE = re.compile(r"`[^`\n]+`")
 _HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
-_LINK_RE = re.compile(r"\[([^\]]+)\]\([^)]+\)")
+_LINK_RE = re.compile(r"\[([^\]]*)\]\([^)]+\)")
 _IMAGE_RE = re.compile(r"!\[[^\]]*\]\([^)]+\)")
 
 # Abbreviations that end with a period but do not end a sentence
@@ -79,14 +79,18 @@ _CLICHE_RE = re.compile(
 def strip_markup(text: str) -> str:
     """Remove code blocks, inline code, comments, images, and unwrap links."""
     text = _FENCE_RE.sub("", text)
-    text = _INLINE_CODE_RE.sub("", text)
     text = _HTML_COMMENT_RE.sub("", text)
     text = _IMAGE_RE.sub("", text)
+    # Unwrap links before stripping inline code so [`code`](url) unwraps to `code`
+    text = _LINK_RE.sub(r"\1", text)
+    text = _INLINE_CODE_RE.sub("", text)
+    # Re-run link strip in case any empty-bracket links remained
     text = _LINK_RE.sub(r"\1", text)
     return text
 
 
-_BLOCK_START_RE = re.compile(r"^\s*(?:[-*+]|\d+\.|#{1,6}|>)\s+")
+_HEADING_RE = re.compile(r"^\s*#{1,6}\s+(.*)$")
+_LIST_OR_QUOTE_RE = re.compile(r"^\s*(?:[-*+]|\d+\.|>)\s+(.*)$")
 
 
 def split_sentences(text: str) -> list[str]:
@@ -96,14 +100,19 @@ def split_sentences(text: str) -> list[str]:
         return match.group(0).replace(".", "@@DOT@@")
 
     # Separate tight markdown list items, headings, and blockquotes so adjacent
-    # bullets don't concatenate into single compound sentences.
+    # blocks don't concatenate into single compound sentences.
     lines = text.splitlines()
     normalized_lines: list[str] = []
     for line in lines:
-        if _BLOCK_START_RE.match(line):
-            normalized_lines.append("\n" + _BLOCK_START_RE.sub("", line))
-        else:
-            normalized_lines.append(line)
+        h = _HEADING_RE.match(line)
+        if h:
+            normalized_lines.append("\n" + h.group(1) + "\n")
+            continue
+        lq = _LIST_OR_QUOTE_RE.match(line)
+        if lq:
+            normalized_lines.append("\n" + lq.group(1))
+            continue
+        normalized_lines.append(line)
     block_text = "\n".join(normalized_lines)
 
     masked = _ABBR_RE.sub(_mask_abbr, block_text)
@@ -528,6 +537,24 @@ def run_self_test() -> int:
         and tight_sents[0] == "First point ends here."
         and tight_sents[1] == "Second point starts here and continues for a while."
         and tight_sents[2] == "Third bullet item.",
+    )
+
+    # Links containing inline code must unwrap without leaking raw URLs
+    code_link = "Check [`use-preferred-style`](../../skills/use-preferred-style/SKILL.md) step 2."
+    clean_link = strip_markup(code_link)
+    check(
+        "link with inline code does not leak raw URL into text",
+        "SKILL.md" not in clean_link and "use-preferred-style" not in clean_link,
+    )
+
+    # Headings immediately followed by prose without a blank line must split
+    tight_heading = "## Section Heading\nFirst sentence immediately following heading without blank line."
+    heading_sents = split_sentences(strip_markup(tight_heading))
+    check(
+        "tight heading splits into separate sentences",
+        len(heading_sents) == 2
+        and heading_sents[0] == "Section Heading"
+        and heading_sents[1] == "First sentence immediately following heading without blank line.",
     )
 
     # Readability computation

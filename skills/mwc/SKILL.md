@@ -61,10 +61,11 @@ without asking confirmation before every merge.
   `scripts/check-mr-fully-clean.py` with the MR IID and project ID/path.
   The GitLab instrument reads every pipeline, paginated note and discussion,
   proves target currency, and re-reads the head before printing the pinned SHA.
-  Merge with `sha=<pinned-sha>` and
-  `merge_when_pipeline_succeeds=false`; if currency fails, rebase through
-  `PUT /projects/:id/merge_requests/:iid/rebase`, wait for
-  `rebase_in_progress` to clear, and rerun the whole gate on the new head.
+  Merge with `sha=<pinned-sha>` and `auto_merge=false`, passing
+  `--quorum <number-of-reachable-providers>` to the checker; if currency
+  fails, rebase through `PUT /projects/:id/merge_requests/:iid/rebase`, poll
+  with `include_rebase_in_progress=true` until `rebase_in_progress` clears,
+  and rerun the whole gate on the new head.
   On GitHub,
   record `headRefOid` and `baseRefName` before the instrument runs and
   require both live values to equal them immediately before every direct

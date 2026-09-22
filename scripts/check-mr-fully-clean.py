@@ -144,22 +144,31 @@ def _check_notes(notes: list[dict], discussions: list[dict], sha: str, quorum: i
             current_clean.add(identity)
 
     unresolved = []
+    seen_note_ids = set()
     for note in notes:
         if note.get("resolvable") and not note.get("resolved"):
+            note_id = str(note.get("id", "unknown"))
+            if note_id in seen_note_ids:
+                continue
+            seen_note_ids.add(note_id)
             body = str(note.get("body") or "")
             author = _note_author(note)
             # GitLab marks an automated clean summary as resolvable too.
             # An unresolved clean verdict is not an actionable finding; an
             # unresolved note with no clean verdict remains blocking.
             if not _is_clean(body, author):
-                unresolved.append(str(note.get("id", "unknown")))
+                unresolved.append(note_id)
     for discussion in discussions:
         for note in discussion.get("notes") or []:
             if note.get("resolvable") and not note.get("resolved"):
+                note_id = str(note.get("id", "unknown"))
+                if note_id in seen_note_ids:
+                    continue
+                seen_note_ids.add(note_id)
                 body = str(note.get("body") or "")
                 author = _note_author(note)
                 if not _is_clean(body, author):
-                    unresolved.append(str(note.get("id", "unknown")))
+                    unresolved.append(note_id)
     if unresolved:
         issues.append("Unresolved GitLab diff note(s): " + ", ".join(unresolved) + ".")
 
@@ -246,7 +255,7 @@ def main(argv: list[str] | None = None) -> int:
         die("payload mr.sha is required")
     if str(mr.get("iid")) != str(args.iid):
         die("payload MR IID does not match the requested IID")
-    if mr.get("state") not in ("opened", "reopened"):
+    if mr.get("state") != "opened":
         return _report(1, f"MR is not open (state={mr.get('state')!r}).")
     if mr.get("draft"):
         return _report(1, "MR is still a draft.")

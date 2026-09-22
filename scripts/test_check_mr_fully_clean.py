@@ -89,6 +89,23 @@ class CheckMrFullyCleanTests(unittest.TestCase):
         result = self.run_checker(value)
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
 
+    def test_duplicate_diff_note_is_reported_once(self):
+        value = payload()
+        note = {
+            "id": 3,
+            "type": "DiffNote",
+            "resolvable": True,
+            "resolved": False,
+            "author": {"username": "reviewer"},
+            "body": "Please fix this.",
+        }
+        value["notes"].append(note)
+        value["discussions"] = [{"notes": [note]}]
+        result = self.run_checker(value)
+        self.assertEqual(result.returncode, 1, result.stderr + result.stdout)
+        self.assertIn("Unresolved GitLab diff note(s): 3.", result.stdout)
+        self.assertNotIn("3, 3", result.stdout)
+
     def test_missing_currency_proof_is_usage_error(self):
         value = payload()
         value.pop("base_ancestor")

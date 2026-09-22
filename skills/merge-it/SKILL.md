@@ -68,8 +68,8 @@ It must print the current full head SHA and a clean verdict.
 Before the merge call, re-read the MR and confirm its `sha` and
 `target_branch` are unchanged.
 Use `glab api --method PUT
-"projects/<project>/merge_requests/<iid>/merge" -f
-"sha=<pinned-sha>" -f "merge_when_pipeline_succeeds=false"` or the equivalent
+  "projects/<project>/merge_requests/<iid>/merge" -f
+  "sha=<pinned-sha>" -f "auto_merge=false"` or the equivalent
 API client; GitLab rejects the request when the source head has moved.
 
 ### 2. Merge
@@ -106,10 +106,10 @@ API client; GitLab rejects the request when the source head has moved.
 
 - For GitLab, if the currency check fails, call
   `glab api --method PUT
-  "projects/<project>/merge_requests/<iid>/rebase"`, poll the MR until
-  `rebase_in_progress` is false, and rerun `check-mr-fully-clean.py` from the
-  beginning on the new SHA.
-  Do not use `merge_when_pipeline_succeeds=true` as a substitute for the
+  "projects/<project>/merge_requests/<iid>/rebase"`, poll the MR with
+  `include_rebase_in_progress=true` until `rebase_in_progress` is false, and
+  rerun `check-mr-fully-clean.py` from the beginning on the new SHA.
+  Do not use `auto_merge=true` as a substitute for the
   pinned clean gate; it is the GitLab analogue of deferred auto-merge and does
   not pin the reviewed head.
 - Default to **squash** for a feature branch with many small iteration commits

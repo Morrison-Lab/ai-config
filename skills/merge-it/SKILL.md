@@ -62,6 +62,17 @@ standing yes (see `preferences.md`).
   blocking instead. (Only merge a not-clean PR if the user explicitly says to
   anyway.)
 
+For a GitLab MR, use `python3 scripts/check-mr-fully-clean.py <iid>
+--project <id-or-path> --quorum <number-of-reachable-providers>` instead of
+the GitHub checker.
+It must print the current full head SHA and a clean verdict.
+Before the merge call, re-read the MR and confirm its `sha` and
+`target_branch` are unchanged.
+Use `glab api --method PUT
+  "projects/<project>/merge_requests/<iid>/merge" -f
+  "sha=<pinned-sha>" -f "auto_merge=false"` or the equivalent
+API client; GitLab rejects the request when the source head has moved.
+
 ### 2. Merge
 
 - Before the merge command, run the base-currency check that `fully-clean.md` states in its stale-base rule
@@ -72,7 +83,8 @@ standing yes (see `preferences.md`).
   and require `behind_by` of 0, recording `base_commit.sha` as `<pinned-tip>` for the pre-merge recheck of the same endpoint, which requires `behind_by` of 0 again and `base_commit.sha` equal to that pin.
   Where neither is available, do not merge until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) supplies the tool.
   On a base that requires a merge queue, stop and report: the queue form of this gate is [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) and is out of scope until it lands.
-  It is a manual step until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires it into `check-pr-fully-clean.py`,
+  It is a manual step until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires it into `check-pr-fully-clean.py` for GitHub;
+  the GitLab path is instrumented by `check-mr-fully-clean.py`,
   and on a repository that does not require an up-to-date branch GitHub would otherwise permit the stale merge, which is why the manual check stays required there.
   When it fails on a direct merge, update the branch pinned to the recorded head.
   Locally: `gh api -X PUT "repos/<owner>/<repo>/pulls/<N>/update-branch" -f expected_head_sha="<pinned-sha>"`.
@@ -92,6 +104,15 @@ standing yes (see `preferences.md`).
   A repeat names the moving ref, not the remedy.
   When the base moved twice it outruns the gate: merge under strict up-to-date protection instead (or through a merge queue once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) lands), per `fully-clean.md`.
   When the head moved, another writer is on the branch: settle ownership per `claim-pr` before rerunning, since no queue or protection setting stabilizes a head someone else pushes to.
+
+- For GitLab, if the currency check fails, call
+  `glab api --method PUT
+  "projects/<project>/merge_requests/<iid>/rebase"`, poll the MR with
+  `include_rebase_in_progress=true` until `rebase_in_progress` is false, and
+  rerun `check-mr-fully-clean.py` from the beginning on the new SHA.
+  Do not use `auto_merge=true` as a substitute for the
+  pinned clean gate; it is the GitLab analogue of deferred auto-merge and does
+  not pin the reviewed head.
 - Default to **squash** for a feature branch with many small iteration commits
   (and/or a merge-of-main commit) — it gives `main` one clean commit. Use a
   plain merge commit only if the user asks or the repo clearly prefers it; don't

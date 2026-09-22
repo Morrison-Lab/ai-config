@@ -106,6 +106,16 @@ class CheckMrFullyCleanTests(unittest.TestCase):
         self.assertIn("Unresolved GitLab diff note(s): 3.", result.stdout)
         self.assertNotIn("3, 3", result.stdout)
 
+    def test_idless_diff_notes_are_not_deduplicated(self):
+        value = payload()
+        value["notes"].extend([
+            {"type": "DiffNote", "resolvable": True, "resolved": False, "body": "First."},
+            {"type": "DiffNote", "resolvable": True, "resolved": False, "body": "Second."},
+        ])
+        result = self.run_checker(value)
+        self.assertEqual(result.returncode, 1, result.stderr + result.stdout)
+        self.assertIn("Unresolved GitLab diff note(s): unknown, unknown.", result.stdout)
+
     def test_missing_currency_proof_is_usage_error(self):
         value = payload()
         value.pop("base_ancestor")

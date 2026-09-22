@@ -147,10 +147,12 @@ def _check_notes(notes: list[dict], discussions: list[dict], sha: str, quorum: i
     seen_note_ids = set()
     for note in notes:
         if note.get("resolvable") and not note.get("resolved"):
-            note_id = str(note.get("id", "unknown"))
-            if note_id in seen_note_ids:
+            raw_note_id = note.get("id")
+            note_id = str(raw_note_id) if raw_note_id is not None else "unknown"
+            if raw_note_id is not None and note_id in seen_note_ids:
                 continue
-            seen_note_ids.add(note_id)
+            if raw_note_id is not None:
+                seen_note_ids.add(note_id)
             body = str(note.get("body") or "")
             author = _note_author(note)
             # GitLab marks an automated clean summary as resolvable too.
@@ -161,10 +163,12 @@ def _check_notes(notes: list[dict], discussions: list[dict], sha: str, quorum: i
     for discussion in discussions:
         for note in discussion.get("notes") or []:
             if note.get("resolvable") and not note.get("resolved"):
-                note_id = str(note.get("id", "unknown"))
-                if note_id in seen_note_ids:
+                raw_note_id = note.get("id")
+                note_id = str(raw_note_id) if raw_note_id is not None else "unknown"
+                if raw_note_id is not None and note_id in seen_note_ids:
                     continue
-                seen_note_ids.add(note_id)
+                if raw_note_id is not None:
+                    seen_note_ids.add(note_id)
                 body = str(note.get("body") or "")
                 author = _note_author(note)
                 if not _is_clean(body, author):

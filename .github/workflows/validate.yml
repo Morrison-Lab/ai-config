@@ -340,6 +340,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 scripts/test_check_hook_catalog.py
+      - name: Run hook-delivery check tests
+        run: python3 scripts/test_check_hook_delivery.py
       - name: Check hook output shape (warn-only hooks emit systemMessage)
         run: python3 scripts/check-hook-output-shape.py
       - name: Run hook-output-shape check tests

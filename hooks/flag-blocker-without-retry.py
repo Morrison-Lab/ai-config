@@ -73,7 +73,7 @@ of `VAR=value` assignments, a trailing pipeline, and redirection operators)
 before two commands are compared. This is deliberately its OWN, stronger
 normalization rather than a reuse of
 `remind-retry-before-declaring-blocked.py`'s `identity()`, which only
-collapses whitespace -- that hook's docstring explains why byte-for-byT
+collapses whitespace -- that hook's docstring explains why byte-for-byte
 matching is the right default THERE (the displayed command must be
 copy-paste-safe), which is not a concern here since this guard never echoes
 a command back for the user to run.

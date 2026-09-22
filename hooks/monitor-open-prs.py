@@ -43,6 +43,13 @@ MERGE_REQUEST_FIELDS = ("iid", "references", "title", "updated_at", "web_url")
 # poll_once().
 STATE_PATH = os.path.join(tempfile.gettempdir(), "claude-pr-monitors", "all-open-prs.json")
 IS_WINDOWS = os.name == "nt"
+# The daemon runs under pythonw, which has no console. On Windows a console
+# program started from a console-less parent gets a NEW console window unless
+# told otherwise, so every `gh`/`glab` call below flashed a window on the
+# desktop every poll -- several per cycle, forever, for as long as the
+# session lived. The flag was only ever applied to the daemon's own launch.
+NO_WINDOW = ({"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)}
+             if IS_WINDOWS else {})
 
 
 def write_state(value):
@@ -124,7 +131,7 @@ def gh_search_prs(*qualifiers):
     result = subprocess.run(
         [GH_PATH, "search", "prs", "--state", "open", "--limit", "1000",
          "--json", "number,repository,title,updatedAt,url", *qualifiers],
-        capture_output=True, text=True, timeout=60, check=True)
+        capture_output=True, text=True, timeout=60, check=True, **NO_WINDOW)
     pull_requests = json.loads(result.stdout)
     # `gh search prs --json` writes an array of objects. Anything else
     # is refused rather than stored: poll_once() catches ValueError
@@ -156,7 +163,8 @@ def gh_owners():
     for arguments in (["api", "user", "--jq", ".login"],
                       ["api", "--paginate", "user/orgs", "--jq", ".[].login"]):
         result = subprocess.run([GH_PATH, *arguments],
-                                capture_output=True, text=True, timeout=60, check=True)
+                                capture_output=True, text=True, timeout=60, check=True,
+                                **NO_WINDOW)
         owners.extend(line.strip() for line in result.stdout.splitlines() if line.strip())
     if not owners:
         raise OSError("gh api resolved no owner to scope the workflow-bot PR search to")
@@ -250,7 +258,7 @@ def glab_hosts():
     try:
         result = subprocess.run(
             [GLAB_PATH, "auth", "status", "--all"],
-            capture_output=True, text=True, timeout=POLL_SECONDS)
+            capture_output=True, text=True, timeout=POLL_SECONDS, **NO_WINDOW)
         output = (result.stdout or "") + (result.stderr or "")
         none_listed = f"(exit {result.returncode})"
     except subprocess.TimeoutExpired as error:
@@ -288,7 +296,7 @@ def host_merge_requests(host):
             GLAB_PATH, "api", "--hostname", host, "--paginate",
             "merge_requests?scope=created_by_me&state=opened&per_page=100"
         ],
-        capture_output=True, text=True, timeout=60, check=True)
+        capture_output=True, text=True, timeout=60, check=True, **NO_WINDOW)
     merge_requests = []
     for page in json_documents(response.stdout):
         # A page is a JSON array of merge requests. glab exits non-zero on
@@ -394,9 +402,7 @@ def ensure():
     if alive(read_state().get("pid")):
         return True
     try:
-        kwargs = {}
-        if IS_WINDOWS:
-            kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+        kwargs = dict(NO_WINDOW)
         interpreter = resolve_interpreter()
         process = subprocess.Popen([interpreter, os.path.realpath(__file__), "--monitor"],
                                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,

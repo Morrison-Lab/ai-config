@@ -608,6 +608,25 @@ with tempfile.TemporaryDirectory() as pydir:
         resolved = subject.resolve_interpreter()
         assert resolved == str(py_exe), f"expected {py_exe}, got {resolved}"
 
+# Every child process must be started without a console window. The daemon
+# runs under pythonw, so on Windows a console program it launches gets a NEW
+# window unless `CREATE_NO_WINDOW` is passed -- and only the daemon's own
+# launch passed it, so every `gh` poll flashed windows on the desktop. Checked
+# structurally so a call added later cannot quietly reintroduce the popups.
+import ast as _ast
+_tree = _ast.parse(Path(sys.argv[1]).read_text(encoding="utf-8"))
+_bare = []
+for _node in _ast.walk(_tree):
+    if (isinstance(_node, _ast.Call) and isinstance(_node.func, _ast.Attribute)
+            and _node.func.attr in ("run", "Popen")
+            and isinstance(_node.func.value, _ast.Name)
+            and _node.func.value.id == "subprocess"):
+        _passes = any(k.arg is None and isinstance(k.value, _ast.Name)
+                      and k.value.id in ("NO_WINDOW", "kwargs") for k in _node.keywords)
+        if not _passes:
+            _bare.append(_node.lineno)
+assert not _bare, f"subprocess calls without NO_WINDOW at lines {_bare}"
+
 print("PASS: GitHub and GitLab CLIs are resolved or refused at startup; "
       "the GitHub search covers the opened, assigned, and workflow-bot arms; "
       "failures accumulate an error streak that success resets")

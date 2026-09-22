@@ -1492,3 +1492,35 @@ and that the repo's actual gate is the sentence-and-clause checker,
 documented in [`semantic-line-breaks`](semantic-line-breaks.md),
 not a raw character-length pass.
 The author had run an ad-hoc `awk` and `grep` during the session and wrote them up as if they were repo instruments.)
+
+## A prompt is a standing instruction, so it gets more checking than documentation
+
+Prose that steers a model --- a review workflow's `prompt-addendum`, an agent's `CLAUDE.md`, a skill body, a subagent brief --- is not read once and judged.
+It is executed on every future run,
+by a reader that cannot ask which of two readings was meant.
+So a false sentence in it does not mislead one reader;
+it propagates into every verdict or edit made under it,
+and nothing downstream reports where it came from.
+
+In practice it gets less checking than a PR body,
+because it sits inside a YAML or config file and reads as configuration rather than as a claim.
+The checks above apply unchanged.
+The ones that bite hardest are state claims (what a repository contains, what happened in it)
+and unhedged absolutes,
+since an instruction that says where *not* to look is a scope claim the reviewer will obey.
+
+- **Do:** fact-check prompt text sentence by sentence before committing it,
+  running the same state queries you would for a PR body.
+- **Do:** describe the tree the prompt runs against,
+  which is the default branch at run time rather than the unmerged branch you wrote it on.
+- **Don't:** write an incident, a repository's contents, or a "this is safe" absolute into a prompt from recall.
+- **Don't:** treat prompt text as configuration because it lives in a YAML string.
+
+([`Morrison-Lab/mln#25`](https://github.com/Morrison-Lab/mln/pull/25), 2026-09-21:
+nine false or misleading claims in the review workflows merged in `mln#23`,
+found by an adversarial review of the sibling `mlg#5`.
+The addendum said three disclosure leaks "reached this repository",
+when nothing had been pushed and `main`'s history held none of the files;
+the accurate version was in the PR body and the false one in the file that steers reviews.
+It also carried the unhedged "material arriving is safe"
+in the sentence telling the reviewer where not to look.)

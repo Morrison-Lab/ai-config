@@ -314,7 +314,7 @@ Learned 2026-09-21 on ai-config#3829 when patching `os.name` in `hooks/test-ensu
 - **Don't:** monkeypatch `os.name = "nt"` in tests where code calls `pathlib.Path` constructors or mutating methods on POSIX hosts.
 
 ## Headless background execution on Windows requires pythonw
- 
+
 On Windows 11 with Windows Terminal set as the default terminal emulator,
 launching bare `python3` via `subprocess.Popen` without `CREATE_NO_WINDOW`
 will flash a console window or open a terminal tab,

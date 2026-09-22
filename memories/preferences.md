@@ -1130,10 +1130,11 @@ safer/preferred choice merely because the repo has external consumers.
 
 - **Never pause or stop early on wave boundaries;
   babysit in-flight PRs to completion.**
-  Reaching a wave boundary (e.g. 5/5 in `gii`) pauses *grabbing new issues*, but mandates actively babysitting all in-flight PRs to completion and clean merge.
-  Do not pause or exit the session while a PR in the wave remains unmerged.
-  - **Do:** Keep the session actively driving until every in-flight PR in the current wave is merged under MWC.
-  - **Don't:** Pause or exit at the wave boundary while a PR is still awaiting review or CI.
+  Reaching a wave boundary (e.g. 5/5 in `gii`, per `skills/finish-wave/SKILL.md` and `shared/workflow/stack-dont-pause.md`) pauses *grabbing new issues*,
+  but mandates actively monitoring and babysitting all in-flight PRs until merged (where an `mwc`/`maw` grant is active) or reported clean and ready for decision.
+  Between review/CI steps, arm a wake timer or schedule rather than abandoning in-flight PRs.
+  - **Do:** Keep the session actively driving until every in-flight PR in the current wave is merged under MWC or reported clean and ready with monitoring armed.
+  - **Don't:** Exit or stop monitoring at the wave boundary while a PR in the wave is still awaiting review, CI, or clean resolution.
 
 - **Always answer user questions immediately in visible text as soon as the answer is known.**
   When the user asks direct questions or inquiries, deliver the direct answer immediately in markdown text in that turn.

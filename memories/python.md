@@ -314,10 +314,17 @@ Learned 2026-09-21 on ai-config#3829 when patching `os.name` in `hooks/test-ensu
 - **Don't:** monkeypatch `os.name = "nt"` in tests where code calls `pathlib.Path` constructors or mutating methods on POSIX hosts.
 
 ## Headless background execution on Windows requires pythonw
+ 
+On Windows 11 with Windows Terminal set as the default terminal emulator,
+launching bare `python3` via `subprocess.Popen` without `CREATE_NO_WINDOW`
+will flash a console window or open a terminal tab,
+and resolving `python3` through WindowsApps App Execution Aliases (`%LOCALAPPDATA%\Microsoft\WindowsApps\python3.exe`)
+can trigger interactive launcher behavior.
+To make background helper daemons or git hook controllers truly headless on Windows,
+resolve to sibling `pythonw.exe` (`IMAGE_SUBSYSTEM_WINDOWS_GUI`, which allocates no console window),
+falling back to `sys.executable`,
+and pass `creationflags=subprocess.CREATE_NO_WINDOW` (`0x08000000`) on every child subprocess call (ai-config#3848).
+Learned 2026-09-21 on ai-config#3827, #3829, and #3848.
 
-On Windows 11 with Windows Terminal set as the default terminal emulator, launching `python3` via `subprocess.Popen` will flash a terminal window or open a terminal tab even when `CREATE_NO_WINDOW` (`0x08000000`) is passed, because Windows resolves `python3` through WindowsApps App Execution Aliases (`%LOCALAPPDATA%\Microsoft\WindowsApps\python3.exe`).
-To make background helper daemons or git hook controllers truly headless on Windows, resolve to sibling `pythonw.exe` (`IMAGE_SUBSYSTEM_WINDOWS_GUI`, which allocates no console window), falling back to `sys.executable`.
-Learned 2026-09-21 on ai-config#3827 and #3829.
-
-- **Do:** check for `Path(sys.executable).with_name("pythonw.exe")` or `shutil.which("pythonw")` when spawning background processes on Windows.
+- **Do:** check for `Path(sys.executable).with_name("pythonw.exe")` or `shutil.which("pythonw")` and pass `CREATE_NO_WINDOW` to child subprocesses when spawning background processes on Windows.
 - **Don't:** invoke bare `"python3"` in `subprocess.Popen` on Windows for background processes.

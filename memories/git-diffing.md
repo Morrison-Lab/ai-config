@@ -140,10 +140,90 @@ corroborating detail, and it had moved in the same commit that added the
 skills.
 The next review round retracted the finding once `main` was merged in.)
 
+## A stale base ref defeats both range forms, and `...` is not the fix
+
+The section above chooses between `..` and `...`, which is easy to read as
+the whole of what decides which commits a diff attributes to your branch.
+It is not.
+Both forms resolve `origin/main` through your **remote-tracking ref**, so an
+unfetched copy sends both of them to the same wrong place, and the merge base
+`...` computes is a merge base against that stale position.
+
+The distinction the section above teaches is structurally incapable of
+catching this, which is why reaching for `...` feels like having handled it.
+`...` exists for the case where the base ref carries commits your branch
+lacks.
+A stale `origin/main` is *behind* the real one, so once you have merged main
+in it is an **ancestor** of your `HEAD` and carries no such commits --- and
+`..` and `...` are then identical by definition.
+Comparing the two forms therefore returns agreement in exactly the case where
+both are wrong.
+
+Measured 2026-09-22 on this repo against the head of ai-config#3801,
+`244a0d61`, counting added-line markers per form:
+
+```bash
+F=memories/github-remote-sessions.md
+git diff --unified=0 "$base...244a0d61" -- "$F" | grep -c '^+[^+]'
+git diff --unified=0 "$base..244a0d61"  -- "$F" | grep -c '^+[^+]'
+```
+
+| base ref | `...` | `..` |
+| --- | --- | --- |
+| `7d9607c`, the true tip | 60 | 60 |
+| `51ab28e8`, its parent, one commit stale | 132 | 132 |
+
+The two forms agree in both rows, and moving the base back by a single commit
+adds 72 lines to what the branch appears to have written.
+All 72 come from `7d9607c`, since it is the only commit between the two bases;
+`git show --stat` reports it inserting 83 lines in that file, the gap being
+lines `244a0d61` went on to rewrite, which `--unified=0` then accounts to the
+branch rather than counting twice.
+
+A base ref *ahead* of the merge point does not do this, which is what
+separates the failure from the two-dot one the section above describes.
+Reproduced on a throwaway branch cut at `3ec7ff3` that then merged `bd860bf`:
+against `bd860bf` itself and against the later `d112f37`, both forms report
+zero added lines in that file, while against `7a617bb` --- one commit behind
+what the branch merged --- both report 29.
+Only a base behind the merge point mis-attributes, and it mis-attributes to
+both forms equally.
+
+It bites hardest where a **tool** takes the base as a default rather than
+where you type it.
+Nothing then prompts you to think about the ref at all.
+`scripts/semantic-line-breaks.py` defaults `--base` to `origin/main`
+(line 591) and scopes its added-line set with
+`git diff --unified=0 f'{base}...HEAD'` (line 293), so a run against an
+unfetched checkout proposes reflowing paragraphs `main` already carries ---
+prose the branch never wrote, offered under a label reading
+`paragraphs with lines changed vs origin/main` (line 639) that is true only
+of the stale ref.
+Any diff-scoped check inherits the same exposure;
+[`shared/writing/semantic-line-breaks.md`](../shared/writing/semantic-line-breaks.md)
+documents that scoping mechanism and the index-versus-content trap around it,
+and neither covers the ref being old.
+
+The remedy is one command, and it is not a range choice: `git fetch origin`
+before running anything that reads a base ref, and read
+`git rev-parse origin/main` rather than recalling where `main` was.
+
+- **Do:** fetch immediately before any diff-scoped check, and before any
+  claim about what your branch changed.
+- **Do:** print the base SHA the tool actually used, so a stale reading shows
+  up in the output instead of being inferred from the findings.
+- **Don't:** read agreement between `..` and `...` as evidence the base is
+  current --- they agree under a stale ancestor base too, which is precisely
+  the failing case.
+- **Don't:** treat `...` as protection against upstream commits in general;
+  it protects against the tip having moved, not against your copy of the tip
+  being old.
+
 ## A merge commit's own content is visible to `git diff A...B` and invisible to `git log -p`
 
-The section above picks a **range**.
-This one picks a **read**, which the range does not settle:
+The two sections above pick a **range**, and which ref that range is
+anchored to.
+This one picks a **read**, which neither of those settles:
 once a branch has merged `main` in,
 the same history is reported differently by `git diff`, `git log -p`, and the
 combined diff, and only one of the three hides what the merge commit itself

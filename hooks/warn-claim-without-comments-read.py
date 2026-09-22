@@ -446,6 +446,8 @@ def _json_includes_comments(rest):
     return "comments" in fields
 
 
+# Imported by `no-unread-issue-claim.py` as well as used here, so a
+# signature change here breaks that hook's suite rather than this one's.
 def command_reads_comments(command, number):
     """True when `command` reads issue `number`'s comments at a command
     position, via any of the CLI shapes this hook recognizes."""

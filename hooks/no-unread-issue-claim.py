@@ -451,15 +451,12 @@ RX_CUE = re.compile("|".join(CUES), re.I)
 # the `--json` value on commas and tests for the exact token. Borrowing them
 # fixes both, keeps the two guards agreeing about what a read IS, and means a
 # fix to either reaches both.
-_HOOKS_DIR = os.path.dirname(os.path.realpath(__file__))
-
-
 def _sibling(name, key):
     """Import a hyphenated sibling module, or None. Fails open, as ever."""
     try:
         import importlib.util
         spec = importlib.util.spec_from_file_location(
-            key, os.path.join(_HOOKS_DIR, name))
+            key, os.path.join(_HERE, name))
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         return mod
@@ -476,8 +473,14 @@ mcp_reads_comments = getattr(_claim, "mcp_reads_comments", None)
 # from `command`, `cmd` or `CommandLine` whatever the tool is NAMED. An
 # earlier version of this file walked only block lists and matched the tool
 # name `Bash` exactly, which made a genuine comments read invisible in an
-# Antigravity transcript -- in a file that special-cases Antigravity nine
-# lines from the end.
+# Antigravity transcript -- in a file that special-cases Antigravity in
+# `main` below.
+#
+# That version deleted the `tool_calls` branch on the stated ground that no
+# transcript format emits it. `grep -rln '"tool_calls"' hooks/*.py` returns
+# 33 files, 24 of them not tests. The count is here because the claim it
+# replaces was made with no query behind it, in a commit message arguing for
+# rigour about exactly that.
 _tool_uses = getattr(_claim, "_tool_uses", None)
 _payload_commands = getattr(_claim, "_payload_commands", None)
 
@@ -619,6 +622,12 @@ def main() -> int:
     try:
         payload = json.load(sys.stdin)
         tpath = payload.get("transcript_path") or payload.get("transcriptPath") or ""
+        # The three guards below are COST and INTENT, not correctness: each
+        # converges on the same silence the code after it would reach anyway,
+        # which is why a mutation sweep reports all three as survivors. The
+        # second is the one that earns its place -- it skips reading the whole
+        # transcript, which is the expensive step, whenever the message
+        # asserts nothing about any issue, and that is the common case.
         text = last_assistant_text(tpath)
         if not text:
             return 0
@@ -629,7 +638,8 @@ def main() -> int:
         if uses is None:
             # No readable transcript means no evidence either way. Fail open
             # rather than warn on every issue mention in a session we cannot
-            # inspect.
+            # inspect. Stated here rather than left to the per-issue
+            # fail-open below, so the intent survives a refactor of either.
             return 0
         missing = [n for n in numbers if not comments_were_read(n, uses)]
         if not missing:

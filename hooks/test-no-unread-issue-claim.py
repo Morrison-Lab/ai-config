@@ -109,10 +109,10 @@ CASES = [
     ([PROMPT, bash("gh issue view 1566 -R o/r -c"), say(CLAIM)], False,
      "the `-c` shorthand discharges it too"),
 
-    # The ANTIGRAVITY record shape. Fifteen-odd hooks in this repo parse
-    # `tool_calls`, and a round deleted this file's handling of it on the
-    # claim that no transcript format emits it -- in a file whose last nine
-    # lines special-case Antigravity.
+    # The ANTIGRAVITY record shape. A round deleted this file's handling of
+    # it on the claim that no transcript format emits it;
+    # `grep -rln '"tool_calls"' hooks/*.py` returns 33 files, 24 of them not
+    # tests.
     ([PROMPT,
       {"type": "PLANNER_RESPONSE", "tool_calls": [
           {"name": "run_command",
@@ -384,6 +384,11 @@ CASES = [
     ([PROMPT, READ_BODY_ONLY,
       say("#1566 is pending a decision from you.")], True,
      "'pending' alone is a cue"),
+    # Every cue fixture happened to put its cue mid-sentence, so `re.I` on
+    # `RX_CUE` was deletable with the suite green.
+    ([PROMPT, READ_BODY_ONLY,
+      say("Blocked on your review: #1566 cannot move until then.")], True,
+     "a sentence-initial, capitalised cue matches too"),
     ([PROMPT, READ_BODY_ONLY,
       say("#1566 is blocked on the runner image.")], True,
      "'blocked on' alone is a cue"),

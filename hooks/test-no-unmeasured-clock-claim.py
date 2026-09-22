@@ -283,6 +283,27 @@ META = {
     },
 }
 
+# A skill body that happens to QUOTE the harness's own injected-reading marker
+# text (this hook's own docstring, or the repo README, could plausibly be the
+# source). It must not be read as a real measurement -- adversarial review of
+# ai-config#3860 found this exact gap: guarding only the turn-boundary reset
+# left the separate RX_HOOK_CLOCK detection branch unprotected, letting an
+# isMeta entry manufacture a fake `measured` reading.
+META_QUOTING_CLOCK_MARKER = {
+    "type": "user",
+    "isMeta": True,
+    "sourceToolUseID": "toolu_y",
+    "message": {
+        "role": "user",
+        "content": [{
+            "type": "text",
+            "text": "Example from the guard's own docstring: "
+                    "\"Current time -- local: 2026-08-21 09:00:00 PDT\" is "
+                    "the harness's injected-reading shape.",
+        }],
+    },
+}
+
 
 # The harness's injected reading as it ACTUALLY arrives, copied from a live
 # transcript (2026-08-22). It is not a user turn: it is its own record, type
@@ -355,6 +376,14 @@ CASES = [
     ([DATE, META, say("Recap: 21:31 PDT")], False,
      "ai-config#3860: a mid-turn skill load (isMeta) does not expire an "
      "explicit `date` read taken earlier in the still-current turn"),
+    # Adversarial-review finding on ai-config#3860: guarding only the
+    # turn-boundary reset left the SEPARATE RX_HOOK_CLOCK-marker detection
+    # unprotected, so a skill body quoting the marker's own text (e.g. this
+    # guard's docstring) could manufacture a fake `measured` reading and
+    # silently discharge a claim nothing in this turn actually measured.
+    ([META_QUOTING_CLOCK_MARKER, say("Recap: 09:02 PDT")], True,
+     "ai-config#3860: a skill body quoting the injected-reading marker's "
+     "own text must not be read as a real measurement"),
 
     # --- the incident, and its shape ---
     ([DATE, say("first recap"), NEXT_TURN, say("UPDATE -- 19:24 PDT")], True,

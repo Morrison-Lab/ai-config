@@ -89,17 +89,27 @@ the diagnostic signal lies in clustering and mechanical repetition.
   (e.g., "...thereby highlighting the importance of X", "...ensuring seamless alignment", "...paving the way for future growth").
   *Fix:* Cut the participle clause or split into a concrete second sentence.
 - **Formulaic sentence openers:**
-  Fronting a declarative with a bare demonstrative
-  ("This is", "That is", "These are", "Those are"),
-  a wh-word ("What makes it work is..."),
-  or a partitive quantifier ("Some of the", "Many of the", "None of the").
+  Fronting a declarative with an underspecified reference
+  (bare demonstratives "This is", "That is", "These are", "Those are", or "The one that"),
+  a fronted wh-clause ("Who", "What", "Where", "When", "Why", "How", "Which", "Whose"),
+  a partitive quantifier ("Some of the", "Many of the", "All of the", "None of the"),
+  or a fronted subordinate clause or preposition ("While", "Although", "Despite", "Because", "Since").
   *Fix:* Name the noun the demonstrative stands for,
-  or front the subject and drop the copula.
-- **Contrastive closes and stock metaphors:**
+  front the subject and drop the copula,
+  cut "of the",
+  or lead with the main clause and qualify after.
+- **Contrastive closes, copula clefts, and stock metaphors:**
   Ending a claim by default with "rather than" or "not the same as";
+  unnecessary copula clefts ("is what", "is where", "is when", "is how");
   "carries"/"carry" and "tells"/"doesn't tell" standing in for a plain verb;
-  "load-bearing" standing in for "essential".
-  *Fix:* State the claim positively, and use the plain verb.
+  "load-bearing" standing in for "essential";
+  sports cliches ("own-goal");
+  metaphors ("the whole of it");
+  mid-phrase conjunctives (", however, ");
+  indirect pseudo-questions ("about what").
+  *Fix:* State the claim positively, use direct verbs
+  (e.g. "the lease stops collisions", not "the lease is what stops collisions"),
+  and drop copula clefts.
   Judge these by density, since each is ordinary English at one or two hits.
 - **Sentence-complexity metrics (measuring convoluted nesting):**
   Readability formulas score word and sentence length only
@@ -111,6 +121,11 @@ the diagnostic signal lies in clustering and mechanical repetition.
   a working-memory proxy that correlates with nesting
   without being the same quantity,
   and one a flat coordinated list inflates at zero nesting depth.
+  The deterministic script `scripts/check-sentence-complexity.py` implements
+  candidate detection for sentence length (word counts >= 25),
+  clause and subordinator nesting (commas + subordinators),
+  Automated Readability Index (Smith & Senter 1967),
+  Coleman-Liau (Coleman & Liau 1975), and sentence burstiness.
 - **Hedging stacks:**
   Layering epistemic modals ("may potentially help to", "can arguably to some extent").
   *Fix:* Make the direct claim or drop it.

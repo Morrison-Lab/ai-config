@@ -381,7 +381,9 @@ A consumer workflow calling `Morrison-Lab/gha/.github/workflows/claude-code-revi
   `Morrison-Lab/mln#23` and `Morrison-Lab/mlg#5` copied ai-config's own `claude-review.yml` and `claude-bot.yml` and condensed their comments.
   Besides `id-token: write`, the agent caller had no caller-side `if:` trusted-author gate, which gha's `examples/claude.yml` carries,
   and the condensed header said assigning an issue summons the agent, dropping the qualifier that the body or title must also mention it (or `dispatch-on-assignee` must be set).
-  Reviewers caught all three, and ai-config's own `claude-bot.yml` still carries the first two ([#3862](https://github.com/Morrison-Lab/ai-config/issues/3862)).
+  Reviewers caught all three.
+  ai-config's own `claude-bot.yml` still lacks the `if:` gate and carries a stale header rationale for dropping `issues: opened` ([#3862](https://github.com/Morrison-Lab/ai-config/issues/3862));
+  its `id-token: write` is correct, since the agent writes.
   A consumer caller is a *copy* of the blessed stub, with that repo's drift, so copying it inherits every grant, every missing gate, and every claim in its comments without their sources.
   [`upgrade-to-gha`](../shared/workflow/upgrade-to-gha.md) already says to copy `permissions:` from `examples/<name>.yml`;
   the `if:` gate and the header comments belong to the same diff.

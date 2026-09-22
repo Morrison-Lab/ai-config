@@ -1625,9 +1625,13 @@ It reads the MR `sha` and `target_branch`, every pipeline on that SHA, every pag
 For a local session, it proves currency with `git merge-base --is-ancestor <target-branch> <head-sha>` after fetching the target.
 For a remote session, the agent gathers the same payload through the GitLab API and passes it with `--from-json`, including an explicit `base_ancestor` result and the final head re-read.
 The instrument prints the full pinned SHA for the merge call.
-After the gate, re-read the MR, and merge only with `sha=<pinned-sha>` and `merge_when_pipeline_succeeds=false`; GitLab rejects the request if the head moved.
+After the gate, re-read the MR, and merge only with `sha=<pinned-sha>` and
+`merge_when_pipeline_succeeds=false`.
+GitLab rejects the request if the head moved.
 If currency fails, update with `PUT /projects/:id/merge_requests/:iid/rebase`, poll `rebase_in_progress`, then rerun the entire gate on the new SHA.
-The GitLab direct-merge form is now part of `merge-it`, `mwc`, and `chores`; a merge train remains a separate mode because its speculative pipeline must be verified by the server.
+The GitLab direct-merge form is now part of `merge-it`, `mwc`, and `chores`.
+A merge train remains a separate mode because its speculative pipeline must be
+verified by the server.
 It binds every direct-merge path, including the dependency-bump merges in [`chores`](../../skills/chores/SKILL.md), not only `mwc` and `merge-it`.
 For a bot bump, the gate to rerun after an update is CI plus conflict state, which is what those PRs are gated on, since `@claude` review is skipped on them by design.
 `chores` states that form.

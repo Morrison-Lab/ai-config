@@ -58,6 +58,33 @@ CHECKER_200 = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "python3 scripts/check-pr-fully-clean.py 200 "
                    "-R Morrison-Lab/ai-config"}}]}}
+CHECKER_1031 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 1031 "
+                   "-R ucdavis/bcs"}}]}}
+CHECKER_1032 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 1032 "
+                   "-R ucdavis/bcs"}}]}}
+CHECKER_1034 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 1034 "
+                   "-R ucdavis/bcs"}}]}}
+PUSH_1034 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "git push origin feat/1034"}}]}}
+PARTIAL_87 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "gh pr checks 87 -R d-morrison/macros"}}]}}
+PARTIAL_100 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "gh pr checks 100 -R Morrison-Lab/ai-config"}}]}}
+PARTIAL_200 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "gh pr checks 200 -R Morrison-Lab/ai-config"}}]}}
+PARTIAL_3468 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "gh pr checks 3468 -R Morrison-Lab/ai-config"}}]}}
+PARTIAL_1034 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "gh pr checks 1034"}}]}}
+PARTIAL_CHECK_RUNS_1034 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "gh api repos/ucdavis/bcs/commits/a5f4f3f2/check-runs?per_page=100 --paginate # inspect #1034"}}]}}
 CHECKER_3760 = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "python3 scripts/check-pr-fully-clean.py 3760 "
@@ -279,11 +306,11 @@ CASES = [
     ([AGENT_DISPATCH, UNRELATED_RESULT,
       say("#3468 is fully clean.")], "allow",
      "an unrelated tool_result (wrong id) is not a subagent report"),
-    ([PARTIAL, say("#87 is green, awaiting your merge.")], "warn",
+    ([PARTIAL_87, say("#87 is green, awaiting your merge.")], "warn",
      "d-morrison/macros#87: merge-readiness vocabulary outside the original set"),
     ([say("#87 is green, awaiting your merge.")], "allow",
      "merge-ready phrasing with no reading and no subagent -- nothing to warn about"),
-    ([PARTIAL, CHECKER_87, say("#87 is green, awaiting your merge.")], "allow",
+    ([PARTIAL_87, CHECKER_87, say("#87 is green, awaiting your merge.")], "allow",
      "checker ran last ON #87 -- the merge-ready phrasing is covered"),
 
     # --- ai-config#3485: the read's SUBJECT, not just its shape ---
@@ -353,7 +380,7 @@ CASES = [
      "same data-merge sentence, but 'branch' anchors it as PR-readiness "
      "vocabulary within the window"),
 
-    ([PARTIAL, say("#87 is yours now -- your call to merge.")], "warn",
+    ([PARTIAL_87, say("#87 is yours now -- your call to merge.")], "warn",
      "'your call to merge' is in the merge-ready vocabulary and was "
      "otherwise untested"),
 
@@ -431,6 +458,40 @@ CASES = [
       say("#200 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #300 is fully clean too.")],
      "warn",
      "#3761: multiple independent subagent-warn claims both fire"),
+
+    # --- ai-config#3838: scope partial reads and pushes to target PR ---
+    ([CHECKER_1031, CHECKER_1032, CHECKER_1034, PARTIAL_1034,
+      say("#1031 and #1032 are fully clean.")],
+     "allow",
+     "#3838: complete read of #1031 and #1032 not invalidated by partial read of #1034"),
+    ([CHECKER_1031, CHECKER_1032, CHECKER_1034, PARTIAL_CHECK_RUNS_1034,
+      say("#1031 and #1032 are fully clean.")],
+     "allow",
+     "#3838: check-runs read for #1034 does not invalidate complete read of #1031 and #1032"),
+    ([CHECKER_1031, PUSH_1034, PARTIAL_1034,
+      say("#1031 is fully clean.")],
+     "allow",
+     "#3838: push to #1034 does not invalidate complete read of #1031"),
+    ([CHECKER_1031, CHECKER_1034, PUSH_1034, PARTIAL_1034,
+      say("#1034 is fully clean.")],
+     "block",
+     "#3838: claim for #1034 after push to #1034 with only partial read blocks"),
+    ([CHECKER_1031, PUSH_1034, PARTIAL_1034,
+      say("#1031 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #1034 is fully clean too.")],
+     "block",
+     "#3838: multi-claim message blocks when #1034 lacks complete read after push"),
+    ([CHECKER_1031, PUSH, ENDPOINT,
+      say("#1031 is fully clean.")],
+     "block",
+     "#3838: unrecoverable push and partial read blocks claim as safe fallback"),
+    ([PARTIAL_1034,
+      say("#1031 is fully clean.")],
+     "allow",
+     "#3838: unrelated partial read does not cause warn on unread claim for #1031"),
+    ([PARTIAL_1034,
+      say("#1031 is green, awaiting your merge.")],
+     "allow",
+     "#3838: unrelated partial read does not cause warn on unread second-vocabulary claim for #1031"),
 ]
 
 # (events, must_contain, must_not_contain, label). The WARN explanation must
@@ -495,20 +556,20 @@ CONTENT_CASES = [
      "a far-away reference the message itself calls unrelated must not be "
      "taken as the claim's subject -- an honest vague label beats a "
      "confident wrong one"),
-    ([PARTIAL,
+    ([PARTIAL_200,
       say("#100 was closed as a duplicate. #200 is green, awaiting your "
           "merge.")],
      "#200",
      "about #100",
      "a message naming two PRs must label the claim with the one the claim "
      "is about, not the first reference in the message"),
-    ([PARTIAL, PUSH,
+    ([PARTIAL_100, PUSH,
       say("#100 is good to merge whenever you're ready.")],
      "no complete instrument read appears anywhere",
      "A complete instrument read is in this transcript",
      "a push after a partial reading, with no complete read ever -- the "
      "message must not claim a complete read exists"),
-    ([AGENT_DISPATCH, AGENT_REPORT, PARTIAL,
+    ([AGENT_DISPATCH, AGENT_REPORT, PARTIAL_3468,
       say("#3468 is green, awaiting your merge.")],
      "SHORT CI surface",
      "dispatched subagent's OWN report",
@@ -541,6 +602,16 @@ CONTENT_CASES = [
      "claim about #300",
      "claim about #100",
      "#3761: multiple warn_claims names #300"),
+    ([AGENT_200_DISPATCH, AGENT_200_REPORT, PUSH_1034,
+      say("#200 is fully clean.")],
+     "dispatched subagent's OWN report",
+     "a `git push` landed after it",
+     "#3838: push to unrelated PR does not make subagent report stale for #200"),
+    ([CHECKER, PARTIAL_100, PUSH,
+      say("#100 is good to merge whenever you're ready.")],
+     "no complete instrument read appears anywhere",
+     "A complete instrument read is in this transcript",
+     "#3838: complete read of unrelated PR does not make warn claim think complete read exists for #100"),
 ]
 
 

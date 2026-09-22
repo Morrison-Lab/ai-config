@@ -74,19 +74,20 @@ Reflex vocabulary that LLMs reach for far more than human writers:
 - **Verbs:** delve, leverage, harness, utilize, foster, facilitate, navigate,
   underscore, embark, unlock, elevate, spotlight, "shed light on", "dive into".
 - **Nouns/imagery:** tapestry, testament, realm, landscape, beacon, journey,
-  treasure trove, plethora, myriad, game-changer, deep dive.
+  treasure trove, plethora, myriad, game-changer, deep dive, "own-goal",
+  "the whole of it".
 - **Adjectives:** robust, seamless, holistic, nuanced, multifaceted, intricate,
   comprehensive, pivotal, crucial, vital, paramount, vibrant, bustling,
   cutting-edge, state-of-the-art, ever-evolving, rich (as in "rich history").
 - **Stock frames:** "in today's fast-paced world", "in the realm of", "at the
   heart of", "when it comes to", "more than just", "stands as a testament to",
-  "plays a crucial/pivotal role".
+  "plays a crucial/pivotal role", "about what".
 
 Quick first-pass grep (case-insensitive, prints `file:line`).
 Define the pattern once, then run it through whichever tool is on hand:
 
 ```bash
-tells='delve|leverage|utilize|seamless(ly)?|robust|holistic|nuanced|multifaceted|intricate|tapestry|testament|realm|landscape|beacon|plethora|myriad|pivotal|crucial|paramount|underscore|foster|harness|embark|unlock|elevate|game-?changer|cutting-edge|state-of-the-art|ever-evolving|treasure trove|fast-paced|in the realm of|at the heart of|more than just|shed light|dive in(to)?|deep dive|serves as|stands as'
+tells='delve|leverage|utilize|seamless(ly)?|robust|holistic|nuanced|multifaceted|intricate|tapestry|testament|realm|landscape|beacon|plethora|myriad|pivotal|crucial|paramount|underscore|foster|harness|embark|unlock|elevate|game-?changer|cutting-edge|state-of-the-art|ever-evolving|treasure trove|fast-paced|in the realm of|at the heart of|more than just|shed light|dive in(to)?|deep dive|serves as|stands as|the whole of it|own-goal|about what'
 rg -niE "\b($tells)\b" <target>          # ripgrep
 grep -rniE "\b($tells)\b" <target>       # no ripgrep — same pattern, via grep
 ```
@@ -104,28 +105,38 @@ grep -rniE "\b($tells)\b" <target>       # no ripgrep — same pattern, via grep
 - **The negation-reversal antithesis** — the single biggest tell:
   "It's not just X, it's Y" / "It isn't about X; it's about Y" / "This isn't
   merely X — it's Z". Grep: `rg -niE "(it'?s|this is) not (just|only|merely|about)"`.
-- **Formulaic sentence openers** --- a declarative fronted by a bare
-  demonstrative ("This is", "That is", "These are", "Those are"), a wh-word
-  ("What makes it work is the lease"), or a partitive quantifier ("Some of
-  the", "Many of the", "All of the", "None of the").
+- **Formulaic sentence openers** --- a declarative fronted by an
+  underspecified reference (bare demonstrative "This is", "That is", "These are",
+  "Those are", or "The one that"), a fronted wh-clause ("Who", "What", "Where",
+  "When", "Why", "How", "Which", "Whose"), a partitive quantifier ("Some of
+  the", "Many of the", "All of the", "None of the"), or a fronted subordinate
+  clause/preposition ("While", "Although", "Despite", "Because", "Since").
   Split on sentence-final punctuation before matching; a line-start grep sees
   only the sentences that happen to begin a line:
-  `tr '.!?' '\n' < <target> | grep -icE "^ *(this|that|these|those) (is|are)\b"`.
-  Fix: name the noun the demonstrative stands for, or front the subject and
-  drop the copula.
-- **Contrastive closes and stock metaphors** --- "rather than" and "not the same
-  as" ending a claim by default, "carries"/"carry" and "tells"/"doesn't
-  tell"/"does not tell" standing in for a plain verb, "load-bearing" standing
-  in for "essential".
+  `tr '.!?' '\n' < <target> | grep -icE "^ *(this|that|these|those|the one that|who|what|where|when|why|how|which|whose|while|although|despite) "`.
+  Fix: name the noun the demonstrative stands for, front the subject and drop
+  the copula, cut "of the", or lead with the main clause and qualify after.
+- **Contrastive closes, copula clefts, and stock metaphors** --- "rather than"
+  and "not the same as" ending a claim by default, unnecessary copula clefts
+  ("is what", "is where", "is when", "is how"), "carries"/"carry" and
+  "tells"/"doesn't tell"/"does not tell" standing in for a plain verb,
+  "load-bearing" standing in for "essential", "the whole of it", "own-goal",
+  mid-phrase conjunctives (", however, "), and indirect "about what".
   Each is ordinary English at one or two hits, so count density instead of
   banning them:
-  `grep -ioE "rather than|not the same as|load-bearing|carr(y|ies)|\btells\b|does(n't| not) tell" <target> | wc -l`.
+  `grep -ioE "rather than|not the same as|load-bearing|carr(y|ies)|\btells\b|does(n't| not) tell|the whole of it|own-goal|is (what|where|when|how)|\babout what\b|, however," <target> | wc -l`.
+  Fix: state the claim positively, use direct verbs ("the lease stops collisions",
+  not "the lease is what stops collisions"), drop copula clefts, and replace
+  metaphor cliches with plain wording.
 - **Convoluted sentences** --- clause nesting the reader must hold open across
   two or more embedded clauses.
   Cue: the ~25-word bar `use-preferred-style` step 2 sets, or three or more
   commas plus a subordinator ("which", "whose", "because", "while",
   "so that").
   Fix: split at the outermost clause boundary.
+  Automated checking: `python3 scripts/check-sentence-complexity.py <file>`
+  computes sentence word count, subordinator nesting, readability formulas
+  (ARI, Coleman-Liau), and sentence burstiness deterministically.
 - **Thin punctuation** --- long sentences glued with "and", while commas,
   semicolons, colons, and parentheses stay rarer than a human writer's.
   Count them per 1,000 words and count "and" against them.

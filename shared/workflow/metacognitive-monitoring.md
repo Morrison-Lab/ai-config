@@ -557,12 +557,12 @@ Tracked for the source comment as [ai-config#2532](https://github.com/Morrison-L
 - **Do:** ask how a capped sample was *taken*, and read a contiguous prefix over a nested product as a slice of the outer axis rather than a sample of the whole.
 - **Do:** re-derive a blind-prefix or coverage bound whenever the population it was measured against changes, and quote the axis structure rather than the bound when you cannot.
 - **Do:** date the claim against the change before blaming decay --- a figure that entered with the widening never faced the narrower population.
-- **Don't:** attribute a blind reading to decay without first re-running the control with its patch point corrected;
-  a control patching a function nothing calls reports the same blindness with the population untouched.
 - **Do:** raise the bound until the answer stops changing, or carry the window into the sentence.
 - **Do:** sample along a second axis --- one large item beside four small ones --- rather than adding a fifth of the same kind.
 - **Do:** scope the claim to what was measured, keeping "these four produced none" distinct from "none has ever".
 - **Do:** enumerate the cases a quantified claim did NOT list, since the ones it listed were chosen by whoever wrote the claim.
+- **Don't:** attribute a blind reading to decay without first re-running the control with its patch point corrected;
+  a control patching a function nothing calls reports the same blindness with the population untouched.
 - **Don't:** read a query returning exactly `--limit N` rows as a complete answer --- that is precisely what a truncated one looks like.
 - **Don't:** cap a generated corpus with a contiguous prefix;
   that fixes the slowest-varying axis and hides every shape it produces.
@@ -1301,10 +1301,10 @@ write the thing that can be wrong.
 - **Do:** write the claim that can be wrong --- a specification, a prediction, a
   precise statement of mechanism --- early enough that being wrong still costs
   little.
-- **Don't:** treat a polished retrospective as evidence that thinking happened;
-  a summary of settled conclusions cannot fail, so it cannot test anything.
 - **Do:** strip a brief, issue, or PR body after writing it, asking of each
   element whether the task actually depends on it.
+- **Don't:** treat a polished retrospective as evidence that thinking happened;
+  a summary of settled conclusions cannot fail, so it cannot test anything.
 - **Don't:** mistake a complete document for a tested one --- completeness is
   satisfied by adding, and adding tests nothing.
 - **Don't:** use confidence as the signal to stop checking --- it runs the

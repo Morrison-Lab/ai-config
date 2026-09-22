@@ -188,8 +188,6 @@ so a count in a claim about a branch's commits reaches neither.
   the substring claim at the top of this file is about the sentence around a keyword,
   not about letters inside a word,
   so read each hit.
-- **Don't:** open the PR having written its body but not read what the branch's commits would land;
-  the #1718 case above is a `Refs` PR body over a `Closes` squash body.
 - **Do:** put whatever keyword the merge should carry in the PR body,
   scoped per [`issue-first.md`](../shared/workflow/issue-first.md),
   then read every surface the parser will see for the merge method in use.
@@ -206,21 +204,23 @@ so a count in a claim about a branch's commits reaches neither.
   (`merge_commit_message` read as `PR_TITLE` on 2026-09-04);
   both merge-commit fields are editable in the dialog.
   Under a rebase merge: the PR body and the branch commits.
-- **Don't:** read only the squash body you typed;
-  the title arrives prefilled from the PR or the sole commit and reaches `main` unless you edit it.
-- **Don't:** count a stacked PR's body keyword as what will close the issue.
 - **Do:** when a branch carries `Refs` where a `Closes` was expected,
   read its commit messages for the reason before treating the absence as an omission,
   and look for the acceptance item a deliberate removal names.
-- **Don't:** add the `Closes` because the branch appears to have forgotten it.
 - **Do:** when a brief asserts what a branch's commits carry,
   run the listing above on that branch and paste its output beside the claim,
   per [`challenge-the-assignment.md`](../shared/workflow/challenge-the-assignment.md);
   the check is by hand, since the hook above does not see the claim.
-- **Don't:** assert in a brief that a commit carries a closing keyword the brief's author never read,
-  or read once and never re-read after the loop rewrote history.
 - **Do:** close an issue by hand only when every required acceptance item is met,
   by the merged diff or by the evidence the item asks for (a transcript line, for an observation),
   with a comment naming that evidence.
+- **Don't:** open the PR having written its body but not read what the branch's commits would land;
+  the #1718 case above is a `Refs` PR body over a `Closes` squash body.
+- **Don't:** read only the squash body you typed;
+  the title arrives prefilled from the PR or the sole commit and reaches `main` unless you edit it.
+- **Don't:** count a stacked PR's body keyword as what will close the issue.
+- **Don't:** add the `Closes` because the branch appears to have forgotten it.
+- **Don't:** assert in a brief that a commit carries a closing keyword the brief's author never read,
+  or read once and never re-read after the loop rewrote history.
 - **Don't:** close an issue by hand because its PR merged,
   or because the required items that remain unmet are the hard ones.

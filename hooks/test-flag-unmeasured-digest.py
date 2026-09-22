@@ -64,6 +64,27 @@ def assistant_says_hash(value):
 MD5_RUN = tool_result(f"MD5 (ex04_math.pdf) = {REAL_MD5}\n"
                       f"MD5 (ex05_linear_regression.pdf) = {REAL_MD5}")
 
+# The pin surface (ai-config#3392), from the 2026-09-20 recurrence on
+# Lacaedemon/sparta#1615. `REAL_HEAD` is that PR's actual head; `PADDED_HEAD`
+# shares its first 8 characters and is invented past them -- the exact shape of
+# a value built by padding out the abbreviation a gate printed.
+REAL_HEAD = "d46910953d5ea64ee58a295dd56a6f2b1ac55d80"
+PADDED_HEAD = "d46910959e3d84fd1e5b8b0e6b2ad5e0b1d5a2f9"
+assert REAL_HEAD[:8] == PADDED_HEAD[:8], "the padded fixture must share a prefix"
+assert REAL_HEAD != PADDED_HEAD
+
+# Only the ABBREVIATION reaches the transcript, which is the whole setup: the
+# session has seen `d4691095` and has never seen the full forty characters.
+HEAD_RUN = tool_result(
+    "PR #1615 (feat/621-far-tier-winner-pursuit): HEAD=d4691095\n"
+    "FULLY CLEAN on HEAD d4691095!")
+
+# The corrected reading: the full forty characters, as `--json headRefOid`
+# returns them. Kept separate from HEAD_RUN deliberately -- a case that means
+# "the session read the whole value" must not be fed the abbreviation-only
+# fixture, or it would pass for the wrong reason.
+HEAD_FULL_RUN = tool_result(f"head={REAL_HEAD}")
+
 
 def bash(command):
     return {"tool_name": "Bash", "tool_input": {"command": command}}
@@ -275,6 +296,179 @@ CASES = [
     ([PROMPT],
      bash("gh pr review 5 -R Morrison-Lab/mlg --approve"), False,
      "a review with no body flag posts no prose"),
+
+    # --- the pin surface (ai-config#3392) -------------------------------------
+    # The 2026-09-20 recurrence on Lacaedemon/sparta#1615: the gate printed the
+    # abbreviated head, and a 40-character value was padded out from it.
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh api -X PUT repos/L/s/pulls/1615/update-branch "
+          f"-f expected_head_sha={PADDED_HEAD}"), True,
+     "#3392: a pin padded out from an abbreviation the gate printed warns"),
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr merge 1615 -R L/s --squash --match-head-commit {PADDED_HEAD}"),
+     True,
+     "the same fabrication through --match-head-commit warns"),
+    ([PROMPT],
+     bash(f"gh api -X PUT repos/L/s/pulls/1/update-branch "
+          f"-f expected_head_sha={'b' * 40}"), True,
+     "a pin invented outright, with no observed prefix, warns"),
+    ([PROMPT, HEAD_RUN],
+     {"tool_name": "mcp__github__update_pull_request_branch",
+      "tool_input": {"owner": "L", "repo": "s", "pullNumber": 1,
+                     "expectedHeadSha": PADDED_HEAD}}, True,
+     "the MCP spelling carries the pin as a named parameter and warns"),
+
+    # A correctly-read pin must stay silent, or the guard gets switched off.
+    ([PROMPT, HEAD_FULL_RUN],
+     bash(f"gh api -X PUT repos/L/s/pulls/1615/update-branch "
+          f"-f expected_head_sha={REAL_HEAD}"), False,
+     "the full head the session actually read is silent"),
+    ([PROMPT, HEAD_FULL_RUN],
+     bash(f"gh pr merge 1615 -R L/s --squash --match-head-commit {REAL_HEAD}"),
+     False,
+     "the same real value through --match-head-commit is silent"),
+    ([PROMPT, tool_result(f"head={REAL_HEAD} base=main state=OPEN")],
+     bash(f"gh pr merge 1 -R L/s --squash --match-head-commit {REAL_HEAD}"),
+     False,
+     "a head read as part of a wider --jq line still discharges the pin"),
+    ([PROMPT, {"type": "user", "message": {"content":
+      f"merge it, the head is {REAL_HEAD}"}}],
+     bash(f"gh pr merge 1 -R L/s --squash --match-head-commit {REAL_HEAD}"),
+     False,
+     "a head the USER supplied is measured -- it entered from outside the model"),
+    ([PROMPT, assistant_says_hash(REAL_HEAD)],
+     bash(f"gh pr merge 1 -R L/s --squash --match-head-commit {REAL_HEAD}"),
+     True,
+     "the model's OWN prior assertion does not discharge a pin either"),
+    ([PROMPT, HEAD_RUN],
+     bash("gh api -X PUT repos/L/s/pulls/1/update-branch "
+          "-f expected_head_sha=\"$PINNED\""), False,
+     "a pin passed via a shell variable carries no literal SHA to check"),
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr view 1615 -R L/s --json headRefOid"), False,
+     "a command that merely READS the head is not a pin"),
+
+    # --- pin regressions found by adversarial review -------------------------
+    ([PROMPT, HEAD_FULL_RUN],
+     bash(f"gh pr merge 100 -R o/r --match-head-commit {REAL_HEAD} && "
+          f"gh pr merge 200 -R o/r --match-head-commit {'b' * 40}"), True,
+     "a MEASURED pin first must not mask a fabricated one after it -- "
+     "`search` stops at the first match where `finditer` does not"),
+    ([PROMPT, HEAD_RUN],
+     bash(f"# old attempt: gh pr merge 5 -R o/r --match-head-commit {'b' * 40}\n"
+          f"echo done"), False,
+     "a commented-out command never runs and must not warn"),
+    ([PROMPT, HEAD_RUN],
+     bash("cat > skills/example/SKILL.md <<'EOF'\n"
+          f"Example: `gh pr merge N --match-head-commit {'b' * 40}`\n"
+          "EOF"), False,
+     "a heredoc DOCUMENTING the command is prose, not an invocation -- this "
+     "corpus writes such examples constantly"),
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr merge 1 -R o/r#1 --match-head-commit {'b' * 40}"), True,
+     "a `#` inside a word is not a comment introducer and must not blind the scan"),
+    # The corpus's own canonical merge shape: `Closes #N` inside a quoted
+    # --body, with the pin AFTER it on the same line. A quote-unaware comment
+    # stripper discards everything from that `#` onward and goes silent on
+    # exactly the command this guard exists for.
+    ([PROMPT, HEAD_RUN],
+     bash(f'gh pr merge 1 -R o/r --body "Closes #123" '
+          f"--match-head-commit {'b' * 40}"), True,
+     "a `#` INSIDE a quoted --body must not blind the scan to a pin after it"),
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr merge 1 -R o/r --body 'closes #123' "
+          f"--match-head-commit {'b' * 40}"), True,
+     "the same with single quotes"),
+    # A quoted pin must still be scanned. (This one does not exercise the
+    # comment scanner -- there is no `#` on the line -- it just covers the
+    # quoted-pin shape, which round 1 never tested.)
+    ([PROMPT, HEAD_RUN],
+     bash(f'gh pr merge 1 -R o/r --squash --match-head-commit "{"b" * 40}"'),
+     True,
+     "a QUOTED pin is scanned like an unquoted one"),
+    ([PROMPT, HEAD_FULL_RUN],
+     bash(f'gh pr merge 1 -R o/r --body "Closes #7" '
+          f'--match-head-commit "{REAL_HEAD}"'), False,
+     "a quoted, correctly-read pin beside a quoted `#` stays silent"),
+    # The realistic contraction: an apostrophe INSIDE a double-quoted string,
+    # which is balanced. A blanking approach cross-pairs it with the later
+    # quoted region and swallows the real `#`; the scanner closes the double
+    # quote correctly and strips the comment.
+    ([PROMPT, HEAD_RUN],
+     bash(f'echo "don\'t merge yet" '
+          f"# old: gh pr merge 5 --match-head-commit {'b' * 40} 'x'"), False,
+     "an apostrophe inside a quoted string must not cross-pair with a later "
+     "quoted region and expose a commented-out pin"),
+    # A genuinely UNBALANCED quote is a shell syntax error, and the scanner
+    # deliberately errs toward scanning too much there: it treats the string
+    # as running to end of line, so a later `#` is not a comment and the pin
+    # is still examined. A spurious warning is the safe direction; silently
+    # missing a real pin is not.
+    ([PROMPT, HEAD_RUN],
+     bash(f"echo don't # old: gh pr merge 5 --match-head-commit {'b' * 40}"),
+     False,
+     "an unbalanced quote absorbs the commented text into one word, so no "
+     "word-initial pin flag remains -- and it was a comment anyway"),
+
+    # --- prose is not a pin (CI review of #3818) -----------------------------
+    # The finding that forced word splitting. A --body argument QUOTING a pin
+    # is one word that merely contains the flag text; only a real pin flag
+    # BEGINS its word. Both of these once reported the command as pinning a
+    # merge, which this corpus would hit constantly -- filing #3392 itself
+    # does exactly this.
+    ([PROMPT, HEAD_RUN],
+     bash(f'gh pr merge 1 -R o/r --body "first line\n'
+          f'second line --match-head-commit {"b" * 40}" --squash'), False,
+     "a pin quoted inside a MULTI-LINE --body is prose, not a pin"),
+    # --- and a real pin still fires in every spelling ------------------------
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh api -X PUT repos/o/r/pulls/1/update-branch "
+          f"-f 'expected_head_sha={'b' * 40}'"), True,
+     "a wholly quoted pin ARGUMENT still begins its word, so it still fires"),
+    ([PROMPT, HEAD_RUN],
+     bash(f'gh pr merge 1 -R o/r --match-head-commit="{"b" * 40}"'), True,
+     "the attached --flag=value spelling fires"),
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr merge 1 -R o/r --match-head-commit {'b' * 64}"), True,
+     "a 64-character SHA-256 head is not silently skipped by a length cap"),
+    # A metacharacter ends a word in `sh` with or without surrounding space.
+    # Splitting on whitespace alone glues it to the value, whose whole-word
+    # hex anchor then rejects it -- a silent skip.
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr merge 1 -R o/r --match-head-commit {'b' * 40}&&echo done"),
+     True,
+     "a pin glued to `&&` with no space is still found"),
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr merge 1 -R o/r --match-head-commit {'b' * 40}>log.txt"),
+     True,
+     "a pin glued to a redirect is still found"),
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr merge 1 -R o/r --match-head-commit {'b' * 40};echo done"),
+     True,
+     "a pin glued to `;` is still found"),
+    # A line continuation (`\<newline>`) separates the flag and value onto
+    # separate physical lines, but `sh` splices it out before word splitting.
+    # The pin surface must splice it too, so the flag and value remain adjacent.
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr merge 1 -R o/r --squash --match-head-commit \\\n"
+          f"  {'b' * 40}"),
+     True,
+     "a pin separated from its flag by a line continuation warns"),
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr merge 1 -R o/r --squash --match-head-commit \\\r\n"
+          f"  {'b' * 40}"),
+     True,
+     "a CRLF line continuation separating a pin from its flag warns"),
+    ([PROMPT, HEAD_RUN],
+     bash(f"gh pr merge 1 -R o/r --squash --match-head-commit=\\\n"
+          f"{'b' * 40}"),
+     True,
+     "an attached flag spliced to its value across a line continuation warns"),
+    ([PROMPT, HEAD_FULL_RUN],
+     bash(f"gh pr merge 1 -R o/r --squash --match-head-commit \\\n"
+          f"  {REAL_HEAD}"),
+     False,
+     "the same real value across a line continuation is silent"),
 ]
 
 
@@ -340,6 +534,146 @@ def check_output_shape():
     return 0 if ok else 1
 
 
+def check_pin_warning_distinguishes_padding():
+    """The pin warning must say WHICH failure it is, not merely that one occurred.
+
+    Fire-or-quiet cannot reach this: padded and invented-outright both fire, so
+    a mutation that collapses the two changes no verdict and every case above
+    still passes. The distinction is the actionable half -- "you padded
+    `d4691095`" names the remedy, "this is unmeasured" does not -- so it gets
+    an assertion of its own.
+    """
+    padded = run([PROMPT, HEAD_RUN],
+                 bash(f"gh pr merge 1 -R L/s --match-head-commit {PADDED_HEAD}"))
+    invented = run([PROMPT, HEAD_RUN],
+                   bash(f"gh pr merge 1 -R L/s --match-head-commit {'b' * 40}"))
+    pctx = (padded.get("hookSpecificOutput") or {}).get("additionalContext") or ""
+    ictx = (invented.get("hookSpecificOutput") or {}).get("additionalContext") or ""
+    ok = ("d4691095" in pctx and "padded" in pctx.lower()
+          and "padded" not in ictx.lower()
+          # The misdiagnosis is the reason this surface warrants its own note.
+          and "422" in pctx and "concurrent writer" in pctx)
+    print(f"{'ok  ' if ok else 'FAIL'}  the pin warning names the padded "
+          f"prefix, and says so ONLY when a prefix was observed")
+    return 0 if ok else 1
+
+
+def check_pin_does_not_suppress_body_finding():
+    """A pin and a body digest in one command are independent findings.
+
+    The first implementation returned as soon as the pin fired, so a chained
+    call carrying both reported only the pin -- and the body finding, which
+    has a different remedy, was silently dropped. Fire-or-quiet cannot reach
+    this either: the call fires either way.
+    """
+    out = run([PROMPT, HEAD_RUN],
+              bash(f"gh api -X PUT repos/o/r/pulls/1/update-branch "
+                   f"-f expected_head_sha={PADDED_HEAD} && "
+                   f'gh issue create -R o/r --body "commit {INVENTED}... fixed it"'))
+    ctx = (out.get("hookSpecificOutput") or {}).get("additionalContext") or ""
+    ok = PADDED_HEAD in ctx and INVENTED in ctx
+    print(f"{'ok  ' if ok else 'FAIL'}  a pin finding does not suppress an "
+          f"unmeasured digest in the same command's body")
+    return 0 if ok else 1
+
+
+def check_dry_run_warns_on_pin():
+    """`--dry-run` must reach the pin surface, or the affordance is inert there."""
+    out = run([], bash(f"gh pr merge 1 -R o/r --match-head-commit {'b' * 40}"),
+              extra_args=("--dry-run",))
+    ctx = (out.get("hookSpecificOutput") or {}).get("additionalContext") or ""
+    ok = "b" * 40 in ctx and "pin" in ctx.lower()
+    print(f"{'ok  ' if ok else 'FAIL'}  --dry-run warns on an unmeasured pin")
+    return 0 if ok else 1
+
+
+def check_comment_scanner_directly():
+    """Unit-test `_strip_comment`, which fire/quiet cases cannot pin down.
+
+    A boolean fire/quiet result conflates "the pin was found and judged
+    measured" with "the pin was never seen at all", so it is a weak guard for
+    a text transform. These assert the transform's actual output.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("_hook_under_test", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    f = mod._strip_comments
+    cases = [
+        # Round 5: quote state must survive a newline. A per-line scanner
+        # starts each line with no quote open, reads the `#` on the
+        # continuation line as a comment, and drops the pin after it.
+        ('gh pr merge --body "line one\nline two #inside --match-head-commit abc"',
+         'gh pr merge --body "line one\nline two #inside --match-head-commit abc"',
+         "an open quote carries across a newline, so a `#` there is not a comment"),
+        ("echo one # note\necho two --match-head-commit abc",
+         "echo one \necho two --match-head-commit abc",
+         "a comment ends at the newline; the next line survives intact"),
+        ("echo hi # note", "echo hi ", "a plain trailing comment is cut"),
+        ("echo hi", "echo hi", "a line with no comment is untouched"),
+        ("gh pr merge -R o/r#1 --squash", "gh pr merge -R o/r#1 --squash",
+         "`#` inside a word is not a comment"),
+        ('gh pr merge --body "Closes #1" --match-head-commit abc',
+         'gh pr merge --body "Closes #1" --match-head-commit abc',
+         "`#` inside double quotes is not a comment"),
+        ("gh pr merge --body 'Closes #1' --squash",
+         "gh pr merge --body 'Closes #1' --squash",
+         "`#` inside single quotes is not a comment"),
+        ('echo "don\'t" # note', 'echo "don\'t" ',
+         "an apostrophe inside double quotes does not swallow a later comment"),
+        ('echo "a # b" # note', 'echo "a # b" ',
+         "the FIRST unquoted `#` is the cut, not the quoted one"),
+        ("# whole line", "", "a full-line comment cuts to empty"),
+        ("echo don't # note", "echo don't # note",
+         "an unbalanced quote runs to end of line, so nothing is cut"),
+        ('echo "he said \'hi #1\'" # note', 'echo "he said \'hi #1\'" ',
+         "nested quoting does not confuse the scanner"),
+    ]
+    bad = []
+    for line, want, why in cases:
+        got = f(line)
+        if got != want:
+            bad.append(f"{why}: {line!r} -> {got!r}, wanted {want!r}")
+    ok = not bad
+    print(f"{'ok  ' if ok else 'FAIL'}  _strip_comments handles quoting across "
+          f"newlines, nesting, word-internal `#`, and unbalanced quotes")
+    for b in bad:
+        print(f"        {b}")
+    return 0 if ok else 1
+
+
+def check_prose_quoting_a_pin_is_not_a_pin():
+    """The CI review's blocking finding, asserted on the PIN surface directly.
+
+    A fire/quiet CASE cannot express this: the same command's --body also
+    carries an unmeasured hex, so the DIGEST surface fires on it legitimately
+    and the boolean result is True either way. Only `unmeasured_pin` returning
+    None shows the command is no longer misreported as pinning a merge.
+
+    The repro is the reviewer's own, and is not hypothetical -- filing #3392,
+    whose body quotes a fabricated `expected_head_sha=...`, does exactly this.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("_hook_pin_prose", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    tpath = write_transcript([PROMPT, HEAD_RUN])
+    try:
+        sha = "4d443b7ac57e8b09a7a3e9a41c2c8e2f9a1b0c3d"
+        prose = (f'gh issue create -R o/r --title "pin bug" --body '
+                 f'"a sweep padded it out via -f expected_head_sha={sha} '
+                 f'and it failed."')
+        real = f"gh api -X PUT repos/o/r/pulls/1/update-branch -f expected_head_sha={sha}"
+        prose_hit = mod.unmeasured_pin(prose, tpath)
+        real_hit = mod.unmeasured_pin(real, tpath)
+        ok = prose_hit is None and real_hit is not None
+    finally:
+        os.unlink(tpath)
+    print(f"{'ok  ' if ok else 'FAIL'}  a --body QUOTING a pin is not read as "
+          f"pinning, while the same flag as a real argument still is")
+    return 0 if ok else 1
+
+
 def check_unreadable_transcript_is_silent():
     """No readable transcript means no evidence either way: fail open.
 
@@ -374,6 +708,47 @@ def check_dry_run_warns():
     return 0 if ok else 1
 
 
+def check_line_continuation_word_splitting_and_quoting():
+    """Line continuations must splice outside quotes and in double quotes, but NOT single quotes.
+
+    sh treats `\\<newline>` as line continuation and deletes it outside quotes
+    and inside double quotes. Inside single quotes, the backslash is literal
+    and the newline is preserved.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("_hook_words", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    f = mod._shell_words
+
+    cases = [
+        # Unquoted: line continuation spliced
+        ("echo foo\\\nbar", ["echo", "foobar"], "unquoted line continuation is spliced"),
+        ("echo foo\\\r\nbar", ["echo", "foobar"], "unquoted CRLF line continuation is spliced"),
+        # Double quotes: line continuation spliced
+        ('echo "foo\\\nbar"', ["echo", "foobar"], "double-quoted line continuation is spliced"),
+        ('echo "foo\\\r\nbar"', ["echo", "foobar"], "double-quoted CRLF line continuation is spliced"),
+        # Single quotes: backslash and newline are literal, MUST NOT be spliced
+        ("echo 'foo\\\nbar'", ["echo", "foo\\\nbar"], "single-quoted backslash-newline is preserved literally"),
+        ("echo 'foo\\\r\nbar'", ["echo", "foo\\\r\nbar"], "single-quoted CRLF backslash-newline is preserved literally"),
+        # Flag and value separated across line continuation
+        ("gh pr merge 1 -R o/r --squash --match-head-commit \\\n  abc",
+         ["gh", "pr", "merge", "1", "-R", "o/r", "--squash", "--match-head-commit", "abc"],
+         "flag and value across line continuation become adjacent words"),
+    ]
+    bad = []
+    for cmd, want, why in cases:
+        got = f(cmd)
+        if got != want:
+            bad.append(f"{why}: {cmd!r} -> {got!r}, wanted {want!r}")
+    ok = not bad
+    print(f"{'ok  ' if ok else 'FAIL'}  _shell_words splices line continuations "
+          f"outside and in double quotes, preserving literal single quotes")
+    for b in bad:
+        print(f"        {b}")
+    return 0 if ok else 1
+
+
 def main():
     failures = 0
     for events, payload, should_fire, label in CASES:
@@ -383,14 +758,27 @@ def main():
         failures += 0 if ok else 1
         print(f"{'ok  ' if ok else 'FAIL'}  "
               f"[{'fire ' if should_fire else 'quiet'}] {label}")
-    failures += check_output_shape()
-    failures += check_unreadable_transcript_is_silent()
-    failures += check_dry_run_warns()
+    # Derived, not hand-maintained: the previous `len(CASES) + 3` constant went
+    # stale the moment a fourth check was added, and the suite then under-
+    # reported its own size. A list cannot drift from the calls it holds.
+    ADHOC = [
+        check_output_shape,
+        check_pin_warning_distinguishes_padding,
+        check_comment_scanner_directly,
+        check_prose_quoting_a_pin_is_not_a_pin,
+        check_pin_does_not_suppress_body_finding,
+        check_dry_run_warns_on_pin,
+        check_unreadable_transcript_is_silent,
+        check_dry_run_warns,
+        check_line_continuation_word_splitting_and_quoting,
+    ]
+    for check in ADHOC:
+        failures += check()
     if SHAPE_ERRORS:
         failures += 1
         print(f"FAIL  {len(SHAPE_ERRORS)} payload(s) had no surfacing field: "
               f"{SHAPE_ERRORS}")
-    print(f"\n{len(CASES) + 3} checks, {failures} failure(s)")
+    print(f"\n{len(CASES) + len(ADHOC)} checks, {failures} failure(s)")
     return 1 if failures else 0
 
 

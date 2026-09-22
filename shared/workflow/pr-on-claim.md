@@ -314,15 +314,15 @@ The converse fails too: a redundant branch conflicts as soon as the base edits t
 Merge-tree answers "will this apply", never "is this new".
 
 - **Do:** settle whether work is merged from the PR's own state, or from whether the branch's own additions are present in the default branch's current content.
+- **Do:** treat an **empty** path-scoped two-dot diff as conclusive on its own, without needing the three-dot form, **provided the path list is a complete enumeration of every path the branch touched** (renames and deletions included).
+  If every one of those files is byte-identical to the base, nothing on the branch is missing from it, whoever wrote the matching content.
+  The scoping caveat above is about the non-empty result staying ambiguous, not about the empty one being unreliable.
+  But the path list itself still needs checking: a source like `gh pr view --json files` can paginate or truncate on a PR with an unusually large file count, and a silently incomplete list makes "empty over the checked subset" look identical to "empty over everything the branch touched".
 - **Don't:** read a non-empty `<base>..<branch>` range as unmerged work in a squash-merging repo --- it says nothing there, however fresh the base.
 - **Don't:** read a non-empty two-dot `git diff <base> <branch>` as unmerged work either.
   The base advancing past the fork point makes that diff non-empty on its own, whether or not the branch's own content ever landed --- which is the same reason the commit range cannot say it.
   Scoping the diff to the branch's own files does not fix the **non-empty** case --- a sibling PR that touched the same file after the fork reproduces the same confusion.
   Use a one-directional `git diff <base>...<branch>` (three-dot, merge base on the left) to isolate the branch's own additions, then confirm those specific lines are present in the base with `git show <base>:<path> | grep -c '<distinctive phrase>'`.
-- **Do:** treat an **empty** path-scoped two-dot diff as conclusive on its own, without needing the three-dot form, **provided the path list is a complete enumeration of every path the branch touched** (renames and deletions included).
-  If every one of those files is byte-identical to the base, nothing on the branch is missing from it, whoever wrote the matching content.
-  The scoping caveat above is about the non-empty result staying ambiguous, not about the empty one being unreliable.
-  But the path list itself still needs checking: a source like `gh pr view --json files` can paginate or truncate on a PR with an unusually large file count, and a silently incomplete list makes "empty over the checked subset" look identical to "empty over everything the branch touched".
 - **Don't:** offer a clean or a conflicting `merge-tree` as evidence either way about novelty.
 
 (Measured 2026-08-22 on `Morrison-Lab/ai-config`.

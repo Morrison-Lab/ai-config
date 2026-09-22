@@ -365,6 +365,19 @@ the push to `main`.
 - **Don't:** copy an empty `formats` across from a working `quarto-publish.yml` call.
 - **Don't:** read a green preview build as evidence the PDF path works on `main`.
 
+## `claude-code-review.yml` caller permissions: omit `id-token: write`
+
+A consumer workflow calling `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2` should declare:
+`contents: read`, `pull-requests: write`, `issues: write`, `actions: read`, `checks: read`.
+
+- **Do NOT grant `id-token: write` on the review job:**
+  The review callee processes an untrusted PR diff and specifically omits `id-token: write` in its own jobs.
+  Granting `id-token: write` on the caller ceiling bypasses this isolation and creates an unnecessary privilege escalation risk (e.g. if `claude-code-action` falls back to its default write token minting).
+- **Template propagation hazard:**
+  Permissions copied from a reference caller workflow often escape scrutiny in reviews because copying an existing template reads as standard consistency.
+  Keep caller templates strictly minimized so copy-pasted implementations do not propagate over-privileged permissions.
+  (Measured 2026-09-21, tracked in [#3842](https://github.com/Morrison-Lab/ai-config/issues/3842); surfaced during `@claude` review on `Morrison-Lab/mln#23`.)
+
 ## Bundled repository suites (`check-*.yml`) and callee input verification
 
 Added in Morrison-Lab/gha#903 (closes #865, 2026-09-21):
@@ -389,4 +402,3 @@ six bundled composite actions and reusable workflows consolidate standard check 
   passing `paths` or `fail` causes silent parameter drops.
   Contract tests (`run-bundle-repo-actions-tests.py`) should parse callee `action.yml` files
   and statically assert zero undeclared inputs.
-

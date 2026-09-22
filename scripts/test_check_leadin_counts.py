@@ -89,6 +89,8 @@ def main():
          "a list starting on the next line"),
         ("Four freshness checks to run each session.\n\n- a\n- b\n- c\n",
          "a lead-in whose noun trails an adjective"),
+        ("Two open issues matching 'fix':\n\n- a\n- b\n- c\n",
+         "a non-enumerating noun ending in a colon"),
     ]:
         check(f"fires on {label}", fires(text))
 
@@ -125,6 +127,12 @@ def main():
         ("One thing to note:\n\n- a\n- b\n", "the word 'one'"),
         ("Write 3 sentences explaining the purpose:\n\n- a\n- b\n- c\n",
          "a bare numeral"),
+        ("Two open issues matching 'fix' never made it into the 30-row window.\n\n"
+         "**The first.**\nBody.\n\n**The second.**\nBody.\n\n**A third.**\nBody.\n",
+         "a factual statement of measurement without an enumerating noun (ai-config#3810)"),
+        ("Two rounds found the same defect.\n\n"
+         "**The first.**\nBody.\n\n**The second.**\nBody.\n\n**A third.**\nBody.\n",
+         "a factual statement opening with a number word (ai-config#3810)"),
     ]:
         check(f"does NOT fire on {label}", not fires(text))
 

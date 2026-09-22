@@ -177,6 +177,15 @@ try:
     check("task command quotes interpreter and hook",
           command.startswith('"C:\\py\\python.exe" "') and command.endswith('" --monitor'))
 
+    with tempfile.TemporaryDirectory() as pydir:
+        py_exe = Path(pydir) / "python.exe"
+        pyw_exe = Path(pydir) / "pythonw.exe"
+        py_exe.touch()
+        pyw_exe.touch()
+        resolved = subject.resolve_windows_interpreter(str(py_exe))
+        check("windows interpreter resolves pythonw sibling when present",
+              resolved == str(pyw_exe))
+
     ran = {}
 
     def fake_run(args, **kwargs):

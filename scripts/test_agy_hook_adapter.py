@@ -2446,5 +2446,38 @@ class TestAgyHookAdapter(unittest.TestCase):
             self.assertIn(staging_dir, migrated_paths)
             self.assertNotIn(os.path.join(ROOT, "plugins", "ai-config"), migrated_paths)
 
+    def test_windows_sh_hook_resolution_wraps_in_git_bash(self):
+        adapter = load_adapter()
+        hook = {
+            "type": "command",
+            "command": '"${CLAUDE_PLUGIN_ROOT}/hooks/inject-local-time.sh"',
+            "timeout": 10,
+        }
+        with patch("os.name", "nt"), patch.object(adapter, "find_windows_bash", return_value=r"C:\Program Files\Git\bin\bash.exe"):
+            cmd, timeout = adapter.resolve_cmd_and_timeout(hook, r"C:\fake\repo")
+            self.assertEqual(cmd, r'"C:\Program Files\Git\bin\bash.exe" "C:\fake\repo/hooks/inject-local-time.sh"')
+            self.assertEqual(timeout, 10.0)
+
+    def test_windows_sh_hook_resolution_preserves_non_sh_command(self):
+        adapter = load_adapter()
+        hook = {
+            "type": "command",
+            "command": 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/some-hook.py"',
+            "timeout": 15,
+        }
+        with patch("os.name", "nt"):
+            cmd, timeout = adapter.resolve_cmd_and_timeout(hook, r"C:\fake\repo")
+            self.assertEqual(cmd, r'python3 "C:\fake\repo/hooks/some-hook.py"')
+            self.assertEqual(timeout, 15.0)
+
+    def test_run_hook_command_windows_sets_create_no_window(self):
+        adapter = load_adapter()
+        with patch("os.name", "nt"), patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='{"decision": "allow"}', stderr="")
+            adapter.run_hook_command("echo test", {}, os.getcwd(), 10.0)
+            mock_run.assert_called_once()
+            _, kwargs = mock_run.call_args
+            self.assertEqual(kwargs.get("creationflags"), 0x08000000)
+
 if __name__ == "__main__":
     unittest.main()

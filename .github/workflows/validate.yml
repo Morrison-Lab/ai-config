@@ -147,6 +147,11 @@ jobs:
         # (a four-referent sentence) as the positive case and two
         # single-referent sentences as negative controls.
         run: python3 scripts/test_check_ambiguous_referents.py
+      - name: Run check-sentence-complexity tests
+        # scripts/check-sentence-complexity.py is a candidate detector and metric
+        # computer for convoluted sentence nesting, formulaic openers, and copula
+        # clefts (Refs #3108, shared/writing/ai-tells.md).
+        run: python3 scripts/test_check_sentence_complexity.py
       - name: Check lead-in counts against their enumerations
         # ai-config#3005. A lead-in count goes stale when a later edit splits
         # or merges one item, and a reader who counts along never reaches the
@@ -340,6 +345,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 scripts/test_check_hook_catalog.py
+      - name: Run hook-delivery check tests
+        run: python3 scripts/test_check_hook_delivery.py
       - name: Check hook output shape (warn-only hooks emit systemMessage)
         run: python3 scripts/check-hook-output-shape.py
       - name: Run hook-output-shape check tests

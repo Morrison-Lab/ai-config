@@ -1626,9 +1626,11 @@ For a local session, it proves currency with `git merge-base --is-ancestor <targ
 For a remote session, the agent gathers the same payload through the GitLab API and passes it with `--from-json`, including an explicit `base_ancestor` result and the final head re-read.
 The instrument prints the full pinned SHA for the merge call.
 After the gate, re-read the MR, and merge only with `sha=<pinned-sha>` and
-`merge_when_pipeline_succeeds=false`.
+`auto_merge=false`.
 GitLab rejects the request if the head moved.
-If currency fails, update with `PUT /projects/:id/merge_requests/:iid/rebase`, poll `rebase_in_progress`, then rerun the entire gate on the new SHA.
+If currency fails, update with `PUT /projects/:id/merge_requests/:iid/rebase`,
+poll the MR with `include_rebase_in_progress=true` until
+`rebase_in_progress` is false, then rerun the entire gate on the new SHA.
 The GitLab direct-merge form is now part of `merge-it`, `mwc`, and `chores`.
 A merge train remains a separate mode because its speculative pipeline must be
 verified by the server.

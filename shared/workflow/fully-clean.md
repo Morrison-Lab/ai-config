@@ -1619,8 +1619,15 @@ A clean-gate check the queue cannot block on is a check the queue does not run a
 Those two conditions are the specification the queue form of this gate has to prove ([#3030](https://github.com/Morrison-Lab/ai-config/issues/3030)), and until it lands the exception is unavailable: a base that requires a merge queue stops the merge, since a required check supplied by a GitHub App cannot be verified from workflow files at all.
 The proof will read the required checks from `gh api --paginate "repos/<owner>/<repo>/rules/branches/<base-encoded>"` (encode the base name as one path segment, `jq -rn --arg b "<base>" '$b|@uri'`, since `release/1.x` would otherwise split into two, and paginate, since the first page can omit rules), and each clean-gate workflow's `on:` block and job and step `if:` conditions for `merge_group`.
 
-The rule splits by merge mode: a direct merge from a session with `git` and `gh`, a direct merge from a remote session without `git`, and, once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) lands, a merge queue.
-It is GitHub-specific as written (`headRefOid`, `gh`, the compare endpoint, the update-branch and merge pins), so a GitLab merge has no equivalent gate until [#3021](https://github.com/Morrison-Lab/ai-config/issues/3021) supplies one, and `merge-it`, `mwc`, and `chores` inherit that scope.
+The rule splits by merge mode: a direct merge from a session with `git` and `gh`, a direct merge from a remote session without `git`, a direct GitLab merge from a session with `git` and `glab`, a direct GitLab merge from a remote session without `git`, and, once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) lands, a merge queue.
+GitLab uses `scripts/check-mr-fully-clean.py` for the equivalent gate.
+It reads the MR `sha` and `target_branch`, every pipeline on that SHA, every paginated note and discussion, and then re-reads the head before reporting a verdict.
+For a local session, it proves currency with `git merge-base --is-ancestor <target-branch> <head-sha>` after fetching the target.
+For a remote session, the agent gathers the same payload through the GitLab API and passes it with `--from-json`, including an explicit `base_ancestor` result and the final head re-read.
+The instrument prints the full pinned SHA for the merge call.
+After the gate, re-read the MR, and merge only with `sha=<pinned-sha>` and `merge_when_pipeline_succeeds=false`; GitLab rejects the request if the head moved.
+If currency fails, update with `PUT /projects/:id/merge_requests/:iid/rebase`, poll `rebase_in_progress`, then rerun the entire gate on the new SHA.
+The GitLab direct-merge form is now part of `merge-it`, `mwc`, and `chores`; a merge train remains a separate mode because its speculative pipeline must be verified by the server.
 It binds every direct-merge path, including the dependency-bump merges in [`chores`](../../skills/chores/SKILL.md), not only `mwc` and `merge-it`.
 For a bot bump, the gate to rerun after an update is CI plus conflict state, which is what those PRs are gated on, since `@claude` review is skipped on them by design.
 `chores` states that form.

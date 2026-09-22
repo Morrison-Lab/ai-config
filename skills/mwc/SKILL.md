@@ -57,8 +57,15 @@ without asking confirmation before every merge.
   [`fully-clean`](../../shared/workflow/fully-clean.md) for the payload keys.
   A later all-clear from a different reviewer does not supersede a standing
   not-clean; only a later clean from the same reviewer does.
-  On GitHub (a GitLab MR has no equivalent gate until
-  [#3021](https://github.com/Morrison-Lab/ai-config/issues/3021)),
+  On GitHub, use `check-pr-fully-clean.py`; on GitLab, use
+  `scripts/check-mr-fully-clean.py` with the MR IID and project ID/path.
+  The GitLab instrument reads every pipeline, paginated note and discussion,
+  proves target currency, and re-reads the head before printing the pinned SHA.
+  Merge with `sha=<pinned-sha>` and
+  `merge_when_pipeline_succeeds=false`; if currency fails, rebase through
+  `PUT /projects/:id/merge_requests/:iid/rebase`, wait for
+  `rebase_in_progress` to clear, and rerun the whole gate on the new head.
+  On GitHub,
   record `headRefOid` and `baseRefName` before the instrument runs and
   require both live values to equal them immediately before every direct
   merge, so a retarget at the same tip cannot pass with an old verdict and a

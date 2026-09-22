@@ -148,7 +148,7 @@ rule: a base ref is a cached copy, the three-dot form computes its merge base
 from whatever ref you fed it, and a base behind its remote widens the diff
 with other people's already-merged work.
 Read the argument there.
-This section adds the range-form corollary the section above needs, and the
+This section adds the range-form corollary that section needs, and the
 one surface that rule's own instrument cannot reach.
 
 **The corollary.**

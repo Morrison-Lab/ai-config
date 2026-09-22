@@ -367,7 +367,7 @@ the push to `main`.
 
 ## Bundled repository suites (`check-*.yml`) and callee input verification
 
-Added in Morrison-Lab/gha#865 (2026-09-21):
+Added in Morrison-Lab/gha#903 (closes #865, 2026-09-21):
 six bundled composite actions and reusable workflows consolidate standard check suites by repository type:
 `check-repo-hygiene.yml` (general repos / base suite),
 `check-quarto-website.yml` (websites),

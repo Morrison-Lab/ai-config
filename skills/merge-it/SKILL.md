@@ -63,7 +63,8 @@ standing yes (see `preferences.md`).
   anyway.)
 
 For a GitLab MR, use `python3 scripts/check-mr-fully-clean.py <iid>
---project <id-or-path>` instead of the GitHub checker.
+--project <id-or-path> --quorum <number-of-reachable-providers>` instead of
+the GitHub checker.
 It must print the current full head SHA and a clean verdict.
 Before the merge call, re-read the MR and confirm its `sha` and
 `target_branch` are unchanged.

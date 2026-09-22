@@ -811,6 +811,22 @@
   One worktree in the batch genuinely did have an uncommitted diff worth checking on its own merits (verify content before assuming "has changes" means "has value" --- here it turned out redundant with `main`); excluding just that one already-distinct item let the rest through on retry.
   A follow-up `git branch -D` sweep on the same branches was denied again for the same reason, even though the safe `-d` refusing (making `-D` necessary) is expected on a squash-merge repo, not a sign something's wrong (see `clean-worktrees/SKILL.md`'s squash-merge note).
   The fix is a genuinely more explicit authorization, not a smaller batch chosen to dodge the same check: present the full per-item plan (the `clean-worktrees` skill's own dry-run step already requires this) so the user's confirmation is unambiguously itemized, and if still blocked, stop and hand the specific command to the user to run themselves, or ask them to grant a settings permission rule. (Learned on `Lacaedemon/sparta`, 2026-07-04.)
+- **Partition a deletion choice by BLAST RADIUS, not by size or location --- and remember the option's LABEL is the part that carries consent.**
+  Measured 2026-09-15, a Windows disk-cleanup session.
+  An `AskUserQuestion` option was labelled **"Clear its caches only"** and its description bundled a Temp directory, an npm cache, browser HTTP caches, downloaded ollama models --- and a WSL2 distribution's ~26 GB of storage, the whole set called "regenerable bulk".
+  A WSL2 `ext4.vhdx` is a filesystem, not a cache: it holds whatever home directory, git repos, dotfiles and uncommitted work that Linux install accumulated.
+  The other four genuinely rebuild on demand;
+  that one destroys data that may exist nowhere else.
+  The user approved the option, so the mischaracterization had already done its work by the time it was noticed;
+  the recovery was to narrow the action to the genuinely safe items and report the WSL portion for a separate explicit decision.
+  - **Do:** group options by what a wrong answer costs --- regenerable / re-downloadable / irreplaceable --- and give an irreplaceable item its own option with its own honest label.
+  - **Do:** check that every item under a load-bearing word ("cache", "temp", "regenerable", "safe to delete") independently earns that word, since the label is what the reader weighs the option by.
+  - **Don't:** let an accurate description stand in for an accurate label.
+    An approval obtained under a word that means "reversible" is uninformed even when the description lists the destructive item honestly, and it cannot be taken back once the deletion runs.
+  - **Don't:** bundle items because their size, location, or "cleanup" framing makes them look alike --- similarity of appearance is not similarity of blast radius.
+  - This is distinct from [`avoid-false-dichotomies.md`](../shared/workflow/avoid-false-dichotomies.md), which governs whether the options are mutually **exclusive**;
+    this governs what each option's label **claims about its own contents**, and the two compose.
+    [`hooks/warn-irreplaceable-under-cache-label.py`](../hooks/warn-irreplaceable-under-cache-label.py) is this bullet's mechanism.
 - **A user's status statement about one thing ("all merged") isn't blanket authorization for an adjacent-but-distinct action the statement never actually named (e.g. closing an unnamed tracking issue).** After the user said "all merged" (about a batch of PRs), the conductor inferred license to also close an issue whose fix had landed via one of those PRs but whose PR description never referenced it --- a reasonable-sounding inference the classifier correctly flagged as going beyond what was actually said.
   The issue-close action itself may still be right, but check the specific instruction's actual scope before taking an adjacent action on the strength of it, rather than let a true, narrow statement license everything downstream that logically follows from it. (Learned on `Lacaedemon/sparta`, 2026-07-04.)
 - **"You can merge X" authorizes the merge, not the branch-protection *bypass* (`gh pr merge --admin`) needed to merge past a required approving review --- the auto-mode classifier treats those as two separate grants.** When the user said "you can merge 317," a plain `gh pr merge --squash` was rejected by GitHub itself ("base branch policy prohibits the merge" --- protection requires an approving review, which the `@claude` bot comment doesn't satisfy), and the follow-up `--admin` was then denied by the classifier: the merge was authorized but the review/protection override was not.
@@ -1111,3 +1127,17 @@ safer/preferred choice merely because the repo has external consumers.
   - **Do:** Ship the accountability mechanism in the same turn you make a promise.
   - **Don't:** Make promises about future behavior without a mechanism.
   (Flagged 2026-08-29 in wai GIA session: two consecutive "will drive #146..." promises with no mechanism.)
+
+- **Never pause or stop early on wave boundaries;
+  babysit in-flight PRs to completion.**
+  Reaching a wave boundary (e.g. 5/5 in `gii`, per `skills/finish-wave/SKILL.md` and `shared/workflow/stack-dont-pause.md`) pauses *grabbing new issues*,
+  but mandates actively monitoring and babysitting all in-flight PRs until merged (where an `mwc`/`maw` grant is active) or reported clean and ready for decision.
+  Between review/CI steps, arm a wake timer or schedule rather than abandoning in-flight PRs.
+  - **Do:** Keep the session actively driving until every in-flight PR in the current wave is merged under MWC or reported clean and ready with monitoring armed.
+  - **Don't:** Exit or stop monitoring at the wave boundary while a PR in the wave is still awaiting review, CI, or clean resolution.
+
+- **Always answer user questions immediately in visible text as soon as the answer is known.**
+  When the user asks direct questions or inquiries, deliver the direct answer immediately in markdown text in that turn.
+  Do not defer answering behind tool calls, internal steps, or silent waiting loops.
+  - **Do:** State the direct answer to user questions at the top of the reply before initiating further actions.
+  - **Don't:** Defer answering or run background waiting loops without first delivering the answer.

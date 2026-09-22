@@ -641,6 +641,21 @@ of having left it alone.
 - **Don't:** read this as covered by the import rule above; there is no source
   to have been faithful to, which is what removes the moment of doubt.
 
+**The worst case is a rewrite that raises the burden on the clause it left alone.**
+Above, the carried clause keeps asserting what it always asserted, and the defect is that nobody re-checked it.
+Here the rewrite changes what the clause has to support.
+A sentence rewritten to say where in a source something appears --- "in his conclusion", "in the opening section", "in the abstract" --- turns a locator that only had to land somewhere in the document into a claim about that document's structure.
+The citation's text is unchanged, so it reads as untouched; its job is not.
+The tell is a rewrite that adds a structural noun about the source, and the check is to open the source and find that structure, not merely the content.
+
+- **Do:** re-verify a locator whenever the rewritten sentence makes a claim about where in the source the material sits, even though the locator itself was not edited.
+- **Don't:** treat a pre-existing citation as pre-verified --- it was only ever as good as the weaker claim it used to carry.
+
+(ucdavis/lbt#7, 2026-09-15: replacing a hollow "In conclusion," opening with "Pinter states in his conclusion that ... (pp. 32-33)" made the inherited, already-wrong citation load-bearing.
+The conclusion is on p. 31.
+pp. 32-33 are the references and the author's address.
+Caught by foreground adversarial review, and the same pass had to re-check the other four "In conclusion," rewrites in the branch for the same reason.)
+
 ## When each rewrite is refuted on a NEW clause, the passage is over-specified
 
 The section above governs one rewrite: every clause you carried through it is
@@ -1186,6 +1201,13 @@ And the rewrite destroys its own evidence, per the case record above: there is
 no diff between a message and its predecessor, so nothing a later reader sees
 shows that the figure ever changed.
 
+(Recurrence, ucdavis/lbt#7, 2026-09-15: the original commit and its first amend each carried the same two figures that disagreed with their own diff, and the second amend fixed both.
+"145 packed lines" where the diff showed 117, and "three negation-reversal antitheses" where two were antitheses and the third was a metaphor removal.
+The second widens the class this section states.
+It counts the *kinds* of edit in the diff, not its size, so `git show --stat` cannot settle it and only reading the hunks can --- which is why a message describing a mixed cleanup is likelier to carry one of these than a message describing a single mechanical change.
+A parenthetical in the same message named four of the five items its own lead-in counted, which is [`check-leadin-counts.py`](../../scripts/check-leadin-counts.py)'s defect class on a surface that checker does not read --- and not its shape: that checker requires the count to open the last sentence of a lead-in line with the enumeration below it, while this count sat mid-sentence inside a bullet with the items inline in parentheses.
+[`hooks/flag-positional-figure-in-commit-message.py`](../../hooks/flag-positional-figure-in-commit-message.py) shows the surface is reachable --- a `PreToolUse` guard sees the message before the commit exists --- so a commit-message count check is buildable, though it needs a predicate for the inline-parenthetical form rather than a port of the existing bounds.)
+
 **A *positional* figure is in scope here, not only a measurement of the
 change.**
 "Thirteen lines above", "the section three lines below", "the sibling 39 lines
@@ -1470,3 +1492,35 @@ and that the repo's actual gate is the sentence-and-clause checker,
 documented in [`semantic-line-breaks`](semantic-line-breaks.md),
 not a raw character-length pass.
 The author had run an ad-hoc `awk` and `grep` during the session and wrote them up as if they were repo instruments.)
+
+## A prompt is a standing instruction, so it gets more checking than documentation
+
+Prose that steers a model --- a review workflow's `prompt-addendum`, an agent's `CLAUDE.md`, a skill body, a subagent brief --- is not read once and judged.
+It is executed on every future run,
+by a reader that cannot ask which of two readings was meant.
+So a false sentence in it does not mislead one reader;
+it propagates into every verdict or edit made under it,
+and nothing downstream reports where it came from.
+
+In practice it gets less checking than a PR body,
+because it sits inside a YAML or config file and reads as configuration rather than as a claim.
+The checks above apply unchanged.
+The ones that bite hardest are state claims (what a repository contains, what happened in it)
+and unhedged absolutes,
+since an instruction that says where *not* to look is a scope claim the reviewer will obey.
+
+- **Do:** fact-check prompt text sentence by sentence before committing it,
+  running the same state queries you would for a PR body.
+- **Do:** describe the tree the prompt runs against,
+  which is the default branch at run time rather than the unmerged branch you wrote it on.
+- **Don't:** write an incident, a repository's contents, or a "this is safe" absolute into a prompt from recall.
+- **Don't:** treat prompt text as configuration because it lives in a YAML string.
+
+([`Morrison-Lab/mln#25`](https://github.com/Morrison-Lab/mln/pull/25), 2026-09-21:
+nine false or misleading claims in the review workflows merged in `mln#23`,
+found by an adversarial review of the sibling `mlg#5`.
+The addendum said three disclosure leaks "reached this repository",
+when nothing had been pushed and `main`'s history held none of the files;
+the accurate version was in the PR body and the false one in the file that steers reviews.
+It also carried the unhedged "material arriving is safe"
+in the sentence telling the reviewer where not to look.)

@@ -447,6 +447,20 @@ check(
     False,
 )
 check(
+    "issue_read of a different issue does not view when target URL appears in an unrelated field",
+    subject.mcp_views_issue(
+        stems["view_mcp"],
+        {
+            "issue_number": 99,
+            "method": "get",
+            "body": "See https://github.com/o/r/issues/2282",
+        },
+        issue,
+        stems["view_mcp"],
+    ),
+    False,
+)
+check(
     "glab issue show is an alias for glab issue view",
     subject.command_views_issue("glab issue show 2282", issue, stems["view_cli"]),
     True,

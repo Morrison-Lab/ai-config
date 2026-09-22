@@ -65,6 +65,19 @@ misfires is worse than a missing one" -- no `permissionDecision`, ever.
       least one entry that is NOT untracked (`??`) -- i.e. at least one
       tracked file in scope has a staged or unstaged change relative to
       HEAD, which the command will discard
+  M5  a command line nested in a shell's `-c` argument is matched too, via
+      `scripts/lib/shellcmd.py`'s `shell_c_expansions`. A nested piece
+      contributes only the kinds decided LEXICALLY -- `reset-hard` and
+      `checkout-force`, which discard the whole tracked tree wherever they
+      run. A `checkout`/`restore` pathspec is not one of them: classifying a
+      bare word as a pathspec runs `git rev-parse` in this hook's own
+      directory, and for a nested piece that is the wrong repository
+      (ai-config#1973 review). A piece that can act only on THIS repository
+      takes the ordinary local reading -- M4's status gate included -- rather
+      than the unscoped note. That is a wider question than "contains no
+      `cd`", which is about the shell's directory: `GIT_DIR=` redirects the
+      repository without moving the shell, and `eval` moves the shell without
+      a `cd` token. `_may_change_repository` decides it
 
 ## Ref-vs-path disambiguation
 
@@ -122,6 +135,19 @@ import re
 import shlex
 import subprocess
 import sys
+
+try:
+    _LIB = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+        "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from shellcmd import shell_c_expansions
+except Exception as _exc:  # broken install: degrade to the outer command only
+    print(f"flag-reset-hard-uncommitted-work: cannot load "
+          f"scripts/lib/shellcmd.py ({_exc}); a discard wrapped in an "
+          f"interpreter's -c will not be seen", file=sys.stderr)
+    shell_c_expansions = None
 
 RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
 
@@ -301,23 +327,48 @@ def _looks_like_path(arg):
     return _resolves_as_ref(arg) is False
 
 
-def offending(command):
+def _lead_index(argv):
+    """Index of ARGV's first real word, past env assignments and lead words.
+
+    `_simple_commands` splits on operators only, so a body's keyword arrives
+    attached to the command it heads: `if [ -d w ]; then cd w; git push; fi`
+    yields the argv `["then", "cd", "w"]`. Both callers have to look past that
+    prefix before the command word means anything -- `offending_here` to find
+    the `git`, and `_may_change_repository` to find a `cd`.
+
+    One function rather than the same `while` loop written twice, which is
+    what it was until the second caller arrived (ai-config#3645 review round
+    3).
+    """
+    i = 0
+    while i < len(argv) and (ASSIGNMENT.match(argv[i])
+                             or argv[i] in LEAD_WORDS):
+        i += 1
+    return i
+
+
+def offending_here(command, lexical_only=False):
     """The matched destructive-discard invocation in `command`, or None.
 
     Returns (kind, segment, paths). `kind` is "reset-hard" or
     "checkout-force" (paths is None -- the whole tracked tree is in scope)
     or "checkout"/"restore" (paths is the resolved pathspec list that
     invocation would revert).
+
+    `lexical_only` restricts the answer to the two kinds the TEXT decides on
+    its own, and is what a NESTED piece gets. Without it this function reaches
+    `_looks_like_path` -> `_resolves_as_ref`, which runs `git rev-parse` in the
+    hook's own directory: `sh -c "cd OTHER && git checkout notes.txt"` then
+    warns or stays silent according to whether THIS repository happens to
+    carry a ref called `notes.txt`, which is a fact about the wrong repository
+    (ai-config#1973 review, round 4 finding 3). Relabelling the result
+    afterwards did not help, because the resolution had already happened.
     """
     cmds = _simple_commands(command)
     if cmds is None:
         return None
     for argv in cmds:
-        i = 0
-        while i < len(argv) and (ASSIGNMENT.match(argv[i])
-                                  or argv[i] in LEAD_WORDS):
-            i += 1
-        rest = argv[i:]
+        rest = argv[_lead_index(argv):]
         if len(rest) < 2 or rest[0] != "git":
             continue
         sub = rest[1]
@@ -329,6 +380,13 @@ def offending(command):
             continue
         (pre, post, saw_sep, staged_no_worktree,
          saw_force) = _checkout_restore_targets(sub, rest[2:])
+        if lexical_only:
+            # `--force` is decided by the flag alone, so it survives here.
+            # Everything below this point needs a repository to resolve a
+            # pathspec against, and a nested piece does not have one.
+            if sub == "checkout" and saw_force and not staged_no_worktree:
+                return "checkout-force", " ".join(argv), None
+            continue
         if staged_no_worktree:
             continue
         if sub == "restore":
@@ -349,6 +407,198 @@ def offending(command):
             continue
         return sub, " ".join(argv), paths
     return None
+
+
+_CD_WORDS = ("cd", "pushd", "popd")
+
+# Words that move the shell, and tokens that move the REPOSITORY without
+# moving the shell. The second group is why this is not a `cd` scan: the
+# question a caller asks is which repository the command acts on, and a
+# `cd` is only one of the ways that stops being the shell's own directory.
+# `no-clobbering-push.py` names the same spellings as `GIT_REPO_OPTS` and
+# `GIT_ENV_REDIRECT`; they are restated rather than imported because that
+# guard is not importable from here. `GIT_COMMON_DIR=` is the one addition
+# over that pair's union, and it redirects the same way.
+_REPO_REDIRECT_ENV = ("GIT_DIR=", "GIT_WORK_TREE=", "GIT_COMMON_DIR=")
+_REPO_REDIRECT_OPTS = ("--git-dir", "--work-tree")
+# `eval` builds its command at run time, so nothing lexical can say where it
+# leaves the shell. `source` (and its `.` spelling) runs another file's `cd`s
+# in this shell.
+_OPAQUE_WORDS = ("eval", "source", ".")
+
+
+def _may_change_repository(text):
+    """True when TEXT might act on a repository other than this directory's.
+
+    NOT a `cd` scan, although a `cd` is the obvious case. The premise "a piece
+    containing no `cd` provably starts where the outer command did" is true
+    about the SHELL'S DIRECTORY and does not support the conclusion drawn from
+    it about the REPOSITORY: `GIT_DIR=/other/.git git reset --hard` never
+    moves the shell and discards another repository's work, and
+    `eval 'cd /other'` moves the shell with no `cd` token in sight -- the
+    token is the whole string, whose basename is `other`. Both took the local
+    reading and listed THIS repository's dirty files as what would be lost,
+    which is the cross-repository report `NOTE_NESTED_UNSCOPED` exists to
+    prevent and calls "worse than silence" (ai-config#3645 pre-merge gate,
+    finding 2).
+
+    Deliberately over-reports, and in two ways worth naming so neither reads
+    as a bug. A bare `-C` counts although `grep -C 3` is not a git option, and
+    unparseable text counts as redirecting. Both cost only the file list.
+
+    What is deliberately NOT over-reported is a `cd`, `eval`, `source` or `.`
+    sitting anywhere other than the command word. Those four are only those
+    commands when they are being RUN, and reading them positionally made a
+    bare `.` path argument -- `git add .` -- look like a `source`.
+
+    The unparseable branch is DEFENSIVE and no case reaches it: `offending`
+    calls this only after `shell_c_expansions` has parsed the same text, and
+    the two parsers were measured to fail together on every shape tried
+    (2026-09-14). It stays because dropping it turns a `None` into a
+    `TypeError` that would take the whole guard down.
+    """
+    cmds = _simple_commands(text)
+    if cmds is None:
+        return True
+    for argv in cmds:
+        # A WORD is only `cd` or `source` when it is the command being run.
+        # Scanning every token instead matched a bare `.` as the POSIX
+        # spelling of `source`, so `sh -c "git add . ; git reset --hard"` --
+        # one of the commonest shapes there is -- lost the local reading this
+        # shortcut exists to give it, and the docstring's list of accepted
+        # over-detections did not name it (ai-config#3645 review round 2).
+        #
+        # The prefix comes off first, because a body's keyword arrives
+        # attached: `then cd /other` splits with `then` at the head, and
+        # testing `argv[0]` alone would read that piece as stationary.
+        lead = _lead_index(argv)
+        if lead < len(argv):
+            word = os.path.basename(argv[lead])
+            if word in _CD_WORDS or word in _OPAQUE_WORDS:
+                return True
+        # The REDIRECTION spellings are options and assignments rather than
+        # command words, so they really can sit anywhere in an argv -- and
+        # `nested_git_dir_option_case` pins one in a sibling command.
+        for token in argv:
+            if token.startswith(_REPO_REDIRECT_ENV):
+                return True
+            if token.startswith(_REPO_REDIRECT_OPTS):
+                return True
+            # `git -C <dir>` reads and writes that directory's repository.
+            if token == "-C":
+                return True
+    return False
+
+
+def offending(command):
+    """`offending_here` over COMMAND and every shell `-c` nested command line.
+
+    This hook compares exact tokens, so an interpreter wrapper bypassed it
+    outright: `shlex` collapses the embedded command into ONE opaque token,
+    `argv[0]` is the interpreter, and `rest[0] != "git"` rejects it before any
+    subcommand is read.
+
+    Measured 2026-09-14 against a deliberately DIRTY tree, which is what the
+    check needs -- this hook fires on uncommitted work, so a clean checkout
+    makes the bare form silent too and the probe says nothing either way
+    (ai-config#1973 records an earlier inconclusive one):
+
+        git reset --hard origin/main            -> warns
+        sh -c "git reset --hard origin/main"    -> SILENT
+        bash -c "git reset --hard origin/main"  -> SILENT
+
+    Each piece is analysed separately rather than merged, per
+    `shell_c_expansions`' own contract: a nested `-c` argument is a different
+    shell. Nothing here models shell state, so the separation costs nothing and
+    keeps this call site identical in shape to its sibling guards'.
+
+    First hit wins, matching `offending_here`, which returns on the first
+    destructive invocation it finds rather than collecting them.
+    """
+    pieces = [command]
+    if shell_c_expansions is not None:
+        try:
+            pieces = shell_c_expansions(command)
+        except Exception as exc:  # never let the descent break the base check
+            print(f"flag-reset-hard-uncommitted-work: could not expand nested "
+                  f"shells ({exc}); checking the outer command only",
+                  file=sys.stderr)
+            pieces = [command]
+    # A nested piece is answerable only on what the TEXT decides.
+    #
+    # The comment here used to claim `offending_here` "resolves nothing against
+    # a directory". That is false: `_looks_like_path` calls `_resolves_as_ref`,
+    # which runs `git rev-parse --verify <arg>^{commit}` in the hook's OWN
+    # directory, so whether a `git checkout <word>` reads as a pathspec or as a
+    # branch depends on which repository is asked. For a nested piece that
+    # repository is the wrong one -- `sh -c "cd OTHER && git checkout
+    # feature-x"` reported discarding a tracked file named `feature-x` in THIS
+    # repo, for a command that switches branches in the other and discards
+    # nothing (ai-config#1973 review, round 2 finding 2).
+    #
+    # That is the same defect the sibling guard's `deny_only` exists to
+    # prevent, and this hook asserted its negation in one sentence while the
+    # sibling argued the correct premise at length -- in the same commit.
+    #
+    # So a nested piece contributes only the kinds decided lexically:
+    # `reset-hard` and `checkout-force` discard the whole tracked tree wherever
+    # they run, and carry no resolved pathspec. `checkout`/`restore` with a
+    # pathspec list do, and are skipped for nested pieces.
+    match = offending_here(command)
+    if match is not None:
+        return match
+    for piece in pieces[1:]:
+        match = offending_here(piece, lexical_only=True)
+        if match is None:
+            continue
+        # NESTED_UNSCOPED, not the matched kind. The `paths is None` filter
+        # this replaces narrowed the classification and left the REPORT alone,
+        # and the report is what was wrong: `_tracked_changes` runs
+        # `git status` in the hook's own directory whatever piece matched, so
+        # `sh -c "cd OTHER && git reset --hard"` listed THIS repo's dirty files
+        # as what the command would discard. The classification is
+        # directory-dependent too -- `_looks_like_path` resolves a bare word
+        # with `git rev-parse` here -- so filtering on its result could not
+        # have fixed it either (ai-config#1973 review, round 3, findings 4
+        # and 5).
+        #
+        # A nested piece is worth flagging and not worth enumerating. The
+        # caller emits a warning that names the construct and says which
+        # repository it cannot see, with no file list.
+        #
+        # UNLESS the piece provably stays put. The note's own text blames
+        # `cd`s the outer shell might have run -- so when neither the outer
+        # command nor the piece contains one, that reason does not hold and
+        # the guard is entitled to the ordinary local reading, status gate and
+        # file list included. Returning `nested-unscoped` regardless made
+        # `sh -c "git reset --hard"` warn over a CLEAN tree where the bare
+        # form is silent, because the unscoped path returns before the M4
+        # status gate runs (ai-config#1973 review, round 4 finding 7,
+        # reproduced independently by the @claude review of #3645).
+        if (not _may_change_repository(command)
+                and not _may_change_repository(piece)):
+            return match
+        return "nested-unscoped", match[1], None
+    return None
+
+
+NOTE_NESTED_UNSCOPED = """\
+A destructive discard is wrapped in a shell's `-c` argument:
+
+    {segment}
+
+This guard cannot list what would be lost. Which repository that nested shell
+starts in depends on `cd`s the outer shell runs first, and reading the working
+tree from here would name THIS repository's files for a command acting on
+another one -- which is worse than silence, because it names a cause and
+prescribes a fix.
+
+Before running it, check the target repository yourself:
+
+    git -C <target> status --porcelain
+
+Running the discard in its own Bash call, unwrapped, lets this guard answer
+properly."""
 
 
 def _tracked_changes(paths=None):
@@ -471,7 +721,8 @@ def main() -> int:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
-    inp = payload.get("tool_input") or {}
+    inp = payload.get("tool_input")
+    inp = inp if isinstance(inp, dict) else {}
     command = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script")
     if not isinstance(command, str) or not command.strip():
         if is_dry_run:
@@ -490,6 +741,22 @@ def main() -> int:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
     kind, segment, paths = match
+
+    if kind == "nested-unscoped":
+        # A destructive discard inside a nested shell. No file list, because
+        # this hook cannot know which repository that shell starts in: the
+        # answer depends on `cd`s the outer shell ran, and reading `git status`
+        # here named THIS repo's dirty files for a command acting on another
+        # (ai-config#1973 review, round 3). Naming the construct is what it can
+        # honestly do.
+        note = NOTE_NESTED_UNSCOPED.format(segment=segment)
+        summary = ("A destructive discard is wrapped in a nested shell; this "
+                   "guard cannot see which repository it runs in.")
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "additionalContext": note}}))
+        print(summary, file=sys.stderr)
+        return 0
 
     sim_dirty = os.environ.get("SIMULATE_DIRTY")
     if sim_dirty is not None:

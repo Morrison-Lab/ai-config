@@ -46,6 +46,23 @@ Nothing in the exit code, the stdout, or the summary distinguishes that from a s
 - **Do:** verify a dispatched `agy` run's claimed edits against `git status` or `git diff` before believing its summary.
 - **Don't:** read exit 0 plus a work summary as evidence that any file changed.
 
+### Background tasks and console window popups on Windows
+
+Measured 2026-09-21 in an Antigravity Windows session:
+Commands sent to the background by `run_command`
+(either by setting `WaitMsBeforeAsync` smaller than execution time
+or running `.cmd`/`.bat` scripts and `Start-Sleep`)
+spawn visible console windows (`conhost.exe` / `cmd.exe` / `powershell.exe`)
+that disrupt the user's workspace.
+The harness provides the `schedule` tool for non-blocking timers;
+keep synchronous commands fast (< 10 seconds) with `WaitMsBeforeAsync: 10000`
+so they complete without falling into background execution,
+and invoke executables directly (`python scripts/...`)
+rather than through `.cmd` or `.bat` batch wrappers.
+
+- **Do:** use `schedule(DurationSeconds=N, Prompt="...")` for all delayed checks and polling loops.
+- **Don't:** run `Start-Sleep` or long background commands that spawn visible console windows on Windows.
+
 ### Lifecycle events & payload mapping
 - **`PreToolUse`**: Passed `{"toolCall": {"name": "<tool_name>", "args": { ... }}}`.
   Returns `{"decision": "allow" | "deny" | "ask", "reason": "..."}`.
@@ -192,3 +209,8 @@ The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-anti
 - Neither active `/mwc` session grant nor `ALLOW_MERGE=1` overrides this review-gate requirement in `enforce-mwc-review-gate.py` (which evaluates review and CI status directly rather than delegating review vetting to a command-line wrapper).
 - In repositories without automated bot review workflows, merges must be executed either via an affirmative human review from another repository member or directly by the human from their terminal outside the Antigravity agent hook harness.
   (Observed in live Antigravity sessions 2026-09-11.)
+- **Exempt superseded CANCELLED checks in statusCheckRollup (ai-config#3800):** GitHub Actions concurrency groups (`cancel-in-progress: true`) cancel an in-progress workflow run when a new push or PR event occurs on the same branch.
+  This leaves a `CANCELLED` check run in `statusCheckRollup` alongside the subsequent run's `SUCCESS` entry for the exact same check name and workflow (ai-config#1697, #3343).
+  The merge gate must ignore `CANCELLED` conclusions only when superseded by a later `SUCCESS` entry in the same workflow;
+  otherwise, benign concurrency cancellation permanently blocks automated merge under MWC.
+  (Observed in live Antigravity sessions 2026-09-19 on PR #3797.)

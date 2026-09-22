@@ -116,6 +116,47 @@ mutates a PR stays serial.
    [`pr-prioritization`](../../shared/workflow/pr-prioritization.md). This
    never overrides the stacking order above.
 
+   **Detect a swarm of near-duplicate automated-agent PRs before driving
+   any of them.**
+   An autonomous coding agent (Jules, a scheduled bot, a
+   repeated workflow trigger) can open several open PRs that all attempt
+   the same broad task against overlapping parts of the same repo --- not
+   stacked on each other's branches, all based on the same commit, but
+   colliding hard on file sets and even on the exact same lines.
+   This is a
+   different shape than the `Superseded` terminal state in step 3, which
+   fires *after* one sibling has already merged; here, none have merged
+   yet and the PRs are competing candidates rather than a landed-vs-stale
+   pair.
+   The tell is several open PRs from the same non-human author (or a small
+   family of related bot accounts) with near-identical titles and a `git
+   diff --name-only` overlap across most of the set --- check file lists
+   (`gh pr diff <N> --name-only` per PR, or `pull_request_read` with
+   `get_files` in a remote session) before assuming independence, per
+   `CLAUDE.md`'s "Surface merge-order constraints" collision check.
+   Driving every one of them through full ARDI serially is not just slow,
+   it is actively wasteful: merging any one immediately conflicts most of
+   the rest on the exact same lines, so later rounds spend review cycles
+   re-resolving conflicts against content that was never going to survive
+   anyway.
+   This is an architecturally significant judgment call, not a routine
+   scope decision, so stop and ask the user rather than picking silently:
+   name the colliding PRs, the file/content overlap, and a recommended
+   resolution (usually: keep the largest/most complete PR, close the rest
+   as duplicates with a comment pointing to the survivor, and file one
+   follow-up issue enumerating any content the closed PRs uniquely
+   covered that the survivor doesn't, so nothing is silently dropped).
+   Flag anything in a closed PR that looks like a substantive fix rather
+   than a wording tweak (e.g. an added code chunk fixing a missing
+   dependency) for separate investigation in that follow-up issue, rather
+   than letting it vanish into a bulk "duplicate" close.
+   (d-morrison/rme#1168 and its six closed siblings, 2026-09-17: seven
+   `dem-extra1`/Jules PRs ran the same "improve narrative flow, clarify
+   demonstrative referents, fix heading levels" sweep with heavy file
+   overlap; the largest was kept and the other six closed as duplicates,
+   with [rme#1174](https://github.com/d-morrison/rme/issues/1174) tracking
+   the handful of files and instances only the closed PRs touched.)
+
    Report the in-scope list (with bare PR URLs) **before** you start, so the
    user can veto any before the loop pushes commits.
 

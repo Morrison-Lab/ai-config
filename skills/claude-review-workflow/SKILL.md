@@ -63,8 +63,8 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
-      id-token: write
       actions: read
+      checks: read
     uses: Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2
     secrets: inherit
     with:
@@ -95,8 +95,15 @@ the consumer repo automatically inherits:
 
 1. Confirm `CLAUDE_CODE_OAUTH_TOKEN` secret exists in repo/org secrets (`gh secret list`).
 2. Add the caller stub at `.github/workflows/claude-code-review.yml`.
-3. Ensure required permissions (`contents: read`, `pull-requests: write`, `issues: write`, `id-token: write`, `actions: read`) are declared on the caller job.
+   Diff it against gha's `examples/claude-code-review.yml` at the tag you pin, not against another consumer's caller:
+   see [`gha-reusable-workflows.md`](../../memories/gha-reusable-workflows.md)'s "Template propagation hazard".
+   If this is the repository's **first** workflow, the PR adding it cannot get a bot review:
+   see [`claude-review-dispatch.md`](../../memories/claude-review-dispatch.md)'s first-workflow section.
+3. Ensure required permissions (`contents: read`, `pull-requests: write`, `issues: write`, `actions: read`, `checks: read`) are declared on the caller job.
 4. Pass any project-specific guidance via `prompt-addendum`.
+   Fact-check it like a PR body, not less:
+   it is the standing instruction every future review runs under
+   (see [`fact-check-prose`](../../shared/writing/fact-check-prose.md)'s "A prompt is a standing instruction").
 
 ## Relationship to other skills
 

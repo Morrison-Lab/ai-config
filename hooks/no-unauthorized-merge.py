@@ -147,13 +147,80 @@ EXEC_WRAP = (
 EXEC_AT_CMD_POS = re.compile(
     PERMISSIVE_LEAD + ENV_WRAP + r"(?:[/\w.-]+/)?(?:" + EXEC_PROGS + r")\b"
 )
-HEREDOC_EXECUTOR = EXEC_AT_CMD_POS
+# HEREDOC_EXECUTOR is bound below, once DOT_SOURCE_AT_CMD_POS exists.
 # The quote-masking counterpart. A quoted span is inert only when nothing
 # before it in the same simple command can run it; `bash -c "<merge>"`,
 # `eval "<merge>"` and `ssh host "<merge>"` are the executor's own operand and
 # are LIVE. Same asymmetry as the heredoc anchor above: over-detecting means
 # declining to mask, which costs a scan, while under-detecting hides a merge.
 EXEC_BEFORE_QUOTE = EXEC_AT_CMD_POS
+# `source` and `.` run the CONTENTS of what they are handed, so a process
+# substitution or a heredoc given to either is a script exactly as
+# `bash <(...)` and `bash <<EOF` are.
+#
+# Deliberately NOT folded into EXEC_PROGS, which has THREE consumers where only
+# two want this. EXEC_BEFORE_QUOTE reads an operand as a COMMAND, while
+# `source`'s operand is a FILENAME, so adding it there would keep
+# `source "gh pr merge"` live for no gain. And `.` cannot take the `\b` that
+# consumer appends: `\b` after a non-word character requires a word character
+# next, which `. <(` does not have.
+#
+# Getting that split wrong once already cost a hole. The first version of this
+# comment reasoned about the quoted-operand consumer, concluded "not in
+# EXEC_PROGS", and never asked what the OTHER consumers needed -- so
+# `source /dev/stdin <<'EOF' ... EOF` had its body masked as inert prose while
+# bash ran the merge inside it. Enumerating one consumer and stopping is the
+# same shape as enumerating what may precede a command word.
+#
+# The lookahead keeps `./script.sh` from matching, since `.` is followed by
+# `/`. It does NOT keep a bare `.` pathspec from matching: PERMISSIVE_LEAD
+# makes any whitespace a command position, so the ` . ` in `rsync -a . <(...)`
+# matches and that substitution is read as executed. The over-block is
+# accepted rather than narrowed -- this anchor decides whether to SCAN, where
+# a false positive costs a scan and a false negative hides a merge -- but it
+# is stated here because the claim, not the behaviour, was wrong before.
+DOT_SOURCE_AT_CMD_POS = re.compile(
+    PERMISSIVE_LEAD + ENV_WRAP + r"(?:source|\.)(?=[ \t])"
+)
+# "This construct's CONTENTS are executed", for a caller that only asks WHETHER
+# one is present. `mask_heredocs` is that caller: it decides whether the line's
+# consumer RUNS the body, and `source`/`.` do (ai-config#1308 review, finding
+# 3) -- `source /dev/stdin <<'EOF'` executes what it reads.
+#
+# An alternation is sound for `search`, and NOT for `finditer`. A single
+# pattern consumes text non-overlappingly, so one branch's match can swallow a
+# position the other branch would have reported: over 60,000 random token
+# strings its match-end set differed from the true union in 2,027 of them, and
+# `')$FOO )`bash` . '` reports only the `.` while dropping the `` `bash` ``.
+# For a guard a dropped executor position is the fail-open direction, so the
+# scanner that enumerates POSITIONS uses `executes_its_input_ends` below
+# instead. Calling this one "the union" was wrong (same review, finding 6).
+HEREDOC_EXECUTOR = re.compile(
+    "(?:" + EXEC_AT_CMD_POS.pattern + ")|(?:" + DOT_SOURCE_AT_CMD_POS.pattern + ")"
+)
+
+
+def executes_its_input_ends(text: str) -> list:
+    """Sorted end offsets where `text` invokes something that RUNS its input.
+
+    Each anchor is run separately and the results merged, because ONE
+    alternation cannot report a position another branch consumed: its
+    match-end set differed from the merged one in 2,027 of 60,000 random
+    strings.
+
+    NOT every such position, which this docstring claimed until round 3
+    finding 6. `finditer` is non-overlapping WITHIN each anchor too, so
+    `EXEC_AT_CMD_POS` alone still drops an executor consumed by an earlier
+    match of itself -- 14 of 20,000 random strings disagree with a
+    match-at-every-offset scan. That residue changed 0 of 40,000 fuzzed
+    verdicts, and reverting this function to the alternation fails 0 suite
+    cases, so it narrows a known fail-open direction rather than fixing a
+    reachable defect. Stated here rather than left looking complete.
+    """
+    return sorted({m.end() for m in EXEC_AT_CMD_POS.finditer(text)}
+                  | {m.end() for m in DOT_SOURCE_AT_CMD_POS.finditer(text)})
+
+
 # Where the current simple command begins. An operand cannot be separated from
 # its executor by a command separator, so scanning back only this far keeps
 # `bash -c "x"; echo "prose"` from treating the second quote as live.
@@ -329,6 +396,793 @@ def mask_subexpressions(val: str) -> str:
     return "".join(result)
 
 
+# Where a shell word ends. Anything not in here is part of the word, so
+# `use_case` is one word and not a `case`.
+_WORD_BREAK = set(" \t\n;&|()<>\"'`$\\")
+
+
+def _paren_scan(text: str, quote_aware: bool):
+    """`(closes, starts, quotes_balanced)` for one pass over `text`.
+
+    `closes` maps an opener index to its closer; `starts` lists each expandable
+    `<(` as `(lt_index, open_index)`.
+
+    SOME `)` CHARACTERS ARE NOT CLOSERS. The three below are the ones this
+    scanner models, each found the same way -- by a reviewer executing a merge
+    the scanner had read past. They are NOT the whole set: this docstring once
+    said "THREE THINGS" and there turned out to be at least five, which is why
+    `_body_is_simple` now trusts a matched `)` only for a body containing none
+    of `_APPROXIMATED`. Read that function's comment for the ones NOT modelled
+    here; do not read this list as exhaustive.
+
+    A `case` PATTERN's `)` opened nothing (round 3). Pairing it with the
+    nearest open paren truncated that paren's body, so
+    `bash <(case x in x) echo "<merge>";; esac)` recorded `case x in x` and ran
+    the merge. The discriminator is the stack DEPTH the `case` was opened at: a
+    `)` while the stack has grown no deeper cannot close anything that `case`
+    contains. `case` also requires its `in` -- without that, `grep -c case f`
+    armed pattern mode and the substitution's own closer was skipped, which
+    over-blocked every later quoted merge mention on the line (round 4).
+
+    An EXPANSION's `)` or `}` belongs to the expansion (round 4). `${x//)/}`,
+    `$(echo ")")` and a backtick span all make a `)` literal to bash, and the
+    quote-aware pass reported BALANCED for each -- so the fail-closed default
+    never engaged and the merge ran. `$(`, `${` and backticks are therefore
+    tracked as their own nesting contexts rather than left to the quote state.
+
+    A `)` inside QUOTES is not a closer, which is the original quote tracking.
+    """
+    closes = {}
+    starts = []
+    stack = []            # (kind, index); kind is proc, paren, subst or brace
+    case_depths = []      # stack depth at each `case`, once its `in` is seen
+    pending_case = []     # stack depth at each `case` awaiting its `in`
+    at_cmd_pos = True     # the word about to be flushed starts a command
+    prev_word = ""        # the last complete unquoted word
+    word = ""
+    in_single = in_double = in_backtick = escaped = ansi_c = False
+    i = 0
+    n = len(text)
+    while i < n:
+        c = text[i]
+        if escaped:
+            escaped = False
+        # `$'...'` is ANSI-C quoting, where a backslash DOES escape -- unlike a
+        # plain `'...'`, where it does not.
+        #
+        # MEASURED DEAD AT VERDICT LEVEL AND KEPT, like `EXEC_WRAP` and the
+        # comment masking below: reverting this branch fails 0 suite cases and
+        # produces 0 verdict differences across 30,000 random inputs, because
+        # `$'` is in `_APPROXIMATED` and short-circuits the region either way.
+        # It stays live at SCANNER level (quote balance differs), and it is
+        # kept because the whitelist's coverage of `$'` is itself the thing
+        # under review. The fail-open below is stated in the PAST tense for
+        # that reason (ai-config#1308 review, round 8 finding 6). Reading `$'a\')'` under plain
+        # single-quote rules ended the string one quote early, closed the
+        # substitution at the `)` that followed, and truncated the body past
+        # the merge (ai-config#1308 review, round 4 finding 2).
+        elif (quote_aware and c == "$" and i + 1 < n and text[i + 1] == "'"
+              and not in_single and not in_double and not in_backtick):
+            in_single = ansi_c = True
+            i += 2
+            continue
+        elif quote_aware and c == "\\" and (not in_single or ansi_c):
+            escaped = True
+        elif quote_aware and c == "'" and not in_double and not in_backtick:
+            if in_single:
+                ansi_c = False
+            in_single = not in_single
+        elif quote_aware and c == '"' and not in_single and not in_backtick:
+            in_double = not in_double
+        elif quote_aware and c == "`" and not in_single and not in_double:
+            # A backtick span is a command substitution whose parens are its
+            # own. Treated as opaque rather than modelled, which is the
+            # fail-closed direction for the span that contains it.
+            in_backtick = not in_backtick
+        elif not in_single and not in_double and not in_backtick:
+            # Word tracking runs only outside quotes, so a quoted "esac" in
+            # prose closes nothing.
+            #
+            # A word ends at a shell METACHARACTER, not at any non-letter.
+            # Accumulating `c.isalpha()` alone gave the word no LEFT boundary,
+            # so `use_case` and `test_case` flushed as the bare word `case`,
+            # pushed a spurious depth, and the substitution's own `)` was
+            # skipped -- 36 fail-opens in a 660-command fuzz, every one that
+            # class (round 3).
+            #
+            # `$case` is NOT in that list and never was: `$` is a word break
+            # here, so it still flushes `case`. It is harmless now only because
+            # `in` is also required, and saying otherwise was a false claim in
+            # this comment's previous version (round 4).
+            if c not in _WORD_BREAK:
+                word += c
+            else:
+                # The `in` must belong to the `case`, which means no command
+                # separator between them: `for case in a b` and
+                # `grep -c case f; grep -c in f` both armed pattern mode
+                # otherwise, ran the body to end of text, and blocked a later
+                # prose mention (round 5 finding 9).
+                # `for case in a b` and `select case in ...` name a VARIABLE
+                # `case`, and its `in` follows immediately with no separator,
+                # so the separator test above cannot tell them apart. The
+                # preceding word can (round 5 finding 9).
+                if word == "case" and prev_word not in ("for", "select"):
+                    pending_case.append(len(stack))
+                elif word == "in" and pending_case:
+                    if pending_case.pop() == len(stack):
+                        case_depths.append(len(stack))
+                elif word == "esac" and at_cmd_pos:
+                    # Guarded on COMMAND POSITION and on DEPTH. With neither,
+                    # an ordinary argument word `esac` (`echo esac`,
+                    # `grep esac f`) disarmed a live `case` mid-construct and
+                    # the next arm's `)` truncated the body the same way
+                    # (round 6 finding 2). A real `esac` always follows `;;`
+                    # or a newline, so it is always at a command position.
+                    if case_depths and case_depths[-1] == len(stack):
+                        case_depths.pop()
+                    elif pending_case and pending_case[-1] == len(stack):
+                        pending_case.pop()
+                # A NEWLINE is a command separator everywhere EXCEPT between
+                # a `case` and its `in`, where bash permits one:
+                #
+                #     case b
+                #     in b) echo hi;; esac
+                #
+                # Counting it left a real `case` unarmed, its first arm's `)`
+                # popping the `proc` frame, and the truncated body passing
+                # `_body_is_simple` -- the THIRD executing fail-open in this
+                # model, blocked by rounds 4 and 5 and allowed by 6 and 7. A
+                # grammar enumeration of 103,680 valid `case` shapes found
+                # 28,350 executing strings, every one carrying a newline in
+                # this window and none carrying a plain space (round 7
+                # finding 1).
+                #
+                # The cost is that a newline-separated prose mention
+                # (`grep -c case f` then `grep -c in f` on the next line) now
+                # arms pattern mode and extends the body. That is the
+                # fail-closed direction, and it is narrower than the `;`-
+                # separated shape round 5 finding 9 was about, which
+                # `del pending_case[:]` below still catches.
+                if c in ";&|":
+                    # A real separator proves every PENDING `case` was not a
+                    # construct: bash allows only whitespace and newlines
+                    # between `case WORD` and its `in`, so `: case; ...` is an
+                    # argument word, not a keyword.
+                    #
+                    # Leaving the entry on the stack let a later argument word
+                    # `in` pop it and arm a SECOND `case_depths` entry that the
+                    # construct's single `esac` never disarmed. The
+                    # substitution's own `)` was then consumed as a pattern
+                    # terminator, `closes` came back empty, and
+                    # `< <(: case; case x in x) : in; echo "<merge>";; esac) bash`
+                    # ran a real merge -- the fourth fail-open in this model,
+                    # present on every revision of this branch, and one whose
+                    # body carries no `_APPROXIMATED` token at all
+                    # (ai-config#3649). Both decoys are load-bearing: remove
+                    # either `: case;` or `: in;` and it blocks.
+                    #
+                    # A newline deliberately does NOT clear it, because
+                    # `case b` / `in b)` across two lines is legal bash and is
+                    # the round-7 fail-open.
+                    #
+                    # THIS LINE SUBSUMED A WHOLE `separated` FLAG, which used
+                    # to gate the `in` above and is now removed. The flag was
+                    # set on `;&|` and on a newline with nothing pending; the
+                    # first case clears `pending_case` on the very next line,
+                    # and the second leaves it empty -- so reaching the `in`
+                    # branch at all needs a `case` pushed afterwards, which
+                    # is where the flag was reset. It could therefore never be
+                    # True where it was read.
+                    #
+                    # Measured rather than argued alone: reverting the
+                    # conjunct failed 0 of 343 cases, reverting its assignment
+                    # failed 0, and an instrumented build recorded 0 hits at
+                    # the read site across 300,000 random token strings --
+                    # against 4,640 reads of that site, which is the negative
+                    # control making the 0 a measurement rather than a
+                    # detector that never ran.
+                    #
+                    # A sanity mutant for THAT harness -- dropping the
+                    # `separated = False` reset in the `case` push, the only
+                    # edit that can make the flag True at the read -- records
+                    # 621 hits. An earlier version of this comment said "a
+                    # sanity mutant on the same harness failed 2", which
+                    # attached a SUITE-failure count to a harness that reports
+                    # hits, and named no mutant, so the figure could not be
+                    # reproduced by anyone but its author (ai-config#3681,
+                    # finding 4). The file
+                    # annotates its other measured-dead clauses (`EXEC_WRAP`,
+                    # the ANSI-C `$'` branch) rather than leaving them to read
+                    # as load-bearing; this one was removed instead, because
+                    # unlike those it has a proof and not only a measurement
+                    # (ai-config#3635 pre-merge gate).
+                    del pending_case[:]
+                # A command position is the start of the TEXT, or anything
+                # just past a separator or a bare `(`. Flushing a real word
+                # consumes it: the NEXT word is an argument.
+                #
+                # Two things this deliberately is NOT, both checked rather
+                # than assumed (round 7 finding 4 corrected the earlier
+                # wording, which claimed both):
+                #   - not the start of a REGION. The flag is initialized once
+                #     per `_paren_scan` pass and never reset at a `<(`, so a
+                #     body's first word reads as an argument.
+                #   - not the `(` of `$(`, `${` or `<(`. Each of those
+                #     branches runs AFTER this block and skips its `(` with
+                #     `i += 2; continue`, so only a bare subshell `(` arrives
+                #     here.
+                # Both divergences leave a `case` armed for longer than
+                # strictly necessary, which extends the body -- the
+                # fail-closed direction.
+                if c in ";&|\n(":
+                    at_cmd_pos = True
+                elif word:
+                    at_cmd_pos = False
+                if word:
+                    prev_word = word
+                word = ""
+            if c == "$" and i + 1 < n and text[i + 1] == "(":
+                stack.append(("subst", i + 1))
+                i += 2
+                continue
+            if c == "$" and i + 1 < n and text[i + 1] == "{":
+                stack.append(("brace", i + 1))
+                i += 2
+                continue
+            if c == "(":
+                stack.append(("paren", i))
+            elif c == "}":
+                if stack and stack[-1][0] == "brace":
+                    stack.pop()
+            elif c == ")":
+                # The case-pattern test comes FIRST. Popping a `subst`
+                # unconditionally consumed the pattern terminator of a `case`
+                # opened inside `$( )`, after which the substitution's real `)`
+                # popped the enclosing region and truncated the body
+                # (round 5 finding 2).
+                if case_depths and len(stack) <= case_depths[-1]:
+                    pass                 # a `case` pattern terminator
+                elif stack and stack[-1][0] == "subst":
+                    stack.pop()          # closes the command substitution
+                elif stack and stack[-1][0] in ("paren", "proc"):
+                    closes[stack.pop()[1]] = i
+            elif c == "<" and i + 1 < n and text[i + 1] == "(":
+                starts.append((i, i + 1))
+                stack.append(("proc", i + 1))
+                i += 2
+                continue
+        else:
+            word = ""
+        i += 1
+    return closes, starts, not (in_single or in_double or in_backtick)
+
+
+def _paren_matches(text: str):
+    """`(closes, starts)`, quote-aware, with a quote-blind reading merged in.
+
+    An odd quote leaves every later character reading as quoted, so the
+    quote-aware scan silently stops seeing `<(` at all. Masking comments closes
+    one source of that; it is not the only one, because `mask_heredocs`
+    deliberately leaves an EXECUTING heredoc's body live and an apostrophe
+    there arrives unmasked (round 3). Enumerating the sources is the failure
+    this file keeps recording, so when the quote state does not balance -- the
+    scan calling itself unreliable -- a second, quote-blind pass runs.
+
+    The two readings are MERGED, never substituted. A quote-blind pass finds
+    more region STARTS and can find strictly SHORTER bodies, because a `)`
+    inside quotes closes a region it should not, which is what the substituted
+    version did (round 4). So a start is kept if either pass saw it, and a body
+    runs to the FURTHER of the two closers.
+
+    A body whose CLOSER only one pass found runs to the end of the text. That
+    is about the closer, not about the region: both passes routinely see the
+    same start while only one finds a closer, and the earlier wording here --
+    "when only one pass saw the region at all" -- described a narrower
+    condition than the code applies (round 5 finding 10). The implemented rule
+    is the one stated now.
+
+    Calling it "the more fail-closed of the two" was false when written, and
+    is true only because of a later fix. Dropping the closer leaves
+    `_proc_subst_regions` with no entry for that opener, and blanking to the
+    defaulted end of text erased a TRAILING executor -- so an apostrophe or a
+    lone backtick in an executing heredoc body, which is what makes this pass
+    run at all, opened an executing bypass rather than closing one
+    (ai-config#3635 pre-merge gate). `_depth_view` now reads the region's
+    `closed` field and blanks only the `<(` delimiter in that case, which is
+    what makes the sentence hold.
+
+    `starts` from the fallback may include a `<(` inside quotes, which bash
+    would not expand. That is an over-detection and it is deliberate: the pass
+    only runs on input whose quoting this scanner has already failed to read.
+    """
+    closes, starts, balanced = _paren_scan(text, quote_aware=True)
+    if balanced:
+        return closes, starts
+    blind_closes, blind_starts, _ = _paren_scan(text, quote_aware=False)
+    merged = dict(closes)
+    for open_idx, close_idx in blind_closes.items():
+        merged[open_idx] = max(merged.get(open_idx, close_idx), close_idx)
+    seen = {open_idx for _lt, open_idx in starts}
+    all_starts = list(starts)
+    for lt_idx, open_idx in blind_starts:
+        if open_idx not in seen:
+            all_starts.append((lt_idx, open_idx))
+            seen.add(open_idx)
+    all_starts.sort()
+    # A region only one pass saw has no closer the other can confirm, so it
+    # runs to the end of the text. `_proc_subst_regions` reads a missing key
+    # that way already.
+    for _lt, open_idx in all_starts:
+        if open_idx not in closes or open_idx not in blind_closes:
+            merged.pop(open_idx, None)
+    return merged, all_starts
+
+
+# Past this many nested process substitutions, stop analysing and treat the
+# body as executed. The analysis costs one linear pass per nesting LEVEL, so an
+# unbounded depth is unbounded work on a guard that runs before every Bash
+# call; a cap turns that into a constant. Failing CLOSED at the cap is the
+# direction this whole file takes -- an over-block clears with ALLOW_MERGE=1,
+# and nothing anyone writes by hand nests six deep.
+MAX_PROC_SUBST_DEPTH = 6
+
+
+# Constructs this scanner models APPROXIMATELY. A body containing any of them
+# is not one whose closing `)` can be trusted.
+#
+# WHY A WHITELIST, after five rounds of the other thing. The design rested on
+# "a modelling error fails closed", and that held only when the error also
+# unbalanced the QUOTE state, because the fail-closed path is keyed on quote
+# balance alone. Every fail-open found since has been a `)` misread while
+# quotes stayed balanced, so the net never fired: a `)` in a shell comment, a
+# `case` pattern inside `$( )` whose terminator pops the substitution first, a
+# `$( )` or `${ }` or backtick nested inside DOUBLE QUOTES where bash restarts
+# quoting and this scanner does not, and a `)` inside an executing heredoc body
+# that `mask_heredocs` deliberately leaves live.
+#
+# Each was found by a reviewer executing a real merge. `_paren_scan`'s
+# docstring ABOVE enumerates the three this scanner models, and says there that
+# the list is not exhaustive; there were at least
+# five, and this file records the same enumeration failing five separate times
+# for command-position anchors. An enumeration of what BREAKS the model cannot
+# be finished. An enumeration of what the model provably HANDLES can.
+#
+# So the matched `)` is trusted only for a body with none of these in it, and
+# any other body runs to the end of the text. The cost is an over-block on a
+# command that both contains one of these constructs AND carries a merge-shaped
+# string later on the same line; the benefit is that the next unmodelled
+# construct is a blocked command rather than a silent merge.
+_APPROXIMATED = ("#", "`", "$(", "${", "$'", "<<")
+
+
+def _body_is_simple(text: str, body_start: int, body_end: int) -> bool:
+    """True when nothing in this body defeats the paren model.
+
+    Deliberately conservative and deliberately cheap: a substring scan over one
+    region, with no attempt to decide whether a given occurrence is really the
+    construct it looks like. A `#` inside a word is not a comment, and paying
+    an over-block for it is the whole design.
+
+    `case` is the one construct NOT listed, and that exemption is the weakest
+    joint in this design. The whitelist's safety argument is "everything not
+    on the list is modelled", so exempting a construct is a claim that needs a
+    proof rather than an assertion -- and the first version of this paragraph
+    asserted it. Round 6 of review then executed two real merges straight
+    through the `case` model: a `case` after any separator failed to arm, and
+    an argument word `esac` disarmed a live one. Round 6 was therefore a
+    REGRESSION against rounds 4 and 5, which both blocked those strings.
+
+    Both holes are closed in `_paren_scan`: the first because the `in` arm is
+    now unconditional, the second by its `at_cmd_pos` handling. The six
+    regression cases are in the suite.
+
+    `del pending_case[:]` was named here for the first of them and does not do
+    that work. Reverting it fails exactly one case and that case is an ALLOW:
+    it prevents the round-5-finding-9 over-block and closes no fail-open
+    (ai-config#3681, finding 5). Round 6's hole is closed by the ABSENCE of
+    the `separated` gate, which is a consequence of removing it rather than of
+    any line added. The
+    exemption stays because listing `case` extends every body merely MENTIONING
+    the word to end of text, re-creating the over-block the `in` requirement
+    was added to remove -- `bash <(grep -c case f); echo "<prose>"` blocking a
+    prose mention. A `case` nested inside `$( )`, which the model does not
+    handle, is covered by `$(` being listed.
+
+    A third one did turn up -- round 7's newline between the case word and its
+    `in` -- and a previous version of this paragraph said what to do about it:
+    "the honest alternative if a third one turns up is to list `case` and pay
+    the over-block." That instruction was WRONG, and it was measured wrong
+    rather than argued away.
+
+    Listing `case` (word-bounded, which is the cheaper of the two spellings)
+    moves 5 suite cases -- four verdict-level over-blocks and one scanner-level
+    span change. The figure 6 stood here briefly and belonged to the PLAIN
+    SUBSTRING spelling, which is the one a `_APPROXIMATED` entry gets for free
+    and which this sentence does not name: the parenthetical calls
+    word-bounded the cheaper of the two, and cheaper means fewer, so the
+    sentence contradicted its own number (ai-config#3681, finding 1). Both
+    re-derived here:
+
+        word-bounded  `re.search(r"\bcase\b", body)`   338/343   moves 5
+        substring     `"case" in body`                  337/343   moves 6
+
+    The four over-blocks are `source <(...)`, a bare argument word `case`, a
+    loop variable named `case`, and an `in` in a later simple command; the
+    fifth is the span check `a case pattern's `)` is not the closer`, whose
+    verdict does not change. The paragraph this replaced drew that
+    distinction and the rewrite collapsed it.
+
+    The span for
+
+        < <(case x in x) echo "<merge>";; esac) bash
+
+    goes `[(4, 46)]` to `[(4, 52)]` -- longer, with `len(text) = 52` -- and
+    the verdict stays BLOCK.
+
+    THAT IS A CHANGE, and the paragraph it replaces is worth stating because
+    the correction runs the reassuring way. It read "8 suite cases ... 3
+    fail-opens ... `[(4, 46)]` becomes `[]`", and all three figures were true
+    when written. The commit that split `real_end` from the extended
+    `close_idx` -- and its follow-up, which stopped blanking past a region
+    whose closer was never recorded -- invalidated them without touching this
+    paragraph. A measurement quoted beside a mechanism it can no longer
+    exercise is how the next reader learns a wrong cost model, which is what
+    the sibling suite legislates against: re-measure, never copy forward.
+
+    So the ARGUMENT for the exemption has changed even though the exemption
+    has not. It used to be that listing `case` opened fail-opens, which made
+    keeping it out mandatory. It is now that listing `case` extends every body
+    merely MENTIONING the word to end of text, re-creating the over-block the
+    `in` requirement was added to remove -- `bash <(grep -c case f); echo
+    "<prose>"` blocking a prose mention. A cost, not a hazard.
+
+    The model still has to hold, because the whitelist's safety argument is
+    "everything not on the list is modelled". Four fail-opens have been found
+    in it, the last a stale `pending_case` popped by an argument word `in`,
+    which `_paren_scan` now discards at a separator.
+
+    The general property -- that extending a body is fail-closed for a leading
+    executor and fail-OPEN for a trailing one -- is ai-config#3649, and it is
+    NOT a constraint on future entries only. That is how a previous version of
+    this paragraph and of #3649 both put it, and it was the more damaging
+    error: five of the six entries ALREADY shipped an executing bypass, each
+    blocked by four earlier revisions of this branch.
+
+    Blanking to the real closer restores the premise the whitelist rests on
+    ONLY where a closer was recorded. Where none was, `real_end` defaults to
+    end of text and the split is a no-op -- two more executing bypasses lived
+    there, and `_depth_view` now reads the region's `closed` field instead.
+    The suite carries one trailing-executor case per whitelist member, and one
+    per no-recorded-closer route.
+
+    Finding a mechanism that invalidates a design premise and then scoping it
+    to future work reads as diligence -- a rule written, an issue filed --
+    while the live instances go unexamined. The check cost one loop over six
+    strings.
+    """
+    body = text[body_start:body_end]
+    return not any(token in body for token in _APPROXIMATED)
+
+
+def _proc_subst_regions(text: str) -> list:
+    """`(lt_idx, body_start, close_idx, depth, parent, real_end, closed)` per `<(`.
+
+    Ordered by position, so siblings at one depth are disjoint and a child
+    always follows its parent. `parent` indexes back into this same list, or is
+    `-1` at the top level.
+
+    A candidate with no matching `)` has its BODY taken to run to the end of
+    the text, which is the fail-closed direction for `bash <(...)` and the
+    fail-OPEN direction for `< <(...) bash` -- the extended body swallows the
+    trailing executor, so the region is never classified as executed and the
+    span list comes back empty rather than longer. An earlier version of this
+    paragraph called the behaviour fail-closed without qualification, four
+    paragraphs after the note that records the asymmetry. The seventh tuple
+    field says whether a closer was actually recorded, and `_depth_view` reads
+    it so the blanking does not reach past the region.
+
+    The earlier version dropped it, justified as "bash rejects the command
+    outright". That is a claim about bash, and the condition is a claim about
+    THIS SCANNER -- `bash <(use_case=1; echo "<merge>")` is balanced, bash
+    accepts it, bash runs the merge, and a modelling bug here read it as
+    unbalanced (ai-config#1308 review, round 3 findings 1 and 3). Dropping made
+    every present and future error in the paren model an ALLOW, which is the
+    one direction this file never takes. A genuinely unbalanced command is
+    rejected by bash before anything runs, so over-blocking one costs nothing.
+    """
+    closes, candidates = _paren_matches(text)
+    regions, stack = [], []
+    for lt_idx, open_idx in candidates:
+        real_end = closes.get(open_idx, len(text))
+        close_idx = real_end
+        if not _body_is_simple(text, open_idx + 1, close_idx):
+            close_idx = len(text)
+        while stack and lt_idx > regions[stack[-1]][2]:
+            stack.pop()
+        # Both ends are kept, and the difference is load-bearing.
+        #
+        # `close_idx` is what the SPAN uses: an unmodelled body is assumed to
+        # run to end of text, so everything after it is live. `real_end` is
+        # what BLANKING uses, and blanking to the extended end was an
+        # executing fail-open.
+        #
+        # `bash <(...)` puts the executor BEFORE the region, where a longer
+        # body cannot hide it. `< <(...) bash` puts it AFTER, so blanking to
+        # end of text erased the `bash` itself; `executes_its_input_ends`
+        # then found no executor, the region was never classified as
+        # executed, and the span list came back EMPTY rather than longer.
+        # Five of the six `_APPROXIMATED` entries had a `bash -n` clean
+        # proof of concept that ran a real merge, each blocked by four
+        # earlier revisions of this branch and allowed from the whitelist
+        # commit onward (ai-config#3649).
+        #
+        # The premise the whitelist rests on -- "extending a body is the
+        # fail-closed direction" -- is therefore true only once blanking
+        # stops at the real closer.
+        #
+        # `real_end` alone was not enough, and that is this fix's own missed
+        # half. `closes.get(open_idx, len(text))` DEFAULTS to end of text, so
+        # for a candidate with no recorded closer `real_end` IS the extended
+        # end and blanking erased the trailing executor exactly as before.
+        # Two routes reach that state with valid bash -- a `case` pattern's
+        # `)`, and `_paren_matches` popping the closer on quote imbalance --
+        # and each ran a real merge while the hook allowed it, with the
+        # leading-executor twin of the same command blocking (ai-config#3635
+        # pre-merge gate). `closed` is what lets `_depth_view` tell the two
+        # apart.
+        regions.append((lt_idx, open_idx + 1, close_idx,
+                        len(stack), stack[-1] if stack else -1, real_end,
+                        open_idx in closes))
+        stack.append(len(regions) - 1)
+    return regions
+
+
+# What a blanked region is filled with, and it is deliberately NOT a space.
+#
+# EXEC_AT_CMD_POS is quadratic on a long WHITESPACE run -- its command-position
+# lead is `[;&`()\n\s]\s*` followed by two bounded repetitions that each end in
+# `\s*`/`\s+`, so every position in the run re-tries the same partitions.
+# Measured on `main`: `echo x` plus 1200 trailing spaces takes 1502ms inside
+# `offending`, and 2400 takes 5886ms. That is pre-existing (ai-config#3640) --
+# but filling a view with spaces would hand that regex its worst input once per
+# nesting level, so a 400-deep nest cost 1288ms here before this character
+# changed.
+#
+# What makes NUL work is narrow, and an earlier version of this note overstated
+# it as "NUL is in no character class this file matches" -- false, since `\S`,
+# ENV_WRAP and VAR_PREFIX all match it. What is true is the only part that
+# matters: NUL is not in PERMISSIVE_LEAD's `[;&`()\n\s]`, so no command
+# position opens inside a filled run and the whitespace partitioning above
+# cannot start (ai-config#1308 review, finding 5).
+#
+# `_FILL` fixes the WHITESPACE shape and not the others. A run of `$(` is still
+# quadratic in EXEC_AT_CMD_POS itself, and where a depth view IS built, running
+# that scan once per view multiplies it -- bounded by `MAX_PROC_SUBST_DEPTH` at
+# 7 rather than by the nesting depth, so a constant factor on a pre-existing
+# quadratic rather than a new order. The quadratic itself is ai-config#3640.
+#
+# An earlier version of this comment quoted "380ms on `main` against 923ms
+# here" for 6 KB of `$( ` repetitions. Re-measured on this revision: 385ms,
+# against 381ms on `main`. The figure was wrong AND the mechanism could not
+# have applied to that input, because `'$( ' * 2000` contains no `<(` at all --
+# `_proc_subst_regions` returns 0 regions, `live_proc_subst_spans` returns at
+# `if not regions`, and `_depth_view` is never called. A measurement quoted
+# beside a mechanism it cannot exercise is how the next reader learns a wrong
+# cost model (round 6 finding 7).
+_FILL = "\x00"
+
+
+def _blank(view: list, start: int, stop: int) -> None:
+    """Fill `view[start:stop]` with `_FILL`, keeping one space at each end.
+
+    The end spaces replace the `<` and the `)` themselves, so they supply the
+    command position PERMISSIVE_LEAD needs on either side of a filled run.
+
+    They are NOT what saves `< <(...) bash`: the space before that `bash` sits
+    outside the blanked range and is never touched, and deleting both
+    assignments still blocks it and fails no suite case. An earlier version of
+    this docstring claimed otherwise (ai-config#1308 review, finding 4). What
+    they do change is degenerate input -- a fuzz over 120,000 random token
+    strings found 103 verdict differences with them removed -- so they stay,
+    with the reason stated as what it is.
+    """
+    # `stop` may run one past the end: a candidate with no matching `)` fails
+    # closed with its body taken to the end of the text, and the caller then
+    # asks to blank through `body_end + 1`.
+    stop = min(stop, len(view))
+    if stop <= start:
+        return
+    for i in range(start, stop):
+        view[i] = _FILL
+    view[start] = " "
+    view[stop - 1] = " "
+
+
+def _depth_view(text: str, regions: list, depth: int) -> str:
+    """`text` with only the simple commands at nesting `depth` legible.
+
+    Length-preserving, so one set of offsets indexes this and `text` alike.
+
+    Two blankings, and the second is the whole point. Everything outside a
+    depth-`depth` body is blanked, so a separator in an enclosing shell cannot
+    bound a command in this one. Then every depth-`depth` substitution is
+    blanked WHOLE -- its `<(`, its body, and its `)` -- so the enclosing simple
+    command reads as one contiguous run.
+
+    Blanking the DELIMITERS is what finding 1 of ai-config#1308's review
+    turned on. `(` and `)` are COMMAND_SEPARATORs, so leaving them in place
+    cuts the enclosing simple command in two, and an executor written on the
+    far side of the substitution lands in a different segment:
+    `< <(echo "<merge>") bash` really runs the merge, and a scan that only
+    looked BEFORE the `<(` never saw the `bash`. This file already recorded
+    that lesson for heredocs -- "A redirection may appear anywhere in a simple
+    command ... Order was never part of the question" -- and the first draft of
+    this scanner reproduced it anyway.
+    """
+    if depth == 0:
+        view = list(text)
+    else:
+        view = [_FILL] * len(text)
+        for (_lt, body_start, body_end, region_depth, _parent, _real,
+                _closed) in regions:
+            if region_depth == depth - 1:
+                view[body_start:body_end] = list(text[body_start:body_end])
+                # The `(` and `)` just outside the body become the command
+                # positions its first and last simple commands anchor on.
+                if body_start:
+                    view[body_start - 1] = " "
+                if body_end < len(view):
+                    view[body_end] = " "
+    for (lt_idx, body_start, _body_end, region_depth, _parent, real_end,
+            closed) in regions:
+        if region_depth != depth:
+            continue
+        if closed:
+            # `real_end`, never the extended end -- see `_proc_subst_regions`.
+            _blank(view, lt_idx, real_end + 1)
+        else:
+            # No closer was recorded, so `real_end` is the extended end and
+            # blanking to it erases whatever follows -- including a trailing
+            # executor. Blank the `<(` DELIMITER only: that is what has to go,
+            # since `(` is a COMMAND_SEPARATOR and would otherwise cut the
+            # enclosing simple command in two. Everything after it stays
+            # legible, which is the over-detecting direction and the one this
+            # file takes everywhere else.
+            _blank(view, lt_idx, body_start)
+    return "".join(view)
+
+
+def live_proc_subst_spans(text: str) -> list:
+    """Body spans of `<(...)` process substitutions whose output is EXECUTED.
+
+    `<(...)` runs the body and hands the caller a `/dev/fd/N` path whose
+    contents are the body's OUTPUT. When the caller runs what it is given, that
+    output is a script -- so `bash <(echo "<merge>")`, `sh <(printf "%s"
+    "<merge>")`, `source <(...)` and `. <(...)` all run the merge, while the
+    merge text never appears at a command position anywhere in the command
+    line.
+
+    `mask_inert_quotes` could not see it. `(` is a COMMAND_SEPARATOR, so
+    scanning back from a quote inside the body stops at the `(` and never
+    reaches the `bash` in front of it: the quoted merge was masked as prose and
+    the guard returned allow (ai-config#1308). Widening the command-position
+    anchor does not reach this, and neither does the live-operand rule -- the
+    executor is plainly visible and it is the OPERAND that is unreachable.
+
+    The test is CO-OCCURRENCE, not order: does the simple command owning this
+    `<(` invoke something that executes its input, anywhere on it? A
+    redirection may be written before the command name, so `bash <(...)` and
+    `< <(...) bash` are the same command and both run the body's output. See
+    `_depth_view`.
+
+    Comments are masked first. A `)` inside a shell comment is literal to bash,
+    structural to this scanner, and leaves the quote state BALANCED, so the
+    quote-blind merge never runs and the body is truncated -- which is why the
+    call belongs here.
+
+    Its history is worth stating precisely, because the obvious summary is now
+    wrong. Removing the call WAS a fail-open in round 5's code, where
+    `sh <(#)\necho "<merge>")` ran a real merge with it gone (round 5
+    finding 1). It is no longer, because `_APPROXIMATED` lists `#`: with the
+    masking removed the body reads `#`, `_body_is_simple` returns False, the
+    region runs to end of text, and all three variants still BLOCK (verified
+    round 6 finding 6). So this call is now redundant with the whitelist for
+    the case that motivated it, and is kept because the whitelist's coverage of
+    `#` is itself the thing under review -- not because removing it would
+    reopen that merge today. Stating the round-5 finding in the present tense
+    was the error the round-5 docstring made about round 4, one revision on.
+
+    Returns maximal `(body_start, body_end)` pairs, disjoint and sorted by
+    start. Disjoint because a substitution inside an already-live body is
+    skipped rather than recorded: its own enclosing command may well not be an
+    executor (`bash <(cat <(echo "<merge>"))`), and the outer span already
+    covers it.
+
+    `cat <(echo "<merge>")` is deliberately NOT a span, because `cat` does not
+    run its input. That is a claim about `cat`, NOT about the command line, and
+    two shapes make the difference concrete. `cat <(echo "<merge>") | bash`
+    merges, because SPLIT makes the pipe a segment boundary. And
+    `echo "<merge>" > >(bash)` merges with no pipe at all, because only `<(` is
+    collected here -- an OUTPUT substitution fed by the enclosing command's
+    stdout is a script this scanner never looks at.
+
+    Both are allowed on this branch and on `main` alike, and both are
+    ai-config#3639. Naming only the pipe was wrong (ai-config#1308 review,
+    finding 3): the diff's own `echo x > >(bash -c "<merge>")` BLOCK case
+    catches the merge INSIDE the substitution and says nothing about the merge
+    FEEDING it, which is the shape that is open.
+    """
+    text = mask_trailing_comments(text)
+    regions = _proc_subst_regions(text)
+    if not regions:
+        return []
+
+    # `covered` means live OR inside something live, and the OR is the point:
+    # skipping a child because its parent runs must mark the CHILD too, or a
+    # grandchild reads an unmarked parent, evaluates itself, and records a span
+    # already inside a recorded one -- breaking the disjointness
+    # `mask_inert_quotes` bisects on.
+    #
+    # There was a second array, `live`, kept for that contrast. It was written
+    # and never read, so it explained a distinction the code did not make
+    # (ai-config#1308 review, round 3 finding 5).
+    covered = [False] * len(regions)
+    spans = []
+    by_depth = {}
+    for index, region in enumerate(regions):
+        by_depth.setdefault(region[3], []).append(index)
+    deepest = max(by_depth)
+    for depth in range(deepest + 1):
+        at_depth = by_depth.get(depth)
+        if not at_depth:
+            continue
+        if depth > MAX_PROC_SUBST_DEPTH:
+            # Past the cap, stop asking and assume the body runs.
+            #
+            # `covered` is set on EVERY region here, not only the ones that
+            # record a span. Marking only the recorders left the first region
+            # past the cap uncovered -- its parent was covered, so it was
+            # skipped without being marked -- and its own child then read an
+            # uncovered parent and appended a span INSIDE the recorded
+            # ancestor. That breaks the disjointness `mask_inert_quotes`
+            # bisects on, and the bisect then lands on the inner span and
+            # reports the quote as dead: a nest one level past the cap ran a
+            # real merge and was allowed (ai-config#1308 review, finding 1).
+            # The loop that did this was written as a separate tail pass, which
+            # is how it came to disagree with the main loop about `covered`.
+            for index in at_depth:
+                parent = regions[index][4]
+                if parent < 0 or not covered[parent]:
+                    spans.append((regions[index][1], regions[index][2]))
+                covered[index] = True
+            continue
+        view = _depth_view(text, regions, depth)
+        separators = list(COMMAND_SEPARATOR.finditer(view))
+        sep_ends = [m.end() for m in separators]
+        sep_starts = [m.start() for m in separators]
+        exec_ends = executes_its_input_ends(view)
+        for index in at_depth:
+            (lt_idx, body_start, body_end, _depth, parent, _real,
+             _closed) = regions[index]
+            if parent >= 0 and covered[parent]:
+                covered[index] = True
+                continue  # already covered by an enclosing executed body
+            # bisect_RIGHT: a separator ENDING exactly at `lt_idx` bounds this
+            # segment, and bisect_left would return its own index and hand back
+            # the separator before it -- reaching into the previous segment for
+            # an executor that never introduced this command.
+            i = bisect.bisect_right(sep_ends, lt_idx)
+            seg_start = sep_ends[i - 1] if i else 0
+            j = bisect.bisect_left(sep_starts, body_end)
+            seg_end = sep_starts[j] if j < len(sep_starts) else len(view)
+            if bisect.bisect_right(exec_ends, seg_end) > bisect.bisect_left(
+                    exec_ends, seg_start):
+                covered[index] = True
+                spans.append((body_start, body_end))
+    spans.sort()
+    return spans
+
+
 def mask_inert_quotes(text: str, exec_subject: str | None = None) -> str:
     """Blank quoted spans that bash cannot execute, preserving length.
 
@@ -375,6 +1229,11 @@ def mask_inert_quotes(text: str, exec_subject: str | None = None) -> str:
     if exec_subject is None or len(exec_subject) != len(text):
         exec_subject = text
     exec_ends = [m.end() for m in EXEC_AT_CMD_POS.finditer(exec_subject)]
+    # Read off the SAME subject the executor scan reads, for the same reason:
+    # `mask_payloads` can blank the executor word before this function sees it.
+    # Both strings are length-preserving, so these offsets index either.
+    proc_spans = live_proc_subst_spans(exec_subject)
+    proc_starts = [start for start, _ in proc_spans]
 
     def live_operand_test(subject: str):
         """A `quote_start -> bool` test over one fixed subject string.
@@ -391,6 +1250,14 @@ def mask_inert_quotes(text: str, exec_subject: str | None = None) -> str:
         seps = [m.end() for m in COMMAND_SEPARATOR.finditer(subject)]
 
         def test(quote_start: int) -> bool:
+            # A quote anywhere inside an EXECUTED process-substitution body is
+            # live, whatever separators sit between it and the `<(`. Bash runs
+            # the body's whole output, so `bash <(echo a; echo "<merge>")`
+            # merges exactly as `bash <(echo "<merge>")` does -- and the `;`
+            # would otherwise reset the command position past the executor.
+            k = bisect.bisect_right(proc_starts, quote_start)
+            if k and quote_start < proc_spans[k - 1][1]:
+                return True
             j = bisect.bisect_right(exec_ends, quote_start)
             if j == 0:
                 return False
@@ -853,7 +1720,8 @@ def is_mcp_merge_tool(tool_name: str) -> bool:
 
 
 def check_mcp_merge(payload: dict) -> tuple[str, str] | None:
-    tool_input = payload.get("tool_input") or {}
+    tool_input = payload.get("tool_input")
+    tool_input = tool_input if isinstance(tool_input, dict) else {}
     tool_name = payload.get("tool_name") or "mcp__github__merge_pull_request"
 
     if tool_input.get("allow_merge") in (1, "1", True) or tool_input.get("ALLOW_MERGE") in (1, "1", True):
@@ -919,7 +1787,8 @@ def main() -> int:
     hit = None
 
     if tool_name in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
-        inp = payload.get("tool_input") or {}
+        inp = payload.get("tool_input")
+        inp = inp if isinstance(inp, dict) else {}
         command = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or ""
         hit = offending(command, payload)
     elif is_mcp_merge_tool(tool_name):

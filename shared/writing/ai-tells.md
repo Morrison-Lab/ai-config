@@ -14,41 +14,65 @@ Watch for:
 - **Rhetorical reflexes:** the "it's not just X, it's Y" antithesis (the biggest
   tell), mechanical rule-of-three lists, signposting filler ("it's worth noting
   that", "importantly"), hedging stacks, hollow "in conclusion" restatements.
-- **Formulaic openers:** a declarative sentence fronted by one of three shapes.
-  A bare demonstrative ("This is", "That is", "These are", "Those are").
-  A wh-word ("What makes it work is the lease", "Why that matters is the cost").
+- **Formulaic openers:** a declarative sentence fronted by one of four shapes.
+  An underspecified reference: a bare demonstrative ("This is", "That is",
+  "These are", "Those are") or "The one that".
+  A fronted wh-clause: "Who", "What", "Where", "When", "Why", "How", "Which",
+  "Whose" ("What makes it work is the lease", "Why that matters is the cost").
   A partitive quantifier ("Some of the", "Many of the", "All of the",
   "None of the").
-  The demonstrative shape narrows two rules that already exist.
+  A fronted subordinate clause or preposition ("While", "Although", "Despite",
+  "Because", "Since"), which creates a fronted nested clause before the reader
+  knows the subject or main claim.
+  The underspecified reference narrows two rules that already exist.
   [`use-preferred-style`](../../skills/use-preferred-style/SKILL.md) rule 8 and
   [`ambiguous-reference`](ambiguous-reference.md) both govern a demonstrative
   anywhere in a sentence, and ask whether its referent is named.
   What this adds is **position and count** --- sentence-initial, tallied per
-  page --- plus the wh-word and partitive shapes neither of those covers.
+  page --- plus the wh-word, partitive, and fronted subordinator shapes neither
+  covers.
+  Fronted concessive and conditional clauses bury the core claim;
+  see [`plain-prose`](plain-prose.md)'s subordinate-clause rule and conciseness
+  principles.
   Cue: split on sentence-final punctuation before matching.
   A line-start grep sees only the sentences that happen to begin a line, and
   this repo wraps prose at clause boundaries:
-  `tr '.!?' '\n' < FILE | grep -icE "^ *(this|that|these|those) (is|are)\b"`.
+  `tr '.!?' '\n' < FILE | grep -icE "^ *(this|that|these|those|the one that|who|what|where|when|why|how|which|whose|while|although|despite) "`.
   Fix: name the noun the demonstrative stands for (-> "The clean verdict is
   the trigger").
   Front the subject and drop the copula (-> "The lease makes it work").
   Cut "of the", or give the count (-> "Many checks fail", "Four of the nine
   checks fail").
-- **Cliches and jargon:** a contrastive close used as the default end of a
-  claim ("rather than", "not the same as").
-  It is the quiet sibling of the antithesis above.
-  Also "carries"/"carry" standing in for a plain verb, "load-bearing" standing
-  in for "essential", and "tells"/"doesn't tell"/"does not tell" standing in
-  for a plain verb of report.
+  State the main assertion first, then qualify it, or split into two sentences.
+- **Cliches and jargon:** idioms, sports metaphors, unnecessary copulas, and
+  contrastive closes used as reflexes.
+  A contrastive close used as the default end of a claim ("rather than",
+  "not the same as") --- the quiet sibling of the antithesis above.
+  Unnecessary copula and cleft structures: "is what", "is where", "is when",
+  "is how" ("the lease is what stops" -> "the lease stops"; "this is where
+  the check runs" -> "the check runs here").
+  Metaphor cliches and sports jargon: "the whole of it" (-> "all of it",
+  "the entirety"), "own-goal" (sports jargon for self-inflicted error),
+  "load-bearing" (architectural metaphor for "essential").
+  Overused verbs: "carries"/"carry" standing in for a specific verb, and
+  "tells"/"doesn't tell"/"does not tell" standing in for a plain verb of report.
+  Mid-phrase conjunctive ticks: inserting ", however, " or ", therefore, "
+  mid-clause where a direct sentence or cleaner connector works better.
+  Indirect questions as noun phrases: "about what" where a concrete noun fits
+  (-> "disagreed on the requirements", not "disagreed about what was needed").
+  Gratuitous explanations and disclaimers: unsolicited throat-clearing
+  ("Note that...", "It is important to remember that...").
   Cue: count them per page, since each is ordinary English at one or two hits
   and a verbal tic at ten ---
-  `grep -ioE "rather than|not the same as|load-bearing|carr(y|ies)|\btells\b|does(n't| not) tell" FILE | wc -l`.
+  `grep -ioE "rather than|not the same as|load-bearing|carr(y|ies)|\btells\b|does(n't| not) tell|the whole of it|own-goal|is (what|where|when|how)|\babout what\b|, however," FILE | wc -l`.
   Fix: state the claim positively, and keep one contrast per paragraph at most.
   Say what a thing **is**, not what it is not (-> "the lease compares against
   your remote-tracking ref", not "a lease is not the same as a force").
   Use the plain verb (-> has, includes, states, sets, shows, omits).
-  Say what a part does and what breaks without it (-> "the lease is what stops
+  Say what a part does directly without a copula cleft (-> "the lease stops
   a background fetch clobbering a peer's commit").
+  Drop mid-phrase conjunctives or start with "Yet" or "Still".
+  Replace "about what" with the concrete noun or subject.
 - **Thin punctuation:** long sentences glued together with "and", while commas,
   semicolons, colons, and parentheses stay rarer than a human writer's.
   The Economist measured this in August 2026 ("How to spot AI writing").
@@ -84,6 +108,9 @@ Watch for:
   head-to-dependent span instead, which is a working-memory proxy that
   correlates with nesting without being the same quantity.
   A flat coordinated list inflates it at zero nesting depth.
+  Deterministic candidate scanning: `scripts/check-sentence-complexity.py`
+  computes sentence word count, clause/subordinator nesting, Automated
+  Readability Index (ARI), Coleman-Liau, and paragraph burstiness.
 - **Structural/typographic:** em-dash overuse as a default connector,
   bold-leading `**Term:**` bullets applied mechanically, emoji section headers,
   conspicuously uniform paragraph rhythm.

@@ -506,6 +506,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-claim-without-comments-read.py\"",
+            "timeout": 10,
+            "script": "warn-claim-without-comments-read.py",
+            "why": "Measured on Lacaedemon/sparta#1544 (2026-09-18): a session posted a claim comment on an issue after reading only its BODY. The body posed a diagnostic question; the issue's COMMENTS -- two above the one posted -- recorded that the diagnosis had already merged (PR #1553) and the residual had been escalated elsewhere. Wasted a claim, a draft PR (#1608, closed as obsolete), and drew a public correction. Warns, never blocks, when `gh issue comment <N>` or `glab issue note <N>` posts a body carrying claim vocabulary ('claiming', 'is working on this', 'picking this up', 'grabbing this', 'please hold off') and no earlier command in the transcript read that same issue's comments (`gh issue view <N> --comments`/`--json comments`, `glab issue view|show <N> --comments`, `gh api .../issues/<N>/comments` GET, or a GitHub MCP issue_read with method=get_comments) -- a plain `gh issue view <N>` with no comments flag does NOT discharge it, since reading the body alone is exactly the failure measured."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-agent-disclosure.py\"",
             "timeout": 10,
             "script": "require-agent-disclosure.py",
@@ -572,6 +579,13 @@
             "timeout": 10,
             "script": "flag-unmeasured-timestamp.py",
             "why": "CLAUDE.md 'Timestamp recaps in local time', forge-comment surface (ai-config#2900, #2903; measured 2026-09-01: claim comments stamped 12:15/12:40/12:58 PT off one 12:02 PDT reading, the next real reading 12:21 PDT). Warns, never blocks, when a `gh pr comment`/`gh issue comment`/`gh pr review`/`gh api .../comments` body about to post states a Pacific clock time (the Stop sibling's `RX_CLAIM` shape: HH:MM, optional seconds, optional AM/PM, then PDT, PST, or PT) and no clock read appears in the transcript since the current turn began -- or, when the harness's injected reading is in this turn, the stamp runs ahead of its value. The chat-recap half is `no-unmeasured-clock-claim.py` at Stop, whose `scan()`, `RX_CLAIM`, and context exemptions this hook imports so the two agree on what a turn, a clock read, and a stamp are; a comment body never reaches a Stop hook, which is the gap this fills. A post whose body the hook cannot read (a `--body-file` written by a heredoc in the same call, `--body-file -`) gets a cannot-read note rather than silence, after require-agent-disclosure.py's third verdict. Warns because a quoted or relayed time (a CI timestamp, a reviewer's own stamp) is legitimate and not distinguishable by the body alone."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-unmeasured-capability-claim.py\"",
+            "timeout": 10,
+            "script": "warn-unmeasured-capability-claim.py",
+            "why": "CLAUDE.md 'Don't take anyone's word for it' and shared/workflow/verify-the-right-artifact.md, applied to the one surface where an unmeasured claim becomes expensive (ai-config#3707, #3739; measured 2026-09-17). Warns, never blocks, when a forge write about to post carries an ABSOLUTE claim that a capability is absent -- 'is unavailable', 'is not possible', 'unbuildable', 'there is no way to', 'no X can Y' -- within 400 characters of a tooling noun (harness, guard, dispatch, transcript, agent... each pluralizable). Surfaces are derived from the siblings that already parse them: require-agent-disclosure.py's MCP post tools plus the issue/PR write tools, and flag-uncited-rebuttal.py's gh comment shapes plus gh pr review, gh issue|pr create|edit and glab issue|mr note. A negative-capability claim names no artifact, so it cannot be checked by opening the thing it is about, and so gets inferred from an adjacent observation and published as established. The two measured cases: 'foreground dispatch is unavailable' (it runs synchronously in 16.3s, though not while a sibling agent is in flight) and 'the provenance chain is unbuildable' (the linkage was on a record the author had not read) -- both posted to GitHub within an hour, both retracted in public. Requiring both factors narrows the field rather than separating system claims from ordinary prose (measured at 6a870ecc: 88 of 2010 non-overlapping 2000-character chunks of this repo's shared/ fire, 4.38%), which is why it warns rather than blocks: an exhaustively measured claim is lexically identical and is the valuable one."
           },
           {
             "type": "command",
@@ -709,6 +723,20 @@
             "timeout": 10,
             "script": "no-mutation-in-read-only-reviewer.py",
             "why": "ai-config#3612, citing #3602 and #3584: mechanically blocks mutating git commands (commit, checkout -b, switch, restore, stash, merge, reset, rebase, revert, clean, branch/tag mutation, push) and write tools when executing in a read-only reviewer persona (such as adversarial-reviewer, Explore, Plan), protecting shared checkouts and concurrent sessions from stray contamination. Clearable with ALLOW_READ_ONLY_MUTATION=1."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-partial-validation-before-push.py\"",
+            "timeout": 20,
+            "script": "warn-partial-validation-before-push.py",
+            "why": "memories/preferences.md takes the local check list from .github/workflows/validate.yml rather than from memory, and scripts/run-local-validation.py IS that derivation. The rule is read at session start and broken at push time. The observed shape is not a session that skipped checking but one that checked repeatedly with whichever checkers the first round needed, never widening the set while the diff moved on -- measured twice in one session on ai-config#3629 and #3696, the second time on a checker the session did not know existed. Warns and never blocks: the full sweep takes minutes, and there are legitimate pushes that should not wait for it."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unmeasured-digest.py\"",
+            "timeout": 10,
+            "script": "flag-unmeasured-digest.py",
+            "why": "CLAUDE.md 'Timestamp recaps in local time' / deterministic-tools, generalized from a clock time to a digest (ai-config#3779; measured 2026-09-18: an issue body cited `3e2b9e10...` as the md5 of two files, which no command in the session had produced). Warns, never blocks, when a body about to leave through `gh` (a comment, or an issue or PR being created or edited) or `glab` (whose body is `-d`/`--description`) carries a digest-shaped token -- 7 to 64 hex characters bounded on both sides with at least one a-f, that is a canonical length (32/40/64), or truncated with an ellipsis, or preceded within 48 characters by a boundary-anchored digest word -- and no prior `user` transcript record (message or toolUseResult) contains a hex run having that token as a prefix. The prefix rule keeps a legitimate abbreviation quiet, so a short SHA quoted from `git log` discharges and one typed from memory does not. The body is read from `--body-file`, `-b`, `-F`, `-d`, or -- the case the first version missed -- a heredoc in the same command, which is this corpus's own convention for a backtick-safe body and leaves no file on disk at PreToolUse time. Because body extraction is imported from flag-unmeasured-timestamp.py, a `cat >>` append to a session notebook or memory file reaches its notebook branch and warns too. Warns because a digest quoted from an upstream advisory, a lockfile, or a vendor release page is legitimate and not distinguishable by the body alone."
           }
         ]
       },
@@ -875,10 +903,24 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-unmeasured-capability-claim.py\"",
+            "timeout": 10,
+            "script": "warn-unmeasured-capability-claim.py",
+            "why": "CLAUDE.md 'Don't take anyone's word for it' and shared/workflow/verify-the-right-artifact.md, applied to the one surface where an unmeasured claim becomes expensive (ai-config#3707, #3739; measured 2026-09-17). Warns, never blocks, when a forge write about to post carries an ABSOLUTE claim that a capability is absent -- 'is unavailable', 'is not possible', 'unbuildable', 'there is no way to', 'no X can Y' -- within 400 characters of a tooling noun (harness, guard, dispatch, transcript, agent... each pluralizable). Surfaces are derived from the siblings that already parse them: require-agent-disclosure.py's MCP post tools plus the issue/PR write tools, and flag-uncited-rebuttal.py's gh comment shapes plus gh pr review, gh issue|pr create|edit and glab issue|mr note. A negative-capability claim names no artifact, so it cannot be checked by opening the thing it is about, and so gets inferred from an adjacent observation and published as established. The two measured cases: 'foreground dispatch is unavailable' (it runs synchronously in 16.3s, though not while a sibling agent is in flight) and 'the provenance chain is unbuildable' (the linkage was on a record the author had not read) -- both posted to GitHub within an hour, both retracted in public. Requiring both factors narrows the field rather than separating system claims from ordinary prose (measured at 6a870ecc: 88 of 2010 non-overlapping 2000-character chunks of this repo's shared/ fire, 4.38%), which is why it warns rather than blocks: an exhaustively measured claim is lexically identical and is the valuable one."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unread-commit-citation.py\"",
             "timeout": 10,
             "script": "flag-unread-commit-citation.py",
             "why": "The MCP half of the Bash entry above, following require-agent-disclosure.py's and flag-unmeasured-timestamp.py's precedent. A remote/web session has no `gh` on PATH, so an mcp__github__ comment tool is the only way it posts, and hooks.json matches by tool name, so the Bash entry never sees it. Same script, same warn-only behaviour, reading tool_input.body directly. ai-config#3471."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unmeasured-digest.py\"",
+            "timeout": 10,
+            "script": "flag-unmeasured-digest.py",
+            "why": "The MCP half of the Bash entry above, for a remote session with no `gh` on PATH. NOT full parity: it inherits MCP_POST_TOOLS from require-agent-disclosure.py, which covers the comment and review tools, so an issue or PR CREATED through mcp__github__issue_write or mcp__github__create_pull_request is not seen. That is the very case the Bash entry exists for, and closing it means widening the shared tool tuple rather than this hook's own list (ai-config#3779)."
           }
         ]
       },
@@ -946,6 +988,13 @@
             "script": "no-mutation-in-read-only-reviewer.py",
             "why": "ai-config#3612: mechanically blocks file write tools (Write, Edit, NotebookEdit) in read-only personas such as adversarial-reviewer, Explore, and Plan.",
             "_note_see_bash_entry": "Design notes live on this hook's Bash entry. Repeating them per matcher guarantees sibling divergence on the next correction."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-new-line-breaks-on-edit.py\"",
+            "timeout": 10,
+            "script": "warn-new-line-breaks-on-edit.py",
+            "why": "The Write-time counterpart of warn-new-line-breaks-on-push.py above: warns before a Write composes Markdown lines that pack more than one sentence/clause, in a repo that vendors a local new-line-breaks checker. Shares the push hook's own target-repo-vendoring limitation -- a repo that only consumes Morrison-Lab/gha's reusable check-new-line-breaks workflow with no local checker copy gets no warning from either hook, which includes the repo whose incident motivated it (Morrison-Lab/qbt, 2026-09-14/15; ai-config#3747 tracks closing the gap)."
           }
         ]
       },
@@ -980,6 +1029,13 @@
             "script": "no-mutation-in-read-only-reviewer.py",
             "why": "ai-config#3612: mechanically blocks file write tools (Write, Edit, NotebookEdit) in read-only personas such as adversarial-reviewer, Explore, and Plan.",
             "_note_see_bash_entry": "Design notes live on this hook's Bash entry. Repeating them per matcher guarantees sibling divergence on the next correction."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-new-line-breaks-on-edit.py\"",
+            "timeout": 10,
+            "script": "warn-new-line-breaks-on-edit.py",
+            "why": "The Edit half of the same entry: warns before an Edit's new_string composes Markdown lines that pack more than one sentence/clause, in a repo that vendors a local new-line-breaks checker."
           }
         ]
       },
@@ -1127,6 +1183,42 @@
             "why": "Warns when a `git commit` stages a cross-file content move and no repo-wide search for the source file's basename ran this session, so the files citing the source for moved content get enumerated rather than assumed clean (ai-config#3501)."
           }
         ]
+      },
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-cross-drive-toolchain-move.py\"",
+            "timeout": 15,
+            "script": "warn-cross-drive-toolchain-move.py",
+            "why": "memories/storage-media-placement.md -- warns, never blocks, when a relocation verb moves a package library, depot or VM disk image across drive letters (the wsl --import/--move arm excepted: the verb supplies both the operation and the subject, so one drive letter and no recognised toolchain path still warn) and no media-type query (Get-PhysicalDisk, lsblk ROTA) appears earlier in the session. Toolchain data on a spinning disk is ~100x slower at random reads and NOTHING FAILS to say so. Narrowed four ways: silent for a cross-drive copy naming no toolchain path, for one naming a backup/archive location (an HDD is correct for both; on the wsl arm the SOURCE tar is exempt from this test, so an export into a backup dir does not silence the import beside it), for a rehearsal (/L, -WhatIf, rsync -n), and for tokens belonging to a neighbouring command segment."
+          }
+        ]
+      },
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-irreplaceable-under-cache-label.py\"",
+            "timeout": 15,
+            "script": "warn-irreplaceable-under-cache-label.py",
+            "why": "memories/preferences.md 'Partition a deletion choice by BLAST RADIUS' -- warns, never blocks, when an AskUserQuestion option's LABEL promises reversibility (cache/temp/regenerable/safe-to-delete) while the option names something irreplaceable (a VM or WSL disk image by extension, ext4, a named docker volume, pgdata, a home directory, or uncommitted work -- the one entry that is not storage). The label is what carries consent, so a bundle like that yields an uninformed approval. Keyed on disk-image extensions and volumes, never on the bare word docker, so 'clear the Docker build cache' stays silent; polarity is checked per sentence, so an option naming an item in order to say it is safe is silent too."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-binary-file-read.py\"",
+            "timeout": 10,
+            "script": "no-binary-file-read.py",
+            "why": "Warns when `cat`/`head`/`tail`/`less`/`more` is applied to a path that exists on disk and whose first ~8KB contain a NUL byte -- a whole-file read of a binary file, which dumps raw bytes into the conversation for no benefit (ai-config#3771). `strings` is deliberately not flagged, and `head -c N`/`tail -c N` are exempt as an already-bounded read."
+          }
+        ]
       }
     ],
     "Stop": [
@@ -1271,6 +1363,41 @@
             "timeout": 10,
             "script": "flag-clean-claim-over-findings.py",
             "why": "Morrison-Lab/ai-config#3578: a session read a review body stating `Ready for merge` under `### Verdict` that ALSO carried a `### Findings` section with two entries, and reported the round clean -- backwards per fully-clean.md, whose test is the ABSENCE of findings, not the presence of a clean verdict line. Warns, never blocks, when (1) a review body fetched by something REVIEW_FETCH/SAVED_BODY-shaped (reused from remind-ums-on-scrutiny.py / no-handrolled-verdict-parse.py) and carrying the corpus's own paste marker, is scored -- via check-pr-fully-clean.py's OWN `classify_verdict()`/`_unresolved_finding_pattern()`, not a re-derived heuristic -- as stating a clean verdict while still carrying an unresolved finding, AND (2) the reply states a clean-claim phrase (the same `VERDICT_CLEAN_PATTERNS` list the checker itself uses) outside any fenced/backtick code span, with no findings-acknowledgment vocabulary, AND (3) `check-pr-fully-clean.py` has not been run for that PR since (reused from `no-handrolled-verdict-parse.py`'s own `checked_prs()` discharge). Only the MOST RECENT hazard is consulted. Deliberately narrow so a message merely quoting `Ready for merge`/`### Verdict` while discussing this very rule cannot self-trigger: no hazard is ever recorded from a local file read (only an actual GitHub review fetch or a saved-and-reread body qualifies), and a backtick-quoted mention of the phrase is stripped before matching. Three things discharge a hazard, not two: the reply acknowledging findings vocabulary, check-pr-fully-clean.py having been run for that PR since, and a later review fetch of that same PR coming back genuinely clean -- the last of these is what stops the hook nagging through the ordinary fetch, fix, re-fetch, report loop. A not-clean re-read does not discharge, and neither does one whose PR cannot be recovered from the command."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-bash-command-for-powershell-user.py\"",
+            "timeout": 15,
+            "script": "warn-bash-command-for-powershell-user.py",
+            "why": "memories/shell.md 'Two shells coexist' -- warns, never blocks, when a reply hands the user a short fenced command carrying a construct Windows PowerShell 5.1 cannot run (&&, ||, an MSYS path, an inline VAR=value prefix, 2>/dev/null, a heredoc) while the session's environment brief says their shell is PowerShell. Separation from a QUOTED failure is done on the block's shape -- short, no prompt, no output -- because prose framing marks a directive and a post-mortem identically. Measured over 120 transcripts: 3 firings, all the same true positive, 0 false positives -- which establishes only that the matcher is quiet on the other 13 fenced messages, NOT the false-positive rate; the real evidence is the suite's constructed negatives."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-clean-stop-with-live-agent.py\"",
+            "timeout": 10,
+            "script": "no-clean-stop-with-live-agent.py",
+            "why": "flag-session-boundaries -- blocks a CLEAN stopping-point declaration when a subagent was dispatched and no liveness check followed the last task-notification or the last dispatch, whichever came later (ai-config#3689)."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unchecked-empty-pr-claim.py\"",
+            "timeout": 10,
+            "script": "no-unchecked-empty-pr-claim.py",
+            "why": "memories/github.md 'Close empty PRs' -- warns, never blocks, when a reply characterizes a pull request as abandoned, or as empty and disposable, near a pull-request number, and no commit-list QUERY naming that number was issued this session. pr-on-claim has this repo open pull requests against an empty commit on purpose, so changed_files: 0 reads the same on a live claim, on a thread whose commits cannot be pushed (#3739 / #3743), and on a dead branch; only the last is closeable. Four narrowings, each a draft got wrong and each producing SILENCE rather than noise (#3755, review rounds 1 and 2): the mergeability query that returns the field is not evidence, evidence must name every pull request the claim names, evidence comes from an allowlist of query-bearing tools rather than from any tool call (a reply or a comment body carries prose, and 323 of the measured session's 553 calls were Bash), and a per-close exemption is scoped to its sentence. Warn-only because abandonment is partly a judgment. Measured on #3737, 2026-09-17, against the real transcript, where the guard fires and the first draft did not."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-stale-clean-tree-claim.py\"",
+            "timeout": 10,
+            "script": "flag-stale-clean-tree-claim.py",
+            "why": "ai-config#3821 -- warns, never blocks, when a message asserts a clean working tree or clean stopping point after a path-writing git command (`git checkout <ref> -- <path>`, `git restore`, `git stash pop`, `git apply`) ran without an intervening `git status` or `git diff` check."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unread-issue-claim.py\"",
+            "timeout": 10,
+            "script": "no-unread-issue-claim.py",
+            "why": "An issue's body is frozen at filing time; its comments carry the measurement that already ran, the PR that already shipped half of it, and the decision that was already taken. Warns when the final message reports an issue as open, blocked, or awaiting a decision and nothing in the session read that issue's comments -- a body-only read does not discharge it. Measured twice on Lacaedemon/sparta (ai-config#3823); the second time a decision already taken and documented was reported to the user as theirs to make, across several turns, with two unrelated issues described as blocked behind it. Warns and never blocks: an issue can legitimately be blocked, and the guard can only see that the cheapest supporting evidence was never gathered."
           }
         ]
       }

@@ -46,6 +46,87 @@ CHECKER_3468 = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "python3 scripts/check-pr-fully-clean.py 3468 "
                    "-R Morrison-Lab/ai-config"}}]}}
+CHECKER_87 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 87 "
+                   "-R d-morrison/macros"}}]}}
+CHECKER_100 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 100 "
+                   "-R Morrison-Lab/ai-config"}}]}}
+CHECKER_200 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 200 "
+                   "-R Morrison-Lab/ai-config"}}]}}
+CHECKER_1031 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 1031 "
+                   "-R ucdavis/bcs"}}]}}
+CHECKER_1032 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 1032 "
+                   "-R ucdavis/bcs"}}]}}
+CHECKER_1034 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 1034 "
+                   "-R ucdavis/bcs"}}]}}
+PUSH_1034 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "git push origin feat/1034"}}]}}
+PARTIAL_87 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "gh pr checks 87 -R d-morrison/macros"}}]}}
+PARTIAL_100 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "gh pr checks 100 -R Morrison-Lab/ai-config"}}]}}
+PARTIAL_200 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "gh pr checks 200 -R Morrison-Lab/ai-config"}}]}}
+PARTIAL_3468 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "gh pr checks 3468 -R Morrison-Lab/ai-config"}}]}}
+PARTIAL_1034 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "gh pr checks 1034"}}]}}
+PARTIAL_CHECK_RUNS_1034 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "gh api repos/ucdavis/bcs/commits/a5f4f3f2/check-runs?per_page=100 --paginate # inspect #1034"}}]}}
+CHECKER_3760 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 3760 "
+                   "-R Morrison-Lab/ai-config --from-json /tmp/s3760.json"}}]}}
+# A read of ONE PR whose payload path happens to carry ANOTHER PR's digits --
+# the shape a scratchpad naming scheme produces. Counting the filename's
+# digits as an argument would manufacture coverage the session never had.
+CHECKER_3745_PATH_3750 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 3745 "
+                   "-R Morrison-Lab/ai-config --from-json /tmp/w3750.json"}}]}}
+# The script has a real `--quorum N` integer flag
+# (scripts/check-pr-fully-clean.py). A scan for any bare integer near the call
+# reads that N as a PR and manufactures coverage for it.
+CHECKER_651_QUORUM_2 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 651 "
+                   "-R ucdavis/bcs --quorum 2"}}]}}
+# A window wide enough for the repo and a payload path also reaches past a
+# shell `&&` into whatever the next command names.
+CHECKER_651_THEN_3745 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 651 -R ucdavis/bcs"
+                   " && gh pr comment 3745 --body done"}}]}}
+# The PR trailing the flag instead of leading. Not recoverable by a
+# first-token anchor, so coverage is unknown and the guard must fail open.
+CHECKER_FLAG_FIRST = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py -R ucdavis/bcs 651"}}]}}
+# A first token that is not a bare integer. Reading its leading digits as a
+# PR number would invent a subject the command never had.
+CHECKER_MALFORMED_ARG = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 3745x "
+                   "-R Morrison-Lab/ai-config"}}]}}
+# The instrument invoked through a shape whose argument these lookarounds
+# cannot recover. Coverage is then unknown, and the hook must fall back to
+# its pre-#3485 behaviour rather than treat unknown as mismatched.
+CHECKER_NO_ARG = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "bash scripts/score-every-open-pr.sh  # runs "
+                   "check-pr-fully-clean.py per PR"}}]}}
 # One turn carrying BOTH a push and a complete read -- two tool_use blocks in
 # a single message, the shape a real session produces when it pushes and then
 # verifies. Both land on the SAME transcript index, so neither `last_push >
@@ -79,6 +160,16 @@ AGENT_100_DISPATCH = {"type": "assistant", "message": {"content": [
      "input": {"prompt": "drive #100 to clean"}}]}}
 AGENT_100_REPORT = {"type": "user", "message": {"content": [
     {"type": "tool_result", "tool_use_id": "a100", "content": "#100 done"}]}}
+AGENT_200_DISPATCH = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "a200", "name": "Agent",
+     "input": {"prompt": "drive #200 to clean"}}]}}
+AGENT_200_REPORT = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "a200", "content": "#200 done"}]}}
+AGENT_300_DISPATCH = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "a300", "name": "Agent",
+     "input": {"prompt": "drive #300 to clean"}}]}}
+AGENT_300_REPORT = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "a300", "content": "#300 done"}]}}
 ENDPOINT = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "gh api repos/ucdavis/bcs/commits/a5f4f3f2/check-runs?per_page=100 --paginate"}}]}}
@@ -215,12 +306,45 @@ CASES = [
     ([AGENT_DISPATCH, UNRELATED_RESULT,
       say("#3468 is fully clean.")], "allow",
      "an unrelated tool_result (wrong id) is not a subagent report"),
-    ([PARTIAL, say("#87 is green, awaiting your merge.")], "warn",
+    ([PARTIAL_87, say("#87 is green, awaiting your merge.")], "warn",
      "d-morrison/macros#87: merge-readiness vocabulary outside the original set"),
     ([say("#87 is green, awaiting your merge.")], "allow",
      "merge-ready phrasing with no reading and no subagent -- nothing to warn about"),
-    ([PARTIAL, CHECKER, say("#87 is green, awaiting your merge.")], "allow",
-     "checker ran last -- the merge-ready phrasing is covered"),
+    ([PARTIAL_87, CHECKER_87, say("#87 is green, awaiting your merge.")], "allow",
+     "checker ran last ON #87 -- the merge-ready phrasing is covered"),
+
+    # --- ai-config#3485: the read's SUBJECT, not just its shape ---
+    # This case previously expected `allow` and was the bug in miniature:
+    # the checker read #651 and the claim was about #87, and the hook saw
+    # only that a complete read had happened.
+    ([PARTIAL, CHECKER, say("#87 is green, awaiting your merge.")], "warn",
+     "#3485: a complete read of #651 must not cover a claim about #87"),
+    ([CHECKER, say("#100 is fully clean.")], "warn",
+     "#3485's own example: read 50-style mismatch, no partial reading needed"),
+    ([CHECKER_3760, say("#3760 is fully clean.")], "allow",
+     "the argument survives a --from-json path carrying the same digits"),
+    ([CHECKER_3760, say("#3745 and #3750 are fully clean too.")], "warn",
+     "a read of #3760 covers neither #3745 nor #3750 -- both named"),
+    ([CHECKER_87, PUSH, CHECKER,
+      say("#87 is green, awaiting your merge.")], "warn",
+     "a read of #87 that PREDATES the push cannot supply coverage, even "
+     "though a later read of #651 keeps last_complete fresh"),
+    ([CHECKER_3745_PATH_3750, say("#3750 is fully clean.")], "warn",
+     "digits inside a --from-json filename are not an argument: #3750 in "
+     "the path must not cover a claim about #3750 when #3745 was read"),
+    ([CHECKER_651_QUORUM_2, say("#2 is fully clean now.")], "warn",
+     "the script's own --quorum 2 flag must not manufacture coverage for #2"),
+    ([CHECKER_651_THEN_3745, say("#3745 is fully clean now.")], "warn",
+     "a PR named by a command chained after && is not what the checker read"),
+    ([CHECKER_FLAG_FIRST, say("#651 is fully clean.")], "allow",
+     "a PR trailing the -R flag is unrecoverable, so coverage is unknown and "
+     "the guard falls back to its pre-#3485 behaviour"),
+    ([CHECKER_MALFORMED_ARG, say("#3760 is fully clean.")], "allow",
+     "a malformed first token yields no subject at all, not its leading "
+     "digits -- coverage is unknown, so the guard falls back"),
+    ([CHECKER_NO_ARG, say("#651 is fully clean.")], "allow",
+     "#3485's warning: an unrecoverable argument must fail open, not "
+     "count as a mismatch"),
     ([PARTIAL, say("13 pass, 5 pending, waiting on your review.")], "allow",
      "not merge-readiness vocabulary -- 'your review' is not 'your merge'"),
 
@@ -256,7 +380,7 @@ CASES = [
      "same data-merge sentence, but 'branch' anchors it as PR-readiness "
      "vocabulary within the window"),
 
-    ([PARTIAL, say("#87 is yours now -- your call to merge.")], "warn",
+    ([PARTIAL_87, say("#87 is yours now -- your call to merge.")], "warn",
      "'your call to merge' is in the merge-ready vocabulary and was "
      "otherwise untested"),
 
@@ -302,6 +426,72 @@ CASES = [
      "no CI reading anywhere: an unrelated dispatch must not make a claim "
      "about a different PR look subagent-sourced (there is no window to be "
      "inside when last_partial is -1)"),
+
+    # --- ai-config#3761: evaluate ALL claim phrases across the message,
+    # not only the first hit ---
+    ([CHECKER_100,
+      say("#100 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #200 is fully clean too.")],
+     "warn",
+     "#3761: second claim uncovered when first claim is covered"),
+    ([CHECKER_100, CHECKER_200,
+      say("#100 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #200 is fully clean too.")],
+     "allow",
+     "#3761: both claims covered by respective complete reads"),
+    ([CHECKER_100,
+      say("#100 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #200 is fully clean too.\n\n" +
+          "y" * 400 + "\n\nAlso, #300 is ready for merge.")],
+     "warn",
+     "#3761: multiple uncovered claims unioned"),
+    ([CHECKER_100,
+      say("#100 is fully clean.\n\n" + "x" * 400 + "\n\nEarlier we closed #200 as duplicate.")],
+     "allow",
+     "#3761 window check: mention of #200 outside claim window without claim phrase must not warn"),
+    ([PARTIAL,
+      say("#100 is awaiting merge.\n\n" + "x" * 400 + "\n\nSeparately, #651 is fully clean.")],
+     "block",
+     "#3761: second claim is canonical block even when first claim is warn-only"),
+    ([CHECKER, AGENT_200_DISPATCH, AGENT_200_REPORT,
+      say("#100 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #200 is fully clean too.")],
+     "warn",
+     "#3761: cross-bucket coverage warning and subagent warning both fire"),
+    ([AGENT_200_DISPATCH, AGENT_200_REPORT, AGENT_300_DISPATCH, AGENT_300_REPORT,
+      say("#200 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #300 is fully clean too.")],
+     "warn",
+     "#3761: multiple independent subagent-warn claims both fire"),
+
+    # --- ai-config#3838: scope partial reads and pushes to target PR ---
+    ([CHECKER_1031, CHECKER_1032, CHECKER_1034, PARTIAL_1034,
+      say("#1031 and #1032 are fully clean.")],
+     "allow",
+     "#3838: complete read of #1031 and #1032 not invalidated by partial read of #1034"),
+    ([CHECKER_1031, CHECKER_1032, CHECKER_1034, PARTIAL_CHECK_RUNS_1034,
+      say("#1031 and #1032 are fully clean.")],
+     "allow",
+     "#3838: check-runs read for #1034 does not invalidate complete read of #1031 and #1032"),
+    ([CHECKER_1031, PUSH_1034, PARTIAL_1034,
+      say("#1031 is fully clean.")],
+     "allow",
+     "#3838: push to #1034 does not invalidate complete read of #1031"),
+    ([CHECKER_1031, CHECKER_1034, PUSH_1034, PARTIAL_1034,
+      say("#1034 is fully clean.")],
+     "block",
+     "#3838: claim for #1034 after push to #1034 with only partial read blocks"),
+    ([CHECKER_1031, PUSH_1034, PARTIAL_1034,
+      say("#1031 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #1034 is fully clean too.")],
+     "block",
+     "#3838: multi-claim message blocks when #1034 lacks complete read after push"),
+    ([CHECKER_1031, PUSH, ENDPOINT,
+      say("#1031 is fully clean.")],
+     "block",
+     "#3838: unrecoverable push and partial read blocks claim as safe fallback"),
+    ([PARTIAL_1034,
+      say("#1031 is fully clean.")],
+     "allow",
+     "#3838: unrelated partial read does not cause warn on unread claim for #1031"),
+    ([PARTIAL_1034,
+      say("#1031 is green, awaiting your merge.")],
+     "allow",
+     "#3838: unrelated partial read does not cause warn on unread second-vocabulary claim for #1031"),
 ]
 
 # (events, must_contain, must_not_contain, label). The WARN explanation must
@@ -366,26 +556,62 @@ CONTENT_CASES = [
      "a far-away reference the message itself calls unrelated must not be "
      "taken as the claim's subject -- an honest vague label beats a "
      "confident wrong one"),
-    ([PARTIAL,
+    ([PARTIAL_200,
       say("#100 was closed as a duplicate. #200 is green, awaiting your "
           "merge.")],
      "#200",
      "about #100",
      "a message naming two PRs must label the claim with the one the claim "
      "is about, not the first reference in the message"),
-    ([PARTIAL, PUSH,
+    ([PARTIAL_100, PUSH,
       say("#100 is good to merge whenever you're ready.")],
      "no complete instrument read appears anywhere",
      "A complete instrument read is in this transcript",
      "a push after a partial reading, with no complete read ever -- the "
      "message must not claim a complete read exists"),
-    ([AGENT_DISPATCH, AGENT_REPORT, PARTIAL,
+    ([AGENT_DISPATCH, AGENT_REPORT, PARTIAL_3468,
       say("#3468 is green, awaiting your merge.")],
      "SHORT CI surface",
      "dispatched subagent's OWN report",
      "a partial reading AFTER the subagent's report is the newest evidence, "
      "so the message must name the short CI surface and must not claim the "
      "subagent's report is the most recent thing in the transcript"),
+    ([CHECKER_100,
+      say("#100 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #200 is fully clean too.\n\n" +
+          "y" * 400 + "\n\nAlso, #300 is ready for merge.")],
+     "Nothing in this transcript names #200, #300",
+     "Nothing in this transcript names #100",
+     "#3761: warning names union of all uncovered PRs and not the covered PR"),
+    ([CHECKER, AGENT_200_DISPATCH, AGENT_200_REPORT,
+      say("#100 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #200 is fully clean too.")],
+     "Nothing in this transcript names #100",
+     "Nothing in this transcript names #200",
+     "#3761: coverage warning fires for #100 and subagent warning fires for #200"),
+    ([CHECKER, AGENT_200_DISPATCH, AGENT_200_REPORT,
+      say("#100 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #200 is fully clean too.")],
+     "claim about #200",
+     "claim about #100",
+     "#3761: subagent warning properly names #200 alongside coverage warning for #100"),
+    ([AGENT_200_DISPATCH, AGENT_200_REPORT, AGENT_300_DISPATCH, AGENT_300_REPORT,
+      say("#200 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #300 is fully clean too.")],
+     "claim about #200",
+     "claim about #100",
+     "#3761: multiple warn_claims names #200"),
+    ([AGENT_200_DISPATCH, AGENT_200_REPORT, AGENT_300_DISPATCH, AGENT_300_REPORT,
+      say("#200 is fully clean.\n\n" + "x" * 400 + "\n\nSeparately, #300 is fully clean too.")],
+     "claim about #300",
+     "claim about #100",
+     "#3761: multiple warn_claims names #300"),
+    ([AGENT_200_DISPATCH, AGENT_200_REPORT, PUSH_1034,
+      say("#200 is fully clean.")],
+     "dispatched subagent's OWN report",
+     "a `git push` landed after it",
+     "#3838: push to unrelated PR does not make subagent report stale for #200"),
+    ([CHECKER, PARTIAL_100, PUSH,
+      say("#100 is good to merge whenever you're ready.")],
+     "no complete instrument read appears anywhere",
+     "A complete instrument read is in this transcript",
+     "#3838: complete read of unrelated PR does not make warn claim think complete read exists for #100"),
 ]
 
 

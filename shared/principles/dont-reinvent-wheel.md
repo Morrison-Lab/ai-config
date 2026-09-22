@@ -12,9 +12,8 @@ review" below).
 
 ## Where to look
 
-- **Our own repos**: the lab packages (e.g. `{bcs}`, `{ettbc}`), the
-  shared reusable workflows and actions in `Morrison-Lab/gha`, and this
-  `ai-config` corpus's skills and fragments.
+- **Our own repos**: the lab packages (e.g. `{bcs}`, `{ettbc}`), the shared reusable workflows and actions in `Morrison-Lab/gha`, and this `ai-config` corpus's skills, fragments, **and `memories/`** --- a fact-gathering investigation recorded in a memory file is exactly as much prior art as a skill or fragment is.
+  `memories/MEMORY.md` indexes it, but that index is easy to skip past when the search you actually run is an issue/PR duplicate search rather than a grep of `memories/` itself (see the case below).
   Packages can depend on each other, so reuse across our repos is fine.
 - **Trustworthy external sources**: base R; the
   [r-lib](https://github.com/r-lib) and
@@ -387,11 +386,11 @@ documented, verified, and yours.
   same sentence whether it is external or self-imposed.
 - **Do:** relax a self-imposed constraint --- add the dependency, fix the CI
   job --- and re-run the DRW comparison against the relaxed environment.
-- **Don't:** cite an environment your own change or an earlier one of ours
-  chose as proof that an upstream package does not fit.
 - **Do:** open the upstream PR when the constraint lives in a repo we
   administrate, and hold the consumer until it lands, rather than shipping the
   compromise the constraint would force.
+- **Don't:** cite an environment your own change or an earlier one of ours
+  chose as proof that an upstream package does not fit.
 - **Don't:** classify a limit as external because it sits in another
   repository; ask who can merge a change to it.
 
@@ -502,6 +501,19 @@ of unreferenced packages.
   like a function's, and `data-raw/`'s exemption from `R CMD check` (see
   [`ascii-punctuation-in-source`](../coding/ascii-punctuation-in-source.md))
   is what let this one ship unnoticed.
+
+## A duplicate-search that checks GitHub issues can still miss a memory file that already answers the question
+
+A DRW pass that searches for an existing *issue* or *PR* on a topic is not the same search as one for existing *facts* on that topic, and passing the first gives no signal about the second.
+Building `delegate-to-databricks` ([ai-config#3727](https://github.com/Morrison-Lab/ai-config/pull/3727), 2026-09-15), the issue-filing search (`gh issue list --search`, several phrasings) came back empty, which was read as license to write the skill's technical content from scratch --- reasoning through Codex CLI's config semantics live, including guessing at `wire_api`'s default behavior and which model families would be reachable.
+An adversarial-reviewer round then surfaced `memories/databricks-hosted-llms.md`, a file from a 2026-08-29 investigation --- 17 days earlier, and already listed in `memories/MEMORY.md`'s own index --- that had already established the exact facts being guessed at (Codex CLI 0.151.0+ hard-rejects `wire_api = "chat"`, and Claude on Databricks is Chat-Completions-only and therefore unreachable from Codex regardless of `wire_api`) --- and the skill's first-draft prose contradicted both.
+
+The tell, in hindsight: the issue-search step ran and returned empty, which *felt* like the DRW check having been done, when it had only ruled out a duplicate task, not a duplicate (or contradicting) body of facts.
+`grep -ril databricks memories/` would have surfaced the file directly and costs one command.
+
+- **Do:** grep `memories/` (or the equivalent facts-directory) for the topic before writing new technical content, as its own step, separate from and in addition to an issue/PR duplicate search.
+- **Do:** treat an empty issue-search result as evidence about *tracked tasks*, not as evidence about *known facts* --- the two searches answer different questions and neither substitutes for the other.
+- **Don't:** read "the duplicate-search came back empty" as license to write new technical content from first-principles reasoning rather than from a targeted facts-directory search.
 
 ## In review
 

@@ -17,6 +17,7 @@ import os
 import py_compile
 import sys
 import tempfile
+import time
 import warnings
 
 sys.dont_write_bytecode = True
@@ -31,6 +32,19 @@ failures = []
 def check(label, got, want):
     if got != want:
         failures.append(f"{label}: got {got!r}, want {want!r}")
+
+
+def descends_to(command, nested):
+    """Is `nested` among the command lines the descent reaches from `command`?
+
+    Membership rather than an exact list, because `nested_shell_commands`
+    deliberately OVER-DETECTS: when the program is a shell and a `-c`-shaped
+    flag is present, every later token is a candidate. A candidate that is not
+    a command line costs the caller one scan that finds nothing, while a missed
+    one is an unguarded destructive command -- so the contract is "reaches at
+    least", not "reaches exactly".
+    """
+    return nested in shellcmd.shell_c_expansions(command)[1:]
 
 
 def subs(command):
@@ -355,6 +369,210 @@ check("nesting is a scope path, and the depth is its length",
        ((0, 1, 2), ["ls"]), ((0,), ["cd", "/c"])])
 check("a parse error is None on the scope-aware split too",
       shellcmd.simple_commands_with_scope("git commit -m \'unclosed"), None)
+
+# ------------------------------------------- interpreter descent (#1973)
+#
+# A hook that compares exact tokens is bypassed outright by an interpreter
+# wrapper: `shlex` collapses the embedded command into ONE opaque token, so
+# `argv[0]` is the interpreter and every head-token comparison fails. Measured
+# on `main`: `git push --force origin main` denies and
+# `sh -c "git push --force origin main"` is silently allowed.
+#
+# The command itself is always first, so a caller can take `[0]` for the
+# unchanged outer analysis and treat the rest as additional.
+check("the command itself comes back even with nothing nested",
+      shellcmd.shell_c_expansions("git push --force origin main"),
+      ["git push --force origin main"])
+check("a shell's -c argument is a nested command line",
+      descends_to('sh -c "git push --force origin main"',
+                  "git push --force origin main"), True)
+# Only a SHELL's `-c` takes a command line. `python -c` takes Python SOURCE,
+# where `git push` is a syntax error rather than a push, so descending into it
+# would invent a command nobody ran.
+check("a python -c argument is source, not a command line",
+      shellcmd.shell_c_expansions('python3 -c "git push --force origin main"'),
+      ['python3 -c "git push --force origin main"'])
+# WIDER than the reference implementation in hooks/no-empty-promise.py, whose
+# `-[a-z]*c` anchors the `c` last and so reads `-ec` and misses `-cx`. Short
+# options cluster in any order and `bash -cx 'git push'` really pushes.
+check("a -c inside a short-flag cluster still hands over a command line",
+      descends_to('bash -cx "git push --force origin main"',
+                  "git push --force origin main"), True)
+check("assignments and wrappers before the shell do not hide it",
+      descends_to('env FOO=1 /bin/bash -c "git push origin main"',
+                  "git push origin main"), True)
+check("descent is recursive and terminates",
+      shellcmd.shell_c_expansions('bash -c "bash -c ' + chr(92) + '"git push' + chr(92) + '""'),
+      ['bash -c "bash -c ' + chr(92) + '"git push' + chr(92) + '""',
+       'bash -c "git push"', "git push"])
+# `-c` must be a FLAG TOKEN, not text that merely contains one, or quoting the
+# construct in prose would descend into it.
+check("quoted prose naming the construct is not descended into",
+      shellcmd.shell_c_expansions('echo "sh -c stuff"'), ['echo "sh -c stuff"'])
+check("a -c with no operand yields nothing extra",
+      shellcmd.shell_c_expansions("sh -c"), ["sh -c"])
+# An unparseable piece yields no children and does not discard what was
+# already found -- the outer command is still returned.
+check("an unbalanced quote does not lose the outer command",
+      shellcmd.shell_c_expansions("git commit -m 'unclosed"),
+      ["git commit -m 'unclosed"])
+# The cap must BITE for the check to mean anything. The first version used
+# `"git push"`, which has no nested shell at all, so it returned one piece for
+# every max_depth and passed with the bound deleted outright -- a case that
+# cannot fail, which is the standard this repo applies to its own tests.
+_BS = chr(92)
+_Q = chr(34)
+_THREE_DEEP = ('bash -c ' + _Q + 'bash -c ' + _BS + _Q + 'bash -c '
+               + _BS + _BS + _BS + _Q + 'git push' + _BS + _BS + _BS + _Q
+               + _BS + _Q + _Q)
+check("depth 1 stops after the first nested command line",
+      len(shellcmd.shell_c_expansions(_THREE_DEEP, max_depth=1)), 2)
+check("depth 2 reaches the second",
+      len(shellcmd.shell_c_expansions(_THREE_DEEP, max_depth=2)), 3)
+check("depth 3 reaches all of them",
+      len(shellcmd.shell_c_expansions(_THREE_DEEP, max_depth=3)), 4)
+
+# ai-config#1973 review. After `-c`, bash keeps parsing options and takes the
+# first non-option OPERAND, so the command string is not necessarily adjacent.
+# Each of these really runs the command -- verified directly under bash.
+# Three rounds of review found three separate holes in a model of bash's
+# option grammar, so there is no model any more: every token after a `-c`-shaped
+# flag is a candidate. Both positions of each spelling are covered here.
+for _flags, _label in (("-c -x", "a flag after -c"),
+                       ("-c --", "an end-of-options marker after -c"),
+                       ("-o pipefail -c", "an option VALUE before -c"),
+                       ("--rcfile /dev/null -c", "a long option with a value"),
+                       ("-O extglob -c", "a shopt option with a value"),
+                       ("-eo pipefail -c", "a cluster plus a valued option"),
+                       ("+x -c", "a `+`-prefixed set option before -c"),
+                       ("-c -o pipefail", "a valued option AFTER -c"),
+                       ("-c -O extglob", "a valued shopt option AFTER -c"),
+                       ("-c +x", "a `+`-prefixed option AFTER -c")):
+    check("the -c operand is found past " + _label,
+          descends_to('bash ' + _flags + ' ' + _Q + 'git push' + _Q, "git push"),
+          True)
+
+# The PROGRAM is resolved first, and nothing else is considered unless it is a
+# shell. A walk-back from the `-c` to the nearest non-flag token returned `sh`
+# for the first of these and produced a hard refusal on a command that runs
+# nothing.
+check("a -c belonging to no command word is not followed",
+      shellcmd.shell_c_expansions('echo sh -c ' + _Q + 'git push' + _Q),
+      ['echo sh -c ' + _Q + 'git push' + _Q])
+check("a -c argument of a non-shell program is not followed",
+      shellcmd.shell_c_expansions('printf %s sh -c ' + _Q + 'git push' + _Q),
+      ['printf %s sh -c ' + _Q + 'git push' + _Q])
+# `-C` is noclobber, which takes no command. Matching the flag
+# case-insensitively refused `bash -C <file>`, which runs a FILE by that name.
+check("-C is noclobber, not a command flag",
+      shellcmd.shell_c_expansions('bash -C ' + _Q + 'git push' + _Q),
+      ['bash -C ' + _Q + 'git push' + _Q])
+
+# A bypass guard's coverage is decided by its weakest spelling.
+for _shell in ("ash", "mksh", "pdksh", "/bin/bash-5.2", "busybox ash"):
+    check(_shell + " takes -c identically",
+          descends_to(_shell + ' -c ' + _Q + 'git push' + _Q, "git push"), True)
+
+check("a wrapper with its own argument does not hide the shell",
+      descends_to('timeout 5 bash -c ' + _Q + 'git push' + _Q, "git push"), True)
+check("command_program resolves past assignments and wrappers",
+      shellcmd.command_program(["env", "FOO=1", "/bin/bash", "-c", "git push"]), 2)
+check("command_program stops at a non-shell head",
+      shellcmd.command_program(["echo", "sh", "-c", "git push"]), 0)
+
+# An ENV ASSIGNMENT before the program, with no wrapper to compensate. The
+# existing `env FOO=1 /bin/bash -c` case does NOT cover this branch: the
+# wrapper look-ahead finds the shell anyway when `env` precedes the
+# assignment. Reverting the assignment branch leaves that case green and
+# silences the guard on this one (ai-config#1973 review, round 2 finding 4).
+check("a bare assignment before the shell does not hide it",
+      descends_to('FOO=1 bash -c ' + _Q + 'git push' + _Q, "git push"), True)
+check("setsid is skippable",
+      descends_to('setsid bash -c ' + _Q + 'git push' + _Q, "git push"), True)
+# A wrapper and a shell may BOTH be path-qualified. The membership test used to
+# be an exact string while SHELL_PROGRAM allowed a path prefix.
+for _wrapper in ("/usr/bin/env", "/usr/bin/nice -n 5", "/bin/nohup"):
+    check(_wrapper + " does not hide the shell",
+          descends_to(_wrapper + ' bash -c ' + _Q + 'git push' + _Q, "git push"), True)
+# The scan must stop at the SCRIPT OPERAND, but not at an option's VALUE.
+# ACCEPTED OVER-DETECTION. `bash script.sh -c "<cmd>"` hands `-c "<cmd>"` to
+# the script's own argv and runs no `<cmd>`; the descent scans it anyway.
+check("a script operand is scanned too, and costs only a scan",
+      descends_to('bash script.sh -c ' + _Q + 'git push' + _Q, "git push"), True)
+check("an option value does not stop the scan",
+      descends_to('bash --rcfile /dev/null -c ' + _Q + 'git push' + _Q, "git push"), True)
+check("a cluster ending in a value-taking letter does not stop the scan",
+      descends_to('bash -eo pipefail -c ' + _Q + 'git push' + _Q, "git push"), True)
+# A cluster CONTAINING a lowercase `c` is a `-c`, whatever case surrounds it.
+# Bare `-C` is noclobber and takes no command.
+check("a mixed-case cluster containing c still hands over a command line",
+      descends_to('bash -cC ' + _Q + 'git push' + _Q, "git push"), True)
+check("bare -C is noclobber, not a command flag",
+      shellcmd.shell_c_expansions('bash -C ' + _Q + 'git push' + _Q),
+      ['bash -C ' + _Q + 'git push' + _Q])
+# The `seen` set: a repeated nested string is not queued twice.
+check("an identical nested command is not expanded twice",
+      shellcmd.shell_c_expansions(
+          'bash -c ' + _Q + 'git push' + _Q + ' ; sh -c ' + _Q + 'git push' + _Q),
+      ['bash -c ' + _Q + 'git push' + _Q + ' ; sh -c ' + _Q + 'git push' + _Q,
+       "git push"])
+
+# `memories/hooks.md` 5.6: a hot-path guard's correctness suite does not
+# exercise its performance envelope, so measure adversarial length separately.
+# This runs before every Bash call.
+_WIDE = " ; ".join(
+    ['bash -c ' + _Q + 'git push ' + str(i) + _Q for i in range(2000)])
+_start = time.perf_counter()
+_pieces = shellcmd.shell_c_expansions(_WIDE)
+_elapsed = time.perf_counter() - _start
+check("2000 sibling nested shells all expand", len(_pieces), 2001)
+check("and do so in under two seconds", _elapsed < 2.0, True)
+
+# ------------------------------------------------- env -S (--split-string)
+#
+# `env -S` splits ONE argument into a command line and execs it, so
+# `env -S 'bash -c "<cmd>"'` really runs that shell -- verified against real
+# env, which printed the stubbed command. But the whole invocation is a single
+# already-quoted token and `env` is skipped as a bare wrapper, so the descent
+# found no shell and the push ran with the guard silent (ai-config#1973 review,
+# round 4 finding 5).
+check("env -S hands over its argument as a command line",
+      descends_to("env -S 'bash -c \"git push --force origin main\"'",
+                  'bash -c "git push --force origin main"'), True)
+check("the attached short form is read too",
+      descends_to("env -Sbash\\ -c\\ x", "bash -c x") or
+      descends_to("env '-Sbash -c x'", "bash -c x"), True)
+check("--split-string is the same flag",
+      descends_to("env --split-string 'bash -c \"git push --force\"'",
+                  'bash -c "git push --force"'), True)
+check("the attached long form is read too",
+      descends_to("env '--split-string=bash -c \"git push --force\"'",
+                  'bash -c "git push --force"'), True)
+check("S inside a short cluster counts, as env reads it",
+      descends_to("env -vS 'bash -c \"git push --force\"'",
+                  'bash -c "git push --force"'), True)
+check("a path-spelled env is still env",
+      descends_to("/usr/bin/env -S 'bash -c \"git push --force\"'",
+                  'bash -c "git push --force"'), True)
+check("an ordinary env wrapper is unaffected",
+      descends_to("env FOO=1 bash -c 'git push --force'", "git push --force"),
+      True)
+check("-S on a non-env program hands over nothing",
+      shellcmd.nested_shell_commands(["echo", "-S", "bash -c x"]), [])
+
+# The `env` is looked for in a window from the head, not at argv[0] alone.
+# Testing only the head asked whether `env` was TYPED first rather than
+# whether it RUNS, and every one of these words is already in
+# `COMMAND_WRAPPERS`: `command env -S "bash -c '<push>'"` really executes
+# (measured) and both guards were silent on it, while the bare `env -S`
+# spelling denied (ai-config#3645 pre-merge gate, finding 3).
+for _wrapper in ("command", "sudo", "nohup", "exec"):
+    check(f"a {_wrapper} before env -S still hands over the command line",
+          descends_to(f"{_wrapper} env -S 'bash -c \"git push --force\"'",
+                      'bash -c "git push --force"'), True)
+check("an env -S past the wrapper window is not searched for",
+      shellcmd.nested_shell_commands(
+          ["a", "b", "c", "d", "e", "f", "g", "env", "-S", "bash -c x"]), [])
 
 # ------------------------------------------------- source-level hygiene
 #

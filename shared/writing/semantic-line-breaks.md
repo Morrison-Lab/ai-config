@@ -128,16 +128,16 @@ join that would fail the gate is split rather than written.
   preview; `--write` applies splits the gate's `classify_line` accepts.
 - **Do:** re-run the gate after any reformat, since the joined or split lines
   are added lines and the gate is diff-scoped.
-- **Don't:** treat a green reformatter run as a substitute for the
-  `pull_request`-triggered `new-line-breaks` job --- that job is still
-  diff-scoped to added lines, and this script is not invoked by any workflow.
-- **Don't:** expect `--write` to wrap comma-clause chains to 80 columns.
-  That is #2081, not the gate, and this construction does not close it.
 - **Do:** after any `--write` reflow,
   print the longest added line's length with
   `git diff | grep '^+[^+]' | awk '{ if (length > m) m = length } END { print m }'`
   and re-break by hand when that number is past about 120,
   since the gate does not flag a long comma-joined line with no mid-line semicolon.
+- **Don't:** treat a green reformatter run as a substitute for the
+  `pull_request`-triggered `new-line-breaks` job --- that job is still
+  diff-scoped to added lines, and this script is not invoked by any workflow.
+- **Don't:** expect `--write` to wrap comma-clause chains to 80 columns.
+  That is #2081, not the gate, and this construction does not close it.
 - **Don't:** ship a `--write` reflow on the gate's clean verdict alone.
   Recurred 2026-09-02 in a `/gia` session:
   `--write` rewrapped three clause-broken prose additions into single lines up to 398 characters long,
@@ -429,8 +429,10 @@ because re-running it after a correct hand-break restored the violation.
 - **Do:** treat a `.` before a lowercased package or brand name (`opencode`,
   `renv`) opening a sentence as a boundary the gate will split; the
   reformatter now splits it the same way.
-- **Do:** still reword an opener that is a digit or an opening parenthesis,
-  which neither the gate nor the reformatter treats as a sentence start.
+- **Do:** break before a sentence opening with a digit,
+  open parenthesis,
+  or underscore emphasis (e.g. count, parenthetical citation, or measurement);
+  both the gate and the reformatter recognize and split there (gha#884, ai-config#3789).
 - **Don't:** hand-reimplement `_SENT_BREAK_LOWER_RE` in the reformatter ---
   that is the second-implementation drift #2085 retired.
 - **Don't:** read a historical rejoin of a lowercase-follower break as current
@@ -447,55 +449,39 @@ into one.
 Re-verified 2026-08-26 after #2085: the same `reformat()` call keeps the
 break.)
 
-**The durable fix at a boundary neither tool sees is to break the line AND
-give the opener a form the gate recognizes.**
-Choosing the opener retires a prohibition that would otherwise depend on
-habit.
+**A boundary opening with a digit, opening parenthesis, or underscore emphasis
+previously required rewording before gha#884 / ai-config#3789.**
+Prior to that fix, choosing a recognized opener was the only way to keep the
+break from being rejoined.
 
-The gate's sentence regexes --- which the reformatter now imports --- accept
-an opener in ``[A-Z"'`*\[]`` on the uppercase branch and a lowercase letter
-on `_SENT_BREAK_LOWER_RE`.
-A digit or an opening parenthesis is in neither class.
-That third case is the one worth naming, because both instruments go quiet
-at once.
-Nothing reports the violation and nothing preserves a hand-break there, so
-a line packing two sentences survives every check this section describes.
-Choose an opener from the first class rather than leaving the gate to catch
-the mistake.
+The gate's sentence regexes originally accepted an opener in ``[A-Z"'`*\[]`` on
+the uppercase branch and a lowercase letter on `_SENT_BREAK_LOWER_RE`.
+A digit (`0-9`), an opening parenthesis (`(`), or an underscore (`_`) was in
+neither class, so both instruments went quiet at once.
+Nothing reported the violation and nothing preserved a hand-break there, so a
+line packing two sentences survived every check.
+Upstream Morrison-Lab/gha#884 (closing gha#878) widened `_SENT_BREAK_RE` to
+``(?=[A-Z0-9"'`*\[(_])``, and ai-config#3789 vendored the updated checker.
+Both the gate and the reformatter now recognize these boundaries directly and
+preserve them under `--write`.
 
-Bold and a bracketed link both qualify and are ordinary in this corpus, so the
-edit is often free.
-`gha's README names ...` can become `` `gha`'s README names ... ``, which keeps
-the possessive, or `The gha README names ...`, which drops it.
+- **Do:** break at sentence boundaries when the next sentence opens with a
+  digit, an opening parenthesis, or underscore emphasis; both the gate and the
+  reformatter now split and enforce those boundaries (gha#884, ai-config#3789).
+- **Do:** keep abbreviation protections in mind (`Fig. 1`, `No. 2`), which
+  remain protected and do not trigger a false split.
+- **Don't:** reword a natural sentence-opening digit or parenthetical sentence
+  solely to evade an imagined checker blind spot; the gate now catches and splits
+  both.
+- **Don't:** expect a digit or parenthesis opener to rejoin under `--write`;
+  the reformatter splits them the same way the gate does.
 
-- **Do:** break at the period, then start the next line with a capital letter or
-  with markup --- a backtick, bold, or a link --- when the natural opener is a
-  digit or a parenthesis.
-- **Do:** confirm the break survived by re-running the reformatter and checking
-  that the two sentences still land on separate output lines, since its preview
-  is non-empty either way.
-- **Don't:** rely on the gate to catch an unbroken two-sentence line --- it is
-  silent when the second sentence opens with a digit or a parenthesis.
-- **Don't:** expect a lowercase opener to rejoin under `--write` any longer;
-  that was the pre-#2085 trap, and the reformatter now uses the gate's lower
-  branch.
-
-(Measured 2026-08-24 against `Morrison-Lab/gha` at `9ad1cde` and this repo's
-then-local `scripts/semantic-line-breaks.py`.
-`classify_line` returns `sentence` for the unbroken line under a lowercase
-opener and under all six forms in the lookahead class, and `None` under a digit
-or an opening parenthesis.
-Calling `reformat()` on the broken pair rejoined it under a lowercase, digit, or
-parenthesis opener, and left it alone under all six of the class's forms.
-After #2085, the lowercase rejoin is gone; the digit and parenthesis rejoins
-remain, because the gate itself does not split those.
-The case is
-[ai-config#2127](https://github.com/Morrison-Lab/ai-config/pull/2127), where
-`shared/workflow/upgrade-to-gha.md:64` at `7f352648` was flagged
-`Line packs more than one sentence`, and the fix at `7f352648` -> `d70465f5`
-both broke the line and reworded the opener to `The gha README names`.
-That file has since moved on, so read both line numbers against `7f352648`
-rather than against the current tree.)
+(Measured 2026-08-24 against `Morrison-Lab/gha` at `9ad1cde` when digits and
+parentheses passed silently.
+Resolved 2026-09-19 by [Morrison-Lab/gha#884](https://github.com/Morrison-Lab/gha/pull/884)
+and [Morrison-Lab/ai-config#3789](https://github.com/Morrison-Lab/ai-config/issues/3789):
+detected multi-sentence lines rose across `ai-config` from 21,807 to 24,682
+(+13.2%), and the blind spot was closed across both the gate and reformatter.)
 
 **That check WAS advisory --- it warned and exited 0 --- and stopped being so
 on 2026-08-18.**
@@ -663,6 +649,107 @@ lines added since `NLB_BASE_REF`.
 (ai-config#725: a round of review fixes introduced 7 multi-sentence lines; the
 check flagged all 7 while `validate` stayed green, and the review bot did not
 catch them either --- they were found only by reading the check's own output.)
+
+**`NLB_BASE_REF` is the input whose absence disables the check outright, and
+the script announces that in a line shaped like ordinary CI noise.**
+
+The paragraph above names `NLB_PATHS_IGNORE` as the input a local run has to
+supply, because its default **over**-reports, which is the safe direction.
+`NLB_BASE_REF` fails the other way.
+With it unset the script runs no check at all, prints one `::warning::` line,
+and exits 0.
+Measured 2026-09-15 against the SHA this repo vendors:
+
+```console
+$ python3 scripts/vendor/gha-check-new-line-breaks.py
+::warning::Skipping the new-line-breaks check for this run (no base-ref given; not falling back to a whole-tree scan, which would reflag pre-existing long lines).
+$ echo $?
+0
+```
+
+The exit status is the whole problem.
+A skip and a clean run return the same byte, so any caller reading `$?` --- a
+`&&` chain, a pre-push sweep, a person glancing at a terminal --- gets a pass.
+The `::warning::` prefix compounds it, because that token is addressed to
+GitHub Actions' annotation parser and reads outside CI as decoration rather
+than as the verdict.
+
+A second route reaches the same skip **with the variable set**, so "always set
+it" is not by itself the remedy.
+Where the ref cannot be diffed --- an unfetched ref, a shallow clone ---
+`find_violations` returns its `skipped` flag and `main()` returns 0 just the
+same, naming the ref in the reason:
+
+```console
+$ NLB_BASE_REF=origin/does-not-exist python3 scripts/vendor/gha-check-new-line-breaks.py
+::warning::Skipping the new-line-breaks check for this run (could not diff against 'origin/does-not-exist'; not falling back to a whole-tree scan, which would reflag pre-existing long lines).
+$ echo $?
+0
+```
+
+So read the output either way --- and read the right line.
+`No lines missing semantic breaks.` is the only clean verdict this script
+emits, and it is **not** evidence that anything was diffed:
+a base ref that resolves but selects nothing prints it over an empty diff.
+
+```console
+$ NLB_BASE_REF=HEAD python3 scripts/vendor/gha-check-new-line-breaks.py
+Checking for missing semantic line breaks (lines added since HEAD)
+
+Examined 0 added line(s) across 0 file(s) (scope: committed).
+No lines missing semantic breaks.
+```
+
+The line that carries the information is the one above it.
+`Examined N added line(s) across M file(s)` is the script's own report of what
+it looked at, so a clean verdict means something only when `N` is the size of
+the diff you meant to check --- which is the same reading
+[`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md) asks
+for a zero anywhere else: pair it with the count that shows the detector ran.
+
+This is at least the seventh recorded false clean from this checker, and the
+first in which it **emitted no verdict at all**.
+The six already on record, each in a different shape:
+ai-config#730, #732, #752 and #2381, a pre-commit run over an empty diff
+(`memories/git-diffing.md` for the first two, this file for the other two);
+ai-config#2542, the line-numbers-from-HEAD against content-from-the-tree
+mismatch, which is the dirty-tree section further down this file; and
+ai-config#2074, a green push-event run standing in for the pull_request-event
+run that is the PR's actual verdict.
+
+That is the novelty, and it is narrower than "the check never ran".
+The pre-commit family examined nothing either:
+with nothing committed, `HEAD` equals the base ref and the diff is empty.
+What every one of them still produced was the clean verdict string, over that
+empty diff, which is what got read.
+Here the script declined to diff at all, printed `::warning::Skipping` and no
+verdict, and the false clean came from reading **exit 0** as one.
+(Measured 2026-09-15 on
+[ai-config#3677](https://github.com/Morrison-Lab/ai-config/pull/3677): a local
+run with the variable unset was read as a pass, the push went out, and CI's own
+`new-line-breaks` job --- which does supply a base ref --- flagged the line the
+local run would have caught.
+`c712ad9b`, "break the shellcmd population sentence at its clauses", is the
+follow-up commit that fixed it.
+The three console blocks above are this entry's own measurements, taken here
+rather than recovered from that run;
+the incident is the occasion for taking them.)
+
+- **Do:** set `NLB_BASE_REF` on every local invocation, per the command block
+  above, and read the script's output rather than its exit status.
+- **Do:** treat any line beginning `::warning::Skipping` as "the check did not
+  run", whatever the status was.
+- **Do:** read the `Examined N added line(s) across M file(s)` line and check
+  `N` against the diff you meant to check;
+  that is the only line that distinguishes a clean run from a vacuous one.
+- **Don't:** read exit 0 from this script as a pass --- a skip and a clean run
+  are indistinguishable by status.
+- **Don't:** read `No lines missing semantic breaks.` as a pass either;
+  it prints over an empty diff, which is how four of the six already on record
+  happened.
+- **Don't:** assume supplying the variable is sufficient;
+  an unfetchable ref skips with it set, and the reason string is the only place
+  that difference appears.
 
 **Run it AFTER committing, not before: it diffs `<base>...HEAD`, so
 uncommitted work is invisible to it and a pre-commit run reports clean

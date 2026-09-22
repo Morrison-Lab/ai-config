@@ -149,6 +149,42 @@ Use the system's own local clock (`datetime.datetime.now().astimezone()`) when t
 - **Don't:** assume `time.tzset()` exists, or that `zoneinfo.ZoneInfo("America/Los_Angeles")` succeeds out-of-the-box, on a Windows Python installation.
 - **Don't:** wrap a `ZoneInfo` call in `except ModuleNotFoundError`, or hard-code a fixed UTC offset for a DST-observing zone.
 
+## `Path(...).resolve()` silently tolerates an embedded NUL on Windows and raises on POSIX
+
+`pathlib.Path("a\0b").resolve()` returns quietly on Windows --- confirmed here, CPython 3.13.7: no exception, `WindowsPath('.../a\x00b')`.
+On POSIX (measured directly on CPython 3.12.3, the exact version this repo's own CI pins), the same call raises `ValueError: embedded null byte`, because the underlying `os.path.realpath`/`stat` syscalls reject a NUL in a path string outright.
+A code path that assumes the POSIX behaviour --- catching that `ValueError` to treat a NUL-containing path as invalid input --- is unreachable on Windows: the `except` clause never fires, and whatever the `try` block does with the tainted path executes instead.
+
+Measured directly on `Morrison-Lab/ai-config` PR [#3833](https://github.com/Morrison-Lab/ai-config/pull/3833): an earlier commit on that branch (`83bafbef`) narrowed a `try`/`except` in `entries_for` to catch only `OSError`.
+Its commit message states, with the one word capitalized, "an embedded NUL was MEASURED not to raise" --- but the source comment it actually committed reads, all lowercase and with no platform named, "an embedded NUL was measured not to raise either (`resolve()` is non-strict by default)."
+The emphasis lived only in the commit message, which a later reader of the file does not see;
+the artifact that persists --- the comment --- carried the same wrong generalisation with none of the shouting that might have prompted a second look.
+`472408f8`, the next commit on that branch, is where the crash surfaced: CI runs on `ubuntu-latest`, where the same construction raises `ValueError`, not `OSError`, so the script crashed with an uncaught traceback on exactly the malformed input it exists to survive --- JSON round-trips a NUL byte through its own escape, so the input is reachable from an otherwise syntactically valid file.
+The fix widened the catch to `(OSError, ValueError)`, and that commit records why a fixture cannot pin this on its own: a real NUL byte written into a test fixture would assert nothing on Windows, the platform the wrong generalisation came from, so the regression case has to substitute the module's own `Path` rather than write the byte literally --- a NUL fixture is green in exactly the environment where the original mistake was made.
+
+**A second, narrower instance of this same entry's own subject sat inside it until review caught it.**
+An earlier draft of this entry, and PR #3833's own source comment and test fixture (`scripts/check-hook-delivery.py`, `scripts/test_check_hook_delivery.py`), quoted the POSIX message as `ValueError: embedded null character`.
+The actual text, measured directly on CPython 3.12.3 --- the version this repo's own CI pins --- is `embedded null byte`.
+The wrong wording was never empirically checked at its source either: PR #3833's regression test substitutes a mocked `Path.resolve()` that hand-writes the string `"embedded null character in path"` rather than capturing a real traceback, so the fixture necessarily agrees with the assertion it was meant to verify.
+An entry whose whole point is "re-measure a stdlib call's exact behaviour rather than trust an unverified claim" shipped an unverified claim about the exact wording of that same call's exception message --- caught only by a reviewer who ran the command directly against the CI-pinned interpreter rather than trusting either the commit message or the mocked fixture.
+
+This is a second, independent instance of the class [`heredoc-backslash-collapse.md`](../shared/coding/heredoc-backslash-collapse.md) states generally --- "Scope it before relying on it: this is a property of the environment, not of [the mechanism you happened to be testing]" --- and of [ai-config#2158](https://github.com/Morrison-Lab/ai-config/issues/2158)'s `ls` exit-code case (BSD `ls` returns 1 for "no such file", GNU coreutils `ls` reserves 2 for it).
+Both of those are **shell command** behaviour;
+this one is a **standard library call**, which is exactly why a rule framed around shell transport or coreutils exit codes does not fire when the thing being measured is `pathlib`.
+The class is broader than either title suggests: any measured behaviour --- a shell command, a coreutils exit code, a stdlib function, an API response --- is scoped to the platform (and often the specific library version) it was measured on, and a comment or commit message that states the conclusion unconditionally turns a true observation into a wrong rule the moment it is read on a different platform.
+[`metacognitive-monitoring.md`](../shared/workflow/metacognitive-monitoring.md)'s **Inference** claim type already names the general check --- "state what the measurement establishes and what you are claiming as two sentences, and check the second is not wider than or beside the first" --- the platform is one axis the claim can silently widen along.
+
+- **Do:** name the platform (and interpreter/version where relevant) next to any claim about a stdlib call's exception behaviour, exactly as for a shell command's exit code.
+- **Do:** re-measure on the actual target platform (here: POSIX, since the code shipped into Linux CI) before writing "unreachable" into a comment or commit message, rather than trusting a measurement taken on whichever platform the session happened to be running on.
+- **Do:** put the platform-scoping caveat in the artifact a later reader actually encounters --- the source comment --- rather than only in the commit message that introduced it;
+  a commit message's emphasis (capitals, a flagged caveat) does not travel with the code.
+- **Don't:** write a code comment or commit message asserting a branch is unreachable based on a measurement taken on one platform when the code runs on another --- here the comment itself never named a platform at all, which is a stronger miss than an emphasized-but-scoped claim would have been.
+- **Don't:** assume the existing environment-scoping rule fires just because it exists --- it is stated narrowly (heredoc transport, `ls` exit codes) in both of its prior instances, so recognizing "this is the same class" for a stdlib call takes a deliberate generalization step, not pattern-matching on the rule's own title.
+- **Don't:** trust that a strongly-worded commit message (capitals, "MEASURED") carries its caution into the code --- the comment a maintainer reads six months later is the one written in the diff, not the one narrated about it.
+- **Do:** re-run the exact reproducer yourself, against the exact interpreter version the target CI pins, before quoting an exception's message text --- not just its type.
+  A message string is as measurable, and as easy to get wrong from memory or from a secondhand quote, as the exception type itself.
+- **Don't:** trust a test fixture as corroboration for a message string it mocks rather than captures --- a fixture that hand-writes the expected string can never disagree with the assertion it exists to check.
+
 ## `itertools.islice` caps a generator by prefix, and the obvious integer stride collapses to it
 
 `itertools.islice(gen, n)` takes the **first** `n` items, not `n` items spread across what `gen` produces.
@@ -300,3 +336,31 @@ p.write_bytes(s.encode("utf-8"))
 - **Don't:** verify what `write_text` wrote by reading it back with `read_text` --- that round-trip normalizes the very bytes in question.
 - **Don't:** diagnose the resulting anchor-match failure as a wrong anchor string;
   print `repr()` of the file's bytes.
+
+## Mocking Windows paths in pathlib under Python 3.12+
+
+In Python 3.12+, patching `os.name = "nt"` on non-Windows systems causes `pathlib.Path` to instantiate `WindowsPath`, which raises `NotImplementedError: cannot instantiate 'WindowsPath' on your system` when methods like `.with_name()` or `.resolve()` are invoked.
+This breaks cross-platform unit tests that attempt to simulate Windows path handling on Linux CI runners.
+
+Gating Windows-specific code on a module-level boolean constant (`IS_WINDOWS = os.name == "nt"`) allows tests to patch `subject.IS_WINDOWS = True` without altering `os.name`, so `pathlib.Path` constructs normal `PosixPath` instances that exercise the branch logic cleanly.
+Learned 2026-09-21 on ai-config#3829 when patching `os.name` in `hooks/test-ensure-open-pr-monitor.py` crashed under Python 3.12 on Linux CI.
+
+- **Do:** branch on a module-level constant (`IS_WINDOWS = os.name == "nt"`) rather than reading `os.name` directly in functions manipulating `pathlib.Path`.
+- **Do:** patch `subject.IS_WINDOWS` in unit tests simulating Windows execution on Linux.
+- **Don't:** monkeypatch `os.name = "nt"` in tests where code calls `pathlib.Path` constructors or mutating methods on POSIX hosts.
+
+## Headless background execution on Windows requires pythonw
+
+On Windows 11 with Windows Terminal set as the default terminal emulator,
+launching bare `python3` via `subprocess.Popen` without `CREATE_NO_WINDOW`
+will flash a console window or open a terminal tab,
+and resolving `python3` through WindowsApps App Execution Aliases (`%LOCALAPPDATA%\Microsoft\WindowsApps\python3.exe`)
+can trigger interactive launcher behavior.
+To make background helper daemons or git hook controllers truly headless on Windows,
+resolve to sibling `pythonw.exe` (`IMAGE_SUBSYSTEM_WINDOWS_GUI`, which allocates no console window),
+falling back to `sys.executable`,
+and pass `creationflags=subprocess.CREATE_NO_WINDOW` (`0x08000000`) on every child subprocess call (ai-config#3848).
+Learned 2026-09-21 on ai-config#3827, #3829, and #3848.
+
+- **Do:** check for `Path(sys.executable).with_name("pythonw.exe")` or `shutil.which("pythonw")` and pass `CREATE_NO_WINDOW` to child subprocesses when spawning background processes on Windows.
+- **Don't:** invoke bare `"python3"` in `subprocess.Popen` on Windows for background processes.

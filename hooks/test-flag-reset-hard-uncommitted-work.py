@@ -169,6 +169,254 @@ def lead_word_case(path):
     return "sudo FOO=1 git reset --hard"
 
 
+def shell_c_wrapped_case(path):
+    """ai-config#1973: wrapping the discard in a shell's `-c` argument.
+
+    `shlex` collapses the embedded command into ONE opaque token, so `argv[0]`
+    is the interpreter and `rest[0] != "git"` rejected it before any subcommand
+    was read. Measured silent on `main` against a dirty tree -- which is the
+    measurement this needs, since a clean tree makes the BARE form silent too
+    and the probe then distinguishes nothing.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return 'sh -c "git reset --hard origin/main"'
+
+
+def nested_reset_clean_tree_case(path):
+    """A nested `reset --hard` over a CLEAN tree stays silent, as the bare form does.
+
+    This is the over-block the stationary shortcut exists to remove. The
+    unscoped path returns before the M4 status gate, so while every nested
+    piece took it, `sh -c "git reset --hard"` warned over a tree with nothing
+    to lose while `git reset --hard` on the same tree was silent -- a guard
+    strictly noisier for a wrapped command than a bare one, in the direction
+    that trains people to ignore it (round 4 finding 7).
+
+    The tree is left CLEAN deliberately: committed and untouched.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    return 'sh -c "git reset --hard"'
+
+
+def nested_cd_then_reset_case(path):
+    """A nested piece that MOVES, so the unscoped report is the right one.
+
+    W1973a/b carry no `cd`, so the nested shell provably starts where the
+    outer command did and the ordinary local reading -- status gate and file
+    list -- is sound for them. This case is the other half: once a `cd` is in
+    the piece, the directory really is unknowable from here, and the guard
+    must fall back to the note that lists nothing.
+
+    Without this case the unscoped path has no coverage at all, which is how
+    it would go quietly dead the moment the stationary shortcut was added.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return 'sh -c "cd /nonexistent-elsewhere && git reset --hard origin/main"'
+
+
+def nested_git_dir_redirect_case(path):
+    """A nested piece that redirects the REPOSITORY without moving the shell.
+
+    `GIT_DIR=/other/.git git reset --hard` runs `cd` nowhere, so a shortcut
+    asking only "does this text contain a `cd`" read it as acting here and
+    listed THIS repository's dirty files as what would be lost -- the
+    cross-repository report `NOTE_NESTED_UNSCOPED` calls worse than silence
+    (ai-config#3645 pre-merge gate, finding 2).
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return ('sh -c "GIT_DIR=/nonexistent-elsewhere/.git '
+            'git reset --hard origin/main"')
+
+
+def nested_eval_cd_case(path):
+    """A nested piece that moves the shell with no `cd` TOKEN in it.
+
+    `eval 'cd /other'` is one quoted token whose basename is `other`, so a
+    token scan for `cd` finds nothing while the shell really moves --
+    measured: `sh -c "eval 'cd /tmp'; pwd"` prints `/tmp`. The sibling of the
+    case above, for the other half of the same wrong premise.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return ('sh -c "eval \'cd /nonexistent-elsewhere\'; '
+            'git reset --hard origin/main"')
+
+
+def nested_work_tree_redirect_case(path):
+    """`GIT_WORK_TREE=` alone, without the `GIT_DIR=` its sibling case uses.
+
+    Each redirect spelling needs its own case: reverting them one at a time
+    left the suite at 42/42 while only `GIT_DIR=` was exercised
+    (ai-config#3645 self-review, finding 4).
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return ('sh -c "GIT_WORK_TREE=/nonexistent-elsewhere '
+            'git reset --hard origin/main"')
+
+
+def nested_common_dir_redirect_case(path):
+    """`GIT_COMMON_DIR=`, the one spelling beyond the sibling guard's pair."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return ('sh -c "GIT_COMMON_DIR=/nonexistent-elsewhere/.git '
+            'git reset --hard origin/main"')
+
+
+def nested_git_dir_option_case(path):
+    """A `--git-dir` OPTION in a sibling command of the same piece.
+
+    Deliberately not `git --git-dir=X reset --hard`, which `offending_here`
+    does not classify as a reset at all -- a pre-existing gap filed as
+    ai-config#3661. The option only ever reaches `_may_change_repository`
+    beside a command that IS classified, so that is the shape pinned here.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return ('sh -c "git reset --hard origin/main; '
+            'git --git-dir=/nonexistent-elsewhere/.git log -1"')
+
+
+def nested_dash_c_option_case(path):
+    """A bare `-C` in a sibling command, for the same reason as above."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return ('sh -c "git reset --hard origin/main; '
+            'git -C /nonexistent-elsewhere log -1"')
+
+
+def nested_source_case(path):
+    """`source` runs another file's `cd`s in this shell, with no `cd` token.
+
+    The `eval` case's sibling, for the other half of `_OPAQUE_WORDS`.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return ('sh -c "source /nonexistent-elsewhere/env.sh; '
+            'git reset --hard origin/main"')
+
+
+def nested_dot_path_argument_case(path):
+    """A bare `.` as a PATH argument is not the `source` builtin.
+
+    `git add .` is one of the commonest shapes there is, and reading `.`
+    positionally made it look like a `source`, so the piece lost the local
+    reading -- file list included -- that the M5 shortcut exists to give it
+    (ai-config#3645 review round 2). The expected report here is the ordinary
+    local one, which is what distinguishes this case.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return 'sh -c "git add . ; git reset --hard origin/main"'
+
+
+def nested_dot_source_case(path):
+    """The same `.` as the COMMAND WORD really is `source`.
+
+    The other direction of the case above, so scoping the check to the
+    command word cannot be widened back to "never match a dot" without a
+    case failing.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return ('sh -c ". /nonexistent-elsewhere/env.sh; '
+            'git reset --hard origin/main"')
+
+
+def nested_keyword_prefixed_cd_case(path):
+    """A `cd` inside a branch body arrives with the keyword still attached.
+
+    `_simple_commands` splits on operators only, so `then cd /other` hands
+    back `["then", "cd", "/other"]` and the command word is `then`. Reading
+    `argv[0]` without taking the prefix off first would call this piece
+    stationary, which is the fail-open direction -- the shortcut would then
+    list THIS repository's files for a command acting elsewhere.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return ('sh -c "if true; then cd /nonexistent-elsewhere; fi; '
+            'git reset --hard origin/main"')
+
+
+def nested_checkout_word_case(path):
+    """A nested `git checkout <word>` is not classified against THIS repo.
+
+    `_looks_like_path` calls `_resolves_as_ref`, which runs `git rev-parse` in
+    the hook's own directory. For a nested piece that is the wrong repository,
+    so the verdict turned on an accident: a word that happens to name a ref
+    here read as a branch switch and stayed silent, while the same command
+    with a word that does not read as a pathspec and warned about files in a
+    repository the command never touches (ai-config#1973 review, round 4
+    finding 3).
+
+    The tree is left DIRTY so the silence is attributable to the
+    classification rather than to the status gate, and the word is chosen not
+    to resolve as a ref here -- which is the direction that used to warn.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return 'sh -c "cd /nonexistent-elsewhere && git checkout no-such-ref-xyz"'
+
+
+def shell_c_cluster_case(path):
+    """A `-c` inside a short-flag CLUSTER still hands over a command line.
+
+    `bash -cx '...'` really runs it. The reference implementation this descent
+    was extracted from anchors the `c` last (`-[a-z]*c`), which reads `-ec` and
+    misses this.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return 'bash -cx "git reset --hard"'
+
+
+def python_c_case(path):
+    """A PYTHON `-c` argument is SOURCE, not a command line.
+
+    `git reset --hard x` is a syntax error there, not a discard, so descending
+    into it would warn about a command nobody ran. Only a shell's `-c` is
+    followed.
+    """
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return 'python3 -c "git reset --hard x"'
+
+
 def mention_in_string_case(path):
     """A mention of the command inside a quoted string is not an
     invocation."""
@@ -461,6 +709,37 @@ SHOULD_WARN = [
     ("W6", lead_word_case,
      "a lead word (`sudo`) and an assignment are both skipped before "
      "matching the invocation"),
+    ("W1973a", shell_c_wrapped_case,
+     "a discard wrapped in a shell's `-c` argument (ai-config#1973)"),
+    ("W1973c", nested_cd_then_reset_case,
+     "a nested piece that `cd`s first gets the unscoped report, which lists "
+     "no files"),
+    ("W1973b", shell_c_cluster_case,
+     "a `-c` inside a short-flag cluster still hands over a command line"),
+    ("W1973d", nested_git_dir_redirect_case,
+     "a nested piece carrying `GIT_DIR=` redirects the repository without "
+     "moving the shell, so it gets the unscoped report"),
+    ("W1973e", nested_eval_cd_case,
+     "a nested `eval 'cd ...'` moves the shell with no `cd` token, so it "
+     "gets the unscoped report"),
+    ("W1973f", nested_work_tree_redirect_case,
+     "`GIT_WORK_TREE=` alone redirects the repository"),
+    ("W1973g", nested_common_dir_redirect_case,
+     "`GIT_COMMON_DIR=` redirects it too"),
+    ("W1973h", nested_git_dir_option_case,
+     "a `--git-dir` option in a sibling command of the piece"),
+    ("W1973i", nested_dash_c_option_case,
+     "a bare `-C` in a sibling command of the piece"),
+    ("W1973m", nested_keyword_prefixed_cd_case,
+     "a `cd` behind a body keyword is still a `cd`, so the prefix comes off "
+     "before the command word is read"),
+    ("W1973k", nested_dot_path_argument_case,
+     "a bare `.` PATH argument is not `source`, so the piece keeps the "
+     "ordinary local reading"),
+    ("W1973l", nested_dot_source_case,
+     "a bare `.` as the COMMAND WORD is `source`, so the piece is unscoped"),
+    ("W1973j", nested_source_case,
+     "`source` runs another file's `cd`s in this shell, with no `cd` token"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -473,6 +752,14 @@ SHOULD_STAY_SILENT = [
      "`git reset` with no `--hard` never discards working-tree content"),
     ("S4", mention_in_string_case,
      "a mention inside a quoted string is not an invocation"),
+    ("S1973c", nested_reset_clean_tree_case,
+     "a nested `reset --hard` over a CLEAN tree is silent, like the bare form"),
+    ("S1973b", nested_checkout_word_case,
+     "a nested `git checkout <word>` is not classified against THIS "
+     "repository's refs"),
+    ("S1973", python_c_case,
+     "a PYTHON `-c` argument is source, not a command line, so it is not "
+     "descended into"),
     ("S5", heredoc_mention_case,
      "a heredoc that MENTIONS the command runs neither"),
     ("S6", different_subcommand_case, "a different git subcommand entirely"),
@@ -541,11 +828,29 @@ SHOULD_STAY_SILENT += [
 ]
 
 
+# The mutation harness copies ONE FILE to a temp directory, so a hook that
+# imports a shared module cannot resolve it from `__file__` there -- the copy
+# has no repo above it. Without this, `shell_c_expansions` lands as `None` in
+# every mutant, the interpreter-wrapper cases go silent under EVERY clause, and
+# they read as "flipped" for reasons that have nothing to do with the clause
+# being reverted (ai-config#1973). The mutant is a reverted clause, not a
+# broken install. The degraded path -- `shell_c_expansions` left as `None`
+# because the import failed -- is NOT covered by any test here or elsewhere; an
+# earlier version of this comment claimed it was (ai-config#1973 review). It is
+# stated as a known gap rather than left reading as covered.
+_REAL_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+    "scripts", "lib")
+
+
 def verdict(hook_path, repo, command):
     payload = bash(command)
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(
+        [_REAL_LIB] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
     proc = subprocess.run(
         [sys.executable, hook_path], input=json.dumps(payload),
-        capture_output=True, text=True, cwd=repo,
+        capture_output=True, text=True, cwd=repo, env=env,
     )
     if proc.returncode != 0:
         sys.exit(f"FATAL: hook exited {proc.returncode} on {command!r}\n"
@@ -562,7 +867,23 @@ def verdict(hook_path, repo, command):
         sys.exit(f"FATAL: hook emitted permissionDecision="
                  f"{hso['permissionDecision']!r}; this guard must only ever "
                  "add context, never allow/deny/ask")
-    return "WARN" if hso.get("additionalContext") else "silent"
+    context = hso.get("additionalContext")
+    if not context:
+        return "silent"
+    # WARN is not one verdict. This guard has two report shapes, and the
+    # difference between them is the whole point of the nested path: a LOCAL
+    # match lists the tracked files the command would discard, while a NESTED
+    # match must not, because the working tree it can read belongs to a
+    # different repository than the one the nested shell will run in.
+    #
+    # Collapsing both to "WARN" meant reverting the `nested-unscoped`
+    # relabelling -- which reintroduces exactly that cross-repository file
+    # list -- passed the entire suite, every case and every mutation clause
+    # (ai-config#1973 review, round 4 finding 4). A test that cannot fail on
+    # the defect it was written for is not coverage.
+    if "cannot list what would be lost" in context:
+        return "WARN-unscoped"
+    return "WARN"
 
 
 def build_and_verdict(hook_path, builder):
@@ -584,21 +905,38 @@ with open(HOOK, encoding="utf-8") as handle:
 
 EXPECTED = {case_id: "WARN" for case_id, *_ in SHOULD_WARN}
 EXPECTED.update({case_id: "silent" for case_id, *_ in SHOULD_STAY_SILENT})
+# The nested cases must emit the UNSCOPED report, not the local one. Named
+# explicitly rather than derived from the case id, so that adding a nested
+# case without deciding which report it should produce is a visible omission
+# rather than a silent default to "WARN".
+# Only a piece that MOVES gets the unscoped report. W1973a/b carry no `cd`, so
+# the nested shell provably starts where the outer command did and the ordinary
+# local reading is sound for them -- returning the unscoped note regardless made
+# `sh -c "git reset --hard"` warn over a CLEAN tree, since that path returns
+# before the M4 status gate runs (round 4 finding 7).
+EXPECTED.update({case_id: "WARN-unscoped"
+                 for case_id in ("W1973c", "W1973d", "W1973e",
+                                 "W1973f", "W1973g", "W1973h", "W1973i",
+                                 "W1973j", "W1973l", "W1973m")})
 CASES = {case_id: builder
          for case_id, builder, _ in SHOULD_WARN + SHOULD_STAY_SILENT}
 
+# Both loops compare against EXPECTED, which the mutation harness below also
+# reads. They used to compare against the literals "WARN" and "silent" while
+# the harness read EXPECTED, so the two disagreed the moment a case expected
+# anything else -- one source of truth for what a case should produce.
 wrong = 0
 print("should WARN:")
 for case_id, builder, desc in SHOULD_WARN:
     got = build_and_verdict(HOOK, builder)
-    wrong += got != "WARN"
-    print(f"  {got:<6} {case_id}  {desc}")
+    wrong += got != EXPECTED[case_id]
+    print(f"  {got:<14} {case_id}  {desc}")
 
 print("\nshould STAY SILENT:")
 for case_id, builder, desc in SHOULD_STAY_SILENT:
     got = build_and_verdict(HOOK, builder)
-    wrong += got != "silent"
-    print(f"  {got:<6} {case_id}  {desc}")
+    wrong += got != EXPECTED[case_id]
+    print(f"  {got:<14} {case_id}  {desc}")
 
 total = len(SHOULD_WARN) + len(SHOULD_STAY_SILENT)
 print(f"\n{total - wrong}/{total} correct"
@@ -610,11 +948,18 @@ MUTATIONS = {
     "M2_lead_words": (
         "leading assignments/lead words are skipped before matching `git "
         "reset`",
-        [('        while i < len(argv) and (ASSIGNMENT.match(argv[i])\n'
-          "                                  or argv[i] in LEAD_WORDS):\n"
-          "            i += 1",
-          "        pass")],
-        {"W6"},
+        # Anchored on `_lead_index`, shared by BOTH callers since round 3, so
+        # reverting it costs `_may_change_repository` its command word too.
+        [("    while i < len(argv) and (ASSIGNMENT.match(argv[i])\n"
+          "                             or argv[i] in LEAD_WORDS):\n"
+          "        i += 1",
+          "    pass")],
+        # The `GIT_*=` cases ride on this clause too: each redirection is
+        # spelled as a leading assignment, so without the skip the `git` never
+        # reaches the head of the argv and the piece matches nothing at all.
+        # The option-spelled and `source` cases do not, since their redirect
+        # sits in a sibling command rather than in the reset's own prefix.
+        {"W6", "W1973d", "W1973f", "W1973g", "W1973m"},
     ),
     "M2_subcommand_gate": (
         "only `checkout`/`restore` route through the pathspec logic, not "
@@ -661,7 +1006,63 @@ MUTATIONS = {
         [("    if not changed:\n        return 0  # None (git unreachable) "
           "or empty (clean tree) -- fail open",
           "    if False:\n        return 0")],
-        {"S1", "S2"},
+        # S1973c joins S1 and S2 because a nested piece that does not move now
+        # reaches this gate at all. While every nested piece returned the
+        # unscoped report, it returned BEFORE the gate, so the wrapped form
+        # could not exercise it (round 4 finding 7).
+        {"S1", "S2", "S1973c"},
+    ),
+    "M5_stationary_shortcut": (
+        "a nested piece that cannot reach another repository takes the "
+        "ordinary local reading, rather than the unscoped note",
+        [("        if (not _may_change_repository(command)\n"
+          "                and not _may_change_repository(piece)):\n"
+          "            return match",
+          "        pass")],
+        # S1973b is deliberately absent: its nested `git checkout <word>`
+        # is never classified lexically, so it matches nothing and the
+        # shortcut is not on its path at all.
+        {"W1973a", "W1973b", "S1973c", "W1973k"},
+    ),
+    "M5_repo_redirect_env_counts": (
+        "a `GIT_DIR=`-family assignment redirects the repository without "
+        "moving any directory",
+        [("            if token.startswith(_REPO_REDIRECT_ENV):\n"
+          "                return True",
+          "            pass")],
+        {"W1973d", "W1973f", "W1973g"},
+    ),
+    "M5_repo_redirect_opts_count": (
+        "a `--git-dir` / `--work-tree` option does the same",
+        [("            if token.startswith(_REPO_REDIRECT_OPTS):\n"
+          "                return True",
+          "            pass")],
+        {"W1973h"},
+    ),
+    "M5_dash_c_counts": (
+        "`git -C <dir>` reads and writes that directory's repository",
+        [('            if token == "-C":\n                return True',
+          "            pass")],
+        {"W1973i"},
+    ),
+    "M5_command_word_counts": (
+        "a `cd`/`eval`/`source` COMMAND WORD makes the piece unscoped",
+        [("            if word in _CD_WORDS or word in _OPAQUE_WORDS:\n"
+          "                return True",
+          "            pass")],
+        {"W1973c", "W1973e", "W1973j", "W1973l", "W1973m"},
+    ),
+    "M5_only_the_command_word_counts": (
+        "`cd`/`eval`/`source`/`.` are those commands only where they are RUN, "
+        "so a bare `.` path argument does not make the piece unscoped",
+        [("            word = os.path.basename(argv[lead])\n"
+          "            if word in _CD_WORDS or word in _OPAQUE_WORDS:\n"
+          "                return True",
+          "            if any(os.path.basename(t) in _CD_WORDS\n"
+          "                   or os.path.basename(t) in _OPAQUE_WORDS\n"
+          "                   for t in argv):\n"
+          "                return True")],
+        {"W1973k"},
     ),
     "M4_untracked_excluded": (
         "an untracked (`??`) entry does not count as a change `--hard` "

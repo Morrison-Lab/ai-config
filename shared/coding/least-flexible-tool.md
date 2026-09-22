@@ -208,6 +208,48 @@ This case is neither: the property is real and recurring, and the instrument is 
 - **Don't:** ship a matcher you have just established cannot answer the question while its comment still claims it does.
 - **Don't:** narrow the overclaim and stop where the instrument is still wanted --- without the filed issue that is the softening `algorithmatize-checks` refuses.
 
+**Fifth occurrence, 2026-09-15 on [ai-config#3697](https://github.com/Morrison-Lab/ai-config/issues/3697) --- and the first where the raw text being matched is a whole session TRANSCRIPT rather than one live command.**
+
+`hooks/warn-partial-validation-before-push.py` decides two things: whether a push should be warned about, and whether a named script already ran.
+Both were first answered by substring search over command text, and an adversarial review found both directions broken.
+
+`grep -r "run-local-validation.py" memories/` set the "the sweep already ran" flag and silenced the guard.
+So did paging that script's own source.
+That is the self-referential case this ladder had not yet produced: the text describing a check is input the check's own matcher reads, and a guard a grep of its own filename can switch off is treating its own documentation as evidence.
+The mirror direction was live at the same time --- `grep -rn "scripts/check-ascii-punctuation.py" README.md` counted as having RUN that checker, so the warning asserted a run that never happened.
+
+The fix is this rule's middle rung applied to a log of many commands instead of one: a script counts as invoked only when it occupies **command position** in some parsed command --- the program token itself, or an interpreter's first non-flag argument --- never when its name appears as somebody else's argument.
+Finding command position is then its own ladder, and two rounds were spent climbing the wrong one.
+`uv run <script>`, `timeout 60 python3 <script>` and `sudo -u someone python3 <script>` each hide the program behind a wrapper, so `argv[0]` reports `uv`, `60` and `-u`.
+`shellcmd`'s `strip_env` does not rescue this, and for two different reasons worth keeping straight.
+`sudo` IS one of its wrappers, so it peels that one and then returns unpeeled tokens when the bounded window after it holds no `git`.
+`uv` is not a wrapper it knows at all, so it returns immediately without looking.
+Either way the caller gets tokens whose head is not the program, and each wrapper needed its own case.
+
+The escape was to stop asking which token is the program, and the FIRST attempt at that was still wrong in the same direction.
+Asking instead whether the path is an argument to something that READS files --- `grep`, `cat`, `sed`, an editor --- is a blacklist, and a blacklist of this kind cannot be completed.
+`flake8 <script>`, `some-linter --file=<script>` and `echo x > <script>` are all not-readers that were never listed, so each counted as a run and SILENCED the guard.
+
+The same question asked as a whitelist works, and the FIRST whitelist written still did not.
+Accepting a runner anywhere earlier in the argv reads `grep python3 scripts/run-local-validation.py` --- an ordinary way to inspect a shebang --- as a run of that script, and a Python file's own text carries the word `python3` constantly.
+That silenced the guard again, which is the failure the whitelist was adopted to prevent, arriving one round later in a new costume.
+What holds is requiring the runner to occupy command position itself: the script IS `argv[0]`, or `argv[0]` is a runner and the script is its first non-flag argument.
+
+The cost is then explicit and runs one way.
+`timeout 60 python3 <script>`, `sudo -u me python3 <script>`, `make check` and `$PY <script>` each genuinely run the thing and are not credited, so the warning fires when it need not have.
+That spends a line of noise; the alternative spent the guard.
+[`fail-fast`](../principles/fail-fast.md) settles which way an incomplete rule should lean, and that is what this rule's ladder does not say on its own: when no construct can be complete, take the one whose incompleteness fails closed, and write the residue down as a stated limit rather than leaving it to be rediscovered. (`bash -c "<script>"` is separate, and `shell_c_expansions` is the shared helper for it.)
+
+The same commit had independently hand-rolled a `git push` regex, which missed a long global option taking a separate argument (`git --git-dir <path> push`) exactly as the first occurrence above did.
+`scripts/lib/shellcmd.py` already exposes `git_subcommand`, which four other hooks consume.
+Re-deriving it is this file's own `Don't` arriving as a second derivation rather than as a second widening --- and it is the defect the hook itself warns about, since a duplicated derivation is precisely what drifts from the thing it duplicates.
+
+- **Do:** require command position, in a parsed command, when deciding from a log or transcript whether a script ran.
+- **Do:** skip wrappers and interpreters before reading the program token, rather than trusting `argv[0]`.
+- **Do:** call the shared parser for a CLI whose grammar the repo already models.
+- **Don't:** count a path that appears as an argument to `grep`, `cat`, `sed` or an editor as an invocation.
+- **Don't:** let a check read its own source or documentation as evidence about the world --- test that naming the guard does not disarm it.
+
 ## In review
 
 Flag these with the same weight as the other coding rules:

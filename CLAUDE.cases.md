@@ -183,6 +183,55 @@ were written (ai-config#2004, ai-config#1683).
 - **Don't:** read a hook's existence as coverage --- a matcher can be right
   while nothing in the session has the hook enabled.
 
+**3rd measured occurrence, 2026-09-14, and the first on the surface the rule
+is named for.**
+Real readings at 20:27 PDT and 20:49 PDT were followed by three status recaps
+stamped 21:04, 21:12 and 21:18 PT, none of them measured;
+the next real read came back 21:00 PDT, so all three ran ahead of the clock
+they were extrapolated from.
+The 2026-09-01 case is forge comments and notebook headings and the 2026-09-04
+one is a notebook heading, so every stamp in both went out through a tool call.
+This one is the chat recap itself, which is what
+`hooks/no-unmeasured-clock-claim.py` reads at `Stop`.
+
+The direction is the same in all three, and that is the part worth carrying
+forward.
+Extrapolating from a sense of elapsed work over-estimates it, so the invented
+stamp lands in the **future** relative to **the reading it was extrapolated
+from**: 12:15/12:40/12:58 from a real 12:02, 16:20/16:23 from a real 16:19,
+and 21:04/21:12/21:18 from a real 20:49.
+
+The baseline has to be the LAST measured reading and not the next one, which
+an earlier version of this entry used --- and against which 12:15 runs
+*behind* a real 12:21, a counter-example sitting inside a list arguing the
+direction is uniform (ai-config#3677 review, finding 4).
+`timestamp-local-recaps.md` hedges that datapoint itself, with "up to an hour
+behind the invented stamps".
+The last reading is also the comparison the guard performs, so stating it that
+way makes the entry and the instrument agree.
+Running ahead is therefore the signature rather than an incidental detail, and
+it is the one direction that guard already refuses --- `_skew` against
+`TOLERANCE_MIN`, under a comment reading "the turn cannot have run forward of
+the clock, so a time later than the last reading was not observed".
+
+What it has no way to reach is a baseline from an earlier turn.
+That comparison is gated on `measured[0] >= turn_start`, `turn_start` comes
+from the most recent real user prompt, and `measured` is the most recent
+**injected** reading, so a `date` the session ran by hand two turns ago
+supplies neither a position nor a value.
+Across a turn boundary the guard can at most say "unmeasured";
+it can never say "ahead of 20:49".
+Widening the comparison to the most recent readable reading anywhere in the
+transcript is filed as
+[ai-config#3675](https://github.com/Morrison-Lab/ai-config/issues/3675).
+Note also that the guard warns and never blocks, so its firing is not what
+decides whether a stamp goes out --- reading the warning is.
+
+- **Do:** treat a stamp later than your last real reading as unmeasured until
+  the clock is run again, whichever turn that reading was in.
+- **Don't:** count a reading taken in an earlier turn as a baseline the guard
+  compared against --- it holds none across the turn boundary.
+
 ## Surface merge-order constraints --- Draft-gating is the last resort, not the default
 
 (`UCD-SERG/ucd-serg.github.io`

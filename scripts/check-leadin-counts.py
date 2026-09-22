@@ -48,6 +48,10 @@ measured against the live corpus rather than guessed:
   this bound exists to catch.
 - That count is followed within three tokens by a plural-looking noun, so
   "two variables" is a candidate and "two of those runs" is not.
+- When the sentence does not end in a colon, that noun must be an enumerating
+  noun (things, properties, consequences, rules, details, etc.) rather than
+  a domain entity (issues, rounds, scripts), so factual statements of
+  measurement are not misclassified as lead-ins (ai-config#3810).
 - The lead-in starts its own paragraph and is not itself a list item, so a
   count inside one bullet never claims the bullets below it.
 - The enumeration begins within one blank line of the lead-in.
@@ -167,6 +171,89 @@ NOUN_WINDOW = 3
 BOLD_OVERSHOOT = 1
 
 
+# Nouns that introduce an enumeration when a lead-in sentence ends in a
+# period rather than an explicit colon. A colon is the universal punctuation
+# mark announcing what follows, so a colon-terminated sentence admits any plural
+# noun ("Two open issues:", "Three candidates:"). Without a colon, factual
+# statements of measurement ("Two open issues matching 'fix' never made it into
+# the 30-row window.", "Two rounds found the same defect.") are not enumeration
+# lead-ins and must not be flagged when bold headers or lists follow.
+# (Morrison-Lab/ai-config#3810)
+ENUMERATING_NOUNS = {
+    "thing", "things",
+    "property", "properties",
+    "consequence", "consequences",
+    "lesson", "lessons",
+    "detail", "details",
+    "shape", "shapes",
+    "way", "ways",
+    "rule", "rules",
+    "failure", "failures",
+    "cost", "costs",
+    "boundary", "boundaries",
+    "follow-on", "follow-ons", "followon", "followons",
+    "blind spot", "blind spots", "spot", "spots",
+    "form", "forms",
+    "fragment", "fragments",
+    "answer", "answers",
+    "decision", "decisions",
+    "signal", "signals",
+    "check", "checks",
+    "reason", "reasons",
+    "step", "steps",
+    "trap", "traps",
+    "remedy", "remedies",
+    "question", "questions",
+    "case", "cases",
+    "difference", "differences",
+    "mechanism", "mechanisms",
+    "mode", "modes",
+    "point", "points",
+    "pattern", "patterns",
+    "observation", "observations",
+    "example", "examples",
+    "instance", "instances",
+    "scale", "scales",
+    "approach", "approaches",
+    "habit", "habits",
+    "route", "routes",
+    "effect", "effects",
+    "fact", "facts",
+    "signature", "signatures",
+    "condition", "conditions",
+    "refinement", "refinements",
+    "primitive", "primitives",
+    "instrument", "instruments",
+    "interval", "intervals",
+    "asymmetry", "asymmetries",
+    "option", "options",
+    "kind", "kinds",
+    "aspect", "aspects",
+    "finding", "findings",
+    "phase", "phases",
+    "stage", "stages",
+    "element", "elements",
+    "component", "components",
+    "item", "items",
+    "piece", "pieces",
+    "part", "parts",
+    "principle", "principles",
+    "exception", "exceptions",
+    "caveat", "caveats",
+    "pitfall", "pitfalls",
+    "tell", "tells",
+    "heuristic", "heuristics",
+    "criterion", "criteria",
+    "dimension", "dimensions",
+    "theme", "themes",
+    "takeaway", "takeaways",
+    "category", "categories",
+    "class", "classes",
+    "incident", "incidents",
+    "sentence", "sentences",
+}
+
+
 def looks_plural(token: str) -> bool:
     """Return True when the token reads as a plural noun."""
     low = token.lower()
@@ -194,13 +281,14 @@ def last_sentence(line: str) -> str:
     return re.sub(r"^[\s*_>]+", "", tail)
 
 
-def stated_count(sentence: str) -> tuple[int, str] | None:
+def stated_count(sentence: str, ends_with_colon: bool = False) -> tuple[int, str] | None:
     """Return (count, phrase) for a genuine lead-in count, else None."""
     tokens = TOKEN_RE.findall(sentence)
     if tokens and tokens[-1].lower() in CONDITIONAL_TAIL:
         # "Two changes are independent if:" counts the conditions below, not
         # the two changes.
         return None
+    has_colon = ends_with_colon or sentence.strip().rstrip("*_ \t`\"'").endswith(":")
     for match in COUNT_RE.finditer(sentence):
         before = [tok.lower() for tok in TOKEN_RE.findall(sentence[: match.start()])]
         if len(before) > MAX_TOKENS_BEFORE_COUNT:
@@ -220,6 +308,8 @@ def stated_count(sentence: str) -> tuple[int, str] | None:
         if any(tok.lower() in BACKREF_AFTER for tok in window):
             continue
         if not any(looks_plural(tok) for tok in window):
+            continue
+        if not has_colon and not any(tok.lower() in ENUMERATING_NOUNS for tok in window):
             continue
         return value, f"{match.group('count')} {' '.join(window)}"
     return None
@@ -336,7 +426,8 @@ def scan_text(text: str) -> list[tuple[int, int, int, str, str]]:
         found = enumeration_after(lines, lead, fenced)
         if found is None:
             continue
-        counted = stated_count(last_sentence(line))
+        has_colon = line.strip().rstrip("*_ \t`\"'").endswith(":")
+        counted = stated_count(last_sentence(line), ends_with_colon=has_colon)
         if counted is None:
             continue
         start, kind = found

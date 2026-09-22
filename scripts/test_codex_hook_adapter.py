@@ -90,6 +90,22 @@ prompt = run("UserPromptSubmit", {
     "turn_id": "prompt",
 })
 assert isinstance(prompt, dict)
+assert "hookSpecificOutput" in prompt
+prompt_context = prompt["hookSpecificOutput"].get("additionalContext", "")
+assert "Current time -- local:" in prompt_context
+assert "invalid JSON" not in prompt_context
+
+plain_prompt = mod.run_entry({"command": "printf 'plain-text context'", "timeout": 1},
+                             {"hook_event_name": "UserPromptSubmit"})
+assert plain_prompt == {"additionalContext": "plain-text context"}
+
+plain_pretool = mod.run_entry({"command": "printf 'plain-text context'", "timeout": 1},
+                              {"hook_event_name": "PreToolUse"})
+assert plain_pretool and "systemMessage" in plain_pretool and "invalid JSON" in plain_pretool["systemMessage"]
+
+if os.name == "nt":
+    sh_cmd = mod.resolve_command('"${CLAUDE_PLUGIN_ROOT}/hooks/inject-local-time.sh"')
+    assert "bash" in sh_cmd.lower()
 
 stop = run("Stop", {
     "session_id": "test",

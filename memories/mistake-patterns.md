@@ -449,6 +449,9 @@ A clean automated review from every available provider evaluating the current HE
   Before assuming the review state itself is stale, read the guard's refusal for a resolution error naming a suspicious token (a bare digit, a stray file target, an unexpanded `$VAR`).
 - **Do**: write literal paths in every `git -C ... push` this guard sees, and read a "could not be resolved to a commit" refusal as a possible command-text parsing failure before treating it as a stale or missing review.
 - **Don't**: pass a shell variable to `git -C` in a guarded push, and don't respond to a resolution-failure refusal by re-dispatching the reviewer or reaching for `ALLOW_UNREVIEWED_PUSH=1` --- neither addresses a parsing failure the review itself never caused.
+- **Example (3rd occurrence, mechanism unconfirmed)**: 2026-09-14, proposed on Morrison-Lab/ai-config#3657: a bare `git push -u origin <literal-branch-name>` (no pipe, no `$VAR`, no `-C`) was refused twice in a row, both times citing the literal branch name itself as unresolvable to a commit, while `git rev-parse <branch>` succeeded in the same shell throughout.
+  No suspicious token is visible in the refused command text, unlike the first two examples, so the underlying cause is not the one this pattern's canonical rule names, and is recorded here only as a third symptom-alike rather than as a diagnosed mechanism.
+  This bullet is a case of the very "Don't" two lines above: the resolution failure did not clear on retry and no textual fix (unlike examples 1 and 2) was available to try, so `ALLOW_UNREVIEWED_PUSH=1` was used after a genuine foreground adversarial review had already returned clean against the exact pushed commit -- an exception made because the alternative recommended by this pattern (find and fix the offending token) had nothing to find, not a case of the guard being routinely worked around.
 
 ## Pattern 22: A Background-Dispatched Review Verdict Is Invisible to Older Push Guard Revisions
 - **Mistake**: Dispatching the final adversarial-reviewer round with `run_in_background: true` (or resuming a completed reviewer via `SendMessage`) and then pushing on the strength of its clean report, when older revisions of `hooks/no-push-without-self-review.py` only scanned the foreground tool results and missed background task notifications / TaskOutput.
@@ -1222,3 +1225,26 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
 - **Don't:** trust that a fix which resolves the reported false positive is safe merely because it does;
   test what it newly permits, separately from what it correctly stopped denying.
 - **Don't:** stop at the review's own named finding --- the fix for a comparison bug in one branch can leave the identical bug shape live in a sibling branch nobody pointed at.
+
+## Pattern 56: Reporting a Tool Incapable Without Checking the Test's Own Environment
+
+- **Mistake**: testing whether `actionlint` honors a `.github/actionlint.yaml` per-path `ignore:` suppression by running it in a throwaway scratch directory, seeing the same error it was meant to suppress, and reporting the suppression "cannot be suppressed" --- a claim about the tool's capability drawn from a single negative trial whose environment was never checked against the tool's own assumptions.
+- **Root cause**: `actionlint` resolves `.github/actionlint.yaml` by walking up from the target file to the git project root it detects.
+  A scratch directory that is not itself a git repository has no project root, so the config sitting right next to the workflow file is never loaded and the run proceeds with zero config --- the same symptom a genuinely unsupported feature would produce.
+- **Direction of failure**: a correct, reproducible experiment, reasoned about soundly, landing on a false conclusion because one precondition of the experiment (being inside a git repository) silently did not hold.
+  This is `verify-the-right-artifact.md`'s substitution pattern one level removed: not the wrong artifact read, but the wrong *environment* tested, which produces the identical false confidence.
+- **Example**: 2026-09-14/15, a session researching the `concurrency: queue: max` / actionlint#657 false-positive gap (see `memories/github-actions.md`) built a `.github/actionlint.yaml` suppression in `/tmp`, ran `actionlint` there, watched the `unexpected key "queue"` error print unchanged, and drafted a claim that the suppression path does not work.
+  Re-running the identical config and workflow file inside a real (`git init`-ed) repository suppressed the error as documented.
+- **Canonical Rule**: `shared/principles/think-outside-the-box.md`'s "test the assumed constraints empirically" (the near-miss this pattern names: an empirical test was run, but its own setup was never itself tested), `shared/workflow/verify-the-right-artifact.md` (the general substitution shape), `shared/principles/dont-take-my-word-for-it.md`.
+- **Fix**: before reporting a capability absent from a negative test, name the tool's own environment/location assumptions (project root, config search path, working-directory convention) and confirm the test environment satisfies every one of them;
+  re-run inside a corrected environment before generalizing.
+
+- **Do:** before concluding "X cannot be done" from a failed experiment, ask what the tool being tested assumes about its environment, and check the test satisfied each assumption.
+- **Do:** when a scratch-directory test of a git-aware (or otherwise environment-sensitive) tool fails unexpectedly, retry inside a real or minimally initialized instance of whatever context the tool expects, before trusting the negative result.
+- **Don't:** treat a scratch `/tmp` directory as a neutral stand-in for a project checkout --- many tools behave differently, or not at all, outside one, with no error message distinguishing "unsupported" from "misconfigured environment."
+- **Don't:** let a single negative trial, however cleanly reproduced, stand in for a capability claim without first ruling out the test's own setup as the cause.
+
+## Pattern 57: Pronouncing a Two-Part Fix Dangerous From Its Combined Effect, With Neither Half Tested Alone
+- **Mistake**: judging a fix dangerous from what the WHOLE change would do, when only the conjunction of its halves carries the risk and one half is safe alone (measured case in [`mistake-patterns.cases.md`](mistake-patterns.cases.md)).
+- **Do:** apply each half of a multi-part fix separately, in a scratch copy, and re-run the check against real input before pronouncing the whole dangerous.
+- **Don't:** let a true claim about the conjunction stand for both halves --- it can block a half that measurement shows is safe.

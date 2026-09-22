@@ -204,6 +204,26 @@ When a brief, an issue body, or a review finding asserts what a repository says,
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale branch read that produced two issues and a config edit".
 
+## A different endpoint is another shape, and the two names read as synonyms
+
+Two APIs can describe overlapping but distinct populations under names that read as synonyms.
+GitHub's `GET /repos/{owner}/{repo}/pages/builds` documents itself as listing *builds* of a Pages site ([REST API docs](https://docs.github.com/en/rest/pages/pages), read 2026-09-17), while `GET /repos/{owner}/{repo}/deployments?environment=github-pages` lists *deployments* to an environment.
+Both answer to "how many times has this site deployed" in English, and they enumerate different objects, so a count taken from one is not comparable to a count taken from the other.
+
+What distinguishes it is not that the substitution is silent --- [`A working-directory checkout is another shape, and it stays silent`](#a-working-directory-checkout-is-another-shape-and-it-stays-silent) says the same of a stale read, and says it first.
+It is that there is no authoritative store to go to.
+Every other shape's remedy presumes one of the two artifacts is the right one, so suspecting the substitution is most of the work of undoing it.
+Here both endpoints are authoritative, each for its own population, and neither is the correct one in the abstract --- only the endpoint the original measurement used is comparable to the original measurement.
+So the usual move, go and check against the real thing, does not terminate: whichever endpoint you reach for is a real thing.
+
+Re-measuring a prior claim through the *other* endpoint and getting a different number is therefore evidence that the two endpoints disagree, not evidence that the original figure decayed.
+A drift claim needs both readings taken the same way, and the endpoint is part of "the same way".
+
+- **Do:** use the endpoint the original measurement named, and say which one it was.
+- **Do:** use the other party's endpoint when checking someone else's number, before concluding drift.
+- **Don't:** read a different number from a different endpoint as decay.
+- **Don't:** treat two API paths as interchangeable because their names describe the same thing in English.
+
 ## A mechanism's prose is not the mechanism's definition
 
 A hook's comment, a skill's description, a docstring: each one explains a
@@ -359,6 +379,70 @@ It has no fetch-based discharge on purpose: [`keep-checkouts-fresh`](keep-checko
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale local base that nearly quadrupled a review diff's file count".
 
+**A base that is fresh, correct, and current can still be one the comparison is incapable of failing against.**
+
+The error above is staleness, and every remedy it names is a freshness remedy.
+This one survives all of them.
+The ref is right, the fetch is current, the detector runs on every input, and the comparison still returns zero --- because the base has no behaviour of the kind being counted.
+
+**The mechanism is already written down**, in
+[`fixtures-are-not-evidence`](fixtures-are-not-evidence.md)'s
+"Which ref to restore from, not only which file":
+a base branch that lacks the structure under test cannot reproduce the
+behaviour, so it returns a plausible result rather than an error, and the
+remedy is to baseline against the previous round's head and to prefer a
+three-way comparison over a two-way one.
+Read that subsection for the argument;
+this one adds two things to it, both about the **zero** rather than about the
+baseline.
+
+**A large case count weakens a zero rather than strengthening it.**
+A differential run counts *transitions* between what two revisions decide, so
+where the base classifies the whole family one way by default, the transition
+has nothing to transition from.
+Scaling that up multiplies the comparison's reach and not its capability:
+60,000 cases returning zero reads as thorough while carrying exactly as much
+information as one case would.
+The count is the most reassuring number the run can print and the one least
+entitled to reassure.
+
+**So report a zero with the negative control's hit count beside it.**
+A detector that never reached its read site and a detector that reached it
+60,000 times and found nothing print the same zero.
+Only an instrumented count of reads at the site separates them, and it is the
+half that turns a zero into a measurement.
+
+The section on baseline verdicts in
+[`algorithmatize-checks`](algorithmatize-checks.md)
+covers the opposite direction --- a baseline flag earned by coincidence and read as a regression the branch introduced.
+That one produces a finding somebody argues with.
+This one produces a clean run nobody questions, which is why it can repeat.
+
+Measured on [ai-config#3635](https://github.com/Morrison-Lab/ai-config/pull/3635), whose own merged body records it:
+
+> A 60,000-case differential fuzz claimed "zero BLOCK-to-allow against `main`".
+> True and nearly vacuous --- `main` has no substitution scanner, so it already allows this whole family and no regression can appear in that comparison.
+> **The baseline that can fail is the previous round.**
+
+The consequence is in the same body's table.
+`bash <(true; case b in b) echo "<m>";; esac)` reads `allow` on `main`, `BLOCK` at rounds 4 and 5, `allow` at round 6, and `BLOCK` at the head that merged.
+Round 6 was a regression against its own two predecessors, and a comparison against `main` cannot see it by construction: the regressed revision and `main` both return `allow`, so the transition count is zero on precisely the input that shipped the defect.
+
+The pre-merge gate on that PR did both, and **named the revisions rather than counting back from a moving head**:
+29,813 strings scored at `994b975c` and its four predecessors --- `6449c317`, `d7169012`, `c8482025`, `73e95727` --- found 0 transitions, and a separate 240,000-scan comparison reported 0 diffs alongside an instrumented count of 4,640 reads at the site.
+An earlier draft of this paragraph wrote that set as ``HEAD`` and ``HEAD~1``..``HEAD~4``, which names nothing once the branch merges and `HEAD` is somebody else's.
+That is this fragment's own subject applied to a citation: a relative ref is a claim about the reader's checkout, and it resolves to a different artifact in every one.
+
+The falsifying question in "The test" above settles it in one reading: ask what the base does with the family under test.
+If the answer is that it has no opinion, the base cannot testify.
+
+- **Do:** name what the baseline revision does with the construct under test, in the same sentence as the zero.
+- **Do:** baseline a hardening branch against its own previous rounds, and say which ones **by SHA** --- a relative ref names a different commit in every checkout that reads it.
+- **Do:** report the negative control's hit count beside a zero, so the zero distinguishes itself from a detector that never ran.
+- **Don't:** read a large case count as strengthening a zero --- it multiplies the comparison's reach, not its capability.
+- **Don't:** baseline against the default branch for a feature the default branch does not have;
+  that arm agrees with every revision, including the regressed one.
+
 ## A measurement of the right artifact can still be scoped narrower than the claim made from it
 
 Every shape above is a *substitution*: the thing read is not the thing the claim is about.
@@ -411,6 +495,40 @@ the fix here is a stricter version of the same falsifying-question test, aimed a
 The Pandoc-bypass and the empty-submodule-baseline are also written up in that PR's own thread and in d-morrison/rme#1154's "Two instrument traps" section;
 the bypass produced a wrong "fix" and two issues filed on the false "math does not compile" premise, one of them d-morrison/macros#85, closed not-planned once the Pandoc-expansion mistake was found.)
 
+## A sweep's PREDICATE is a choice too, and a named standard can stand in for the policy actually being applied
+
+The section above keeps the predicate and narrows the scope: the right question was asked of too little.
+This one inverts that.
+The scope is complete --- every file read, every one of them scanned --- and the *question* is somebody else's.
+
+The evidence is unusually strong here, which is the whole problem.
+A sweep that visits every file and returns zero is a true statement about the predicate the sweep ran, and that predicate was exhaustively applied.
+Nothing is missing from the coverage, so none of the width remedies above fire, and none of the emptiness remedies fire either --- a negative control would have confirmed the pattern works, because the pattern *does* work.
+It answers a different question than the decision needed.
+
+**The tell is that the sweep's terms came from a named standard rather than from the decision in hand.**
+FERPA, HIPAA, PII, GDPR, an SPDX license list, a secrets-scanner ruleset: each is real, externally validated, and thorough about its own subject, so completing one reads as diligence in a way an improvised list never does.
+That authority is exactly what suppresses the next question.
+A standard is written for *its* decision, so its predicate and yours overlap rather than coincide, and the residue --- everything your policy forbids that the standard never contemplated --- is invisible by construction.
+
+The check is one sentence, written before any pattern is typed: **state the predicate the decision actually turns on**, in the policy's own terms.
+Then derive each search term from a clause of that sentence, and report which clause each pattern discharges.
+A clause with no pattern beside it is the gap, and it is visible in the report rather than in the material.
+The named standard then appears where it belongs --- as one clause among several, not as the sweep.
+
+- **Do:** write the deciding policy's predicate as a sentence first, and derive every pattern from a clause of it.
+- **Do:** report the clause each pattern discharges, so a clause nothing searched for shows up as a blank row rather than as silence.
+- **Don't:** let a named compliance standard's checklist stand in for the policy's predicate --- it was written for a different decision and only overlaps yours.
+- **Don't:** read a thorough, externally validated checklist's zero as clearing a decision that checklist was not written to make.
+
+(Measured 2026-09-18, importing course material from a OneDrive folder into two sibling repos --- `Morrison-Lab/mln`, student-facing and intended to become public, and `Morrison-Lab/mlg`, private grading.
+The decision being made was *which repo each file goes in*, whose predicate is "does this reveal anything a student is to be graded on".
+The sweep that ran scanned every imported file for PII and for health keywords, found nothing, and reported the material clean.
+It never searched for `Exercise Solution`, `answer`, or `solution`.
+An adversarial review round then found a PowerPoint slide hidden with `show="0"`, titled `Exercise Solution:`, carrying worked answers to a graded exercise, in the repo intended to go public.
+Both sweeps were sound.
+Only one of them was about the decision.)
+
 ## A reviewer's counter-measurement needs the same check the claim it rebuts would have needed
 
 The section above is about the same artifact measured at a narrower scope than the claim names.
@@ -451,11 +569,11 @@ Amending the commit message to carry the three-row table above did both jobs at 
 A durable artifact that states its own discriminator is [`quotable-findings`](quotable-findings.md)'s standard turned around --- a claim that names the exact measurement that would falsify it is the one nobody can plausibly misread.
 
 - **Do:** treat a reviewer's own counter-test as a claim requiring the same re-derivation any other claim does, whichever side of the finding you are on.
-- **Don't:** read "the reviewer ran a command" as equivalent to "the reviewer ran the command that could have shown the claim false" --- a command that cannot exhibit the failure mode has not tested the claim, however real its output is.
 - **Do:** when rebutting a finding, name the precondition the original claim relied on and confirm the counter-test carried it.
+- **Do:** write the discriminating measurement --- including the null case that shows what a non-discriminating test looks like --- into the durable artifact (commit message, PR body) rather than only into a comment thread.
+- **Don't:** read "the reviewer ran a command" as equivalent to "the reviewer ran the command that could have shown the claim false" --- a command that cannot exhibit the failure mode has not tested the claim, however real its output is.
 - **Don't:** rebut by re-asserting the original claim against the counter-test's bare output;
   that answers confidence with confidence and settles nothing --- name the specific precondition the counter-test dropped.
-- **Do:** write the discriminating measurement --- including the null case that shows what a non-discriminating test looks like --- into the durable artifact (commit message, PR body) rather than only into a comment thread.
 - **Don't:** leave a verification claim as a bare tool invocation ("verified through X") with no stated discriminator;
   that vagueness is what makes a plausible-but-wrong counter-finding possible in the first place.
 
@@ -755,7 +873,8 @@ the code.)
 that capability through a different one.**
 
 The shapes above substitute a cached copy for an origin, a checkout for a run,
-half a mechanism for the whole, a neighbour for the target.
+half a mechanism for the whole, a neighbour for the target, a different
+endpoint for the same-sounding metric.
 This is another: the documentation is correct, your reading of it is correct,
 every quotation checks out --- and it describes the feature as reached through
 a surface your code does not use.
@@ -1754,3 +1873,75 @@ The remedy is to read the file an unresolved thread names on the default branch 
 
 - **Do:** read the file an unresolved thread names on the default branch (e.g., with `git show origin/main:<path>`), and file only what is still true there.
 - **Don't:** treat an unresolved review thread on a merged pull request as evidence of an open defect in the code.
+
+## When the check that would refute the claim is unavailable, the claim is unverified --- not merely caveated
+
+The four shapes above all describe verifying the *wrong* artifact.
+This one describes the case where the right artifact is identified correctly
+and simply **cannot be reached** --- a blocked egress proxy, a missing
+credential, a UI with no API behind it.
+
+The failure is not that the check is skipped.
+It is what happens to the claim afterwards.
+The unreachable check gets demoted to a parenthetical, the claim is stated at
+full confidence, and the caveat reads as thoroughness rather than as the
+warning it is.
+Nobody is deceived about the blocked check, because it is disclosed --- they
+are deceived about the claim, which was never downgraded to match.
+
+Measured 2026-09-15.
+A Quarto site was rendered, deployed to `gh-pages`, and the branch confirmed to
+hold 36 HTML pages, 21 PDFs and every asset directory.
+Every one of those is a fact about the **branch**.
+The claim made was that the site was *published*, with one routine settings
+step left --- a fact about **serving**, which the session could not check
+because its proxy blocked `github.io`, and which it noted in passing while
+stating the claim anyway.
+The setting did not exist: the repository was a private fork, and GitHub Pages
+was unavailable to it entirely (see
+[`github-repo-transfers`](../../memories/github-repo-transfers.md)).
+The maintainer had to supply what the blocked check would have shown.
+
+**The asymmetry to notice is that a blocked check removes evidence against the
+claim while leaving every piece of evidence for it intact.**
+So the remaining evidence looks unanimous, and confidence goes *up* exactly
+when it should go down.
+That inverts the usual relationship between missing information and certainty,
+which is why disclosing the gap does not correct for it.
+
+The test is the one this fragment already states, applied to reachability
+rather than to identity: ask what would have to be true for the claim to be
+false, then ask whether the artifact that would show it is one you can
+actually reach.
+When it is not, say the claim is unverified and name what would settle it.
+
+- **Do:** state the claim at the confidence the reachable evidence supports,
+  and say plainly which part is unverified.
+- **Do:** name the specific check that would settle it, so whoever can run it
+  knows what to run.
+- **Don't:** disclose the blocked check and then assert the claim anyway --- a
+  caveat beside a confident claim is read as rigour, not as doubt.
+- **Don't:** treat unanimous surviving evidence as strong when the blocked
+  check was the only thing that could have disagreed.
+
+## A local test run is not the CI job's conclusion
+
+This is the "a checkout for the run" substitution in its most available form, and the one least likely to register as a substitution: the local run is faster, it is under your hand, and it tests the same code.
+
+Measured 2026-09-18 on [`Morrison-Lab/gha`](https://github.com/Morrison-Lab/gha) PR 883.
+A session ran `python3 -m unittest discover -s antigravity-review/tests` at head `dd243dc`, got 42 of 42, and reported the `antigravity-tests` job green.
+The check-runs query in that same turn reported the job `in_progress`.
+It did conclude `success` a minute later --- so the conclusion was right and the evidence for it did not exist yet, which is the dangerous case, because nothing corrects it.
+
+`hooks/no-stale-pr-status.py` caught it: it compares a clean-state assertion against the most recent status query in the transcript, so the gap was visible to an instrument even though the claim turned out true.
+
+The two artifacts genuinely differ.
+A CI job can diverge on runner OS, tool versions, steps wrapped around the suite, and inputs the job's own `with:` block overrides --- `gha`'s `CLAUDE.md` records `PHI_DETECTORS` and `NLB_GLOBS` doing exactly that, so a local run of the same script exercises a different configuration from the one CI runs.
+
+- **Do:** use a local run to decide whether to push, never to report a job's state.
+- **Do:** report a job by its `conclusion` field, and name the job id so the claim is checkable.
+- **Do:** read `status` before `conclusion` --- `in_progress` has no conclusion, and an absent conclusion is not a pass.
+- **Do:** read the job's own `with:` block before trusting a local invocation of the script it calls.
+- **Don't:** characterize the PR when some checks are still running;
+  say which jobs concluded and that others are in flight.
+  A whole-PR claim is a scope claim over every check.

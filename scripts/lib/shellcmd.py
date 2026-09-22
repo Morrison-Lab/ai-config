@@ -608,3 +608,332 @@ def resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
     if cur_dir is not None:
         return os.path.normpath(os.path.join(cur_dir, target))
     return os.path.normpath(target)
+
+
+# A SHELL specifically, which is a narrower question than "an interpreter".
+# Only a shell's `-c` takes a nested COMMAND LINE. `python -c` takes Python
+# SOURCE, where `git push` is a syntax error rather than a push, so re-testing
+# a Python `-c` argument under shell semantics invents commands nobody ran.
+# The distinction is `hooks/no-empty-promise.py`'s, which spent four review
+# rounds on this class and is the reference implementation.
+#
+# Wider than the reference in two ways it was measured to need. `ash` is the
+# default shell on Alpine and the busybox applet, and `mksh`/`pdksh` take `-c`
+# identically; a bypass guard's coverage is decided by its weakest spelling.
+# And a version suffix is an ordinary way to name a binary -- the reference
+# allows one for `python[\d.]*` and for no shell, so `/bin/bash-5.2 -c` walked
+# past it.
+SHELL_PROGRAM = re.compile(
+    r"\A(?:[\w.@/-]*/)?(?:ash|bash|dash|ksh|mksh|pdksh|sh|zsh)(?:-?[\d.]+)?\Z",
+    re.I)
+
+# `busybox sh -c ...` names the shell in ARGV[1]. The applet is the program as
+# far as the kernel is concerned and the shell as far as this question is.
+_MULTICALL = re.compile(r"\A(?:[\w.@/-]*/)?busybox\Z", re.I)
+
+# A `-c`-shaped flag hands a command STRING to the shell.
+#
+# WIDER than the reference implementation's `-[a-z]*c`, which anchors the `c`
+# last and so reads `-ec` and misses `-cx`. Short options cluster in any order
+# and every shell here spells `-c` as one letter, so a cluster CONTAINING `c`
+# sets it: `bash -cx 'git push'` really pushes.
+#
+# A LOWERCASE `c` is required, and any case is allowed around it. `-C` alone is
+# `noclobber`, a different option taking no command, and matching it
+# case-insensitively produced a hard refusal on `bash -C <file>`, which runs a
+# FILE by that name and pushes nothing. But dropping case-insensitivity from
+# the whole cluster went too far the other way: `bash -cC '<cmd>'` really runs
+# `<cmd>`, and an all-lowercase cluster arm cannot express "contains a
+# lowercase `c`" (ai-config#1973 review, round 2 finding 8).
+#
+# `--command` was carried over from the reference implementation and removed:
+# no shell in SHELL_PROGRAM accepts it (`bash --command x` reports "invalid
+# option"), so it only ever produced a false DENY. Reusing a pattern
+# structurally without checking that each element transfers is exactly what
+# `shared/workflow/check-purpose-before-reusing.md` is about.
+#
+# `+` is accepted alongside `-` because every shell here spells its `set`
+# options both ways.
+#
+# `-check` is deliberately matched, unlike in the reference implementation:
+# bash parses it as `-c -h -e -c -k`, so it really is a `-c`. Over-detecting a
+# flag is bounded here because the PROGRAM is checked first AND the scan stops
+# at the script operand -- without that second stop, `bash script.sh -c "x"`
+# was refused for a `-c` belonging to the script's own argv (round 2 finding
+# 5).
+DASH_C_FLAG = re.compile(r"\A[-+][A-Za-z]*c[A-Za-z]*\Z")
+
+# Tokens that may precede the program without changing what runs.
+#
+# `setsid` is the ONLY addition over COMMAND_WRAPPERS. An earlier version of
+# this comment named `sudo` and `stdbuf` as additions too; both are already
+# members, and `stdbuf` never appeared in the literal at all (ai-config#1973
+# review, round 2 finding 6). The wording had been written against
+# `hooks/no-empty-promise.py`'s `_EXEC_PREFIX`, which lists a different set.
+_DESCENT_SKIPPABLE = COMMAND_WRAPPERS | {"setsid"}
+
+
+def command_program(argv):
+    """Index of ARGV's program token, for the purpose of finding a SHELL.
+
+    Not a general program resolver, and the summary used to read as one. When
+    the wrapper look-ahead finds no shell, this returns the index of the
+    wrapper's first ARGUMENT rather than of the program:
+    `command_program(["timeout", "5", "git", "push"])` is 1, which is `"5"`.
+    That is harmless to the only caller, which rejects a non-shell
+    immediately, and would mislead any other.
+
+    Leading `VAR=value` assignments and wrappers are skipped. A wrapper with
+    its own arguments (`sudo -u me bash`, `timeout 5 bash`, `env -i bash`) is
+    handled by looking ahead a bounded distance for a shell rather than by
+    modelling each wrapper's option grammar -- the same trick `strip_env` uses,
+    and nothing is consumed unless a shell is actually found.
+    """
+    index, after_wrapper = 0, False
+    while index < len(argv):
+        token = argv[index]
+        if ENV_ASSIGNMENT.match(token):
+            index += 1
+            after_wrapper = False
+            continue
+        # A shell KEYWORD is not the program. `strip_env` has skipped these
+        # since the constant was introduced, and its comment says why: the
+        # splitter breaks on `;` and `&&`, so the keyword lands at argv[0] of
+        # the segment carrying the command. Omitting the same skip here made
+        # every keyword-wrapped nesting invisible to the descent --
+        # `{ sh -c "git push --force origin main"; }`, `if true; then sh -c
+        # "..."; fi` and `for i in 1; do sh -c "..."; done` were each SILENT
+        # while their unwrapped forms denied (ai-config#1973 review, round 4
+        # finding 1, reproduced independently by the @claude review of #3645).
+        if token in SHELL_KEYWORDS:
+            index += 1
+            after_wrapper = False
+            continue
+        # Basename first. The membership test used to be an exact string while
+        # SHELL_PROGRAM allows a path prefix, so `/bin/sh -c` was followed and
+        # `/usr/bin/env bash -c` was not -- measured silent on both guards
+        # while really running the push (ai-config#1973 review, round 2).
+        if os.path.basename(token) in _DESCENT_SKIPPABLE:
+            index += 1
+            after_wrapper = True
+            continue
+        if after_wrapper:
+            window = argv[index:index + WRAPPER_ARG_WINDOW]
+            hit = next((offset for offset, candidate in enumerate(window)
+                        if SHELL_PROGRAM.match(candidate)
+                        or _MULTICALL.match(candidate)), None)
+            if hit is not None:
+                index += hit
+        break
+    if index < len(argv) and _MULTICALL.match(argv[index]):
+        index += 1
+    return index
+
+
+def nested_shell_commands(argv):
+    """Every token in ARGV that a shell there might be handed as a command.
+
+    STOP MODELLING THE OPTION GRAMMAR. Three rounds of review found three
+    separate holes in it, each a real push executing while both guards stayed
+    silent: an operand assumed adjacent to `-c`; an option's VALUE read as the
+    script operand (`bash -o pipefail -c`); a `+`-prefixed set option read the
+    same way (`bash +x -c`), and a value-taking option AFTER the `-c`
+    (`bash -c -O extglob`) whose value was returned as the command. Each fix
+    named the next gap in its own comment. `bash --`, `bash -oc` and
+    `bash --command` were the over-blocks the same modelling produced.
+
+    The enumeration is not finishable, and it does not have to be, because
+    over-detection here is nearly free. A candidate that is not really a
+    command line is handed to the caller's own analysis, which finds no `git`
+    in it and reports nothing. The cost of a wrong guess is one wasted scan;
+    the cost of a missed one is an unguarded destructive command. So when the
+    program is a shell and a `-c`-shaped flag appears anywhere in its argv,
+    every token after the PROGRAM is a candidate, except the `-c`-shaped
+    tokens themselves.
+
+    Stated that precisely because the shorter "EVERY later token" is wrong in
+    both directions, and this sentence is the whole specification of the
+    design. Tokens BEFORE the flag are candidates too:
+
+        >>> nested_shell_commands(["bash", "-o", "pipefail", "-c", "git push"])
+        ['-o', 'pipefail', 'git push']
+
+    and a second `-c` AFTER the flag is not one (round 4 finding 13).
+
+    Returns a list, possibly empty, in argv order.
+
+    What this over-detects, stated rather than discovered later: `bash -- -c
+    "<cmd>"` runs no `<cmd>` (the `--` makes `-c` the script name and bash
+    exits 127), and `bash script.sh -c "<cmd>"` hands `-c "<cmd>"` to the
+    script's own argv. Both are scanned, and both cost only a scan unless the
+    token really does carry a gated command -- in which case blocking a command
+    that executes nothing is the cheap error.
+    """
+    split_string = _env_split_string(argv)
+    index = command_program(argv)
+    if index >= len(argv) or not SHELL_PROGRAM.match(argv[index]):
+        return split_string
+    rest = argv[index + 1:]
+    if not any(DASH_C_FLAG.match(token) for token in rest):
+        return split_string
+    return split_string + [
+        token for token in rest if not DASH_C_FLAG.match(token)]
+
+
+# `env -S` / `--split-string` takes ONE argument and splits it into a command
+# line itself, so `env -S 'bash -c "<cmd>"'` really execs that shell -- but the
+# whole invocation is a single already-quoted token, and `command_program`
+# skips `env` as a bare wrapper and then finds no shell. The descent never
+# reached it, and `env -S 'bash -c "git push --force origin main"'` ran the
+# push while the guard stayed silent (ai-config#1973 review, round 4 finding 5,
+# reproduced independently by the @claude review of #3645).
+#
+# Both spellings, attached and detached, and `-vS` style clusters: `env` reads
+# `-S` anywhere in a short cluster.
+_ENV_PROGRAM = re.compile(r"\A(?:[\w.@/-]*/)?env\Z")
+_SPLIT_STRING_ATTACHED = re.compile(r"\A(?:-[A-Za-z]*S|--split-string=)(.+)\Z")
+_SPLIT_STRING_BARE = re.compile(r"\A(?:-[A-Za-z]*S|--split-string)\Z")
+
+
+def _env_split_string(argv):
+    """The command lines `env -S` would split out of ARGV, in argv order.
+
+    Over-detects on purpose, like the rest of this module: a token that is not
+    really a command line costs one wasted scan, while a missed one is an
+    unguarded destructive command.
+
+    The `env` is looked for in a WINDOW from the head rather than at `argv[0]`
+    alone. Testing only the head asked whether `env` was typed first, which is
+    a different question from whether `env` runs: every one of `command`,
+    `sudo`, `nohup` and `exec` is already in `COMMAND_WRAPPERS`, which
+    `command_program` skips two functions up, so the module knew those words
+    were transparent while this function did not -- and `command env -S "bash
+    -c '<push>'"` ran the push with both guards silent, where the bare `env -S`
+    spelling denied (ai-config#3645 pre-merge gate, finding 3).
+
+    A window rather than a wrapper-by-wrapper skip, for the reason
+    `nested_shell_commands` gives at length: the enumeration is not finishable
+    and does not have to be, because a wrong guess costs one scan of a token
+    that carries no gated command.
+    """
+    start = next((position for position, token
+                  in enumerate(argv[:1 + WRAPPER_ARG_WINDOW])
+                  if _ENV_PROGRAM.match(os.path.basename(token))), None)
+    if start is None:
+        return []
+    out = []
+    for position, token in enumerate(argv[start + 1:], start=start + 1):
+        attached = _SPLIT_STRING_ATTACHED.match(token)
+        if attached:
+            out.append(attached.group(1))
+        elif _SPLIT_STRING_BARE.match(token) and position + 1 < len(argv):
+            out.append(argv[position + 1])
+    return out
+
+
+def shell_c_expansions(command, max_depth=3):
+    """`command` first, then every command line reachable via a shell's `-c`.
+
+    WHY THIS EXISTS
+    ---------------
+    A hook that tokenizes and compares exact tokens is bypassed outright by
+    wrapping the gated command in an interpreter's `-c` argument. `shlex`
+    collapses the embedded command into ONE opaque token, so `argv[0]` is the
+    interpreter and every head-token comparison fails immediately.
+
+    Measured on `main` (ai-config#1973): `git push --force origin main` fed to
+    `hooks/no-clobbering-push.py` denies, and `sh -c "git push --force origin
+    main"` produces no output and is silently allowed. That is the direction
+    `shared/principles/fail-fast.md` calls the dangerous one -- a silent
+    discharge rather than an over-warn.
+
+    HOW TO USE IT
+    -------------
+    Analyse each returned string SEPARATELY. Do not concatenate their argv
+    lists: a nested `-c` argument is a DIFFERENT SHELL, so its `cd` moves that
+    shell and not the caller's.
+
+    A caller that resolves anything against a WORKING DIRECTORY must go
+    further than that, and `hooks/no-clobbering-push.py` records what happens
+    when it does not: this function cannot tell a nested shell what directory
+    it starts in, because that depends on the `cd`s the outer shell ran first.
+    A verdict that depends on a directory is therefore unsound for a nested
+    piece, and evaluating one anyway fabricated a warning quoting an unrelated
+    repository's commits. Use nested pieces only for verdicts decidable from
+    the command TEXT.
+
+    THE FAILURE DIRECTION INVERTS WHEN THIS IS COPIED INTO A GUARD
+    --------------------------------------------------------------
+    In `hooks/no-empty-promise.py`, where this descent was extracted from, each
+    give-up point fails CLOSED -- the worst case is a promise that does not
+    discharge. In a guard the identical give-up point fails OPEN. So the limits
+    below are not the reference's limits with a different label on them; they
+    are holes, and each one is a command that runs while the guard is silent.
+
+    LIMITS
+    ------
+    A shell function, an `eval`, a command assembled from a variable, a remote
+    command sent by `ssh`, a `-c` operand built by expansion, and any shell not
+    in SHELL_PROGRAM all yield nothing extra.
+
+    So does an interpreter that SHELLS OUT rather than taking a command line:
+    `python3 -c "import os; os.system('git push --force origin main')"` and
+    `perl -e "system(q(...))"` run the push and yield nothing here. That is
+    deliberate -- a Python `-c` argument is SOURCE, and reading it as shell
+    once made a bare path inside it look like an execution -- but it is named
+    because the issue this closes is titled around an interpreter's `-c`, and
+    a reader could otherwise take the silence for coverage (round 4
+    finding 9).
+
+    So does a wrapper chain longer than `WRAPPER_ARG_WINDOW` tokens --
+    `sudo -u me -H -E -i -n bash -c "<push>"` measured silent -- and a wrapper
+    the set does not know, such as `flock /tmp/x bash -c` or
+    `git bisect run sh -c`. `bash -s` reads its script from stdin, which is not
+    in the argv at all. Each of these is a HOLE rather than a design boundary,
+    and they are named here because the previous version of this section listed
+    only the first group and so read as exhaustive (ai-config#1973 review,
+    round 2 finding 9).
+
+    So does a `-c` nested more than `max_depth` levels deep. Measured at the
+    default of 3: one, two and three levels of `bash -c` reach the push, four
+    and five do not. It is listed among the holes rather than only under
+    BOUNDS below, because a reader auditing coverage reads the enumerated
+    list and a cap named elsewhere as a performance knob does not register as
+    a bypass (ai-config#3645 pre-merge gate, finding 8).
+
+    BOUNDS
+    ------
+    `max_depth` and the `seen` set bound the walk, and neither is what makes it
+    terminate. The operand is NOT always a substring of its parent, which this
+    paragraph claimed until round 2 of ai-config#1973's review: `simple_commands`
+    returns DEQUOTED tokens, so `bash -c "git commit -m \\"x\\""` yields
+    `git commit -m "x"`, which its parent does not contain. What is true, and
+    is what makes the recursion finite, is that dequoting never lengthens and
+    the program plus its `-c` are always consumed, so each operand is strictly
+    shorter than the text it came from. The bounds cap work on adversarial
+    input rather than preventing a loop. `max_depth` is nonetheless a real
+    hole, and it is named as one in LIMITS above: raising it is nearly free
+    for the `deny_only`, network-free lexical pass both guards run, and the
+    default stays at 3 only because nothing has yet been measured past it.
+
+    An unparseable piece yields no children and does not discard the pieces
+    already found.
+    """
+    found = [command]
+    seen = {command}
+    frontier = [(command, 0)]
+    while frontier:
+        text, depth = frontier.pop(0)
+        if depth >= max_depth:
+            continue
+        argvs = simple_commands(text)
+        if argvs is None:
+            continue  # unparseable: no children, and the rest still stands
+        for argv in argvs:
+            for nested in nested_shell_commands(argv):
+                if nested in seen:
+                    continue
+                seen.add(nested)
+                found.append(nested)
+                frontier.append((nested, depth + 1))
+    return found

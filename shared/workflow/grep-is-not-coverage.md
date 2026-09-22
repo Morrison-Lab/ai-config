@@ -821,6 +821,136 @@ whether a figure is derivable requires arithmetic over an arbitrary source
 document, so no matcher over the assertion can see it --- the same conclusion
 the negative-existence section above reached about its own rejected guard.)
 
+## Indirection defeats a literal search, and the conclusion arrives as a reviewer's finding
+
+Every case above searches PROSE for a concept.
+This one searches CONFIGURATION for a step, and it fails for a structural reason the others do not have:
+the artifact that would carry the string does not carry it, by design.
+
+A CI workflow that runs a hundred test suites does not name a hundred paths.
+It invokes one runner that globs them.
+So grepping `.github/workflows/` for `hooks/test-*.py` returns zero,
+and that zero is not weak evidence of a gap --- it is no evidence at all,
+because a conforming repository and a broken one return the same zero.
+The search cannot distinguish the two states it was run to distinguish.
+
+Measured 2026-09-17 on this repository.
+A review reported that "no `hooks/test-*.py` suite is CI-gated anywhere in `.github/workflows/` (85 such suites exist, 0 referenced)",
+scoped carefully as pre-existing rather than as a defect of the diff.
+The grep was rerun independently and agreed: 85 files, 0 references.
+Both were wrong.
+`scripts/test_hooks.py` globs `hooks/test-*.py`, runs each against its subject,
+and is invoked at `.github/workflows/validate.yml:293`.
+An open issue in the same tracker named its runtime, which is what prompted the re-check.
+
+The trap is that the independent confirmation feels like verification and is the same mistake run twice.
+Two searches of the same wrong artifact are one measurement, not two,
+so agreement between them carries no information ---
+which is `verify-the-right-artifact.md`'s substitution, arriving here through a reviewer rather than through your own reasoning.
+A finding you did not generate gets less scrutiny than one you did, because checking it feels like the scrutiny.
+
+The remedy is not a better pattern.
+It is to ask what would have to be true for the absence to be real,
+and then to look for the thing that would make it false:
+an aggregator, a generated manifest, a wildcard, a `Makefile` target, a pre-commit config.
+Run the pipeline rather than reading it, where you can.
+
+- **Do:** ask whether the string you are grepping for would exist even if the behaviour did, before reading a zero as an absence.
+- **Do:** look for an aggregator by name --- a runner, a glob, a generated manifest --- whenever the claim is about configuration rather than prose.
+- **Do:** treat a reviewer's absence finding as a claim to derive independently, by a DIFFERENT method than the one that produced it.
+- **Don't:** count your own grep agreeing with a reviewer's grep as confirmation.
+  The same query against the same artifact is one measurement, however many sessions run it.
+- **Don't:** file an issue whose whole content is a zero, without naming what a non-zero would have looked like.
+
+## `head -N` on a multi-directory grep deletes whole directories, not whole lines
+
+Every rule above is about a query too narrow to reach the answer.
+This one is about a query that reached it and a pipe that threw it away.
+That is worse in one specific respect:
+the search was right,
+so re-running it in your head finds nothing wrong with it.
+
+`grep -r <term> shared/ memories/ skills/... | head -20` walks its path
+arguments in order,
+so the cap is spent on the first directory
+and the later ones are never *printed* ---
+indistinguishable, in the output,
+from their having been searched and found empty.
+The habit that produces it is the right one: capping output is how a session
+keeps a read small.
+
+Measured 2026-09-18 on this corpus.
+A UMS pass asked whether anything in `memories/` documented
+`hooks/no-unauthorized-merge.py`'s MCP path, ran
+
+```bash
+grep -rn "no-unauthorized-merge" shared/ memories/ skills/mwc/SKILL.md | head -20
+```
+
+and read 20 hits, all from `shared/`, all describing that hook's shell-parsing
+machinery.
+It concluded the corpus nowhere documented the MCP path and wrote that
+conclusion into a new memory entry.
+Against the tree that query actually ran on, it returns 44 hits;
+12 are in `memories/`;
+the first is hit **21**, and hit 22 is `memories/hooks.md`'s
+"MCP Tool Interceptors" table row saying the hook blocks `merge_pull_request`.
+The answer sat one line past the cut, in the very file the new entry was
+appended to, and an adversarial review caught it rather than the author.
+
+That qualifier is load-bearing, and the first write-up of this entry did not
+carry it.
+It reported 45 and 13, which are the counts on the tree *after* the false
+section had been written --- the section's own text is a 45th hit, in
+`memories/`.
+So the numbers offered as evidence about the query were measured on a tree the
+query never saw, which is
+[`verify-the-right-artifact`](verify-the-right-artifact.md)'s substitution
+arriving inside the entry written to record a different instance of it.
+A count re-derived later is a measurement of the tree you are standing on, not
+of the one you were standing on when you ran the command:
+
+Either of these gets you back to it;
+they are alternatives, not a sequence:
+
+```bash
+# in place, if the edits are yours and stashing them is safe
+git stash && grep -rc <term> <paths> && git stash pop
+```
+
+```bash
+# or against the commit the original query saw, leaving your tree alone
+git worktree add /tmp/base <base-sha> &&
+  (cd /tmp/base && grep -rc <term> <paths>)
+```
+
+- **Do:** name the commit a re-derived count was taken against, and take it
+  against the tree the original command ran on.
+- **Don't:** re-run a query in your current working tree to check a number you
+  are about to write about a query you ran before editing it.
+
+The tell is structural rather than topical:
+**a capped result whose hit count equals the cap is a truncated result**, and a
+truncated result supports no claim about anything the cap did not reach.
+So the repair is not "cap less".
+It is to make the cap's own arithmetic visible, and to derive an absence from a
+count rather than from a listing:
+
+```bash
+grep -rc <term> shared/ memories/ skills/   # per-path counts, uncapped
+grep -rn <term> memories/ | head -20        # then read one path at a time
+```
+
+- **Do:** read a hit count equal to your `head -N` as "truncated", and re-run
+  before concluding anything.
+- **Do:** settle an absence with a count per path, then cap the *reading* of
+  whichever path you are actually asking about.
+- **Don't:** pass several path arguments to a capped grep and then make a claim
+  about the last of them.
+- **Don't:** treat "the output contained only `shared/` hits" as evidence that
+  `memories/` had none;
+  the command never got there.
+
 ## Where this fires
 
 The skills whose workflows run exactly this grep, and whose next step is to

@@ -261,6 +261,45 @@ pre-empt these when authoring shell, especially under `set -euo pipefail`:
   **associative arrays do NOT** (4.0+).
   Parse key=value records with `while IFS='=' read -r k v; do case "$k" in ...`.
 
+## A `while read` loop's own stdin can be silently stolen by a command in its body
+
+`while read -r x; do <cmd using $x>; done < <(source)` (or `< file`) hands
+the loop's file descriptor 0 to every command in the body, not just to
+`read`.
+If the body runs something that reads stdin with no explicit redirect of
+its own (any interactive-shaped `gh`/`git`/`ssh`/`curl` call lacking a
+`< /dev/null` or its own `< file`), that command consumes whatever lines
+are still buffered on the loop's stdin --- so the loop appears to run to
+completion, exits cleanly, and reports nothing wrong, while having
+actually processed only the lines that arrived before the first
+stdin-reading child ran.
+
+- **Do:** redirect every other stdin use inside the loop body explicitly
+  (`< /dev/null` for a command that reads none, or its own `< file`), so
+  nothing but the loop's own `read` ever touches fd 0.
+- **Do:** count iterations against the source's own line/record count when
+  a `while read` loop's correctness matters, rather than trusting a clean
+  exit.
+- **Don't:** hand-build a `while read` loop over a maintained instrument's
+  own job when one already exists and owns its input internally --- see
+  [`derive-dont-enumerate`](../shared/workflow/derive-dont-enumerate.md)'s
+  "Which local checks predict CI is itself a derivable set" section, whose
+  `scripts/run-local-validation.py` has neither this bug nor the
+  hand-picking one it documents.
+
+(2026-09-14: a hand-built `while read -r cmd; do $cmd > "$log" 2>&1; done <
+steps.txt` loop, run over the 104 distinct `python3 scripts/...` commands
+grepped out of `.github/workflows/validate.yml`, silently executed 27 of them
+--- a child command read from the loop's own redirected stdin and consumed
+the remaining lines.
+Count the unit carefully: 104 is the number of *commands*, not of jobs.
+`validate.yml` defines four jobs and no matrix, so a reader checking "104
+jobs" against the workflow finds four and has grounds to distrust the whole
+record.
+`run-local-validation.py`, the maintained instrument for exactly this task,
+was available the whole time, derives its own list the same way, and has
+neither bug.)
+
 ## Git Bash process substitution fails for a native-Windows consumer
 
 In Git Bash on Windows, `<(...)` works for msys-native consumers and fails only when the consumer is a **native Windows binary** that has to reopen the msys `/proc/NNNN/fd/N` path.
@@ -275,3 +314,158 @@ Two unrelated platform failures of one construct is the argument for suspecting 
 - **Do:** write the content to a file when the consumer is a native Windows binary (`git`, and anything else not built against msys).
 - **Do:** grep for the construct rather than for an error string, since the message belongs to the consumer.
 - **Don't:** conclude process substitution is unavailable in Git Bash --- test it with `cat` and it works.
+
+## An argv split on operators alone leaves a compound body's keyword at `argv[0]`
+
+`scripts/lib/shellcmd.py`'s `simple_commands` --- and the hand-rolled copies under `hooks/`, whose bodies its module docstring records as identical --- cuts a command line at the characters in `_SHELL_OPS = set("();|&")`.
+Derive the population rather than reading a number off that docstring.
+It states 8 and 7 for two commands that both return 9, measured 2026-09-15:
+`grep -rlF '_SHELL_OPS = set("();|&")' hooks/` and
+`grep -rl "def _simple_commands" hooks/`.
+The stale docstring is
+[ai-config#3680](https://github.com/Morrison-Lab/ai-config/issues/3680), and
+it means [ai-config#3178](https://github.com/Morrison-Lab/ai-config/issues/3178)'s
+migration inventory is short.
+That models operators, not compound commands, so a body's keyword stays attached to the command it heads.
+Measured on this branch:
+
+```console
+$ python3 -c "import sys; sys.path.insert(0, 'scripts/lib'); import shellcmd; print(shellcmd.simple_commands('if [ -d w ]; then cd w; echo hi; fi'))"
+[['if', '[', '-d', 'w', ']'], ['then', 'cd', 'w'], ['echo', 'hi'], ['fi']]
+$ python3 -c "import sys; sys.path.insert(0, 'scripts/lib'); import shellcmd; print(shellcmd.simple_commands('while true; do cd w; done'))"
+[['while', 'true'], ['do', 'cd', 'w'], ['done']]
+```
+
+`then` and `do` are `argv[0]`;
+the word that decides what the piece does sits one position further in.
+`else`, `elif`, and a `{` group opener arrive the same way, and so do environment-assignment prefixes (`GIT_DIR=/other git reset --hard`).
+Only the body's **first** command carries the keyword, which is why a spot check on a two-command body reads as fine.
+
+The consequence is a rule about how to read the split, and it is sharpest when a check is being **narrowed**.
+An over-broad check that scans every token has an obvious repair --- test the command word --- and `argv[0]` is the obvious spelling of it.
+That spelling is wrong in the fail-open direction: a piece whose head is a keyword reads as an ordinary command whose verb is `then`, so the `cd` or the `git` behind the keyword is never seen.
+Skip the prefix first and read the token at that index.
+
+Measured 2026-09-14/15 on `hooks/flag-reset-hard-uncommitted-work.py` ([ai-config#3645](https://github.com/Morrison-Lab/ai-config/pull/3645)).
+`_may_change_repository` had scanned every token, so a bare `.` path argument in `git add .` matched the POSIX spelling of `source`, and `sh -c "git add . ; git reset --hard"` lost the local file list the scan exists to give it.
+Testing `argv[0]` instead would have made `then cd /other` read as stationary, which is the direction that reports another repository's work as this one's.
+The landed form calls `_lead_index(argv)` --- skip assignments and lead words, then read the command word --- and both callers in that hook share it.
+
+- **Do:** skip assignment prefixes and lead words before reading a command word out of this splitter's argv.
+- **Do:** ask what a narrowed check now MISSES, against the tokenizer's actual output rather than an idealized argv, whenever an over-detection is being repaired.
+- **Don't:** read `argv[0]` as the command word --- the splitter never removed the keyword heading a compound command's body.
+- **Don't:** answer an over-detection with the first narrowing that removes it;
+  a narrowing moves a check toward silence, which is the direction a guard cannot afford.
+
+## A command in a fenced block is addressed to the USER's shell, not your Bash tool's
+
+Two shells coexist on this machine and they are different programs.
+The `Bash` tool runs Git Bash;
+the user's terminal, per the session's own environment brief, is **Windows PowerShell 5.1**.
+Which one a command has to satisfy is decided by **where the command goes**, not by which one you last used.
+
+- **Measured 2026-09-15, Windows 11 Pro 26200.**
+  The environment brief for that session said `Shell: PowerShell (primary)`, and listed the relevant constructs as errors in as many words: `&&` is a parser error, inline `VAR=value cmd` prefixes do not exist, Unix paths do not resolve.
+  The reply nonetheless handed the user this, in a fenced block, to paste into their terminal:
+
+  ```console
+  $ cd /d/GitHub/ai-config/.claude/worktrees/ums-media-type-guard && ALLOW_UNREVIEWED_PUSH=1 git push -u origin ums/cross-drive-media-type-guard
+  The token '&&' is not a valid statement separator in this version.
+  ```
+
+  Three incompatibilities in one line --- `&&`, the MSYS `/d/...` path, and the env-var prefix --- each of them separately named in a document that was in context the whole time.
+  The correct form is `Set-Location D:\GitHub\...; $env:ALLOW_UNREVIEWED_PUSH='1'; git push ...`.
+
+  The belief that produced it was "I am composing a shell command", where the shell in mind was simply the one the tool calls had been using all session.
+  Nothing in the act of writing a fenced block prompts the question "whose shell is this for?", which is why the rule was available and not consulted: the brief is read at session start and the command is composed hours later.
+  This is the same family as [`shared/writing/examples-are-scanned.md`](../shared/writing/examples-are-scanned.md) --- a fenced block has a consumer you did not picture --- reached from the shell side rather than the scanner side.
+
+  - **Do:** ask "whose shell runs this?" before writing any fenced command in a reply, and write it in the **user's** shell dialect.
+  - **Do:** translate at the boundary --- `;` for `&&`, `$env:VAR='v'; cmd` for the prefix, `D:\...` for `/d/...`, `2>$null` for `2>/dev/null`, `@'...'@` for a heredoc.
+  - **Do:** say which shell a block is for when it is deliberately Git Bash, since nothing else in the block says so.
+  - **Don't:** carry the dialect of your own `Bash` tool calls into a block the user will paste --- the tool you used is not evidence about the terminal they are sitting in.
+  - **Don't:** treat the environment brief as read-once orientation.
+    It states the target shell, and that fact is needed at composition time, not at session start.
+
+## Mechanism
+
+[`hooks/warn-bash-command-for-powershell-user.py`](../hooks/warn-bash-command-for-powershell-user.py) is this entry's guard, and what it is *not* keyed on is the interesting part.
+
+The obvious trigger --- a fenced block containing `&&` while the user runs PowerShell --- fires four times over the 120 transcripts under `~/.claude/projects` for three true positives (all one incident, re-issued) and one quoted session.
+The discriminator that suggests itself, suppressing when the surrounding prose is retrospective ("failed", "the error was", "I handed you"), marks **all four identically, the true positives included**, because the offending message also discussed a failure at length.
+Suppressing on it would have removed the only real incident and kept nothing;
+firing on it is the [ai-config#2997](https://github.com/Morrison-Lab/ai-config/issues/2997) pattern, a guard that fires on the explanation of the mistake it polices.
+
+What separates the two classes is the **shape of the block**, not the prose around it.
+A command handed over to be pasted is short, carries no prompt, and shows no output;
+a quotation of a failure shows its prompt, or the error beneath it, or runs long.
+At a bound of eight non-blank lines the corpus yields three firings, all the same genuine directive, and no false positives --- and the corrected PowerShell form of that very command, which also appears in the corpus, is silent.
+
+Say plainly what that does and does not establish, because the first draft of this entry overstated it and adversarial review caught the figure.
+The corpus holds **one** incident across 500 readable assistant messages, so it shows the matcher is quiet on the other thirteen fenced messages in it and nothing about the false-positive rate.
+The real evidence is the constructed negatives in the hook's suite --- a Dockerfile `RUN` line, a Make recipe, a git alias, a CI step, a session prompted `user@host:~$`, a heredoc merely named in a comment --- every one of which fired against the first implementation and is now pinned as a case.
+The line bound is defence in depth rather than a measured ceiling: after quote and comment masking were added the firing count is flat at three for every bound, including unbounded.
+
+The same PowerShell 5.1 limitation is recorded for two other consumers, from their own angles: [`opencode-bash-windows.md`](opencode-bash-windows.md) for OpenCode's shell and [`delegation.md`](delegation.md) for agy's.
+What is new here is *which* consumer a fenced block in a reply is addressed to.
+
+- **Do:** when a prose-context discriminator looks necessary, check whether a structural one exists first --- prose framing marked a directive and a post-mortem identically here.
+- **Don't:** quote a failing command in a bare short block;
+  show it with its prompt and its error, which is both the honest presentation and the one the guard reads as a citation.
+
+## The heredoc backslash collapse has a second stage when the heredoc writes code
+
+[`heredoc-backslash-collapse`](../shared/coding/heredoc-backslash-collapse.md) records the collapse itself: a doubled `\\` inside a Bash-tool heredoc body can arrive as a single `\`, even with a quoted delimiter.
+Its worked cases are regexes, where the damage is a pattern that still compiles and matches the wrong thing.
+
+A heredoc that writes a **Python generator script** adds a second stage, and the two compose in a way neither one predicts.
+The script is itself Python, so a `\n` that survives the collapse is then read by Python's own string literal:
+
+```console
+$ cat > /tmp/gen.py <<'EOF'
+block = """    line_start = body.rfind("\\n", 0, m.start()) + 1"""
+EOF
+```
+
+The transport collapses `\\n` to `\n`, and the non-raw `"""..."""` turns that into a REAL NEWLINE.
+The generated file gets a line break where the source was meant to say backslash-n, and the result is a syntax error or, worse, a string literal that silently spans lines.
+
+Measured 2026-09-14 on Windows MINGW64 while generating `plugins/ai-config/enforce-mwc-review-gate.py`.
+`grep` on the written file showed `line_start = body.rfind("` with the rest of the line gone.
+It happened a second time the same session, in a heredoc patching a test file, after the rule had already been read once --- which is the fragment's own "having read this rule is not the check" point, measured twice in one session.
+
+**How much of a doubled escape survives, measured.**
+A probe written through the same Bash-tool heredoc, reading back both the source line and the value:
+
+| typed | backslashes in the source | Python value |
+| --- | --- | --- |
+| `a\nb` | 1 | a real newline |
+| `a\\nb` | 1 | a real newline |
+| `a\\\\nb` | 2 | backslash then `n` --- the intended one |
+
+So the collapse is one pairwise halving, applied once, and quadrupling cancels it.
+
+**Three forms, two of them portable.**
+
+- The **Write tool** with a raw string, `r` plus triple quotes, is the cleanest: its content is JSON-encoded on the way to disk, so nothing collapses, and a raw literal keeps `\n` as two characters.
+  This is the form to reach for when generating code.
+- A **placeholder** in a heredoc: write `@BS@n`, and end the literal with `.replace("@BS@", chr(92))`.
+  No escape sequence is ever typed, so there is nothing to collapse.
+- Quadrupling produces the right literal in the table above, and is still the wrong remedy.
+  It encodes the collapse into the source, and the fragment above records that collapse as a property of the ENVIRONMENT, absent on a GitHub Actions Linux runner and in a Linux remote container.
+  So it is correct exactly where the collapse happens and wrong everywhere else: on a transport that does not collapse, the same four backslashes arrive as four and Python reads two.
+
+**`repr()` doubles a backslash, so the readback needs halving before it is a count.**
+This is how the table above was first published with the wrong numbers, and it is worth more than the numbers are.
+`repr()` is the right instrument --- it is the only thing that separates a real newline from a backslash and an `n` --- and its output is itself escaped, so a source line holding ONE backslash prints as two.
+Reading the printed count as the actual count reports no collapse at every level at once, which is internally inconsistent in a way the surrounding prose can state and the table cannot.
+Count the characters in the file instead, with `cat -A` or a `.count(chr(92))`, and use `repr()` for the question it actually answers.
+
+**Print `repr()` of the written line, not the line.**
+A terminal renders a real newline as a line break and a backslash-n as `\n`, and at a glance in a diff the two look like ordinary formatting.
+`repr()` is what separates them.
+
+- **Do:** generate code with the Write tool and a raw string, or with a placeholder substituted via `chr(92)`.
+- **Do:** read back the written line with `repr()` before trusting it.
+- **Don't:** type a doubled backslash in a heredoc that writes a Python string literal --- two interpreters get a turn at it, not one.
+- **Don't:** answer a collapse by adding more backslashes.

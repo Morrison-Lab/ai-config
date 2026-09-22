@@ -31,6 +31,18 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: check-md056-table-columns
+        name: check markdown table column counts (MD056)
+        entry: python scripts/check-md056-table-columns.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: test-check-md056-table-columns
+        name: check-md056-table-columns tests
+        entry: python scripts/test_check_md056_table_columns.py
+        language: python
+        pass_filenames: false
+        always_run: true
       - id: check-ascii-punctuation
         name: check ASCII punctuation in source (.py, .R)
         entry: python scripts/check-ascii-punctuation.py
@@ -176,5 +188,18 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: check-do-dont-order
+        name: check Do/Don't guidance bullet ordering (advisory)
+        entry: python scripts/check-do-dont-order.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: test-check-do-dont-order
+        name: check-do-dont-order tests
+        entry: python scripts/test_check_do_dont_order.py
+        language: python
+        pass_filenames: false
+        always_run: true
+
 
 

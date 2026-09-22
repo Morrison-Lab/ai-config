@@ -90,3 +90,144 @@ Second instance: a Python-heredoc edit writing `"\\n"` escapes into a test fixtu
 
 `hooks/warn-heredoc-doubled-backslash.py` is the mechanism this recurrence produced: a warn-only `PreToolUse` guard on the `Bash` tool matcher that scans a command's heredoc bodies for a doubled backslash and names the offending line, so the rule fires at composition time instead of relying on having read this file. (Tracked as [ai-config#3362](https://github.com/Morrison-Lab/ai-config/issues/3362).)
 
+**The rule has an inverse, and knowing the rule is what produces it.**
+Everything above argues one direction:
+a doubled `\\` typed into a heredoc body can arrive as a single `\`.
+Every **Don't** here is about under-escaping.
+So the natural compensation, for a reader who has absorbed all of it, is to
+double the escapes on purpose --- which is wrong on every transport that does
+not collapse, and this file has already measured one of those.
+
+Measured 2026-09-15, in a Linux remote Claude Code container, the exact
+environment the 2026-09-01 bullet above records as **not** collapsing.
+A Python converter's table pass was written through a heredoc with its escapes
+pre-doubled: `r"\\\\"` reached the file where `r"\\"` was meant, and
+`r"\\hline"` where `r"\hline"` was meant.
+Nothing collapsed, so nothing corrected them.
+
+**The doubled form is not a safer version of the prescribed remedy.**
+Building the character with `chr(92)` is transport-agnostic and correct either
+way; doubling is a different move, wrong on exactly the transports where the
+documented hazard is absent.
+That asymmetry is why the compensation instinct has to be named rather than
+left to follow from the remedy.
+Building the character does not imply doubling it,
+and the argument above is what makes doubling feel implied.
+
+**The failure mode is quieter than the collapse case, because the corrupted
+literals were anchors rather than output.**
+`str.count()` and `str.partition()` over a four-backslash literal simply match
+nothing.
+The function returned its input unchanged, the converter exited 0, and its own
+summary line reported `0 table(s) unruled` --- which reads as "no tables needed
+it", not as "the pass never fired".
+A corrupted regex at least tends to throw or to mismatch visibly;
+a corrupted anchor reports an honest zero.
+
+**Reading `grep` output is not the check, and it is the one that feels like
+one.**
+The literals here were "verified" by grepping the written file and reading the
+result.
+Backslash counts in unhighlighted terminal output are close to unreadable, so
+the grep ran, returned the wrong-but-plausible line, and was misread --- which
+is indistinguishable from a grep that confirmed the literal.
+`repr()` is already prescribed above for a failing match;
+it is equally the check for a literal you believe is correct.
+
+- **Do:** build every literal backslash with `chr(92)` or a placeholder,
+  whatever the transport is known to do.
+- **Do:** print `repr()` of the emitted literal, rather than grepping for it.
+- **Do:** distrust a pass that reports zero work done, when you did not first
+  confirm it fires on a known-positive input.
+- **Don't:** double escapes as compensation --- that is not the remedy above,
+  and it is wrong wherever the hazard is absent.
+- **Don't:** read this file's argument as making the doubled form the safe default;
+  it is the failing form in both directions, which is why the hook flags it regardless of transport. (One bounded exception, stated here rather than pointed at: a heredoc writing SOURCE CODE puts two parsers between the keyboard and the behaviour rather than one, so on a non-collapsing transport the doubled form is what the second parser needs and is arithmetic rather than error.)
+
+`hooks/warn-heredoc-doubled-backslash.py` needs nothing for this direction: it says the transport *can* collapse and prescribes building the character, both direction-neutral.
+It fires on the doubled form either way, which is the right behaviour here --- the doubled form is what is wrong, not the collapse.
+
+(Tracked as [ai-config#3710](https://github.com/Morrison-Lab/ai-config/issues/3710).)
+
+**A heredoc that writes SOURCE CODE has two parse layers, and there the doubled form is not the failing form --- it is the arithmetic.**
+Everything above is about content that must survive verbatim, where one layer sits between what you type and what the interpreter sees.
+A generator adds a second: the heredoc feeds Python, and the string Python writes is itself Python source that will be parsed again.
+On a transport that does not collapse, `"\\n"` in the generator is then exactly right: it puts `\n` in the generated file, which that file parses as a newline.
+Neither the collapse rule nor its inverse applies there, and both of them read as though they do.
+
+**On a collapsing transport the doubled form fails exactly as the sections above say, and this file deliberately does not say what number replaces it.**
+The first layer eats one before Python ever sees it, so `"\\n"` hands the generator a real newline and the generated file gets a literal line break inside a string literal.
+How many to type instead follows from what the transport does to a run, which this file has measured only at length two (`\\` arrives as `\`) and length one (`\` survives).
+What that does to a run of three or four is not derivable from those two, and this container does not collapse, so it cannot be measured from here either.
+So none is given: `chr(92)` is correct whatever the transport does to a run, which is the whole reason the arithmetic never had to be settled, and a number asserted here would be exactly the reasoning-instead-of-measuring this section exists to warn about.
+That literal line break is the 2026-09-08 recurrence recorded above, which was a generator case: a Python-heredoc edit writing `"\\n"` into a test fixture produced literal newlines and a `SyntaxError` that reached a PR.
+So layer counting says how many doublings the *parsers* need, and the transport says how many survive --- and `chr(92)` is correct on both, which is why it stays the prescription rather than any arithmetic.
+
+The danger is diagnostic rather than mechanical, which is why it needs saying after everything above rather than being derivable from it.
+Measured 2026-09-17, in a Linux remote Claude Code container: a generator heredoc carrying `"\\n"` produced a file containing `"\n"`, and that was read as the transport having collapsed it --- a conclusion that would have contradicted the 2026-09-01 and 2026-09-15 measurements recorded above, both of which are correct.
+The canonical interpreter-free reproducer, run in the same session, left `a\\nb` intact.
+So the wrong artifact was consulted: a two-layer edit cannot measure a one-layer transport, and it is the artifact nearest to hand at exactly the moment the question arises.
+
+Counting the layers first settles it and costs nothing.
+Ask how many times the text will be parsed between the keyboard and the behaviour, and expect one doubling per layer beyond the first.
+A collapsing transport is another such layer rather than a fixed surcharge, so it wants a doubling of its own and not one extra backslash --- an earlier revision of this paragraph said "then one more", which happens to land on a working count for the two-layer case above and understates every longer one.
+Or sidestep the count entirely with `chr(92)`, which is why the count is an aside here rather than the prescription.
+Then confirm the outcome rather than the theory, by exercising the generated code --- here, the denial message printed with a real line break, which no amount of reasoning about backslashes establishes.
+
+- **Do:** count the parse layers before judging whether a doubled escape is wrong.
+- **Do:** measure a transport with the interpreter-free reproducer above, never with a generator edit that happens to be in front of you.
+- **Do:** confirm the generated code behaves, rather than confirming the literal looks right.
+- **Don't:** read a correct two-layer escape as evidence about the transport --- that is how a true measurement gets overturned by a wrong one.
+- **Don't:** read the hook's warning on a generator heredoc as a defect;
+  it cannot count layers, and flagging the form regardless is the behaviour the section above asks for.
+
+(Tracked as [ai-config#3738](https://github.com/Morrison-Lab/ai-config/issues/3738).)
+
+## A collapse into a VALID escape gets past the PARSER checks this file prescribes
+
+One of the remedies above is a parser check --- `ast.parse` the file, prescribed as "parse-check (or read back) a file a heredoc just wrote with escapes in it".
+It works because the collapses measured so far produced something broken --- a `SyntaxError`, a string literal spanning lines, an anchor matching nothing.
+It does not fire when the surviving single backslash forms an escape Python accepts, and neither does `scripts/check-python-escapes.py`, the repo-wide instrument for the same question, which this section reaches for below.
+
+`\b` is the case in hand.
+A doubled `\\b` arriving single is read as BACKSPACE, `0x08`, and written into the file as that byte.
+Nothing raises: `ast.parse` succeeds and the escapes checker has nothing to report, because the escape is valid.
+
+**`repr()` is the exception, and it is this file's most emphasised Do for a reason --- but only where there is a literal to print.**
+`repr('a\b')` renders `'a\x08'`, unmissably, so a round-tripped string literal gives the byte up immediately.
+What it does not reach is a backslash that landed in a **comment**, which is where two of the three instances below landed: no literal is constructed, so there is nothing to `repr()`, and the byte sits in the file with every parser check green.
+That is the gap --- not that the prescribed checks are weak, but that the one strong enough is scoped to emitted literals.
+
+Observed 2026-09-15 on `Morrison-Lab/ai-config`, three collapses in one session, and recorded as an unverified session account rather than as a measurement for the first two: they were repaired before any commit, so no `0x08` byte is greppable in the corpus today and nothing anchors them.
+All three occurred while editing the branches carrying this file's own subject matter.
+Twice a `\b` meant as text became a literal `0x08` inside a comment.
+The third is anchored, and landed on a different branch: an invalid escape reached `ums/cross-drive-media-type-guard` and took `scripts/check-python-escapes.py` red.
+Under `test_hooks.py`'s `PYTHONWARNINGS` the affected suite raised `SyntaxError` and did not execute --- reported as a failure by the runner, not silently dropped.
+The green runs recorded for it came from invoking the suite file DIRECTLY, without the environment the runner sets;
+that is an omission at the call site, not a laxer local setting, per the retraction in [`derive-dont-enumerate`](../workflow/derive-dont-enumerate.md).
+Fixed in `335861fc` (PR #3728).
+Only `chr(92)` survived, which is what this file already prescribes.
+The first two were caught by a control-character scan over the changed files;
+the third by the escapes checker.
+Neither instrument would have caught the other's case.
+
+**So the post-edit scan is two instruments, not one, because the two failure modes are different bytes.**
+An invalid escape is a parser question and a valid-but-unintended escape is a byte question, and outside an emitted literal only the parser question shows up in the checks above.
+
+```bash
+python3 -c "import re,sys;[print(f'{f}:{i}') for f in sys.argv[1:] for i,l in enumerate(open(f,'rb'),1) if re.search(rb'[\x00-\x08\x0b\x0c\x0e-\x1f]',l)]" <changed files>
+python3 scripts/check-python-escapes.py   # the invalid-escape direction
+```
+
+The byte scan reports on stdout and exits 0 either way, so read its output rather than chaining it behind `&&` --- the same caution [`derive-dont-enumerate`](../workflow/derive-dont-enumerate.md)'s eighth occurrence states for a checker whose warning rides above its success line.
+It is written in Python rather than as `grep -nP '[\x00-\x08...]'` deliberately, even though that character class is correct and does match.
+`-P` is a GNU extension: on a BSD `grep` it exits non-zero with empty stdout and `grep: invalid option -- P`, which is indistinguishable from a clean scan if only the output is read.
+[`hooks/flag-indirect-gnu-grep-flag.py`](../../hooks/flag-indirect-gnu-grep-flag.py) records that exact failure being written into a commit message as "no tracked file contains an em dash" when five did.
+Prescribing a portability-dependent flag inside a section about checks that return green while missing the defect would reproduce this file's own subject.
+
+- **Do:** run both a control-character scan and the escapes checker after any scripted edit that touches a backslash, rather than either alone.
+- **Do:** treat a comment as needing the same care as a string literal --- the bytes land wherever the escape was typed, and a comment is where nothing will ever raise about them.
+- **Don't:** read a clean `ast.parse` as evidence a heredoc'd backslash edit landed correctly;
+  it answers only the direction that happens to be broken.
+
+This is the same displacement this file's own "treat having read this file as the check" records, one level in: having a check is not the check either, when the check is blind to the half you hit.

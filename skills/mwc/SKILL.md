@@ -57,8 +57,16 @@ without asking confirmation before every merge.
   [`fully-clean`](../../shared/workflow/fully-clean.md) for the payload keys.
   A later all-clear from a different reviewer does not supersede a standing
   not-clean; only a later clean from the same reviewer does.
-  On GitHub (a GitLab MR has no equivalent gate until
-  [#3021](https://github.com/Morrison-Lab/ai-config/issues/3021)),
+  On GitHub, use `check-pr-fully-clean.py`; on GitLab, use
+  `scripts/check-mr-fully-clean.py` with the MR IID and project ID/path.
+  The GitLab instrument reads every pipeline, paginated note and discussion,
+  proves target currency, and re-reads the head before printing the pinned SHA.
+  Merge with `sha=<pinned-sha>` and `auto_merge=false`, passing
+  `--quorum <number-of-reachable-providers>` to the checker; if currency
+  fails, rebase through `PUT /projects/:id/merge_requests/:iid/rebase`, poll
+  with `include_rebase_in_progress=true` until `rebase_in_progress` clears,
+  and rerun the whole gate on the new head.
+  On GitHub,
   record `headRefOid` and `baseRefName` before the instrument runs and
   require both live values to equal them immediately before every direct
   merge, so a retarget at the same tip cannot pass with an old verdict and a
@@ -78,7 +86,11 @@ without asking confirmation before every merge.
   recorded head (`PUT .../pulls/<N>/update-branch` with
   `expected_head_sha`, or the MCP tool's `expectedHeadSha`; a `422`
   whose message names an expected-head mismatch (match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show)
-  means another writer moved the head, so settle ownership instead,
+  means another writer moved the head only if the live `headRefOid` no longer
+  equals the SHA you pinned --- re-read it and compare before settling
+  ownership, since a correctly-lengthed but wrong-content SHA (most often one
+  guessed or padded from an abbreviation instead of read in full) produces
+  the byte-identical message with no other writer involved,
   and any other `422` is a failed update to stop on),
   a wait of a few minutes at most until `headRefOid` changes (the update is
   asynchronous; expiry is a failed update to stop on and report),
@@ -212,6 +224,155 @@ and a peer warning that red review checks from that afternoon's reusable-workflo
 stay red after the fix and need a full re-run rather than a `--failed` one.
 Neither late reply would have changed the merge decision,
 and a five-minute window is expected to miss a slow reply now and then.)
+
+**Derive that a peer is gone; never assert it.**
+
+The twenty-minute threshold and the five-minute window are both inferences
+about a session you cannot reach, and both are written above as inferences.
+"The session that opened it is no longer running on this machine" is not one.
+It is a claim about the world, asserted in the very sentence that invites the
+peer to refute it, and no reader of that comment can check it.
+
+A branch's last **push** is the cheapest liveness signal available, and it is
+the one a live session moves.
+A branch pushed twenty minutes ago is a session that was working twenty minutes
+ago, whatever the verdict age says --- and the verdict age can be comfortably
+past the threshold while the push is not, because a session that pushes, gets a
+clean verdict, and then keeps working leaves the verdict clock running and the
+push clock short.
+So read both, state both, and phrase the conclusion as what you measured:
+"no push in N minutes, verdict clean for M" rather than "the session is gone".
+
+**Read the push time from the forge, which records it, rather than from git,
+which does not.**
+GitHub's repository-activity endpoint carries a real per-push timestamp:
+
+```bash
+gh api "repos/<owner>/<repo>/activity?ref=refs/heads/<branch>&per_page=10" \
+  --jq '.[] | "\(.timestamp)  \(.activity_type)  \(.after[0:8])"'
+```
+
+```
+2026-09-15T06:59:42Z  push             b00d37b2
+2026-09-15T06:49:12Z  branch_creation  57643c49
+```
+
+Those two rows are this branch's real activity, read from that endpoint on
+2026-09-15 in a session without `gh` on `PATH`;
+the `gh api` spelling above is the same request, not the call that produced
+them.
+
+The obvious local substitute, `git log -1 --format=%cI origin/<branch>`, is
+wrong twice over, and **both errors run in the same direction: they make a live
+peer look gone.**
+That is the direction this whole section exists to guard, so the substitute
+fails exactly where it is being relied on.
+
+`%cI` is the tip commit's **committer date**, not its push time.
+A commit is always made before it is pushed, so the reading is a lower bound
+that is loose by however long the session held the commit --- unbounded above,
+zero below.
+Measured on this branch, where the commit and the push were seconds apart:
+`57643c49`'s committer date is `06:48:41Z` against a `06:49:12Z` branch
+creation, a 31-second gap that grows without limit for a branch pushed the
+morning after it was written.
+
+`origin/<branch>` is a **remote-tracking ref**, which a bare `git log` does not
+refresh.
+Where the peer has pushed since your last fetch, the command reports your stale
+copy's tip --- older than reality again, and silently, since a remote-tracking
+ref that no longer matches the remote looks identical to one that does.
+[`check-before-pushing`](../../shared/workflow/check-before-pushing.md) makes
+the same point about `--force-with-lease`: a ref you have not just fetched is a
+measurement of a moment that has passed.
+
+If no forge route is available, `git fetch origin <branch>` first and then read
+`%cI` as what it is --- **a lower bound on the push time**, stated as one.
+
+**A hold-off ends the window; it does not shorten it.**
+
+Above, "honour a hold-off reply" is the whole of what is said, which leaves the
+commonest shape unaddressed: the hold-off arrives and the five minutes keep
+running.
+They do not.
+The window exists to collect an objection, so an objection collected ends it,
+and no amount of subsequent silence converts a hold-off into consent.
+
+The same applies to anything else that lands inside the window.
+The grant is conditioned on a **fully clean** reading (see
+[`fully-clean`](../../shared/workflow/fully-clean.md)), and that reading is a
+snapshot rather than a standing guarantee, so a NOT_CLEAN result posted after
+the announcement invalidates it exactly as a check flipping red would.
+The window is precisely when such a thing arrives, since announcing an
+intention to merge is what prompts the owner to publish what it has.
+Re-read the PR immediately before merging, not the reading that opened the
+window.
+
+- **Do:** derive a peer's liveness from the forge's own push timestamp before
+  writing anything about it, and put that timestamp in the comment.
+- **Do:** `git fetch origin <branch>` first, and call `%cI` a lower bound, when
+  the forge route is unavailable.
+- **Do:** state the inference as an inference, naming both clocks you read.
+- **Do:** treat a hold-off as terminating the window at the moment it arrives.
+- **Do:** re-read the PR's clean state immediately before the merge.
+- **Don't:** assert that a session has stopped --- nothing available to you
+  observes that, and the claim is unfalsifiable to the reader you are asking to
+  refute it.
+- **Don't:** read `%cI` on an unfetched remote-tracking ref as a push time;
+  it is wrong twice, and both errors age the peer rather than freshening it.
+- **Don't:** run the remaining minutes out after a hold-off and merge on the
+  silence;
+  the objection you asked for has already arrived.
+- **Don't:** merge on the readiness reading that opened the window.
+
+(Measured 2026-09-15 on
+[ai-config#3635](https://github.com/Morrison-Lab/ai-config/pull/3635), from the
+PR's own comment timestamps.
+A merge-intent comment at `05:51:13Z` asserted the PR "was opened by a session
+that is no longer running on this machine".
+The owning session replied at `05:51:39Z` --- 26 seconds in --- that it had
+pushed to the branch four times that night, and that a pre-merge adversarial
+gate was running against that exact head.
+(That reply put its own last push "about twenty minutes earlier", which was
+itself an unmeasured figure and wrong by a factor of two: the branch's tip,
+`994b975c`, is dated `05:11:01Z`, forty minutes and thirty-eight seconds before
+the reply.
+It is quoted here as the peer's prose rather than as a measurement, and the
+error is the rule above failing in the *other* direction --- the owner
+under-stating its own liveness while disputing a claim that it had none.)
+That gate posted **NOT_CLEAN, 7 findings** at `05:52:12Z`.
+The PR merged at `05:58:47Z`: 7 minutes 8 seconds after the hold-off and 6
+minutes 35 seconds after the gate result, putting all seven findings on `main`.
+They were closed forward by
+[#3681](https://github.com/Morrison-Lab/ai-config/issues/3681) ->
+[#3682](https://github.com/Morrison-Lab/ai-config/pull/3682) rather than by a
+revert, for the reason
+[`revert-premature-merge`](../../shared/workflow/revert-premature-merge.md)
+now records.)
+
+### `ListAgents` does not reach a project-thread session, and the author field cannot tell you whose PR it is
+
+Both mechanics above assume a peer you can enumerate and a PR you can attribute.
+In a Claude Code **project thread** session neither holds, and both fail quietly rather than erroring.
+
+**`ListAgents` names in-process subagents and local peer sessions, and returns nothing for a sibling thread session in the same project.**
+So the "ask the session directly" step reads as unavailable when it is merely being asked through the wrong tool, and a session that stops there falls straight to comment-and-wait for no reason.
+The route that does reach them is `mcp__hearthbot__list_thread_sessions` to enumerate, then `mcp__claude-code-remote__send_message` to the returned `session_id`.
+
+**Every thread session posts as `claude[bot]`, so the PR's `user.login` is the same for yours and the peer's.**
+The author arm of the scope test is satisfied by all of them at once, which makes it useless for telling them apart.
+The `head.ref` does distinguish: a thread's own branch is `claude/project-thread-<slug>`, and a named feature branch belongs to whoever cut it.
+
+- **Do:** enumerate peers with `list_thread_sessions` and message them with `send_message` before falling back to comment-and-wait.
+- **Do:** compare the PR's `head.ref` against your own branch to decide whether a PR is yours.
+- **Don't:** read an empty `ListAgents` in a thread session as "no peer is reachable".
+- **Don't:** use the PR's author to decide whose PR it is under a shared bot identity.
+
+(Measured 2026-09-18 on [ai-config#3737](https://github.com/Morrison-Lab/ai-config/pull/3737), as a violation of the rule above rather than an application of it.
+A thread session merged that peer-owned PR nine minutes after its clean verdict landed, with no hold-off comment and no message to the session driving it.
+Nothing was lost --- the PR was fully clean and the maintainer had told that session to merge when ready --- but its own merge call had failed with a `409 Head branch was modified` seconds earlier, so it was actively working the PR at the moment it was taken.
+The scorer is what made this feel authorized: `check-pr-fully-clean.py` answers *is this PR mergeable*, which is a different question from *is this PR mine to merge*, and nothing in it knows the second --- so a clean exit reads as complete authorization when it is half of it.
+A clean scorer exit is not the hold-off, and neither is a standing merge grant.)
 
 ## The standing per-repository grant
 

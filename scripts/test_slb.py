@@ -205,6 +205,45 @@ check(
     "The two run at different rates.\n",
 )
 
+# Bug 7e (ai-config#3789, gha#884, gha#878): a sentence opening with a digit
+# (`0-9`) is a sentence boundary and must split. Prose routinely opens with
+# counts or numbers (e.g. '19 sites across 18 hooks...').
+check(
+    "digit sentence-opener boundary splits (Next sentence starts with count)",
+    "The blast radius is the whole tree, not one guard. "
+    "19 sites across 18 hooks computed a path from file this way.\n",
+    "The blast radius is the whole tree, not one guard.\n"
+    "19 sites across 18 hooks computed a path from file this way.\n",
+)
+
+# Bug 7f (ai-config#3789, gha#884, gha#878): a sentence opening with an open
+# parenthesis (`(`) is a sentence boundary and must split. Prose often carries
+# parenthetical measurement sentences, e.g. '(Measured ...)'.
+check(
+    "open paren sentence-opener boundary splits (Next sentence starts with paren)",
+    "The test suite passed. (Measured on 2026-09-13.)\n",
+    "The test suite passed.\n"
+    "(Measured on 2026-09-13.)\n",
+)
+
+# Bug 7g (ai-config#3789, gha#884, gha#878): a sentence opening with markdown
+# underscore emphasis (`_`) is a sentence boundary and must split.
+check(
+    "underscore emphasis sentence-opener boundary splits",
+    "First claim was established. _Explanation follows in italic._\n",
+    "First claim was established.\n"
+    "_Explanation follows in italic._\n",
+)
+
+# Bug 7h (ai-config#3789, gha#884, gha#878): standard abbreviations before
+# digits must remain protected and not split.
+check(
+    "abbreviation before digit is protected",
+    "See Fig. 1 for details. Item No. 2 is ready.\n",
+    "See Fig. 1 for details.\n"
+    "Item No. 2 is ready.\n",
+)
+
 # Bug 8: a GitHub alert marker (`> [!IMPORTANT]`, `[!NOTE]`, `[!WARNING]`,
 # `[!TIP]`, `[!CAUTION]`) inside a blockquote must never be joined onto the
 # following prose line --- GitHub only renders the alert when the marker sits

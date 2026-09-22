@@ -97,9 +97,18 @@ check("line-leading Closes is deliberate", v["verdict"] == "deliberate")
 
 # References to other issues, or to the same number in another repo, are not
 # this issue's close.
-v = verdict(pr_node(700, "This does not close #701, nor other/repo#700."))
-check("other issue and other repo references are ignored",
-      v["verdict"] == "unattributed")
+v = verdict(pr_node(700, "This does not close #701."))
+check("a reference to another issue number is ignored", v["verdict"] == "unattributed")
+
+v = verdict(pr_node(700, "This closes other/repo#700 and will not touch anything else."))
+check("the same number in another repo is ignored", v["verdict"] == "unattributed")
+
+v = verdict(pr_node(700, "This closes lacaedemon/SPARTA#700 and will not touch anything else."))
+check("this repo named explicitly, in any case, is recognised", v["verdict"] == "flagged")
+
+v = verdict(pr_node(100, "", "* start: tidy (closes #100, not yet verified)"))
+check("a cue inside the close tag's own parenthesis still makes it risky",
+      v["verdict"] == "flagged")
 
 v = verdict(pr_node(
     435, "This must not auto-close https://github.com/Lacaedemon/sparta/issues/435 yet."))
@@ -126,6 +135,12 @@ with tempfile.TemporaryDirectory() as directory:
     clean.write_text(json.dumps([pr_node(5, "Closes #5")]), encoding="utf-8")
     broken = Path(directory) / "broken.json"
     broken.write_text("{not json", encoding="utf-8")
+    malformed = Path(directory) / "malformed.json"
+    malformed.write_text(json.dumps([{"number": 4, "stateReason": "COMPLETED",
+                                      "timelineItems": {"nodes": ["not an object"]}}]),
+                         encoding="utf-8")
+    check("main exits 2, not 1, on a malformed node",
+          audit.main(["-R", REPO, "--from-json", str(malformed)]) == 2)
     check("main exits 1 when an issue is flagged",
           audit.main(["-R", REPO, "--from-json", str(flagged)]) == 1)
     check("main exits 0 when nothing is flagged",

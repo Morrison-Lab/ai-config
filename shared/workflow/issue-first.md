@@ -236,10 +236,11 @@ so it cannot catch a close that already happened.
 it reads each closed issue's recorded closer,
 reuses the hook's sentence heuristic on that closer's description and merge commit,
 and reports how many issues it examined beside the ones it flagged.
-Measured 2026-09-22 on `Lacaedemon/sparta`:
-650 closed issues examined and 6 flagged,
-5 of them closes the closer's own text had disclaimed,
-each still reading as finished work.
+Its first run, on `Lacaedemon/sparta` on 2026-09-22, examined 650 closed issues and flagged 6.
+In 5 of the 6, the closer's own text disclaimed or deferred the close,
+yet each issue still read as finished work.
+Triage then reopened one and re-closed two as not planned,
+so a later run of the same command reports fewer.
 
 See [`ardi.cases.md`](ardi.cases.md), "A negated closing-keyword sentence
 still closes the issue", and

@@ -134,8 +134,13 @@ def closing_references(text: str, repo: str, number: int) -> list[dict]:
         sentence = " ".join(hook.sentence_around(
             item, match.start() - begin, match.end() - begin).split())
         # `(closes #N)` is a close tag, not prose: the parenthesis opens on the
-        # keyword itself, so no cue elsewhere in the sentence governs it.
-        tagged = text[:match.start()].endswith("(")
+        # keyword itself, so no cue OUTSIDE it governs it. A cue inside the
+        # same parenthesis -- `(closes #N, not yet verified)` -- still does.
+        tagged = False
+        if text[:match.start()].endswith("("):
+            closing = text.find(")", match.end())
+            inside = text[match.end():closing if closing >= 0 else len(text)]
+            tagged = not hook.RX_CUE.search(inside)
         risky = (not tagged
                  and not hook.begins_line(text, match.start())
                  and bool(hook.RX_CUE.search(sentence)))
@@ -254,7 +259,10 @@ def main(argv: list[str] | None = None) -> int:
         else:
             nodes = fetch_nodes(args.repo, args.limit)
         verdicts = [classify(node, args.repo) for node in nodes]
-    except (OSError, ValueError, KeyError, TypeError, subprocess.CalledProcessError) as error:
+    except (OSError, ValueError, KeyError, TypeError, AttributeError,
+            subprocess.CalledProcessError) as error:
+        # AttributeError is a malformed node (a string where an object
+        # belongs); without it the crash exits 1, which reads as "flagged".
         detail = getattr(error, "stderr", "") or ""
         print(f"ERROR: {error} {detail}".rstrip(), file=sys.stderr)
         return 2

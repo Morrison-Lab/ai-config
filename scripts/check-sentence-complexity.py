@@ -86,13 +86,27 @@ def strip_markup(text: str) -> str:
     return text
 
 
+_BLOCK_START_RE = re.compile(r"^\s*(?:[-*+]|\d+\.|#{1,6}|>)\s+")
+
+
 def split_sentences(text: str) -> list[str]:
-    """Split text into sentences while protecting common abbreviations."""
+    """Split text into sentences while protecting common abbreviations and markdown blocks."""
     # Mask periods in abbreviations temporarily
     def _mask_abbr(match: re.Match[str]) -> str:
         return match.group(0).replace(".", "@@DOT@@")
 
-    masked = _ABBR_RE.sub(_mask_abbr, text)
+    # Separate tight markdown list items, headings, and blockquotes so adjacent
+    # bullets don't concatenate into single compound sentences.
+    lines = text.splitlines()
+    normalized_lines: list[str] = []
+    for line in lines:
+        if _BLOCK_START_RE.match(line):
+            normalized_lines.append("\n" + _BLOCK_START_RE.sub("", line))
+        else:
+            normalized_lines.append(line)
+    block_text = "\n".join(normalized_lines)
+
+    masked = _ABBR_RE.sub(_mask_abbr, block_text)
     sentences: list[str] = []
     for paragraph in masked.split("\n\n"):
         para = " ".join(paragraph.split())
@@ -102,6 +116,8 @@ def split_sentences(text: str) -> list[str]:
         parts = _SENTENCE_SPLIT_RE.split(para)
         for part in parts:
             clean = part.replace("@@DOT@@", ".").strip()
+            # Strip any residual block or bullet marker from sentence start
+            clean = re.sub(r"^(?:[-*+>]|\d+\.)\s+", "", clean).strip()
             if clean:
                 sentences.append(clean)
     return sentences
@@ -125,7 +141,7 @@ def count_subordinators(sentence: str) -> int:
 
 def find_openers(sentence: str) -> list[str]:
     hits: list[str] = []
-    cleaned = sentence.lstrip("\"'([ ")
+    cleaned = re.sub(r"^[*_#\"'([ ]+", "", sentence).strip()
     if _OPENER_DEMONSTRATIVE_RE.match(cleaned):
         hits.append("bare demonstrative ('This/That is')")
     if _OPENER_THE_ONE_THAT_RE.match(cleaned):
@@ -497,6 +513,21 @@ def run_self_test() -> int:
     check(
         "fenced code does not trigger opener or copula cleft flags",
         len(flagged) == 0,
+    )
+
+    # Tight markdown list items must not be merged into one sentence
+    tight_list = (
+        "- First point ends here.\n"
+        "- Second point starts here and continues for a while.\n"
+        "- Third bullet item.\n"
+    )
+    tight_sents = split_sentences(strip_markup(tight_list))
+    check(
+        "tight markdown list splits into 3 separate sentences",
+        len(tight_sents) == 3
+        and tight_sents[0] == "First point ends here."
+        and tight_sents[1] == "Second point starts here and continues for a while."
+        and tight_sents[2] == "Third bullet item.",
     )
 
     # Readability computation

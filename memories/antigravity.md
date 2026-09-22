@@ -55,8 +55,7 @@ or running `.cmd`/`.bat` scripts and `Start-Sleep`)
 spawn visible console windows (`conhost.exe` / `cmd.exe` / `powershell.exe`)
 that disrupt the user's workspace.
 The harness provides the `schedule` tool for non-blocking timers;
-running background sleep commands violates the universal rule
-"Never run a background 'sleep' command to set a timer, use this tool instead".
+avoid background sleep commands to poll or wait.
 To prevent unwanted command window popups on Windows:
 - Never run background sleep commands (`Start-Sleep` or `timeout`).
   Use `schedule` (one-shot timer) to wake up reactively.

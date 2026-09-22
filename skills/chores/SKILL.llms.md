@@ -84,7 +84,7 @@ That listing is a snapshot. Assignment, the title, and the labels can all change
 
 ### 2. Classify each PR by bump size
 
-Record the head, the base, and the title before classifying (GitHub only: the pins and the gate they feed have no GitLab form until [\#3021](https://github.com/Morrison-Lab/ai-config/issues/3021)), since the classification, every read in step 3, and the merge in step 4 are claims about one SHA on one target under one title, and Dependabot can replace the head or retitle the PR between any two of them:
+Record the head, the base, and the title before classifying; on GitHub use the PR pins and `check-pr-fully-clean.py`, while on GitLab use the MR `sha`, `target_branch`, and `check-mr-fully-clean.py`, since the classification, every read in step 3, and the merge in step 4 are claims about one SHA on one target under one title, and Dependabot can replace the head or retitle the PR between any two of them:
 
 ``` bash
 PINNED=$(gh pr view "$N" --repo "$REPO" --json headRefOid -q .headRefOid)   # VIEW_PR

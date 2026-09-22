@@ -321,7 +321,8 @@ So establish what makes a neighbour's branch dead before transferring the verdic
 - **Do:** have the check runner refuse a name it has already seen (`ai-config#2725`'s suggested fix), turning a silent duplicate into an immediate failure rather than an inflated count.
 - **Don't:** discriminate on exit status --- a malformed mutant and a real failure both exit 1, so it cannot separate them.
 - **Don't:** read every genuine survivor as a coverage hole --- that is the reading that adds code rather than removing it.
-- **Don't:** construct contrived input to kill a mutant; needing to is the evidence that the branch is redundant.
+- **Don't:** construct contrived input to kill a mutant.
+  Needing to is the evidence that the branch is redundant.
 - **Don't:** write "unreachable" into a comment on the strength of one platform's run --- that is a survivor promoted to an assertion a later reader will trust instead of re-measuring.
 - **Don't:** generate a test's cases from the value under test --- the DRY form is the defective one here.
 - **Don't:** record a skip with `check(..., True)`; that is a pass asserting nothing.

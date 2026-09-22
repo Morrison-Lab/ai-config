@@ -377,3 +377,28 @@ A consumer workflow calling `Morrison-Lab/gha/.github/workflows/claude-code-revi
   Permissions copied from a reference caller workflow often escape scrutiny in reviews because copying an existing template reads as standard consistency.
   Keep caller templates strictly minimized so copy-pasted implementations do not propagate over-privileged permissions.
   (Measured 2026-09-21, tracked in [#3842](https://github.com/Morrison-Lab/ai-config/issues/3842); surfaced during `@claude` review on `Morrison-Lab/mln#23`.)
+
+## Bundled repository suites (`check-*.yml`) and callee input verification
+
+Added in Morrison-Lab/gha#903 (closes #865, 2026-09-21):
+six bundled composite actions and reusable workflows consolidate standard check suites by repository type:
+`check-repo-hygiene.yml` (general repos / base suite),
+`check-quarto-website.yml` (websites),
+`check-quarto-book.yml` (books),
+`check-quarto-manuscript.yml` (manuscripts),
+`check-r-package.yml` (R packages), and
+`check-python-package.yml` (Python packages).
+
+- **Read-only permission boundary vs PR label inspection:**
+  All six bundled workflows declare and require only `contents: read`.
+  Governance checks inspecting live PR labels (`check-news.yml`, `version-check.yml`)
+  must remain dedicated standalone workflows
+  because querying live labels from the GitHub API requires `pull-requests: read`.
+  Inlining them into a read-only bundle breaks label bypasses (`no-changelog`, `no version increment`).
+- **Callee input parity:**
+  When composing higher-level composite actions from existing single-purpose composites (`Morrison-Lab/gha/<action>@v2`),
+  always verify each step's `with:` keys against the callee's declared `action.yml` inputs.
+  For example, `check-non-standard-chars` takes only `python-version` and `extensions`;
+  passing `paths` or `fail` causes silent parameter drops.
+  Contract tests (`run-bundle-repo-actions-tests.py`) should parse callee `action.yml` files
+  and statically assert zero undeclared inputs.

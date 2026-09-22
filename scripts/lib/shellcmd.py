@@ -957,7 +957,10 @@ def native_path(path, is_windows=None):
     either refuses a reviewed push or fails open, depending on the guard.
 
     Only the drive-letter forms are rewritten (`/c/x` and `/cygdrive/c/x`
-    become `C:/x`). Other absolute MSYS paths (`/tmp`, `/usr`) map to the
+    become `C:/x`). Every single-letter first segment counts, `/a/b`
+    included: Git Bash mounts each drive at `/<letter>` (`mount` lists
+    `C: on /c`, `D: on /d`), so in the shell that wrote the command `/a/b`
+    already means `A:/b`, not a directory named `a`. Other absolute MSYS paths (`/tmp`, `/usr`) map to the
     Git install's own root, which this cannot know, so they are returned
     unchanged. Off Windows the path is always returned unchanged, since
     `/c/...` is then an ordinary directory. `None` passes through.

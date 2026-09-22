@@ -1613,10 +1613,13 @@ def cd_tracking_cases() -> tuple[int, int]:
     check("chained cd with relative target resolves joined path",
           len(p) == 1 and p[0][2] == os.path.normpath("/dir1/dir2"))
 
-    # Chained relative directory tracking: cd /a/b && cd ..
-    p = list(mod.iter_pushes("cd /a/b && cd .. && git push origin main"))
+    # Chained relative directory tracking: cd /srv/b && cd ..
+    # Not `/a/b`: under Git Bash a single-letter first segment IS a drive
+    # mount (`/a/b` is `A:/b`), which native_path now honours on Windows, so a
+    # single-letter fixture would test drive conversion rather than `..`.
+    p = list(mod.iter_pushes("cd /srv/b && cd .. && git push origin main"))
     check("chained cd with .. parent segment resolves normalized parent path",
-          len(p) == 1 and p[0][2] == os.path.normpath("/a"))
+          len(p) == 1 and p[0][2] == os.path.normpath("/srv"))
 
     # cd combined with git -C (relative)
     p = list(mod.iter_pushes("cd /dir1 && git -C sub push origin main"))

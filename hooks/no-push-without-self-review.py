@@ -598,6 +598,30 @@ except Exception:
     _extract_review_payload, _payload_is_blocking = None, None
 
 
+def _load_native_path():
+    """`scripts/lib/shellcmd.py`'s `native_path`, or the identity.
+
+    The Bash tool on Windows is Git Bash, so a `-C` or `cd` target arrives as
+    `/c/Users/...`, which native `git.exe` cannot open ("cannot change to
+    '/c/Users/...'"). Every git call here would then fail, and a cross-repo
+    push with a clean verdict was refused as unresolvable. The identity
+    fallback reproduces that refusal rather than an allow, so a broken install
+    fails in the safe direction.
+    """
+    lib_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                           "scripts", "lib")
+    try:
+        if lib_dir not in sys.path:
+            sys.path.insert(0, lib_dir)
+        from shellcmd import native_path
+        return native_path
+    except Exception:
+        return lambda path, is_windows=None: path
+
+
+_native_path = _load_native_path()
+
+
 ENV_ASSIGNMENT = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*=")
 
 
@@ -1224,7 +1248,7 @@ def _run_git(directory: str | None, env: list[str], *args: str) -> str | None:
     remaining = _DEADLINE[0] - time.monotonic()
     if remaining <= 0:
         raise TimeoutError("ran out of time resolving what this push would ship")
-    cmd = ["git"] + (["-C", directory] if directory else []) + list(args)
+    cmd = ["git"] + (["-C", _native_path(directory)] if directory else []) + list(args)
     try:
         overlay = dict(os.environ)
         for assignment in env:

@@ -1305,6 +1305,55 @@ def fixture_branch_cases() -> tuple[int, int]:
     return failures, ran
 
 
+def msys_path_cases() -> tuple[int, int]:
+    """A Git Bash `-C /c/...` path reaches git as `C:/...`.
+
+    The Bash tool on Windows is Git Bash, so a cross-repo push is spelled
+    `git -C /c/Users/...` or `cd /c/Users/... && git push`, and native git.exe
+    cannot open that form (measured: exit 128, "cannot change to
+    '/c/Users/...'"). Every read then failed and a push with a clean verdict
+    was refused as unresolvable. These pin the loader and the wiring; git is
+    stubbed, because CI runs on Linux where the rewrite is (correctly) off.
+    """
+    failures = 0
+    ran = 0
+    mod = _load_subject()
+
+    def check(label, ok):
+        nonlocal failures, ran
+        ran += 1
+        if ok:
+            print(f"PASS: {label}")
+        else:
+            print(f"FAIL: {label}")
+            failures += 1
+
+    check("the guard loads shellcmd's native_path, not the identity fallback",
+          mod._native_path("/c/Users/x", True) == "C:/Users/x")
+
+    seen = []
+
+    class Done:
+        returncode = 0
+        stdout = "ok"
+
+    def fake_run(cmd, **kwargs):
+        seen.append(cmd)
+        return Done()
+
+    real_run, real_native = mod.subprocess.run, mod._native_path
+    mod.subprocess.run = fake_run
+    mod._native_path = lambda path, is_windows=None: real_native(path, True)
+    mod._DEADLINE[0] = time.monotonic() + 10
+    try:
+        mod._run_git("/c/Users/x/repo", [], "rev-parse", "HEAD")
+    finally:
+        mod.subprocess.run, mod._native_path = real_run, real_native
+    check("_run_git hands git a native path for a Git Bash -C directory",
+          seen and seen[0][:3] == ["git", "-C", "C:/Users/x/repo"])
+    return failures, ran
+
+
 def windows_path_cases() -> tuple[int, int]:
     """POSIX shlex eating `C:\\...` in `-C` is the Windows 58-case failure.
 
@@ -2995,7 +3044,7 @@ def main():
                 print(f"PASS: {label}")
         for fn in (raw_cases, orphan_cases, config_cases,
                    valueless_bool_cases, budget_cases,
-                   fixture_branch_cases, windows_path_cases,
+                   fixture_branch_cases, windows_path_cases, msys_path_cases,
                    structured_payload_cases, transcript_scoping_cases,
                    cd_tracking_cases, fallback_cases,
                    fingerprint_guidance_cases, fingerprint_resolution_cases,

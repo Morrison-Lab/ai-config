@@ -608,6 +608,35 @@ with tempfile.TemporaryDirectory() as pydir:
         resolved = subject.resolve_interpreter()
         assert resolved == str(py_exe), f"expected {py_exe}, got {resolved}"
 
+# Every child process must be started without a console window. The daemon
+# runs under pythonw, so on Windows a console program it launches gets a NEW
+# window unless `CREATE_NO_WINDOW` is passed -- and only the daemon's own
+# launch passed it, so every `gh` poll flashed windows on the desktop.
+#
+# Checked structurally, and the scope of the check is stated because it is
+# narrower than it looks: it matches `subprocess.<spawner>(...)` written
+# with the module name. A call spelled through an alias (`import subprocess
+# as sp`) would not be seen. The floor below is what stops that degrading
+# silently: if a refactor makes the matcher see fewer calls than the file
+# has, the count assertion fails rather than passing on zero examined.
+import ast as _ast
+_tree = _ast.parse(Path(sys.argv[1]).read_text(encoding="utf-8"))
+_bare = []
+_seen = 0
+for _node in _ast.walk(_tree):
+    if (isinstance(_node, _ast.Call) and isinstance(_node.func, _ast.Attribute)
+            and _node.func.attr in ("run", "Popen", "call", "check_call", "check_output")
+            and isinstance(_node.func.value, _ast.Name)
+            and _node.func.value.id == "subprocess"):
+        _seen += 1
+        _passes = any(k.arg is None and isinstance(k.value, _ast.Name)
+                      and k.value.id == "NO_WINDOW" for k in _node.keywords)
+        if not _passes:
+            _bare.append(_node.lineno)
+assert _seen >= 5, f"matched only {_seen} subprocess calls; expected the 5 in the file"
+assert not _bare, f"subprocess calls without NO_WINDOW at lines {_bare}"
+
 print("PASS: GitHub and GitLab CLIs are resolved or refused at startup; "
       "the GitHub search covers the opened, assigned, and workflow-bot arms; "
-      "failures accumulate an error streak that success resets")
+      "failures accumulate an error streak that success resets; "
+      "every child process starts without a console window")

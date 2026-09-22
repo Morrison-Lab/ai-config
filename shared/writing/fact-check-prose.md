@@ -1564,10 +1564,11 @@ A few were claims about what the pinned callee does: an exhausted quota is not
 caught pre-flight, only a missing secret is; a draft, fork, or bot-sender skip
 concludes `skipped` rather than `success`; a `GITHUB_TOKEN` push fires no
 `synchronize` event at all, so no run exists for the sender gate to skip.
-Two were permission claims that would have caused an outage if acted on: the
-comment singled out `id-token: write` as the worst scope to expose, inviting
-its removal, when all five scopes the callee's job requests are required and a
-caller missing any one fails the run before it starts.
+One was a permission claim that got acted on and then had to be reverted: a
+round singled out `id-token: write` as the worst scope to expose, the next
+commit dropped it, and two rounds later a further commit put it back, because
+all five scopes the callee's job requests are required and a caller missing
+any one fails the run before it starts.
 The rest, and the majority, were the incident narration: the wrong three leaks
 (two list items described the same mistake, and the first leak actually caught
 was missing), in an order the commits refute, credited to checks that did not

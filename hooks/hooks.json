@@ -66,7 +66,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-mistake-without-a-hook.py\"",
             "timeout": 10,
             "script": "no-mistake-without-a-hook.py",
-            "why": "cai 2026-08-02 'every time you make a mistake, write a hook to prevent it recurring'. Injects rather than blocks, because an error admission is RIGHT to send -- only the follow-up is owed. Complements remind-ums-after-error.py: that one wants a recorded learning, this one wants a mechanism."
+            "why": "cai 2026-08-02 'every time you make a mistake, write a hook to prevent it recurring', extended 2026-09-22: recognizing redundant prose/content is evidence that prior prose was insufficient, so it also owes an explicit hook or algorithmic-check decision. Injects rather than blocks, because an error admission is RIGHT to send -- only the follow-up is owed. Complements remind-ums-after-error.py: that one wants a recorded learning, this one wants a mechanism."
           },
           {
             "type": "command",
@@ -1299,7 +1299,7 @@
             "command": "AI_CONFIG_STOP=1 python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-mistake-without-a-hook.py\"",
             "timeout": 10,
             "script": "no-mistake-without-a-hook.py",
-            "why": "Turns an admitted, mechanizable mistake into an immediate stop condition, capped once per admitted phrase within a short transcript window so a re-explanation of the same admission does not re-block; the same phrase re-admitted well beyond that window blocks again."
+            "why": "Turns an admitted, mechanizable mistake or recognized redundant prose/content into an immediate stop condition, capped once per trigger phrase within a short transcript window so a re-explanation of the same trigger does not re-block; the same phrase well beyond that window blocks again."
           },
           {
             "type": "command",

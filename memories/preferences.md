@@ -25,6 +25,9 @@
 - When the user corrects my behavior or identifies a workflow gap, invoke UMS
   immediately and persist the lesson before resuming the main task. Do not wait
   for the user to say `ums` or to remind me again.
+- When redundant prose is identified or removed, decide explicitly whether it
+  shows that the existing text needs a hook or other algorithmic safeguard;
+  record either the mechanism or why the condition is not mechanizable.
 - **Treat user profanity and frustration as an urgent defect signal**:
   Profanity, exasperation, or intense frustration from the user is almost always a signal that an agent made a severe mistake, regressed behavior, dropped context, violated a preference, or gave a cop-out offer.
   Never tone-police, scold the user, debate politeness, emit canned corporate apologies, or offer defensive excuses.

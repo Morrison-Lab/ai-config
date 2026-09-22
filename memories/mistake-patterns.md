@@ -15,7 +15,7 @@ When a new entry lands after `main` has appended one of its own, take the next n
 - **Mistake**: Asking permission for routine, non-destructive steps already authorized by standing rules.
 - **Example**: Asking "Should I open a PR?" when standing rules mandate opening PRs for completed changes.
 - **Canonical Rule**: See `CLAUDE.md` ("Non-destructive actions") and `AGENTS.md` ("Default to action without asking"), plus "Open a PR for every pushed feature branch".
-- **Fix**: Execute standing instructions autonomously; reserve questions for genuine design ambiguity.
+- **Fix**: Execute standing instructions autonomously, reserving questions for genuine design ambiguity while `no-redundant-push-pr-authorization.py` blocks repeat routine-push and PR/MR authorization asks but leaves merge and force-push questions properly gated.
 
 ## Pattern 3: Give Up Instead of Diagnose
 - **Mistake**: Treating a "command not found" or tool path error as a permanent blocker without searching.

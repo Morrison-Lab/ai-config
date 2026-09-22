@@ -103,7 +103,12 @@ def _note_time(note: dict) -> str:
 
 def _note_author(note: dict) -> str:
     author = note.get("author") or {}
-    return str(author.get("username") or author.get("name") or "unknown")
+    known = author.get("username") or author.get("name")
+    if known:
+        return str(known)
+    note_id = note.get("id")
+    suffix = str(note_id) if note_id is not None else str(id(note))
+    return f"unknown-note-author-{suffix}"
 
 
 def _check_pipelines(pipelines: list[dict], sha: str) -> list[str]:
@@ -211,7 +216,7 @@ def _live_payload(project: str, iid: str) -> dict:
 
 def _local_base_ancestor(target_branch: str, sha: str) -> bool:
     """Prove target currency from a local checkout, failing closed if absent."""
-    refs = [target_branch, f"origin/{target_branch}", f"refs/remotes/origin/{target_branch}"]
+    refs = [f"origin/{target_branch}", f"refs/remotes/origin/{target_branch}"]
     for ref in refs:
         result = subprocess.run(
             ["git", "merge-base", "--is-ancestor", ref, sha],

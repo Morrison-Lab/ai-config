@@ -3,16 +3,22 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import subprocess
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "check-mr-fully-clean.py"
 SHA = "0123456789abcdef0123456789abcdef01234567"
+MODULE_SPEC = importlib.util.spec_from_file_location("check_mr_fully_clean", SCRIPT)
+MODULE = importlib.util.module_from_spec(MODULE_SPEC)
+MODULE_SPEC.loader.exec_module(MODULE)
 
 
 def payload(**overrides):
@@ -129,6 +135,22 @@ class CheckMrFullyCleanTests(unittest.TestCase):
         result = self.run_checker(value)
         self.assertEqual(result.returncode, 1, result.stderr + result.stdout)
         self.assertIn("merge conflicts", result.stdout)
+
+    def test_local_currency_uses_fetched_remote_ref_first(self):
+        calls = []
+
+        def run(command, **kwargs):
+            calls.append(command)
+            return SimpleNamespace(returncode=0)
+
+        with patch.object(MODULE.subprocess, "run", side_effect=run):
+            self.assertTrue(MODULE._local_base_ancestor("main", SHA))
+        self.assertEqual(calls[0][3], "origin/main")
+
+    def test_missing_note_author_does_not_use_shared_identity(self):
+        first = {"id": 1, "author": {}}
+        second = {"id": 2, "author": {}}
+        self.assertNotEqual(MODULE._note_author(first), MODULE._note_author(second))
 
 
 if __name__ == "__main__":

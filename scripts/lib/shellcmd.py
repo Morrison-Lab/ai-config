@@ -960,10 +960,15 @@ def native_path(path, is_windows=None):
     become `C:/x`). Every single-letter first segment counts, `/a/b`
     included: Git Bash mounts each drive at `/<letter>` (`mount` lists
     `C: on /c`, `D: on /d`), so in the shell that wrote the command `/a/b`
-    already means `A:/b`, not a directory named `a`. Other absolute MSYS paths (`/tmp`, `/usr`) map to the
-    Git install's own root, which this cannot know, so they are returned
-    unchanged. Off Windows the path is always returned unchanged, since
-    `/c/...` is then an ordinary directory. `None` passes through.
+    already means `A:/b`, not a directory named `a`.
+
+    Other absolute MSYS paths (`/tmp`, `/usr`) resolve through the MSYS
+    mount table, which this cannot read, so they are returned unchanged --
+    and that is NOT harmless: on Python 3.13 a caller's `os.path.isabs` still
+    calls them relative and joins them onto the current directory, a wrong
+    reading this helper does not fix (ai-config#3874). Off Windows the path is
+    always returned unchanged, since `/c/...` is then an ordinary directory.
+    `None` passes through.
     """
     if path is None:
         return None

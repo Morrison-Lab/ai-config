@@ -20,8 +20,10 @@
   see [`shared/workflow/ardi.md`](../shared/workflow/ardi.md) for foreground verification and turn-ending review monitor timer rules.
 - **Never pause without an armed wake mechanism and stopping point declaration**:
   Whenever yielding a turn while tasks, tests, CI, or review checks remain incomplete, declare `**Stopping Point**: Not a clean stopping point / work remains queued: <details>` and arm a timer (`schedule`, `ScheduleWakeup`, `CronCreate`, or background monitor).
-  Never yield a turn claiming to wait on background tasks or external results without an armed wake mechanism; report the clock time in local time (Pacific Time) when the timer will fire.
-  See [`shared/workflow/resume-every-non-clean-pause.md`](../shared/workflow/resume-every-non-clean-pause.md). (User directive, 2026-09-22).
+  Never yield a turn claiming to wait on background tasks or external results without an armed wake mechanism;
+  report the clock time in local time (Pacific Time) when the timer will fire.
+  See [`shared/workflow/resume-every-non-clean-pause.md`](../shared/workflow/resume-every-non-clean-pause.md).
+  (User directive, 2026-09-22).
 - Default to the most recent available package version.
   Use an older or pinned version only when compatibility, reproducibility,
   or another concrete project constraint gives a reason;

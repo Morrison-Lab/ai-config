@@ -5,7 +5,8 @@ A pause is any point where the agent yields the turn to the user or waits on ext
 
 - If work remains queued or in flight, **it is not a clean stopping point**.
 - State `**Stopping Point**: Not a clean stopping point / work remains queued: <details>` in the reply.
-- **Arm a wake mechanism before ending the turn.** Report the concrete mechanism armed and the exact clock time it will fire in local time (Pacific Time).
+- **Arm a wake mechanism before ending the turn.**
+  Report the concrete mechanism armed and the exact clock time it will fire in local time (Pacific Time).
 - A verified clean stopping point (`**Stopping Point**: Clean stopping point reached`) needs no timer because no work remains to resume.
 
 ## Why this rule exists

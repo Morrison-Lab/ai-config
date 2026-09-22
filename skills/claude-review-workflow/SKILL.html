@@ -445,9 +445,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="setting-up-in-a-new-repo">Setting up in a new repo</h2>
 <ol type="1">
 <li>Confirm <code>CLAUDE_CODE_OAUTH_TOKEN</code> secret exists in repo/org secrets (<code>gh secret list</code>).</li>
-<li>Add the caller stub at <code>.github/workflows/claude-code-review.yml</code>.</li>
+<li>Add the caller stub at <code>.github/workflows/claude-code-review.yml</code>. Diff it against gha’s <code>examples/claude-code-review.yml</code> at the tag you pin, not against another consumer’s caller: see <a href="../../memories/gha-reusable-workflows.md"><code>gha-reusable-workflows.md</code></a>’s “Template propagation hazard”. If this is the repository’s <strong>first</strong> workflow, the PR adding it cannot get a bot review: see <a href="../../memories/claude-review-dispatch.md"><code>claude-review-dispatch.md</code></a>’s first-workflow section.</li>
 <li>Ensure required permissions (<code>contents: read</code>, <code>pull-requests: write</code>, <code>issues: write</code>, <code>actions: read</code>, <code>checks: read</code>) are declared on the caller job.</li>
-<li>Pass any project-specific guidance via <code>prompt-addendum</code>.</li>
+<li>Pass any project-specific guidance via <code>prompt-addendum</code>. Fact-check it like a PR body, not less: it is the standing instruction every future review runs under (see <a href="../../shared/writing/fact-check-prose.md"><code>fact-check-prose</code></a>’s “A prompt is a standing instruction”).</li>
 </ol>
 </section>
 <section id="relationship-to-other-skills" class="level2">

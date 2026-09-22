@@ -14,16 +14,26 @@ on:
     types: [created]
   pull_request_review_comment:
     types: [created]
-  # Summon the agent explicitly: assign the issue (requires mention in body/title),
-  # or mention the bot in a comment. Deliberately not `issues: opened` to avoid
-  # dispatching on issues that merely discuss the bot.
+  # `opened` is safe: the callee's mention-filter runs detect-bot-mention on
+  # issue body and title and stands down on a quoted mention (gha#554).
+  # `assigned` fires only when the issue body or title also mentions the bot
+  # and the issue author is trusted -- or add a dispatch-on-assignee clause
+  # below AND pass the dispatch-on-assignee input (see gha examples/claude.yml).
   issues:
-    types: [assigned]
+    types: [opened, assigned]
   pull_request_review:
     types: [submitted]
 
 jobs:
   claude:
+    # Caller-side trusted-author gate, copied from gha examples/claude.yml at
+    # the pinned tag: an untrusted mention never invokes a workflow that holds
+    # write permissions and secrets. Re-diff against the example on every bump.
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude') && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude') && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude') && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.review.author_association)) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')) && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
     permissions:
       contents: write
       pull-requests: write
@@ -61,7 +71,7 @@ By delegating to `Morrison-Lab/gha/.github/workflows/claude.yml@v2`, the consume
 ## Setting up in a new repo
 
 1.  Confirm `CLAUDE_CODE_OAUTH_TOKEN` secret exists in repo/org secrets (`gh secret list`).
-2.  Add the caller stub at `.github/workflows/claude.yml`.
+2.  Add the caller stub at `.github/workflows/claude.yml`. Diff it against gha’s `examples/claude.yml` at the tag you pin, not against another consumer’s caller: see [`gha-reusable-workflows.md`](../../memories/gha-reusable-workflows.md)’s “Template propagation hazard”.
 3.  Ensure required permissions (`contents: write`, `pull-requests: write`, `issues: write`, `id-token: write`, `actions: write`) are declared on the caller job.
 4.  Configure appropriate inputs (`setup-r`, `review-workflow-file`, etc.).
 

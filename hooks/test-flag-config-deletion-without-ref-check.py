@@ -886,5 +886,78 @@ for _verb in sorted(set(_BARE) | set(_PATTERN)):
           % ("ok" if _ok else "WRONG", _verb,
              "" if _ok else (": " + ", ".join(_overlap))))
 
+def run_reply_tool(reply, narration="", prior_commands=()):
+    """Return WARN or silent for a project-thread transcript ending in reply tool."""
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    os.close(fd)
+    try:
+        with open(path, "w", encoding="utf-8") as stream:
+            for command in prior_commands:
+                stream.write(json.dumps({
+                    "type": "assistant",
+                    "message": {"content": [{
+                        "type": "tool_use", "name": "Bash",
+                        "input": {"command": command},
+                    }]},
+                }) + "\n")
+            blocks = []
+            if narration:
+                blocks.append({"type": "text", "text": narration})
+            blocks.append({
+                "type": "tool_use",
+                "name": "mcp__hearthbot__reply",
+                "input": {"text": reply},
+            })
+            stream.write(json.dumps({
+                "type": "assistant",
+                "message": {"content": blocks},
+            }) + "\n")
+        temp_dir = tempfile.mkdtemp()
+        _TEMP_DIRS.append(temp_dir)
+        env = os.environ.copy()
+        env["TMPDIR"] = temp_dir
+        env["TEMP"] = temp_dir
+        env["TMP"] = temp_dir
+        proc = subprocess.run(
+            [sys.executable, HOOK],
+            input=json.dumps({"transcript_path": path}),
+            text=True,
+            capture_output=True,
+            env=env,
+        )
+        if proc.returncode != 0:
+            sys.exit("FATAL: hook failed with code %d: %s"
+                     % (proc.returncode, proc.stderr))
+        return "WARN" if proc.stdout.strip() else "silent"
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+_verdict = run_reply_tool(DELETE_REPLY)
+total += 1
+_ok = _verdict == "WARN"
+wrong += not _ok
+print("%-7s undischarged deletion in reply-tool payload WARNs" % _verdict)
+
+_verdict = run_reply_tool("Safe completion text.")
+total += 1
+_ok = _verdict == "silent"
+wrong += not _ok
+print("%-7s safe completion in reply-tool payload stays silent" % _verdict)
+
+_verdict = run_reply_tool("Safe completion text.", narration=DELETE_REPLY)
+total += 1
+_ok = _verdict == "silent"
+wrong += not _ok
+print("%-7s undelivered narration deletion stays silent when clean reply spoke" % _verdict)
+
+_verdict = run_reply_tool(DELETE_REPLY, narration="Safe completion text.")
+total += 1
+_ok = _verdict == "WARN"
+wrong += not _ok
+print("%-7s reply-tool deletion wins over safe narration" % _verdict)
+
 print("\n%d/%d correct" % (total - wrong, total))
 sys.exit(1 if wrong else 0)

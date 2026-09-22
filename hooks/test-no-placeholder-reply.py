@@ -30,6 +30,37 @@ def say(text):
         {"type": "text", "text": text}]}}
 
 
+def reply(text):
+    return {
+        "type": "assistant",
+        "message": {
+            "content": [
+                {
+                    "type": "tool_use",
+                    "name": "mcp__hearthbot__reply",
+                    "input": {"text": text},
+                }
+            ]
+        },
+    }
+
+
+def narrate_and_reply(narration, text):
+    return {
+        "type": "assistant",
+        "message": {
+            "content": [
+                {"type": "text", "text": narration},
+                {
+                    "type": "tool_use",
+                    "name": "mcp__hearthbot__reply",
+                    "input": {"text": text},
+                },
+            ]
+        },
+    }
+
+
 # (events, should_block, label)
 CASES = [
     # Case one is the reported input, verbatim, per algorithmatize-checks'
@@ -95,6 +126,16 @@ CASES = [
     # String content assistant message
     ([{"type": "assistant", "content": "No response requested."}], True,
      "assistant string content placeholder blocks"),
+
+    # Project-thread reply-tool cases
+    ([TOOL, reply("No response requested.")], True,
+     "reply-tool placeholder blocks"),
+    ([TOOL, reply("Completed task successfully.")], False,
+     "reply-tool non-placeholder does not block"),
+    ([TOOL, narrate_and_reply("No response requested.", "Completed task successfully.")], False,
+     "undelivered narration placeholder does not block when reply spoke"),
+    ([TOOL, narrate_and_reply("Completed task successfully.", "No response requested.")], True,
+     "reply-tool placeholder wins over clean narration"),
 ]
 
 
@@ -151,7 +192,18 @@ def main():
         ({"reply": "No response requested."}, True, "direct reply field blocks"),
         ({"last_assistant_message": "No response requested."}, True, "direct last_assistant_message field blocks"),
         ({"message": {"content": [{"type": "text", "text": "No response requested."}]}}, True, "direct message object blocks"),
-        ({"content": "No response requested."}, True, "direct content string blocks"),
+        ({"message": {"content": [
+            {"type": "text", "text": "Completed task successfully."},
+            {"type": "tool_use", "name": "mcp__hearthbot__reply", "input": {"text": "No response requested."}},
+        ]}}, True, "direct message with narration + reply-tool placeholder blocks"),
+        ({"message": {"content": [
+            {"type": "text", "text": "No response requested."},
+            {"type": "tool_use", "name": "mcp__hearthbot__reply", "input": {"text": "Completed task successfully."}},
+        ]}}, False, "direct message with placeholder narration + substantive reply does not block"),
+        ({"content": [
+            {"type": "text", "text": "Task finished."},
+            {"type": "tool_use", "name": "mcp__hearthbot__reply", "input": {"text": "No response requested."}},
+        ]}, True, "direct content list with narration + reply-tool placeholder blocks"),
         ({"reply": "Completed wave-1 review and tests passed."}, False, "direct reply substantive does not block"),
     ]
     for payload, expected, label in direct_cases:

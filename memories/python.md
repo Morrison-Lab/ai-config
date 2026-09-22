@@ -152,7 +152,7 @@ Use the system's own local clock (`datetime.datetime.now().astimezone()`) when t
 ## `Path(...).resolve()` silently tolerates an embedded NUL on Windows and raises on POSIX
 
 `pathlib.Path("a\0b").resolve()` returns quietly on Windows --- confirmed here, CPython 3.13.7: no exception, `WindowsPath('.../a\x00b')`.
-On POSIX (measured on `ubuntu-latest`, per the incident below), the same call raises `ValueError: embedded null character`, because the underlying `os.path.realpath`/`stat` syscalls reject a NUL in a path string outright.
+On POSIX (measured directly on CPython 3.12.3, the exact version this repo's own CI pins), the same call raises `ValueError: embedded null byte`, because the underlying `os.path.realpath`/`stat` syscalls reject a NUL in a path string outright.
 A code path that assumes the POSIX behaviour --- catching that `ValueError` to treat a NUL-containing path as invalid input --- is unreachable on Windows: the `except` clause never fires, and whatever the `try` block does with the tainted path executes instead.
 
 Measured directly on `Morrison-Lab/ai-config` PR [#3833](https://github.com/Morrison-Lab/ai-config/pull/3833): an earlier commit on that branch (`83bafbef`) narrowed a `try`/`except` in `entries_for` to catch only `OSError`.
@@ -161,6 +161,12 @@ The emphasis lived only in the commit message, which a later reader of the file 
 the artifact that persists --- the comment --- carried the same wrong generalisation with none of the shouting that might have prompted a second look.
 `472408f8`, the next commit on that branch, is where the crash surfaced: CI runs on `ubuntu-latest`, where the same construction raises `ValueError`, not `OSError`, so the script crashed with an uncaught traceback on exactly the malformed input it exists to survive --- JSON round-trips a NUL byte through its own escape, so the input is reachable from an otherwise syntactically valid file.
 The fix widened the catch to `(OSError, ValueError)`, and that commit records why a fixture cannot pin this on its own: a real NUL byte written into a test fixture would assert nothing on Windows, the platform the wrong generalisation came from, so the regression case has to substitute the module's own `Path` rather than write the byte literally --- a NUL fixture is green in exactly the environment where the original mistake was made.
+
+**A second, narrower instance of this same entry's own subject sat inside it until review caught it.**
+An earlier draft of this entry, and PR #3833's own source comment and test fixture (`scripts/check-hook-delivery.py`, `scripts/test_check_hook_delivery.py`), quoted the POSIX message as `ValueError: embedded null character`.
+The actual text, measured directly on CPython 3.12.3 --- the version this repo's own CI pins --- is `embedded null byte`.
+The wrong wording was never empirically checked at its source either: PR #3833's regression test substitutes a mocked `Path.resolve()` that hand-writes the string `"embedded null character in path"` rather than capturing a real traceback, so the fixture necessarily agrees with the assertion it was meant to verify.
+An entry whose whole point is "re-measure a stdlib call's exact behaviour rather than trust an unverified claim" shipped an unverified claim about the exact wording of that same call's exception message --- caught only by a reviewer who ran the command directly against the CI-pinned interpreter rather than trusting either the commit message or the mocked fixture.
 
 This is a second, independent instance of the class [`heredoc-backslash-collapse.md`](../shared/coding/heredoc-backslash-collapse.md) states generally --- "Scope it before relying on it: this is a property of the environment, not of [the mechanism you happened to be testing]" --- and of [ai-config#2158](https://github.com/Morrison-Lab/ai-config/issues/2158)'s `ls` exit-code case (BSD `ls` returns 1 for "no such file", GNU coreutils `ls` reserves 2 for it).
 Both of those are **shell command** behaviour;
@@ -175,6 +181,9 @@ The class is broader than either title suggests: any measured behaviour --- a sh
 - **Don't:** write a code comment or commit message asserting a branch is unreachable based on a measurement taken on one platform when the code runs on another --- here the comment itself never named a platform at all, which is a stronger miss than an emphasized-but-scoped claim would have been.
 - **Don't:** assume the existing environment-scoping rule fires just because it exists --- it is stated narrowly (heredoc transport, `ls` exit codes) in both of its prior instances, so recognizing "this is the same class" for a stdlib call takes a deliberate generalization step, not pattern-matching on the rule's own title.
 - **Don't:** trust that a strongly-worded commit message (capitals, "MEASURED") carries its caution into the code --- the comment a maintainer reads six months later is the one written in the diff, not the one narrated about it.
+- **Do:** re-run the exact reproducer yourself, against the exact interpreter version the target CI pins, before quoting an exception's message text --- not just its type.
+  A message string is as measurable, and as easy to get wrong from memory or from a secondhand quote, as the exception type itself.
+- **Don't:** trust a test fixture as corroboration for a message string it mocks rather than captures --- a fixture that hand-writes the expected string can never disagree with the assertion it exists to check.
 
 ## `itertools.islice` caps a generator by prefix, and the obvious integer stride collapses to it
 

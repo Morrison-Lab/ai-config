@@ -8,7 +8,9 @@ now skips it). The rest are constructed edge cases, and use issue numbers
 only as labels. The classifier is pure over the GraphQL node shape, so these
 run offline with no `gh` call.
 """
+import contextlib
 import importlib.util
+import io
 import json
 import sys
 import tempfile
@@ -173,6 +175,25 @@ with tempfile.TemporaryDirectory() as directory:
     check("main exits 2 on an unreadable payload",
           audit.main(["-R", REPO, "--from-json", str(broken)]) == 2)
     check("main exits 2 on a malformed repo", audit.main(["-R", "sparta"]) == 2)
+
+
+# A failing `gh` call, through the live path rather than --from-json.
+def failing_run(command, **kwargs):
+    raise audit.subprocess.CalledProcessError(
+        4, command, output="", stderr="gh: API rate limit exceeded\n")
+
+
+real_run = audit.subprocess.run
+captured = io.StringIO()
+audit.subprocess.run = failing_run
+try:
+    with contextlib.redirect_stderr(captured):
+        status = audit.main(["-R", REPO])
+finally:
+    audit.subprocess.run = real_run
+check("main exits 2 when gh fails", status == 2)
+check("the gh failure message names gh's own stderr, not the query",
+      captured.getvalue().strip() == "ERROR: gh exited 4: gh: API rate limit exceeded")
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

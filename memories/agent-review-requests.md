@@ -1,6 +1,9 @@
 # Requesting a Claude review from an agent session
 
 Split out of [`github-actions.md`](github-actions.md) at the 1250-line gate.
+For what the reusable review workflow does once dispatched --- including how it
+triggers, stashes and restores requested reviewers, and posts its reply ---
+see [`claude-review-dispatch.md`](claude-review-dispatch.md).
 
 ## How an agent session requests a review: a `/review` comment, never a dispatch
 
@@ -56,7 +59,9 @@ rather than the attempt --- 4 of 4 one way, 4 of 4 the other.
 Read the actor before reading the failure kind.
 
 **So request a review by posting a comment whose first token is `/review`.**
-`.github/workflows/claude-review.yml`'s `dispatch-on-comment` job answers it:
+`.github/workflows/claude-review.yml`'s `dispatch-on-comment` job answers it
+(see [`claude-review-dispatch.md`](claude-review-dispatch.md) for how the
+workflow handles the dispatch once started):
 it looks the PR's head branch up over the API, dispatches with `--ref` so the
 check-runs land on the PR's own head rather than the default branch
 (gha#285), omits `--ref` for a fork or a workflow-editing PR (gha#289,

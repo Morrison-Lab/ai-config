@@ -4,6 +4,9 @@ How a review run gets **triggered** in each repo family, and what happens to
 the reply once it is written.
 Satellite of [`claude-bot-workflows.md`](claude-bot-workflows.md), which owns
 what a run does once it starts, split at the 1200-line gate.
+For how an AI agent session requests a review via `/review` comments (avoiding
+the bot-sender and allowed-bots short-circuit gates), see
+[`agent-review-requests.md`](agent-review-requests.md).
 
 ## Re-triggering the @claude PR *review* (the repository owner Quarto / R-pkg repos, e.g. `psw`)
 - Filenames below are those in the **content/package repos** (verified in
@@ -76,7 +79,10 @@ what a run does once it starts, split at the 1200-line gate.
   "`ai-config` auto-reviews on push as of 2026-08-20, and did not before" later
   in this file, and read its date before acting on it.
 - To force a fresh review on an existing PR **without a new commit**:
-  - **workflow_dispatch** (preferred --- no extra PR timeline noise).
+  - **workflow_dispatch** (preferred for humans --- no extra PR timeline
+    noise; for agent sessions, direct dispatch short-circuits under
+    `claude[bot]`, so agents must post a `/review` comment instead, per
+    [`agent-review-requests.md`](agent-review-requests.md)).
     Same
     dispatch, three ways to send it:
     - **`gh`:** `gh workflow run claude-code-review.yml -f pr_number=<N>`
@@ -662,6 +668,8 @@ That last line is the whole point.
 An empty stash restores nothing, so **withdrawing a review request is
 durable**: the workflow can only put back a request that was already there
 when it started.
+(For an agent session requesting a review without adding reviewer state, see
+[`agent-review-requests.md`](agent-review-requests.md).)
 
 This matters because the observable pattern looks like the opposite.
 A request is removed when each review starts and re-added a few seconds after

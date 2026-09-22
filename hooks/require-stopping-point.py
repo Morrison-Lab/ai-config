@@ -81,6 +81,12 @@ def last_text(path: str) -> str:
                     continue
                 etype = event.get("type") or event.get("role") or ""
                 source = event.get("source") or ""
+                if event.get("isMeta"):
+                    # A loaded skill body arrives as a `type: "user"` entry
+                    # with `isMeta: true`. It was never a real prompt, so it
+                    # must not reset the accumulated reply the way a genuine
+                    # new user turn does (ai-config#3860).
+                    continue
                 if (
                     etype == "user"
                     or etype == "USER_INPUT"

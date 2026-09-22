@@ -577,6 +577,14 @@ def scan(path):
         # `discharges()` for what a delegated build discharges on instead.
         if m.get("isSidechain"):
             continue
+        if m.get("isMeta"):
+            # A loaded skill body arrives as a `type: "user"` entry with
+            # `isMeta: true`. It was never a real prompt, so it must not
+            # reset the pending-mechanism/promise state the way a genuine
+            # new user turn does -- that would discard evidence of a
+            # promise and its discharge made just before the skill load
+            # (ai-config#3860).
+            continue
 
         if kind == "user" or m.get("source") == "USER_EXPLICIT" or kind == "USER_INPUT":
             # A tool_result arrives as a `user` record; a real prompt does not.

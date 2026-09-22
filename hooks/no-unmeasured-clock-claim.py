@@ -655,8 +655,11 @@ def scan(path):
                 # `attachment`, `last-prompt`, `custom-title` and similar
                 # records, which belong to the turn already open. Advancing
                 # past one of those expires the injected reading that arrives
-                # beside it.
-                if role == "user":
+                # beside it. A loaded skill body (`isMeta: true`) is also NOT
+                # a real prompt, so it must not advance `turn_start` either --
+                # doing so would expire a reading taken just before the skill
+                # loaded, in the still-current turn (ai-config#3860).
+                if role == "user" and not m.get("isMeta"):
                     turn_start = i
                 if role != "assistant" and RX_HOOK_CLOCK.search(blocks):
                     got = RX_HOOK_CLOCK_VALUE.search(blocks)
@@ -671,8 +674,11 @@ def scan(path):
             # opens a new turn. One carrying only `tool_result` blocks is this
             # turn's own tool output, which opens nothing -- that distinction is
             # the whole fix: the window must start where the USER spoke, not
-            # wherever the assistant last emitted text.
-            if role == "user" and any(
+            # wherever the assistant last emitted text. A loaded skill body
+            # (`isMeta: true`) carries a `text` block too but was never typed
+            # by the person, so it must not open a new turn either
+            # (ai-config#3860).
+            if role == "user" and not m.get("isMeta") and any(
                     isinstance(b, dict) and b.get("type") == "text"
                     for b in blocks):
                 turn_start = i

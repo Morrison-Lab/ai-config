@@ -401,12 +401,20 @@ def last_assistant_text(transcript_path):
     `isSidechain` records are skipped: in a subagent transcript every
     assistant record carries it, and this hook is bound to `Stop` in the main
     session only.
+
+    `isMeta` records are skipped the same way, and NOT treated as opening a
+    new turn: a loaded skill's body arrives mid-turn as a `type: "user"`
+    entry with `isMeta: true`, and resetting the accumulated turn there would
+    discard any bash command the assistant handed over just before invoking
+    the skill (ai-config#3860).
     """
     saw_reply_tool = False
     turn_replies = []
     turn = []
     for entry in _records(transcript_path):
         etype = entry.get("type") or entry.get("role")
+        if entry.get("isMeta"):
+            continue
         if etype == "user" and not entry.get("isSidechain"):
             turn = []
             turn_replies = []

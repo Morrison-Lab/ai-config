@@ -428,6 +428,12 @@ def is_user_prose(entry):
     kind = entry.get("type") or entry.get("role") or entry.get("source")
     if kind not in ("user", "USER_EXPLICIT", "USER_INPUT"):
         return False
+    if entry.get("isMeta"):
+        # A loaded skill body (or other harness-injected context) arrives as
+        # a `type: "user"` entry with `isMeta: true` and a `sourceToolUseID`.
+        # It was never typed by the person, so a forge issue URL or number
+        # the skill quotes must not arm this guard. ai-config#3860.
+        return False
     blocks = _content_blocks(entry)
     if not blocks:
         return False

@@ -50,6 +50,18 @@ def user(s):
     return {"type": "user", "message": {"content": [{"type": "text", "text": s}]}}
 
 
+def meta(s, tool_use_id="toolu_x"):
+    """Shape of a loaded skill body (ai-config#3860): a `type: "user"` entry
+    with `isMeta: true`, injected by the harness rather than typed by the
+    person."""
+    return {
+        "type": "user",
+        "isMeta": True,
+        "sourceToolUseID": tool_use_id,
+        "message": {"role": "user", "content": [{"type": "text", "text": s}]},
+    }
+
+
 def tool_result(s="ok"):
     return {
         "type": "user",
@@ -163,6 +175,12 @@ SILENT = [
      "commit filtered ... rather than (word ending in it)"),
     ([Q, txt("The audit filtered results rather than users.")],
      "audit filtered ... rather than (word ending in it)"),
+    ([meta("are you sure about that?"), WRONG],
+     "a loaded skill body quoting 'are you sure' does not open a question "
+     "window (ai-config#3860)"),
+    ([meta("**Claude finished** reviewing HEAD. ### Verdict")],
+     "a loaded skill body quoting review-shaped text is not a review-read "
+     "(ai-config#3860)"),
     ([REVIEW], "placeholder -- replaced below for sidechain"),
 ]
 

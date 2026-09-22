@@ -214,6 +214,13 @@ def scan(path):
     for i, m in enumerate(records(path)):
         if m.get("isSidechain"):
             continue
+        if m.get("isMeta"):
+            # A loaded skill body arrives as a `type: "user"` entry with
+            # `isMeta: true`. It was never typed by the person, so a skill
+            # quoting review-shaped or question-shaped language (e.g. a
+            # linked issue's title) must not count as a review read or a
+            # "are you sure" question (ai-config#3860).
+            continue
 
         blocks = _blocks(m)
         rec_type = m.get("type") or m.get("role")

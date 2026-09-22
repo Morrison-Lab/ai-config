@@ -67,6 +67,23 @@ SUBAGENT_WROTE = {"type": "assistant", "isSidechain": True, "message": {
     "content": [{"type": "tool_use", "name": "Write",
                  "input": {"file_path": "shared/workflow/x.md",
                            "content": "the rule"}}]}}
+# A loaded skill body (ai-config#3860): a `type: "user"` entry with
+# `isMeta: true`, injected by the harness rather than typed by the person.
+# It must not reset the pending-mechanism state the way a real new user
+# turn does.
+META = {
+    "type": "user",
+    "isMeta": True,
+    "sourceToolUseID": "toolu_x",
+    "message": {
+        "role": "user",
+        "content": [{
+            "type": "text",
+            "text": "Base directory for this skill: ...\\skills\\mwc\n"
+                    "... https://github.com/Morrison-Lab/ai-config/issues/3021 ...",
+        }],
+    },
+}
 SUBAGENT_SAID = {"type": "assistant", "isSidechain": True, "message": {
     "content": [{"type": "text",
                  "text": "Going forward I will always do X."}]}}
@@ -222,6 +239,17 @@ CASES = [
     ([say("Going forward I'll run the checker."), WROTE_FRAGMENT,
       say("Recorded the rule.")],
      False, "a shared/ fragment write discharges it"),
+    # A loaded skill body (isMeta) must not be treated as a new user turn: it
+    # would wipe BOTH the promise text and the already-shipped write's
+    # discharge together, which happens to still read as "not blocked" --
+    # the discriminating shape needs a promise restated AFTER the isMeta
+    # entry, so a pre-fix reset shows up as a FALSE block on a turn that did
+    # in fact ship the mechanism (ai-config#3860).
+    ([say("Going forward I'll run the checker before reporting status."),
+      WROTE_FRAGMENT, META,
+      say("Going forward I'll run the checker before reporting status.")],
+     False, "a write shipped before a mid-turn skill load (isMeta) still "
+            "discharges a promise restated after it (ai-config#3860)"),
     ([say("From now on I won't skip it."), WROTE_MEMORY],
      False, "a memories/ write discharges it"),
     ([say("I'll always request the reviewer."), WROTE_HOOK],

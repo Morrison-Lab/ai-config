@@ -264,6 +264,25 @@ def say(text):
 # recaps (ai-config#1917). Where a case means "a later turn", it must say so.
 NEXT_TURN = {"type": "user", "content": "and what about the other one?"}
 
+# A loaded skill body (ai-config#3860): a `type: "user"` entry with
+# `isMeta: true`, injected by the harness rather than typed by the person.
+# It carries a `text` block, so a naive turn-boundary check treats it like a
+# real prompt -- it must not, or it expires a reading taken earlier in the
+# still-current turn.
+META = {
+    "type": "user",
+    "isMeta": True,
+    "sourceToolUseID": "toolu_x",
+    "message": {
+        "role": "user",
+        "content": [{
+            "type": "text",
+            "text": "Base directory for this skill: ...\\skills\\mwc\n"
+                    "... https://github.com/Morrison-Lab/ai-config/issues/3021 ...",
+        }],
+    },
+}
+
 
 # The harness's injected reading as it ACTUALLY arrives, copied from a live
 # transcript (2026-08-22). It is not a user turn: it is its own record, type
@@ -333,6 +352,9 @@ CASES = [
     ([hook_clock("21:30:00"), DATE, say("Got it."), say("Recap: 21:31 PDT")],
      False,
      "#1917: an explicit `date` THIS turn discharges even with narration after"),
+    ([DATE, META, say("Recap: 21:31 PDT")], False,
+     "ai-config#3860: a mid-turn skill load (isMeta) does not expire an "
+     "explicit `date` read taken earlier in the still-current turn"),
 
     # --- the incident, and its shape ---
     ([DATE, say("first recap"), NEXT_TURN, say("UPDATE -- 19:24 PDT")], True,

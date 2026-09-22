@@ -611,6 +611,55 @@ check("issue 2 weeks ago does not arm the write guard", warned(out), False)
 
 
 # ---------------------------------------------------------------------------
+# isMeta entries (a loaded skill body) are not user prose (ai-config#3860)
+# ---------------------------------------------------------------------------
+
+def meta_user(text, tool_use_id="toolu_x"):
+    """Shape of a loaded-skill-body transcript entry (ai-config#3860)."""
+    return {
+        "type": "user",
+        "isMeta": True,
+        "sourceToolUseID": tool_use_id,
+        "message": {"role": "user", "content": [{"type": "text", "text": text}]},
+    }
+
+
+# Real entry shape from the transcript named in the issue: a loaded skill's
+# body, injected as isMeta, quoting an issue URL the user never typed.
+SKILL_BODY_TEXT = (
+    "Base directory for this skill: C:\\Users\\dougm\\.claude\\skills\\mwc\n"
+    "... https://github.com/Morrison-Lab/ai-config/issues/3021 ..."
+)
+
+check(
+    "is_user_prose rejects an isMeta entry",
+    subject.is_user_prose(meta_user(SKILL_BODY_TEXT)),
+    False,
+)
+check(
+    "is_user_prose accepts the identical text from a real user entry",
+    subject.is_user_prose(user(SKILL_BODY_TEXT)),
+    True,
+)
+
+skill_meta_only = write_transcript([meta_user(SKILL_BODY_TEXT)])
+out = run_hook(skill_meta_only)
+check(
+    "a loaded skill body (isMeta user entry) does not arm the guard",
+    warned(out),
+    False,
+)
+
+skill_body_as_real_user = write_transcript([user(SKILL_BODY_TEXT)])
+out = run_hook(skill_body_as_real_user)
+check(
+    "the identical text as a genuine user message still warns (control)",
+    warned(out),
+    True,
+)
+
+
+# ---------------------------------------------------------------------------
 # Mapping MCP spelling, GitLab, ls-remote; unrelated tools stay silent
 # ---------------------------------------------------------------------------
 

@@ -309,5 +309,87 @@ if tool_result_transcript(CLEAN_DECL):
 else:
     print("PASS: reply-tool followed by tool_result passes when declaration is present")
 
+
+def meta_mid_turn_transcript(reply_text):
+    """A loaded skill body arrives mid-turn as a `type: "user"` entry with
+    `isMeta: true`, AFTER the reply-tool already delivered the final content
+    and with no further reply-tool call afterward. It must not be treated as
+    a new user turn -- doing so wipes the delivered reply the same way a real
+    turn 2 legitimately would (ai-config#3860)."""
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(json.dumps({"type": "user", "message": {"content": "do task"}}) + "\n")
+        f.write(json.dumps({
+            "type": "assistant",
+            "message": {"content": [{
+                "type": "tool_use",
+                "name": "mcp__hearthbot__reply",
+                "input": {"text": reply_text},
+            }]},
+        }) + "\n")
+        f.write(json.dumps({
+            "type": "user",
+            "isMeta": True,
+            "sourceToolUseID": "toolu_x",
+            "message": {
+                "role": "user",
+                "content": [{
+                    "type": "text",
+                    "text": "Base directory for this skill: ...\\skills\\mwc\n"
+                            "... https://github.com/Morrison-Lab/ai-config/issues/3021 ...",
+                }],
+            },
+        }) + "\n")
+        f.write(json.dumps({
+            "type": "assistant",
+            "message": {"content": [{
+                "type": "tool_use", "name": "Bash", "input": {"command": "echo hi"},
+            }]},
+        }) + "\n")
+    tmpdir = tempfile.mkdtemp()
+    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
+    res = subprocess.run(
+        [sys.executable, HOOK],
+        input=json.dumps({"transcript_path": path}),
+        text=True,
+        capture_output=True,
+        env=env,
+    )
+    os.unlink(path)
+    assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
+    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
+
+
+if meta_mid_turn_transcript(CLEAN_DECL):
+    print(
+        "FAIL: reply-tool delivery with a clean declaration blocked after a "
+        "mid-turn skill load (isMeta) (ai-config#3860)"
+    )
+    failed += 1
+else:
+    print(
+        "PASS: reply-tool delivery with a clean declaration survives a "
+        "mid-turn skill load (isMeta)"
+    )
+
+# The discriminating case: a MISSING declaration must still be caught after
+# a mid-turn skill load. If the isMeta entry is (wrongly) treated as a new
+# user turn, it wipes `saw_reply_tool`/`last_reply`, the trailing tool-only
+# assistant entry sets nothing, and `extract_text_from_payload` returns "" --
+# which the hook reads as "nothing to check" rather than "no declaration",
+# so the miss silently produces NO block instead of the block it should.
+if not meta_mid_turn_transcript(MISSING_DECL):
+    print(
+        "FAIL: reply-tool delivery missing its declaration did not block "
+        "after a mid-turn skill load (isMeta) -- the load silently erased "
+        "the missing-declaration signal (ai-config#3860)"
+    )
+    failed += 1
+else:
+    print(
+        "PASS: reply-tool delivery missing its declaration still blocks "
+        "after a mid-turn skill load (isMeta)"
+    )
+
 raise SystemExit(bool(failed))
 

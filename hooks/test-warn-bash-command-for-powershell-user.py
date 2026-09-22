@@ -659,6 +659,55 @@ if not verdict(HOOK, multi_turn_transcript("Turn 1 safe reply.", bash_cmd)):
 if verdict(HOOK, multi_turn_transcript(bash_cmd, safe_cmd)):
     failures.append("turn 2 safe plain text warned because turn 1 had bash command in reply tool")
 
+
+# A loaded skill body arrives mid-turn as a `type: "user"` entry with
+# `isMeta: true`. It must NOT be treated as opening a new turn -- doing so
+# would discard a bash command handed over just before the skill load
+# (ai-config#3860).
+def meta_mid_turn_transcript(pre_reply, post_reply, brief=BRIEF_PS):
+    _n[0] += 1
+    path = os.path.join(TMP, f"t_meta_{_n[0]}.jsonl")
+    with open(path, "w", encoding="utf-8") as fh:
+        if brief is not None:
+            fh.write(json.dumps({
+                "type": "attachment",
+                "rendered": [{"content": brief}],
+            }) + "\n")
+        fh.write(json.dumps({
+            "type": "assistant",
+            "message": {"content": [{"type": "text", "text": pre_reply}]},
+        }) + "\n")
+        fh.write(json.dumps({
+            "type": "user",
+            "isMeta": True,
+            "sourceToolUseID": "toolu_x",
+            "message": {
+                "role": "user",
+                "content": [{
+                    "type": "text",
+                    "text": "Base directory for this skill: ...\\skills\\mwc\n"
+                            "... https://github.com/Morrison-Lab/ai-config/issues/3021 ...",
+                }],
+            },
+        }) + "\n")
+        fh.write(json.dumps({
+            "type": "assistant",
+            "message": {"content": [{"type": "text", "text": post_reply}]},
+        }) + "\n")
+    return {"transcript_path": path}
+
+
+if not verdict(HOOK, meta_mid_turn_transcript(bash_cmd, "Continuing after the skill loaded.")):
+    failures.append(
+        "bash command handed over just before a mid-turn skill load "
+        "(isMeta) did not warn (ai-config#3860)"
+    )
+if verdict(HOOK, meta_mid_turn_transcript(safe_cmd, "Continuing after the skill loaded.")):
+    failures.append(
+        "safe powershell command before a mid-turn skill load (isMeta) "
+        "warned"
+    )
+
 if failures or mutation_wrong:
     print("FAILED:")
     for line in failures:

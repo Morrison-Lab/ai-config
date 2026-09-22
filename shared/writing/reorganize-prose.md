@@ -491,6 +491,60 @@ That is the general case for this failure and the reason to name the file and
 both headings here: a merge-arrival defect leaves no artifact a bare PR
 number would lead a reader to.)
 
+### Two things the order sweep leaves open
+
+The sweep above settles the **order** of two kept blocks.
+Two things it does not, each of which a correctly-ordered resolution can
+still get wrong.
+
+Proving both blocks actually survived is a third, and it is not this
+fragment's to state: the bullets above pull the "prove nothing was lost" check
+into a resolved collision by treating the resolution as a move, and
+[`batch-merge-and-resolve.md`](../workflow/batch-merge-and-resolve.md) already
+gives the merge-shaped form of it, taking its inputs from `HEAD^1` and
+`HEAD^2` and pairing a count delta with a set difference so a dropped block is
+named rather than merely implied.
+Read it there rather than settling for the weaker "no deletions" reading,
+which a resolution that drops one line and adds another survives.
+
+**The no-reword rule is about prose neither branch wrote.**
+One of this fragment's bullets rules out rewording a self-reference broken by
+a merge, on the ground that "rewording edits prose neither branch actually
+wrote".
+That reasoning scopes it, and the scope needs stating because the bullet reads
+absolutely.
+Quoting it beats pointing at it here.
+Another Do/Don't list now sits in between, which is the same broken-pointer
+failure this subsection is about.
+When the broken pointer sits in **your own** appended block, you wrote it.
+Rewriting it to name its subject outright is then editing your own prose, and
+it is the remedy the both-blocks-back-reference case above already reaches
+for.
+Reordering still beats it wherever reordering can give both blocks an
+accurate pointer, since one reorder repairs the pair at once.
+
+**A pointer sweep is not a read.**
+The two blocks were written by sessions that could not see each other.
+So they can restate one rule twice, contradict each other, or leave the file
+arguing both ways.
+None of that is a relative pointer, and none of it is what the sweep above
+inspects.
+Once the order is settled, read your own appended block against its new
+neighbour and apply
+[`challenge-redundant-content.md`](../workflow/challenge-redundant-content.md)
+to the pair.
+Consolidating at the conflict is nearly free;
+after the merge lands it is a separate PR nobody has a reason to open.
+
+- **Do:** reword your own block's opening sentence where reordering cannot
+  leave both blocks with an accurate pointer.
+- **Do:** read the two appended blocks against each other for duplication and
+  contradiction, once their order is settled.
+- **Don't:** read the no-reword rule as covering a sentence you wrote
+  yourself.
+- **Don't:** treat a clean pointer sweep as having read the merged result ---
+  it inspects one grammatical relation and nothing else.
+
 ## Relationship to other rules
 
 - [`forward-references.md`](forward-references.md) is the specific case this

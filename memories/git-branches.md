@@ -328,6 +328,85 @@ Two consequences worth carrying:
 - **Don't:** hold a dead branch open as the backup copy -- GitHub already is
   one.
 
+## Scrubbing a later commit does not remove what an earlier commit already pushed -- PR refs keep it reachable
+
+The section above is about recovering a closed PR's deleted branch.
+This is the same mechanism read as a liability: a branch that carried
+sensitive material, and later had that material removed by a later commit,
+is not clean, because the earlier commit is still reachable through the PR's
+own refs even though `main` never saw it.
+
+`Morrison-Lab/mln` PR #15 pushed filled notebooks, notebooks with stored
+outputs, and 32 lecture decks (one carrying a hidden solution slide) in
+commit `c98d5f450f`.
+Later commits on the same branch removed them, and `main` stayed clean.
+That commit is still in the repository: `refs/pull/15/head` and
+`refs/pull/15/merge` both reach it, those refs are not something a non-admin
+user can delete, and they stay reachable once the repository goes public --
+exactly the population this repo was headed toward.
+
+Settle it by fetching each PR ref and walking it, one ref at a time:
+
+```bash
+git ls-remote origin 'refs/pull/*'          # which PR refs exist
+git fetch origin refs/pull/<N>/head         # lands in FETCH_HEAD; writes no ref
+git merge-base --is-ancestor <commit> FETCH_HEAD && echo reachable
+git ls-tree -r <commit>                     # what that commit carries
+```
+
+Repeat for `refs/pull/<N>/merge`, which is a second ref reaching the same
+commits.
+The section below on orphaned namespaces is why this fetches one ref at a
+time rather than `'+refs/pull/*:refs/remotes/pr/*'`: a wildcard fetch writes
+refs no configured refspec matches, so they persist and inflate every branch
+count.
+`FETCH_HEAD` writes no ref at all, and the two layouts would collide anyway
+-- `refs/remotes/pr/<N>` and `refs/remotes/pr/<N>/head` cannot both exist,
+since git cannot hold a ref and a directory at the same path.
+
+"Is it in `main`?" and "was it ever pushed?" are different questions, and a
+PR ref is the part of the second question that is easy to forget -- nothing
+about a clean `main` implies a clean object store.
+
+- **Do:** treat the object store and every PR ref as the exposure surface for
+  a repository headed toward public, not `main` alone.
+- **Do:** run the `fetch`-then-`merge-base`-then-`ls-tree` recipe against
+  `refs/pull/<N>/head` and `refs/pull/<N>/merge` before calling a branch's
+  history clean.
+- **Don't:** read a later commit that removes sensitive files as having
+  removed them from the branch's history -- the earlier commit that pushed
+  them is still reachable through the PR refs.
+- **Don't:** treat "not on `main`" as "not exposed" for a repository that will
+  go public -- squash-merge only, and consider a purge or a recreate through
+  GitHub Support before the flip (`Morrison-Lab/mln#27`).
+
+**A "correction" of that exposure claim is itself a state claim, and needs
+the same settling query rather than a re-reading.**
+An early write-up on this said the leaked material "reached mln"; a later
+pass "corrected" that to "none was pushed, so nothing reached mln's history"
+-- which was false, in the opposite direction from the first claim, and
+reached that conclusion by re-reading the branch's final diff rather than by
+running the fetch above against the PR refs.
+The false correction read as more careful than the claim it replaced, which
+is what let it pass two rounds of adversarial review and spread into a
+merged workflow-prompt addendum, two merged PR bodies, and a second
+repository's addendum before a fourth review round caught it.
+[`metacognitive-monitoring`](../shared/workflow/metacognitive-monitoring.md)'s
+"A correction inherits its instrument, so a second reading is not a check"
+section names this pattern in general; this is the case that motivated
+recording it here too, because the instrument for a reachability claim is
+specifically the PR-refs fetch above, not a diff read.
+
+- **Do:** re-run the `fetch`-then-`merge-base`-then-`ls-tree` recipe before
+  writing or accepting a correction to a "was this pushed / is this
+  reachable" claim.
+- **Don't:** let a correction to a reachability claim ride on rereading a
+  diff or a commit message -- that is the same claim type as the one being
+  corrected, and it carries no more evidence than the original did.
+
+(Recorded 2026-09-22, from `Morrison-Lab/mln` PR #15 / commit `c98d5f450f`
+and the remedy tracked in `Morrison-Lab/mln#27`.)
+
 ## An orphaned `refs/remotes/<ns>/*` namespace inflates every branch count
 
 A one-off `git fetch origin '+refs/pull/*/head:refs/remotes/pr/*'` writes refs

@@ -175,6 +175,12 @@ with tempfile.TemporaryDirectory() as directory:
     check("main exits 2 on an unreadable payload",
           audit.main(["-R", REPO, "--from-json", str(broken)]) == 2)
     check("main exits 2 on a malformed repo", audit.main(["-R", "sparta"]) == 2)
+    mixed = Path(directory) / "mixed.json"
+    mixed.write_text(json.dumps([pr_node(5, "Closes #5"),
+                                 pr_node(32, "This does not close #32.")]), encoding="utf-8")
+    check("--limit applies to --from-json too",
+          audit.main(["-R", REPO, "--from-json", str(mixed), "--limit", "1"]) == 0
+          and audit.main(["-R", REPO, "--from-json", str(mixed)]) == 1)
 
 
 # A failing `gh` call, through the live path rather than --from-json.

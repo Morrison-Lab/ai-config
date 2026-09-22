@@ -304,6 +304,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.from_json:
             nodes = json.loads(args.from_json.read_text(encoding="utf-8"))
+            if args.limit is not None:
+                nodes = nodes[:args.limit]
         else:
             nodes = fetch_nodes(args.repo, args.limit)
         verdicts = [classify(node, args.repo) for node in nodes]

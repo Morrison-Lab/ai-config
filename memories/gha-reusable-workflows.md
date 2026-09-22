@@ -377,6 +377,21 @@ A consumer workflow calling `Morrison-Lab/gha/.github/workflows/claude-code-revi
   Permissions copied from a reference caller workflow often escape scrutiny in reviews because copying an existing template reads as standard consistency.
   Keep caller templates strictly minimized so copy-pasted implementations do not propagate over-privileged permissions.
   (Measured 2026-09-21, tracked in [#3842](https://github.com/Morrison-Lab/ai-config/issues/3842); surfaced during `@claude` review on `Morrison-Lab/mln#23`.)
+- **The permission was one of three defects from one copy, and the other two travel the same way.**
+  `Morrison-Lab/mln#23` and `Morrison-Lab/mlg#5` copied ai-config's own `claude-review.yml` and `claude-bot.yml` and condensed their comments.
+  Besides `id-token: write`, the agent caller had no caller-side `if:` trusted-author gate, which gha's `examples/claude.yml` carries,
+  and the condensed header said assigning an issue summons the agent, dropping the qualifier that the body or title must also mention it (or `dispatch-on-assignee` must be set).
+  Reviewers caught all three.
+  ai-config's own `claude-bot.yml` still lacks the `if:` gate and carries a stale header rationale for dropping `issues: opened` ([#3862](https://github.com/Morrison-Lab/ai-config/issues/3862));
+  its `id-token: write` is correct, since the agent writes.
+  A consumer caller is a *copy* of the blessed stub, with that repo's drift, so copying it inherits every grant, every missing gate, and every claim in its comments without their sources.
+  [`upgrade-to-gha`](../shared/workflow/upgrade-to-gha.md) already says to copy `permissions:` from `examples/<name>.yml`;
+  the `if:` gate and the header comments belong to the same diff.
+  A condensed comment is a fresh claim, per [`fact-check-prose`](../shared/writing/fact-check-prose.md)'s condensation section.
+  - **Do:** start from gha's `examples/<name>.yml` at the tag you pin, and diff the finished caller against it clause by clause: `permissions:`, job `if:`, `on:` types, and each header claim.
+  - **Do:** re-check every qualifier a condensed comment dropped against the callee at the pinned tag.
+  - **Don't:** copy a sibling consumer's caller, ai-config's own included, as the reference.
+  - **Don't:** treat a copied comment's rationale as true because the file it came from is blessed.
 
 ## Bundled repository suites (`check-*.yml`) and callee input verification
 

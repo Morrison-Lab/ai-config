@@ -85,3 +85,45 @@ itself.
 - **Don't:** reach for an `@claude review` comment instead; the mention filter
   skips a bot sender before any agent starts, and if it ever stopped doing so
   it would start an agent rather than a review.
+
+## Measured end to end, and the one row that reads like a failure
+
+The `/review` route above was written from the workflow's own source.
+Measured from a thread session on 2026-09-21, that route works:
+a bare `/review` comment posted by `claude[bot]` on
+[ai-config#3852](https://github.com/Morrison-Lab/ai-config/pull/3852)
+at head `6b318903` produced
+[run 35689771719](https://github.com/Morrison-Lab/ai-config/actions/runs/35689771719),
+in which all six `review /` jobs concluded `success` ---
+`require-review` and `require-clean-verdict` among them ---
+at a cost of $0.6517, and `scripts/check-pr-fully-clean.py` then exited 0
+on that same head.
+The push to that identical head five minutes earlier skipped all six,
+so the two paths were compared against one commit rather than across two.
+
+**The dispatched run's own `dispatch-on-comment` job reads `skipped`, and
+that row is not evidence the route failed.**
+That job's `if:` requires `github.event_name == 'issue_comment'`, while the
+run it dispatched carries `workflow_dispatch` --- so the job is by
+construction inapplicable to the very run it produced.
+The trap is that this row sits at the top of the job list, above the six that
+matter, and `skipped` is exactly the word this page teaches a reader to
+distrust on the automatic path.
+Reading that row as the same signal inverts the conclusion: the one route that
+does produce a verdict gets abandoned for the reason the other one fails.
+
+The mechanism is written down in the workflow itself, in
+`.github/workflows/claude-review.yml`'s header on `main`.
+Read that header rather than inferring the mechanism from the event sequence,
+which is the same trap [`claude-review-dispatch.md`](claude-review-dispatch.md)
+records for the reviewer's stash-and-restore of requested reviewers.
+
+- **Do:** read the six `review /` jobs on the dispatched run, and ignore the
+  `dispatch-on-comment` row there.
+- **Do:** confirm a route's verdict by scoring the head with
+  `scripts/check-pr-fully-clean.py`, not by reading job rows alone.
+- **Don't:** read `dispatch-on-comment: skipped` on a dispatched run as the
+  bot-sender skip this page's first section describes --- it is an event-type
+  mismatch, and it appears on every successful dispatch.
+- **Don't:** conclude the comment route is unavailable to an agent session;
+  it is the one path measured to produce a verdict from `claude[bot]`.

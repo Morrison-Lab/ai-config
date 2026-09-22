@@ -345,14 +345,24 @@ That commit is still in the repository: `refs/pull/15/head` and
 user can delete, and they stay reachable once the repository goes public --
 exactly the population this repo was headed toward.
 
-Settle it with the same fetch-then-walk recipe the section above uses, run
-against every PR ref rather than assumed clean from a clean `main`:
+Settle it by fetching each PR ref and walking it, one ref at a time:
 
 ```bash
-git fetch origin '+refs/pull/*:refs/remotes/pr/*'
-git merge-base --is-ancestor <commit> refs/remotes/pr/<N>/head    # and /merge
-git ls-tree -r <commit>                                           # what it carries
+git ls-remote origin 'refs/pull/*'          # which PR refs exist
+git fetch origin refs/pull/<N>/head         # lands in FETCH_HEAD; writes no ref
+git merge-base --is-ancestor <commit> FETCH_HEAD && echo reachable
+git ls-tree -r <commit>                     # what that commit carries
 ```
+
+Repeat for `refs/pull/<N>/merge`, which is a second ref reaching the same
+commits.
+The section below on orphaned namespaces is why this fetches one ref at a
+time rather than `'+refs/pull/*:refs/remotes/pr/*'`: a wildcard fetch writes
+refs no configured refspec matches, so they persist and inflate every branch
+count.
+`FETCH_HEAD` writes no ref at all, and the two layouts would collide anyway
+-- `refs/remotes/pr/<N>` and `refs/remotes/pr/<N>/head` cannot both exist,
+since git cannot hold a ref and a directory at the same path.
 
 "Is it in `main`?" and "was it ever pushed?" are different questions, and a
 PR ref is the part of the second question that is easy to forget -- nothing
@@ -360,7 +370,7 @@ about a clean `main` implies a clean object store.
 
 - **Do:** treat the object store and every PR ref as the exposure surface for
   a repository headed toward public, not `main` alone.
-- **Do:** run the fetch-then-`merge-base`-then-`ls-tree` recipe against
+- **Do:** run the `fetch`-then-`merge-base`-then-`ls-tree` recipe against
   `refs/pull/<N>/head` and `refs/pull/<N>/merge` before calling a branch's
   history clean.
 - **Don't:** read a later commit that removes sensitive files as having
@@ -387,7 +397,7 @@ section names this pattern in general; this is the case that motivated
 recording it here too, because the instrument for a reachability claim is
 specifically the PR-refs fetch above, not a diff read.
 
-- **Do:** re-run the fetch-then-`merge-base`-then-`ls-tree` recipe before
+- **Do:** re-run the `fetch`-then-`merge-base`-then-`ls-tree` recipe before
   writing or accepting a correction to a "was this pushed / is this
   reachable" claim.
 - **Don't:** let a correction to a reachability claim ride on rereading a

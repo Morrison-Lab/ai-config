@@ -311,17 +311,16 @@ gh api repos/<owner>/<repo>/pulls/<N> -X PATCH -F body=@<file>
 `-F body=@<file>` keeps the body-file discipline (backtick-safe, no shell
 interpolation), same as `--body-file` on the porcelain command.
 
-- **Do:** fall back to the REST PATCH when `gh pr edit` errors on
+- **Do:** fall back to the REST API when `gh pr edit` errors on
   `projectCards`, rather than retrying or hand-editing on the web.
-  For adding or removing labels on a PR, `gh issue edit <N> --add-label <label>`
-  targets the issue endpoint directly and bypasses the `pullRequest.projectCards`
-  deprecation failure entirely.
+  For labels on a PR, use `gh api -X POST repos/{owner}/{repo}/issues/{number}/labels -f "labels[]=<label>"`,
+  which bypasses the porcelain GraphQL `projectCards` query entirely.
 - **Don't:** read the error as a permissions or repo problem --- the failing
   field is one the edit never needed.
 
 (Measured 2026-08-23 on Morrison-Lab/ai-config#1976 and 2026-09-23 on Morrison-Lab/gha#913,
 gh in local Windows sessions;
-the REST PATCH and `gh issue edit` succeeded immediately.)
+the REST endpoints succeeded immediately.)
 
 ## `gh pr merge` "not up to date with the base branch" does not fire consistently on an equally-stale PR
 

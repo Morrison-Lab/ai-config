@@ -4,6 +4,13 @@
 - To move a tag to a new commit: `git tag -d <tag> && git tag <tag> <target> && git push origin :refs/tags/<tag> && git push origin <tag>`
 - Can't use `git push --force origin <tag>` on some GitLab instances (protected tags). The delete+recreate pattern always works.
 - `git fetch --tags` silently refuses to update a local tag that already exists if the remote moved it. Use `git fetch --tags --force` to get the latest remote tag positions. Without `--force`, you'll see stale local tags and draw wrong conclusions about what the tag includes.
+  - **Recurrence, 2026-09-21: a floating tag read from a local checkout.**
+    A session verified a peer's findings against its local `Morrison-Lab/gha` clone, whose `v2` sat at `d9c6936d`;
+    the real `v2` was `27721bd6`, the SHA the peer had cited, so the check refuted correct findings and cost a verification round.
+    A floating tag (`v2`) moves by design, so a local copy of it is a checkout, not the tag ---
+    [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)'s "cached copy for the origin" shape, applied to a tag.
+    - **Do:** run `git ls-remote --tags origin v2` (or `git fetch --tags --force`) before reading anything off a floating tag, and compare the SHA with the one a peer cites.
+    - **Don't:** read a local floating tag as the tag, least of all to rebut a peer who cited a different SHA.
 
 ## Resolving a tag to a COMMIT sha (e.g. to SHA-pin a GitHub Action)
 

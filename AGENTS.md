@@ -112,6 +112,7 @@ Use an active background monitor or durable scheduled trigger if the harness has
 no reliable timer.
 A verified clean stopping point needs no timer because no work remains to resume.
 Do not substitute a promise to return for a mechanism that will actually fire.
+See `shared/workflow/flag-session-boundaries.md`.
 
 ## Prefer optionality over removing functionality
 

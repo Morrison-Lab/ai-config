@@ -119,7 +119,7 @@ Blocking hooks prevent the turn from ending until the missing artifact or requir
 | [`no-unfiled-finding.py`](../hooks/no-unfiled-finding.py) | **Block** | Blocks declarative statements that an issue or finding is "worth filing" without having filed it. | File the tracking issue immediately before concluding the turn. | None. |
 | [`no-stale-pr-status.py`](../hooks/no-stale-pr-status.py) | **Block** | Blocks replies declaring PR check status based on readings taken prior to the latest push. | Always query fresh PR status (`gh pr checks <N> -R ...`) after any `git push` before stating check results. | None. |
 | [`no-incomplete-check-enumeration.py`](../hooks/no-incomplete-check-enumeration.py) | **Block** | Blocks declaring a PR fully clean based solely on surface rollup checks (`gh pr checks`). | Run `python3 scripts/check-pr-fully-clean.py <pr>` to evaluate full CI run logs and reviewer verdicts. | None. |
-| [`no-unreviewed-pr.py`](../hooks/no-unreviewed-pr.py) | **Block** | Blocks ending a turn after creating/updating a PR without requesting an AI reviewer. | Request a review on opened/updated PRs (`gh pr create` with reviewer request, or request review via forge tools). | Set `ALLOW_UNREVIEWED_REDACTION_PR=1` on redaction PRs or use `no-ai-review` label. |
+| [`no-unreviewed-pr.py`](../hooks/no-unreviewed-pr.py) | **Block** | Blocks ending a turn after creating/updating a PR without requesting an AI reviewer. Discharges automatically if the PR reached a terminal state (`MERGED` or `CLOSED`) or if Copilot already answered the current head commit. | Request a review on opened/updated PRs (`gh pr create` with reviewer request, or request review via forge tools). | Set `ALLOW_UNREVIEWED_REDACTION_PR=1` on redaction PRs or use `no-ai-review` label. |
 | [`no-unshipped-commit.py`](../hooks/no-unshipped-commit.py) | **Block** | Blocks ending a turn when unpushed commits remain on the local branch. | Push all commits (`git push`) or cleanly drop temporary exploratory commits before ending the turn. | None. |
 | [`no-report-unfixed-hook-test.py`](../hooks/no-report-unfixed-hook-test.py) | **Block** | Blocks status replies reporting a missing hook test identified by CI without writing the test. | Implement the companion `hooks/test-<name>.py` test suite in the same turn before reporting status. | None. |
 | [`no-unmonitored-pr.py`](../hooks/no-unmonitored-pr.py) | **Block** | Ensures a PR poller or model scheduler is armed when a PR remains open. | Arm an explicit timer or rely on the detached PR monitor service. | None. |
@@ -248,6 +248,26 @@ A suite composed only of allow-cases would have gone green on a guard that had s
 - **Do:** keep block/warn cases in the majority, since only a case that expects the guard to FIRE can detect a guard that has stopped firing.
 - **Do:** prefer an anchored replace of an exact known string over a slice between two anchors, whose span you are asserting rather than reading.
 - **Don't:** read "it parses" or "it exits 0" as evidence an edited fail-open guard still works --- both are exactly what total breakage looks like.
+
+### 3.4 Widening an inner branch without widening the dispatch guard ahead of it
+
+Adding an alternative command caller (such as `curl` or `wget` alongside `gh`)
+in an inner branch of a parser or guard function,
+while leaving an upstream guard (e.g. `argv[0] != "gh"`) that short-circuits execution
+before the inner branch can ever be reached,
+creates permanently unreachable dead code for the new caller shapes.
+
+Measured 2026-09-23 on [ai-config#3893](https://github.com/Morrison-Lab/ai-config/pull/3893) (`hooks/no-unreviewed-pr.py`).
+`_argv_close` added REST merge detection for `gh api`, `curl`, and `wget`.
+Its leading guard retained `if not argv or argv[0] != "gh" or len(argv) < 2: return False, None, None`.
+Consequently, `curl` and `wget` calls returned `(False, None, None)` immediately at the top.
+The sibling function `_argv_update_branch` added in the same commit had the correct guard (`if not argv or len(argv) < 2:`).
+The code parsed and imported cleanly,
+and the regression was surfaced by Claude code review.
+
+- **Do:** audit all early-return guards between the function signature and the modified branch whenever adding new supported tools or command shapes.
+- **Do:** add unit tests for every distinct tool or prefix added to an alternative branch.
+- **Don't:** assume that because an adjacent sibling function implemented the widened guard correctly, a duplicate or sibling function in the same file did as well without direct inspection.
 
 ---
 

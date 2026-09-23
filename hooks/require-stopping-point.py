@@ -22,7 +22,12 @@ except Exception:
 
 try:
     from transcript_meta import is_skill_load_meta
-except Exception:
+except Exception as _exc:  # broken install: degrade, do not fail open silently
+    print(f"require-stopping-point: cannot load scripts/lib/transcript_meta.py "
+          f"({_exc}); a mid-turn skill load will wrongly reset the "
+          f"accumulated reply",
+          file=sys.stderr)
+
     def is_skill_load_meta(entry):  # noqa: D103 -- fail-open fallback
         return False
 

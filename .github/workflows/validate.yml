@@ -219,6 +219,12 @@ jobs:
         # discriminates a loaded skill's body from a scheduled check-in
         # continuation, both of which carry isMeta: true.
         run: python3 scripts/test_transcript_meta.py
+      - name: Run transcript-meta fallback-messaging tests
+        # ai-config#3860 (fail-fast.md follow-up): each of the six consuming
+        # hooks must print an observable stderr message, naming itself and
+        # the import error, when scripts/lib/transcript_meta.py cannot be
+        # loaded, and its stdout must stay unaffected.
+        run: python3 scripts/test_transcript_meta_fallback.py
       - name: Run shell-command library tests
         # ai-config#2992: scripts/lib/shellcmd.py argv splitting, heredoc
         # blanking, and git-invocation classification.

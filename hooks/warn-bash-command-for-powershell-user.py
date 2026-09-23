@@ -113,7 +113,12 @@ if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
 try:
     from transcript_meta import is_skill_load_meta
-except Exception:
+except Exception as _exc:  # broken install: degrade, do not fail open silently
+    print(f"warn-bash-command-for-powershell-user: cannot load "
+          f"scripts/lib/transcript_meta.py ({_exc}); a mid-turn skill load "
+          f"will wrongly reset the accumulated turn",
+          file=sys.stderr)
+
     def is_skill_load_meta(entry):  # noqa: D103 -- fail-open fallback
         return False
 

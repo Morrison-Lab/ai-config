@@ -107,7 +107,12 @@ if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
 try:
     from transcript_meta import is_skill_load_meta
-except Exception:
+except Exception as _exc:  # broken install: degrade, do not fail open silently
+    print(f"no-empty-promise: cannot load scripts/lib/transcript_meta.py "
+          f"({_exc}); a mid-turn skill load will wrongly reset "
+          f"promise/discharge state",
+          file=sys.stderr)
+
     def is_skill_load_meta(entry):  # noqa: D103 -- fail-open fallback
         return False
 

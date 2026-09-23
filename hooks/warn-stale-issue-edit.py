@@ -95,7 +95,12 @@ if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
 try:
     from transcript_meta import is_skill_load_meta
-except Exception:
+except Exception as _exc:  # broken install: degrade, do not fail open silently
+    print(f"warn-stale-issue-edit: cannot load scripts/lib/transcript_meta.py "
+          f"({_exc}); is_user_prose will not recognize a loaded skill body, "
+          f"arming on any issue URL it quotes",
+          file=sys.stderr)
+
     def is_skill_load_meta(entry):  # noqa: D103 -- fail-open fallback
         return False
 

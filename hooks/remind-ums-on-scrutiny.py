@@ -67,7 +67,12 @@ if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
 try:
     from transcript_meta import is_skill_load_meta
-except Exception:
+except Exception as _exc:  # broken install: degrade, do not fail open silently
+    print(f"remind-ums-on-scrutiny: cannot load scripts/lib/transcript_meta.py "
+          f"({_exc}); a skill body's quoted text may open a false "
+          f"review-read or question window",
+          file=sys.stderr)
+
     def is_skill_load_meta(entry):  # noqa: D103 -- fail-open fallback
         return False
 

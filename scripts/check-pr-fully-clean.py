@@ -2213,7 +2213,16 @@ COPILOT_COMMENT_COUNT = re.compile(
 COPILOT_FINDINGS_LINE = re.compile(
     r"\*\*Findings:\*\*[ \t]*(?P<rest>[^\n\r]*)", re.IGNORECASE
 )
-COPILOT_FINDINGS_SEVERITY_COUNT = re.compile(r"(\d+)[ \t]*<(?:picture|img)\b", re.IGNORECASE)
+# Bounded to 1-4 digits (a real severity count is a small integer, never in
+# the thousands): an unbounded `\d+` here backtracks quadratically on a long
+# digit run with no trailing `<picture`/`<img` -- `\d+` greedily consumes the
+# whole run, fails to find `<`, and gives back one digit at a time before
+# `finditer` retries from the next starting position, repeating that O(n)
+# backtrack at every one of the run's O(n) positions
+# (shared/coding/regex-backtracking-pitfalls.md). Measured before this bound:
+# 25s at 65,536 digits for this regex alone, 19.6s end to end through
+# copilot_verdict() on a `**Findings:** ` line followed by 60,000 `1`s.
+COPILOT_FINDINGS_SEVERITY_COUNT = re.compile(r"(\d{1,4})[ \t]*<(?:picture|img)\b", re.IGNORECASE)
 
 
 def _copilot_v2_findings_count(scan: str, cited: bytearray):

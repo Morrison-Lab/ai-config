@@ -6113,17 +6113,20 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     # ai-config#3899: Copilot's `ccr-overview-v2` body format drops the
     # `Comments generated:` field the checks above rely on in favor of a
     # `**Findings:**` line -- `None`, or one or more `<n> <severity-badge>`
-    # pairs. Fixture provenance, per fixtures-are-not-evidence.md: the
-    # `v2_approval_none_body` and `v2_approval_nonzero_body` bodies below are
-    # transcribed (severity-badge markup trimmed to one representative
-    # `<picture>` element) from Copilot's real reviews on
+    # pairs. Fixture provenance, per fixtures-are-not-evidence.md:
+    # `v2_approval_none_body` and `v2_approval_nonzero_body` below are
+    # transcribed, INCLUDING their trailing `<details>` blocks ("Resolved
+    # since last review" / "Open (1)"), from Copilot's real reviews on
     # Lacaedemon/sparta#1635, fetched 2026-09-23 -- reviews 5295055730 (the
-    # `None` approval) and 5294462601 (the single-finding approval). No real
-    # review combining a negative v2 heading with `**Findings:** None` (or a
-    # mixed-severity `**Findings:**` line) was available at fetch time, so
-    # `v2_changes_none_body`, `v2_closer_look_none_body`, and
-    # `v2_approval_mixed_severity_body` are constructed from the same overview
-    # shape rather than transcribed.
+    # `None` approval) and 5294462601 (the single-finding approval). Only the
+    # repeated severity-badge markup inside each `<picture>` element is
+    # replaced with the `_v2_picture` placeholder, so the classifier is
+    # exercised against the real surrounding shape rather than a stripped-down
+    # approximation of it. No real review combining a negative v2 heading with
+    # `**Findings:** None` (or a mixed-severity `**Findings:**` line) was
+    # available at fetch time, so `v2_changes_none_body`,
+    # `v2_closer_look_none_body`, and `v2_approval_mixed_severity_body` are
+    # constructed from the same overview shape rather than transcribed.
     _v2_picture = (
         "<picture><source media=\"(prefers-color-scheme: dark)\" "
         "srcset=\"low-v2-dark.svg\"><source media=\"(prefers-color-scheme: light)\" "
@@ -6134,14 +6137,25 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
         "### \U0001f7e2 Approval recommended\n\n"
         "No unresolved review issues remain.\n\n"
-        "**Review effort:** Lite  \n**Findings:** None"
+        "**Review effort:** Lite  \n**Findings:** None\n\n"
+        "<details>\n<summary><strong>Resolved since last review (1)</strong></summary>\n\n"
+        f"- {_v2_picture} [Break documentation line after mid-line colon]"
+        "(#discussion_r4085342719)\n</details>"
     )
     v2_approval_nonzero_body = (
         "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
         "### \U0001f7e2 Approval recommended\n\n"
         "No blocking issues were identified; the remaining comment is a minor "
         "documentation-style nit.\n\n"
-        f"**Review effort:** Lite  \n**Findings:** 1 {_v2_picture}"
+        f"**Review effort:** Lite  \n**Findings:** 1 {_v2_picture}\n\n"
+        "<details open>\n<summary><strong>Open (1)</strong></summary>\n\n"
+        f"- {_v2_picture} [Break documentation line after mid-line colon]"
+        "(#discussion_r4085342719) · New\n</details>\n\n"
+        "<details>\n<summary><strong>Resolved since last review (2)</strong></summary>\n\n"
+        f"- {_v2_picture} [Add new fog behavior to permanent demo catalog]"
+        "(#discussion_r4083921526)\n"
+        f"- {_v2_picture} [Update fog guidance to document the new visibility exception]"
+        "(#discussion_r4083921456)\n</details>"
     )
     v2_approval_mixed_severity_body = (
         "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
@@ -6193,6 +6207,25 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check(
         "classify_verdict: v2 approval with a nonzero 'Findings:' count classifies not-clean",
         checker.classify_verdict(v2_approval_nonzero_body, "COMMENTED", "copilot") == "not-clean",
+    )
+
+    # Timing regression test (ai-config#3899 review finding): an unbounded
+    # `\d+` in COPILOT_FINDINGS_SEVERITY_COUNT backtracked quadratically on a
+    # long digit run with no trailing `<picture`/`<img` -- `\d+` greedily
+    # consumes the whole run, fails to find `<`, gives back one digit at a
+    # time, and `finditer` repeats that O(n) backtrack at every one of the
+    # run's O(n) starting positions (shared/coding/regex-backtracking-pitfalls.md).
+    # Measured before bounding it to `\d{1,4}`: 25s for the isolated regex and
+    # 19.6s end to end through copilot_verdict() at 65,536 digits.
+    _adversarial_findings_body = (
+        "### \U0001f7e2 Approval recommended\n\n" "**Findings:** " + "1" * 65536
+    )
+    _av_secs, _av_verdict = best_of_three(
+        checker.copilot_verdict, _adversarial_findings_body
+    )
+    check(
+        "copilot_verdict on a 65,536-digit adversarial 'Findings:' line scales linearly (< 1s)",
+        _av_verdict == "" and _av_secs < 1.0,
     )
 
     check(

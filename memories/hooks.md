@@ -919,7 +919,24 @@ When a hook correlates transcript events (such as CI check readings, git pushes,
 ## Windows command-line batch argument corruption and native launcher shimming (#3881)
 
 When testing hooks or mocking commands on Windows:
-- **`cmd.exe` strips `^` in unquoted arguments:** When `subprocess.run` invokes a `.cmd` or `.bat` file without `shell=True`, Windows CreateProcess wraps it in `cmd.exe /c`. `cmd.exe` treats `^` outside double quotes as an escape character, mutating `HEAD^{commit}` into `HEAD{commit}` and breaking git subcommands.
-- **Generate native PE executables with ScriptMaker:** Instead of brittle batch files, use `from pip._vendor.distlib.scripts import ScriptMaker` (or `distlib.scripts`). Calling `ScriptMaker(None, d).make("cmd = module:func")` generates a genuine `.exe` launcher that forwards command-line arguments verbatim without shell interpolation or batch escaping quirks.
-- **Only resolve `shutil.which` when PATH is customized:** In `_run_git`, resolving `"git"` via `shutil.which` unconditionally on Windows replaces `"git"` with the full system path (e.g. `C:\Program Files\Git\cmd\git.exe`), breaking unit tests that mock `subprocess.run` and expect `cmd[0] == "git"`. Only call `shutil.which` when `overlay.get("PATH") != os.environ.get("PATH")`.
-- **Win32 path resolution collapses `..` lexically across directory symlinks:** Win32 `os.path.normpath` collapses `..` against the path text rather than traversing the physical symlink target's parent directory (`dir/symlink/../..` resolves to `dir` rather than `target/..`). Tests asserting symlinked plugin root traversal must guard with `os.path.exists()` on platforms without lexical traversal.
+- **`cmd.exe` strips `^` in unquoted arguments:**
+  When `subprocess.run` invokes a `.cmd` or `.bat` file without `shell=True`,
+  Windows CreateProcess wraps it in `cmd.exe /c`.
+  `cmd.exe` treats `^` outside double quotes as an escape character,
+  mutating `HEAD^{commit}` into `HEAD{commit}` and breaking git subcommands.
+- **Generate native PE executables with ScriptMaker:**
+  Instead of brittle batch files,
+  use `from pip._vendor.distlib.scripts import ScriptMaker` (or `distlib.scripts`).
+  Calling `ScriptMaker(None, d).make("cmd = module:func")` generates a genuine `.exe` launcher
+  that forwards command-line arguments verbatim without shell interpolation or batch escaping quirks.
+- **Only resolve `shutil.which` when PATH is customized:**
+  In `_run_git`, resolving `"git"` via `shutil.which` unconditionally on Windows
+  replaces `"git"` with the full system path (e.g. `C:\Program Files\Git\cmd\git.exe`),
+  breaking unit tests that mock `subprocess.run` and expect `cmd[0] == "git"`.
+  Only call `shutil.which` when `overlay.get("PATH") != os.environ.get("PATH")`.
+- **Win32 path resolution collapses `..` lexically across directory symlinks:**
+  Win32 `os.path.normpath` collapses `..` against the path text rather than
+  traversing the physical symlink target's parent directory
+  (`dir/symlink/../..` resolves to `dir` rather than `target/..`).
+  Tests asserting symlinked plugin root traversal must guard with `os.path.exists()`
+  on platforms without lexical traversal.

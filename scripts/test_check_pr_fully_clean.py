@@ -6337,6 +6337,86 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         checker.classify_verdict(v2_approval_nonzero_body, "COMMENTED", "copilot") == "not-clean",
     )
 
+    # ai-config#3899 review finding, seventh round (FAIL-OPEN): the legacy
+    # `Comments generated: N` field and the v2 `**Findings:**` line are NOT
+    # mutually exclusive, and treating the legacy field as authoritative
+    # whenever present let an uncited `Comments generated: 0` phrase --
+    # even plain prose quoting an earlier round -- override a real nonzero
+    # v2 `**Findings:**` line and read as clean. Both present sources are
+    # now combined with the same fail-closed rule the multi-line v2 scan
+    # already uses: any nonzero wins, otherwise any unparseable yields no
+    # verdict, zero only when every present source reads zero.
+    _legacy0_v2_3_body = (
+        "### \U0001f7e2 Approval recommended\n\n"
+        "<details>\n<summary>Review details</summary>\n\n"
+        "- **Comments generated:** 0\n"
+        "</details>\n\n"
+        f"**Review effort:** Lite  \n**Findings:** 3 {_v2_picture}"
+    )
+    _legacy3_v2_none_body = (
+        "### \U0001f7e2 Approval recommended\n\n"
+        "<details>\n<summary>Review details</summary>\n\n"
+        "- **Comments generated:** 3\n"
+        "</details>\n\n"
+        "**Review effort:** Lite  \n**Findings:** None"
+    )
+    _legacy0_v2_none_body = (
+        "### \U0001f7e2 Approval recommended\n\n"
+        "<details>\n<summary>Review details</summary>\n\n"
+        "- **Comments generated:** 0\n"
+        "</details>\n\n"
+        "**Review effort:** Lite  \n**Findings:** None"
+    )
+    check(
+        "copilot_verdict: a legacy 'Comments generated: 0' no longer "
+        "overrides a real nonzero v2 'Findings:' line",
+        checker.copilot_verdict(_legacy0_v2_3_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: a nonzero legacy count combined with a v2 "
+        "'Findings: None' line is not clean",
+        checker.copilot_verdict(_legacy3_v2_none_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: legacy 0 combined with v2 'Findings: None' "
+        "(both present, both zero) is clean",
+        checker.copilot_verdict(_legacy0_v2_none_body) == "clean",
+    )
+
+    # ai-config#3899 review finding, eighth round: Python's `\d` matches
+    # every Unicode `Nd`-category digit, not just ASCII, contradicting the
+    # grammar's own stated "1-4 ASCII digits" rule -- a full-width digit
+    # (U+FF15, "5") would otherwise parse as a real count.
+    check(
+        "_copilot_v2_line_findings_count fails closed on a full-width "
+        "Unicode digit rather than reading it as ASCII 5",
+        checker._copilot_v2_line_findings_count(
+            "５ " + _v2_picture
+        ) is None,
+    )
+
+    # ai-config#3899 review finding, ninth round: the tokenizer ended a tag
+    # at the first '>' even inside a quoted attribute value, so
+    # `<img alt="a>5">` truncated mid-attribute and a `>` hidden inside a
+    # quoted value could evade the nested-tag/unterminated-tag checks
+    # entirely (`5 <img alt="z> · 3 <img>` summed to 8 instead of
+    # failing closed, since the quote-blind scan read the badge boundaries
+    # wrong).
+    check(
+        "_copilot_v2_line_findings_count parses a badge whose attribute "
+        "value contains a quoted '>' without truncating early",
+        checker._copilot_v2_line_findings_count(
+            '1 <img alt="a>5">'
+        ) == 1,
+    )
+    check(
+        "_copilot_v2_line_findings_count fails closed on an unterminated "
+        "quoted attribute value rather than misreading the tag boundary",
+        checker._copilot_v2_line_findings_count(
+            '5 <img alt="z> · 3 <img>'
+        ) is None,
+    )
+
     # Timing regression test (ai-config#3899 review finding): the original
     # unbounded `\d+` counting regex backtracked quadratically on a long
     # digit run with no trailing `<picture`/`<img` -- 25s for the isolated

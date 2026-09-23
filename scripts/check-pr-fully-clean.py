@@ -2258,35 +2258,75 @@ COPILOT_FINDINGS_LINE = re.compile(
 # regex match against one already-short token's text, or a name comparison
 # against one already-short tag's text), so the whole function is linear
 # in `len(rest)` regardless of how the line is malformed.
-_COPILOT_FIRST_COUNT = re.compile(r"^[ \t]*(\d{1,4})[ \t]*$")
-_COPILOT_SEP_COUNT = re.compile(r"^[ \t]*·[ \t]*(\d{1,4})[ \t]*$")
+# `[0-9]`, not `\d`: Python's `\d` matches every Unicode `Nd`-category
+# digit, not just ASCII -- a full-width `５` ("5") would otherwise
+# satisfy "1-4 ASCII digits" and parse as a real count, contradicting the
+# grammar's own stated ASCII-only rule.
+_COPILOT_FIRST_COUNT = re.compile(r"^[ \t]*([0-9]{1,4})[ \t]*$")
+_COPILOT_SEP_COUNT = re.compile(r"^[ \t]*·[ \t]*([0-9]{1,4})[ \t]*$")
 _COPILOT_WS_ONLY = re.compile(r"^[ \t]*$")
 
 
 def _tokenize_copilot_line(rest: str):
     """Split a Findings-line remainder into ('TAG', text) / ('TEXT', text)
-    tokens in one left-to-right pass, or None if a `<` is unterminated or a
-    second `<` opens before the first one's own `>` closes it.
+    tokens in one left-to-right pass, or None if a `<` is unterminated, a
+    second `<` opens (outside any quoted attribute value) before the first
+    one's own `>` closes it, or a quoted attribute value itself is left
+    unterminated.
 
-    The second condition is deliberate, not merely a stricter version of
-    the first: it is what rejects a digit sitting INSIDE a malformed tag
-    (`<picture 5 <img>`), by refusing to let that whole span collapse into
-    one TAG token whose embedded `5` a later grammar check could never see
-    as a separate token to validate.
+    The nested-`<` condition is deliberate, not merely a stricter version
+    of "unterminated": it is what rejects a digit sitting INSIDE a
+    malformed tag (`<picture 5 <img>`), by refusing to let that whole span
+    collapse into one TAG token whose embedded `5` a later grammar check
+    could never see as a separate token to validate.
+
+    Quote tracking exists because a naive "next `>`" search truncates a
+    tag at a `>` that appears inside a quoted attribute value
+    (`<img alt="a>5">` would otherwise end at the `>` inside the quotes),
+    which both mis-tokenizes legitimate markup and lets a `<`/`>` hidden
+    inside a quoted value silently evade the nested-tag/unterminated-tag
+    checks above (ai-config#3899 review finding). While scanning for a
+    tag's own `>`, a `"` or `'` toggles an in-quote state, and any `<`/`>`
+    encountered while in that state is ordinary attribute content, not a
+    tag boundary; a quote left open when the scan runs off the end of the
+    string is itself an unterminated tag.
+
+    Still one linear pass: the inner quote-tracking scan for one tag's `>`
+    only ever advances forward, and the outer loop resumes immediately
+    after wherever that scan stopped (its found `>`, or the end of the
+    string on failure) -- so no character is ever re-examined by a second
+    tag's scan, the same non-overlapping-advance argument that keeps a
+    `str.find`-based scan linear.
     """
     tokens = []
     pos = 0
     n = len(rest)
     while pos < n:
         if rest[pos] == "<":
-            next_lt = rest.find("<", pos + 1)
-            next_gt = rest.find(">", pos + 1)
-            if next_gt == -1:
+            j = pos + 1
+            quote = None
+            close = -1
+            while j < n:
+                c = rest[j]
+                if quote is not None:
+                    if c == quote:
+                        quote = None
+                elif c in ('"', "'"):
+                    quote = c
+                elif c == ">":
+                    close = j
+                    break
+                elif c == "<":
+                    close = -2  # a second '<' before this tag's own '>'
+                    break
+                j += 1
+            if close < 0:
+                # close == -1: ran off the end with no '>' found, or a
+                # quoted attribute value left open. close == -2: a nested
+                # '<' outside any quote. Both fail the whole line closed.
                 return None
-            if next_lt != -1 and next_lt < next_gt:
-                return None
-            tokens.append(("TAG", rest[pos:next_gt + 1]))
-            pos = next_gt + 1
+            tokens.append(("TAG", rest[pos:close + 1]))
+            pos = close + 1
         else:
             next_lt = rest.find("<", pos)
             if next_lt == -1:
@@ -2435,15 +2475,28 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
     is recognisably a Copilot verdict returns ``not-clean``, and a body this
     function does not recognise returns ``''`` so the ordinary scans decide.
 
-    The inline-finding count is read from whichever of two mutually exclusive
-    formats the body carries: the legacy `Comments generated: N` field, or the
-    `ccr-overview-v2` format's `**Findings:**` line (ai-config#3899) --
-    checked in that order, so a body carrying neither still fails closed.
+    The inline-finding count is read from BOTH the legacy
+    `Comments generated: N` field and the `ccr-overview-v2` format's
+    `**Findings:**` line (ai-config#3899) when either is present in the
+    body -- the two are NOT mutually exclusive, and treating them as such
+    was itself a fail-open defect: a body carrying an uncited legacy
+    `Comments generated: 0` phrase anywhere (even in plain prose quoting
+    an earlier round) used to override a real nonzero v2 `**Findings:**`
+    line and read as clean. Each PRESENT source contributes its own count
+    (or None, for a v2 line present but in an unrecognised shape); a
+    source that is simply absent contributes nothing, so a body carrying
+    only the legacy field behaves exactly as it did before v2 existed.
+    Combined the same way the v2 multi-line scan combines several
+    uncited `**Findings:**` lines: any nonzero count from any present
+    source is decisive and wins (not-clean); failing that, any
+    unparseable present source yields no verdict; zero only when every
+    present source reads zero.
 
-    Fails closed on a missing count in both forms. An affirmative heading with
-    neither field states an approval this function cannot confirm is
-    finding-free, so it yields no verdict rather than a clean one -- the same
-    direction ``_is_bot_author`` and the quorum tag already take.
+    Fails closed when neither source is present at all. An affirmative
+    heading with no count field states an approval this function cannot
+    confirm is finding-free, so it yields no verdict rather than a clean
+    one -- the same direction ``_is_bot_author`` and the quorum tag
+    already take.
     """
     if not body:
         return ""
@@ -2467,12 +2520,18 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
         return ""
     if _has_valid_match(COPILOT_SUPPRESSED_BLOCK, scan):
         return "not-clean"
-    count_match = _has_valid_match(COPILOT_COMMENT_COUNT, scan)
-    count = int(count_match.group(1)) if count_match is not None else _copilot_v2_findings_count(scan, cited)
-    if count is None:
+    counts = []
+    legacy_match = _has_valid_match(COPILOT_COMMENT_COUNT, scan)
+    if legacy_match is not None:
+        counts.append(int(legacy_match.group(1)))
+    if _has_valid_match(COPILOT_FINDINGS_LINE, scan) is not None:
+        counts.append(_copilot_v2_findings_count(scan, cited))
+    if not counts:
         return ""
-    if count != 0:
+    if any(c is not None and c != 0 for c in counts):
         return "not-clean"
+    if any(c is None for c in counts):
+        return ""
     return "clean"
 
 

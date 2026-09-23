@@ -262,6 +262,11 @@ jobs:
         # sweep in CI would prove nothing. Its classification logic is pure
         # over the GraphQL payload shape, so the tests cover it offline.
         run: python3 scripts/test_pr_sweep.py
+      - name: Run closing-keyword close audit tests
+        # Only the tests run here, for the same reason as pr-sweep: the audit
+        # queries GitHub via `gh`, while its classifier is pure over the
+        # GraphQL node shape and is covered offline.
+        run: python3 scripts/test_audit_closing_keyword_closes.py
       - name: Run PR-scope tests
         # Only the tests run here. pr-scope.py's --repo mode shells out to
         # `gh`, which a runner cannot do unauthenticated, but its predicate

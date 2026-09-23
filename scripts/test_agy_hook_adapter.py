@@ -644,6 +644,7 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertEqual(len(out["injectSteps"]), 2)
         self.assertEqual(out["injectSteps"][0]["ephemeralMessage"], "Message 1")
         self.assertEqual(out["injectSteps"][1]["ephemeralMessage"], "Message 2")
+        self.assertEqual(mock_stderr.getvalue(), "")
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
@@ -1870,12 +1871,11 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
-    def test_pre_invocation_invalid_json_output_logs_diagnostic_and_falls_back_to_raw_text(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
-        # Regression guard: the PreInvocation JSON-parse fallback used to be
-        # the file's only `except Exception: pass` with no diagnostic. A
-        # hook returning non-JSON text must still fall back to using that
-        # raw text (unchanged behavior) AND must log a stderr diagnostic,
-        # like every sibling parse handler in this file.
+    def test_pre_invocation_raw_text_falls_back_quietly(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        # Regression guard: several UserPromptSubmit hooks intentionally emit
+        # raw text. It must become injected context without a stderr parse
+        # diagnostic, because Antigravity treats that diagnostic as a hook
+        # failure and retries the invocation.
         mock_result = MagicMock(returncode=0, stdout="not valid json {", stderr="")
         mock_run.return_value = mock_result
 
@@ -1892,7 +1892,7 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertEqual(len(out["injectSteps"]), 2)
         for step in out["injectSteps"]:
             self.assertEqual(step["ephemeralMessage"], "not valid json {")
-        self.assertIn("failed to parse PreInvocation hook output", mock_stderr.getvalue())
+        self.assertEqual(mock_stderr.getvalue(), "")
 
     def test_default_timeout_applied_at_all_three_call_sites(self):
         # Regression guard for the resolve_cmd_and_timeout() extraction:

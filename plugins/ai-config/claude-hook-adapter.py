@@ -720,11 +720,14 @@ def main():
                             text_out = parsed.get("systemMessage") or parsed.get("additionalContext") or nested_context or ""
                     except Exception as exc:
                         # Not valid JSON -- fall back to the raw text as-is
-                        # (text_out is left unchanged), same as every other
-                        # parse-failure path in this file, but this one was
-                        # the sole exception silently swallowed with no
-                        # stderr diagnostic.
-                        print(f"claude-hook-adapter: failed to parse PreInvocation hook output: {exc}", file=sys.stderr)
+                        # (text_out is left unchanged). Plain text is the
+                        # documented and intentional output of several
+                        # UserPromptSubmit hooks, so it is not an adapter
+                        # error and must not be reported on stderr: the
+                        # Antigravity hook runner treats that diagnostic as
+                        # a hook failure and can repeatedly retry the
+                        # invocation.
+                        pass
                     # A parsed field (systemMessage / additionalContext / the
                     # nested hookSpecificOutput.additionalContext) is not
                     # guaranteed to be a string -- a hook may return a dict,

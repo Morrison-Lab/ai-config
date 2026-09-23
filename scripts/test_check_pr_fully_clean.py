@@ -6466,6 +6466,61 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) != "clean",
     )
 
+    # ai-config#3899 review finding, thirteenth round (PR ai-config#3906
+    # Copilot review): COPILOT_FINDINGS_LINE was unanchored, matching
+    # `**Findings:**` anywhere in the body -- mid-sentence prose quoting an
+    # earlier round's overview, or a blockquoted copy -- and reading it as
+    # the real v2 zero-count source for an affirmative review that carries
+    # no genuine overview field. Anchored to the start of a Markdown line
+    # (optional leading whitespace only, matching the real #1635 fixture
+    # shape), so neither case matches any more and the affirmative heading
+    # states no verdict instead of clean.
+    check(
+        "copilot_verdict: an affirmative heading plus a mid-line prose "
+        "'**Findings:** None' phrase (no real overview field) states no "
+        "verdict rather than clean",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "Earlier output said **Findings:** None\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: an affirmative heading plus a blockquoted copy "
+        "of '**Findings:** None' (no real overview field) states no "
+        "verdict rather than clean",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "> **Findings:** None\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: the real overview shape ('**Findings:**' as its "
+        "own line) still classifies clean after the anchoring fix",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Review effort:** Lite  \n**Findings:** None"
+        ) == "clean",
+    )
+
+    # ai-config#3899 review finding, fourteenth round: `_copilot_tag_name`
+    # stopped its alnum scan at the first non-alnum character without
+    # checking that character was a valid tag-name delimiter, so
+    # `<img:evil>` and `<picture:evil>` -- neither a real tag -- scanned as
+    # plain "img"/"picture" names and counted as real badges.
+    # `0 <img:evil>` used to parse as a real zero-finding badge.
+    check(
+        "_copilot_v2_line_findings_count fails closed on '<img:evil>' "
+        "rather than reading it as a real <img> badge",
+        checker._copilot_v2_line_findings_count("0 <img:evil>") is None,
+    )
+    check(
+        "_copilot_v2_line_findings_count fails closed on "
+        "'<picture:evil>' rather than reading it as a real <picture> badge",
+        checker._copilot_v2_line_findings_count(
+            "0 <picture:evil></picture>"
+        ) is None,
+    )
+
     # Timing regression test (ai-config#3899 review finding): the original
     # unbounded `\d+` counting regex backtracked quadratically on a long
     # digit run with no trailing `<picture`/`<img` -- 25s for the isolated

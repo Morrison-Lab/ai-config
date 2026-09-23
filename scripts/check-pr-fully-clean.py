@@ -2226,8 +2226,20 @@ COPILOT_COMMENT_COUNT = re.compile(r"(?<![0-9])([0-9]{1,6})(?![0-9])")
 # body. The badge markup is the anchor because the plain number alone is not
 # distinguishable from other digits on the line (a review-effort word, a PR
 # number quoted in prose).
+#
+# Anchored to the start of a Markdown line -- `(?:^|\n)`, the same idiom
+# `_COPILOT_HEADING_PREFIX` above already uses, plus optional leading
+# whitespace only -- because an unanchored `\*\*Findings:\*\*` matches
+# anywhere in the body, including mid-sentence prose ("Earlier output said
+# **Findings:** None") or a blockquoted copy of an earlier round's overview
+# (whose line begins with `>`, which the whitespace-only prefix does not
+# admit). Either would otherwise be read as the real v2 zero-count source
+# for an affirmative review that carries no genuine overview field at all,
+# reading clean (ai-config#3899 review finding). This matches the real
+# overview shape in the Lacaedemon/sparta#1635 fixtures, where
+# `**Findings:**` always starts its own line.
 COPILOT_FINDINGS_LINE = re.compile(
-    r"\*\*Findings:\*\*[ \t]*(?P<rest>[^\n\r]*)", re.IGNORECASE
+    r"(?:^|\n)[ \t]*\*\*Findings:\*\*[ \t]*(?P<rest>[^\n\r]*)", re.IGNORECASE
 )
 # A `**Findings:**` line's per-severity counts are validated against a
 # small grammar rather than by pattern-matching one bad shape at a time.
@@ -2363,13 +2375,29 @@ def _tokenize_copilot_line(rest: str):
 def _copilot_tag_name(tag: str):
     """Return the lowercased name of an OPENING TAG token ('picture',
     'img', 'source', ...), or None for a closing tag or anything else that
-    doesn't start with a letter right after `<`."""
+    doesn't start with a letter right after `<`, or where the character
+    right after the scanned name isn't a valid tag-name delimiter.
+
+    That last check is required, not merely stricter (ai-config#3899
+    review finding): stopping the alnum scan at the first non-alnum
+    character without also checking what that character IS let
+    `<img:evil>` and `<picture:evil>` -- neither a real tag -- scan as
+    plain "img"/"picture" names (`:` simply isn't alnum, so the loop
+    stopped there and returned the prefix as if it were valid), so
+    `0 <img:evil>` parsed as a real zero-finding badge instead of failing
+    closed. A real opening tag's name is always followed by whitespace
+    (before an attribute), `/` (a void-element self-close), or `>` (the
+    tag's own end) -- anything else means the "name" scanned is not
+    actually a complete tag name.
+    """
     low = tag.lower()
     if len(low) < 2 or not low[1].isalpha():
         return None
     j = 1
     while j < len(low) and low[j].isalnum():
         j += 1
+    if low[j] not in (" ", "\t", "/", ">"):
+        return None
     return low[1:j]
 
 

@@ -377,18 +377,38 @@ ENUM_SEPARATOR = r"\s*/?(?:,|(?<=\s)/|/(?=\s))\s*"
 # constant -- `remind-brief-premises.py`'s own Agent-brief use of "no" is a
 # different population (a brief instructing an agent, not review-comment
 # prose) and is out of scope for this hook's fix.
-# The number words run to `hundred`, not to `twelve`. Measured 2026-09-23
-# over this repository's own 111 multi-line merged commit bodies: the wider
-# vocabulary flags exactly the same 53 as the twelve-word one, so it costs
-# nothing in precision, while "Fourteen such references remain in text at
-# this head" -- a real miscount posted to Morrison-Lab/mlg, whose true figure
-# was 23 -- matches only with it. A number word above twelve is if anything a
+# The number words run to `hundred`, not to `twelve`, because "Fourteen such
+# references remain in text at this head" -- a real miscount posted to
+# Morrison-Lab/mlg, whose true figure was 23 -- matched nothing while the
+# vocabulary stopped at twelve. A number word above twelve is if anything a
 # stronger signal than a digit run, because prose spells out a count someone
 # holds in mind and writes digits for one they just read off a command.
+#
+# The widening costs nothing in precision on this corpus:
+# `scripts/measure-cardinality-vocabulary.py` flags 54 of this repository's
+# 111 multi-line commit bodies under EITHER vocabulary (measured 2026-09-23
+# against origin/main at b96c640f). That figure moves as the history grows,
+# so re-run the script rather than trusting this number; what the script
+# asserts is that the two counts stay EQUAL.
+#
+# A tens word joined by a hyphen to a ones word is one count, so the compound
+# needs its own alternative: without it the pattern fails on "Twenty-", which
+# requires whitespace after the count, restarts at the next word boundary, and
+# quotes "three files" out of "Twenty-three files" -- a surfaced figure the
+# author never wrote.
+#
+# Its POSITION in the alternation is readability rather than correctness, which
+# a mutation measured rather than reasoned: moving it after the bare ones words
+# keeps both compound cases green, because Python backtracks within the group
+# at one start position rather than committing to the first alternative that
+# begins to match.
+CARDINALITY_TENS = r"twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety"
+CARDINALITY_ONES = r"one|two|three|four|five|six|seven|eight|nine"
 CARDINALITY_COUNT = (
-    r"\d[\d,]*|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve"
+    rf"\d[\d,]*|(?:{CARDINALITY_TENS})-(?:{CARDINALITY_ONES})"
+    rf"|{CARDINALITY_ONES}|ten|eleven|twelve"
     r"|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen"
-    r"|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred"
+    rf"|{CARDINALITY_TENS}|hundred"
     r"|zero"
 )
 CARDINALITY_RE = re.compile(

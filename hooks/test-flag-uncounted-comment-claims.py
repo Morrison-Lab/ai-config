@@ -868,9 +868,10 @@ def vocabulary_checks(mod):
     where the true figure was 23. It matched nothing, because the vocabulary
     stopped at `twelve`.
 
-    Measured over this repository's own 111 multi-line merged commit bodies,
-    the wider vocabulary flags exactly the same 54 as the twelve-word one, so
-    the widening costs nothing in precision.
+    The widening costs nothing in precision on this corpus:
+    `scripts/measure-cardinality-vocabulary.py` is the instrument, and it
+    reports the same flagged count under either vocabulary rather than a
+    figure this docstring would have to keep in step with the history.
 
     Every case here was confirmed by mutation to go red, and the note on each
     names the mutation that kills it. Two earlier drafts of this block --
@@ -883,23 +884,61 @@ def vocabulary_checks(mod):
     one each case here is written against. A case that passes under every
     single-token mutation tests nothing.
     """
+    # Each positive case asserts the WHOLE return value rather than that some
+    # cardinality claim is present. The quoted span is what reaches the
+    # warning a reader acts on, so a case that only counts kinds would pass
+    # over a truncated or over-long quote -- which is exactly the defect the
+    # hyphen cases below exist for.
+    #
     # Dies when the teens branch is dropped from CARDINALITY_COUNT.
     check("a teens number word is a cardinality claim",
-          any(k == "cardinality"
-              for k, _ in mod.find_claims(
-                  "Fourteen such references remain in text at this head.")),
-          True)
+          mod.find_claims(
+              "Fourteen such references remain in text at this head."),
+          [("cardinality", "Fourteen such references")])
     # Dies when the tens branch is dropped, while the teens case stays green
     # -- so the two branches are pinned separately rather than together.
     check("a tens number word is a cardinality claim",
-          any(k == "cardinality"
-              for k, _ in mod.find_claims("Ninety rows were rewritten.")),
-          True)
+          mod.find_claims("Ninety rows were rewritten."),
+          [("cardinality", "Ninety rows")])
     # Dies with the tens branch too; `hundred` is the widening's upper end.
     check("`hundred` is a cardinality claim",
-          any(k == "cardinality"
-              for k, _ in mod.find_claims("A hundred files still carry it.")),
-          True)
+          mod.find_claims("A hundred files still carry it."),
+          [("cardinality", "hundred files")])
+    # Dies when the hyphenated compound alternative is dropped: the match
+    # then restarts at the trailing word and the quote reads "three files",
+    # silently dropping the tens digit from a figure the hook is about to
+    # ask someone to justify.
+    #
+    # Its POSITION in the alternation is not what these two cases pin --
+    # moving it after the bare ones words was measured to keep both green,
+    # because the engine backtracks within the group at the same start
+    # position rather than committing to the first alternative that begins
+    # to match. Ordering it first is readability, not correctness.
+    check("a hyphenated compound keeps its tens word in the quote",
+          mod.find_claims("Twenty-three files remain unchanged."),
+          [("cardinality", "Twenty-three files")])
+    # The same alternative, at the top of its range, where the trailing word
+    # is itself a tens-range word rather than a small one.
+    check("a hyphenated compound at the top of the range",
+          mod.find_claims("Ninety-nine files still fail."),
+          [("cardinality", "Ninety-nine files")])
+    # Dies when the compound alternative admits anything after the hyphen
+    # (`-[a-z]+` rather than the ones words). A hedged approximation is not a
+    # count anyone could have got wrong -- "twenty-odd" names a band, not a
+    # figure to check -- which is the same reasoning that exempts a negated
+    # `no` above.
+    #
+    # Two earlier drafts of this case tested nothing, and both read as
+    # discriminating. "The twenty-first commit touched it" carries no plural
+    # noun at all, so the pattern's trailing group never matches whatever the
+    # vocabulary admits. Pluralizing it to "the twenty-first commits were
+    # dropped" does not fix that: `find_claims` filters every match through
+    # `LISTABLE_NOUN_RE`, and `commits` is not listable, so the claim is
+    # dropped one step later than before and just as silently. Measured under
+    # the mutation, this phrasing yields
+    # [("cardinality", "Twenty-odd files")]; under the real pattern, [].
+    check("a hedged compound is not a count",
+          mod.find_claims("Twenty-odd files still carry it."), [])
     # Dies when CARDINALITY_RE's LEADING \b is removed, which lets a number
     # word embedded at the end of an ordinary word start a match. This guard
     # predates the widening; the case is here because the widening edits the

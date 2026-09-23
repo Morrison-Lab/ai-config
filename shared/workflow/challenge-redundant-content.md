@@ -184,3 +184,28 @@ copy about `markdownlint`'s `blanks-around-lists` explanation that review had
 missed, and two already-cited overlaps.
 A literal grep for the `blanks-around-lists` wording in `sync-with-main.md`
 returned nothing because the phrase crossed a semantic line break.)
+
+## Consolidate overlapping principles instead of creating redundant principle documents
+
+When introducing guidance that extends or deepens an existing core principle
+(such as independent verification, empirical pushback, or avoiding sycophancy):
+
+- **Audit existing principle catalog first:**
+  Before authoring a new standalone principle document,
+  search `shared/principles/` for existing documents that address the same failure mode or epistemic domain
+  (`dont-take-my-word-for-it.md`, `challenge-the-assignment.md`).
+- **Extend existing principles to absorb new rules:**
+  Creating a parallel principle file (such as `no-sycophancy.md` alongside `dont-take-my-word-for-it.md`)
+  dilutes authority,
+  fragments searchability,
+  and duplicates psychological and operational explanations.
+  Incorporate new rules (such as unprompted pushback, active consideration before action, and never deferring when you disagree)
+  directly into the canonical document as dedicated sections and update Do/Don't tables.
+- **Maintain single source of truth in catalog and AGENTS.md:**
+  Update `shared/principles/README.md` and `AGENTS.md` to reference the unified canonical document
+  rather than splitting guidance across multiple overlapping files.
+
+- **Do:** audit the existing principle catalog and extend an established document when new guidance deepens the same core failure mode.
+- **Do:** maintain a single source of truth in `AGENTS.md` and the principles catalog for related guidance.
+- **Don't:** author a new principle document that duplicates the why, how-to-pushback, or limits of an existing principle.
+- **Don't:** file principle-authoring learnings into narrow catalogs (such as `memories/hooks.md`) that belong in shared workflow guidance.

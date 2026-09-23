@@ -885,9 +885,9 @@ def _argv_close(argv):
     Identity comes from the terminal command ITSELF, so a decoy PR number
     earlier in a chain cannot misdirect the clear onto a different PR.
     """
-    if not argv or argv[0] != "gh" or len(argv) < 2:
+    if not argv or len(argv) < 2:
         return False, None, None
-    if len(argv) >= 3 and argv[1] == "pr":
+    if argv[0] == "gh" and len(argv) >= 3 and argv[1] == "pr":
         if argv[2] in ("merge", "close"):
             num, repo = _verb_ident(argv)
             return True, num, repo

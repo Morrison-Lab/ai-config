@@ -1248,3 +1248,14 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
 - **Mistake**: judging a fix dangerous from what the WHOLE change would do, when only the conjunction of its halves carries the risk and one half is safe alone (measured case in [`mistake-patterns.cases.md`](mistake-patterns.cases.md)).
 - **Do:** apply each half of a multi-part fix separately, in a scratch copy, and re-run the check against real input before pronouncing the whole dangerous.
 - **Don't:** let a true claim about the conjunction stand for both halves --- it can block a half that measurement shows is safe.
+
+## Pattern 58: Widening an Inner Branch Without Widening the Dispatch Guard Ahead of It
+
+- **Mistake**: Adding an alternative command caller (such as `curl` or `wget` alongside `gh`) in an inner branch of a parser or guard function, while leaving an upstream guard (e.g. `argv[0] != "gh"`) that short-circuits execution before the inner branch can ever be reached.
+- **Root cause**: Authoring the alternative branch by matching on the new tools (`argv[0] in ("curl", "wget")`) deep in the function, while overlooking a top-of-function early exit designed solely for the original tool (`gh`). The new code parses and imports cleanly, but is permanently unreachable dead code for the new caller shapes.
+- **Example**: 2026-09-23, ai-config#3893 / #3889. In `hooks/no-unreviewed-pr.py`, `_argv_close` added REST merge detection for `gh api`, `curl`, and `wget`. But its top guard retained `if not argv or argv[0] != "gh" or len(argv) < 2: return False, None, None`. Consequently, `curl` and `wget` calls returned `(False, None, None)` immediately at line 888. The companion function `_argv_update_branch` added in the same commit had the correct guard (`if not argv or len(argv) < 2:`).
+- **Fix**: When extending a parser to accept new tools or formats, inspect the entire function entry path and widen leading guards to encompass the new alternatives. Always pair each added alternative with explicit unit test cases (`curl`, `wget`, etc.) rather than only testing the primary tool (`gh api`).
+- **Do:** Audit all early-return guards between the function signature and the modified branch whenever adding new supported tools or command shapes.
+- **Do:** Add unit tests for every distinct tool or prefix added to an alternative branch.
+- **Don't:** Assume that because an adjacent function implemented the widened guard correctly, a duplicate or sibling function in the same file did as well without direct inspection.
+

@@ -2349,6 +2349,24 @@ def _test_update_branch_and_live_checks():
         print(f"FAIL: _argv_close on REST merge: {(ok, num, repo)}")
         failures += 1
 
+    curl_argv = ["curl", "-X", "PUT", "https://api.github.com/repos/Morrison-Lab/ai-config/pulls/1038/merge"]
+    ok, num, repo = hookmod._argv_close(curl_argv)
+    if ok and num == "1038" and repo == "Morrison-Lab/ai-config":
+        print("PASS: _argv_close recognizes curl REST merge endpoint")
+        passes += 1
+    else:
+        print(f"FAIL: _argv_close on curl merge: {(ok, num, repo)}")
+        failures += 1
+
+    wget_argv = ["wget", "--method=PUT", "https://api.github.com/repos/Morrison-Lab/ai-config/pulls/1038/merge"]
+    ok, num, repo = hookmod._argv_close(wget_argv)
+    if ok and num == "1038" and repo == "Morrison-Lab/ai-config":
+        print("PASS: _argv_close recognizes wget REST merge endpoint")
+        passes += 1
+    else:
+        print(f"FAIL: _argv_close on wget merge: {(ok, num, repo)}")
+        failures += 1
+
     # 3. _check_live_pr logic with mock subprocess.run
     real_subproc = hookmod.subprocess.run
 

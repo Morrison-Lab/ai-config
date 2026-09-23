@@ -2216,41 +2216,67 @@ COPILOT_FINDINGS_LINE = re.compile(
 # A `**Findings:**` line's per-severity counts are validated with a linear
 # scan rather than a single counting regex (shared/coding/
 # regex-backtracking-pitfalls.md's "replace nested quantifiers with linear
-# scans" remedy). Two prior narrower fixes both still had a fail-open gap:
+# scans" remedy). Three prior narrower fixes each still had a gap:
 # an unbounded `\d+` backtracked quadratically on a long digit run with no
 # trailing badge (25s at 65,536 digits); bounding it to `\d{1,4}` alone then
 # let the regex match the LAST 1-4 digits of a longer run (`12345<picture`
 # read as `2345`); and adding a `(?<!\d)` digit boundary still let a comma or
 # decimal point reset that boundary (`1,000 <picture>` and `10,000
-# <picture>` both parsed as their trailing `000`, summing to 0). Rather than
-# add a third lookaround to patch a third separator shape, every digit run
-# outside the badge markup is required to be a clean standalone 1-4 digit
-# token immediately preceding a badge (only whitespace, or one middle-dot
-# separator, allowed between a count and its badge, or between one badge and
-# the next count) -- ANY digit run that does not fit that shape fails the
-# whole line closed, rather than silently summing whatever part of the line
-# still looks parseable.
-_COPILOT_BADGE = re.compile(r"<picture\b.*?</picture>|<img\b[^<>]*>", re.IGNORECASE | re.DOTALL)
+# <picture>` both parsed as their trailing `000`, summing to 0). Every digit
+# run outside the badge markup is required to be a clean standalone 1-4
+# digit token immediately preceding a badge (only whitespace, or one
+# middle-dot separator, allowed between a count and its badge, or between
+# one badge and the next count) -- ANY digit run that does not fit that
+# shape fails the whole line closed, rather than silently summing whatever
+# part of the line still looks parseable.
+#
+# `_COPILOT_BADGE_OPEN` locates only the badge's OPENING marker (`<picture`
+# or `<img`, at a word boundary so `<picturex` doesn't count) -- a plain
+# alternation of two literals plus a zero-width `\b`, with no repetition to
+# backtrack. Finding each badge's CLOSING marker is then a separate,
+# un-anchored `str.find()` rather than a second regex, because a lazy-dot
+# regex alternative here (`<picture\b.*?</picture>`) is itself a quadratic
+# trap: DOTALL's `.` matches everything including further `<picture`
+# openers, so on a line of many unclosed `<picture ` markers with no
+# `</picture>` anywhere, EVERY opener re-scans forward to the end of the
+# line looking for a close tag that never comes -- measured 1.34s at 64KB
+# and 5.5s at 128KB (roughly 4x per doubling, i.e. quadratic), 1.37s end to
+# end through copilot_verdict() at 7,280 repeats of `"<picture "`. `str.find`
+# has the same per-call worst case, but the loop below calls it only ONCE
+# per opener and returns None -- failing the whole line closed -- the
+# moment a close marker is missing, instead of continuing to the next
+# opener and repeating the failed scan.
+_COPILOT_BADGE_OPEN = re.compile(r"<picture\b|<img\b", re.IGNORECASE)
 _COPILOT_LEADING_COUNT = re.compile(r"[ \t]*(?:·[ \t]*)?(\d{1,4})[ \t]*\Z")
 
 
 def _copilot_v2_line_findings_count(rest: str):
     """Sum one `**Findings:**` line's badge-adjacent counts, or None.
 
-    See the module comment above `_COPILOT_BADGE` for the validation rule.
-    Each loop iteration locates the next badge with a single bounded
-    `.search()` and then anchors a bounded count-token match (`.match()`,
-    not `.search()`, so it tries exactly one starting alignment) against the
-    text between it and the previous badge -- so even an adversarial
-    65,536-digit run with no badge at all costs one linear search plus one
-    bounded match, never a scan whose cost depends on the run's length or
-    position (shared/coding/regex-backtracking-pitfalls.md).
+    See the module comment above `_COPILOT_BADGE_OPEN` for the validation
+    rule and why the closing marker is located with `str.find()` rather
+    than a second regex.
+
+    Cost depends on shape, not just length: a well-formed line (every
+    opener closed) is O(n) overall, since each `str.find()` call's own
+    worst-case cost is bounded by the distance to that opener's close
+    marker and `pos` only ever advances forward past what has already been
+    scanned -- the same non-overlapping-advance argument that makes any
+    single left-to-right scan linear. A line whose FIRST unclosed opener
+    has no close marker anywhere in the remainder costs one O(n) `str.find`
+    call before returning None immediately (this function never resumes
+    scanning past an unterminated badge to look for a second one, which is
+    precisely what keeps that case from compounding into the quadratic
+    "every opener rescans to the end" trap the lazy-dot regex had). An
+    all-digits run with no badge at all (the original adversarial case this
+    scan was built to guard) costs one bounded `_COPILOT_BADGE_OPEN` search
+    plus one `re.search` scan for a leftover digit, both O(n).
     """
     total = 0
     pos = 0
     saw_badge = False
     while True:
-        m = _COPILOT_BADGE.search(rest, pos)
+        m = _COPILOT_BADGE_OPEN.search(rest, pos)
         if m is None:
             if re.search(r"\d", rest[pos:]):
                 return None
@@ -2259,9 +2285,21 @@ def _copilot_v2_line_findings_count(rest: str):
         token = _COPILOT_LEADING_COUNT.match(between)
         if token is None:
             return None
+        if m.group().lower() == "<picture":
+            close_token = "</picture>"
+        else:
+            close_token = ">"
+        close_pos = rest.find(close_token, m.end())
+        if close_pos == -1:
+            # Unterminated badge: fail the whole line closed immediately
+            # rather than resuming past it to look for another opener --
+            # that resumption is exactly what made the lazy-dot regex
+            # rescan to the end of the line at every one of many unclosed
+            # openers.
+            return None
         total += int(token.group(1))
         saw_badge = True
-        pos = m.end()
+        pos = close_pos + len(close_token)
     return total if saw_badge else None
 
 

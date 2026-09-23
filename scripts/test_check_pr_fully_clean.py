@@ -6289,10 +6289,10 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     # digit run with no trailing `<picture`/`<img` -- 25s for the isolated
     # regex and 19.6s end to end through copilot_verdict() at 65,536 digits.
     # `_copilot_v2_line_findings_count`'s linear scan (see its module
-    # comment above `_COPILOT_BADGE`) replaced that regex entirely, so this
-    # now also guards the replacement: a single `.search()` for a badge
-    # that never appears, plus one bounded `.match()` check, not a scan
-    # whose cost depends on the run's length or position.
+    # comment above `_COPILOT_BADGE_OPEN`) replaced that regex entirely, so
+    # this now also guards the replacement: a single bounded `.search()`
+    # for a badge opener that never appears, plus one bounded `.match()`
+    # check, not a scan whose cost depends on the run's length or position.
     _adversarial_findings_body = (
         "### \U0001f7e2 Approval recommended\n\n" "**Findings:** " + "1" * 65536
     )
@@ -6302,6 +6302,44 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check(
         "copilot_verdict on a 65,536-digit adversarial 'Findings:' line scales linearly (< 1s)",
         _av_verdict == "" and _av_secs < 1.0,
+    )
+
+    # Timing regression test (ai-config#3899 review finding, fourth round): a
+    # lazy-dot `<picture\b.*?</picture>` alternative re-scanned to the end of
+    # the line at EVERY unclosed `<picture ` opener, since DOTALL's `.`
+    # crosses further openers looking for a `</picture>` that never comes.
+    # Measured before the str.find-based closing-marker lookup: 1.34s at
+    # 64KB, 5.5s at 128KB (~4x per doubling), 1.37s end to end through
+    # copilot_verdict() at 7,280 repeats of "<picture ". The fix -- fail the
+    # whole line closed the moment ANY opener's close marker is missing,
+    # instead of resuming past it to rescan for the next one -- means this
+    # now costs one `str.find` call, not one per opener.
+    _unclosed_picture_body = (
+        "### \U0001f7e2 Approval recommended\n\n**Findings:** " + "<picture " * 7280
+    )
+    _up_secs, _up_verdict = best_of_three(
+        checker.copilot_verdict, _unclosed_picture_body
+    )
+    check(
+        "copilot_verdict on 65,520 characters of unclosed '<picture ' openers "
+        "scales linearly (< 0.1s)",
+        _up_verdict == "" and _up_secs < 0.1,
+    )
+
+    # Companion negative control: many CLOSED badges must stay linear too --
+    # a fix that merely stops on the first unterminated opener could still
+    # be quadratic on well-formed input if `pos` did not monotonically
+    # advance past each completed badge.
+    _closed_badges_line = " · ".join(["1 <picture></picture>"] * 8000)
+    _closed_badges_body = (
+        "### \U0001f7e2 Approval recommended\n\n**Findings:** " + _closed_badges_line
+    )
+    _cb_secs, _cb_verdict = best_of_three(
+        checker.copilot_verdict, _closed_badges_body
+    )
+    check(
+        "copilot_verdict on 8000+ repeated CLOSED badges scales linearly (< 0.1s)",
+        _cb_verdict == "not-clean" and _cb_secs < 0.1,
     )
 
     check(

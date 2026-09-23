@@ -6253,6 +6253,59 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "'1.000 <picture'",
         checker._copilot_v2_line_findings_count(_v2_decimal_rest) is None,
     )
+    # ai-config#3899 review finding, fifth round: `str.find(close_token, ...)`
+    # lands on whichever close marker comes FIRST, so nested/malformed
+    # `<picture>` markup lets it land on an INNER `</picture>` and silently
+    # swallow whatever count sits between the two openers, undercounting
+    # rather than failing closed -- the coordinator's own reprex.
+    check(
+        "_copilot_v2_line_findings_count fails closed on nested <picture> "
+        "markup rather than swallowing the inner count: "
+        "'1 <picture 2 <picture></picture></picture>'",
+        checker._copilot_v2_line_findings_count(
+            "1 <picture 2 <picture></picture></picture>"
+        ) is None,
+    )
+    check(
+        "copilot_verdict: nested <picture> markup in the 'Findings:' line "
+        "states no verdict rather than an undercounted clean/not-clean",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Review effort:** Lite  \n"
+            "**Findings:** 1 <picture 2 <picture></picture></picture>"
+        ) == "",
+    )
+    # A nested `<img>` is the opposite case and must NOT trip the same
+    # guard: real Copilot markup wraps a fallback `<img>` inside
+    # `<picture>...</picture>` (see `_v2_picture` above), so only a nested
+    # `<picture` -- never a nested `<img` -- disqualifies a badge.
+    check(
+        "_copilot_v2_line_findings_count still counts a badge whose "
+        "<picture> legitimately wraps an <img> fallback",
+        checker._copilot_v2_line_findings_count("2 <picture><img></picture>") == 2,
+    )
+    # Three fail-closed paths with no prior direct coverage (ai-config#3899
+    # review finding): a badge with no leading count at all, stray text
+    # between two badges that is not itself a count, and a trailing count
+    # after the last badge with no badge following it.
+    check(
+        "_copilot_v2_line_findings_count fails closed on a badge with no "
+        "leading count: '<picture></picture>'",
+        checker._copilot_v2_line_findings_count("<picture></picture>") is None,
+    )
+    check(
+        "_copilot_v2_line_findings_count fails closed on stray text between "
+        "two badges: '1 <picture></picture> extra text 2 <picture></picture>'",
+        checker._copilot_v2_line_findings_count(
+            "1 <picture></picture> extra text 2 <picture></picture>"
+        ) is None,
+    )
+    check(
+        "_copilot_v2_line_findings_count fails closed on a trailing count "
+        "after the last badge: '1 <picture></picture> 2'",
+        checker._copilot_v2_line_findings_count("1 <picture></picture> 2") is None,
+    )
     check(
         "copilot_verdict: a 'None' Findings line followed by a later "
         "nonzero one is not clean regardless of order",

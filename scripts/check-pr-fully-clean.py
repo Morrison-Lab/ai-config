@@ -2247,6 +2247,15 @@ COPILOT_FINDINGS_LINE = re.compile(
 # moment a close marker is missing, instead of continuing to the next
 # opener and repeating the failed scan.
 _COPILOT_BADGE_OPEN = re.compile(r"<picture\b|<img\b", re.IGNORECASE)
+# Only a NESTED `<picture` (never a nested `<img`) disqualifies a badge:
+# real Copilot markup legitimately nests an `<img>` fallback inside a
+# `<picture>...</picture>` wrapper (`<picture><source ...><img ...>
+# </picture>`), and that `<img>` is part of the outer badge, not a second
+# opener to flag. A second `<picture` before the first one's own close IS
+# always malformed/ambiguous, because `str.find` then lands on whichever
+# `</picture>` comes first -- the INNER one -- silently swallowing any
+# count between the two openers rather than failing closed.
+_COPILOT_PICTURE_OPEN = re.compile(r"<picture\b", re.IGNORECASE)
 _COPILOT_LEADING_COUNT = re.compile(r"[ \t]*(?:·[ \t]*)?(\d{1,4})[ \t]*\Z")
 
 
@@ -2296,6 +2305,21 @@ def _copilot_v2_line_findings_count(rest: str):
             # that resumption is exactly what made the lazy-dot regex
             # rescan to the end of the line at every one of many unclosed
             # openers.
+            return None
+        if _COPILOT_PICTURE_OPEN.search(rest, m.end(), close_pos):
+            # A `<picture` opener appears before this one's own close
+            # marker: nested or malformed markup (`1 <picture 2 <picture>
+            # </picture></picture>`), where `str.find` would otherwise land
+            # on the INNER close and silently swallow whatever count sits
+            # between the two openers -- e.g. the outer badge alone reads
+            # as the whole line's only finding, undercounting rather than
+            # failing. Deliberately narrower than `_COPILOT_BADGE_OPEN`: a
+            # nested `<img>` is legitimate (real Copilot markup wraps a
+            # fallback `<img>` inside `<picture>`), so only a second
+            # `<picture` disqualifies. This bounded search costs at most
+            # the width of this one badge's own span, and that span never
+            # overlaps a later badge's (pos only ever advances past a
+            # completed badge), so it stays linear over the whole line.
             return None
         total += int(token.group(1))
         saw_badge = True

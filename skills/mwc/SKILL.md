@@ -57,8 +57,16 @@ without asking confirmation before every merge.
   [`fully-clean`](../../shared/workflow/fully-clean.md) for the payload keys.
   A later all-clear from a different reviewer does not supersede a standing
   not-clean; only a later clean from the same reviewer does.
-  On GitHub (a GitLab MR has no equivalent gate until
-  [#3021](https://github.com/Morrison-Lab/ai-config/issues/3021)),
+  On GitHub, use `check-pr-fully-clean.py`; on GitLab, use
+  `scripts/check-mr-fully-clean.py` with the MR IID and project ID/path.
+  The GitLab instrument reads every pipeline, paginated note and discussion,
+  proves target currency, and re-reads the head before printing the pinned SHA.
+  Merge with `sha=<pinned-sha>` and `auto_merge=false`, passing
+  `--quorum <number-of-reachable-providers>` to the checker; if currency
+  fails, rebase through `PUT /projects/:id/merge_requests/:iid/rebase`, poll
+  with `include_rebase_in_progress=true` until `rebase_in_progress` clears,
+  and rerun the whole gate on the new head.
+  On GitHub,
   record `headRefOid` and `baseRefName` before the instrument runs and
   require both live values to equal them immediately before every direct
   merge, so a retarget at the same tip cannot pass with an old verdict and a
@@ -78,7 +86,11 @@ without asking confirmation before every merge.
   recorded head (`PUT .../pulls/<N>/update-branch` with
   `expected_head_sha`, or the MCP tool's `expectedHeadSha`; a `422`
   whose message names an expected-head mismatch (match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show)
-  means another writer moved the head, so settle ownership instead,
+  means another writer moved the head only if the live `headRefOid` no longer
+  equals the SHA you pinned --- re-read it and compare before settling
+  ownership, since a correctly-lengthed but wrong-content SHA (most often one
+  guessed or padded from an abbreviation instead of read in full) produces
+  the byte-identical message with no other writer involved,
   and any other `422` is a failed update to stop on),
   a wait of a few minutes at most until `headRefOid` changes (the update is
   asynchronous; expiry is a failed update to stop on and report),

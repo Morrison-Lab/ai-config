@@ -402,6 +402,33 @@ The causal claim was wrong too --- the silence came from accepting the mergeabil
 - **Don't:** assume a tool call carries a query --- most of them carry prose or a path.
 - **Don't:** read a passing fixture suite as evidence the guard fires in a real session.
 
+## 4.8 A guard that cannot resolve a legitimate action, with an unreliable override, manufactures a dead end at the prohibited bypass
+
+This is a design duty for the person (or session) **authoring** a guard, not a rule about how to respond once blocked by one --- that half is already covered above, in the `no-push-without-self-review.py` table row and in [`check-before-pushing.md`](../shared/workflow/check-before-pushing.md)'s "Out-of-band publish channels must not bypass push guards": the sanctioned response to a refused push with no working override is to stop and report, never to route around the guard through the Contents API, GraphQL, or an MCP write tool.
+That prohibition is correct and this section does not weaken it.
+
+The design gap it exposes is upstream of the prohibition.
+`no-push-without-self-review.py` resolves the commits a push would ship against the **session's own working directory** rather than the repository and worktree the push actually targets, so a legitimate cross-repo or cross-worktree push --- one carrying a genuine clean verdict for the right commit --- can be refused with "could not be resolved to a commit," a failure that has nothing to do with whether the commit was reviewed.
+`ALLOW_UNREVIEWED_PUSH=1` is the documented escape valve for exactly this situation, but the auto-mode permission classifier can deny that override too --- see [`mistake-patterns.md`](mistake-patterns.md)'s Pattern 43 ("Auto-Mode Push-Guard Deadlock") and its recurrences in [`mistake-patterns.cases.md`](mistake-patterns.cases.md), which record the same override succeeding on an unrephrased retry more often than not.
+So the refusal measured here is **intermittent, not stable**: the guard's own message, when it fires, recommends exactly the sanctioned response --- stop, explain, and let the user add a Bash permission rule or push manually --- which is a real path forward, not a dead end.
+
+What composing a mis-resolving guard with a classifier-vulnerable override actually costs is narrower than "no way forward": it makes the **unguarded** path (the Contents API, `gh api`, an MCP write tool) the most *available* one at the exact moment the sanctioned ones look exhausted, which is a design cost worth naming even though a sanctioned path --- retry, then escalate --- remains open throughout.
+That is the failure mode worth designing against, not a structural deadlock: a session under `Stop`-hook pressure, several denials into a session, is more likely to reach for the channel that asks no questions than to retry the identical command once more or stop and report, even though retrying or stopping is what the guard's own refusal message asks for.
+
+The transferable design principle, for any guard we author that gates a real action behind a resolution step and an override: **the resolution should correctly handle every legitimate invocation shape (not just the common one), and the override should be reliably reachable when resolution fails** --- not because getting either wrong strands the session, but because it raises the pull toward the one channel the corpus has to prohibit outright.
+
+- **Do:** when authoring a guard that resolves a target (a repo, a worktree, a ref) before deciding, test it against an invocation from **outside** the common case --- a different repo, a different worktree, a fresh branch with no remote-tracking ref --- not just the case the guard was written for.
+- **Do:** when a guard's own documented override can itself be denied by a separate mechanism (the auto-mode classifier, a permission policy), treat that composition as a first-class failure mode of the guard, not a separate, unrelated problem.
+- **Do:** retry an identical denial once, and stop and report if it still fails, per Pattern 43's canonical Do --- both are sanctioned paths that a mis-resolving guard makes easy to skip past.
+- **Don't:** treat "there's a sanctioned override" as having closed the gap if that override's own reliability was never verified under the conditions that make the primary guard fail.
+- **Don't:** read a single denial, or a single mis-resolution, as evidence of a structural deadlock --- Pattern 43's own retry evidence shows the same override succeeding minutes later with nothing changed.
+
+(Measured 2026-09-21, [ai-config#3412](https://github.com/Morrison-Lab/ai-config/issues/3412), a cross-repo/cross-worktree push refusal on branch `fix/unread-issue-comments-guard`: "With `git push` refused and the env prefix denied, what remains reachable is the Contents API or `gh api` --- both of which reach the remote and consult no guard at all.
+A guard that cannot evaluate a legitimate push, whose documented override is blocked, makes the unguarded path the only path."
+That framing was itself corrected in a later comment on the same issue thread: the refusal turned out to be intermittent rather than stable, and the override succeeded on a later, unrephrased retry --- see Pattern 43's occurrence ledger in [`mistake-patterns.cases.md`](mistake-patterns.cases.md).
+The session did not take the unguarded path;
+it retried the override and reported the corrected scope rather than the first, more alarming reading.)
+
 ---
 
 ## 5. Adding & Modifying Hooks: Checklist
@@ -877,3 +904,14 @@ Padding added for realism can move the trigger out of scope, and every verdict t
 - **Don't:** read a green suite as evidence a new case is sound --- a case that cannot reach the defect is green for the same reason a correct one is.
 - **Don't:** widen the bound to make a fixture fit;
   that re-admits whatever the bound excludes, which is the production-side fix this hook already rejected.
+
+## Target PR scoping for hook evidence and warning diagnostics (#3838)
+
+When a hook correlates transcript events (such as CI check readings, git pushes, or subagent reports) with claims made in assistant output:
+
+- **Scope evidence to target PRs consistently across all claim vocabularies:**
+  If a claim targets a specific PR, all evidence variables (`rel_last_partial`, `rel_last_push`, `rel_last_complete`) must be resolved with respect to that target PR across both core and secondary ("awaiting merge") vocabularies.
+  Falling back to global unscoped indexes when `claim_pr_refs` is non-empty causes an unrelated PR's partial check to falsely convert a silent-allow claim into an unverified warning.
+- **Pass scoped variables to warning formatters:**
+  Ensure warning formatters receive the PR-scoped indices (`w_partial`, `w_push`, `w_complete`) rather than global indices (`last_complete`).
+  Otherwise, diagnostic messages will cite events (such as an unrelated PR's complete read or a recent `git push`) from unrelated PRs as reasons why a claim is stale or uncovered.

@@ -937,3 +937,46 @@ def shell_c_expansions(command, max_depth=3):
                 found.append(nested)
                 frontier.append((nested, depth + 1))
     return found
+
+
+# `/c/...` (Git Bash / MSYS) or `/cygdrive/c/...` (Cygwin): a drive letter as
+# the first path segment. Group 1 is the letter, group 2 the remainder.
+_RX_POSIX_DRIVE = re.compile(r"\A/(?:cygdrive/)?([A-Za-z])(?=/|\Z)(.*)\Z", re.S)
+
+
+def native_path(path, is_windows=None):
+    """PATH in a form native Windows `git.exe` and `subprocess` can open.
+
+    A hook's command text comes from the Bash tool, which on Windows is Git
+    Bash, so a `cd` or `git -C` target is spelled `/c/Users/...`. The hook
+    itself runs under native Windows Python and calls native `git.exe`, and
+    neither reads that form: measured, `git -C /c/Users/x rev-parse HEAD`
+    exits 128 with "cannot change to '/c/Users/x'", and
+    `subprocess.run(..., cwd="/c/Users/x")` raises `NotADirectoryError`
+    (WinError 267). A push guard that resolves a push in that directory then
+    either refuses a reviewed push or fails open, depending on the guard.
+
+    Only the drive-letter forms are rewritten (`/c/x` and `/cygdrive/c/x`
+    become `C:/x`). Every single-letter first segment counts, `/a/b`
+    included: Git Bash mounts each drive at `/<letter>` (`mount` lists
+    `C: on /c`, `D: on /d`), so in the shell that wrote the command `/a/b`
+    already means `A:/b`, not a directory named `a`.
+
+    Other absolute MSYS paths (`/tmp`, `/usr`) resolve through the MSYS
+    mount table, which this cannot read, so they are returned unchanged --
+    and that is NOT harmless: on Python 3.13 a caller's `os.path.isabs` still
+    calls them relative and joins them onto the current directory, a wrong
+    reading this helper does not fix (ai-config#3874). Off Windows the path is
+    always returned unchanged, since `/c/...` is then an ordinary directory.
+    `None` passes through.
+    """
+    if path is None:
+        return None
+    if is_windows is None:
+        is_windows = os.name == "nt"
+    if not is_windows:
+        return path
+    match = _RX_POSIX_DRIVE.match(path)
+    if not match:
+        return path
+    return f"{match.group(1).upper()}:{match.group(2) or '/'}"

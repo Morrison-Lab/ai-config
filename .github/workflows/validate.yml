@@ -85,6 +85,9 @@ jobs:
         run: python3 scripts/test_check_unpinned_git_fixtures.py
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
+      - name: Run check-mr-fully-clean tests
+        # ai-config#3021: GitLab's equivalent fully-clean merge gate.
+        run: python3 scripts/test_check_mr_fully_clean.py
       - name: Run check-review-body tests
         run: python3 scripts/test_check_review_body.py
       - name: Check regex patterns for catastrophic backtracking
@@ -147,6 +150,11 @@ jobs:
         # (a four-referent sentence) as the positive case and two
         # single-referent sentences as negative controls.
         run: python3 scripts/test_check_ambiguous_referents.py
+      - name: Run check-sentence-complexity tests
+        # scripts/check-sentence-complexity.py is a candidate detector and metric
+        # computer for convoluted sentence nesting, formulaic openers, and copula
+        # clefts (Refs #3108, shared/writing/ai-tells.md).
+        run: python3 scripts/test_check_sentence_complexity.py
       - name: Check lead-in counts against their enumerations
         # ai-config#3005. A lead-in count goes stale when a later edit splits
         # or merges one item, and a reader who counts along never reaches the
@@ -206,6 +214,17 @@ jobs:
       - name: Run markdown fences library tests
         # ai-config#2540: scripts/lib/fences.py code block and code span parsing.
         run: python3 scripts/test_fences.py
+      - name: Run transcript-meta library tests
+        # ai-config#3860: scripts/lib/transcript_meta.py's is_skill_load_meta()
+        # discriminates a loaded skill's body from a scheduled check-in
+        # continuation, both of which carry isMeta: true.
+        run: python3 scripts/test_transcript_meta.py
+      - name: Run transcript-meta fallback-messaging tests
+        # ai-config#3860 (fail-fast.md follow-up): each of the six consuming
+        # hooks must print an observable stderr message, naming itself and
+        # the import error, when scripts/lib/transcript_meta.py cannot be
+        # loaded, and its stdout must stay unaffected.
+        run: python3 scripts/test_transcript_meta_fallback.py
       - name: Run shell-command library tests
         # ai-config#2992: scripts/lib/shellcmd.py argv splitting, heredoc
         # blanking, and git-invocation classification.
@@ -254,6 +273,11 @@ jobs:
         # sweep in CI would prove nothing. Its classification logic is pure
         # over the GraphQL payload shape, so the tests cover it offline.
         run: python3 scripts/test_pr_sweep.py
+      - name: Run closing-keyword close audit tests
+        # Only the tests run here, for the same reason as pr-sweep: the audit
+        # queries GitHub via `gh`, while its classifier is pure over the
+        # GraphQL node shape and is covered offline.
+        run: python3 scripts/test_audit_closing_keyword_closes.py
       - name: Run PR-scope tests
         # Only the tests run here. pr-scope.py's --repo mode shells out to
         # `gh`, which a runner cannot do unauthenticated, but its predicate
@@ -340,6 +364,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 scripts/test_check_hook_catalog.py
+      - name: Run hook-delivery check tests
+        run: python3 scripts/test_check_hook_delivery.py
       - name: Check hook output shape (warn-only hooks emit systemMessage)
         run: python3 scripts/check-hook-output-shape.py
       - name: Run hook-output-shape check tests

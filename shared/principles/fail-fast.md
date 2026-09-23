@@ -648,12 +648,12 @@ drops".
 - **Do:** separate a prefix-compatible delimiter by **position**
   (`grep '^+' | tail -n +2`) rather than by a longer prefix, since a longer
   prefix is still a prefix and still collides.
-- **Don't:** read a narrowed pattern as a fixed one --- `^+++ ` collides with
-  an added `++ foo` exactly as `^+++` collides with an added `++i;`.
 - **Do:** ask what a pattern *feeds* --- a detector's extra match gets
   investigated, an extractor's becomes content.
 - **Do:** compare a moved block in both directions, so an added line is as
   visible as a dropped one.
+- **Don't:** read a narrowed pattern as a fixed one --- `^+++ ` collides with
+  an added `++ foo` exactly as `^+++` collides with an added `++i;`.
 - **Don't:** read a passing known-positive test as clearing this; the pattern
   matches the content correctly and takes one line more.
 - **Don't:** reuse `^+[^+]` on prose --- it eats added blank lines, and the

@@ -44,6 +44,8 @@ CASES = [
      "'my mistake' reminds"),
     ([say("Correcting myself: that regex never matched.")], True,
      "'correcting myself' reminds"),
+    ([say("I removed redundant prose because it repeated an existing rule."), UNRELATED], True,
+     "recognizing redundant prose with no mechanism reminds"),
 
     # Discharged by doing the work.
     ([say("I was wrong."), WROTE_HOOK, say("Wrote the guard.")], False,
@@ -55,6 +57,9 @@ CASES = [
     ([say("I was wrong. That is not mechanizable -- there is no decidable "
           "condition in the transcript for a domain error like this.")],
      False, "an explicit not-mechanizable judgment discharges it"),
+    ([say("The redundant prose is not mechanizable because there is no decidable "
+          "condition in the transcript.")], False,
+     "an explicit non-mechanizable redundancy judgment discharges it"),
 
     # A UMS/memory write is the SIBLING hook's discharge, not this one's.
     # Recording the learning does not prevent the recurrence.

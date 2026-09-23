@@ -50,6 +50,34 @@ def user(s):
     return {"type": "user", "message": {"content": [{"type": "text", "text": s}]}}
 
 
+def meta(s, tool_use_id="toolu_x"):
+    """Shape of a loaded skill body (ai-config#3860): a `type: "user"` entry
+    with `isMeta: true`, injected by the harness rather than typed by the
+    person."""
+    return {
+        "type": "user",
+        "isMeta": True,
+        "sourceToolUseID": tool_use_id,
+        "message": {"role": "user", "content": [{"type": "text", "text": s}]},
+    }
+
+
+def scheduled(s, prompt_id="p1"):
+    """Shape of a scheduled check-in continuation (ai-config#3860
+    coordinator review finding): a `type: "user"` entry with
+    `isMeta: true` but no `sourceToolUseID`, often `promptSource: "sdk"`.
+    Unlike a loaded skill's body this IS a genuine new turn, and its
+    question/review-read content must still count -- see
+    scripts/lib/transcript_meta.py."""
+    return {
+        "type": "user",
+        "isMeta": True,
+        "promptId": prompt_id,
+        "promptSource": "sdk",
+        "message": {"role": "user", "content": [{"type": "text", "text": s}]},
+    }
+
+
 def tool_result(s="ok"):
     return {
         "type": "user",
@@ -100,6 +128,9 @@ MCP_CHECKS = tool("CallDynamicTool", {
 
 REMIND = [
     ([Q, WRONG], "given example: are you sure, then I was wrong"),
+    ([scheduled("are you sure about that?"), WRONG],
+     "a scheduled check-in continuation's own 'are you sure' still opens "
+     "a question window (ai-config#3860 coordinator review finding)"),
     ([Q, SILENT_UPDATE], "questioned then 'that count was wrong' without I-was-wrong"),
     ([Q, CONTRAST], "closed Q&A contrast without admission: it's 12, not 9"),
     ([Q, CONTRAST_AS_SAID], "figure is 12, not 9 as I said"),
@@ -163,6 +194,12 @@ SILENT = [
      "commit filtered ... rather than (word ending in it)"),
     ([Q, txt("The audit filtered results rather than users.")],
      "audit filtered ... rather than (word ending in it)"),
+    ([meta("are you sure about that?"), WRONG],
+     "a loaded skill body quoting 'are you sure' does not open a question "
+     "window (ai-config#3860)"),
+    ([meta("**Claude finished** reviewing HEAD. ### Verdict")],
+     "a loaded skill body quoting review-shaped text is not a review-read "
+     "(ai-config#3860)"),
     ([REVIEW], "placeholder -- replaced below for sidechain"),
 ]
 

@@ -66,7 +66,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-mistake-without-a-hook.py\"",
             "timeout": 10,
             "script": "no-mistake-without-a-hook.py",
-            "why": "cai 2026-08-02 'every time you make a mistake, write a hook to prevent it recurring'. Injects rather than blocks, because an error admission is RIGHT to send -- only the follow-up is owed. Complements remind-ums-after-error.py: that one wants a recorded learning, this one wants a mechanism."
+            "why": "cai 2026-08-02 'every time you make a mistake, write a hook to prevent it recurring', extended 2026-09-22: recognizing redundant prose/content is evidence that prior prose was insufficient, so it also owes an explicit hook or algorithmic-check decision. Injects rather than blocks, because an error admission is RIGHT to send -- only the follow-up is owed. Complements remind-ums-after-error.py: that one wants a recorded learning, this one wants a mechanism."
           },
           {
             "type": "command",
@@ -1207,6 +1207,18 @@
             "why": "memories/preferences.md 'Partition a deletion choice by BLAST RADIUS' -- warns, never blocks, when an AskUserQuestion option's LABEL promises reversibility (cache/temp/regenerable/safe-to-delete) while the option names something irreplaceable (a VM or WSL disk image by extension, ext4, a named docker volume, pgdata, a home directory, or uncommitted work -- the one entry that is not storage). The label is what carries consent, so a bundle like that yields an uninformed approval. Keyed on disk-image extensions and volumes, never on the bare word docker, so 'clear the Docker build cache' stays silent; polarity is checked per sentence, so an option naming an item in order to say it is safe is silent too."
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-binary-file-read.py\"",
+            "timeout": 10,
+            "script": "no-binary-file-read.py",
+            "why": "Warns when `cat`/`head`/`tail`/`less`/`more` is applied to a path that exists on disk and whose first ~8KB contain a NUL byte -- a whole-file read of a binary file, which dumps raw bytes into the conversation for no benefit (ai-config#3771). `strings` is deliberately not flagged, and `head -c N`/`tail -c N` are exempt as an already-bounded read."
+          }
+        ]
       }
     ],
     "Stop": [
@@ -1218,6 +1230,13 @@
             "timeout": 10,
             "script": "no-offer-to-file.py",
             "why": "report-mistakes-proactively 'Filing is not gated on approval' -- blocks a reply that offers to file or record instead of doing it."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-redundant-push-pr-authorization.py\"",
+            "timeout": 10,
+            "script": "no-redundant-push-pr-authorization.py",
+            "why": "The standing authorization in AGENTS.md and memories/preferences.md for ordinary, non-force pushes and opening/updating PRs or MRs was still re-asked after redundant prose was removed (2026-09-22), so blocks only those routine authorization asks. Merge and force-push questions, plus an explicit request where the external-repository membership or access gate is unverified, remain outside this lexical guard because they require separate authorization."
           },
           {
             "type": "command",
@@ -1280,7 +1299,7 @@
             "command": "AI_CONFIG_STOP=1 python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-mistake-without-a-hook.py\"",
             "timeout": 10,
             "script": "no-mistake-without-a-hook.py",
-            "why": "Turns an admitted, mechanizable mistake into an immediate stop condition, capped once per admitted phrase within a short transcript window so a re-explanation of the same admission does not re-block; the same phrase re-admitted well beyond that window blocks again."
+            "why": "Turns an admitted, mechanizable mistake or recognized redundant prose/content into an immediate stop condition, capped once per trigger phrase within a short transcript window so a re-explanation of the same trigger does not re-block; the same phrase well beyond that window blocks again."
           },
           {
             "type": "command",
@@ -1372,6 +1391,27 @@
             "timeout": 10,
             "script": "no-unchecked-empty-pr-claim.py",
             "why": "memories/github.md 'Close empty PRs' -- warns, never blocks, when a reply characterizes a pull request as abandoned, or as empty and disposable, near a pull-request number, and no commit-list QUERY naming that number was issued this session. pr-on-claim has this repo open pull requests against an empty commit on purpose, so changed_files: 0 reads the same on a live claim, on a thread whose commits cannot be pushed (#3739 / #3743), and on a dead branch; only the last is closeable. Four narrowings, each a draft got wrong and each producing SILENCE rather than noise (#3755, review rounds 1 and 2): the mergeability query that returns the field is not evidence, evidence must name every pull request the claim names, evidence comes from an allowlist of query-bearing tools rather than from any tool call (a reply or a comment body carries prose, and 323 of the measured session's 553 calls were Bash), and a per-close exemption is scoped to its sentence. Warn-only because abandonment is partly a judgment. Measured on #3737, 2026-09-17, against the real transcript, where the guard fires and the first draft did not."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-stale-clean-tree-claim.py\"",
+            "timeout": 10,
+            "script": "flag-stale-clean-tree-claim.py",
+            "why": "ai-config#3821 -- warns, never blocks, when a message asserts a clean working tree or clean stopping point after a path-writing git command (`git checkout <ref> -- <path>`, `git restore`, `git stash pop`, `git apply`) ran without an intervening `git status` or `git diff` check."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unread-issue-claim.py\"",
+            "timeout": 10,
+            "script": "no-unread-issue-claim.py",
+            "why": "An issue's body is frozen at filing time; its comments carry the measurement that already ran, the PR that already shipped half of it, and the decision that was already taken. Warns when the final message reports an issue as open, blocked, or awaiting a decision and nothing in the session read that issue's comments -- a body-only read does not discharge it. Measured twice on Lacaedemon/sparta (ai-config#3823); the second time a decision already taken and documented was reported to the user as theirs to make, across several turns, with two unrelated issues described as blocked behind it. Warns and never blocks: an issue can legitimately be blocked, and the guard can only see that the cheapest supporting evidence was never gathered."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-blocker-without-retry.py\"",
+            "timeout": 10,
+            "script": "flag-blocker-without-retry.py",
+            "why": "ai-config#3389 -- Stop-side sibling of remind-retry-before-declaring-blocked.py (#2994), one turn earlier. Measured 2026-09-22: the auto-mode classifier denied `ALLOW_MERGE=1 gh pr merge 5 -R Morrison-Lab/mlg --squash --delete-branch`, and the reply that followed posted a BLOCKER box saying the PR 'needs you to merge it' and 'the permission classifier denied my merge, and I'm not routing around it' -- the next turn re-ran the byte-identical command and it merged. Warns, never blocks, when the final message pairs a blocker/handoff marker (a boxed BLOCKER, 'needs you to', 'not routing around', 'I cannot') with an explicit attribution to a permission/classifier denial, AND the transcript's most recent classifier denial has no later attempt of a command with the same normalized shape (a leading env-var prefix, a trailing pipeline, and redirections are stripped before comparing, so `ALLOW_MERGE=1 gh pr merge 5 ...` and `gh pr merge 5 ...` count as the same attempt). Anchored on the ATTRIBUTION side rather than the escalation side, since 'I cannot' alone is common in this corpus for reasons that have nothing to do with a permission classifier. Reuses `is_classifier_denial` from the sibling hook (with a local fallback) so the two guards agree on what counts as a denial; command-identity normalization is its own, stronger than the sibling's whitespace-only collapse. Fenced code, blockquotes, and inline code spans are stripped before matching, so a reply that quotes the classifier's own denial text in backticks does not self-trigger."
           }
         ]
       }

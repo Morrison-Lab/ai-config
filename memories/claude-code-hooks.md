@@ -796,6 +796,12 @@ That pattern means the mutant is not running the code under test at all --- the 
 A single clause flipping unexpected cases is a test problem.
 ALL of them flipping the same new cases is an import problem.)
 
+**Recurrence, 2026-09-21, `hooks/no-unread-issue-claim.py` on branch `fix/unread-issue-comments-guard` ([#3826](https://github.com/Morrison-Lab/ai-config/pull/3826)).**
+The same `_sibling()` loader pattern this section is about, mutation-tested with a copy placed outside `hooks/` --- confirmed by the exact tell this section already names: every positive case failed regardless of which mutant clause was reverted, because the sibling import had landed as `None` rather than because any mutation did anything.
+Two review rounds were spent diagnosing what looked like widespread test failures before the copy's location was identified as the cause, which is the cost this section's `hooks/`-only prescription exists to avoid.
+Knowing the rule (this file had the section above, on record, before the mutation run) did not by itself prevent tripping it --- the same "read it and hit it anyway" pattern [`heredoc-backslash-collapse.md`](../shared/coding/heredoc-backslash-collapse.md) records for its own subject.
+The remedy applied was the one already prescribed: mutate the hook in place, inside `hooks/`, and restore it afterward, rather than copying it elsewhere first.
+
 **Whichever remedy you pick, a one-file mutant harness cannot mutate the imported module --- and the remedy is what guarantees it.**
 
 Everything above is about making the mutant's import *work*.
@@ -1011,11 +1017,17 @@ So a session that reads the remedy, follows it, and gets an agent id back cannot
 **Why this is worth recognizing early rather than re-deriving:** each layer is correct in isolation and their intersection is empty, so there is nothing to debug.
 A session that does not name the deadlock re-tests the same two commands every turn under `Stop`-hook pressure, and is pushed toward a genuinely bad workaround.
 
-- **Do:** re-test both commands once per session for a fresh reading, then stop --- both denials are stable.
+- **Do:** re-test both commands once per session for a fresh reading, then stop if both still deny.
 - **Do:** emit the `**Stopping Point**: Not a clean stopping point` declaration and name the deadlock plainly;
   the classifier explicitly instructs this.
 - **Don't:** route around it with MCP GitHub write tools (`push_files`, `create_or_update_file`) --- that is the documented guard gap ai-config#1929, not a remedy.
 - **Don't:** soft-reset to zero the unshipped count, and never edit the blocking hook to silence it.
+
+**Correction: "both denials are stable" does not hold for the override in general, and this paragraph previously said it did.**
+The 2026-09-17 measurement above genuinely found both layers denied and stayed denied within that one session --- that observation stands.
+But [`mistake-patterns.md`](mistake-patterns.md)'s Pattern 43 (and its recurrences in [`mistake-patterns.cases.md`](mistake-patterns.cases.md)) records the identical `ALLOW_UNREVIEWED_PUSH=1` override being denied once and then succeeding on an unrephrased retry, repeatedly, across several separate sessions --- most recently 2026-09-21, on [ai-config#3412](https://github.com/Morrison-Lab/ai-config/issues/3412).
+So "stable" describes what this one session measured, not a property of the classifier: read a fresh denial as one sample, retry the identical command once before concluding the deadlock is real, and only then apply the Do/Don't pair above.
+[`memories/hooks.md`](hooks.md) section 4.8 covers the guard-design side of the same composition --- why a guard that cannot resolve a legitimate action, paired with a classifier that can deny its own override, pulls toward the unguarded path even when retrying or stopping remains available.
 
 (Only the maintainer clears it: a Bash permission rule, a push from their own account, or authorizing the consumer-half guard change above.
 An earlier record of this named the classifier's reason as `[Auto-Mode Bypass]`;

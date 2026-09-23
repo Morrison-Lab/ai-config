@@ -4,6 +4,9 @@ How a review run gets **triggered** in each repo family, and what happens to
 the reply once it is written.
 Satellite of [`claude-bot-workflows.md`](claude-bot-workflows.md), which owns
 what a run does once it starts, split at the 1200-line gate.
+For how an AI agent session requests a review via `/review` comments (avoiding
+the bot-sender and allowed-bots short-circuit gates), see
+[`agent-review-requests.md`](agent-review-requests.md).
 
 ## Re-triggering the @claude PR *review* (the repository owner Quarto / R-pkg repos, e.g. `psw`)
 - Filenames below are those in the **content/package repos** (verified in
@@ -76,7 +79,10 @@ what a run does once it starts, split at the 1200-line gate.
   "`ai-config` auto-reviews on push as of 2026-08-20, and did not before" later
   in this file, and read its date before acting on it.
 - To force a fresh review on an existing PR **without a new commit**:
-  - **workflow_dispatch** (preferred --- no extra PR timeline noise).
+  - **workflow_dispatch** (preferred for humans --- no extra PR timeline
+    noise; for agent sessions, direct dispatch short-circuits under
+    `claude[bot]`, so agents must post a `/review` comment instead, per
+    [`agent-review-requests.md`](agent-review-requests.md)).
     Same
     dispatch, three ways to send it:
     - **`gh`:** `gh workflow run claude-code-review.yml -f pr_number=<N>`
@@ -316,6 +322,31 @@ merge and yields an actual external verdict.
 (ucdavis/bcs#450, 2026-07-28: its workflow-rename commit was superseded by
 \#453; the `main`-merge shrank #450's diff back to its own five files and
 re-enabled a genuine bot review that had been unobtainable for hours.)
+
+## A repository's first-workflow PR cannot be bot-reviewed, and none of the remedies above apply
+
+When the default branch has **no** `.github/workflows` tree,
+the PR that adds the first review caller gets no verdict on any run.
+The review workflow restores default-branch workflow files before reviewing a workflow-editing PR (gha#598),
+and `restore-default-branch-workflows.sh` exits 1 when that tree does not exist.
+The run records the failure as a skip, reports `conclusion: success`,
+and posts "No review ran --- restoring default-branch workflow files failed",
+whose re-run advice does not apply: there is nothing to fetch.
+Measured on `Morrison-Lab/mlg#5`, three runs, all green, no verdict;
+filed as [Morrison-Lab/gha#904](https://github.com/Morrison-Lab/gha/issues/904).
+
+The agent-mention remedy above fails too,
+because an `issue_comment` run uses the workflow file on the default branch,
+and the default branch has no agent caller yet either.
+A `main`-merge cannot absorb the edit, since the edit *is* the first workflow.
+So the only verdict available is the [`self-review-fallback`](../shared/workflow/self-review-fallback.md),
+and under `AGENTS.md`'s strict merge policy a fallback self-review does not satisfy `mwc`,
+so such a PR always needs a human merge.
+
+- **Do:** say in the PR body that the PR is a first-workflow PR and cannot be bot-reviewed, citing gha#904, and post the fallback self-review.
+- **Do:** request the human merge rather than waiting for a bot verdict or merging under `mwc`.
+- **Don't:** re-run the review, or read its green check as a review.
+- **Don't:** post an agent mention expecting it to substitute for the review on this PR.
 
 ## `ai-config` auto-reviews on push as of 2026-08-20, and did not before
 
@@ -662,6 +693,8 @@ That last line is the whole point.
 An empty stash restores nothing, so **withdrawing a review request is
 durable**: the workflow can only put back a request that was already there
 when it started.
+(For an agent session requesting a review without adding reviewer state, see
+[`agent-review-requests.md`](agent-review-requests.md).)
 
 This matters because the observable pattern looks like the opposite.
 A request is removed when each review starts and re-added a few seconds after

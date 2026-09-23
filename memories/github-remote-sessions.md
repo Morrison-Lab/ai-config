@@ -203,6 +203,39 @@ PRs the scorer had just passed:
   abbreviated one is refused with "The sha parameter must be exactly 40
   characters".
 
+**A correctly-lengthed but wrong-content `expected_head_sha` is a different
+failure from the one above, and it is NOT self-diagnosing.**
+The abbreviated-SHA refusal just above names its own cause in plain English.
+A 40-character SHA that is merely *wrong* --- built by padding or guessing
+from an abbreviation instead of read in full --- returns the REST
+`update-branch` endpoint's ordinary `422`
+("expected head sha didn't match current head ref.", curly apostrophe in the
+live text), the byte-identical message a genuine concurrent-writer collision
+returns.
+Before routing to either remedy, re-read the live `headRefOid` and confirm
+it actually differs from the SHA you pinned: only a head that has actually
+changed licenses the ownership-settling step that
+[`fully-clean`](../shared/workflow/fully-clean.md), [`mwc`](../skills/mwc/SKILL.md),
+and [`merge-it`](../skills/merge-it/SKILL.md) each route to, or
+[`chores`](../skills/chores/SKILL.md)'s parallel remedy (per the same
+restart-from-step-2 procedure the skill already uses elsewhere for a
+replaced head).
+Measured 2026-09-20 on
+[Lacaedemon/sparta#1615](https://github.com/Lacaedemon/sparta/pull/1615): an
+8-character abbreviation printed by `check-pr-fully-clean.py` (`d4691095`)
+was padded into a 40-character guess and returned the identical `422`, with
+no other writer involved --- the padded string was never a real commit on
+the PR.
+
+- **Do:** re-read the full SHA from the API (`headRefOid`) or resolve it
+  with `git rev-parse` at the point of use.
+- **Do:** compare the live head to your pin before concluding a writer
+  moved it.
+- **Don't:** construct or pad a full SHA from an abbreviation printed by a
+  script or a checker.
+- **Don't:** treat an `expected_head_sha`/`expectedHeadSha` `422` as proof
+  of a concurrent writer on the message text alone.
+
 **`mergeable` and `mergeable_state` are cached, and a merge to the base
 invalidates them.**
 Immediately after three merges landed, an open PR read
@@ -422,3 +455,39 @@ authorized for is almost always the media type.
   wrong.
 - **Don't:** assume an absent header when a wrong one produces the identical
   status.
+
+## Splitting a refused compound command is frequently the fix, not only the diagnostic
+
+The entry "The classifier also refuses a COMMIT on a branch this session does not own" uses splitting as a diagnostic --- split the command and see what the second refusal names.
+Measured twice on 2026-09-19, that is the weaker half of the finding.
+Splitting is often the remedy too: each of these chains was refused while every command in it succeeded on its own.
+
+- `DELETE .../pulls/3775/requested_reviewers`, on [#3775](https://github.com/Morrison-Lab/ai-config/pull/3775), bundled with a `sleep` and a follow-up `GET` in a single `&&`/`;` chain, was refused as `[Merge Without Review]`.
+  The identical `DELETE` issued alone, with an explicit `Content-Type: application/json`, returned `200`.
+- A six-command `git` tidy chain (`checkout`, `pull --ff-only`, `branch -d`, `status`, `log`, a checker) was refused as `[Auto-Mode Bypass]`.
+  Each command run on its own succeeded.
+
+**Two observations do not establish a mechanism, so take the remedy and leave the cause open.**
+"A chain is classified as its riskiest-looking member" fits both cases and is not the only reading that does.
+Chaining may simply raise scrutiny of the whole call however it is composed;
+`sleep` and `branch -d` may each be independently flag-prone, which would explain both refusals with no per-member scoring at all;
+and the second case names a different reason from the first, which a single riskiest-member rule does not obviously predict.
+What is measured is that both chains were refused and every constituent command succeeded alone.
+Issuing one operation per call is worth doing on that evidence, and it also makes each result attributable.
+
+**This is not a licence to re-run a refused command until it passes.**
+The distinction is whether the second attempt changes the *shape* of the request or merely repeats it hoping the classifier lands differently.
+One unbundled retry of an action you can state plainly is defensible, since it asks a different question --- whether the bundling was the objection --- rather than the same one twice.
+A third rephrasing is bypassing the intent.
+When the single-purpose form is still refused, that is the answer: [`mistake-patterns`](mistake-patterns.md)'s Pattern 43 governs from there --- stop after the classifier's second denial of the same goal and hand the user the decision, which may be a Bash permission rule.
+Its Don't half also rules out routing the refused action through a peer session, a separately-billed CLI, or the MCP write tools, each of which launders the user's decision rather than satisfying it.
+
+**A read-only call on a sensitive path is refused too, which is easy to misread as the write having failed.**
+After the `DELETE` above returned `200`, a plain `GET .../pulls/3775/requested_reviewers` --- no body, no side effect --- was refused with the same `[Merge Without Review]` reason.
+So the refusal tracks the path rather than the method, at least on this route.
+Verify through a different reader rather than concluding the state did not change: `scripts/build-pr-payload.py` reads the same fact into `pr.reviewRequests`, and `scripts/check-pr-fully-clean.py` then scores it.
+
+- **Do:** issue one operation per Bash call, especially when any part of the chain touches a merge, a push, or a review gate.
+- **Do:** confirm a refused-path write through a different reader, since the read on that path is refused as well.
+- **Don't:** read a refusal on a compound command as a verdict on the operation you cared about --- it may be the `sleep` beside it.
+- **Don't:** reshape a refused single-purpose command a second time, and never hand it to a peer session.

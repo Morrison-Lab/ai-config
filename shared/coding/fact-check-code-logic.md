@@ -252,13 +252,80 @@ A **duplicated block counted as two passes** inflates the total in the opposite 
 `Morrison-Lab/ai-config#2725` measured this directly on `scripts/test_check_pr_fully_clean.py`: two checks each ran twice on `main`, inflating the reported total by exactly the duplicate's size, and it was caught only because a reviewer diffed two line ranges byte for byte while porting tests in a later PR --- not a check anyone runs by habit.
 The pass count is routinely quoted in commit messages and reviews as evidence of coverage, which is exactly what makes a silently double-counted total worth naming as its own hazard alongside the two above.
 
+**A GENUINE survivor then forks again, and only one branch of that fork is about the tests.**
+The hazards above separate a real survivor from a mutant that never ran.
+Once the survivor is real, it means either that the suite has a coverage hole, or that the mutated code is **redundant** --- something else in the same diff already handles the input the mutant should have broken.
+Nothing in the run separates the two readings: the mutant applies, the baseline pass count reproduces, nothing fails.
+Only the second is a finding about production code, and it is the one nothing prompts, because every other survivor in this section resolves by adding a test.
+
+Reaching for a test is the worse default when the reading is redundancy.
+It locks the redundant branch in behind an assertion, so the next reader treats it as load-bearing --- the shape [`dead-code-is-tech-debt`](../principles/dead-code-is-tech-debt.md) is about, arrived at through a step that felt like improving coverage.
+The tell is having to construct contrived input to kill the mutant: where the only input reaching a branch is input nobody produces, the branch covers nothing.
+
+So ask the discriminating question before writing the test --- does another change in this same diff already handle the input this mutant should have broken?
+The situation that produces it is ordinary rather than exotic: two fixes landed in one round for one review finding, which is how a review round usually goes.
+
+Measured 2026-09-21 on `scripts/check-hook-delivery.py` ([ai-config#3833](https://github.com/Morrison-Lab/ai-config/pull/3833)), where [`83bafbef`](https://github.com/Morrison-Lab/ai-config/commit/83bafbef) records the survivor and [`472408f8`](https://github.com/Morrison-Lab/ai-config/commit/472408f8) records what it was worth.
+Both are pre-merge commits on that PR's branch, linked by SHA because a squash merge will leave neither reachable from `main`.
+A review finding about a crash on a malformed records file drew a type filter that dropped every non-string `installPath` at read time, upstream of the `Path().resolve()` that consumed it.
+Mutating the filter failed a test.
+Widening the `except` around that `resolve()` past `OSError` survived, because the filter had already removed the input that would have reached it, so the narrow catch shipped with a comment stating which exceptions were unreachable and why.
+
+**That comment was half wrong, and the reason is worth more than the rule it illustrates.**
+`TypeError` really was unreachable.
+`ValueError` was not: an embedded NUL raises it on POSIX and returns quietly on Windows, where the mutation run happened, and CI runs on Linux.
+So the survivor was a true reading of an incomplete experiment, and the next round widened the catch back.
+What the narrow catch would have let through, unexercised, is a crash in the environment the code actually runs in --- which no CI run ever observed, because that commit never stood as a head of its own.
+
+The mutation experiment itself is uncommitted --- widening the catch and reverting it happened inside `83bafbef`'s own authoring, so its diff shows a catch narrow before and narrow after --- and is carried only by that commit's message: "A widened catch would have been a branch no input can take, which is what mutation testing reported when it survived".
+An experiment nobody committed is not evidence anyone else can check, which is why both SHAs are cited directly rather than through the PR.
+
+A survivor is therefore evidence about redundancy only across the conditions the run covered.
+Before deleting, ask what the mutation run did not vary --- platform, locale, Python version, filesystem --- and whether the branch could be reachable there.
+[`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md)'s falsifying question is the tool for it: ask what would have to be true for "this branch is unreachable" to be FALSE, and whether the run you have could show you that.
+A run on one platform cannot, which is decidable before the run rather than after it.
+
+### The boundary with deliberate redundancy
+
+Not every unkillable branch is redundant in this sense, and two places in this corpus say so about cases that look identical from the mutation run.
+
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s "tenth outcome" covers a property enforced at more than one site: each site's mutant survives because the other still enforces it, and the remedy there is to keep both and document the pair rather than to delete either.
+[`simplify`](../../skills/simplify/SKILL.md) treats a duplicate constraint as belt-and-suspenders worth keeping.
+
+So the question is what the sibling actually does to the input, and there are three answers rather than two.
+A sibling that **removes** the input --- a filter upstream of the branch --- leaves that branch nothing to do, and it goes.
+A sibling that **enforces the same property independently** is defence in depth, and both sites stay.
+And a branch with **no sibling at all** is not redundant in any sense: its mutant survived because the suite lacks the input, which is the coverage hole this section's first reading names.
+
+That third answer is the one most easily assumed away, because a branch can look like a duplicate of a neighbour without being one.
+[`dead-code-is-tech-debt`](../principles/dead-code-is-tech-debt.md)'s worked example (ai-config#3707) is exactly that: a `transcript_path and` conjunct, structurally identical to inert siblings a few lines away in the same function, was read as inert by analogy with them.
+Those siblings were inert because the statement above them guaranteed the operand truthy.
+This one sat where nothing did, and dropping it would have turned `os.path.exists(None)`'s `TypeError` into a silent allow through the caller's blanket `except`.
+
+That case states this section's limit more sharply than anything else here, in its own words:
+
+> a clean mutation run over that suite could not have told the two cases apart --- it would have reported both as safe to remove, for opposite reasons.
+
+Keep that counterfactual as a counterfactual.
+No such run was ever made: the live conjunct was found by a same-file grep for the operand, and settled by measuring the guard with and without it against a `None` input.
+That measurement is the remedy to copy, and it is neither a test for the inert pair nor a deletion of the live one.
+So establish what makes a neighbour's branch dead before transferring the verdict, which is [`check-purpose-before-reusing`](../workflow/check-purpose-before-reusing.md)'s question asked about a diagnosis rather than about a template.
+
 - **Do:** write the members as literals in the test, and assert separately that the constant contains them.
+- **Do:** ask whether a sibling change in the same diff already covers a genuine survivor's input, before writing a test for it.
+- **Do:** delete the redundant branch instead, but only where the sibling REMOVES the input rather than independently enforcing the same property.
+- **Do:** name what the mutation run did not vary --- platform above all --- before reading a survivor as proof that a branch is unreachable.
+- **Do:** establish that a neighbouring branch is dead for a reason that also applies here, before transferring the verdict to this one.
 - **Do:** compare each mutation run's PASS count against the baseline's, and treat a run that reports no count at all as "mutant not applied".
-- **Don't:** discriminate on exit status --- a malformed mutant and a real failure both exit 1, so it cannot separate them.
 - **Do:** count skips separately, so a weakened run and a full one differ in the totals.
+- **Do:** have the check runner refuse a name it has already seen (`ai-config#2725`'s suggested fix), turning a silent duplicate into an immediate failure rather than an inflated count.
+- **Don't:** discriminate on exit status --- a malformed mutant and a real failure both exit 1, so it cannot separate them.
+- **Don't:** read every genuine survivor as a coverage hole --- that is the reading that adds code rather than removing it.
+- **Don't:** construct contrived input to kill a mutant.
+  Needing to is the evidence that the branch is redundant.
+- **Don't:** write "unreachable" into a comment on the strength of one platform's run --- that is a survivor promoted to an assertion a later reader will trust instead of re-measuring.
 - **Don't:** generate a test's cases from the value under test --- the DRY form is the defective one here.
 - **Don't:** record a skip with `check(..., True)`; that is a pass asserting nothing.
-- **Do:** have the check runner refuse a name it has already seen (`ai-config#2725`'s suggested fix), turning a silent duplicate into an immediate failure rather than an inflated count.
 - **Don't:** treat a rising pass count as evidence of rising coverage without a name registry (or an equivalent dedup check) backing it.
 
 (Measured 2026-08-28 on [ai-config#2539](https://github.com/Morrison-Lab/ai-config/pull/2539), where it occurred **twice in one file** against two different constants, the second after the first had been fixed --- which is why it is written down rather than noted.
@@ -579,6 +646,9 @@ The total reads as coverage of "the fix" when it is coverage of one of its two c
   from the implementation's,
   since the two paths agree on every fixture that shares it.
 - **Do:** when a fix touches two parallel code paths, mutate (revert) each path's own copy separately and confirm a case fails for that specific reversion --- run the mutation once per path, not once for the suite.
+- **Do:** for an expected value about a third-party tool's own behaviour,
+  derive it from that tool's documentation or a fresh measurement,
+  never from what the implementation under test already returns.
 - **Don't:** read a single aggregate PASS total as having pinned every path a fix touches;
   a suite concentrated on one shape can stay green with the other shape's half of the fix reverted out entirely.
 - **Don't:** accept a test because it mentions the helper that changed,
@@ -589,9 +659,6 @@ The total reads as coverage of "the fix" when it is coverage of one of its two c
 - **Don't:** read a representative fixture as a discriminating one ---
   representativeness is a claim about typical inputs,
   and a guard needs an input the two candidate behaviours disagree on.
-- **Do:** for an expected value about a third-party tool's own behaviour,
-  derive it from that tool's documentation or a fresh measurement,
-  never from what the implementation under test already returns.
 - **Don't:** trust agreement between a test and its implementation as evidence either is right ---
   when both were written from the same mental model,
   agreement is exactly what a **Mirrored misunderstanding** produces.

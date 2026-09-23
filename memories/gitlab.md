@@ -60,10 +60,21 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   Pipe the raw JSON to `jq` separately instead: `glab api "projects/<id>" | jq '.default_branch'`.
   **2nd occurrence (2026-09-14, HACtions !56; 1st: 2026-08-06):**
   A pipeline-monitoring loop repeated the same unsupported flag until stopped and rewritten with a pipe.
+  **3rd occurrence (2026-09-21, [abridge !103](https://hc2-gitlab.ucdmc.ucdavis.edu/health-analytics-core/abridge/-/merge_requests/103)):**
+  A diagnostic query retried the unsupported flag once before switching to raw JSON output.
+  **Do:** before running a copied or generated `glab api` command, scan its
+  arguments for `--jq` and replace that flag with a separate `jq` pipeline.
+  **Don't:** assume a command copied from `gh api` is valid for `glab api`.
 - **Use the paginated MR notes endpoint as the authoritative unresolved-inline-comment sweep.**
   `GET /projects/:id/merge_requests/:iid/notes` can return resolvable unresolved `DiffNote`s that a Discussions API sweep does not expose as an unresolved discussion.
   Filter every page on `.resolvable == true and .resolved == false`, then use the Discussions API only to locate and resolve the corresponding thread.
   Do not infer that there are no inline findings from an empty discussion-level timestamp filter.
+- **Activate manual review jobs before waiting on a GitLab pipeline.**
+  After each push, inspect the current pipeline's jobs rather than relying on
+  the overall `running` status.
+  If the review job is `manual`, play it through the Jobs API (for example,
+  `POST /projects/:id/jobs/:job_id/play`) before starting the watcher.
+  A pipeline can run its tests while leaving the review stage dormant.
 - **A self-hosted GitLab instance on an institutional internal network may only resolve while on that network's VPN.**
   A DNS failure (`NXDOMAIN` / `no such host`) for the GitLab hostname, with ordinary internet DNS resolving fine otherwise, points at needing the VPN rather than a broader outage or sandbox restriction: `nslookup <host>` before and after connecting confirms it.
 - Key commands:
@@ -172,3 +183,9 @@ HACtions added a new script dependency to `templates/claude.yml`'s
 (`allow_failure: true`) started failing to fetch the script, and the
 pipeline stayed green throughout --- the MR simply stopped getting
 reviewed, with no failed check anywhere to notice.)
+
+(Measured 2026-09-21, [abridge !103](https://hc2-gitlab.ucdmc.ucdavis.edu/health-analytics-core/abridge/-/merge_requests/103), pipeline 9236; 2nd occurrence:
+the allowed-to-fail manual `claude-manual` job 39259 failed before review
+because `claude-review.sh` referenced the missing
+`.gitlab/scripts/lib/review-tools.sh`; as in the first occurrence, the
+pipeline remained successful with a warning.)

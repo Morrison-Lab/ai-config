@@ -364,3 +364,56 @@ the push to `main`.
 - **Do:** pair `tinytex: true` with `r-packages: any::tinytex` on `preview.yml`.
 - **Don't:** copy an empty `formats` across from a working `quarto-publish.yml` call.
 - **Don't:** read a green preview build as evidence the PDF path works on `main`.
+
+## `claude-code-review.yml` caller permissions: omit `id-token: write`
+
+A consumer workflow calling `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2` should declare:
+`contents: read`, `pull-requests: write`, `issues: write`, `actions: read`, `checks: read`.
+
+- **Do NOT grant `id-token: write` on the review job:**
+  The review callee processes an untrusted PR diff and specifically omits `id-token: write` in its own jobs.
+  Granting `id-token: write` on the caller ceiling bypasses this isolation and creates an unnecessary privilege escalation risk (e.g. if `claude-code-action` falls back to its default write token minting).
+- **Template propagation hazard:**
+  Permissions copied from a reference caller workflow often escape scrutiny in reviews because copying an existing template reads as standard consistency.
+  Keep caller templates strictly minimized so copy-pasted implementations do not propagate over-privileged permissions.
+  (Measured 2026-09-21, tracked in [#3842](https://github.com/Morrison-Lab/ai-config/issues/3842); surfaced during `@claude` review on `Morrison-Lab/mln#23`.)
+- **The permission was one of three defects from one copy, and the other two travel the same way.**
+  `Morrison-Lab/mln#23` and `Morrison-Lab/mlg#5` copied ai-config's own `claude-review.yml` and `claude-bot.yml` and condensed their comments.
+  Besides `id-token: write`, the agent caller had no caller-side `if:` trusted-author gate, which gha's `examples/claude.yml` carries,
+  and the condensed header said assigning an issue summons the agent, dropping the qualifier that the body or title must also mention it (or `dispatch-on-assignee` must be set).
+  Reviewers caught all three.
+  ai-config's own `claude-bot.yml` still lacks the `if:` gate and carries a stale header rationale for dropping `issues: opened` ([#3862](https://github.com/Morrison-Lab/ai-config/issues/3862));
+  its `id-token: write` is correct, since the agent writes.
+  A consumer caller is a *copy* of the blessed stub, with that repo's drift, so copying it inherits every grant, every missing gate, and every claim in its comments without their sources.
+  [`upgrade-to-gha`](../shared/workflow/upgrade-to-gha.md) already says to copy `permissions:` from `examples/<name>.yml`;
+  the `if:` gate and the header comments belong to the same diff.
+  A condensed comment is a fresh claim, per [`fact-check-prose`](../shared/writing/fact-check-prose.md)'s condensation section.
+  - **Do:** start from gha's `examples/<name>.yml` at the tag you pin, and diff the finished caller against it clause by clause: `permissions:`, job `if:`, `on:` types, and each header claim.
+  - **Do:** re-check every qualifier a condensed comment dropped against the callee at the pinned tag.
+  - **Don't:** copy a sibling consumer's caller, ai-config's own included, as the reference.
+  - **Don't:** treat a copied comment's rationale as true because the file it came from is blessed.
+
+## Bundled repository suites (`check-*.yml`) and callee input verification
+
+Added in Morrison-Lab/gha#903 (closes #865, 2026-09-21):
+six bundled composite actions and reusable workflows consolidate standard check suites by repository type:
+`check-repo-hygiene.yml` (general repos / base suite),
+`check-quarto-website.yml` (websites),
+`check-quarto-book.yml` (books),
+`check-quarto-manuscript.yml` (manuscripts),
+`check-r-package.yml` (R packages), and
+`check-python-package.yml` (Python packages).
+
+- **Read-only permission boundary vs PR label inspection:**
+  All six bundled workflows declare and require only `contents: read`.
+  Governance checks inspecting live PR labels (`check-news.yml`, `version-check.yml`)
+  must remain dedicated standalone workflows
+  because querying live labels from the GitHub API requires `pull-requests: read`.
+  Inlining them into a read-only bundle breaks label bypasses (`no-changelog`, `no version increment`).
+- **Callee input parity:**
+  When composing higher-level composite actions from existing single-purpose composites (`Morrison-Lab/gha/<action>@v2`),
+  always verify each step's `with:` keys against the callee's declared `action.yml` inputs.
+  For example, `check-non-standard-chars` takes only `python-version` and `extensions`;
+  passing `paths` or `fail` causes silent parameter drops.
+  Contract tests (`run-bundle-repo-actions-tests.py`) should parse callee `action.yml` files
+  and statically assert zero undeclared inputs.

@@ -286,6 +286,26 @@ check("cursor-mapped name ending in issue_read discharges",
           {"method": "get_comments", "number": 1544},
           "1544"),
       True)
+check("mcp issue_read for issue A with unrelated issue B URL in payload does not discharge B (ai-config#3845)",
+      hook.mcp_reads_comments(
+          "mcp__github__issue_read",
+          {"method": "get_comments", "issue_number": 42,
+           "related": "https://github.com/o/r/issues/1544"},
+          "1544"),
+      False)
+check("mcp issue_read using url field parsed structurally discharges target (ai-config#3845)",
+      hook.mcp_reads_comments(
+          "mcp__github__issue_read",
+          {"method": "get_comments",
+           "url": "https://api.github.com/repos/o/r/issues/1544/comments"},
+          "1544"),
+      True)
+check("mcp issue_read fallback without structural target field still discharges (ai-config#3845)",
+      hook.mcp_reads_comments(
+          "mcp__github__issue_read",
+          {"method": "get_comments", "custom_target": "/issues/1544"},
+          "1544"),
+      True)
 check("unrelated mcp tool does not discharge",
       hook.mcp_reads_comments("mcp__github__get_me", {}, "1544"), False)
 

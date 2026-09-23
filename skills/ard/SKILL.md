@@ -323,6 +323,10 @@ Do-Confirm; per
 - [ ] Every table row has exactly one disposition (A/R/D/K), and no change
       request is labeled K.
 - [ ] Every Address row points to a pushed commit SHA.
+- [ ] Every Address row whose finding quoted a concrete input re-ran **that**
+      input against the fixed code, with the result in the reply --- see
+      [`address-every-comment`](../../shared/workflow/address-every-comment.md)'s
+      "The same reviewer's case, never run at all".
 - [ ] Every Defer row links a filed tracking issue.
 - [ ] **Killer item:** every inline thread has a reply; settled
       Address/Defer/Acknowledge threads are **resolved**; unresolved rebuttals

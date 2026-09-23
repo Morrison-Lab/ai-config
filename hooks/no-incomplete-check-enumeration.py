@@ -287,6 +287,73 @@ def _complete_refs(blob):
 # fails open on anything it cannot parse.
 RX_PR_REF = re.compile(r"#\d{1,6}\b")
 
+# Regexes to recover PR references from partial readings and pushes (ai-config#3838).
+# Where a command or payload specifies a PR, associate the reading/push with that PR
+# so an unrelated reading on PR B does not invalidate or block a clean claim on PR A.
+RX_PARTIAL_GH_PR = re.compile(
+    r"\bgh\s+pr\s+(?:checks|view)\b[^\n&|;]*?\b#?(\d{1,6})(?![\w./-])",
+    re.I,
+)
+RX_PARTIAL_MCP = re.compile(
+    r"[\"'](?:pull_?[nN]umber|pr|pullRequestNumber)[\"']\s*[:=]\s*#?(\d{1,6})\b",
+    re.I,
+)
+RX_PULL_URL = re.compile(r"/pull/(\d{1,6})\b", re.I)
+RX_GRAPHQL_PR = re.compile(r"pullRequest\s*\(\s*number\s*:\s*(\d{1,6})\b", re.I)
+
+RX_PUSH_BRANCH = re.compile(
+    r"\b(?:feat|fix|pr|branch|issue)[/-]#?(\d{1,6})(?![\w./-])",
+    re.I,
+)
+
+
+def _partial_refs(blob):
+    """The PR numbers a partial CI reading names.
+
+    Returns a set of `#N` strings, or an empty set if unrecoverable.
+    """
+    refs = set(RX_PR_REF.findall(blob))
+    for m in RX_PARTIAL_GH_PR.finditer(blob):
+        refs.add("#" + m.group(1))
+    for m in RX_PARTIAL_MCP.finditer(blob):
+        refs.add("#" + m.group(1))
+    for m in RX_PULL_URL.finditer(blob):
+        refs.add("#" + m.group(1))
+    for m in RX_GRAPHQL_PR.finditer(blob):
+        refs.add("#" + m.group(1))
+    return refs
+
+
+def _push_refs(blob):
+    """The PR numbers a push target branch or command names.
+
+    Returns a set of `#N` strings, or an empty set if unrecoverable.
+    """
+    refs = set(RX_PR_REF.findall(blob))
+    for m in RX_PUSH_BRANCH.finditer(blob):
+        refs.add("#" + m.group(1))
+    return refs
+
+
+def _relevant_last_event(events, claim_pr_refs):
+    """Return the highest index among events relevant to claim_pr_refs.
+
+    An event with recoverable `refs` matches if `claim_pr_refs` is empty (un-scoped
+    claim) or if `refs & claim_pr_refs`.
+    An event with empty `refs` (unrecoverable subject) is an un-scoped event,
+    so it matches all claims as a safe fallback.
+    """
+    rel = -1
+    for idx, refs in events:
+        if not refs:
+            rel = max(rel, idx)
+        elif not claim_pr_refs:
+            rel = max(rel, idx)
+        elif refs & claim_pr_refs:
+            rel = max(rel, idx)
+    return rel
+
+
 # Tool names a subagent dispatch arrives under, for correlating a dispatch's
 # `tool_use` id with the `tool_result` that later carries its report. Same
 # set `remind-brief-premises.py` uses for the identical correlation.
@@ -295,7 +362,7 @@ AGENT_TOOLS = {"Agent", "Task", "agent", "task", "dispatch_agent", "run_agent"}
 
 def scan(path):
     """Return (last_push, last_partial, last_complete, complete_events,
-    subagent_events, text).
+    subagent_events, partial_events, push_events, text).
 
     `complete_events` is a list of `(index, pr_refs)` for every complete
     instrument read, where `pr_refs` is the set of `#N` arguments that
@@ -313,11 +380,17 @@ def scan(path):
     Relevance to a *specific* claim (in-window vs. matching target) is
     scored in `main()`, not here -- see the module docstring's EXTENSION
     section, finding (1) in ai-config#3472.
+
+    `partial_events` and `push_events` track `(index, pr_refs)` for partial
+    reads and pushes, so un-scoped global integers do not invalidate readings
+    taken for a different PR (ai-config#3838).
     """
     last_push = last_partial = last_complete = -1
     agent_pr_refs = {}
     subagent_events = []
     complete_events = []
+    partial_events = []
+    push_events = []
     text = ""
     i = 0
     with open(path, errors="ignore") as fh:
@@ -339,11 +412,13 @@ def scan(path):
                         blob = (tc.get("name") or "") + " " + json.dumps(tc.get("args") or tc.get("input") or {})
                         if RX_PUSH.search(blob):
                             last_push = i
+                            push_events.append((i, _push_refs(blob)))
                         if RX_COMPLETE.search(blob):
                             last_complete = i
                             complete_events.append((i, _complete_refs(blob)))
                         elif RX_PARTIAL.search(blob):
                             last_partial = i
+                            partial_events.append((i, _partial_refs(blob)))
 
             # Antigravity text content
             if m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
@@ -360,11 +435,13 @@ def scan(path):
                         blob = bname + " " + json.dumps(b.get("input") or {})
                         if RX_PUSH.search(blob):
                             last_push = i
+                            push_events.append((i, _push_refs(blob)))
                         if RX_COMPLETE.search(blob):
                             last_complete = i
                             complete_events.append((i, _complete_refs(blob)))
                         elif RX_PARTIAL.search(blob):
                             last_partial = i
+                            partial_events.append((i, _partial_refs(blob)))
                         if bname in AGENT_TOOLS:
                             tid = b.get("id")
                             if tid:
@@ -382,7 +459,7 @@ def scan(path):
             elif isinstance(blocks, str) and role == "assistant" and blocks.strip():
                 text = blocks
     return (last_push, last_partial, last_complete, complete_events,
-            subagent_events, text)
+            subagent_events, partial_events, push_events, text)
 
 
 def already_fired(text):
@@ -619,7 +696,7 @@ def main() -> int:
         payload = json.load(sys.stdin)
         path = payload.get("transcript_path") or ""
         (last_push, last_partial, last_complete, complete_events,
-         subagent_events, text) = scan(path)
+         subagent_events, partial_events, push_events, text) = scan(path)
     except Exception:
         return 0  # fail open
 
@@ -639,12 +716,15 @@ def main() -> int:
     for hit, is_core in all_claims:
         pr_label = _pr_label(text, hit)
         claim_pr_refs = {r for r in _claim_window_refs(text, hit)}
+        rel_last_partial = _relevant_last_event(partial_events, claim_pr_refs)
+        rel_last_push = _relevant_last_event(push_events, claim_pr_refs)
+        rel_last_complete = _relevant_last_event(complete_events, claim_pr_refs)
         last_subagent, subagent_timed = _relevant_last_subagent(
-            subagent_events, last_partial, claim_pr_refs)
+            subagent_events, rel_last_partial, claim_pr_refs)
         subagent_on_topic = any(
             idx == last_subagent and pr_label in refs
             for idx, refs in subagent_events)
-        reading_needed_since = max(last_push, last_subagent)
+        reading_needed_since = max(rel_last_push, last_subagent)
 
         fresh_complete_refs = set()
         for idx, refs in complete_events:
@@ -661,12 +741,16 @@ def main() -> int:
             if uncovered:
                 coverage_warnings.append((hit, pr_label, fresh_complete_refs, uncovered))
         else:
+            w_push = rel_last_push if rel_last_push >= 0 else (last_push if not claim_pr_refs else -1)
+            w_partial = rel_last_partial if rel_last_partial >= 0 else (last_partial if not claim_pr_refs else -1)
+            w_complete = rel_last_complete if rel_last_complete >= 0 else (last_complete if not claim_pr_refs else -1)
             is_original_ci_case = (
-                bool(is_core) and subagent_timed < 0 and last_partial >= 0)
+                bool(is_core) and subagent_timed < 0 and rel_last_partial >= 0)
             if is_original_ci_case:
                 block_claims.append((hit, pr_label))
-            elif last_partial >= 0 or last_subagent >= 0:
-                warn_claims.append((hit, is_core, pr_label, last_subagent, subagent_on_topic))
+            elif w_partial >= 0 or last_subagent >= 0:
+                warn_claims.append((hit, is_core, pr_label, last_subagent, subagent_on_topic,
+                                    w_partial, w_push, w_complete))
 
     # Priority 1: Canonical BLOCK. If any claim in the message is backed only
     # by a short CI surface without a subagent or complete read, block.
@@ -735,14 +819,14 @@ def main() -> int:
     # warn_claims: report all distinct unverified claims across the message.
     if warn_claims:
         seen_warn_prs = set()
-        for hit, is_core, pr_label, last_subagent, subagent_on_topic in warn_claims:
+        for hit, is_core, pr_label, last_subagent, subagent_on_topic, w_partial, w_push, w_complete in warn_claims:
             if pr_label != "the PR you named":
                 if pr_label in seen_warn_prs:
                     continue
                 seen_warn_prs.add(pr_label)
             system_messages.append(_format_warn_claim(
                 hit, is_core, pr_label, last_subagent, subagent_on_topic,
-                last_partial, last_push, last_complete))
+                w_partial, w_push, w_complete))
 
     if system_messages:
         if already_fired(text):

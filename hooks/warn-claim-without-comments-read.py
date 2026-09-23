@@ -446,6 +446,8 @@ def _json_includes_comments(rest):
     return "comments" in fields
 
 
+# Imported by `no-unread-issue-claim.py` as well as used here, so a
+# signature change here breaks that hook's suite rather than this one's.
 def command_reads_comments(command, number):
     """True when `command` reads issue `number`'s comments at a command
     position, via any of the CLI shapes this hook recognizes."""
@@ -479,6 +481,43 @@ def command_reads_comments(command, number):
     return False
 
 
+def _extract_target_issue_number(tool_input):
+    """Extract the target issue number from an MCP tool_input dict, or None.
+
+    Reads the target from structural identifying fields rather than searching
+    the serialized payload: `issue_number`, `issueNumber`, or `number` as
+    scalar values, or an `issue`, `url`, or `path` field whose path segment
+    names `/issues/<n>`. Prevents an unrelated issue URL quoted in a body,
+    title, or cross-reference field from falsely identifying the call's target
+    (ai-config#3845).
+    """
+    if not isinstance(tool_input, dict):
+        return None
+    for key in ("issue_number", "issueNumber", "number"):
+        val = tool_input.get(key)
+        if val is not None and not isinstance(val, (dict, list)):
+            s = str(val).strip()
+            if s.isdigit():
+                return s
+    issue_val = tool_input.get("issue")
+    if issue_val is not None and not isinstance(issue_val, (dict, list)):
+        s = str(issue_val).strip()
+        if s.isdigit():
+            return s
+        m = re.search(r"/issues/(\d+)\b", s)
+        if m:
+            return m.group(1)
+    for key in ("url", "path"):
+        val = tool_input.get(key)
+        if isinstance(val, str):
+            m = re.search(r"/issues/(\d+)\b", val)
+            if m:
+                return m.group(1)
+    return None
+
+
+# Imported by `no-unread-issue-claim.py` as well as used here, so a
+# signature change here breaks that hook's suite rather than this one's.
 def mcp_reads_comments(name, tool_input, number):
     """True when this MCP tool_use is a READ_ISSUE_COMMENTS call for
     `number` -- tool-mappings.yml's `mcp__github__issue_read` with
@@ -492,11 +531,16 @@ def mcp_reads_comments(name, tool_input, number):
     method = tool_input.get("method")
     if not (isinstance(method, str) and method.lower() == "get_comments"):
         return False
+    target = _extract_target_issue_number(tool_input)
+    if target is not None:
+        return target == str(number).strip()
+    # Fallback only when tool_input carries no structural target field.
+    # Matches /issues/<num> or a number key in the serialized blob (ai-config#3845).
     try:
         blob = json.dumps(tool_input)
     except (TypeError, ValueError):
         blob = str(tool_input)
-    num = re.escape(number)
+    num = re.escape(str(number).strip())
     if re.search(rf"/issues/{num}\b", blob):
         return True
     return bool(re.search(

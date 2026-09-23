@@ -324,10 +324,6 @@ the counterpart of the skipped-step rule at the top of this file.
   until each line carries one operation.
 - **Do:** stop at the level where an expression names a modeled quantity the
   reader already accepts at that point in the argument.
-- **Don't:** unfold past that floor into internal construction the reader has
-  already been asked to accept --- and don't decide the floor from the kind
-  of expression, since the same expression can be a floor in one section and
-  composite in the next.
 - **Do:** introduce the name where the concept first enters the document, not
   where you happened to notice the dense equation, so later sections consume
   it instead of rebuilding it.
@@ -335,6 +331,10 @@ the counterpart of the skipped-step rule at the top of this file.
   reader needs no introduction to it.
 - **Do:** check a proposed name against the first three gains above, and drop it
   when it buys none of them.
+- **Don't:** unfold past that floor into internal construction the reader has
+  already been asked to accept --- and don't decide the floor from the kind
+  of expression, since the same expression can be a floor in one section and
+  composite in the next.
 - **Don't:** stop at the first decomposition because it is plainly better
   than what you started with --- that is the state that most reads as
   finished while still nesting.

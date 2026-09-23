@@ -18,6 +18,12 @@
   See [`shared/workflow/fully-clean.md`](../shared/workflow/fully-clean.md) and [`memories/mistake-patterns.md`](mistake-patterns.md) Pattern 5f. (User directive / CAI, 2026-08-31.)
 - **ARDI Loop Foreground Verification & Monitor Timers**: Run `python3 scripts/check-pr-fully-clean.py <pr>` synchronously in the foreground turn;
   see [`shared/workflow/ardi.md`](../shared/workflow/ardi.md) for foreground verification and turn-ending review monitor timer rules.
+- **Never pause without an armed wake mechanism**:
+  Whenever yielding a turn while tasks, tests, CI, or review checks remain incomplete, arm a timer (`schedule`, `ScheduleWakeup`, `CronCreate`, or background monitor) to resume the next concrete step.
+  Never yield a turn claiming to wait on background tasks or external results without an armed wake mechanism;
+  report the clock time in local time (Pacific Time) when the timer will fire.
+  See [`shared/workflow/flag-session-boundaries.md`](../shared/workflow/flag-session-boundaries.md).
+  (User directive, 2026-09-22).
 - Default to the most recent available package version.
   Use an older or pinned version only when compatibility, reproducibility,
   or another concrete project constraint gives a reason;
@@ -25,6 +31,9 @@
 - When the user corrects my behavior or identifies a workflow gap, invoke UMS
   immediately and persist the lesson before resuming the main task. Do not wait
   for the user to say `ums` or to remind me again.
+- When redundant prose is identified or removed, decide explicitly whether it
+  shows that the existing text needs a hook or other algorithmic safeguard;
+  record either the mechanism or why the condition is not mechanizable.
 - **Treat user profanity and frustration as an urgent defect signal**:
   Profanity, exasperation, or intense frustration from the user is almost always a signal that an agent made a severe mistake, regressed behavior, dropped context, violated a preference, or gave a cop-out offer.
   Never tone-police, scold the user, debate politeness, emit canned corporate apologies, or offer defensive excuses.
@@ -365,6 +374,8 @@
 - Always use `glab` (the GitLab CLI) for GitLab operations --- MR comments, file uploads, API calls, pipeline checks --- instead of raw `curl` against the GitLab REST API.
   `glab` handles auth via its own config (no `GITLAB_TOKEN` env var needed), so it works even when a token isn't exported in the current shell.
   Use `glab api` for endpoints without a dedicated subcommand (e.g. `POST /projects/:id/uploads` for file attachments).
+- Treat the browser GUI as a last resort for every task.
+  Prefer a CLI, MCP tool, or direct API whenever the task does not inherently require a visual/browser-only capability.
 - Run local validation before pushing R-pkg work: lintr::lint_package(), devtools::document(), devtools::test(), devtools::check(), pkgdown::build_site() (per repo copilot-instructions).
 - Before opening a PR, read the repo's own agent/contributor instructions (CLAUDE.md → the canonical reference it points to, e.g. `.github/copilot-instructions.md` / CONTRIBUTING) and front-load the required pre-PR housekeeping in the FIRST commit instead of discovering it via red CI.
   For R packages this means a NEWS.md entry AND a `usethis::use_version()` DESCRIPTION dev-version bump, even for a docs-only / vignette-only change --- see `r-quarto.md`'s "R-package PR CI gates" section for the full changelog-check / version-check / spellcheck / opt-out-label details.
@@ -1127,3 +1138,17 @@ safer/preferred choice merely because the repo has external consumers.
   - **Do:** Ship the accountability mechanism in the same turn you make a promise.
   - **Don't:** Make promises about future behavior without a mechanism.
   (Flagged 2026-08-29 in wai GIA session: two consecutive "will drive #146..." promises with no mechanism.)
+
+- **Never pause or stop early on wave boundaries;
+  babysit in-flight PRs to completion.**
+  Reaching a wave boundary (e.g. 5/5 in `gii`, per `skills/finish-wave/SKILL.md` and `shared/workflow/stack-dont-pause.md`) pauses *grabbing new issues*,
+  but mandates actively monitoring and babysitting all in-flight PRs until merged (where an `mwc`/`maw` grant is active) or reported clean and ready for decision.
+  Between review/CI steps, arm a wake timer or schedule rather than abandoning in-flight PRs.
+  - **Do:** Keep the session actively driving until every in-flight PR in the current wave is merged under MWC or reported clean and ready with monitoring armed.
+  - **Don't:** Exit or stop monitoring at the wave boundary while a PR in the wave is still awaiting review, CI, or clean resolution.
+
+- **Always answer user questions immediately in visible text as soon as the answer is known.**
+  When the user asks direct questions or inquiries, deliver the direct answer immediately in markdown text in that turn.
+  Do not defer answering behind tool calls, internal steps, or silent waiting loops.
+  - **Do:** State the direct answer to user questions at the top of the reply before initiating further actions.
+  - **Don't:** Defer answering or run background waiting loops without first delivering the answer.

@@ -265,6 +265,62 @@ def say(text):
 # recaps (ai-config#1917). Where a case means "a later turn", it must say so.
 NEXT_TURN = {"type": "user", "content": "and what about the other one?"}
 
+# A loaded skill body (ai-config#3860): a `type: "user"` entry with
+# `isMeta: true`, injected by the harness rather than typed by the person.
+# It carries a `text` block, so a naive turn-boundary check treats it like a
+# real prompt -- it must not, or it expires a reading taken earlier in the
+# still-current turn.
+META = {
+    "type": "user",
+    "isMeta": True,
+    "sourceToolUseID": "toolu_x",
+    "message": {
+        "role": "user",
+        "content": [{
+            "type": "text",
+            "text": "Base directory for this skill: ...\\skills\\mwc\n"
+                    "... https://github.com/Morrison-Lab/ai-config/issues/3021 ...",
+        }],
+    },
+}
+
+# A skill body that happens to QUOTE the harness's own injected-reading marker
+# text (this hook's own docstring, or the repo README, could plausibly be the
+# source). It must not be read as a real measurement -- adversarial review of
+# ai-config#3860 found this exact gap: guarding only the turn-boundary reset
+# left the separate RX_HOOK_CLOCK detection branch unprotected, letting an
+# isMeta entry manufacture a fake `measured` reading.
+META_QUOTING_CLOCK_MARKER = {
+    "type": "user",
+    "isMeta": True,
+    "sourceToolUseID": "toolu_y",
+    "message": {
+        "role": "user",
+        "content": [{
+            "type": "text",
+            "text": "Example from the guard's own docstring: "
+                    "\"Current time -- local: 2026-08-21 09:00:00 PDT\" is "
+                    "the harness's injected-reading shape.",
+        }],
+    },
+}
+
+# A scheduled check-in continuation (ai-config#3860 coordinator review
+# finding): `isMeta: true` but no `sourceToolUseID`, often
+# `promptSource: "sdk"`. Unlike a loaded skill's body this IS a genuine new
+# turn with real elapsed time, so a reading taken BEFORE it must expire --
+# see scripts/lib/transcript_meta.py for the transcript survey.
+SCHEDULED = {
+    "type": "user",
+    "isMeta": True,
+    "promptId": "p1",
+    "promptSource": "sdk",
+    "message": {
+        "role": "user",
+        "content": "Scheduled check-in: continue the task.",
+    },
+}
+
 
 # The harness's injected reading as it ACTUALLY arrives, copied from a live
 # transcript (2026-08-22). It is not a user turn: it is its own record, type
@@ -334,6 +390,24 @@ CASES = [
     ([hook_clock("21:30:00"), DATE, say("Got it."), say("Recap: 21:31 PDT")],
      False,
      "#1917: an explicit `date` THIS turn discharges even with narration after"),
+    ([DATE, META, say("Recap: 21:31 PDT")], False,
+     "ai-config#3860: a mid-turn skill load (isMeta) does not expire an "
+     "explicit `date` read taken earlier in the still-current turn"),
+    # Adversarial-review finding on ai-config#3860: guarding only the
+    # turn-boundary reset left the SEPARATE RX_HOOK_CLOCK-marker detection
+    # unprotected, so a skill body quoting the marker's own text (e.g. this
+    # guard's docstring) could manufacture a fake `measured` reading and
+    # silently discharge a claim nothing in this turn actually measured.
+    ([META_QUOTING_CLOCK_MARKER, say("Recap: 09:02 PDT")], True,
+     "ai-config#3860: a skill body quoting the injected-reading marker's "
+     "own text must not be read as a real measurement"),
+    # Coordinator review finding on ai-config#3860: the opposite
+    # discriminator. A SCHEDULED continuation is a genuine new turn with
+    # real elapsed time, so a `date` read taken BEFORE it must expire --
+    # unlike a loaded skill's body, which does not represent elapsed time.
+    ([DATE, SCHEDULED, say("Recap: 21:31 PDT")], True,
+     "ai-config#3860: a scheduled check-in continuation (isMeta, no "
+     "sourceToolUseID) DOES expire an explicit `date` read taken before it"),
 
     # --- the incident, and its shape ---
     ([DATE, say("first recap"), NEXT_TURN, say("UPDATE -- 19:24 PDT")], True,

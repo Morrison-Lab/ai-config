@@ -137,7 +137,9 @@ passes.
 
 ### 2. Classify each PR by bump size
 
-Record the head, the base, and the title before classifying (GitHub only: the pins and the gate they feed have no GitLab form until [#3021](https://github.com/Morrison-Lab/ai-config/issues/3021)),
+Record the head, the base, and the title before classifying; on GitHub use the
+PR pins and `check-pr-fully-clean.py`, while on GitLab use the MR `sha`,
+`target_branch`, and `check-mr-fully-clean.py`,
 since the classification, every read in step 3, and the merge in step 4 are claims about one SHA on one target under one title,
 and Dependabot can replace the head or retitle the PR between any two of them:
 
@@ -209,7 +211,7 @@ wait until `headRefOid` differs from `$PINNED`, with a deadline of a few minutes
 and then start again from the top of step 2: re-record `$PINNED` and `$BASE`, re-classify the bump, and rerun the CI and conflict checks against the new pin (review stays skipped on bot PRs).
 The first different SHA is not necessarily the update's result, since Dependabot or another writer can replace the head in the same window, so re-classification is what keeps the merge pinned to a head this skill has actually judged.
 `gh api -X PUT "repos/$REPO/pulls/$N/update-branch" -f expected_head_sha="$PINNED"` merges the base in, pinned to the head whose CI was read.
-A `422` whose message names an expected-head mismatch (match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show) means the bot or another writer already replaced that head, so re-read before touching it.
+A `422` whose message names an expected-head mismatch (match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show) means the bot or another writer already replaced that head only if `headRefOid` actually differs from `$PINNED` --- the identical message also appears when `$PINNED` itself was wrong (built from an abbreviation rather than read in full), so re-reading before touching the branch is what tells the two apart, not merely a precaution.
 Any other `422` is a failed update: stop and read the message.
 `@dependabot rebase` rewrites the head onto the base branch and also clears a conflict.
 It too replaces the head, so it is followed by the same bounded wait and restart from step 2, never by a direct merge on the old `$PINNED`.

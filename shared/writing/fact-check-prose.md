@@ -1513,14 +1513,76 @@ since an instruction that says where *not* to look is a scope claim the reviewer
   running the same state queries you would for a PR body.
 - **Do:** describe the tree the prompt runs against,
   which is the default branch at run time rather than the unmerged branch you wrote it on.
+- **Do:** state a hazard as what to check and what makes it easy to miss,
+  not as a story of how it was found --- a list of hazards over a narrative about them.
 - **Don't:** write an incident, a repository's contents, or a "this is safe" absolute into a prompt from recall.
 - **Don't:** treat prompt text as configuration because it lives in a YAML string.
+- **Don't:** encode a relation between events --- which check caught which,
+  what happened before what, who is responsible --- when a claim about the
+  hazard itself would do the reader's job just as well.
 
 ([`Morrison-Lab/mln#25`](https://github.com/Morrison-Lab/mln/pull/25), 2026-09-21:
 nine false or misleading claims in the review workflows merged in `mln#23`,
 found by an adversarial review of the sibling `mlg#5`.
-The addendum said three disclosure leaks "reached this repository",
-when nothing had been pushed and `main`'s history held none of the files;
-the accurate version was in the PR body and the false one in the file that steers reviews.
-It also carried the unhedged "material arriving is safe"
-in the sentence telling the reviewer where not to look.)
+It carried the unhedged "material arriving is safe"
+in the sentence telling the reviewer where not to look.
+
+That round also "corrected" the addendum's claim that three disclosure leaks
+"reached this repository" to say nothing had been pushed,
+on the evidence that `main`'s history held none of the files.
+**That correction was itself false**, and is the worked example
+in [`git-branches`](../../memories/git-branches.md)'s
+"Scrubbing a later commit does not remove what an earlier commit already pushed" section:
+the material was pushed on a pull-request branch and stays reachable through that PR's refs,
+so a clean `main` was the wrong artifact to check.
+The original claim was right, and a round of review replaced it with a wrong one.)
+
+**Narrative structure is a defect factory in its own right, independent of any single false claim inside it.**
+A prompt that *narrates* an incident --- what happened, in what order, which
+check caught it, who is responsible --- asserts a relation between events on
+top of every claim about the events themselves.
+A relation costs more to keep true than a claim about a thing, because it
+decays whenever any one element is edited: fix the date of one leak and the
+"after" clause pointing at it goes stale, fix which check caught a leak and
+the ordinal position in the list is now wrong, without either edit touching
+the sentence that broke.
+No single query settles an ordering or attribution claim the way a query can
+settle "does this secret exist", so nobody re-derives the relation when
+editing one sentence near it --- and the narrative reads as informative
+precisely because it sounds like it is telling the reader something, when
+what it is telling them adds no instruction value a hazard list would not
+carry on its own.
+
+(`Morrison-Lab/mlg#5`, 2026-09-22: two GitHub Actions caller workflows carried
+a `prompt-addendum` that told the review bot about three past disclosure leaks,
+in narrative form, so it would check for the same classes.
+Because gha#904 means a repository's first-workflow PR cannot get an automated
+review, ten rounds of adversarial fallback review ran against the addendum.
+Rounds 4 through 10 produced 23 findings, and almost none were YAML or logic
+defects.
+A few were claims about what the pinned callee does: an exhausted quota is not
+caught pre-flight, only a missing secret is; a draft, fork, or bot-sender skip
+concludes `skipped` rather than `success`; a `GITHUB_TOKEN` push fires no
+`synchronize` event at all, so no run exists for the sender gate to skip.
+One was a permission claim that got acted on and then had to be reverted: a
+round singled out `id-token: write` as the worst scope to expose, the next
+commit dropped it, and two rounds later a further commit put it back, because
+all five scopes the callee's job requests are required and a caller missing
+any one fails the run before it starts.
+The rest, and the majority, were the incident narration: the wrong three leaks
+(two list items described the same mistake, and the first leak actually caught
+was missing), in an order the commits refute, credited to checks that did not
+catch them, with a claim that a sweep could not have caught something the
+sweep's own README says it did catch.
+Three consecutive rounds found a new error in the chronology alone, and each
+fix was locally correct and introduced the next, because the narration
+asserted relations between events that no single query settles.
+**Patching each narration error individually reads as diligence, and is what
+kept the defect alive for three rounds** --- what ended it was deleting the
+chronology: state what each hazard is and what makes it hard to see, and drop
+every claim about sequence and attribution.
+A prompt's job is to tell the reader what to check, not to recount how the
+team found out.
+A related, narrower finding from the same rounds: a secrets listing returns
+names, not scopes, so it cannot support "no secret here can do X" --- name the
+specific secret the consumer reads instead.)

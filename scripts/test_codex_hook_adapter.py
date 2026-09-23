@@ -42,6 +42,9 @@ assert plugin_manifest["skills"] == "codex-skills"
 plugin_hooks = json.loads((ROOT / "plugins/ai-config/codex-hooks.json").read_text())
 assert "${PLUGIN_ROOT}" in json.dumps(plugin_hooks)
 assert plugin_manifest["hooks"] == "./plugins/ai-config/codex-hooks.json"
+for stop_group in plugin_hooks["hooks"]["Stop"]:
+    for stop_hook in stop_group["hooks"]:
+        assert "additionalContextLimit" not in stop_hook
 
 failed = mod.run_entry({"command": "exit 2", "timeout": 1}, {})
 assert failed and failed["decision"] == "block"

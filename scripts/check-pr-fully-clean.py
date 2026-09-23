@@ -2213,117 +2213,177 @@ COPILOT_COMMENT_COUNT = re.compile(
 COPILOT_FINDINGS_LINE = re.compile(
     r"\*\*Findings:\*\*[ \t]*(?P<rest>[^\n\r]*)", re.IGNORECASE
 )
-# A `**Findings:**` line's per-severity counts are validated with a linear
-# scan rather than a single counting regex (shared/coding/
-# regex-backtracking-pitfalls.md's "replace nested quantifiers with linear
-# scans" remedy). Three prior narrower fixes each still had a gap:
-# an unbounded `\d+` backtracked quadratically on a long digit run with no
-# trailing badge (25s at 65,536 digits); bounding it to `\d{1,4}` alone then
-# let the regex match the LAST 1-4 digits of a longer run (`12345<picture`
-# read as `2345`); and adding a `(?<!\d)` digit boundary still let a comma or
-# decimal point reset that boundary (`1,000 <picture>` and `10,000
-# <picture>` both parsed as their trailing `000`, summing to 0). Every digit
-# run outside the badge markup is required to be a clean standalone 1-4
-# digit token immediately preceding a badge (only whitespace, or one
-# middle-dot separator, allowed between a count and its badge, or between
-# one badge and the next count) -- ANY digit run that does not fit that
-# shape fails the whole line closed, rather than silently summing whatever
-# part of the line still looks parseable.
+# A `**Findings:**` line's per-severity counts are validated against a
+# small grammar rather than by pattern-matching one bad shape at a time.
+# Four narrower fixes in a row each still had a gap, which is the tell
+# that the right fix is a grammar rather than a fifth exclusion
+# (shared/coding/regex-backtracking-pitfalls.md's "replace nested
+# quantifiers with linear scans" remedy, generalised from a counting
+# regex to a small hand-rolled parser): an unbounded `\d+` backtracked
+# quadratically on a long digit run with no trailing badge; bounding it to
+# `\d{1,4}` alone let it match the LAST 1-4 digits of a longer run
+# (`12345<picture` read as `2345`); a `(?<!\d)` digit boundary still let a
+# comma or decimal point reset that boundary (`1,000 <picture>` summed to
+# 0); a lazy-dot `<picture\b.*?</picture>` regex was itself quadratic on
+# many unclosed openers (1.37s at 7,280 repeats of `"<picture "`) and,
+# once replaced with a bounded `str.find`, still let `str.find` land on an
+# INNER `</picture>` for nested markup (`1 <picture 2 <picture>
+# </picture></picture>`), silently swallowing the count between the two
+# openers rather than failing closed; and the regex-based nested-opener
+# guard added for THAT case still missed a digit sitting INSIDE a
+# malformed tag itself (`0 <picture 5 <img></picture>` read as 0, not
+# None), because a `<` that opens a second tag before the first one's own
+# `>` was never rejected at the tokenisation boundary.
 #
-# `_COPILOT_BADGE_OPEN` locates only the badge's OPENING marker (`<picture`
-# or `<img`, at a word boundary so `<picturex` doesn't count) -- a plain
-# alternation of two literals plus a zero-width `\b`, with no repetition to
-# backtrack. Finding each badge's CLOSING marker is then a separate,
-# un-anchored `str.find()` rather than a second regex, because a lazy-dot
-# regex alternative here (`<picture\b.*?</picture>`) is itself a quadratic
-# trap: DOTALL's `.` matches everything including further `<picture`
-# openers, so on a line of many unclosed `<picture ` markers with no
-# `</picture>` anywhere, EVERY opener re-scans forward to the end of the
-# line looking for a close tag that never comes -- measured 1.34s at 64KB
-# and 5.5s at 128KB (roughly 4x per doubling, i.e. quadratic), 1.37s end to
-# end through copilot_verdict() at 7,280 repeats of `"<picture "`. `str.find`
-# has the same per-call worst case, but the loop below calls it only ONCE
-# per opener and returns None -- failing the whole line closed -- the
-# moment a close marker is missing, instead of continuing to the next
-# opener and repeating the failed scan.
-_COPILOT_BADGE_OPEN = re.compile(r"<picture\b|<img\b", re.IGNORECASE)
-# Only a NESTED `<picture` (never a nested `<img`) disqualifies a badge:
-# real Copilot markup legitimately nests an `<img>` fallback inside a
-# `<picture>...</picture>` wrapper (`<picture><source ...><img ...>
-# </picture>`), and that `<img>` is part of the outer badge, not a second
-# opener to flag. A second `<picture` before the first one's own close IS
-# always malformed/ambiguous, because `str.find` then lands on whichever
-# `</picture>` comes first -- the INNER one -- silently swallowing any
-# count between the two openers rather than failing closed.
-_COPILOT_PICTURE_OPEN = re.compile(r"<picture\b", re.IGNORECASE)
-_COPILOT_LEADING_COUNT = re.compile(r"[ \t]*(?:·[ \t]*)?(\d{1,4})[ \t]*\Z")
+# Grammar (WS = an optional run of space/tab; SEP is the middle dot
+# `·`, the only separator the real ccr-overview-v2 fixtures use):
+#
+#   LINE  := WS? ENTRY (WS? SEP WS? ENTRY)* WS?
+#   ENTRY := COUNT WS? BADGE
+#   COUNT := 1-4 ASCII digits
+#   BADGE := `<picture ...>`, then any number of `<source ...>` and AT
+#             MOST one `<img ...>` (whitespace-only text allowed between
+#             the tags, nothing else, and no nested `<picture`), then
+#             `</picture>` -- or a standalone `<img ...>` tag on its own.
+#
+# Parsing is two linear passes. `_tokenize_copilot_line` splits `rest`
+# into TAG (`<...>`) and TEXT tokens in one left-to-right scan: an
+# unterminated `<` (no `>` anywhere after it) fails the whole line closed,
+# and so does a SECOND `<` appearing before the first one's own `>` --
+# that second condition is what makes `<picture 5 <img></picture>` and the
+# nested-`<picture>` case both fail at tokenisation, since in each one a
+# `<` opens before the enclosing tag's `>` arrives, with no dedicated
+# per-shape check needed for either. The grammar walk below then consumes
+# that fixed token list once, in order, doing only O(1) work per token (a
+# regex match against one already-short token's text, or a name comparison
+# against one already-short tag's text), so the whole function is linear
+# in `len(rest)` regardless of how the line is malformed.
+_COPILOT_FIRST_COUNT = re.compile(r"^[ \t]*(\d{1,4})[ \t]*$")
+_COPILOT_SEP_COUNT = re.compile(r"^[ \t]*·[ \t]*(\d{1,4})[ \t]*$")
+_COPILOT_WS_ONLY = re.compile(r"^[ \t]*$")
+
+
+def _tokenize_copilot_line(rest: str):
+    """Split a Findings-line remainder into ('TAG', text) / ('TEXT', text)
+    tokens in one left-to-right pass, or None if a `<` is unterminated or a
+    second `<` opens before the first one's own `>` closes it.
+
+    The second condition is deliberate, not merely a stricter version of
+    the first: it is what rejects a digit sitting INSIDE a malformed tag
+    (`<picture 5 <img>`), by refusing to let that whole span collapse into
+    one TAG token whose embedded `5` a later grammar check could never see
+    as a separate token to validate.
+    """
+    tokens = []
+    pos = 0
+    n = len(rest)
+    while pos < n:
+        if rest[pos] == "<":
+            next_lt = rest.find("<", pos + 1)
+            next_gt = rest.find(">", pos + 1)
+            if next_gt == -1:
+                return None
+            if next_lt != -1 and next_lt < next_gt:
+                return None
+            tokens.append(("TAG", rest[pos:next_gt + 1]))
+            pos = next_gt + 1
+        else:
+            next_lt = rest.find("<", pos)
+            if next_lt == -1:
+                next_lt = n
+            tokens.append(("TEXT", rest[pos:next_lt]))
+            pos = next_lt
+    return tokens
+
+
+def _copilot_tag_name(tag: str):
+    """Return the lowercased name of an OPENING TAG token ('picture',
+    'img', 'source', ...), or None for a closing tag or anything else that
+    doesn't start with a letter right after `<`."""
+    low = tag.lower()
+    if len(low) < 2 or not low[1].isalpha():
+        return None
+    j = 1
+    while j < len(low) and low[j].isalnum():
+        j += 1
+    return low[1:j]
+
+
+def _consume_copilot_badge(tokens, i: int):
+    """Consume one BADGE starting at tokens[i] (already known to be a TAG).
+
+    Returns the index just past the badge on success, or None if it is
+    not well-formed per the grammar in `_copilot_v2_line_findings_count`.
+    """
+    name = _copilot_tag_name(tokens[i][1])
+    if name == "img":
+        return i + 1
+    if name != "picture":
+        return None
+    i += 1
+    n = len(tokens)
+    saw_img = False
+    while True:
+        if i >= n:
+            return None  # <picture ...> never closed
+        kind, val = tokens[i]
+        if kind == "TEXT":
+            if not _COPILOT_WS_ONLY.match(val):
+                return None
+            i += 1
+            continue
+        if val.lower() == "</picture>":
+            return i + 1
+        inner_name = _copilot_tag_name(val)
+        if inner_name == "source":
+            i += 1
+            continue
+        if inner_name == "img" and not saw_img:
+            saw_img = True
+            i += 1
+            continue
+        return None  # any other tag, including a second <img> or a nested
+        # <picture>, is disallowed inside a picture badge
 
 
 def _copilot_v2_line_findings_count(rest: str):
-    """Sum one `**Findings:**` line's badge-adjacent counts, or None.
-
-    See the module comment above `_COPILOT_BADGE_OPEN` for the validation
-    rule and why the closing marker is located with `str.find()` rather
-    than a second regex.
-
-    Cost depends on shape, not just length: a well-formed line (every
-    opener closed) is O(n) overall, since each `str.find()` call's own
-    worst-case cost is bounded by the distance to that opener's close
-    marker and `pos` only ever advances forward past what has already been
-    scanned -- the same non-overlapping-advance argument that makes any
-    single left-to-right scan linear. A line whose FIRST unclosed opener
-    has no close marker anywhere in the remainder costs one O(n) `str.find`
-    call before returning None immediately (this function never resumes
-    scanning past an unterminated badge to look for a second one, which is
-    precisely what keeps that case from compounding into the quadratic
-    "every opener rescans to the end" trap the lazy-dot regex had). An
-    all-digits run with no badge at all (the original adversarial case this
-    scan was built to guard) costs one bounded `_COPILOT_BADGE_OPEN` search
-    plus one `re.search` scan for a leftover digit, both O(n).
+    """Parse one `**Findings:**` line's remainder against the grammar in
+    the module comment above `_COPILOT_FIRST_COUNT`, summing the
+    per-badge counts, or None (fail closed) if the line does not match.
     """
+    tokens = _tokenize_copilot_line(rest)
+    if tokens is None:
+        return None
+    n = len(tokens)
+    i = 0
     total = 0
-    pos = 0
     saw_badge = False
-    while True:
-        m = _COPILOT_BADGE_OPEN.search(rest, pos)
+    first = True
+    while i < n:
+        if tokens[i][0] != "TEXT":
+            return None
+        pattern = _COPILOT_FIRST_COUNT if first else _COPILOT_SEP_COUNT
+        m = pattern.match(tokens[i][1])
         if m is None:
-            if re.search(r"\d", rest[pos:]):
-                return None
-            break
-        between = rest[pos:m.start()]
-        token = _COPILOT_LEADING_COUNT.match(between)
-        if token is None:
+            # Only a whitespace-only tail at the very end of the line
+            # (the grammar's trailing WS?) may fail this without failing
+            # the whole line.
+            if i == n - 1 and _COPILOT_WS_ONLY.match(tokens[i][1]):
+                i += 1
+                break
             return None
-        if m.group().lower() == "<picture":
-            close_token = "</picture>"
-        else:
-            close_token = ">"
-        close_pos = rest.find(close_token, m.end())
-        if close_pos == -1:
-            # Unterminated badge: fail the whole line closed immediately
-            # rather than resuming past it to look for another opener --
-            # that resumption is exactly what made the lazy-dot regex
-            # rescan to the end of the line at every one of many unclosed
-            # openers.
+        i += 1
+        if i >= n or tokens[i][0] != "TAG":
             return None
-        if _COPILOT_PICTURE_OPEN.search(rest, m.end(), close_pos):
-            # A `<picture` opener appears before this one's own close
-            # marker: nested or malformed markup (`1 <picture 2 <picture>
-            # </picture></picture>`), where `str.find` would otherwise land
-            # on the INNER close and silently swallow whatever count sits
-            # between the two openers -- e.g. the outer badge alone reads
-            # as the whole line's only finding, undercounting rather than
-            # failing. Deliberately narrower than `_COPILOT_BADGE_OPEN`: a
-            # nested `<img>` is legitimate (real Copilot markup wraps a
-            # fallback `<img>` inside `<picture>`), so only a second
-            # `<picture` disqualifies. This bounded search costs at most
-            # the width of this one badge's own span, and that span never
-            # overlaps a later badge's (pos only ever advances past a
-            # completed badge), so it stays linear over the whole line.
+        new_i = _consume_copilot_badge(tokens, i)
+        if new_i is None:
             return None
-        total += int(token.group(1))
+        total += int(m.group(1))
         saw_badge = True
-        pos = close_pos + len(close_token)
+        i = new_i
+        first = False
+    if i != n:
+        return None
     return total if saw_badge else None
 
 

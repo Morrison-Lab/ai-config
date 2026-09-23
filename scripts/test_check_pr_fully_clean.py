@@ -6341,11 +6341,11 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     # unbounded `\d+` counting regex backtracked quadratically on a long
     # digit run with no trailing `<picture`/`<img` -- 25s for the isolated
     # regex and 19.6s end to end through copilot_verdict() at 65,536 digits.
-    # `_copilot_v2_line_findings_count`'s linear scan (see its module
-    # comment above `_COPILOT_BADGE_OPEN`) replaced that regex entirely, so
-    # this now also guards the replacement: a single bounded `.search()`
-    # for a badge opener that never appears, plus one bounded `.match()`
-    # check, not a scan whose cost depends on the run's length or position.
+    # `_copilot_v2_line_findings_count`'s tokenizer-plus-grammar parser (see
+    # its module comment above `_COPILOT_FIRST_COUNT`) replaced that regex
+    # entirely, so this now also guards the replacement: one linear
+    # tokenisation pass plus one linear grammar walk, not a scan whose cost
+    # depends on the run's length or position.
     _adversarial_findings_body = (
         "### \U0001f7e2 Approval recommended\n\n" "**Findings:** " + "1" * 65536
     )
@@ -6393,6 +6393,59 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check(
         "copilot_verdict on 8000+ repeated CLOSED badges scales linearly (< 0.1s)",
         _cb_verdict == "not-clean" and _cb_secs < 0.1,
+    )
+
+    # ai-config#3899 review finding, sixth round: a digit sitting INSIDE a
+    # malformed tag (a second `<` opening before the first tag's own `>`)
+    # was silently skipped rather than rejected, since `str.find` treated
+    # the whole `<picture 5 <img>` span as one opaque tag. The coordinator's
+    # own reprex: `_copilot_v2_line_findings_count` returned 0 (read as
+    # clean) instead of failing closed. This is what drove the rewrite from
+    # a sequence of one-off exclusions to a tokenizer plus a strict
+    # grammar: `_tokenize_copilot_line` now refuses to fold a `<` that
+    # opens before its enclosing tag's `>` into one token, so the `5`
+    # never has a chance to be silently absorbed.
+    check(
+        "_copilot_v2_line_findings_count fails closed on a digit inside a "
+        "malformed tag rather than skipping it: '0 <picture 5 <img></picture>'",
+        checker._copilot_v2_line_findings_count(
+            "0 <picture 5 <img></picture>"
+        ) is None,
+    )
+    check(
+        "copilot_verdict: a Findings line with a digit inside a malformed "
+        "tag states no verdict rather than reading as clean",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Review effort:** Lite  \n"
+            "**Findings:** 0 <picture 5 <img></picture>"
+        ) == "",
+    )
+    check(
+        "_copilot_v2_line_findings_count fails closed on stray non-whitespace "
+        "text inside a <picture> badge: '1 <picture>x</picture>'",
+        checker._copilot_v2_line_findings_count("1 <picture>x</picture>") is None,
+    )
+
+    # Timing regression test: a 262,144-character line of many well-formed
+    # entries must stay linear too -- the tokenizer-plus-grammar rewrite
+    # adds a second full pass over the token list on top of the earlier
+    # str.find-based scan, so this confirms that second pass did not
+    # reintroduce quadratic cost on legitimate, well-formed input.
+    _many_entries_unit = "1 <picture><source media=\"x\"><img src=\"y\"></picture> · "
+    _many_entries_reps = 262144 // len(_many_entries_unit)
+    _many_entries_line = (_many_entries_unit * _many_entries_reps).rstrip(" ·")
+    _many_entries_body = (
+        "### \U0001f7e2 Approval recommended\n\n**Findings:** " + _many_entries_line
+    )
+    _me_secs, _me_verdict = best_of_three(
+        checker.copilot_verdict, _many_entries_body
+    )
+    check(
+        "copilot_verdict on a 262,144-character line of many well-formed "
+        "entries scales linearly (< 0.5s)",
+        _me_verdict == "not-clean" and _me_secs < 0.5,
     )
 
     check(

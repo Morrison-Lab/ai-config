@@ -6417,6 +6417,55 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) is None,
     )
 
+    # ai-config#3899 review finding, tenth round (FAIL-OPEN, new in this
+    # PR): `_COPILOT_NONE_LINE`'s predecessor was `re.match(r"[ \t]*None\b",
+    # rest, ...)`, which only checked the START of the line -- the word
+    # boundary after "None" is satisfied by the following space regardless
+    # of what comes after it, so `**Findings:** None but actually 5
+    # <picture></picture>` read as zero and classified clean.
+    # `_COPILOT_NONE_LINE` now anchors both ends, so any trailing content
+    # falls through to the grammar parser, which fails the line closed.
+    check(
+        "copilot_verdict: a 'Findings:' line reading 'None but actually N "
+        "<badge>' states no verdict rather than reading as clean",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            f"**Findings:** None but actually 5 {_v2_picture}"
+        ) == "",
+    )
+
+    # ai-config#3899 review finding, eleventh round: the legacy path used
+    # `_has_valid_match`, which returns only the FIRST uncited match --
+    # pre-existing on main, the same class of bug this PR already fixed
+    # for the v2 multi-line scan. "Comments generated: 0 ... Comments
+    # generated: 3" classified clean off the first match alone.
+    check(
+        "copilot_verdict: a second uncited legacy 'Comments generated:' "
+        "occurrence is not shadowed by the first",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "<details>\n- **Comments generated:** 0\n</details>\n\n"
+            "A later round:\n"
+            "<details>\n- **Comments generated:** 3\n</details>"
+        ) == "not-clean",
+    )
+
+    # ai-config#3899 review finding, twelfth round: COPILOT_COMMENT_COUNT's
+    # `(\d+)` was unbounded, and `int()` on a run past a few thousand
+    # digits raises ValueError uncaught -- pre-existing on main, crashing
+    # the merge-gate classifier instead of failing closed. Now bounded to
+    # 1-6 digits with a lookbehind/lookahead pair, so a longer run matches
+    # nothing at all (not a truncated head or tail of itself) and is
+    # treated as a present-but-unparseable source.
+    check(
+        "copilot_verdict: a 5000-digit legacy 'Comments generated:' count "
+        "does not crash and does not classify clean",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "<details>\n- **Comments generated:** " + ("9" * 5000) + "\n</details>"
+        ) != "clean",
+    )
+
     # Timing regression test (ai-config#3899 review finding): the original
     # unbounded `\d+` counting regex backtracked quadratically on a long
     # digit run with no trailing `<picture`/`<img` -- 25s for the isolated

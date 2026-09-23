@@ -2198,9 +2198,25 @@ COPILOT_SUPPRESSED_BLOCK = re.compile(r"\bSuppressed\s+comments\b", re.IGNORECAS
 # Copilot reports its own inline-finding count in the `Review details` block, as
 # `0`, `0 new`, or a positive integer. This is the only count available to a
 # body-only classifier, and its absence is not evidence of zero.
-COPILOT_COMMENT_COUNT = re.compile(
-    r"\bComments\s+generated:\**[ \t]*(\d+)", re.IGNORECASE
+#
+# Split into two regexes rather than one, and the digit group is bounded
+# (ai-config#3899 review finding): the field's own real counts are always
+# small, and an unbounded `(\d+)` let `int()` on a >4300-digit run raise
+# ValueError uncaught, crashing the merge-gate classifier instead of
+# failing closed. `COPILOT_COMMENT_GENERATED` matches just the phrase
+# prefix; `COPILOT_COMMENT_COUNT` is then `.match()`-anchored at that
+# phrase's end, bounded to 1-6 digits, with `(?<![0-9])`/`(?![0-9])`
+# guarding both ends so a run LONGER than 6 digits cannot match a
+# truncated head or tail of itself -- it fails to match at all, and the
+# caller treats that as a present-but-unparseable source (fail closed)
+# rather than silently reading its first 6 digits as a small count. Each
+# check is a single bounded match (at most 6 backtrack attempts, O(1)) at
+# one fixed anchor position, so this stays O(1) per occurrence regardless
+# of how long the adversarial digit run is.
+COPILOT_COMMENT_GENERATED = re.compile(
+    r"\bComments\s+generated:\**[ \t]*", re.IGNORECASE
 )
+COPILOT_COMMENT_COUNT = re.compile(r"(?<![0-9])([0-9]{1,6})(?![0-9])")
 # The `ccr-overview-v2` body format (ai-config#3899) replaces that
 # `Comments generated:` field with a `**Findings:**` line instead: either the
 # word `None`, or one or more `<n> <severity-badge>` pairs (an inline `<picture>`
@@ -2259,12 +2275,20 @@ COPILOT_FINDINGS_LINE = re.compile(
 # against one already-short tag's text), so the whole function is linear
 # in `len(rest)` regardless of how the line is malformed.
 # `[0-9]`, not `\d`: Python's `\d` matches every Unicode `Nd`-category
-# digit, not just ASCII -- a full-width `５` ("5") would otherwise
-# satisfy "1-4 ASCII digits" and parse as a real count, contradicting the
-# grammar's own stated ASCII-only rule.
+# digit, not just ASCII -- a full-width digit (U+FF15, "5") would
+# otherwise satisfy "1-4 ASCII digits" and parse as a real count,
+# contradicting the grammar's own stated ASCII-only rule.
 _COPILOT_FIRST_COUNT = re.compile(r"^[ \t]*([0-9]{1,4})[ \t]*$")
 _COPILOT_SEP_COUNT = re.compile(r"^[ \t]*·[ \t]*([0-9]{1,4})[ \t]*$")
 _COPILOT_WS_ONLY = re.compile(r"^[ \t]*$")
+# Anchored at both ends (`$`, not `\b`): a bare `re.match(r"[ \t]*None\b", ...)`
+# only checked the START of the line, so `**Findings:** None but actually 5
+# <picture></picture>` satisfied it and read as zero -- the word boundary
+# after "None" is satisfied by the following space regardless of what comes
+# after it (ai-config#3899 review finding). Requiring the whole line to be
+# `None` (plus optional surrounding whitespace) means any trailing content
+# falls through to the grammar parser instead, which fails it closed.
+_COPILOT_NONE_LINE = re.compile(r"^[ \t]*None[ \t]*$", re.IGNORECASE)
 
 
 def _tokenize_copilot_line(rest: str):
@@ -2453,7 +2477,7 @@ def _copilot_v2_findings_count(scan: str, cited: bytearray):
             continue
         saw_line = True
         rest = m.group("rest")
-        if re.match(r"[ \t]*None\b", rest, re.IGNORECASE):
+        if _COPILOT_NONE_LINE.match(rest):
             continue
         count = _copilot_v2_line_findings_count(rest)
         if count is None:
@@ -2475,24 +2499,33 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
     is recognisably a Copilot verdict returns ``not-clean``, and a body this
     function does not recognise returns ``''`` so the ordinary scans decide.
 
-    The inline-finding count is read from BOTH the legacy
-    `Comments generated: N` field and the `ccr-overview-v2` format's
-    `**Findings:**` line (ai-config#3899) when either is present in the
-    body -- the two are NOT mutually exclusive, and treating them as such
-    was itself a fail-open defect: a body carrying an uncited legacy
-    `Comments generated: 0` phrase anywhere (even in plain prose quoting
-    an earlier round) used to override a real nonzero v2 `**Findings:**`
-    line and read as clean. Each PRESENT source contributes its own count
-    (or None, for a v2 line present but in an unrecognised shape); a
-    source that is simply absent contributes nothing, so a body carrying
-    only the legacy field behaves exactly as it did before v2 existed.
-    Combined the same way the v2 multi-line scan combines several
-    uncited `**Findings:**` lines: any nonzero count from any present
+    The inline-finding count is read from EVERY uncited legacy
+    `Comments generated: N` occurrence and every uncited `ccr-overview-v2`
+    `**Findings:**` line (ai-config#3899), not just the first of either --
+    a body reading "Comments generated: 0 ... Comments generated: 3"
+    used to classify clean off the first match alone, a pre-existing gap
+    of the same class this function's v2 handling was already fixed for.
+    The two formats are also NOT mutually exclusive with each other:
+    treating them as such was itself a fail-open defect, since a body
+    carrying an uncited legacy `Comments generated: 0` phrase anywhere
+    (even in plain prose quoting an earlier round) used to override a
+    real nonzero v2 `**Findings:**` line and read as clean.
+
+    Each PRESENT source -- one per uncited legacy occurrence, plus the v2
+    multi-line scan's own combined result if any uncited `**Findings:**`
+    line exists -- contributes its own count, or None if that particular
+    occurrence does not parse (an over-long legacy digit run past
+    COPILOT_COMMENT_COUNT's bound, or a v2 line in an unrecognised
+    shape). A source that is simply absent (the field never appears)
+    contributes nothing, so a body carrying only the legacy field behaves
+    exactly as it did before v2 existed. All contributed sources are
+    combined the same way the v2 multi-line scan combines several
+    `**Findings:**` lines on its own: any nonzero count from any present
     source is decisive and wins (not-clean); failing that, any
     unparseable present source yields no verdict; zero only when every
     present source reads zero.
 
-    Fails closed when neither source is present at all. An affirmative
+    Fails closed when no source is present at all. An affirmative
     heading with no count field states an approval this function cannot
     confirm is finding-free, so it yields no verdict rather than a clean
     one -- the same direction ``_is_bot_author`` and the quorum tag
@@ -2521,9 +2554,18 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
     if _has_valid_match(COPILOT_SUPPRESSED_BLOCK, scan):
         return "not-clean"
     counts = []
-    legacy_match = _has_valid_match(COPILOT_COMMENT_COUNT, scan)
-    if legacy_match is not None:
-        counts.append(int(legacy_match.group(1)))
+    for gm in COPILOT_COMMENT_GENERATED.finditer(scan):
+        if match_is_cited(cited, gm.start(), gm.end()):
+            continue
+        dm = COPILOT_COMMENT_COUNT.match(scan, gm.end())
+        if dm is not None and not match_is_cited(cited, dm.start(), dm.end()):
+            counts.append(int(dm.group(1)))
+        else:
+            # The phrase is present but no bounded 1-6 digit count follows
+            # it immediately -- most likely an over-long digit run that
+            # COPILOT_COMMENT_COUNT's lookaround refuses to match a
+            # truncated head/tail of. Present but unparseable, not absent.
+            counts.append(None)
     if _has_valid_match(COPILOT_FINDINGS_LINE, scan) is not None:
         counts.append(_copilot_v2_findings_count(scan, cited))
     if not counts:

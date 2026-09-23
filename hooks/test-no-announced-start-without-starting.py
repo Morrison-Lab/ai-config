@@ -82,6 +82,14 @@ CASES_BLOCK = [
 ]
 
 CASES_PASS = [
+    # Round-3 review finding on ai-config#3887, verified there by direct
+    # execution. "start with" is expository -- it says where an explanation
+    # begins, not that work is about to be done -- and the colon-joined
+    # delivery shares a splitter sentence with the match, so the tail window
+    # alone could not save it.
+    "I'll start with the easy part of the analysis: the data looks clean "
+    "and complete.",
+    "I'll start with the numbers, then the caveats.",
     # The review finding on ai-config#3887: an ordinary mid-reply narrative
     # transition, in a reply that then delivers what it announced. Blocking
     # this is how a guard earns being switched off.

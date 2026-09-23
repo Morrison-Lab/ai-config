@@ -63,8 +63,8 @@ import tempfile
 # because what is being started is not what decides this -- whether it started
 # is.
 PATTERNS = [
-    r"I'?ll start (?:on |with )?(?:it|that|this|these|those|them)\b",
-    r"I'?ll start (?:on |with )?(?:the|a|an|my|our) \w+",
+    r"I'?ll start (?:on )?(?:it|that|this|these|those|them)\b",
+    r"I'?ll start (?:on )?(?:the|a|an|my|our) \w+",
     r"(?:I am|I'?m) (?:now )?starting (?:it|that|this|on it|the|a|an|my|our)\b",
     r"(?:I am|I'?m) (?:going to )?(?:start|begin) (?:it|that|this|on it)\s+now\b",
     r"starting (?:it|that|this|on it|work on it) now\b",
@@ -72,6 +72,12 @@ PATTERNS = [
     r"I'?ll (?:do|handle|tackle|take) (?:it|that|this) now\b",
     r"(?:I am|I'?m) (?:now )?(?:beginning|kicking off) (?:it|that|this|the)\b",
 ]
+# `start WITH` was dropped from the two `I'll start` alternatives above.
+# "I'll start with the easy part: the data looks clean" is expository -- it
+# says where an explanation begins, not that work is about to be gone and
+# done. "start on" and bare "start the" carry the announcement sense; "start
+# with" mostly does not, and the ambiguity is not worth the false positives.
+#
 # `next,? I'?ll \w+` was here and was removed. "Next, I'll summarize the
 # findings below" is an ordinary narrative transition, and in a reply that
 # then delivers the summary it is not an announcement of anything. A guard

@@ -960,3 +960,21 @@ When testing hooks or mocking commands on Windows:
   (`dir/symlink/../..` resolves to `dir` rather than `target/..`).
   Tests asserting symlinked plugin root traversal must guard with `os.path.exists()`
   on platforms without lexical traversal.
+
+## Consolidate overlapping principles instead of creating redundant principle documents (#3891)
+
+When introducing guidance that extends or deepens an existing core principle:
+- **Audit existing principle catalog first:**
+  Before authoring a new standalone principle document,
+  search `shared/principles/` for existing documents that address the same failure mode or epistemic domain
+  (`dont-take-my-word-for-it.md`, `challenge-the-assignment.md`).
+- **Extend existing principles to absorb new rules:**
+  Creating a parallel principle file (such as `no-sycophancy.md` alongside `dont-take-my-word-for-it.md`)
+  dilutes authority,
+  fragments searchability,
+  and duplicates psychological and operational explanations.
+  Incorporate new rules (such as unprompted pushback, active consideration before action, and never deferring when you disagree)
+  directly into the canonical document as dedicated sections and update Do/Don't tables.
+- **Maintain single source of truth in catalog and AGENTS.md:**
+  Update `shared/principles/README.md` and `AGENTS.md` to reference the unified canonical document
+  rather than splitting guidance across multiple overlapping files.

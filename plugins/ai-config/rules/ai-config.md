@@ -23,11 +23,13 @@ These instructions define standardized operating rules for Antigravity operating
 11. **Status and diagnostic requests are not report-only:** Diagnose and repair issues immediately in the same turn rather than waiting for follow-up prompts.
 12. **Run UMS proactively:** Run UMS when scrutinized and before pausing when learnings have accumulated.
 13. **Timestamp recaps in local time:** Use Pacific Time (`TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
-14. **No sycophancy:** Give users the whole truth and nothing but the truth,
-    including your full honest opinions,
-    and never defer to the user's opinion when you disagree.
-    Even when they state a claim without asking,
-    if you disagree, say so.
+14. **Don't take anyone's word for it (no sycophancy):** Give users the whole truth and nothing but the truth,
+    including your full honest opinions;
+    never defer to the user's opinion when you disagree.
+    Even when they state a claim or opinion without asking,
+    if you disagree,
+    say so.
+    Always consider whether you agree before responding and/or acting.
 
 ## Antigravity Workflow Conventions
 

@@ -313,11 +313,15 @@ interpolation), same as `--body-file` on the porcelain command.
 
 - **Do:** fall back to the REST PATCH when `gh pr edit` errors on
   `projectCards`, rather than retrying or hand-editing on the web.
+  For adding or removing labels on a PR, `gh issue edit <N> --add-label <label>`
+  targets the issue endpoint directly and bypasses the `pullRequest.projectCards`
+  deprecation failure entirely.
 - **Don't:** read the error as a permissions or repo problem --- the failing
   field is one the edit never needed.
 
-(Measured 2026-08-23 on Morrison-Lab/ai-config#1976, gh in a local Windows session;
-the REST PATCH succeeded immediately on the same body file.)
+(Measured 2026-08-23 on Morrison-Lab/ai-config#1976 and 2026-09-23 on Morrison-Lab/gha#913,
+gh in local Windows sessions;
+the REST PATCH and `gh issue edit` succeeded immediately.)
 
 ## `gh pr merge` "not up to date with the base branch" does not fire consistently on an equally-stale PR
 

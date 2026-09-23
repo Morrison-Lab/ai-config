@@ -55,6 +55,14 @@ gate.
   up to date, and `git branch -d <branch>` errors `branch '<branch>' not
   found` since `gh` already deleted it. Check `git branch --show-current`
   first before running any of those.
+  **Worktree conflict caveat:**
+  if the default branch (`main`) is already checked out in another worktree
+  (such as the primary repository checkout),
+  `gh pr merge --delete-branch` fails with `fatal: 'main' is already checked out at '<path>'`.
+  In an isolated worktree,
+  omit `--delete-branch` (run `gh pr merge <PR> --squash`)
+  to merge without triggering the local checkout conflict.
+  (Measured 2026-09-23 on Morrison-Lab/gha#913 in a local Windows worktree.)
 
 ## Git --- renaming an open PR's *head* branch can close the PR (no reopen)
 

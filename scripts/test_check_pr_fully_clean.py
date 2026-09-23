@@ -6167,7 +6167,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     # longer digit run by taking only its last 1-4 digits, so `10000` was
     # misread as `0000` (sums to 0, the unsafe fail-open direction) and
     # `12345` as `2345`. A five-digit finding count is not realistic Copilot
-    # output, but the regex must not silently misparse one into a wrong
+    # output, but the parser must not silently misparse one into a wrong
     # small number -- it has to fail closed instead. Constructed, since no
     # real review reports five-digit findings.
     v2_approval_five_digit_body = (
@@ -6175,6 +6175,34 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "### \U0001f7e2 Approval recommended\n\n"
         "A five-digit finding count is not realistic, but must not parse as 0.\n\n"
         f"**Review effort:** Lite  \n**Findings:** 10000 {_v2_picture}"
+    )
+    # ai-config#3899 review finding, second round: a digit-boundary lookaround
+    # alone still let a thousands or decimal separator reset the boundary --
+    # `1,000 <picture>` and `10,000 <picture>` both parsed as their trailing
+    # `000` (three digits, since `,`/`.` are not `\d`), summing to 0 exactly
+    # as the unbounded five-digit case did. Constructed, since no real review
+    # reports a comma- or decimal-separated finding count.
+    _v2_comma_thousand_rest = f"1,000 {_v2_picture}"
+    _v2_comma_ten_thousand_rest = f"10,000 {_v2_picture}"
+    _v2_decimal_rest = f"1.000 {_v2_picture}"
+    # ai-config#3899 review finding, third round: `_copilot_v2_findings_count`
+    # committed to the FIRST uncited `**Findings:**` match, so a body quoting
+    # an earlier round's `**Findings:** None` ahead of its own current
+    # `**Findings:** 5 <picture...>` -- or the reverse order -- let the
+    # zero-reading line win regardless of position. Constructed (transcribed
+    # bodies never carry two uncited Findings lines), covering both orders
+    # since the fix must not merely favor whichever line comes first.
+    v2_none_then_five_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n"
+        "**Review effort:** Lite  \n**Findings:** None\n\n"
+        f"**Findings:** 5 {_v2_picture}"
+    )
+    v2_five_then_none_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n"
+        f"**Review effort:** Lite  \n**Findings:** 5 {_v2_picture}\n\n"
+        "**Findings:** None"
     )
     v2_changes_none_body = (
         "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
@@ -6202,18 +6230,38 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         checker.copilot_verdict(v2_approval_mixed_severity_body) == "not-clean",
     )
     check(
-        "COPILOT_FINDINGS_SEVERITY_COUNT does not read the last 4 digits of a "
+        "_copilot_v2_line_findings_count does not read the last 4 digits of a "
         "5-digit run: '12345<picture' is not misread as 2345",
-        checker.COPILOT_FINDINGS_SEVERITY_COUNT.findall("12345<picture") == [],
-    )
-    check(
-        "COPILOT_FINDINGS_SEVERITY_COUNT does not misread '10000<picture' as 0000/0",
-        checker.COPILOT_FINDINGS_SEVERITY_COUNT.findall("10000<picture") == [],
+        checker._copilot_v2_line_findings_count("12345<picture>") is None,
     )
     check(
         "copilot_verdict: a 5-digit 'Findings:' count states no verdict rather "
         "than misreading it as a wrong small number",
         checker.copilot_verdict(v2_approval_five_digit_body) == "",
+    )
+    check(
+        "_copilot_v2_line_findings_count fails closed on a comma thousands "
+        "separator: '1,000 <picture' does not sum to 0",
+        checker._copilot_v2_line_findings_count(_v2_comma_thousand_rest) is None,
+    )
+    check(
+        "_copilot_v2_line_findings_count fails closed on '10,000 <picture'",
+        checker._copilot_v2_line_findings_count(_v2_comma_ten_thousand_rest) is None,
+    )
+    check(
+        "_copilot_v2_line_findings_count fails closed on a decimal separator: "
+        "'1.000 <picture'",
+        checker._copilot_v2_line_findings_count(_v2_decimal_rest) is None,
+    )
+    check(
+        "copilot_verdict: a 'None' Findings line followed by a later "
+        "nonzero one is not clean regardless of order",
+        checker.copilot_verdict(v2_none_then_five_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: a nonzero Findings line followed by a later "
+        "'None' one is not clean regardless of order",
+        checker.copilot_verdict(v2_five_then_none_body) == "not-clean",
     )
     check(
         "copilot_verdict: v2 'Changes recommended' with 'Findings: None' is not clean",
@@ -6236,14 +6284,15 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         checker.classify_verdict(v2_approval_nonzero_body, "COMMENTED", "copilot") == "not-clean",
     )
 
-    # Timing regression test (ai-config#3899 review finding): an unbounded
-    # `\d+` in COPILOT_FINDINGS_SEVERITY_COUNT backtracked quadratically on a
-    # long digit run with no trailing `<picture`/`<img` -- `\d+` greedily
-    # consumes the whole run, fails to find `<`, gives back one digit at a
-    # time, and `finditer` repeats that O(n) backtrack at every one of the
-    # run's O(n) starting positions (shared/coding/regex-backtracking-pitfalls.md).
-    # Measured before bounding it to `\d{1,4}`: 25s for the isolated regex and
-    # 19.6s end to end through copilot_verdict() at 65,536 digits.
+    # Timing regression test (ai-config#3899 review finding): the original
+    # unbounded `\d+` counting regex backtracked quadratically on a long
+    # digit run with no trailing `<picture`/`<img` -- 25s for the isolated
+    # regex and 19.6s end to end through copilot_verdict() at 65,536 digits.
+    # `_copilot_v2_line_findings_count`'s linear scan (see its module
+    # comment above `_COPILOT_BADGE`) replaced that regex entirely, so this
+    # now also guards the replacement: a single `.search()` for a badge
+    # that never appears, plus one bounded `.match()` check, not a scan
+    # whose cost depends on the run's length or position.
     _adversarial_findings_body = (
         "### \U0001f7e2 Approval recommended\n\n" "**Findings:** " + "1" * 65536
     )

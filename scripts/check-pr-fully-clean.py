@@ -2213,52 +2213,95 @@ COPILOT_COMMENT_COUNT = re.compile(
 COPILOT_FINDINGS_LINE = re.compile(
     r"\*\*Findings:\*\*[ \t]*(?P<rest>[^\n\r]*)", re.IGNORECASE
 )
-# Bounded to 1-4 digits (a real severity count is a small integer, never in
-# the thousands): an unbounded `\d+` here backtracks quadratically on a long
-# digit run with no trailing `<picture`/`<img` -- `\d+` greedily consumes the
-# whole run, fails to find `<`, and gives back one digit at a time before
-# `finditer` retries from the next starting position, repeating that O(n)
-# backtrack at every one of the run's O(n) positions
-# (shared/coding/regex-backtracking-pitfalls.md). Measured before this bound:
-# 25s at 65,536 digits for this regex alone, 19.6s end to end through
-# copilot_verdict() on a `**Findings:** ` line followed by 60,000 `1`s.
-#
-# `(?<!\d)` is required alongside the bound, not merely a style choice: a
-# bare `\d{1,4}` still MATCHES inside a longer run by taking only its last
-# 1-4 digits -- `findall` on `12345<picture` returns `['2345']`, and on
-# `10000<picture` returns `['0000']`, which sums to 0 and would misclassify
-# a body reporting 10,000 findings as clean. That is the unsafe direction:
-# a length bound alone weakens the fail-closed contract instead of only
-# fixing the backtracking. The digit boundary makes the whole run fail to
-# match (no valid 1-4-digit token starts where the run starts, and every
-# other position inside the run is preceded by a digit), so
-# `_copilot_v2_findings_count` sees an empty `findall()` and returns None
-# rather than a wrong 0.
-COPILOT_FINDINGS_SEVERITY_COUNT = re.compile(
-    r"(?<!\d)(\d{1,4})[ \t]*<(?:picture|img)\b", re.IGNORECASE
-)
+# A `**Findings:**` line's per-severity counts are validated with a linear
+# scan rather than a single counting regex (shared/coding/
+# regex-backtracking-pitfalls.md's "replace nested quantifiers with linear
+# scans" remedy). Two prior narrower fixes both still had a fail-open gap:
+# an unbounded `\d+` backtracked quadratically on a long digit run with no
+# trailing badge (25s at 65,536 digits); bounding it to `\d{1,4}` alone then
+# let the regex match the LAST 1-4 digits of a longer run (`12345<picture`
+# read as `2345`); and adding a `(?<!\d)` digit boundary still let a comma or
+# decimal point reset that boundary (`1,000 <picture>` and `10,000
+# <picture>` both parsed as their trailing `000`, summing to 0). Rather than
+# add a third lookaround to patch a third separator shape, every digit run
+# outside the badge markup is required to be a clean standalone 1-4 digit
+# token immediately preceding a badge (only whitespace, or one middle-dot
+# separator, allowed between a count and its badge, or between one badge and
+# the next count) -- ANY digit run that does not fit that shape fails the
+# whole line closed, rather than silently summing whatever part of the line
+# still looks parseable.
+_COPILOT_BADGE = re.compile(r"<picture\b.*?</picture>|<img\b[^<>]*>", re.IGNORECASE | re.DOTALL)
+_COPILOT_LEADING_COUNT = re.compile(r"[ \t]*(?:·[ \t]*)?(\d{1,4})[ \t]*\Z")
+
+
+def _copilot_v2_line_findings_count(rest: str):
+    """Sum one `**Findings:**` line's badge-adjacent counts, or None.
+
+    See the module comment above `_COPILOT_BADGE` for the validation rule.
+    Each loop iteration locates the next badge with a single bounded
+    `.search()` and then anchors a bounded count-token match (`.match()`,
+    not `.search()`, so it tries exactly one starting alignment) against the
+    text between it and the previous badge -- so even an adversarial
+    65,536-digit run with no badge at all costs one linear search plus one
+    bounded match, never a scan whose cost depends on the run's length or
+    position (shared/coding/regex-backtracking-pitfalls.md).
+    """
+    total = 0
+    pos = 0
+    saw_badge = False
+    while True:
+        m = _COPILOT_BADGE.search(rest, pos)
+        if m is None:
+            if re.search(r"\d", rest[pos:]):
+                return None
+            break
+        between = rest[pos:m.start()]
+        token = _COPILOT_LEADING_COUNT.match(between)
+        if token is None:
+            return None
+        total += int(token.group(1))
+        saw_badge = True
+        pos = m.end()
+    return total if saw_badge else None
 
 
 def _copilot_v2_findings_count(scan: str, cited: bytearray):
-    """Parse a `ccr-overview-v2` `**Findings:**` line into an inline-finding count.
+    """Parse every `ccr-overview-v2` `**Findings:**` line into an inline-finding count.
 
-    Mirrors COPILOT_COMMENT_COUNT's contract: returns an int on a recognised
-    line (0 for `None`, otherwise the summed per-severity counts) and None --
-    fail closed -- when no such line is present, the matched line is itself
-    cited (quoted inside a fenced example), or the line is present but in
-    neither recognised shape (a future format this function does not know).
+    Mirrors COPILOT_COMMENT_COUNT's contract: returns an int (0 for `None`,
+    otherwise the summed per-severity counts) and None -- fail closed --
+    when no recognisable line is present, every match is cited (quoted
+    inside a fenced example), or a line is present but in neither
+    recognised shape (a future format this function does not know).
+
+    Scans every uncited line rather than committing to the first
+    (ai-config#3899 review finding), the same way COPILOT_NEGATIVE_HEADER
+    is scanned for every uncited match in `copilot_verdict` below: a body
+    carrying two uncited `**Findings:**` lines -- `None` followed by a
+    genuine `5 <picture...>` from a later round, or the reverse order --
+    must not let either line's zero win over the other's nonzero. A nonzero
+    count on any uncited line is decisive and returned immediately; failing
+    that, any unparseable line makes the whole result None; only when every
+    uncited line parses to exactly zero does this return 0.
     """
+    saw_line = False
+    saw_unparseable = False
     for m in COPILOT_FINDINGS_LINE.finditer(scan):
         if match_is_cited(cited, m.start(), m.end()):
             continue
+        saw_line = True
         rest = m.group("rest")
         if re.match(r"[ \t]*None\b", rest, re.IGNORECASE):
-            return 0
-        counts = COPILOT_FINDINGS_SEVERITY_COUNT.findall(rest)
-        if counts:
-            return sum(int(c) for c in counts)
+            continue
+        count = _copilot_v2_line_findings_count(rest)
+        if count is None:
+            saw_unparseable = True
+            continue
+        if count != 0:
+            return count
+    if not saw_line or saw_unparseable:
         return None
-    return None
+    return 0
 
 
 def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str:

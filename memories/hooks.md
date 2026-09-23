@@ -249,6 +249,26 @@ A suite composed only of allow-cases would have gone green on a guard that had s
 - **Do:** prefer an anchored replace of an exact known string over a slice between two anchors, whose span you are asserting rather than reading.
 - **Don't:** read "it parses" or "it exits 0" as evidence an edited fail-open guard still works --- both are exactly what total breakage looks like.
 
+### 3.4 Widening an inner branch without widening the dispatch guard ahead of it
+
+Adding an alternative command caller (such as `curl` or `wget` alongside `gh`)
+in an inner branch of a parser or guard function,
+while leaving an upstream guard (e.g. `argv[0] != "gh"`) that short-circuits execution
+before the inner branch can ever be reached,
+creates permanently unreachable dead code for the new caller shapes.
+
+Measured 2026-09-23 on [ai-config#3893](https://github.com/Morrison-Lab/ai-config/pull/3893) (`hooks/no-unreviewed-pr.py`).
+`_argv_close` added REST merge detection for `gh api`, `curl`, and `wget`.
+Its leading guard retained `if not argv or argv[0] != "gh" or len(argv) < 2: return False, None, None`.
+Consequently, `curl` and `wget` calls returned `(False, None, None)` immediately at the top.
+The sibling function `_argv_update_branch` added in the same commit had the correct guard (`if not argv or len(argv) < 2:`).
+The code parsed and imported cleanly,
+and the regression was surfaced by Claude code review.
+
+- **Do:** audit all early-return guards between the function signature and the modified branch whenever adding new supported tools or command shapes.
+- **Do:** add unit tests for every distinct tool or prefix added to an alternative branch.
+- **Don't:** assume that because an adjacent sibling function implemented the widened guard correctly, a duplicate or sibling function in the same file did as well without direct inspection.
+
 ---
 
 ## 4. Detached Timers & Monitoring Services

@@ -9,6 +9,7 @@ Run: python3 hooks/test-no-stale-pr-status.py hooks/no-stale-pr-status.py
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -412,25 +413,21 @@ CASES = [
 
 
 def run(events):
-    fd, path = tempfile.mkstemp(suffix=".jsonl")
-    with os.fdopen(fd, "w") as fh:
-        for e in events:
-            fh.write(json.dumps(e) + "\n")
-    # The guard fires once per distinct message; clear sentinels so repeated
-    # runs of this suite stay deterministic.
-    for f in os.listdir(tempfile.gettempdir()):
-        if f.startswith(SENTINEL_PREFIX):
-            try:
-                os.remove(os.path.join(tempfile.gettempdir(), f))
-            except OSError:
-                pass
-    out = subprocess.run(
-        [sys.executable, HOOK],
-        input=json.dumps({"transcript_path": path}),
-        capture_output=True, text=True,
-    ).stdout.strip()
-    os.remove(path)
-    return bool(out)
+    td = tempfile.mkdtemp()
+    try:
+        path = os.path.join(td, "transcript.jsonl")
+        with open(path, "w", encoding="utf-8") as fh:
+            for e in events:
+                fh.write(json.dumps(e) + "\n")
+        env = dict(os.environ, TMPDIR=td, TEMP=td, TMP=td)
+        out = subprocess.run(
+            [sys.executable, HOOK],
+            input=json.dumps({"transcript_path": path}),
+            capture_output=True, text=True, env=env,
+        ).stdout.strip()
+        return bool(out)
+    finally:
+        shutil.rmtree(td, ignore_errors=True)
 
 
 
@@ -513,26 +510,24 @@ def check_attribution():
     """Each warning must describe what it matched, not what it assumed."""
     failures = 0
     for message, expected, label in ATTRIBUTION:
-        fd, path = tempfile.mkstemp(suffix=".jsonl")
-        with os.fdopen(fd, "w") as fh:
-            for e in (QUERY, PUSH, say(message)):
-                fh.write(json.dumps(e) + "\n")
-        for f in os.listdir(tempfile.gettempdir()):
-            if f.startswith(SENTINEL_PREFIX):
-                try:
-                    os.remove(os.path.join(tempfile.gettempdir(), f))
-                except OSError:
-                    pass
-        out = subprocess.run(
-            [sys.executable, HOOK],
-            input=json.dumps({"transcript_path": path}),
-            capture_output=True, text=True,
-        ).stdout.strip()
-        os.remove(path)
-        reason = (json.loads(out).get("reason") if out else "") or ""
-        ok = expected in reason
-        failures += 0 if ok else 1
-        print(f"{'ok  ' if ok else 'FAIL'}  attribution: {label}")
+        td = tempfile.mkdtemp()
+        try:
+            path = os.path.join(td, "transcript.jsonl")
+            with open(path, "w", encoding="utf-8") as fh:
+                for e in (QUERY, PUSH, say(message)):
+                    fh.write(json.dumps(e) + "\n")
+            env = dict(os.environ, TMPDIR=td, TEMP=td, TMP=td)
+            out = subprocess.run(
+                [sys.executable, HOOK],
+                input=json.dumps({"transcript_path": path}),
+                capture_output=True, text=True, env=env,
+            ).stdout.strip()
+            reason = (json.loads(out).get("reason") if out else "") or ""
+            ok = expected in reason
+            failures += 0 if ok else 1
+            print(f"{'ok  ' if ok else 'FAIL'}  attribution: {label}")
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
     return failures
 
 

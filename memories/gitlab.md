@@ -65,6 +65,20 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   **Do:** before running a copied or generated `glab api` command, scan its
   arguments for `--jq` and replace that flag with a separate `jq` pipeline.
   **Don't:** assume a command copied from `gh api` is valid for `glab api`.
+- **Never inspect GitLab CI/CD variables with the project variables API in an
+  agent-visible terminal.**
+  On the HC2 self-hosted GitLab instance, measured
+  2026-09-22, `GET /projects/<id>/variables` returned each variable's plaintext
+  `value`, including values marked masked.
+  Treat the endpoint response as secret material rather than configuration
+  metadata: do not run it to enumerate keys, pipe it to a formatter, or include
+  it in a diagnostic transcript.
+  Audit variable names through the GitLab settings UI, or have a Maintainer
+  perform a no-output administrative check; rotate any value emitted by a prior
+  API inspection.
+  Masking affects logs, not this API response, and variables available to an
+  unprotected merge-request pipeline are readable by that pipeline's source
+  code.
 - **Use the paginated MR notes endpoint as the authoritative unresolved-inline-comment sweep.**
   `GET /projects/:id/merge_requests/:iid/notes` can return resolvable unresolved `DiffNote`s that a Discussions API sweep does not expose as an unresolved discussion.
   Filter every page on `.resolvable == true and .resolved == false`, then use the Discussions API only to locate and resolve the corresponding thread.

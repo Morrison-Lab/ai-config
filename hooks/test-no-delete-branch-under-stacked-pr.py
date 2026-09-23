@@ -73,6 +73,7 @@ def run(command, mode="child", with_gh=True, capture_argv=False):
     calls = []
     with tempfile.TemporaryDirectory() as tmp:
         env = dict(os.environ)
+        env.pop("ANTIGRAVITY_AGENT", None)
         if capture_argv:
             env["FAKE_GH_LOG"] = os.path.join(tmp, "argv.log")
         if with_gh:
@@ -80,6 +81,10 @@ def run(command, mode="child", with_gh=True, capture_argv=False):
             with open(shim, "w") as fh:
                 fh.write(GH_SHIM)
             os.chmod(shim, os.stat(shim).st_mode | stat.S_IEXEC)
+            if sys.platform == "win32":
+                shim_cmd = os.path.join(tmp, "gh.cmd")
+                with open(shim_cmd, "w") as fh:
+                    fh.write(f'@"{sys.executable}" "{shim}" %*\n')
             env["PATH"] = tmp + os.pathsep + env.get("PATH", "")
             env["FAKE_GH_MODE"] = mode
         else:

@@ -103,9 +103,12 @@ import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import time
+
+NO_WINDOW = {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)} if sys.platform == "win32" else {}
 
 # --- what counts as a verdict ----------------------------------------------
 
@@ -900,11 +903,11 @@ def _resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
     # False, so a Git Bash drive path was joined onto `cur_dir` and then
     # normalized into a drive-less path nothing downstream could repair.
     target = _native_path(target)
-    if os.path.isabs(target):
-        return os.path.normpath(target)
-    if cur_dir is not None:
-        return os.path.normpath(os.path.join(cur_dir, target))
-    return os.path.normpath(target)
+    was_windows_drive_forward = bool(re.match(r"^[A-Za-z]:/", target))
+    resolved = os.path.normpath(os.path.join(cur_dir, target) if cur_dir is not None else target)
+    if was_windows_drive_forward:
+        resolved = resolved.replace("\\", "/")
+    return resolved
 
 
 def _hints_by_position(command: str) -> list[str | None]:
@@ -1256,15 +1259,20 @@ def _run_git(directory: str | None, env: list[str], *args: str) -> str | None:
     remaining = _DEADLINE[0] - time.monotonic()
     if remaining <= 0:
         raise TimeoutError("ran out of time resolving what this push would ship")
-    cmd = ["git"] + (["-C", _native_path(directory)] if directory else []) + list(args)
+    overlay = dict(os.environ)
+    for assignment in env:
+        key, sep, value = assignment.partition("=")
+        if sep:
+            overlay[key] = value
+    git_bin = "git"
+    custom_path = overlay.get("PATH")
+    if custom_path and custom_path != os.environ.get("PATH"):
+        git_bin = shutil.which("git", path=custom_path) or "git"
+    cmd = [git_bin] + (["-C", _native_path(directory)] if directory else []) + list(args)
     try:
-        overlay = dict(os.environ)
-        for assignment in env:
-            key, sep, value = assignment.partition("=")
-            if sep:
-                overlay[key] = value
         out = subprocess.run(cmd, capture_output=True, text=True, env=overlay,
-                             timeout=min(PER_CALL_SECONDS, remaining))
+                             timeout=min(PER_CALL_SECONDS, remaining),
+                             **NO_WINDOW)
     except subprocess.TimeoutExpired:
         raise TimeoutError("ran out of time resolving what this push would ship")
     except Exception:

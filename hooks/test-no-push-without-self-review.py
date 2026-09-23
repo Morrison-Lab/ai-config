@@ -1073,11 +1073,28 @@ def budget_cases() -> tuple[int, int]:
         with open(shim, "w") as f:
             f.write(f'#!/bin/sh\nsleep 1\nexec {real} "$@"\n')
         os.chmod(shim, 0o755)
+        extra_env = {"PATH": d + os.pathsep + os.environ.get("PATH", ""),
+                     "NPWSR_BUDGET_SECONDS": "2"}
+        if sys.platform == "win32":
+            mod_path = os.path.join(d, "_slowgit.py")
+            with open(mod_path, "w") as f:
+                f.write(f'''import sys, time, subprocess
+def main():
+    time.sleep(1)
+    cp = subprocess.run([{repr(real)}] + sys.argv[1:])
+    sys.exit(cp.returncode)
+''')
+            try:
+                from pip._vendor.distlib.scripts import ScriptMaker
+            except ImportError:
+                from distlib.scripts import ScriptMaker
+            maker = ScriptMaker(None, d)
+            maker.clobber = True
+            maker.make("git = _slowgit:main")
+            extra_env["PYTHONPATH"] = d + os.pathsep + os.environ.get("PYTHONPATH", "")
 
         started = time.monotonic()
-        rc, out = run_hook(f"git -C {REPO} push", reviewed(),
-                           {"PATH": d + os.pathsep + os.environ.get("PATH", ""),
-                            "NPWSR_BUDGET_SECONDS": "2"})
+        rc, out = run_hook(f"git -C {REPO} push", reviewed(), extra_env)
         elapsed = time.monotonic() - started
         denied = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
         reason = (out.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
@@ -1193,6 +1210,9 @@ def symlinked_plugin_root_cases() -> tuple[int, int]:
         # back out twice.
         via_symlink = os.path.join(dotclaude, "skills", "plug", "..", "..",
                                    "hooks", os.path.basename(HOOK))
+        if not os.path.exists(via_symlink):
+            print("SKIP (symlink parent traversal unavailable on platform): symlinked plugin root")
+            return 0, 0
         # The second case is the symptom the issue actually reported: a
         # heredoc writing an issue body that QUOTES a push line. Degraded mode
         # keys its deny on a narrow `git ... push` match over the whole

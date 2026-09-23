@@ -97,8 +97,76 @@ import json
 import os
 import re
 import shlex
+import shutil
+import subprocess
 import sys
 import tempfile
+
+NO_WINDOW = ({"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)}
+             if sys.platform == "win32" else {})
+
+
+def _gh_cmd():
+    return shutil.which("gh") or "gh"
+
+
+def _check_live_pr(num, repo=None):
+    """Query live PR state and reviews via gh to inspect terminal state or answered head.
+
+    Returns True if the PR should be retired because:
+    1. The PR is in a terminal state (state is MERGED or CLOSED, or closed=True).
+       A merged or closed PR cannot receive code pushes, and GitHub rejects or
+       drops reviewer requests on merged PRs, making obligations unsatisfiable
+       (ai-config#1279, #3889).
+    2. Copilot has already submitted a review matching the current head commit
+       (headRefOid). A reviewer request has already been answered for this head.
+
+    Returns False if the PR is still open and unreviewed at its current head,
+    or if gh is unavailable or errors (fail-safe fallback to transcript tracking).
+    """
+    if os.environ.get("NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK"):
+        return False
+    if not num:
+        return False
+    cmd = [_gh_cmd(), "pr", "view", str(num), "--json", "state,closed,headRefOid,reviews"]
+    if repo and "/" in str(repo):
+        cmd.extend(["-R", str(repo)])
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            **NO_WINDOW,
+        )
+    except Exception:
+        return False
+    if proc.returncode != 0 or not proc.stdout:
+        return False
+    try:
+        data = json.loads(proc.stdout)
+    except Exception:
+        return False
+    if not isinstance(data, dict):
+        return False
+
+    state = str(data.get("state") or "").upper()
+    closed = bool(data.get("closed")) or state in ("MERGED", "CLOSED")
+    if closed:
+        return True
+
+    head_oid = str(data.get("headRefOid") or "")
+    reviews = data.get("reviews") or []
+    if head_oid and isinstance(reviews, list):
+        for r in reviews:
+            if not isinstance(r, dict):
+                continue
+            author = (r.get("author") or {}).get("login") or (r.get("user") or {}).get("login") or ""
+            if "copilot" in author.lower():
+                commit_oid = (r.get("commit") or {}).get("oid") or r.get("commit_id") or ""
+                if commit_oid and (head_oid.startswith(commit_oid) or commit_oid.startswith(head_oid)):
+                    return True
+    return False
 
 # --- Copilot moratorium ----------------------------------------------------
 # Every discharge this guard offers is a Copilot reviewer request, so a
@@ -792,6 +860,15 @@ def push_ident(cmd):
     return any(_argv_push(a) for a in cmds)
 
 
+RX_CMD_MERGE = re.compile(
+    r"(?:https?://[^/\s]+)?/?(?:api/v3/)?"
+    r"repos/([\w.-]+)/([\w.-]+)/pulls?/(\d+)/merge(?:[?#]|$)", re.I)
+
+RX_CMD_UPDATE_BRANCH = re.compile(
+    r"(?:https?://[^/\s]+)?/?(?:api/v3/)?"
+    r"repos/([\w.-]+)/([\w.-]+)/pulls?/(\d+)/update-branch(?:[?#]|$)", re.I)
+
+
 def _argv_close(argv):
     """(is_close, num, repo) for one simple command's argv: a terminal action.
 
@@ -808,11 +885,48 @@ def _argv_close(argv):
     Identity comes from the terminal command ITSELF, so a decoy PR number
     earlier in a chain cannot misdirect the clear onto a different PR.
     """
-    if not argv or argv[0] != "gh" or len(argv) < 3 or argv[1] != "pr":
+    if not argv or len(argv) < 2:
         return False, None, None
-    if argv[2] in ("merge", "close"):
+    if argv[0] == "gh" and len(argv) >= 3 and argv[1] == "pr":
+        if argv[2] in ("merge", "close"):
+            num, repo = _verb_ident(argv)
+            return True, num, repo
+    api = (argv[0] == "gh" and len(argv) >= 2 and argv[1] == "api") \
+        or argv[0] in ("curl", "wget")
+    if api:
+        for t in _api_path_tokens(argv):
+            m = RX_CMD_MERGE.match(t)
+            if m:
+                return True, m.group(3), f"{m.group(1)}/{m.group(2)}"
+    return False, None, None
+
+
+def _argv_update_branch(argv):
+    """(is_update, num, repo) for a command that updates a PR branch."""
+    if not argv:
+        return False, None, None
+    if argv[0] == "gh" and len(argv) >= 3 and argv[1] == "pr" and argv[2] == "update-branch":
         num, repo = _verb_ident(argv)
         return True, num, repo
+    api = (argv[0] == "gh" and len(argv) >= 2 and argv[1] == "api") \
+        or argv[0] in ("curl", "wget")
+    if api:
+        for t in _api_path_tokens(argv):
+            m = RX_CMD_UPDATE_BRANCH.match(t)
+            if m:
+                return True, m.group(3), f"{m.group(1)}/{m.group(2)}"
+    return False, None, None
+
+
+def update_branch_ident(cmd):
+    """(is_update, num, repo): True if cmd updates a PR's branch."""
+    cmds = _simple_commands(cmd)
+    if cmds is None:
+        return False, None, None
+    for a in cmds:
+        ok, num, repo = _argv_update_branch(a)
+        if ok:
+            return True, num, repo
     return False, None, None
 
 
@@ -1850,6 +1964,16 @@ def _clear(obligations, num, repo):
         obligations.pop(best)
 
 
+def _clear_all(obligations, num, repo):
+    """Remove ALL obligations matching (num, repo) when a PR reaches terminal state."""
+    if num is None:
+        return
+    obligations[:] = [
+        ob for ob in obligations
+        if not (ob["num"] is not None and ob["num"] == num and _repo_ok(ob["repo"], repo))
+    ]
+
+
 def scan(path):
     """Return (obligations, text).
 
@@ -2109,7 +2233,7 @@ def scan(path):
                                      live, uncertain)
                         if xlast and not failed:
                             xnum, xrepo = xnum or rnum, xrepo or rrepo
-                            _clear(obligations, xnum, xrepo)
+                            _clear_all(obligations, xnum, xrepo)
                             # Terminal, so it can gain no further reviewable
                             # head: it leaves the live set, and no later push in
                             # this session re-arms review for it.
@@ -2134,7 +2258,7 @@ def scan(path):
                     if rid in pending_probe:
                         pnum, prepo, plast = pending_probe.pop(rid)
                         if plast and not failed and RX_TERMINAL_STATE.search(body):
-                            _clear(obligations, pnum, prepo)
+                            _clear_all(obligations, pnum, prepo)
                             live.pop(pnum, None)
                             if not live:
                                 obligations[:] = [o for o in obligations
@@ -2272,6 +2396,7 @@ def scan(path):
                 requested, rnum, rrepo, rlast = request_ident(cmd_raw, _reqs=reqs_parsed)
                 _dok, dnum, drepo, dlast = draft_ident(cmd_raw)
                 pushed = push_ident(cmd_raw)
+                uok, unum, urepo = update_branch_ident(cmd_raw)
                 # Draft is checked first: `gh pr ready --undo` matches RX_OPEN
                 # too, and it is the draft action that decides. The clear is
                 # deferred to the command's own non-failed result: a `gh pr
@@ -2425,7 +2550,9 @@ def scan(path):
                 # call cannot both retire a PR and owe review on it, so the arm
                 # yields to the transition -- but only DEFERS to it, since a
                 # transition that fails retires nothing (see _resolve_arm).
-                if pushed:
+                if pushed or uok:
+                    if uok and unum is not None:
+                        _note_live(live, unum, urepo)
                     _rearm(obligations, live, tid, turn_targets, pending_arm,
                            uncertain)
     # One sweep, after every obligation exists and every number is backfilled.
@@ -2448,6 +2575,20 @@ def main() -> int:
         return 0  # fail open
 
     if not text or not obligations:
+        return 0
+
+    # Filter out obligations for PRs that are already merged/closed in live state,
+    # or whose current head commit has already been reviewed by Copilot (ai-config#3889).
+    active_obligations = []
+    for ob in obligations:
+        num = ob.get("num")
+        repo = ob.get("repo")
+        if num and _check_live_pr(num, repo):
+            continue
+        active_obligations.append(ob)
+    obligations = active_obligations
+
+    if not obligations:
         return 0
 
     named = sorted({o["num"] for o in obligations if o["num"]}, key=int)

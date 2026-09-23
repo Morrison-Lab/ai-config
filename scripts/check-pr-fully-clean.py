@@ -2222,7 +2222,21 @@ COPILOT_FINDINGS_LINE = re.compile(
 # (shared/coding/regex-backtracking-pitfalls.md). Measured before this bound:
 # 25s at 65,536 digits for this regex alone, 19.6s end to end through
 # copilot_verdict() on a `**Findings:** ` line followed by 60,000 `1`s.
-COPILOT_FINDINGS_SEVERITY_COUNT = re.compile(r"(\d{1,4})[ \t]*<(?:picture|img)\b", re.IGNORECASE)
+#
+# `(?<!\d)` is required alongside the bound, not merely a style choice: a
+# bare `\d{1,4}` still MATCHES inside a longer run by taking only its last
+# 1-4 digits -- `findall` on `12345<picture` returns `['2345']`, and on
+# `10000<picture` returns `['0000']`, which sums to 0 and would misclassify
+# a body reporting 10,000 findings as clean. That is the unsafe direction:
+# a length bound alone weakens the fail-closed contract instead of only
+# fixing the backtracking. The digit boundary makes the whole run fail to
+# match (no valid 1-4-digit token starts where the run starts, and every
+# other position inside the run is preceded by a digit), so
+# `_copilot_v2_findings_count` sees an empty `findall()` and returns None
+# rather than a wrong 0.
+COPILOT_FINDINGS_SEVERITY_COUNT = re.compile(
+    r"(?<!\d)(\d{1,4})[ \t]*<(?:picture|img)\b", re.IGNORECASE
+)
 
 
 def _copilot_v2_findings_count(scan: str, cited: bytearray):

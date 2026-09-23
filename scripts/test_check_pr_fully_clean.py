@@ -6163,6 +6163,19 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "Mixed-severity findings remain.\n\n"
         f"**Review effort:** Lite  \n**Findings:** 2 {_v2_picture} · 1 {_v2_picture}"
     )
+    # ai-config#3899 review finding: a bare `\d{1,4}` still matches inside a
+    # longer digit run by taking only its last 1-4 digits, so `10000` was
+    # misread as `0000` (sums to 0, the unsafe fail-open direction) and
+    # `12345` as `2345`. A five-digit finding count is not realistic Copilot
+    # output, but the regex must not silently misparse one into a wrong
+    # small number -- it has to fail closed instead. Constructed, since no
+    # real review reports five-digit findings.
+    v2_approval_five_digit_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n"
+        "A five-digit finding count is not realistic, but must not parse as 0.\n\n"
+        f"**Review effort:** Lite  \n**Findings:** 10000 {_v2_picture}"
+    )
     v2_changes_none_body = (
         "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
         "### \U0001f7e1 Changes recommended\n\n"
@@ -6187,6 +6200,20 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check(
         "copilot_verdict: v2 'Findings:' line sums counts across several severity badges",
         checker.copilot_verdict(v2_approval_mixed_severity_body) == "not-clean",
+    )
+    check(
+        "COPILOT_FINDINGS_SEVERITY_COUNT does not read the last 4 digits of a "
+        "5-digit run: '12345<picture' is not misread as 2345",
+        checker.COPILOT_FINDINGS_SEVERITY_COUNT.findall("12345<picture") == [],
+    )
+    check(
+        "COPILOT_FINDINGS_SEVERITY_COUNT does not misread '10000<picture' as 0000/0",
+        checker.COPILOT_FINDINGS_SEVERITY_COUNT.findall("10000<picture") == [],
+    )
+    check(
+        "copilot_verdict: a 5-digit 'Findings:' count states no verdict rather "
+        "than misreading it as a wrong small number",
+        checker.copilot_verdict(v2_approval_five_digit_body) == "",
     )
     check(
         "copilot_verdict: v2 'Changes recommended' with 'Findings: None' is not clean",

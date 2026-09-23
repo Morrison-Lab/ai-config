@@ -214,6 +214,11 @@ jobs:
       - name: Run markdown fences library tests
         # ai-config#2540: scripts/lib/fences.py code block and code span parsing.
         run: python3 scripts/test_fences.py
+      - name: Run transcript-meta library tests
+        # ai-config#3860: scripts/lib/transcript_meta.py's is_skill_load_meta()
+        # discriminates a loaded skill's body from a scheduled check-in
+        # continuation, both of which carry isMeta: true.
+        run: python3 scripts/test_transcript_meta.py
       - name: Run shell-command library tests
         # ai-config#2992: scripts/lib/shellcmd.py argv splitting, heredoc
         # blanking, and git-invocation classification.

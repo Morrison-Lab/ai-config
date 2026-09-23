@@ -708,6 +708,60 @@ if verdict(HOOK, meta_mid_turn_transcript(safe_cmd, "Continuing after the skill 
         "warned"
     )
 
+
+# A scheduled check-in continuation (ScheduleWakeup/cron fire, delivered
+# through a queue enqueue/dequeue pair) ALSO carries `isMeta: true`, but
+# with no `sourceToolUseID`. Unlike a loaded skill's body it IS a genuine
+# new turn, so it must open one exactly as a real user message does
+# (ai-config#3860 coordinator review finding). See
+# scripts/lib/transcript_meta.py for the transcript survey.
+def scheduled_continuation_multi_turn_transcript(turn1_reply, turn2_text, brief=BRIEF_PS):
+    _n[0] += 1
+    path = os.path.join(TMP, f"t_sched_{_n[0]}.jsonl")
+    with open(path, "w", encoding="utf-8") as fh:
+        if brief is not None:
+            fh.write(json.dumps({
+                "type": "attachment",
+                "rendered": [{"content": brief}],
+            }) + "\n")
+        fh.write(json.dumps({"type": "user", "message": {"content": "do turn 1"}}) + "\n")
+        fh.write(json.dumps({
+            "type": "assistant",
+            "message": {"content": [{
+                "type": "tool_use",
+                "name": "mcp__hearthbot__reply",
+                "input": {"text": turn1_reply},
+            }]},
+        }) + "\n")
+        fh.write(json.dumps({
+            "type": "user",
+            "isMeta": True,
+            "promptId": "p1",
+            "promptSource": "sdk",
+            "message": {"role": "user", "content": "Scheduled check-in: continue the task."},
+        }) + "\n")
+        fh.write(json.dumps({
+            "type": "assistant",
+            "message": {"content": [{"type": "text", "text": turn2_text}]},
+        }) + "\n")
+    return {"transcript_path": path}
+
+
+if not verdict(HOOK, scheduled_continuation_multi_turn_transcript(
+        "Turn 1 safe reply.", bash_cmd)):
+    failures.append(
+        "a scheduled check-in continuation (isMeta, no sourceToolUseID) "
+        "did not open a new turn -- turn 2's plain-text bash command did "
+        "not warn after turn 1 used the reply tool (ai-config#3860)"
+    )
+if verdict(HOOK, scheduled_continuation_multi_turn_transcript(bash_cmd, safe_cmd)):
+    failures.append(
+        "a scheduled check-in continuation (isMeta, no sourceToolUseID) "
+        "did not open a new turn -- turn 2's safe plain text warned "
+        "because turn 1's reply-tool content leaked across it "
+        "(ai-config#3860)"
+    )
+
 if failures or mutation_wrong:
     print("FAILED:")
     for line in failures:

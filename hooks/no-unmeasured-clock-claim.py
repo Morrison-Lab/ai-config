@@ -80,6 +80,15 @@ import re
 import sys
 import tempfile
 
+_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from transcript_meta import is_skill_load_meta
+except Exception:
+    def is_skill_load_meta(entry):  # noqa: D103 -- fail-open fallback
+        return False
+
 # A claim about the present, in the form the recap convention prescribes.
 # The Pacific marker is required: it is what distinguishes "it is now 18:52 PT"
 # from an ISO timestamp quoted out of an API response.
@@ -620,16 +629,21 @@ def scan(path):
             role = m.get("type")
 
             # A loaded skill body arrives as a `type: "user"` entry with
-            # `isMeta: true`. It was never typed by the person, so it must
-            # not advance `turn_start` (which would expire a reading taken
-            # just before the skill loaded, in the still-current turn) NOR
-            # be scanned for the harness's own injected-clock-reading marker
-            # below -- a skill body that happens to quote that marker's text
-            # (e.g. this hook's own docstring, or this repo's README) would
-            # otherwise manufacture a fake `measured` reading and silently
-            # defeat the guard for a real unmeasured claim made afterward in
-            # the same turn (ai-config#3860).
-            if role == "user" and m.get("isMeta"):
+            # `isMeta: true` and a `sourceToolUseID`. It was never typed by
+            # the person, so it must not advance `turn_start` (which would
+            # expire a reading taken just before the skill loaded, in the
+            # still-current turn) NOR be scanned for the harness's own
+            # injected-clock-reading marker below -- a skill body that
+            # happens to quote that marker's text (e.g. this hook's own
+            # docstring, or this repo's README) would otherwise manufacture
+            # a fake `measured` reading and silently defeat the guard for a
+            # real unmeasured claim made afterward in the same turn
+            # (ai-config#3860). `isMeta` alone is not this test: a
+            # scheduled check-in continuation also carries `isMeta: true`
+            # but no `sourceToolUseID`, and it IS a genuine new turn with
+            # real elapsed time -- see scripts/lib/transcript_meta.py for
+            # the transcript survey that pins the discriminator.
+            if role == "user" and is_skill_load_meta(m):
                 continue
 
             # The UserPromptSubmit hook's reading does NOT arrive as a user

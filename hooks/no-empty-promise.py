@@ -102,6 +102,15 @@ import tempfile
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 
+_LIB = os.path.join(os.path.dirname(HERE), "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from transcript_meta import is_skill_load_meta
+except Exception:
+    def is_skill_load_meta(entry):  # noqa: D103 -- fail-open fallback
+        return False
+
 
 def _sibling(name):
     """Import a hyphenated sibling module, or None if unavailable."""
@@ -577,13 +586,16 @@ def scan(path):
         # `discharges()` for what a delegated build discharges on instead.
         if m.get("isSidechain"):
             continue
-        if m.get("isMeta"):
+        if is_skill_load_meta(m):
             # A loaded skill body arrives as a `type: "user"` entry with
-            # `isMeta: true`. It was never a real prompt, so it must not
-            # reset the pending-mechanism/promise state the way a genuine
-            # new user turn does -- that would discard evidence of a
-            # promise and its discharge made just before the skill load
-            # (ai-config#3860).
+            # `isMeta: true` and a `sourceToolUseID`. It was never a real
+            # prompt, so it must not reset the pending-mechanism/promise
+            # state the way a genuine new user turn does -- that would
+            # discard evidence of a promise and its discharge made just
+            # before the skill load (ai-config#3860). `isMeta` alone is not
+            # this test: a scheduled check-in continuation also carries
+            # `isMeta: true` but no `sourceToolUseID`, and it IS a genuine
+            # new turn -- see scripts/lib/transcript_meta.py.
             continue
 
         if kind == "user" or m.get("source") == "USER_EXPLICIT" or kind == "USER_INPUT":

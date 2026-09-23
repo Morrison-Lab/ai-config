@@ -391,5 +391,71 @@ else:
         "after a mid-turn skill load (isMeta)"
     )
 
+
+def scheduled_continuation_transcript(reply_text):
+    """A scheduled check-in continuation (ScheduleWakeup/cron fire, via a
+    queue enqueue/dequeue pair) ALSO arrives as `isMeta: true`, but with no
+    `sourceToolUseID`. Unlike a loaded skill's body it IS a genuine new
+    turn, so it MUST reset the accumulated reply -- an old turn's
+    (missing-declaration) reply-tool content must not leak past it into a
+    later turn that said nothing at all (ai-config#3860 coordinator review
+    finding). See scripts/lib/transcript_meta.py for the transcript
+    survey."""
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(json.dumps({"type": "user", "message": {"content": "do task"}}) + "\n")
+        f.write(json.dumps({
+            "type": "assistant",
+            "message": {"content": [{
+                "type": "tool_use",
+                "name": "mcp__hearthbot__reply",
+                "input": {"text": reply_text},
+            }]},
+        }) + "\n")
+        f.write(json.dumps({
+            "type": "user",
+            "isMeta": True,
+            "promptId": "p1",
+            "promptSource": "sdk",
+            "message": {
+                "role": "user",
+                "content": "Scheduled check-in: continue the task.",
+            },
+        }) + "\n")
+        f.write(json.dumps({
+            "type": "assistant",
+            "message": {"content": [{
+                "type": "tool_use", "name": "Bash", "input": {"command": "echo hi"},
+            }]},
+        }) + "\n")
+    tmpdir = tempfile.mkdtemp()
+    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
+    res = subprocess.run(
+        [sys.executable, HOOK],
+        input=json.dumps({"transcript_path": path}),
+        text=True,
+        capture_output=True,
+        env=env,
+    )
+    os.unlink(path)
+    assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
+    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
+
+
+if scheduled_continuation_transcript(MISSING_DECL):
+    print(
+        "FAIL: an old turn's missing-declaration reply-tool content leaked "
+        "past a scheduled check-in continuation (isMeta, no "
+        "sourceToolUseID) into a later turn that said nothing at all "
+        "(ai-config#3860)"
+    )
+    failed += 1
+else:
+    print(
+        "PASS: a scheduled check-in continuation (isMeta, no "
+        "sourceToolUseID) opens a new turn, expiring an old turn's "
+        "missing-declaration reply exactly as a real user message would"
+    )
+
 raise SystemExit(bool(failed))
 

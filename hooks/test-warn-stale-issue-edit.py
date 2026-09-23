@@ -659,6 +659,45 @@ check(
 )
 
 
+def scheduled_continuation(text, prompt_id="p1"):
+    """Shape of a scheduled check-in continuation (ScheduleWakeup/cron fire),
+    delivered through a queue enqueue/dequeue pair: `isMeta: true` but NO
+    `sourceToolUseID`, often carrying `promptSource: "sdk"`. Verified against
+    real transcripts under ~/.claude/projects -- see
+    scripts/lib/transcript_meta.py. A genuine new turn with real elapsed
+    time, and must still count as user prose (ai-config#3860 coordinator
+    review finding)."""
+    return {
+        "type": "user",
+        "isMeta": True,
+        "promptId": prompt_id,
+        "promptSource": "sdk",
+        "message": {"role": "user", "content": text},
+    }
+
+
+SCHEDULED_TEXT = (
+    "Check status on Morrison-Lab/ai-config#2070 (head 7ecc61d7). "
+    "Drive it to fully-clean per ARDI."
+)
+
+check(
+    "is_user_prose accepts a scheduled check-in continuation "
+    "(isMeta, no sourceToolUseID)",
+    subject.is_user_prose(scheduled_continuation(SCHEDULED_TEXT)),
+    True,
+)
+
+scheduled = write_transcript([scheduled_continuation(SCHEDULED_TEXT)])
+out = run_hook(scheduled)
+check(
+    "a scheduled check-in continuation naming an issue/PR still arms the "
+    "guard (ai-config#3860 coordinator review finding)",
+    warned(out),
+    True,
+)
+
+
 # ---------------------------------------------------------------------------
 # Mapping MCP spelling, GitLab, ls-remote; unrelated tools stay silent
 # ---------------------------------------------------------------------------

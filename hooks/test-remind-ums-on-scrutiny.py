@@ -62,6 +62,22 @@ def meta(s, tool_use_id="toolu_x"):
     }
 
 
+def scheduled(s, prompt_id="p1"):
+    """Shape of a scheduled check-in continuation (ai-config#3860
+    coordinator review finding): a `type: "user"` entry with
+    `isMeta: true` but no `sourceToolUseID`, often `promptSource: "sdk"`.
+    Unlike a loaded skill's body this IS a genuine new turn, and its
+    question/review-read content must still count -- see
+    scripts/lib/transcript_meta.py."""
+    return {
+        "type": "user",
+        "isMeta": True,
+        "promptId": prompt_id,
+        "promptSource": "sdk",
+        "message": {"role": "user", "content": [{"type": "text", "text": s}]},
+    }
+
+
 def tool_result(s="ok"):
     return {
         "type": "user",
@@ -112,6 +128,9 @@ MCP_CHECKS = tool("CallDynamicTool", {
 
 REMIND = [
     ([Q, WRONG], "given example: are you sure, then I was wrong"),
+    ([scheduled("are you sure about that?"), WRONG],
+     "a scheduled check-in continuation's own 'are you sure' still opens "
+     "a question window (ai-config#3860 coordinator review finding)"),
     ([Q, SILENT_UPDATE], "questioned then 'that count was wrong' without I-was-wrong"),
     ([Q, CONTRAST], "closed Q&A contrast without admission: it's 12, not 9"),
     ([Q, CONTRAST_AS_SAID], "figure is 12, not 9 as I said"),

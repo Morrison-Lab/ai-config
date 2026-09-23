@@ -20,6 +20,12 @@ try:
 except Exception:
     strip_code = strip_fences = None
 
+try:
+    from transcript_meta import is_skill_load_meta
+except Exception:
+    def is_skill_load_meta(entry):  # noqa: D103 -- fail-open fallback
+        return False
+
 # In a project-thread session every user-visible sentence is the `text` input
 # of an `mcp__hearthbot__reply` tool call, never an assistant text block.
 # Measured on ai-config#3798/#3804: a reader that only walks `type == "text"` blocks
@@ -81,11 +87,15 @@ def last_text(path: str) -> str:
                     continue
                 etype = event.get("type") or event.get("role") or ""
                 source = event.get("source") or ""
-                if event.get("isMeta"):
+                if is_skill_load_meta(event):
                     # A loaded skill body arrives as a `type: "user"` entry
-                    # with `isMeta: true`. It was never a real prompt, so it
-                    # must not reset the accumulated reply the way a genuine
-                    # new user turn does (ai-config#3860).
+                    # with `isMeta: true` and a `sourceToolUseID`. It was
+                    # never a real prompt, so it must not reset the
+                    # accumulated reply the way a genuine new user turn does
+                    # (ai-config#3860). `isMeta` alone is not this test: a
+                    # scheduled check-in continuation also carries `isMeta:
+                    # true` but no `sourceToolUseID`, and it IS a genuine
+                    # new turn -- see scripts/lib/transcript_meta.py.
                     continue
                 if (
                     etype == "user"

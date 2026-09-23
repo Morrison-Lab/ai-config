@@ -107,6 +107,16 @@ import re
 import sys
 import tempfile
 
+_HERE = os.path.dirname(os.path.realpath(__file__))
+_LIB = os.path.join(os.path.dirname(_HERE), "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from transcript_meta import is_skill_load_meta
+except Exception:
+    def is_skill_load_meta(entry):  # noqa: D103 -- fail-open fallback
+        return False
+
 # ---------------------------------------------------------------------------
 # Gate 1: is the USER's shell PowerShell?
 #
@@ -402,18 +412,22 @@ def last_assistant_text(transcript_path):
     assistant record carries it, and this hook is bound to `Stop` in the main
     session only.
 
-    `isMeta` records are skipped the same way, and NOT treated as opening a
-    new turn: a loaded skill's body arrives mid-turn as a `type: "user"`
-    entry with `isMeta: true`, and resetting the accumulated turn there would
-    discard any bash command the assistant handed over just before invoking
-    the skill (ai-config#3860).
+    A loaded skill's body is skipped the same way, and NOT treated as
+    opening a new turn: it arrives mid-turn as a `type: "user"` entry with
+    `isMeta: true` and a `sourceToolUseID`, and resetting the accumulated
+    turn there would discard any bash command the assistant handed over
+    just before invoking the skill (ai-config#3860). `isMeta` ALONE is not
+    this test: a scheduled check-in continuation also carries `isMeta:
+    true` but no `sourceToolUseID`, and it IS a genuine new turn -- see
+    scripts/lib/transcript_meta.py for the transcript survey that pins the
+    discriminator.
     """
     saw_reply_tool = False
     turn_replies = []
     turn = []
     for entry in _records(transcript_path):
         etype = entry.get("type") or entry.get("role")
-        if entry.get("isMeta"):
+        if is_skill_load_meta(entry):
             continue
         if etype == "user" and not entry.get("isSidechain"):
             turn = []

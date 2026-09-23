@@ -304,6 +304,22 @@ META_QUOTING_CLOCK_MARKER = {
     },
 }
 
+# A scheduled check-in continuation (ai-config#3860 coordinator review
+# finding): `isMeta: true` but no `sourceToolUseID`, often
+# `promptSource: "sdk"`. Unlike a loaded skill's body this IS a genuine new
+# turn with real elapsed time, so a reading taken BEFORE it must expire --
+# see scripts/lib/transcript_meta.py for the transcript survey.
+SCHEDULED = {
+    "type": "user",
+    "isMeta": True,
+    "promptId": "p1",
+    "promptSource": "sdk",
+    "message": {
+        "role": "user",
+        "content": "Scheduled check-in: continue the task.",
+    },
+}
+
 
 # The harness's injected reading as it ACTUALLY arrives, copied from a live
 # transcript (2026-08-22). It is not a user turn: it is its own record, type
@@ -384,6 +400,13 @@ CASES = [
     ([META_QUOTING_CLOCK_MARKER, say("Recap: 09:02 PDT")], True,
      "ai-config#3860: a skill body quoting the injected-reading marker's "
      "own text must not be read as a real measurement"),
+    # Coordinator review finding on ai-config#3860: the opposite
+    # discriminator. A SCHEDULED continuation is a genuine new turn with
+    # real elapsed time, so a `date` read taken BEFORE it must expire --
+    # unlike a loaded skill's body, which does not represent elapsed time.
+    ([DATE, SCHEDULED, say("Recap: 21:31 PDT")], True,
+     "ai-config#3860: a scheduled check-in continuation (isMeta, no "
+     "sourceToolUseID) DOES expire an explicit `date` read taken before it"),
 
     # --- the incident, and its shape ---
     ([DATE, say("first recap"), NEXT_TURN, say("UPDATE -- 19:24 PDT")], True,

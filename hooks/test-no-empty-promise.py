@@ -23,6 +23,7 @@ Run: python3 hooks/test-no-empty-promise.py hooks/no-empty-promise.py
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -809,15 +810,17 @@ CASES = [
 
 
 def run(events):
-    fd, path = tempfile.mkstemp(suffix=".jsonl")
-    with os.fdopen(fd, "w") as fh:
-        for e in events:
-            fh.write(json.dumps(e) + "\n")
+    td = tempfile.mkdtemp()
     try:
+        path = os.path.join(td, "transcript.jsonl")
+        with open(path, "w", encoding="utf-8") as fh:
+            for e in events:
+                fh.write(json.dumps(e) + "\n")
+        env = dict(os.environ, TMPDIR=td, TEMP=td, TMP=td)
         r = subprocess.run(
             [sys.executable, HOOK],
             input=json.dumps({"transcript_path": path}),
-            capture_output=True, text=True,
+            capture_output=True, text=True, env=env,
         )
         assert r.returncode == 0, f"must exit 0, got {r.returncode}"
         if not r.stdout.strip():
@@ -825,7 +828,7 @@ def run(events):
         payload = json.loads(r.stdout)
         return payload.get("decision") == "block"
     finally:
-        os.unlink(path)
+        shutil.rmtree(td, ignore_errors=True)
 
 
 def main():
@@ -845,10 +848,15 @@ def main():
             failures += 1
 
     # Fails open rather than crashing when the transcript is unreadable.
-    out = subprocess.run(
-        [sys.executable, HOOK], input='{"transcript_path": "/nonexistent"}',
-        capture_output=True, text=True,
-    )
+    td_unreadable = tempfile.mkdtemp()
+    try:
+        env_unreadable = dict(os.environ, TMPDIR=td_unreadable, TEMP=td_unreadable, TMP=td_unreadable)
+        out = subprocess.run(
+            [sys.executable, HOOK], input='{"transcript_path": "/nonexistent"}',
+            capture_output=True, text=True, env=env_unreadable,
+        )
+    finally:
+        shutil.rmtree(td_unreadable, ignore_errors=True)
     if out.returncode == 0 and not out.stdout.strip():
         print("PASS: fails open on an unreadable transcript")
         passes += 1
@@ -929,10 +937,15 @@ def main():
         passes += 1
 
     # Malformed stdin must not crash the Stop event either.
-    out = subprocess.run(
-        [sys.executable, HOOK], input="not json",
-        capture_output=True, text=True,
-    )
+    td_malformed = tempfile.mkdtemp()
+    try:
+        env_malformed = dict(os.environ, TMPDIR=td_malformed, TEMP=td_malformed, TMP=td_malformed)
+        out = subprocess.run(
+            [sys.executable, HOOK], input="not json",
+            capture_output=True, text=True, env=env_malformed,
+        )
+    finally:
+        shutil.rmtree(td_malformed, ignore_errors=True)
     if out.returncode == 0 and not out.stdout.strip():
         print("PASS: fails open on malformed stdin")
         passes += 1

@@ -22,12 +22,21 @@ Run: python3 hooks/test-warn-title-only-issue-edit.py hooks/warn-title-only-issu
 """
 from __future__ import annotations
 
+import atexit
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
+
+_TMPDIR = tempfile.mkdtemp()
+atexit.register(lambda: shutil.rmtree(_TMPDIR, ignore_errors=True))
+os.environ["TMPDIR"] = _TMPDIR
+os.environ["TEMP"] = _TMPDIR
+os.environ["TMP"] = _TMPDIR
+tempfile.tempdir = None
 
 if len(sys.argv) < 2:
     sys.exit(f"Usage: python3 {sys.argv[0]} <path-to-hook>")

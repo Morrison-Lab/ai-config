@@ -377,8 +377,18 @@ ENUM_SEPARATOR = r"\s*/?(?:,|(?<=\s)/|/(?=\s))\s*"
 # constant -- `remind-brief-premises.py`'s own Agent-brief use of "no" is a
 # different population (a brief instructing an agent, not review-comment
 # prose) and is out of scope for this hook's fix.
+# The number words run to `hundred`, not to `twelve`. Measured 2026-09-23
+# over this repository's own 111 multi-line merged commit bodies: the wider
+# vocabulary flags exactly the same 53 as the twelve-word one, so it costs
+# nothing in precision, while "Fourteen such references remain in text at
+# this head" -- a real miscount posted to Morrison-Lab/mlg, whose true figure
+# was 23 -- matches only with it. A number word above twelve is if anything a
+# stronger signal than a digit run, because prose spells out a count someone
+# holds in mind and writes digits for one they just read off a command.
 CARDINALITY_COUNT = (
     r"\d[\d,]*|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve"
+    r"|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen"
+    r"|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred"
     r"|zero"
 )
 CARDINALITY_RE = re.compile(

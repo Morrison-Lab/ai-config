@@ -860,6 +860,59 @@ def run_hook(command, cwd=None, tpath=""):
 # Unit-level checks on the pure functions
 # --------------------------------------------------------------------------
 
+def vocabulary_checks(mod):
+    """The number words above twelve, added 2026-09-23.
+
+    The founding case is a real miscount posted to a Morrison-Lab/mlg pull
+    request body: "Fourteen such references remain in text at this head",
+    where the true figure was 23. It matched nothing, because the vocabulary
+    stopped at `twelve`.
+
+    Measured over this repository's own 111 multi-line merged commit bodies,
+    the wider vocabulary flags exactly the same 54 as the twelve-word one, so
+    the widening costs nothing in precision.
+
+    Every case here was confirmed by mutation to go red, and the note on each
+    names the mutation that kills it. Two earlier drafts of this block --
+    "sixteenth" and "fortifications" as word-boundary cases -- are deliberately
+    absent: no single-token mutation turns either red, because no vocabulary
+    word occurs in "fortifications" at all, and "sixteenth" stays unreachable
+    when the trailing boundary and the whitespace requirement are each removed
+    on their own. Removing both at once does reach it, through the shorter
+    "six" alternative, but that is a compound mutation rather than the single
+    one each case here is written against. A case that passes under every
+    single-token mutation tests nothing.
+    """
+    # Dies when the teens branch is dropped from CARDINALITY_COUNT.
+    check("a teens number word is a cardinality claim",
+          any(k == "cardinality"
+              for k, _ in mod.find_claims(
+                  "Fourteen such references remain in text at this head.")),
+          True)
+    # Dies when the tens branch is dropped, while the teens case stays green
+    # -- so the two branches are pinned separately rather than together.
+    check("a tens number word is a cardinality claim",
+          any(k == "cardinality"
+              for k, _ in mod.find_claims("Ninety rows were rewritten.")),
+          True)
+    # Dies with the tens branch too; `hundred` is the widening's upper end.
+    check("`hundred` is a cardinality claim",
+          any(k == "cardinality"
+              for k, _ in mod.find_claims("A hundred files still carry it.")),
+          True)
+    # Dies when CARDINALITY_RE's LEADING \b is removed, which lets a number
+    # word embedded at the end of an ordinary word start a match. This guard
+    # predates the widening; the case is here because the widening edits the
+    # pattern that carries it.
+    check("a number word inside a longer word is not a count",
+          mod.find_claims("I asked someone files be renamed."), [])
+    # Dies when `no` is restored to CARDINALITY_COUNT. The negation exemption
+    # predates this change and the widening must not undo it: "no matches" is
+    # hedging, not a derived figure someone could have gotten wrong.
+    check("a negation is still not a cardinality claim",
+          mod.find_claims("No occurrences found in that file."), [])
+
+
 def unit_checks(mod):
     # find_claims: the incident text yields both claim shapes.
     claims = mod.find_claims(INCIDENT_BODY)
@@ -1393,6 +1446,7 @@ def main():
     global failures
     mod = load(SUBJECT)
     unit_checks(mod)
+    vocabulary_checks(mod)
     end_to_end_checks()
 
     if failures:

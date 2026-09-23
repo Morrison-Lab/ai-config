@@ -23,19 +23,8 @@ Operationalizes the strong form of the claim workflow: branch â†’ empty commit â
 ## What it does
 
 Before any PR creation --- including a repair PR that was not opened through
-this skill --- search the repository's complete PR history for the proposed
-topic.
-A branch-name lookup is not a substitute for this content preflight:
-
-```bash
-gh pr list --repo <owner>/<repo> --state all --limit 300 \
-  --search "<topic keywords> in:title,body"
-```
-
-Treat a result count equal to 300 as truncated and re-run with a higher limit.
-Continue an actionable open matching PR instead of opening a duplicate.
-For a closed or merged match, first determine whether it already resolved the
-work or whether a distinct follow-up is needed.
+this skill --- apply the complete preflight in
+[`check-open-prs-before-duplicating`](../../shared/workflow/check-open-prs-before-duplicating.md).
 
 1. Fetch `origin/main` and check out a clean branch: `feat/<slug>` or `fix/<slug>` (inferred from issue title)
 2. Create an empty commit with message: `"start: <issue title> (closes #<N>)"`

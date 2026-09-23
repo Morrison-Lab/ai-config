@@ -384,12 +384,22 @@ ENUM_SEPARATOR = r"\s*/?(?:,|(?<=\s)/|/(?=\s))\s*"
 # stronger signal than a digit run, because prose spells out a count someone
 # holds in mind and writes digits for one they just read off a command.
 #
-# The widening costs nothing in precision on this corpus:
-# `scripts/measure-cardinality-vocabulary.py` flags 54 of this repository's
-# 111 multi-line commit bodies under EITHER vocabulary (measured 2026-09-23
-# against origin/main at b96c640f). That figure moves as the history grows,
-# so re-run the script rather than trusting this number; what the script
-# asserts is that the two counts stay EQUAL.
+# The widening costs nothing in precision on this corpus, and the precision
+# claim is a BODY count rather than a claim count, because a body is what
+# this hook acts on: `scripts/measure-cardinality-vocabulary.py` flags 54 of
+# this repository's 111 multi-line commit bodies under EITHER vocabulary
+# (measured 2026-09-23 against origin/main at b96c640f). The script exits 1
+# if that ever stops holding.
+#
+# The CLAIM counts do differ, and reporting only bodies hid that: 319 to
+# twelve against 325 to hundred, 7 gained and 1 lost, every one of them
+# inside a body already flagged under both. Each gain is a count the narrow
+# vocabulary could not spell. The single loss is `six lines`, which the
+# narrow pattern quoted out of `thirty-six lines` -- the same
+# surfaced-figure-the-author-never-wrote failure the compound-word note
+# below describes, so the widening corrected it rather than causing it.
+# Every figure here moves as the history grows, so re-run the script rather
+# than trusting any of them.
 #
 # A tens word joined by a hyphen to a ones word is one count, so the compound
 # needs its own alternative: without it the pattern fails on "Twenty-", which

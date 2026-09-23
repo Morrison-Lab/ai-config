@@ -66,9 +66,14 @@ CASES_BLOCK = [
     "I'll start on it while the arrays run.",
     # The other measured instance, with the stopping-point pairing that makes
     # it read as compliance.
+    # A realistic closing block: the announcement sits above a multi-sentence
+    # Stopping Point declaration, which is why that block is stripped before
+    # the tail is taken. Without the strip, the announcement falls outside
+    # the window and the measured instance goes unmatched.
     "I'm starting it now: issue, branch, PR.\n\n"
-    "**Stopping Point**: Not a clean stopping point.",
-    "Next, I'll implement the combiner change.",
+    "**Stopping Point**: Not a clean stopping point / work remains queued: "
+    "#1045 awaiting CI. Seven arrays run until 06:30. Then #1016, #1036, "
+    "#1015, #1007 and #1000.",
     "I'll begin the refactor.",
     "I am now starting the month_pool propagation fix.",
     "I'll do that now.",
@@ -77,6 +82,16 @@ CASES_BLOCK = [
 ]
 
 CASES_PASS = [
+    # The review finding on ai-config#3887: an ordinary mid-reply narrative
+    # transition, in a reply that then delivers what it announced. Blocking
+    # this is how a guard earns being switched off.
+    "Next, I'll summarize the findings below.\n\n"
+    "Finding 1 is a false positive; finding 2 is real and is fixed in "
+    "4053b6f3. Both are addressed.",
+    # An announcement early in a reply that goes on to do the work.
+    "I'll start on the combiner change.\n\n"
+    "Done: the map is carried through, the article reads it, and the tests "
+    "cover the legacy artifact. Pushed as abc1234.",
     # Gated on something outside this turn's control: a real plan.
     "I'll start on it once the review lands.",
     "I'll push after you confirm.",

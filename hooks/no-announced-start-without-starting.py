@@ -70,9 +70,13 @@ PATTERNS = [
     r"starting (?:it|that|this|on it|work on it) now\b",
     r"I'?ll (?:begin|kick off|get started on) (?:it|that|this|the|a|an)\b",
     r"I'?ll (?:do|handle|tackle|take) (?:it|that|this) now\b",
-    r"next,? I'?ll \w+",
     r"(?:I am|I'?m) (?:now )?(?:beginning|kicking off) (?:it|that|this|the)\b",
 ]
+# `next,? I'?ll \w+` was here and was removed. "Next, I'll summarize the
+# findings below" is an ordinary narrative transition, and in a reply that
+# then delivers the summary it is not an announcement of anything. A guard
+# that blocks a common, correct sentence gets switched off, taking the real
+# cases with it, so the pattern is worth less than the noise it makes.
 RX = re.compile("|".join(f"(?:{p})" for p in PATTERNS), re.I)
 
 # A blocker named in the same sentence makes the statement a legitimate plan
@@ -84,6 +88,34 @@ CONDITIONAL_RX = re.compile(
 )
 
 SENTENCE_SPLIT_RX = re.compile(r"(?<=[.!?;])\s+|\n")
+
+# The rule is about how a reply ENDS, so only its tail is inspected. Scanning
+# the whole message contradicts the rule's own premise and is what made an
+# early mid-reply transition read the same as a closing announcement -- the
+# first match anywhere won, however much delivered work followed it.
+#
+# Two sentences rather than one, so a closing announcement followed by a
+# short sign-off is still caught; and two rather than more, because the
+# window is the whole difference between this guard and one that blocks any
+# mention of what happens next. A reply that announces work and then DOES it
+# has delivered content after the announcement, which pushes it out of the
+# window -- that is the discriminator, and it is why widening this is not
+# free.
+#
+# The measured instance was not literally last: "I'm starting it now: issue,
+# branch, PR." sat above a Stopping Point declaration, which is stripped
+# first for the same reason.
+TAIL_SENTENCES = 2
+STOPPING_POINT_RX = re.compile(
+    r"\*\*Stopping Point\*\*.*\Z", re.S | re.I
+)
+
+
+def tail_of(prose):
+    """The closing sentences of a reply, minus its stopping-point block."""
+    trimmed = STOPPING_POINT_RX.sub(" ", prose)
+    sentences = [s for s in SENTENCE_SPLIT_RX.split(trimmed) if s.strip()]
+    return sentences[-TAIL_SENTENCES:]
 
 try:
     _lib = os.path.join(
@@ -132,10 +164,13 @@ def last_assistant_text(path):
 
 
 def offending_sentence(prose):
-    """The first unconditional immediate-start sentence, or None."""
-    for sentence in SENTENCE_SPLIT_RX.split(prose):
-        if not sentence.strip():
-            continue
+    """The LAST unconditional immediate-start sentence in the tail, or None.
+
+    Last rather than first: when a reply closes on an announcement, that
+    sentence is the one the rule is about, and an earlier transition in a
+    reply that went on to do the work is not.
+    """
+    for sentence in reversed(tail_of(prose)):
         hit = RX.search(sentence)
         if hit and not CONDITIONAL_RX.search(sentence):
             return sentence.strip(), hit.group(0).strip()

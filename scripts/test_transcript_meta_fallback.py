@@ -9,10 +9,34 @@ Silently, that reintroduces the ORIGINAL #3860 bug with no signal at all --
 a stale consumer copy lacking scripts/lib/transcript_meta.py degrades with
 nothing to notice it by.
 
-This test forces the import to fail (by temporarily corrupting the real
-`scripts/lib/transcript_meta.py` with a stub that raises on import, restored
-in a `finally` block even if the test itself errors) and, for each of the six
-hooks, checks two things:
+WHY THIS TEST NEVER WRITES THE REAL TRACKED FILE
+--------------------------------------------------
+An earlier revision corrupted the real `scripts/lib/transcript_meta.py` IN
+PLACE and relied on a `finally` block to restore it. That is unsafe on its
+own terms: a SIGKILL or a CI force-cancel skips `finally` entirely, leaving
+the real module a raising stub in that checkout -- the exact silent
+degradation this whole PR exists to prevent, now caused by the PR's own
+test. It also races a concurrent test run or any live hook firing from the
+same checkout while the corrupted content sits on disk.
+
+So this test never opens the real file for writing. Instead, for each run
+it copies `hooks/` and `scripts/lib/` into a fresh `tempfile.mkdtemp()`
+tree and corrupts ONLY the COPY's `transcript_meta.py`. This works because
+each hook resolves its own `scripts/lib` path from `os.path.realpath(
+__file__)` at runtime (see e.g. `warn-stale-issue-edit.py`'s `HERE`/`ROOT`/
+`_LIB` computation) -- running the COPIED hook file makes it compute `_LIB`
+relative to the copy, so `from transcript_meta import ...` finds the
+copy's (corrupted) module. An environment override such as PYTHONPATH
+cannot substitute for this: every hook's own `sys.path.insert(0, _LIB)`
+runs at import time and takes priority over whatever PYTHONPATH already
+put on `sys.path` at interpreter startup.
+
+After every run (success, failure, or exception) the test asserts the REAL
+`scripts/lib/transcript_meta.py`'s bytes and mtime are byte-for-byte and
+timestamp-for-timestamp unchanged, and cleans up the temp tree -- a leaked
+temp directory is harmless, an altered tracked file is not.
+
+For each of the six hooks this checks two things:
 
   1. stderr names the hook and the import error, matching the style
      `hooks/no-clobbering-push.py` already uses for a failed
@@ -33,19 +57,24 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 ROOT = os.path.dirname(HERE)
-HOOKS = os.path.join(ROOT, "hooks")
-REAL_MODULE = os.path.join(ROOT, "scripts", "lib", "transcript_meta.py")
+REAL_HOOKS_DIR = os.path.join(ROOT, "hooks")
+REAL_LIB_DIR = os.path.join(ROOT, "scripts", "lib")
+REAL_MODULE = os.path.join(REAL_LIB_DIR, "transcript_meta.py")
 
 failures = []
+total_checks = 0
 
 
 def check(label, condition):
+    global total_checks
+    total_checks += 1
     if condition:
         print(f"PASS: {label}")
     else:
@@ -53,32 +82,29 @@ def check(label, condition):
         print(f"FAIL: {label}")
 
 
-def write_transcript(lines):
-    fd, path = tempfile.mkstemp(suffix=".jsonl")
+def write_transcript(dirpath, lines):
+    fd, path = tempfile.mkstemp(suffix=".jsonl", dir=dirpath)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         for line in lines:
             f.write(json.dumps(line) + "\n")
     return path
 
 
-def run(hook_name, payload, extra_env=None):
-    """Run one hook with an ISOLATED fire-once-sentinel temp directory.
+def run(hooks_dir, hook_name, payload, tmproot):
+    """Run one COPIED hook with an ISOLATED fire-once-sentinel temp directory.
 
     Several of these hooks dedupe on a sentinel file written under
     `tempfile.gettempdir()`, keyed by the message text (see
     `require-stopping-point.py` and `remind-ums-on-scrutiny.py`). Without a
-    fresh TMPDIR/TEMP/TMP per call, the baseline run's sentinel silently
-    suppresses the corrupted-import run that immediately follows with the
-    SAME transcript text, which is a collision in this test's own harness,
-    not evidence about the fix.
+    fresh TMPDIR/TEMP/TMP per call, a baseline run's sentinel would silently
+    suppress a later run of the same transcript text, which is a collision
+    in this test's own harness, not evidence about the fix.
     """
-    hook_path = os.path.join(HOOKS, hook_name)
-    fresh = tempfile.mkdtemp(prefix="tmeta-fallback-")
+    hook_path = os.path.join(hooks_dir, hook_name)
+    fresh = tempfile.mkdtemp(prefix="tmeta-fallback-sentinel-", dir=tmproot)
     env = dict(os.environ)
     for var in ("TMPDIR", "TEMP", "TMP"):
         env[var] = fresh
-    if extra_env:
-        env.update(extra_env)
     proc = subprocess.run(
         [sys.executable, hook_path],
         input=json.dumps(payload),
@@ -218,31 +244,46 @@ def main() -> int:
         print(f"FATAL: {REAL_MODULE} not found", file=sys.stderr)
         return 1
 
-    with open(REAL_MODULE, "r", encoding="utf-8") as f:
-        real_source = f.read()
+    # Snapshot the REAL tracked file's identity before touching anything, so
+    # the end-of-run assertion has something to compare against. This file
+    # is read-only for the whole test -- never opened for writing.
+    real_stat = os.stat(REAL_MODULE)
+    with open(REAL_MODULE, "rb") as f:
+        real_bytes = f.read()
 
-    # Baseline: capture each hook's stdout/stderr with the REAL module in
-    # place, so the corrupted run can be compared against it rather than
-    # against an assumption of what "unchanged" means.
-    baseline = {}
-    for hook_name, stem, make_payload, transcript_lines in CASES:
-        path = write_transcript(transcript_lines)
-        try:
-            proc = run(hook_name, make_payload(path))
-        finally:
-            os.unlink(path)
-        baseline[hook_name] = proc.stdout
-
+    tmproot = tempfile.mkdtemp(prefix="transcript-meta-fallback-")
     try:
-        with open(REAL_MODULE, "w", encoding="utf-8") as f:
+        copied_hooks = os.path.join(tmproot, "hooks")
+        copied_lib = os.path.join(tmproot, "scripts", "lib")
+        shutil.copytree(
+            REAL_HOOKS_DIR, copied_hooks,
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "test-*.py"),
+        )
+        os.makedirs(os.path.dirname(copied_lib), exist_ok=True)
+        shutil.copytree(
+            REAL_LIB_DIR, copied_lib,
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+        )
+
+        # Baseline: capture each hook's stdout/stderr from the PRISTINE copy,
+        # so the corrupted run can be compared against it rather than against
+        # an assumption of what "unchanged" means. Both phases run from the
+        # copy, so the comparison is copy-vs-corrupted-copy, not
+        # real-tree-vs-copy (which could differ for unrelated reasons, e.g.
+        # a repo file this test's copy does not include).
+        baseline = {}
+        for hook_name, stem, make_payload, transcript_lines in CASES:
+            path = write_transcript(tmproot, transcript_lines)
+            proc = run(copied_hooks, hook_name, make_payload(path), tmproot)
+            baseline[hook_name] = proc.stdout
+
+        copied_module = os.path.join(copied_lib, "transcript_meta.py")
+        with open(copied_module, "w", encoding="utf-8") as f:
             f.write(STUB_SOURCE)
 
         for hook_name, stem, make_payload, transcript_lines in CASES:
-            path = write_transcript(transcript_lines)
-            try:
-                proc = run(hook_name, make_payload(path))
-            finally:
-                os.unlink(path)
+            path = write_transcript(tmproot, transcript_lines)
+            proc = run(copied_hooks, hook_name, make_payload(path), tmproot)
 
             check(
                 f"{hook_name}: exits 0 even with a broken transcript_meta import",
@@ -265,15 +306,24 @@ def main() -> int:
                 proc.stdout == baseline[hook_name],
             )
     finally:
-        with open(REAL_MODULE, "w", encoding="utf-8") as f:
-            f.write(real_source)
+        shutil.rmtree(tmproot, ignore_errors=True)
 
-    # Confirm restoration actually took, not just that the finally ran.
-    with open(REAL_MODULE, "r", encoding="utf-8") as f:
-        check("scripts/lib/transcript_meta.py restored byte-for-byte",
-              f.read() == real_source)
+    # The real tracked file was opened read-only above and never again --
+    # confirm neither its bytes nor its mtime moved, rather than trusting
+    # that "we never wrote to it" from reading the code alone.
+    after_stat = os.stat(REAL_MODULE)
+    with open(REAL_MODULE, "rb") as f:
+        after_bytes = f.read()
+    check(
+        "the real scripts/lib/transcript_meta.py bytes are untouched",
+        after_bytes == real_bytes,
+    )
+    check(
+        "the real scripts/lib/transcript_meta.py mtime is untouched",
+        after_stat.st_mtime_ns == real_stat.st_mtime_ns,
+    )
 
-    print(f"\n{len(CASES) * 5 - len(failures)} passed, {len(failures)} failed")
+    print(f"\n{total_checks - len(failures)} passed, {len(failures)} failed")
     if failures:
         return 1
     return 0

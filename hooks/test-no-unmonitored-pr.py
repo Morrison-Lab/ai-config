@@ -1,10 +1,19 @@
 #!/usr/bin/env python3
 """Regression tests for no-unmonitored-pr.py."""
+import atexit
 import importlib.util
 import json
 import os
+import shutil
 import sys
 import tempfile
+
+_TMPDIR = tempfile.mkdtemp()
+atexit.register(lambda: shutil.rmtree(_TMPDIR, ignore_errors=True))
+os.environ["TMPDIR"] = _TMPDIR
+os.environ["TEMP"] = _TMPDIR
+os.environ["TMP"] = _TMPDIR
+tempfile.tempdir = None
 
 spec = importlib.util.spec_from_file_location("subject", sys.argv[1])
 subject = importlib.util.module_from_spec(spec)

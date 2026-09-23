@@ -14,6 +14,7 @@ Run: python3 hooks/test-no-unmeasured-clock-claim.py hooks/no-unmeasured-clock-c
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -591,42 +592,40 @@ CASES = [
 
 
 def run(events):
-    fd, path = tempfile.mkstemp(suffix=".jsonl")
-    with os.fdopen(fd, "w") as fh:
-        for e in events:
-            fh.write(json.dumps(e) + "\n")
-    for f in os.listdir(tempfile.gettempdir()):
-        if f.startswith(".claude-clock-claim-"):
-            try:
-                os.remove(os.path.join(tempfile.gettempdir(), f))
-            except OSError:
-                pass
-    out = subprocess.run(
-        [sys.executable, HOOK],
-        input=json.dumps({"transcript_path": path}),
-        capture_output=True, text=True,
-    ).stdout.strip()
-    os.remove(path)
-    if not out:
-        return False
-    # `bool(out)` alone would score any output as a fire, including output the
-    # harness discards. A `Stop` hook's `reason` is read only alongside
-    # `"decision": "block"`, so a warn-only hook emitting `reason` by itself is
-    # a silent no-op -- valid JSON that reaches nobody. Requiring the field
-    # that actually surfaces is what makes a "fires" result mean the warning
-    # was delivered. (ai-config#1566 review round 1: the hook shipped with
-    # `reason` and these tests passed anyway, because they only asked whether
-    # anything was printed.)
-    payload = json.loads(out)
-    surfaced = payload.get("systemMessage") or (
-        payload.get("decision") == "block" and payload.get("reason"))
-    if not surfaced:
-        # Recorded rather than raised: an assert here aborts the matrix at the
-        # first fire case and masks every case after it, which is the
-        # early-abort failure the corpus warns about. The run still fails --
-        # main() reports SHAPE_ERRORS -- and the remaining cases still report.
-        SHAPE_ERRORS.append(sorted(payload))
-    return True
+    td = tempfile.mkdtemp()
+    try:
+        path = os.path.join(td, "transcript.jsonl")
+        with open(path, "w", encoding="utf-8") as fh:
+            for e in events:
+                fh.write(json.dumps(e) + "\n")
+        env = dict(os.environ, TMPDIR=td, TEMP=td, TMP=td)
+        out = subprocess.run(
+            [sys.executable, HOOK],
+            input=json.dumps({"transcript_path": path}),
+            capture_output=True, text=True, env=env,
+        ).stdout.strip()
+        if not out:
+            return False
+        # `bool(out)` alone would score any output as a fire, including output the
+        # harness discards. A `Stop` hook's `reason` is read only alongside
+        # `"decision": "block"`, so a warn-only hook emitting `reason` by itself is
+        # a silent no-op -- valid JSON that reaches nobody. Requiring the field
+        # that actually surfaces is what makes a "fires" result mean the warning
+        # was delivered. (ai-config#1566 review round 1: the hook shipped with
+        # `reason` and these tests passed anyway, because they only asked whether
+        # anything was printed.)
+        payload = json.loads(out)
+        surfaced = payload.get("systemMessage") or (
+            payload.get("decision") == "block" and payload.get("reason"))
+        if not surfaced:
+            # Recorded rather than raised: an assert here aborts the matrix at the
+            # first fire case and masks every case after it, which is the
+            # early-abort failure the corpus warns about. The run still fails --
+            # main() reports SHAPE_ERRORS -- and the remaining cases still report.
+            SHAPE_ERRORS.append(sorted(payload))
+        return True
+    finally:
+        shutil.rmtree(td, ignore_errors=True)
 
 
 def check_output_shape():
@@ -636,29 +635,27 @@ def check_output_shape():
     rather than whether the guard fired, and because a reader scanning the
     matrix should see it named.
     """
-    fd, path = tempfile.mkstemp(suffix=".jsonl")
-    with os.fdopen(fd, "w") as fh:
-        for e in (DATE, say("earlier"), NEXT_TURN,
-                  say("UPDATE -- 19:24 PDT")):
-            fh.write(json.dumps(e) + "\n")
-    for f in os.listdir(tempfile.gettempdir()):
-        if f.startswith(".claude-clock-claim-"):
-            try:
-                os.remove(os.path.join(tempfile.gettempdir(), f))
-            except OSError:
-                pass
-    out = subprocess.run(
-        [sys.executable, HOOK],
-        input=json.dumps({"transcript_path": path}),
-        capture_output=True, text=True,
-    ).stdout.strip()
-    os.remove(path)
-    payload = json.loads(out) if out else {}
-    ok = bool(payload.get("systemMessage"))
-    print(f"{'ok  ' if ok else 'FAIL'}  "
-          f"payload keys={sorted(payload)}  "
-          "the warning is emitted in a field the harness surfaces")
-    return 0 if ok else 1
+    td = tempfile.mkdtemp()
+    try:
+        path = os.path.join(td, "transcript.jsonl")
+        with open(path, "w", encoding="utf-8") as fh:
+            for e in (DATE, say("earlier"), NEXT_TURN,
+                      say("UPDATE -- 19:24 PDT")):
+                fh.write(json.dumps(e) + "\n")
+        env = dict(os.environ, TMPDIR=td, TEMP=td, TMP=td)
+        out = subprocess.run(
+            [sys.executable, HOOK],
+            input=json.dumps({"transcript_path": path}),
+            capture_output=True, text=True, env=env,
+        ).stdout.strip()
+        payload = json.loads(out) if out else {}
+        ok = bool(payload.get("systemMessage"))
+        print(f"{'ok  ' if ok else 'FAIL'}  "
+              f"payload keys={sorted(payload)}  "
+              "the warning is emitted in a field the harness surfaces")
+        return 0 if ok else 1
+    finally:
+        shutil.rmtree(td, ignore_errors=True)
 
 
 def main():

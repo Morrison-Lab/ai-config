@@ -594,6 +594,26 @@ with warnings.catch_warnings(record=True) as _w:
                 if "invalid escape" in str(x.message)]
 check("the module compiles with no invalid escape sequences", _escapes, [])
 
+# native_path: Git Bash drive paths become paths native git.exe can open.
+# Measured on Windows before the helper existed: `git -C /c/Users/x ...` exited
+# 128 ("cannot change to '/c/Users/x'"), which made the push guards refuse a
+# reviewed cross-repo push or fail open.
+for given, want in (
+    ("/c/Users/x", "C:/Users/x"),
+    ("/C/a b/c", "C:/a b/c"),
+    ("/cygdrive/d/work", "D:/work"),
+    ("/c", "C:/"),
+    ("/c/", "C:/"),
+    ("/tmp/x", "/tmp/x"),     # MSYS root, not a drive: unknowable, unchanged
+    ("/cc/x", "/cc/x"),       # a two-letter first segment is not a drive
+    ("C:/x", "C:/x"),         # already native
+    ("rel/x", "rel/x"),
+    (None, None),
+):
+    check(f"native_path({given!r}) on Windows", shellcmd.native_path(given, True), want)
+check("native_path leaves /c/... alone off Windows",
+      shellcmd.native_path("/c/Users/x", False), "/c/Users/x")
+
 if failures:
     print("FAILED:")
     for line in failures:

@@ -230,6 +230,18 @@ It is scoped to a pull-request description, an issue description, and a commit
 message, because those are the only three surfaces GitHub's parser reads --- a
 plain comment may carry `closes #N` all it likes and closes nothing.
 
+The hook only sees text about to be posted,
+so it cannot catch a close that already happened.
+`python3 scripts/audit-closing-keyword-closes.py -R <owner>/<repo>` is the retroactive half:
+it reads each closed issue's recorded closer,
+reuses the hook's sentence heuristic on that closer's description and merge commit,
+and reports how many issues it examined beside the ones it flagged.
+Its first run, on `Lacaedemon/sparta` on 2026-09-22, examined 650 closed issues and flagged 6.
+In 5 of the 6, the closer's own text disclaimed or deferred the close,
+yet each issue still read as finished work.
+Triage then reopened one and re-closed two as not planned,
+so a later run of the same command reports fewer.
+
 See [`ardi.cases.md`](ardi.cases.md), "A negated closing-keyword sentence
 still closes the issue", and
 [`github-closing-keywords.md`](../../memories/github-closing-keywords.md).

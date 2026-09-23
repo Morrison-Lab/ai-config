@@ -101,6 +101,14 @@ NOT_HOOKABLE = re.compile(
     re.I,
 )
 
+# Recognizing redundant prose is evidence that the existing written rule did
+# not prevent another written rule. It therefore warrants the same mechanism
+# decision as an explicit error admission.
+REDUNDANT_PROSE = re.compile(
+    r"\b(?:redundant|duplicate|duplicated)\s+(?:prose|content|rule|guidance|instruction|text)\b",
+    re.I,
+)
+
 
 def scan(path):
     """Return (admission_text, admitted_at, addressed_at)."""
@@ -127,8 +135,10 @@ def scan(path):
                 raw_content = m.get("content")
                 if isinstance(raw_content, str) and raw_content.strip():
                     prose = visible_prose(raw_content)
-                    if ADMISSION is not None and ADMISSION.search(prose):
-                        admit_txt, admit_at = ADMISSION.search(prose).group(0), i
+                    hit = ADMISSION.search(prose) if ADMISSION is not None else None
+                    hit = hit or REDUNDANT_PROSE.search(prose)
+                    if hit:
+                        admit_txt, admit_at = hit.group(0), i
                     if NOT_HOOKABLE.search(prose) or HOOK_WORK.search(prose):
                         done_at = i
 
@@ -146,14 +156,18 @@ def scan(path):
                         if not txt.strip():
                             continue
                         prose = visible_prose(txt)
-                        if ADMISSION is not None and ADMISSION.search(prose):
-                            admit_txt, admit_at = ADMISSION.search(prose).group(0), i
+                        hit = ADMISSION.search(prose) if ADMISSION is not None else None
+                        hit = hit or REDUNDANT_PROSE.search(prose)
+                        if hit:
+                            admit_txt, admit_at = hit.group(0), i
                         if NOT_HOOKABLE.search(prose) or HOOK_WORK.search(prose):
                             done_at = i
             elif isinstance(blocks, str) and role == "assistant" and blocks.strip():
                 prose = visible_prose(blocks)
-                if ADMISSION is not None and ADMISSION.search(prose):
-                    admit_txt, admit_at = ADMISSION.search(prose).group(0), i
+                hit = ADMISSION.search(prose) if ADMISSION is not None else None
+                hit = hit or REDUNDANT_PROSE.search(prose)
+                if hit:
+                    admit_txt, admit_at = hit.group(0), i
                 if NOT_HOOKABLE.search(prose) or HOOK_WORK.search(prose):
                     done_at = i
     return admit_txt, admit_at, done_at
@@ -195,16 +209,18 @@ def main() -> int:
         return 0
 
     message = (
-        "[hook: no-mistake-without-a-hook] You admitted a mistake earlier in "
-        f"this session (\"{admit_txt.strip()}\") and no hook work followed "
-        "it.\n\n"
+        "[hook: no-mistake-without-a-hook] You recognized an error or redundant "
+        f"prose earlier in this session (\"{admit_txt.strip()}\") and no hook work "
+        "followed it.\n\n"
         "Standing rule: every mistake owes a MECHANISM, not just a note. "
         "Every mistake this session already had a prose rule covering it, and "
         "the rule is what failed -- a rule is consulted at read time and "
         "broken at composition time, so re-reading it does not reach the "
         "moment it breaks.\n\n"
         "Ask: is there a condition decidable from the transcript that would "
-        "have caught this?\n\n"
+        "have caught this? For redundant prose, ask specifically whether the "
+        "previous text failed to prevent a behavior that a hook or other "
+        "algorithmic check can detect.\n\n"
         "  * If yes -- write the hook (model it on hooks/no-offer-to-file.py "
         "for a message that is wrong to send, or on "
         "hooks/remind-ums-after-error.py for an obligation that follows a "

@@ -2201,6 +2201,41 @@ COPILOT_SUPPRESSED_BLOCK = re.compile(r"\bSuppressed\s+comments\b", re.IGNORECAS
 COPILOT_COMMENT_COUNT = re.compile(
     r"\bComments\s+generated:\**[ \t]*(\d+)", re.IGNORECASE
 )
+# The `ccr-overview-v2` body format (ai-config#3899) replaces that
+# `Comments generated:` field with a `**Findings:**` line instead: either the
+# word `None`, or one or more `<n> <severity-badge>` pairs (an inline `<picture>`
+# or `<img>` element per severity) that need summing when several severities
+# appear on the same line, e.g. `2 <picture ...> ... </picture>` alone, or
+# `2 <picture ...> </picture> · 1 <picture ...> </picture>` for a mixed
+# body. The badge markup is the anchor because the plain number alone is not
+# distinguishable from other digits on the line (a review-effort word, a PR
+# number quoted in prose).
+COPILOT_FINDINGS_LINE = re.compile(
+    r"\*\*Findings:\*\*[ \t]*(?P<rest>[^\n\r]*)", re.IGNORECASE
+)
+COPILOT_FINDINGS_SEVERITY_COUNT = re.compile(r"(\d+)[ \t]*<(?:picture|img)\b", re.IGNORECASE)
+
+
+def _copilot_v2_findings_count(scan: str, cited: bytearray):
+    """Parse a `ccr-overview-v2` `**Findings:**` line into an inline-finding count.
+
+    Mirrors COPILOT_COMMENT_COUNT's contract: returns an int on a recognised
+    line (0 for `None`, otherwise the summed per-severity counts) and None --
+    fail closed -- when no such line is present, the matched line is itself
+    cited (quoted inside a fenced example), or the line is present but in
+    neither recognised shape (a future format this function does not know).
+    """
+    for m in COPILOT_FINDINGS_LINE.finditer(scan):
+        if match_is_cited(cited, m.start(), m.end()):
+            continue
+        rest = m.group("rest")
+        if re.match(r"[ \t]*None\b", rest, re.IGNORECASE):
+            return 0
+        counts = COPILOT_FINDINGS_SEVERITY_COUNT.findall(rest)
+        if counts:
+            return sum(int(c) for c in counts)
+        return None
+    return None
 
 
 def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str:
@@ -2212,10 +2247,15 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
     is recognisably a Copilot verdict returns ``not-clean``, and a body this
     function does not recognise returns ``''`` so the ordinary scans decide.
 
-    Fails closed on a missing comment count. An affirmative heading with no
-    `Comments generated:` field states an approval this function cannot confirm
-    is finding-free, so it yields no verdict rather than a clean one -- the
-    same direction ``_is_bot_author`` and the quorum tag already take.
+    The inline-finding count is read from whichever of two mutually exclusive
+    formats the body carries: the legacy `Comments generated: N` field, or the
+    `ccr-overview-v2` format's `**Findings:**` line (ai-config#3899) --
+    checked in that order, so a body carrying neither still fails closed.
+
+    Fails closed on a missing count in both forms. An affirmative heading with
+    neither field states an approval this function cannot confirm is
+    finding-free, so it yields no verdict rather than a clean one -- the same
+    direction ``_is_bot_author`` and the quorum tag already take.
     """
     if not body:
         return ""
@@ -2230,17 +2270,20 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
 
     # Checked first: a negative heading is a verdict on its own, and reading it
     # before the affirmative test means a body carrying both spellings (a
-    # re-review quoting its own earlier round) cannot resolve to clean.
+    # re-review quoting its own earlier round) cannot resolve to clean. This
+    # also covers a v2 negative heading whose `**Findings:** None` line would
+    # otherwise read as finding-free: the heading itself already decided.
     if _has_valid_match(COPILOT_NEGATIVE_HEADER, scan):
         return "not-clean"
     if not _has_valid_match(COPILOT_AFFIRMATIVE_HEADER, scan):
         return ""
     if _has_valid_match(COPILOT_SUPPRESSED_BLOCK, scan):
         return "not-clean"
-    count = _has_valid_match(COPILOT_COMMENT_COUNT, scan)
+    count_match = _has_valid_match(COPILOT_COMMENT_COUNT, scan)
+    count = int(count_match.group(1)) if count_match is not None else _copilot_v2_findings_count(scan, cited)
     if count is None:
         return ""
-    if int(count.group(1)) != 0:
+    if count != 0:
         return "not-clean"
     return "clean"
 

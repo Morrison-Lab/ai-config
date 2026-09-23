@@ -6109,6 +6109,92 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "copilot_verdict: quoted heading is not affirmative",
         checker.copilot_verdict("## \"Approval recommended\"? No.\n\n- **Comments generated:** 0") == "",
     )
+
+    # ai-config#3899: Copilot's `ccr-overview-v2` body format drops the
+    # `Comments generated:` field the checks above rely on in favor of a
+    # `**Findings:**` line -- `None`, or one or more `<n> <severity-badge>`
+    # pairs. Fixture provenance, per fixtures-are-not-evidence.md: the
+    # `v2_approval_none_body` and `v2_approval_nonzero_body` bodies below are
+    # transcribed (severity-badge markup trimmed to one representative
+    # `<picture>` element) from Copilot's real reviews on
+    # Lacaedemon/sparta#1635, fetched 2026-09-23 -- reviews 5295055730 (the
+    # `None` approval) and 5294462601 (the single-finding approval). No real
+    # review combining a negative v2 heading with `**Findings:** None` (or a
+    # mixed-severity `**Findings:**` line) was available at fetch time, so
+    # `v2_changes_none_body`, `v2_closer_look_none_body`, and
+    # `v2_approval_mixed_severity_body` are constructed from the same overview
+    # shape rather than transcribed.
+    _v2_picture = (
+        "<picture><source media=\"(prefers-color-scheme: dark)\" "
+        "srcset=\"low-v2-dark.svg\"><source media=\"(prefers-color-scheme: light)\" "
+        "srcset=\"low-v2-light.svg\"><img src=\"low-v2-light.png\" "
+        "alt=\"Low severity\" width=\"62\" height=\"18\" align=\"texttop\"></picture>"
+    )
+    v2_approval_none_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n"
+        "No unresolved review issues remain.\n\n"
+        "**Review effort:** Lite  \n**Findings:** None"
+    )
+    v2_approval_nonzero_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n"
+        "No blocking issues were identified; the remaining comment is a minor "
+        "documentation-style nit.\n\n"
+        f"**Review effort:** Lite  \n**Findings:** 1 {_v2_picture}"
+    )
+    v2_approval_mixed_severity_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n"
+        "Mixed-severity findings remain.\n\n"
+        f"**Review effort:** Lite  \n**Findings:** 2 {_v2_picture} · 1 {_v2_picture}"
+    )
+    v2_changes_none_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e1 Changes recommended\n\n"
+        "The overview sentence carries the only complaint.\n\n"
+        "**Review effort:** Lite  \n**Findings:** None"
+    )
+    v2_closer_look_none_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f535 Needs a closer look\n\n"
+        "The overview sentence carries the only complaint.\n\n"
+        "**Review effort:** Lite  \n**Findings:** None"
+    )
+
+    check(
+        "copilot_verdict: v2 approval with 'Findings: None' is clean",
+        checker.copilot_verdict(v2_approval_none_body) == "clean",
+    )
+    check(
+        "copilot_verdict: v2 approval with a nonzero 'Findings:' count is not clean",
+        checker.copilot_verdict(v2_approval_nonzero_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: v2 'Findings:' line sums counts across several severity badges",
+        checker.copilot_verdict(v2_approval_mixed_severity_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: v2 'Changes recommended' with 'Findings: None' is not clean",
+        checker.copilot_verdict(v2_changes_none_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: v2 'Needs a closer look' with 'Findings: None' is not clean",
+        checker.copilot_verdict(v2_closer_look_none_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: legacy 'Comments generated: 0' body is unchanged by the v2 path",
+        checker.copilot_verdict(copilot_clean_body) == "clean",
+    )
+    check(
+        "classify_verdict: v2 approval with 'Findings: None' classifies clean",
+        checker.classify_verdict(v2_approval_none_body, "COMMENTED", "copilot") == "clean",
+    )
+    check(
+        "classify_verdict: v2 approval with a nonzero 'Findings:' count classifies not-clean",
+        checker.classify_verdict(v2_approval_nonzero_body, "COMMENTED", "copilot") == "not-clean",
+    )
+
     check(
         "_is_bot_author admits Copilot's bare login as well as the [bot] form",
         checker._is_bot_author("copilot-pull-request-reviewer")

@@ -10,6 +10,8 @@ Operationalizes the strong form of the claim workflow: branch → empty commit �
 
 ## What it does
 
+Before any PR creation — including a repair PR that was not opened through this skill — apply the complete preflight in [`check-open-prs-before-duplicating`](../../shared/workflow/check-open-prs-before-duplicating.md).
+
 1.  Fetch `origin/main` and check out a clean branch: `feat/<slug>` or `fix/<slug>` (inferred from issue title)
 2.  Create an empty commit with message: `"start: <issue title> (closes #<N>)"`
 3.  Push the branch with `-u origin HEAD`

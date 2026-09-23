@@ -478,6 +478,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>If the PR’s CI checks are failing (not just the review), investigate and fix them as part of the ARDI loop — don’t declare “clean” with red CI. This includes:</p>
 <ul>
 <li><strong>Workflow syntax errors</strong> — fix them in this repo.</li>
+<li><strong>Caller/bootstrap failures</strong> — trace the local caller and reusable workflow interface before filing anything. When a supported caller setting can remove an unnecessary bootstrap step, make the scoped local repair in the same round; reserve an issue-only response for a genuinely upstream or externally blocked fix.</li>
 <li><strong>Upstream template bugs</strong> — if the failure is in a reusable workflow from a shared CI library (e.g., HACtions) or a GitHub Action, file an issue (or open a PR) upstream using the <code>sup</code> skill, then either pin a working version or apply a local workaround until the upstream fix lands.</li>
 <li><strong>Flaky / infra failures</strong> — retry once; if it persists, investigate root cause.</li>
 </ul>

@@ -375,6 +375,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="what-it-does" class="level2">
 <h2 class="anchored" data-anchor-id="what-it-does">What it does</h2>
+<p>Before any PR creation — including a repair PR that was not opened through this skill — apply the complete preflight in <a href="../../shared/workflow/check-open-prs-before-duplicating.md"><code>check-open-prs-before-duplicating</code></a>.</p>
 <ol type="1">
 <li>Fetch <code>origin/main</code> and check out a clean branch: <code>feat/&lt;slug&gt;</code> or <code>fix/&lt;slug&gt;</code> (inferred from issue title)</li>
 <li>Create an empty commit with message: <code>"start: &lt;issue title&gt; (closes #&lt;N&gt;)"</code></li>

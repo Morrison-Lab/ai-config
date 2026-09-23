@@ -56,9 +56,12 @@ import re
 import subprocess
 import sys
 
-# An absolute POSIX path in the prompt. Trailing punctuation is trimmed so a
+# An absolute POSIX or Windows path in the prompt. Trailing punctuation is trimmed so a
 # path at the end of a sentence still resolves.
-RX_ABS_PATH = re.compile(r"(/(?:[\w.@+-]+/)+[\w.@+-]*)")
+RX_ABS_PATH = re.compile(
+    r"((?:/(?:[\w.@+-]+/)+[\w.@+-]*"
+    r"|[A-Za-z]:[/\\](?:[\w.@+-]+[/\\])*[\w.@+-]*))"
+)
 
 # Phrases by which a brief declares the agent must not write AT ALL. Matched
 # on the prompt, because the tool input carries no capability field a hook
@@ -131,7 +134,7 @@ def candidates(prompt, cwd):
     """
     out = []
     for m in RX_ABS_PATH.finditer(prompt or ""):
-        p = m.group(1).rstrip("/.,;:)\"'`")
+        p = m.group(1).rstrip("/\\.,;:)\"'`")
         if os.path.isdir(p) and p not in out:
             out.append(p)
     if cwd and os.path.isdir(cwd) and cwd not in out:

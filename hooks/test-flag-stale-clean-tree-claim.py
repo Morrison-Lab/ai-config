@@ -178,17 +178,19 @@ CASES = [
 
 
 def run_case(events, should_warn):
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False, encoding="utf-8") as tf:
-        for ev in events:
-            tf.write(json.dumps(ev) + "\n")
-        tpath = tf.name
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tpath = os.path.join(tmp_dir, "transcript.jsonl")
+        with open(tpath, "w", encoding="utf-8") as tf:
+            for ev in events:
+                tf.write(json.dumps(ev) + "\n")
 
-    try:
+        env = dict(os.environ, TMPDIR=tmp_dir, TEMP=tmp_dir, TMP=tmp_dir)
         proc = subprocess.run(
             [sys.executable, HOOK],
             input=json.dumps({"transcript_path": tpath}),
             text=True,
             capture_output=True,
+            env=env,
             timeout=10,
         )
         assert proc.returncode == 0, f"Hook crashed with code {proc.returncode}: {proc.stderr}"
@@ -198,9 +200,6 @@ def run_case(events, should_warn):
             data = json.loads(out)
             warned = bool(data.get("systemMessage"))
         return warned == should_warn, warned
-    finally:
-        if os.path.exists(tpath):
-            os.remove(tpath)
 
 
 def main():

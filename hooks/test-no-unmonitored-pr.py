@@ -101,4 +101,34 @@ finally:
     os.unlink(ag_opened)
     os.unlink(ag_scheduled)
 
-print("PASS: detects an unmonitored PR and gives each PR a stable timer state file")
+# Verify alive() liveness checking across valid, dead, and invalid PIDs
+assert subject.alive(os.getpid()) is True
+assert subject.alive(2 ** 30) is False
+assert subject.alive(0) is False
+assert subject.alive(-1) is False
+assert subject.alive("not a pid") is False
+if os.name == "nt":
+    assert subject._alive_windows(os.getpid()) is True
+
+# Every child process must be started without a console window on Windows.
+# Checked structurally via AST: every subprocess.<spawner>(...) call in the
+# hook must pass **NO_WINDOW with a floor assertion on total calls seen.
+import ast as _ast
+from pathlib import Path
+_tree = _ast.parse(Path(sys.argv[1]).read_text(encoding="utf-8"))
+_bare = []
+_seen = 0
+for _node in _ast.walk(_tree):
+    if (isinstance(_node, _ast.Call) and isinstance(_node.func, _ast.Attribute)
+            and _node.func.attr in ("run", "Popen", "call", "check_call", "check_output")
+            and isinstance(_node.func.value, _ast.Name)
+            and _node.func.value.id == "subprocess"):
+        _seen += 1
+        _passes = any(k.arg is None and isinstance(k.value, _ast.Name)
+                      and k.value.id == "NO_WINDOW" for k in _node.keywords)
+        if not _passes:
+            _bare.append(_node.lineno)
+assert _seen >= 3, f"matched only {_seen} subprocess calls; expected the 3 in the file"
+assert not _bare, f"subprocess calls without NO_WINDOW at lines {_bare}"
+
+print("PASS: detects an unmonitored PR, gives each PR a stable timer state file, and guards Windows process liveness and NO_WINDOW")

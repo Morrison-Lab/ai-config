@@ -150,6 +150,14 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
     job token, keep `GIT_TERMINAL_PROMPT=0`, disable shell tracing during
     authentication, and remove the helper on exit.
     (Measured 2026-09-23 while testing HACR access from `test.hac`.)
+  - Build a CI Git remote from `CI_SERVER_URL`, not `CI_SERVER_HOST`.
+    The host drops the configured protocol, port, and any GitLab relative URL
+    root, which breaks self-hosted instances outside default HTTPS.
+    (Learned from the 2026-09-24 review of HACtions MR !71.)
+  - A regression test for a CI-variable default must not set that variable in
+    the test environment.
+    Also assert the rendered YAML value when the default itself is contractual.
+    (Learned from the 2026-09-24 review of HACtions MR !71.)
   - A Maintainer cannot always temporarily disable a target project's inbound
     scope for an access A/B.
     If `PATCH /projects/<ID>/job_token_scope` with `enabled=false` returns

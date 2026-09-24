@@ -409,6 +409,83 @@ CASES = [
                        "address.")], True,
      "nor must a trailing 'did not' -- this is the phrasing the RX_NEGATION "
      "comment says the guard must keep catching"),
+
+    # ai-config#3958: quoted push vocabulary in tool inputs must not be treated as a push.
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "edit", "input": {
+              "file_path": "hooks/no-stale-pr-status.py",
+              "text": "RX_PUSH = re.compile(r'git push|push_files')\n"
+          }}]}},
+      say("All checks green at this head.")], False,
+     "edit tool modifying code containing push vocabulary is not a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "replace_file_content", "input": {
+              "TargetFile": "/path/to/script.py",
+              "ReplacementContent": "def push_files():\n    pass\n"
+          }}]}},
+      say("All checks green at this head.")], False,
+     "replace_file_content writing push_files is not a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "run_command", "input": {
+              "command": "cat << 'EOF' > hooks/no-stale-pr-status.py\nRX_PUSH = re.compile(r'git push')\nEOF"
+          }}]}},
+      say("All checks green at this head.")], False,
+     "bash heredoc rewriting file with git push vocabulary is not a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "bash", "input": {
+              "command": 'git commit -m "fix(guard): ignore quoted git push in messages"'
+          }}]}},
+      say("All checks green at this head.")], False,
+     "git commit message mentioning git push is not a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "bash", "input": {
+              "command": "sed -i 's/git push/git push --dry-run/' script.sh"
+          }}]}},
+      say("All checks green at this head.")], False,
+     "sed substitution mentioning git push is not a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "run_command", "input": {
+              "command": "python -c \"print('git push')\""
+          }}]}},
+      say("All checks green at this head.")], False,
+     "python command mentioning git push in arguments is not a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "run_command", "input": {
+              "command": "git add -A && git push origin fix-branch"
+          }}]}},
+      say("All checks green at this head.")], True,
+     "chained git push after git add is recognized as a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "run_command", "input": {
+              "CommandLine": "git push --force-with-lease origin main"
+          }}]}},
+      say("All checks green at this head.")], True,
+     "CommandLine parameter with git push is recognized as a push"),
+
+    # Local file tools mentioning query vocabulary must not register as a fresh status query.
+    ([QUERY, PUSH,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "view_file", "input": {
+              "AbsolutePath": "/path/to/scripts/check-pr-fully-clean.py"
+          }}]}},
+      say("All checks green at this head.")], True,
+     "view_file mentioning query vocabulary must not count as fresh status query"),
+    ([QUERY, PUSH,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "edit", "input": {
+              "file_path": "scripts/ci.sh",
+              "text": "gh pr checks 123\n"
+          }}]}},
+      say("All checks green at this head.")], True,
+     "edit tool mentioning query vocabulary must not count as fresh status query"),
 ]
 
 
@@ -531,6 +608,41 @@ def check_attribution():
     return failures
 
 
+# ai-config#3958: warning must name the push command or tool that triggered the staleness.
+PUSH_ATTRIBUTION = [
+    (PUSH, "(git push -q)", "CLI git push summary in reason"),
+    (MCP_PUSH, "(mcp__github__push_files)", "MCP push tool name in reason"),
+    ({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "run_command", "input": {"command": "git push origin main"}}]}},
+     "(git push origin main)", "CLI chained/argument push in reason"),
+]
+
+
+def check_push_attribution():
+    """Warning must name the push command or tool that triggered the staleness."""
+    failures = 0
+    for push_event, expected, label in PUSH_ATTRIBUTION:
+        td = tempfile.mkdtemp()
+        try:
+            path = os.path.join(td, "transcript.jsonl")
+            with open(path, "w", encoding="utf-8") as fh:
+                for e in (QUERY, push_event, say("All checks green at this head.")):
+                    fh.write(json.dumps(e) + "\n")
+            env = dict(os.environ, TMPDIR=td, TEMP=td, TMP=td)
+            out = subprocess.run(
+                [sys.executable, HOOK],
+                input=json.dumps({"transcript_path": path}),
+                capture_output=True, text=True, env=env,
+            ).stdout.strip()
+            reason = (json.loads(out).get("reason") if out else "") or ""
+            ok = expected in reason
+            failures += 0 if ok else 1
+            print(f"{'ok  ' if ok else 'FAIL'}  push-attribution: {label}")
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+    return failures
+
+
 def main():
     failures = 0
     for events, want_block, label in CASES:
@@ -541,8 +653,9 @@ def main():
         print(f"{'ok  ' if ok else 'FAIL'}  "
               f"{'block' if want_block else 'allow'}: {label}")
     failures += check_attribution()
+    failures += check_push_attribution()
     failures += check_query_forms()
-    total = len(CASES) + len(ATTRIBUTION) + len(QUERY_FORMS)
+    total = len(CASES) + len(ATTRIBUTION) + len(PUSH_ATTRIBUTION) + len(QUERY_FORMS)
     print(f"\n{total - failures}/{total} passed")
     return 1 if failures else 0
 

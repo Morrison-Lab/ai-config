@@ -25,6 +25,16 @@ import re
 import sys
 import tempfile
 
+try:
+    _LIB = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+        "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from shellcmd import git_subcommand, simple_commands
+except Exception as _exc:  # broken install; fail open and say so
+    git_subcommand = simple_commands = None
+
 # A bare pass/fail count says nothing about WHERE it came from: a local test
 # suite and a check-run query both read "<n> pass". The trigger stays broad,
 # because staleness after a push is worth warning about either way -- but the
@@ -76,8 +86,68 @@ ASSERT = [
 ]
 RX_ASSERT = re.compile("|".join(ASSERT), re.I)
 
-# A push invalidates any earlier reading.
+# An MCP write carries its verb in the tool NAME (mcp__github__push_files,
+# mcp__github__create_or_update_file, etc.).
+RX_MCP_PUSH = re.compile(
+    r"mcp__.*__(?:push_files|create_or_update_file)|\b(?:push_files|create_or_update_file)\b",
+    re.I,
+)
+
+# A push invalidates any earlier reading. Kept for unparseable-command fallback.
 RX_PUSH = re.compile(r"git\s+push|create_or_update_file|push_files", re.I)
+
+LOCAL_FILE_TOOLS = {
+    "view_file", "read_file", "grep_search", "list_dir", "find_by_name",
+    "write_to_file", "replace_file_content", "edit", "write", "str_replace_editor",
+    "multiedit", "view", "read",
+}
+
+
+def _check_push(tool_name: str, args: any) -> tuple[bool, str]:
+    """Return (is_push, push_summary).
+
+    Detect genuine push events (CLI git push or MCP file push) while avoiding
+    false positives from push vocabulary appearing quoted in commit messages,
+    heredocs, sed substitutions, or local file edits (ai-config#3958).
+    """
+    tool_lower = (tool_name or "").lower()
+
+    # 1. MCP push: verb is in the tool name.
+    if RX_MCP_PUSH.search(tool_lower):
+        return True, tool_name
+
+    # 2. Extract shell command string if present.
+    cmd_str = None
+    if isinstance(args, dict):
+        cmd_str = args.get("command") or args.get("CommandLine") or args.get("cmd")
+    elif isinstance(args, str):
+        cmd_str = args
+
+    if cmd_str and isinstance(cmd_str, str):
+        if simple_commands is not None and git_subcommand is not None:
+            cmds = simple_commands(cmd_str)
+            if cmds is not None:
+                for argv in cmds:
+                    res = git_subcommand(argv)
+                    if res and res[0] == "push":
+                        summary = " ".join(argv[:4])
+                        return True, summary
+                return False, ""
+
+        # Fallback when simple_commands returns None (parse error) or shellcmd is absent.
+        # Fail closed on unparseable shell command containing git push.
+        m = re.search(r"\bgit\s+push\b", cmd_str, re.I)
+        if m:
+            summary = cmd_str.strip().splitlines()[0][:60]
+            return True, summary
+        return False, ""
+
+    # 3. Fallback for non-dict args or unrecognized tool wrappers.
+    blob = (tool_name or "") + " " + json.dumps(args or {})
+    m = RX_PUSH.search(blob)
+    if m:
+        return True, m.group(0)
+    return False, ""
 
 # A fresh reading. Covers the CLI and the MCP surfaces for both GitHub and GitLab (#2667).
 RX_QUERY = re.compile(
@@ -446,8 +516,9 @@ def find_unnegated_assert(text):
 
 
 def scan(path):
-    """Return (last_push_idx, last_query_idx, last_failing_query_idx, last_assistant_text)."""
+    """Return (last_push_idx, last_query_idx, last_failing_query_idx, last_assistant_text, last_push_cmd)."""
     last_push = last_query = last_failing_query = -1
+    last_push_cmd = ""
     text = ""
     i = 0
     query_tool_use_ids = set()
@@ -468,13 +539,15 @@ def scan(path):
                 for tc in m.get("tool_calls") or []:
                     if isinstance(tc, dict):
                         tool_name = (tc.get("name") or (tc.get("function") or {}).get("name") or "").lower()
-                        if tool_name in ("view_file", "read_file", "grep_search", "list_dir"):
+                        if tool_name in LOCAL_FILE_TOOLS:
                             continue
                         args = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
                         blob = tool_name + " " + json.dumps(args)
                         tool_id = tc.get("id") or str(id(tc))
-                        if RX_PUSH.search(blob):
+                        is_push, push_cmd = _check_push(tool_name, args)
+                        if is_push:
                             last_push = i
+                            last_push_cmd = push_cmd
                         if RX_QUERY.search(blob):
                             last_query = i
                             if tool_id:
@@ -492,12 +565,15 @@ def scan(path):
                         continue
                     if b.get("type") == "tool_use":
                         tool_name = (b.get("name") or "").lower()
-                        if tool_name in ("view_file", "read_file", "grep_search", "list_dir"):
+                        if tool_name in LOCAL_FILE_TOOLS:
                             continue
-                        blob = tool_name + " " + json.dumps(b.get("input") or {})
+                        args = b.get("input") or {}
+                        blob = tool_name + " " + json.dumps(args)
                         tool_id = b.get("id") or b.get("tool_use_id") or ""
-                        if RX_PUSH.search(blob):
+                        is_push, push_cmd = _check_push(tool_name, args)
+                        if is_push:
                             last_push = i
+                            last_push_cmd = push_cmd
                         if RX_QUERY.search(blob):
                             last_query = i
                             if tool_id:
@@ -513,14 +589,14 @@ def scan(path):
                             text = b["text"]
             elif isinstance(blocks, str) and role == "assistant" and blocks.strip():
                 text = blocks
-    return last_push, last_query, last_failing_query, text
+    return last_push, last_query, last_failing_query, text, last_push_cmd
 
 
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
         path = payload.get("transcript_path") or ""
-        last_push, last_query, last_failing_query, text = scan(path)
+        last_push, last_query, last_failing_query, text, last_push_cmd = scan(path)
     except Exception:
         return 0  # fail open
 
@@ -594,12 +670,13 @@ def main() -> int:
             "merge on it."
         )
 
+    push_spec = f" ({last_push_cmd})" if last_push_cmd else ""
     print(json.dumps({
         "decision": "block",
         "reason": (
             f"{lead} -- "
             f"\"{hit.group(0).strip()}\" -- but the most recent status query in "
-            "this transcript is OLDER than your most recent push. The reading "
+            f"this transcript is OLDER than your most recent push{push_spec}. The reading "
             "you are about to report describes a commit that is no longer the "
             "head.\n\n"
             f"{consequence}\n\n"

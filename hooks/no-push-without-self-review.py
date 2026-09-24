@@ -82,8 +82,9 @@ WHERE IT DELIBERATELY DOES NOT FIRE
 - A push whose every resolved push URL ends in an `EXEMPT_REPOS` entry
   (Morrison-Lab's mln, mlg and mlr) passes with no verdict and no override.
   Only a github.com URL (https or ssh) on a configured remote counts, and only
-  for a plain push: no `-c`, no environment prefix, and no ssh command, proxy,
-  exec path or receive-pack program that could deliver the pack elsewhere. A
+  for a plain push in a plain command (`[cd DIR &&] git ... [| tail N]`): no
+  `-c`, no environment setting of any kind, and no ssh command, proxy, exec
+  path or receive-pack program that could deliver the pack elsewhere. A
   push URL on any other host, a local path, a literal URL in the remote
   position, or anything else is still gated.
 
@@ -1456,6 +1457,49 @@ TRANSPORT_CONFIG = (r"^(core\.sshcommand|core\.gitproxy"
                     r"|remote\..*\.(receivepack|vcs))$")
 
 
+def _is_plain_command(command: str) -> bool:
+    """True when the whole Bash command is `[cd DIR &&]... git ... [2>&1] [| tail|head N]`.
+
+    `iter_pushes` reports only the environment PREFIX of a push, so anything
+    that sets the push's environment another way -- `export X=... &&`, an
+    `env -i X=... git push` wrapper whose assignments `_strip_env` skips, a
+    sourced file, a function, a substitution -- is invisible to
+    `_is_plain_push`. Rather than enumerate those, the exemption accepts only
+    this one shape and sends every other command to the ordinary review check.
+    """
+    if re.search(r"[$`;()<\n\\]", command):
+        return False
+    try:
+        lex = shlex.shlex(command, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        toks = list(lex)
+    except ValueError:
+        return False
+    i = 0
+    while toks[i:i + 1] == ["cd"]:
+        if len(toks) < i + 3 or toks[i + 2] != "&&" or not _is_word(toks[i + 1]):
+            return False
+        i += 3
+    if toks[i:i + 1] != ["git"]:
+        return False
+    j = i + 1
+    while (j < len(toks) and _is_word(toks[j])
+           and toks[j:j + 3] != ["2", ">&", "1"]):
+        j += 1
+    rest = toks[j:]
+    if rest[:3] == ["2", ">&", "1"]:
+        rest = rest[3:]
+    if not rest:
+        return True
+    return (rest[0] == "|" and rest[1:2] in (["tail"], ["head"])
+            and all(re.fullmatch(r"-n|-?\d+", t) for t in rest[2:]))
+
+
+def _is_word(tok: str) -> bool:
+    """A shlex token that is not shell punctuation."""
+    return not re.fullmatch(r"[|&;<>()]+", tok)
+
+
 def _is_plain_push(directory: str | None, argv: list[str],
                    env: list[str]) -> bool:
     """True when nothing in or around this push can redirect its transport.
@@ -1474,18 +1518,21 @@ def _is_plain_push(directory: str | None, argv: list[str],
             return False
         i += 2
     for tok in argv[i + 1:]:
-        if tok.startswith(("--receive-pack", "--exec")):
+        # git accepts any unambiguous prefix of a long option, so match the
+        # prefixes that can only mean these two (`--rec`, `--ex`).
+        if tok.startswith(("--rec", "--ex")):
             return False
     return not _run_git(directory, env, "config", "--get-regexp",
                         TRANSPORT_CONFIG)
 
 
 def push_is_exempt(directory: str | None, argv: list[str],
-                   env: list[str]) -> bool:
+                   env: list[str], command: str) -> bool:
     """True when every URL this push would write to is in EXEMPT_REPOS.
 
-    Only a plain push (`_is_plain_push`) qualifies, so no `-c`, environment
-    prefix or transport command is in play. The remote is resolved the way
+    Only a plain command (`_is_plain_command`) running a plain push
+    (`_is_plain_push`) qualifies, so no `-c`, environment setting or transport
+    command is in play. The remote is resolved the way
     `_push_remote` resolves it, and its URLs are read with
     `git remote get-url --push --all`, so `pushurl` and `insteadOf` rewrites
     in the repository's config are seen as git will apply them.
@@ -1503,7 +1550,8 @@ def push_is_exempt(directory: str | None, argv: list[str],
     whole command, which is what `push_refspecs` guards against the same way.
     """
     try:
-        if not _is_plain_push(directory, argv, env):
+        if not (_is_plain_command(command)
+                and _is_plain_push(directory, argv, env)):
             return False
         remote = _push_remote(directory, argv, env)
         if not remote:
@@ -2349,7 +2397,7 @@ def main() -> int:
                      "(`--git-dir`/`--work-tree`/`GIT_DIR`/`GIT_WORK_TREE`), "
                      "so a verdict naming a commit in this one cannot cover it")
                 return 0
-            if push_is_exempt(directory, argv, env):
+            if push_is_exempt(directory, argv, env, cmd):
                 continue
             # Coerce before `os.path.exists` rather than after. `or ""` rescues
             # only the FALSY non-`str` values: a truthy `list` or `dict` reaches

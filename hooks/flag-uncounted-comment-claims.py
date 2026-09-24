@@ -410,18 +410,16 @@ ENUM_SEPARATOR = r"\s*/?(?:,|(?<=\s)/|/(?=\s))\s*"
 # claim actually is. Restating any of that here is what let two copies drift
 # apart inside a single commit, which is the argument for keeping one.
 #
-# The headline the hook itself depends on: measured 2026-09-23 against
-# origin/main at b96c640f over a COMPLETE clone -- 2753 commits, 2539
-# multi-line bodies -- the narrow vocabulary flags 677 and the current one
-# 680, so the SET MOVED. 3 bodies are newly flagged and none lost, and all
-# three carry a positional line reference rather than a count. At claim
-# level, 29 gained and 1 lost, and 10 of the 29 are counts of things
-# (`Fourteen markdown files`, `Fifteen tests`) -- the shape the widening was
-# written for, which is where its case actually comes from.
+# The one fact the widening rests on, which the script derives and reports:
+# the flagged body set MOVED rather than merely growing in claim count, and
+# the claims gained include counts of things rather than only positional line
+# references. Run the script for the figures; it prints them, and this comment
+# deliberately does not, because the copy that used to sit here is what drifted.
 #
 # An earlier revision of this comment read "the same 54 of 111 bodies",
-# measured at that same ref from a SHALLOW clone carrying 111 of the 2539
-# multi-line bodies -- a fragment whose own depth is unrecoverable. `git log`
+# measured at that same ref from a SHALLOW clone carrying a small fraction of
+# the multi-line bodies the complete history holds -- a fragment whose own
+# depth is unrecoverable. `git log`
 # reports a grafted fragment with no warning and exits 0, so the figures were
 # true statements about a history nobody chose, and they inverted the
 # conclusion. The script now refuses a shallow clone.

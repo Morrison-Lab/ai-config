@@ -141,6 +141,7 @@ block's span AND outside every comment span.
 """
 from __future__ import annotations
 
+import bisect
 import re
 from typing import Callable, List, Optional, Tuple
 
@@ -158,16 +159,37 @@ COPILOT_FINDINGS_LINE = re.compile(
 # second round): line-anchored like every sibling boundary here (so a
 # blockquoted or mid-sentence quote of an earlier round's marker cannot
 # open a block), and requiring the heading immediately after the marker
-# with only blank/whitespace-only lines between -- `(?:[ \t]*\n)+`
+# with only blank/whitespace-only lines between -- `(?:[ \t]*\r?\n)+`
 # consumes the marker's own line ending plus any number of blank lines,
 # and stops (with no backtracking needed) the instant it reaches a
 # non-blank line, so a real heading right after matches in one pass and
 # a marker with no adjacent heading, or one found only much later past
-# an unrelated section, matches nothing at all.
+# an unrelated section, matches nothing at all. `\r?\n`, not a bare
+# `\n` (ai-config#3917 item 2, PR ai-config#3906 Copilot review, third
+# round): a CRLF body's marker line ends in `\r\n`, and the bare `\n`
+# form cannot consume the `\r` (it is neither `[ \t]` nor `\n` itself),
+# so the bridge failed to match at all and the whole body read as
+# carrying no v2 overview. That was the fail-closed direction (no block
+# found means no verdict, never a wrong clean), and GitHub's API
+# normalizes bodies to LF before this ever runs, so it was consistency
+# rather than exposure -- but every other line-anchor in this module
+# already tolerates a `\r` for free (a preceding `\r\n` still contains
+# the literal `\n` those patterns look for), and this is the one place
+# that did not.
+#
+# The heading is anchored at ITS end too -- `[ \t]*(?=\r?\n|$)`, not a
+# trailing `\b` (ai-config#3906 Copilot review, third round): a word
+# boundary only asserts a transition between a word and non-word
+# character, which the space before "quoted" in "## Copilot review
+# overview quoted" already satisfies, so that suffixed line opened a
+# trusted block too. The lookahead instead requires nothing but
+# whitespace between the heading text and the end of its line (or the
+# end of the string), so any real trailing content -- a word, a colon
+# and more heading text, anything -- fails the match outright.
 _COPILOT_OVERVIEW_START = re.compile(
     r"(?:^|\n)[ ]{0,3}<!--\s*ccr-overview-v2\s*-->"
-    r"(?:[ \t]*\n)+"
-    r"[ ]{0,3}##[ \t]+Copilot review overview\b",
+    r"(?:[ \t]*\r?\n)+"
+    r"[ ]{0,3}##[ \t]+Copilot review overview[ \t]*(?=\r?\n|$)",
     re.IGNORECASE,
 )
 _COPILOT_DETAILS_OPEN = re.compile(r"(?:^|\n)[ ]{0,3}<details\b", re.IGNORECASE)
@@ -246,9 +268,31 @@ def _find_html_comment_spans(text: str) -> List[Tuple[int, int]]:
     return spans
 
 
-def _position_in_spans(pos: int, spans: List[Tuple[int, int]]) -> bool:
-    """True when `pos` falls inside any (start, end) span in `spans`."""
-    return any(s <= pos < e for s, e in spans)
+def _position_in_spans(
+    pos: int, span_starts: List[int], spans: List[Tuple[int, int]]
+) -> bool:
+    """True when `pos` falls inside any (start, end) span in `spans`.
+
+    `span_starts` is the parallel, already-sorted list of each span's own
+    start (`_find_html_comment_spans` produces spans in start order via
+    sequential `str.find`, so this is just `[s for s, _ in spans]`,
+    computed ONCE by the caller rather than rebuilt on every call).
+    Comment spans never overlap (each subsequent search starts strictly
+    after the previous span's end), so the only span that could contain
+    `pos` is the one with the rightmost start <= pos -- found with
+    `bisect_right` in O(log k) rather than scanning every span in O(k)
+    (ai-config#3917 item 1, PR ai-config#3906 Copilot review, third
+    round). The prior linear scan made the OVERALL cost O(blocks x
+    findings): each block's own marker is itself a complete HTML
+    comment, so the comment-span list grows with the block count, and
+    this function ran once per Findings-line match -- measured at a fixed
+    262,144 characters: 1000 blocks 0.053s, 2000 blocks 0.188s.
+    """
+    i = bisect.bisect_right(span_starts, pos) - 1
+    if i < 0:
+        return False
+    start, end = spans[i]
+    return start <= pos < end
 
 
 def _tokenize_copilot_line(rest: str) -> Optional[List[Tuple[str, str]]]:
@@ -489,13 +533,14 @@ def _copilot_v2_findings_count(
     # form preserves that fix across multiple blocks).
     max_end = max(end for _, end in blocks)
     comment_spans = _find_html_comment_spans(scan[:max_end])
+    comment_span_starts = [s for s, _ in comment_spans]
     saw_line = False
     saw_unparseable = False
     for block_start, block_end in blocks:
         for m in COPILOT_FINDINGS_LINE.finditer(scan, block_start, block_end):
             if match_is_cited(cited, m.start(), m.end()):
                 continue
-            if _position_in_spans(m.start(), comment_spans):
+            if _position_in_spans(m.start(), comment_span_starts, comment_spans):
                 continue
             saw_line = True
             rest = m.group("rest")

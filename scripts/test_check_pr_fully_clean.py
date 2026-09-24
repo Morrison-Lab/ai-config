@@ -6544,7 +6544,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     # anchor excludes. The fix is structural: `COPILOT_FINDINGS_LINE` is
     # now bounded to at most 3 leading spaces, and the search is further
     # restricted to the actual overview block
-    # (`_copilot_overview_block_span` in scripts/lib/copilot_overview.py)
+    # (`_copilot_overview_block_spans` in scripts/lib/copilot_overview.py)
     # with any match landing inside an HTML comment rejected outright.
     # These four constructed bodies all carry a REAL overview block (the
     # marker and heading are present and correctly formed) with the fake
@@ -6714,6 +6714,84 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
             "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
         ) == "clean",
+    )
+
+    # ai-config#3899 review finding, eighteenth round (PR ai-config#3906
+    # Copilot review, third round): the heading in `_COPILOT_OVERVIEW_START`
+    # was only `\b`-bounded, so `## Copilot review overview quoted` --
+    # extra text after the real heading words -- still satisfied the word
+    # boundary (the space before "quoted" already is one) and opened a
+    # trusted block. Anchored the heading to the end of its own line
+    # instead (`[ \t]*(?=\r?\n|$)`), so any real trailing content fails
+    # the match. Also fixed ai-config#3917 item 2 while touching this same
+    # pattern: the marker-to-heading bridge required a bare `\n`, so a
+    # CRLF body's marker line (ending `\r\n`) could never satisfy it --
+    # the `\r` is neither `[ \t]` nor `\n` -- and the whole body read as
+    # carrying no v2 overview. Fixed to `\r?\n`, matching every other
+    # line-anchor in this module, which already tolerate a `\r` for free.
+    check(
+        "copilot_verdict: a heading with trailing text after it "
+        "('## Copilot review overview quoted') opens no block",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview quoted\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: a CRLF marker-to-heading bridge still finds "
+        "the block",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\r\n\r\n## Copilot review overview\r\n\r\n"
+            "### \U0001f7e2 Approval recommended\r\n\r\n**Findings:** None"
+        ) == "clean",
+    )
+
+    # Timing regression tests (ai-config#3917, PR ai-config#3906 Copilot
+    # review, third round): `_position_in_spans` scanned every HTML-comment
+    # span linearly for every Findings-line match, making the OVERALL cost
+    # O(comments x findings) -- and since each block's own marker is
+    # itself a complete HTML comment, the comment-span list grows with the
+    # block count too. Measured before the fix (`bisect` over the
+    # start-sorted spans instead of a linear scan) at a fixed 262,144
+    # characters: 1000 blocks 0.053s, 2000 blocks 0.188s -- clearly
+    # super-linear. Two adversarial shapes, both at 262,144 characters:
+    # many small HTML comments interleaved with many Findings lines
+    # within ONE block (stresses a large comment-span list against many
+    # lookups), and many separate marker+heading blocks (the exact #3917
+    # reprex shape).
+    _many_comments_unit = "<!-- c -->\n**Findings:** None\n"
+    _many_comments_header = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n"
+    )
+    _many_comments_reps = (262144 - len(_many_comments_header)) // len(_many_comments_unit)
+    _many_comments_body = (
+        _many_comments_header + _many_comments_unit * _many_comments_reps
+    )
+    _mc_secs, _mc_verdict = best_of_three(
+        checker.copilot_verdict, _many_comments_body
+    )
+    check(
+        "copilot_verdict on 262,144 characters of many HTML comments "
+        "interleaved with many Findings lines in one block scales "
+        "linearly (< 1s)",
+        _mc_verdict == "clean" and _mc_secs < 1.0,
+    )
+    _many_blocks_unit = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n\n"
+        "<details>\nx\n</details>\n\n"
+    )
+    _many_blocks_reps = 262144 // len(_many_blocks_unit)
+    _many_blocks_body = _many_blocks_unit * _many_blocks_reps
+    _mb_secs, _mb_verdict = best_of_three(
+        checker.copilot_verdict, _many_blocks_body
+    )
+    check(
+        "copilot_verdict on 262,144 characters of many separate "
+        "marker+heading blocks (the #3917 reprex shape) scales linearly "
+        "(< 1s)",
+        _mb_verdict == "clean" and _mb_secs < 1.0,
     )
 
     # ai-config#3899 review finding, thirteenth round (PR ai-config#3906

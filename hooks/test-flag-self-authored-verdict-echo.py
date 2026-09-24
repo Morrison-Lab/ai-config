@@ -24,6 +24,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 HOOK = (
     sys.argv[1]
@@ -68,6 +69,269 @@ ECHO_BULLET_ONLY = (
     "**1. Addressed.** The gate was wrong.\n"
     "**2. Rebutted.** The cited line does not exist.\n"
 ) % NOT_CLEAN.lower()
+
+# The bulleted-bold-label finding. A BULLETED list of BOLD ARD labels:
+# ordinary Markdown
+# for a disposition list, and the shape `RX_DISPOSITION`'s prefix could not
+# reach while its list marker and its emphasis run were two branches of one
+# alternation rather than two optional groups. Measured against the prior
+# commit: every row below returned no match, so the guard was silent on the
+# artifact it exists for.
+ECHO_BULLET_BOLD_ARD = (
+    "## Round 3\n\n"
+    "Verdict: **%s**, two findings.\n\n"
+    "- **1--2. Rebutted.** The regex already handles it.\n"
+    "- **3. Addressed.** The gate was wrong.\n"
+) % NOT_CLEAN.lower()
+
+# The numbered-list rendering of the same thing.
+ECHO_NUMBERED_BOLD_ARD = (
+    "## Round 3\n\n"
+    "Verdict: **%s**, one finding.\n\n"
+    "1. **Addressed.** The gate was wrong.\n"
+) % NOT_CLEAN.lower()
+
+# The zero-quantifier finding. The most HONEST disposition comment there is: it
+# reports that nothing was fixed. `NEGATION_RX` carried no zero-quantifier,
+# so each of these warned -- and a warning on a comment that fixed nothing is
+# the direction that gets a warn-only guard switched off.
+#
+# The vocabulary is `scripts/check-pr-fully-clean.py`'s own `_NEGATOR_RE`
+# group (`zero|hardly|barely|scarcely`), so `barely` and `scarcely` are here
+# as well as `hardly`: taking one member of a group and leaving its synonyms
+# behind is how two guards drift into disagreeing about the same sentence
+# (the incomplete-corpus-group finding).
+HONEST_ZERO_ADDRESSED = (
+    "### Verdict\n**%s**\n\n"
+    "Zero findings are addressed in this push.\n"
+) % NOT_CLEAN
+
+HONEST_NUMERIC_ZERO_ADDRESSED = (
+    "### Verdict\n**%s**\n\n"
+    "0 findings are addressed in this push.\n"
+) % NOT_CLEAN
+
+HONEST_HARDLY_ADDRESSED = (
+    "### Verdict\n**%s**\n\n"
+    "Hardly any are addressed in `abc1234`.\n"
+) % NOT_CLEAN
+
+HONEST_BARELY_ADDRESSED = (
+    "### Verdict\n**%s**\n\n"
+    "Barely any are addressed in `abc1234`.\n"
+) % NOT_CLEAN
+
+HONEST_SCARCELY_ADDRESSED = (
+    "### Verdict\n**%s**\n\n"
+    "Scarcely any are addressed in `abc1234`.\n"
+) % NOT_CLEAN
+
+# Each of these four words negates whatever noun FOLLOWS it, which need not
+# be the disposition: `Hardly a blocker` negates the blocker and `Zero
+# tolerance` the tolerance, while the claim beside them is a plain echo. An
+# earlier revision admitted all four unanchored, on the reasoning that the
+# corpus group in `check-pr-fully-clean.py`'s `_NEGATOR_RE` should be taken
+# whole. That reasoning was a purpose mismatch: `_NEGATOR_RE` asks whether a
+# whole verdict contains negation vocabulary, where a stray hit costs
+# nothing, and this asks whether a negator GOVERNS one claim, where a stray
+# hit silences the guard. Measured through the hook, the unanchored form
+# went silent on all five clauses below while the parent warned on every
+# one. They are anchored to the quantifier now -- `hardly any`, `zero
+# findings`, `zero of` -- which is the same remedy the digit already used,
+# and it is the `few` argument this file states two blocks down, applied to
+# the four tokens that shipped with the property rather than the one that
+# was declined for it.
+ECHO_HARDLY_A_BLOCKER = (
+    "### Verdict\n**%s**\n\n"
+    "Hardly a blocker, all five are addressed in `abc1234`.\n"
+) % NOT_CLEAN
+
+ECHO_BARELY_A_MINUTE = (
+    "### Verdict\n**%s**\n\n"
+    "Barely a minute later, all five are addressed in `abc1234`.\n"
+) % NOT_CLEAN
+
+ECHO_SCARCELY_WORTH = (
+    "### Verdict\n**%s**\n\n"
+    "Scarcely worth noting, all five are addressed in `abc1234`.\n"
+) % NOT_CLEAN
+
+ECHO_HARDLY_SURPRISING = (
+    "### Verdict\n**%s**\n\n"
+    "Hardly surprising, all five are addressed in `abc1234`.\n"
+) % NOT_CLEAN
+
+ECHO_ZERO_TOLERANCE = (
+    "### Verdict\n**%s**\n\n"
+    "Zero tolerance for that, all five are addressed in `abc1234`.\n"
+) % NOT_CLEAN
+
+HONEST_HARDLY_ANYTHING = (
+    "### Verdict\n**%s**\n\n"
+    "Hardly anything is addressed in `abc1234`.\n"
+) % NOT_CLEAN
+
+# `few` and a bare `0` were each considered and DECLINED -- neither is in
+# that corpus group, so declining them departs from nothing. Each is kept
+# as a POSITIVE case so a later widening has to break a test rather than a
+# silence.
+#
+# `few` inverts on its article -- "a few are addressed" reports that some
+# WERE -- and a word-level pattern cannot see the article, so admitting `few`
+# silenced the claim this guard exists for.
+ECHO_A_FEW_ADDRESSED = (
+    "### Verdict\n**%s**\n\n"
+    "A few are addressed in `abc1234`.\n"
+) % NOT_CLEAN
+
+ECHO_QUITE_A_FEW_ADDRESSED = (
+    "### Verdict\n**%s**\n\n"
+    "Quite a few are addressed in `abc1234`.\n"
+) % NOT_CLEAN
+
+# A bare `0` matches any zero after a non-word character, so a version string
+# or an ordinal silenced the sentence beside it. The zero is anchored to the
+# noun it quantifies instead, following `no-stale-pr-status.py`'s own
+# `\b0 fail(s|ures)?\b`.
+ECHO_VERSION_ZERO = (
+    "### Verdict\n**%s**\n\n"
+    "Release v1.0 shipped, all three are addressed in `abc1234`.\n"
+) % NOT_CLEAN
+
+ECHO_LINE_ZERO = (
+    "### Verdict\n**%s**\n\n"
+    "On line 0 of the file, all three are addressed in `abc1234`.\n"
+) % NOT_CLEAN
+
+# The task-list finding. GitHub renders a disposition list as a task list as
+# readily as a plain one, and a numbered item may sit inside a bullet.
+ECHO_TASK_LIST_DONE = (
+    "## Round 3\n\n"
+    "Verdict: **%s**, one finding.\n\n"
+    "- [x] **Addressed.** The gate was wrong.\n"
+) % NOT_CLEAN.lower()
+
+ECHO_TASK_LIST_OPEN = (
+    "## Round 3\n\n"
+    "Verdict: **%s**, one finding.\n\n"
+    "- [ ] **Addressed.** The gate was wrong.\n"
+) % NOT_CLEAN.lower()
+
+ECHO_BULLET_THEN_NUMBER = (
+    "## Round 3\n\n"
+    "Verdict: **%s**, one finding.\n\n"
+    "- 1. **Addressed.** The gate was wrong.\n"
+) % NOT_CLEAN.lower()
+
+# The unpinned-`\s+` mutation finding. The bullet branch's `\s+` is what
+# holds it to actual list items: CommonMark requires whitespace after the
+# marker, and relaxing
+# it to `\s*` makes each of these match while none is a list item. Nothing
+# pinned that, so the mutation left the suite fully green.
+#
+# Each body carries a verdict so it still classifies not-clean; the dashed
+# line is the only thing that could supply a disposition phrase, so a fire
+# here means the prefix matched prose.
+PROSE_DASH_BARE = (
+    "### Verdict\n**%s**\n\n"
+    "-Addressed. was the shorthand in the old template.\n"
+) % NOT_CLEAN
+
+PROSE_PLUS_BARE = (
+    "### Verdict\n**%s**\n\n"
+    "+Addressed. was the shorthand in the old template.\n"
+) % NOT_CLEAN
+
+PROSE_DASH_BOLD = (
+    "### Verdict\n**%s**\n\n"
+    "-**Addressed** was the shorthand in the old template.\n"
+) % NOT_CLEAN
+
+PROSE_DASH_BOLD_LABEL = (
+    "### Verdict\n**%s**\n\n"
+    "-**1. Rebutted.** was the shorthand in the old template.\n"
+) % NOT_CLEAN
+
+# Every single-word negator is bounded against a HYPHEN, not just a word
+# character. A hyphen is a non-word character, so `\bno\b` matched the `no` of
+# `no-op` and of every `no-*.py` hook filename this corpus writes, and
+# `\bzero\b` the `zero-findings`, `zero-cost` and `zero-width` compounds
+# (98 of them here). In each the negator is a hyphenated adjective modifying
+# something else, so the sentence beside it is a genuine positive
+# disposition claim and the guard went silent on it.
+#
+# The `no|not|none|nothing` half of that predates this branch; `zero` added
+# one more instance, which is why the whole set is bounded rather than that
+# one token. These stay POSITIVE cases: the compound must NOT suppress.
+#
+# Each compound is written UNFENCED deliberately. The guard blanks code
+# spans before scanning, so `no-op` in backticks never reaches the negator
+# pattern at all -- a fixture written that way passes under the `\b` mutant
+# too and pins nothing. Measured: the two `no-` cases survived that mutation
+# while fenced, and kill it unfenced.
+ECHO_COMPOUND_ZERO_FINDINGS = (
+    "### Verdict\n**%s**\n\n"
+    "The zero-findings run aside, all three are addressed in `abc1234`.\n"
+) % NOT_CLEAN
+
+ECHO_COMPOUND_ZERO_COST = (
+    "### Verdict\n**%s**\n\n"
+    "A zero-cost check aside, all three are addressed in `abc1234`.\n"
+) % NOT_CLEAN
+
+ECHO_COMPOUND_NO_OP = (
+    "### Verdict\n**%s**\n\n"
+    "The no-op path aside, all three are addressed in `abc1234`.\n"
+) % NOT_CLEAN
+
+ECHO_COMPOUND_HOOK_FILENAME = (
+    "### Verdict\n**%s**\n\n"
+    "The no-stale-pr-status guard aside, all three are addressed in `abc1234`.\n"
+) % NOT_CLEAN
+
+ECHO_COMPOUND_NOTHING_BURGER = (
+    "### Verdict\n**%s**\n\n"
+    "Nothing-burger aside, all three are addressed in `abc1234`.\n"
+) % NOT_CLEAN
+
+# The digit form is STRICTLY NARROWER than the word form, and that residual
+# is pinned rather than closed: anchoring the digit to `findings?` is what
+# keeps a version string from silencing the sentence, and the noun set is
+# open-ended, so any enumeration of it is arbitrary. `Zero of the findings`
+# suppresses; `0 of the findings` does not.
+HONEST_WORD_ZERO_OF_THE = (
+    "### Verdict\n**%s**\n\n"
+    "Zero of the findings are addressed in this push.\n"
+) % NOT_CLEAN
+
+ECHO_DIGIT_ZERO_OF_THE = (
+    "### Verdict\n**%s**\n\n"
+    "0 of the findings are addressed in this push.\n"
+) % NOT_CLEAN
+
+# The negator boundary class is ASCII-only, and these two cases say why.
+# `SCOPE_BREAK_RX` already treats the Unicode en and em dashes as clause
+# separators, so a negator before one does not govern what follows, while
+# the unspaced ASCII hyphen is deliberately NOT a scope break -- it joins.
+# So the en-dash compound warns (the `zero` is out of scope) and the em
+# dash suppresses (the `none` after it is in scope, and the claim really
+# is negative). Measured over 2370 corpus files, U+2013 and U+2014 are the
+# only Unicode dashes present at all, at 64 and 5694 occurrences.
+#
+# The first row was written expecting SILENCE, reasoning from `NEGATION_RX`
+# in isolation, and failed -- which is the whole value of writing it. The
+# regex does match `zero` there; the governing window is what overrides it.
+# Admitting the dashes to the boundary class would flip the second row and
+# leave the first unchanged, so that widening is all cost.
+ECHO_ENDASH_ZERO_COMPOUND = (
+    "### Verdict\n**%s**\n\n"
+    "The zero\u2013findings run aside, all three are addressed in `abc1234`.\n"
+) % NOT_CLEAN
+
+HONEST_EMDASH_AFTER_NEGATOR = (
+    "### Verdict\n**%s**\n\n"
+    "No\u2014none of the three are addressed in `abc1234`.\n"
+) % NOT_CLEAN
 
 # A genuine self-review. States its own verdict; answers nothing.
 SELF_REVIEW = (
@@ -503,6 +767,24 @@ def main():
     check("the ARD bullet form alone is disposition vocabulary",
           mcp(ECHO_BULLET_ONLY), True)
     check("a closed italic ARD label still matches", mcp(ITALIC_ARD_LABEL), True)
+    check("a bulleted list of bold ARD labels matches",
+          mcp(ECHO_BULLET_BOLD_ARD), True)
+    check("a numbered list of bold ARD labels matches",
+          mcp(ECHO_NUMBERED_BOLD_ARD), True)
+    check("a completed task-list disposition matches",
+          mcp(ECHO_TASK_LIST_DONE), True)
+    check("an open task-list disposition matches",
+          mcp(ECHO_TASK_LIST_OPEN), True)
+    check("a numbered item nested in a bullet matches",
+          mcp(ECHO_BULLET_THEN_NUMBER), True)
+    check("`a few are addressed` reports that some WERE, so it still warns",
+          mcp(ECHO_A_FEW_ADDRESSED), True)
+    check("`quite a few are addressed` still warns",
+          mcp(ECHO_QUITE_A_FEW_ADDRESSED), True)
+    check("a version string's zero does not silence the sentence beside it",
+          mcp(ECHO_VERSION_ZERO), True)
+    check("an ordinal zero does not silence the sentence beside it",
+          mcp(ECHO_LINE_ZERO), True)
     check("a QUOTED review payload does not exempt the comment",
           mcp(QUOTED_PAYLOAD), True)
     check("an edit to an existing comment is covered",
@@ -541,6 +823,52 @@ def main():
           mcp(SELF_REVIEW_NEGATED), False)
     check("negated disposition phrases stay silent",
           mcp(NEGATED_PHRASES), False)
+    check("\"Zero findings are addressed\" is an honest report, not an echo",
+          mcp(HONEST_ZERO_ADDRESSED), False)
+    check("a zero anchored to the noun it quantifies reads as a negator",
+          mcp(HONEST_NUMERIC_ZERO_ADDRESSED), False)
+    check("`hardly any are addressed` reads as a negator",
+          mcp(HONEST_HARDLY_ADDRESSED), False)
+    check("`barely any are addressed` reads as a negator",
+          mcp(HONEST_BARELY_ADDRESSED), False)
+    check("`scarcely any are addressed` reads as a negator",
+          mcp(HONEST_SCARCELY_ADDRESSED), False)
+    check("`hardly a blocker` negates the blocker, not the claim",
+          mcp(ECHO_HARDLY_A_BLOCKER), True)
+    check("`barely a minute` negates the minute",
+          mcp(ECHO_BARELY_A_MINUTE), True)
+    check("`scarcely worth noting` negates the noting",
+          mcp(ECHO_SCARCELY_WORTH), True)
+    check("`hardly surprising` negates the surprise",
+          mcp(ECHO_HARDLY_SURPRISING), True)
+    check("`zero tolerance` negates the tolerance",
+          mcp(ECHO_ZERO_TOLERANCE), True)
+    check("`hardly anything` is still an honest negation",
+          mcp(HONEST_HARDLY_ANYTHING), False)
+    check("a `zero-findings` compound does not suppress the claim beside it",
+          mcp(ECHO_COMPOUND_ZERO_FINDINGS), True)
+    check("a `zero-cost` compound does not suppress it either",
+          mcp(ECHO_COMPOUND_ZERO_COST), True)
+    check("a `no-op` compound does not suppress it",
+          mcp(ECHO_COMPOUND_NO_OP), True)
+    check("a hyphenated hook name does not suppress it",
+          mcp(ECHO_COMPOUND_HOOK_FILENAME), True)
+    check("a `Nothing-burger` compound does not suppress it",
+          mcp(ECHO_COMPOUND_NOTHING_BURGER), True)
+    check("the WORD zero quantifies an open noun phrase and suppresses",
+          mcp(HONEST_WORD_ZERO_OF_THE), False)
+    check("the DIGIT zero is anchored to `findings`, so this residual warns",
+          mcp(ECHO_DIGIT_ZERO_OF_THE), True)
+    check("an en dash is already a scope break, so the compound warns",
+          mcp(ECHO_ENDASH_ZERO_COMPOUND), True)
+    check("an em dash after a negator is punctuation, not a compound join",
+          mcp(HONEST_EMDASH_AFTER_NEGATOR), False)
+    check("a bare dash is not a list marker", mcp(PROSE_DASH_BARE), False)
+    check("a bare plus is not a list marker", mcp(PROSE_PLUS_BARE), False)
+    check("a dash glued to a bold run is not a list marker",
+          mcp(PROSE_DASH_BOLD), False)
+    check("a dash glued to a bold ARD label is not a list marker",
+          mcp(PROSE_DASH_BOLD_LABEL), False)
     check("a real review carrying a review-data payload",
           mcp(REVIEW_WITH_PAYLOAD), False)
     check("the call described rather than reproduced",
@@ -908,6 +1236,58 @@ def main():
         check("an identical repost stays silent", seen[1], False)
     finally:
         shutil.rmtree(shared, ignore_errors=True)
+
+    print()
+    print("Bounded cost on a pathological body:")
+    # `RX_DISPOSITION`'s prefix anchors on a newline and then admitted more
+    # whitespace, and `\s` matches a newline, so on a run of blank lines the
+    # engine retried every suffix from every start -- quadratic. Measured on
+    # the shipped pattern before it was narrowed to `[ \t]`, a single comment
+    # body cost 0.6s at 2000 blank lines, 15.0s at 10000, 64.2s at 20000 and
+    # 241.0s at 40000. A PreToolUse hook that takes four minutes is a hang,
+    # and the body that triggers it is one a reviewer can paste by accident.
+    #
+    # Two sites carried the defect and they compound, so a single-site
+    # mutation survives a ceiling set only against the double. Measured at
+    # 20000 blank lines, with the row's own reported time:
+    #
+    #   neither reverted (as shipped)              0.21s
+    #   the prefix reverted to `\s{0,4}` alone      0.16s
+    #   the emphasis gap reverted to `\s*` alone    12.10s
+    #   both reverted                             63.44s
+    #
+    # Those are samples under load rather than constants: a later sweep of
+    # the same four states read 12.98s and 67.25s for the two reverted
+    # cases. The ceiling holds at either reading, which is the point of
+    # leaving this much headroom.
+    #
+    # Reverting the prefix alone costs nothing, because the emphasis gap is
+    # then the only site that can re-consume a newline and one site is
+    # linear; the two together are what multiply. The ceiling is therefore
+    # 5s rather than 30s -- about 24x the measured cost, which is ample
+    # headroom on a slow runner, and still red on the 12.10s single-site
+    # regression a 30s ceiling let through.
+    #
+    # It is the only instrument that can catch a reintroduced `\s`: the
+    # verdict is unchanged either way, so every other row in this suite
+    # passes under all four states above (measured directly: 0 verdict
+    # differences across 302 bodies).
+    flood = "\n" * 20000 + "All three are addressed. Needs more work."
+    env = dict(os.environ)
+    env["TMPDIR"] = tempfile.mkdtemp(prefix="verdict-echo-flood-")
+    try:
+        payload = {"tool_name": "mcp__github__add_issue_comment",
+                   "tool_input": {"owner": "o", "repo": "r",
+                                  "issue_number": 1, "body": flood},
+                   "cwd": ROOT, "transcript_path": "/nonexistent/flood.jsonl"}
+        started = time.time()
+        subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
+                       capture_output=True, text=True, env=env)
+        elapsed = time.time() - started
+    finally:
+        shutil.rmtree(env["TMPDIR"], ignore_errors=True)
+    check(f"20000 blank lines finish under 5s (took {elapsed:.2f}s)",
+          elapsed < 5.0, True)
 
     if FAILURES:
         print(f"\n{EXAMINED - len(FAILURES)}/{EXAMINED} passed")

@@ -727,8 +727,20 @@ def main() -> int:
             # Re-aim past every bare count: the message already discloses its
             # own pending work, so a count in it is the prescribed progress
             # form rather than a clean claim. A non-count assert in the same
-            # message still blocks -- disclosing one PR's pending checks does
-            # not license calling another PR clean.
+            # message still blocks.
+            #
+            # The filter is blind to WHICH PR each count concerns, so it skips
+            # a count about a different PR from the one the disclosure names:
+            # "#50 has 2 checks still in progress. 9 pass on #49." goes
+            # unblocked. An earlier version of this comment asserted the
+            # opposite, which the code never enforced (the disclosed-pending
+            # exemption finding; an earlier revision cited it as "round 10,
+            # finding 4", an ordinal a later review of the same branch also
+            # used for an unrelated finding).
+            # Whether to consult `RX_PR_NEARBY` here the way the staleness
+            # branch below does is ai-config#3968 -- it widens a BLOCKING
+            # guard, so it wants its own measured change rather than a
+            # correction bolted onto a comment fix.
             # Round 9, finding 7. This was a hand-rolled copy of
             # `all_unnegated_asserts` with a filter bolted on, so the
             # negation rule existed in two places and only one of them was

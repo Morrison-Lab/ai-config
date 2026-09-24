@@ -304,8 +304,56 @@ def authored_text(body):
 # that form was silently unmatched -- which made a negative case pass for the
 # wrong reason.
 _ARD_LABEL = r"(?:\d+(?:\s*(?:--|-|to)\s*\d+)?\s*[.):]\s*)?"
+# The list marker and the emphasis run are SEPARATE optional groups, not
+# two branches of one alternation. As a single alternation the prefix
+# could consume `- ` or `**` but never both, so `- **Addressed.**` -- a
+# bulleted list of bold ARD labels, which is ordinary Markdown for a
+# disposition list -- matched nothing and the guard stayed silent on the
+# exact artifact it exists for (the bulleted-bold-label finding; an
+# earlier revision cited it as "round 10, finding 3", which belongs to a
+# DIFFERENT review of this same branch that was also labelled round 10 --
+# its finding 3 is the `few` inversion, argued at `NEGATION_RX`'s own
+# comment block. Two reviews sharing one
+# ordinal is why these citations now name the finding rather than count
+# it).
+#
+# The bullet's `\s+` is what keeps the branch to actual list items. CommonMark
+# requires whitespace after the marker, so relaxing it to `\s*` widens the
+# guard onto ordinary prose: `-Addressed.`, `+Addressed.`, `-**Addressed**`
+# and `-**1. Rebutted.**` all begin matching, and none of them is a list item
+# (the unpinned-`\s+` mutation finding; the suite's own `PROSE_*` cases pin
+# it -- the glob is `PROSE_*` and not `PROSE_DASH_*`, since one of the four
+# is `PROSE_PLUS_BARE`). What the `\s+` does NOT decide is `**Addressed**`
+# -- an earlier version of this comment claimed it did. That form matches
+# under `\s*` too, because the first `*` is eaten as a bullet and the
+# second satisfies the emphasis group, so both spellings reach the label
+# by one route or another.
+#
+# The bullet, the checkbox and the number are three independent optional
+# steps rather than one choice, because GitHub renders a disposition as a
+# task list (`- [x] **Addressed.**`) as readily as a plain one, and a
+# numbered item may sit inside a bullet (`- 1. **Addressed.**`). All three
+# were measured missed while the plain forms matched (the task-list finding).
+#
+# Every gap in the prefix is `[ \t]` rather than `\s`, and that is a cost
+# fix rather than a taste one. `\s` matches a newline, so after anchoring
+# on `(?:^|\n)` the engine could consume the following newlines and retry
+# from every one of them -- quadratic in the number of blank lines. As
+# shipped before this change, one comment body cost 0.6s at 2000 blank
+# lines, 15.0s at 10000, 64.2s at 20000 and 241.0s at 40000; a PreToolUse
+# hook that takes four minutes is a hang, and a reviewer can paste such a
+# body by accident. Narrowing both gaps makes the same series 0.11s,
+# 0.14s, 0.18s and 0.29s.
+#
+# Nothing about the VERDICT changes: a label whose prefix spans a line
+# break is not a disposition on a line, so the newline was never wanted
+# there. Measured directly rather than argued -- 302 bodies (every string
+# in the test suite plus nine synthetic line-break shapes) give identical
+# answers under both patterns. That is exactly why the guard against a
+# reintroduced `\s` has to be a cost ceiling: no body can tell them apart.
 RX_DISPOSITION = re.compile(
-    r"(?:^|\n)\s{0,4}(?:[-*+]\s+|\d+[.)]\s+|\*{1,2}|_{1,2})?\s*" + _ARD_LABEL +
+    r"(?:^|\n)[ \t]{0,4}(?:[-*+][ \t]+(?:\[[ xX]\][ \t]+)?)?(?:\d+[.)][ \t]+)?"
+    r"(?:\*{1,2}|_{1,2})?[ \t]*" + _ARD_LABEL +
     # NOT `\b`: an adversarial review found the underscore branch above dead,
     # because `_` is a word character, so `_Addressed_` has no boundary after
     # the final `d`. A non-alphanumeric lookahead admits the closing emphasis
@@ -540,7 +588,7 @@ def _scan_budget(command):
         if openers > MAX_HEREDOC_OPENERS:
             return openers, cost
         i += 1
-        for nth, (dash, word) in enumerate(found):
+        for dash, word in found:
             k = i
             while k < total:
                 probe = lines[k].rstrip("\r")
@@ -807,10 +855,150 @@ def _elide_bracketed(text):
 
 PREFIX_DISQUALIFY_RX = (getattr(_clean_claim, "PREFIX_DISQUALIFY_RX", None)
                         or _FALLBACK_PREFIX_DISQUALIFY)
+# The zero-quantifiers are negators here too. Omitting them warned on the
+# most honest disposition comment there is: "Zero findings are addressed in
+# this push." reports that nothing was fixed, and still drew the warning
+# (the zero-quantifier finding). The warning's own text says the body
+# classifies as a NOT-CLEAN verdict while reading as a disposition -- see
+# `NOTE` above, which is what makes the misfire legible rather than
+# merely noisy.
+#
+# The vocabulary is `scripts/check-pr-fully-clean.py`'s `_NEGATOR_RE`,
+# cited by name rather than by line because ai-config#3906 moves it and
+# would shift any number written here: that PR's first hunk adds 19 lines
+# above it, carrying it from 1615 to 1634. (Its +236 is the file's total,
+# and 217 of those land BELOW the anchor and move it not at all -- an
+# earlier revision of this comment cited the 236 as though it were the
+# shift.) It carries twelve members:
+# `none|no|not|never|neither|nothing|nobody|nor|zero|hardly|barely|scarcely`.
+# Four of those were missing here, and were added whole and then ANCHORED,
+# for a reason worth stating: taking one member and leaving its synonyms is
+# how two guards drift into disagreeing about one sentence, but taking the
+# group unchanged was a purpose mismatch. `_NEGATOR_RE` asks whether a whole
+# verdict carries negation vocabulary, where a stray hit costs nothing; this
+# asks whether a negator GOVERNS one claim, where a stray hit silences the
+# guard. Measured through the hook, the unanchored form went silent on
+# `Hardly a blocker, all five are addressed`, `Zero tolerance for that, all
+# five are addressed` and three like them, each of which the parent warned
+# on -- the negator attaching to the following noun rather than to the
+# disposition. So `hardly|barely|scarcely` require `any`/`anything` and
+# `zero` requires `of` or `findings`, which is the anchor the digit already
+# used and the same objection this comment raises against `few` below. An earlier revision of this comment cited
+# `no-stale-pr-status.py` instead, which carries none of that vocabulary:
+# that file's `RX_NEGATION` is `not|never|cannot|unable|n't`, and
+# its only `zero` and `0` sit in its `ASSERT` list as CLEAN-claim
+# vocabulary -- the opposite polarity, so following the citation argued
+# against the change it was offered as support for.
+#
+# `few` and a bare `0` were each considered and DECLINED. Neither is in that
+# corpus group, so declining them is not a departure from it -- an earlier
+# revision of this comment called them "two members of that group ... left
+# out", which contradicted the sentence above it and would send a reader to
+# `_NEGATOR_RE` looking for two tokens that were never there.
+#
+# `few` inverts on its article. "A few are addressed" and "quite a few are
+# addressed" report that some or many WERE fixed, which is the disposition
+# claim this guard exists to catch, and a word-level pattern cannot see the
+# article. It appears as a negator nowhere else in `hooks/` or `scripts/`.
+# A `(?<!a )` lookbehind would read the article and was declined anyway: it
+# invents vocabulary the corpus group deliberately lacks, to buy silence on
+# a bare "Few are addressed" nobody has written, and a warning on that
+# sentence costs a reader one line of self-explaining advice.
+#
+# A bare `0` matches any zero after a non-word character, so "Release v1.0
+# shipped, all three are addressed" and "On line 0 of the file, all three
+# are addressed" both went silent. Anchoring the digit to the noun it
+# quantifies is what fixes that, and it leaves the digit form STRICTLY
+# NARROWER than the word form: `Zero of the findings are addressed` is
+# silent while `0 of the findings are addressed` and `0 issues are
+# addressed` both warn. That residual is disclosed rather than closed,
+# because the noun set is open-ended (`issues`, `items`, `threads`,
+# `comments`, `of the findings`), so any enumeration of it is arbitrary,
+# and every noun added re-opens a slice of the version-string hazard the
+# anchor exists to shut. `no-stale-pr-status.py` anchors a zero too
+# (`\b0 fail(s|ures)?\b`, in its `ASSERT` list), but against a different
+# hazard:
+# there the zero already sat beside its noun and the boundary added was the
+# TRAILING one, so `0 failed` -- a test-runner tally rather than a CI
+# verdict -- stopped matching. It is a precedent for anchoring a numeral,
+# not for this particular anchor.
+#
+# Every single-word negator is bounded by `(?<![-\w])` / `(?![-\w])` rather
+# than `\b`. A hyphen is a non-word character, so `\b` opens inside a
+# compound: `\bno\b` matched the `no` of `no-op` and of every
+# `no-*.py` hook filename this corpus writes, `\bnothing\b` the
+# `Nothing-burger`, and `\bzero\b` the `zero-findings`, `zero-cost` and
+# `zero-width` compounds -- 108 of them across 55 tracked files on
+# 2026-09-24, counted with `git ls-files` and `(?i)(?<![-\w])zero-[a-z]`,
+# the command being given because the figure moves. Each made the guard
+# go silent on a sentence whose only negator was a hyphenated adjective
+# modifying something else: "The zero-findings run aside, all three are
+# addressed in `abc1234`." The `no|not|none|nothing` half of that was
+# pre-existing; `zero` added one more instance of it, which is why the
+# whole set is bounded rather than that one token. `n't` keeps a bare
+# trailing `\b` and no leading boundary at all, because in every real
+# contraction the character before `n` is itself a word character -- the
+# reasoning `no-stale-pr-status.py` states beside its own `RX_NEGATION`,
+# cited by name because that file is edited on this branch too.
+#
+# The class is ASCII-only because the ASCII hyphen is the only dash this
+# corpus writes that JOINS rather than separates. `SCOPE_BREAK_RX` above
+# already lists `--`, a spaced `-`, and the Unicode en and em dashes, so
+# a negator sitting before one of those never governs the claim after it
+# and needs no boundary here; the unspaced ASCII hyphen is deliberately
+# absent from that list, which is exactly the hole this class fills. The
+# two mechanisms are complementary by construction rather than by
+# coincidence: one covers the separators, the other the joiner.
+#
+# Measured over 1217 tracked files on 2026-09-24 (`git ls-files`, decoded
+# as UTF-8), U+2013 (32 occurrences) and U+2014 (2866) are the ONLY
+# Unicode dashes present, and `SCOPE_BREAK_RX` carries both. U+2010,
+# U+2011, U+2012, U+2015 and U+2212 occur zero times and are covered by
+# neither pattern -- a disclosed residual rather than a closed one. An
+# earlier revision reported those figures doubled, having walked
+# `/home/user/ai-config` with `rglob` and counted a nested agent worktree
+# as a second copy of the repository; the qualitative claim survived, the
+# numbers did not.
+#
+# What decides the residual is the ABUTTING shape rather than the dash's
+# overall frequency. A negator immediately AFTER an en or em dash occurs
+# 0 times in the corpus; one immediately BEFORE occurs once, in
+# `select-model`'s `A: No\u2014higher models are costlier`. Neither
+# figure settles anything about this guard, because the two halves of the
+# class are not equally REACHABLE through it.
+#
+# Measured by mutating this pattern in place and running the hook over
+# ten bodies: widening the TRAILING lookahead to admit both dashes
+# changes no verdict at all. It blocks a negator that is followed by a
+# dash, and `SCOPE_BREAK_RX` has already stopped such a negator from
+# governing the claim after it, so the suppression it removes was never
+# there -- `No\u2014all three are addressed` warns identically before and
+# after. Widening the LEADING lookbehind does change one: it blocks the
+# `none` in `No\u2014none of the three are addressed`, a genuine
+# negation, and that row flips to a false warning. So the leading half is
+# the only one carrying an observable cost, and the only one a fixture
+# can pin. `HONEST_EMDASH_AFTER_NEGATOR` is that fixture; the trailing
+# half is left unpinned because no body tells the two apart.
+#
+# Three earlier revisions of this passage were wrong, in three different
+# ways worth naming. One asserted that an en-dash compound stays silent,
+# reasoning from the negation pattern alone; the fixture written to pin
+# it failed, because the governing window -- not the pattern -- decides,
+# and `SCOPE_BREAK_RX` had already closed that case one layer up. One
+# claimed both halves were pinned, naming a fixture that does not exist
+# and, per the measurement above, cannot be written. One ran the mutants
+# from a COPY of this file placed outside `hooks/`, where the hook exits
+# 0 and prints nothing -- indistinguishable from a clean verdict -- and
+# so read every row as unchanged.
 NEGATION_RX = re.compile(
-    r"(?i)(?:\bnot\b|\bnever\b|\bno\b|\bnone\b|\bneither\b|\bnor\b|"
-    r"\bnothing\b|\bwithout\b|\bun(?:addressed|resolved)\b|n't\b|"
-    r"\byet\s+to\b|\bfail(?:s|ed)?\s+to\b)"
+    r"(?i)"
+    r"(?:(?<![-\w])(?:not|never|no|none|neither|nor|nothing|without"
+    r"|un(?:addressed|resolved))(?![-\w]))"
+    r"|n't\b"
+    r"|(?<![-\w])(?:hardly|barely|scarcely)\s+any(?:thing)?(?![-\w])"
+    r"|(?<![-\w])zero\s+(?:of(?![-\w])|findings?(?![-\w]))"
+    r"|\b0\s+findings?\b"
+    r"|\byet\s+to\b|\bfail(?:s|ed)?\s+to\b"
 )
 
 # The clause the phrase sits in, bounded by a sentence end or a PARAGRAPH

@@ -130,6 +130,24 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("#3928 has 2 checks still in progress. #49 is fully clean.")], True,
      "disclosing one PR's pending work does not license calling another clean"),
+    # ... but the exemption is blind to WHICH PR each count concerns, so a
+    # bare COUNT about a second PR rides on the first PR's disclosure and
+    # goes unblocked. That is the guard's actual behaviour rather than its
+    # intended one -- whether to scope it by `RX_PR_NEARBY` is
+    # ai-config#3968 -- and it was asserted in a comment and pinned by
+    # nothing, so a scoping change would have landed with a green suite.
+    # It is the counterpart of the case above: a CLEAN CLAIM about the
+    # second PR blocks, a plain count about it does not.
+    #
+    # The mutation that kills this row and nothing else is the #3968 fix
+    # itself: skip a bare count only while the message names at most one
+    # PR. The obvious mutation does not reach it -- the match object is
+    # `9 pass` alone, so a `#` test over `cand.group(0)` is a no-op and
+    # leaves the suite fully green, and disabling the exemption outright
+    # kills five rows rather than this one.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("#50 has 2 checks still in progress. 9 pass on #49.")], False,
+     "a count about a second PR rides on the first PR's disclosure"),
     # ... and the exemption is scoped to THIS branch. The staleness branch
     # still fires on the sibling's prescribed form, deliberately: disclosure
     # answers "did a query report failure", not "is your reading older than

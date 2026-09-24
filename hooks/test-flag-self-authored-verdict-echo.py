@@ -20,8 +20,10 @@ Run: python3 hooks/test-flag-self-authored-verdict-echo.py \\
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 
 HOOK = (
     sys.argv[1]
@@ -99,19 +101,28 @@ DOCS_ABOUT_THE_RULE = (
 
 _CASE = [0]
 
+# Every subprocess gets a TMPDIR created for THIS run. The hook writes a
+# once-per-(transcript, body) sentinel under `tempfile.gettempdir()`, so a
+# suite reusing the system temp dir passes on its first run and then reports
+# every positive case as a failure on every run after -- which reads exactly
+# like the guard being broken rather than like the suite not being repeatable.
+# Measured while writing this file: the second run failed all five positives.
+_TMP = tempfile.mkdtemp(prefix="verdict-echo-tests-")
 
-def run(tool_name, tool_input, cwd=None):
-    # A distinct transcript_path per case, because the hook keys its
-    # once-per-body sentinel on (transcript_path, body): two cases sharing a
-    # body would otherwise see the second suppressed, which reads exactly like
-    # the guard failing to cover that surface.
+
+def run(tool_name, tool_input, cwd=None, tmpdir=None):
+    # A distinct transcript_path per case as well, because two cases sharing a
+    # body would otherwise see the second suppressed by the first's sentinel,
+    # which reads the same way.
     _CASE[0] += 1
     payload = {"tool_name": tool_name, "tool_input": tool_input,
                "cwd": cwd or ROOT,
                "transcript_path": "/nonexistent/case-%d.jsonl" % _CASE[0]}
+    env = dict(os.environ)
+    env["TMPDIR"] = tmpdir or _TMP
     proc = subprocess.run(
         [sys.executable, HOOK], input=json.dumps(payload),
-        capture_output=True, text=True)
+        capture_output=True, text=True, env=env)
     if proc.returncode != 0:
         return None
     out = (proc.stdout or "").strip()
@@ -123,16 +134,17 @@ def run(tool_name, tool_input, cwd=None):
         return None
 
 
-def fired(tool_name, tool_input, cwd=None):
-    out = run(tool_name, tool_input, cwd)
+def fired(tool_name, tool_input, cwd=None, tmpdir=None):
+    out = run(tool_name, tool_input, cwd, tmpdir=tmpdir)
     if not out:
         return False
     ctx = (out.get("hookSpecificOutput") or {}).get("additionalContext")
     return bool(ctx)
 
 
-def mcp(body, tool="mcp__github__add_issue_comment"):
-    return fired(tool, {"owner": "o", "repo": "r", "issue_number": 1, "body": body})
+def mcp(body, tool="mcp__github__add_issue_comment", tmpdir=None):
+    return fired(tool, {"owner": "o", "repo": "r", "issue_number": 1, "body": body},
+                 tmpdir=tmpdir)
 
 
 FAILURES = []
@@ -197,6 +209,37 @@ def main():
     check("an unrelated tool",
           fired("Read", {"file_path": "/etc/hostname"}), False)
 
+    print("Once per body (the sentinel):")
+    shared = tempfile.mkdtemp(prefix="verdict-echo-sentinel-")
+    try:
+        # Both calls share a transcript AND a TMPDIR, so the second is the
+        # repeat the sentinel exists to suppress. Asserted because this is the
+        # behaviour that made an earlier draft of this suite unrepeatable.
+        payload = {"tool_name": "mcp__github__add_issue_comment",
+                   "tool_input": {"owner": "o", "repo": "r",
+                                  "issue_number": 1, "body": ECHO_DISPOSITION},
+                   "cwd": ROOT, "transcript_path": "/nonexistent/sentinel.jsonl"}
+        env = dict(os.environ)
+        env["TMPDIR"] = shared
+        seen = []
+        for _ in range(2):
+            proc = subprocess.run([sys.executable, HOOK],
+                                  input=json.dumps(payload),
+                                  capture_output=True, text=True, env=env)
+            out = (proc.stdout or "").strip()
+            ctx = None
+            if out:
+                try:
+                    ctx = (json.loads(out).get("hookSpecificOutput") or {}
+                           ).get("additionalContext")
+                except Exception:
+                    ctx = None
+            seen.append(bool(ctx))
+        check("first post of a body warns", seen[0], True)
+        check("an identical repost stays silent", seen[1], False)
+    finally:
+        shutil.rmtree(shared, ignore_errors=True)
+
     if FAILURES:
         print("\nFAILURES:")
         for f in FAILURES:
@@ -207,4 +250,7 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    finally:
+        shutil.rmtree(_TMP, ignore_errors=True)

@@ -59,7 +59,9 @@ def check(name: str, got: str, want_fire: bool) -> None:
             f"got {'fire' if fired else 'silence'}\n    stdout={got[:200]!r}")
     if fired:
         try:
-            json.loads(got)
+            data = json.loads(got)
+            if "systemMessage" not in data:
+                FAILURES.append(f"{name}: missing 'systemMessage' in payload ({data})")
         except Exception as exc:
             FAILURES.append(f"{name}: stdout is not valid JSON ({exc})")
 

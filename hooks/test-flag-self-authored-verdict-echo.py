@@ -118,6 +118,36 @@ NEGATED_PHRASES = (
 # instead of interpolating `NOT_CLEAN`. Measuring one form and generalizing
 # to all of them is the population-vs-recall failure this corpus names
 # repeatedly; the row is adopted below rather than dropped.
+# The REGRESSION the fix for the over-correction above shipped, and the four
+# bodies a third-round adversarial review reproduced it on. Reusing
+# `flag-clean-claim-over-findings.py`'s attach test whole imported that hook's
+# separator vocabulary with it, which is tuned to a hedge rather than a
+# negator: it breaks on a bare comma, on brackets, and on `yet`. Each of these
+# is an honest self-review sentence whose negator plainly governs its
+# disposition, and each began warning under that vocabulary. Two are saved by
+# `SCOPE_BREAK_RX` dropping those tokens and two by `RX_ASIDE` eliding the
+# aside before the scan, so the pair of mechanisms needs the pair of cases --
+# neither alone kills both mutations.
+HONEST_YET_IN_CONNECTOR = (
+    "### Verdict\n**%s**\n\n"
+    "No finding is yet addressed in the diff above.\n"
+) % NOT_CLEAN
+
+HONEST_PARENTHETICAL = (
+    "### Verdict\n**%s**\n\n"
+    "Nothing (not even the trivial rename) is addressed in this branch.\n"
+) % NOT_CLEAN
+
+HONEST_BREAK_IN_COMMA_ASIDE = (
+    "### Verdict\n**%s**\n\n"
+    "None of these, though small and fiddly, are addressed in this push.\n"
+) % NOT_CLEAN
+
+HONEST_BREAK_IN_PARENTHETICAL = (
+    "### Verdict\n**%s**\n\n"
+    "Nothing (and this matters) is addressed in this branch.\n"
+) % NOT_CLEAN
+
 # The reviewer's own fourth row. Its verdict is spelled out rather than
 # interpolated from `NOT_CLEAN`, per the comment above: under "Needs more
 # work" this body is stopped at gate 3 by ai-config#3937 and would pin
@@ -342,6 +372,24 @@ def main():
     check("prose about the rule with no disposition vocabulary",
           mcp(DOCS_ABOUT_THE_RULE), False)
     check("an empty body", mcp(""), False)
+    check("a negator reaching past `yet` stays silent",
+          mcp(HONEST_YET_IN_CONNECTOR), False)
+    check("a negator reaching past a parenthetical stays silent",
+          mcp(HONEST_PARENTHETICAL), False)
+    check("a break token inside a comma aside does not sever the negator",
+          mcp(HONEST_BREAK_IN_COMMA_ASIDE), False)
+    check("a break token inside a parenthetical does not sever the negator",
+          mcp(HONEST_BREAK_IN_PARENTHETICAL), False)
+    # Two heredocs, and the one the post reads is the SECOND. An earlier draft
+    # took whichever heredoc came first, so this body was read through the
+    # release notes and reported unreadable.
+    check("the heredoc tied to --body-file is the one read",
+          fired("Bash", {"command":
+                         "cat > /tmp/notes.md <<'A'\nRelease notes.\nA\n"
+                         "cat > /tmp/vb.md <<'B'\n%s\nB\n"
+                         "gh pr comment 49 --body-file /tmp/vb.md"
+                         % ECHO_DISPOSITION}),
+          True)
     # Fire condition 5 leaves a SUBMITTED formal review alone. Each review
     # surface is subtracted from the post tuple by name, and the body itself
     # is checked through each of them -- the tuple assertion alone would pass

@@ -6559,15 +6559,53 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             "</details>\n"
         ) == "not-clean",
     )
+    # ai-config#3899 review finding, twenty-first round (PR ai-config#3906
+    # Copilot review, fifth round): `_find_details_regions` matched a
+    # `<details` opener wherever it appeared, including inside an HTML
+    # comment. A fake `<!--\n<details>\n-->` opener then paired with the
+    # NEXT real `</details>` -- however far away -- producing a region
+    # that engulfed everything in between, including a genuine
+    # marker+heading+Findings block. That read as no block found at all
+    # (fail-closed: no verdict rather than a wrong clean), but it
+    # silently dropped a real not-clean finding down to no-verdict, and
+    # was asymmetric with the containment check this same round already
+    # added for a marker+heading pair. Now skips any `<details` opener
+    # whose own start falls inside an HTML comment.
+    check(
+        "copilot_verdict: a fake <details> opener hidden inside an HTML "
+        "comment does not pair with a later real </details> and engulf "
+        "the real block between them",
+        checker.copilot_verdict(
+            "<!--\n<details>\n-->\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n\n"
+            "<details>\nx\n</details>"
+        ) == "not-clean",
+    )
+    # The FIRST block reads zero here, deliberately (PR ai-config#3906
+    # Copilot review, fifth round on this same pair of tests): the
+    # previous version put the nonzero finding in the FIRST block, so the
+    # test passed regardless of whether the second block was read at all
+    # -- the first block's own nonzero already forces not-clean on its
+    # own. Only the SECOND, later, top-level block carries the nonzero
+    # finding here, so this test can only pass if that block is actually
+    # recognised. Confirmed this discriminates: monkey-patched
+    # `_copilot_overview_block_spans` in a scratch interpreter to return
+    # only `spans[:1]` (simulating a broken later-block recognition that
+    # silently discards every block after the first), re-ran this exact
+    # body through `copilot_verdict`, and got 'clean' -- the wrong
+    # answer, since only the first block's zero was then visible.
+    # Reverting the patch and re-running produced 'not-clean' again, so
+    # this check genuinely fails if the later-block path breaks.
     check(
         "copilot_verdict: a genuinely later top-level block AFTER a "
         "CLOSED <details> region still counts",
         checker.copilot_verdict(
             "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
-            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n\n"
             "<details>\n<summary>x</summary>\ny\n</details>\n\n"
             "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
-            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n"
         ) == "not-clean",
     )
 

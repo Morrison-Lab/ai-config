@@ -315,12 +315,32 @@ def _find_details_regions(scan: str) -> List[Tuple[int, int]]:
     `pos`/`finditer`'s own cursor only ever advance forward past a region
     already found or skipped, so this stays linear regardless of how many
     `<details>` sections (nested or not) the body contains.
+
+    An opening whose own START falls inside an HTML comment is skipped
+    entirely, not paired with whatever `</details>` follows (PR
+    [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, fifth round): a fake
+    `<!--\n<details>\n-->` opener would otherwise pair with the NEXT real
+    `</details>` -- however far away -- producing a region that engulfs
+    everything between them, including a genuine marker+heading+Findings
+    block. That reads as no block found at all (this function's own
+    caller then excludes the real block's start, which falls inside the
+    artificially-huge region), which is the fail-closed direction --
+    `copilot_verdict` returns no verdict rather than a wrong clean -- but
+    it is asymmetric with the containment check this same round already
+    added for a marker+heading pair, and it silently drops a genuine
+    not-clean finding down to no-verdict. Checked with the same
+    bisect-backed `_position_in_spans` helper against
+    `_find_html_comment_spans(scan)`, computed once up front.
     """
+    comment_spans = _find_html_comment_spans(scan)
+    comment_span_starts = [s for s, _ in comment_spans]
     regions: List[Tuple[int, int]] = []
     pos = 0
     n = len(scan)
     for m in _COPILOT_DETAILS_OPEN.finditer(scan):
         if m.start() < pos:
+            continue
+        if _position_in_spans(m.start(), comment_span_starts, comment_spans):
             continue
         close_pos = scan.find("</details>", m.end())
         if close_pos == -1:

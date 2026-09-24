@@ -149,6 +149,8 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
     Use a short-lived, mode-700 `GIT_ASKPASS` helper that reads the inherited
     job token, keep `GIT_TERMINAL_PROMPT=0`, disable shell tracing during
     authentication, and remove the helper on exit.
+    Invoke Git with `LC_ALL=C` when the helper recognizes its username/password
+    prompts, because Git localizes those prompt strings.
     (Measured 2026-09-23 while testing HACR access from `test.hac`.)
   - Build a CI Git remote from `CI_SERVER_URL`, not `CI_SERVER_HOST`.
     The host drops the configured protocol, port, and any GitLab relative URL
@@ -158,6 +160,15 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
     the test environment.
     Also assert the rendered YAML value when the default itself is contractual.
     (Learned from the 2026-09-24 review of HACtions MR !71.)
+  - A shell test double must explicitly exit on an invariant failure unless it
+    enables `set -e`.
+    A bare `test` can be overwritten by a later successful command and leave a
+    regression undetected.
+    (Learned from the 2026-09-24 independent review of HACtions MR !71.)
+  - A test for an environment override must set a contrasting ambient value.
+    Inheriting the runner environment can mask removal of the override when its
+    default already matches the expected value.
+    (Learned from the 2026-09-24 independent review of HACtions MR !71.)
   - A Maintainer cannot always temporarily disable a target project's inbound
     scope for an access A/B.
     If `PATCH /projects/<ID>/job_token_scope` with `enabled=false` returns

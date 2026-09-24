@@ -1116,27 +1116,7 @@ A clean automated review from every available provider evaluating the current HE
   Nothing errors; the input is simply skipped.
   On a blocking guard that is the expensive direction, because the guard
   reports success while not having looked.
-- **Example**: 2026-09-07, `Morrison-Lab/ai-config` PR
-  [#3304](https://github.com/Morrison-Lab/ai-config/pull/3304),
-  `hooks/guard-slide-major-tag.py`.
-  Commit `6694317a0` added a pre-filter skipping any workflow file whose text
-  lacked the substring `workflow_call`; commit `a401ea0eb` reordered it away
-  after review.
-  The bypass needs an ESCAPE, not merely quoting --- a plainly double-quoted
-  key still contains the substring, so it would not have tripped anything:
-
-  ```python
-  >>> "workflow_call" in 'on:\n  "workflow_call":\n'
-  True
-  >>> "workflow_call" in 'on:\n  "\\u0077orkflow_call":\n'
-  False
-  >>> yaml.safe_load('on:\n  "\\u0077orkflow_call":\n')
-  {True: {'workflow_call': None}}
-  ```
-
-  `\u0077` is `w`, so PyYAML and GitHub Actions both resolve the key, while
-  the raw text never carries it.
-  An added `checks: read` job permission passed the guard.
+- **Example**: see [`mistake-patterns.cases.md`](mistake-patterns.cases.md) Pattern 53 for the 2026-09-07 `guard-slide-major-tag.py` case (PR #3304).
 - **Fix**: it is an ordering problem, not a matching problem.
   Parse first, and let the parsed structure be the sole test for anything
   that parses.
@@ -1207,14 +1187,7 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
   When the floor's rank equals the comparison's maximum, every key ranked at or under it becomes permanently unreachable by the escalation check: not merely covered for the cases that motivated the fix, but silently dead for every case past them.
 - **Direction of failure**: the repair for a false-positive DENY opened a false-negative ALLOW, the more dangerous direction for a security guard.
   This is Pattern 15's inversion produced by a different mechanism: not a widened text exemption, but a numeric floor pinned at the max rank.
-- **Example**: 2026-09-08, `Morrison-Lab/ai-config#3304`, `hooks/guard-slide-major-tag.py` (commit `26b154478`).
-  A reviewer finding: shorthand permissions (`read-all`/`write-all`) were compared with a plain inequality while dict-form permissions used a rank ordering, so a strict downgrade (`write-all` -> `read-all`) was flagged as an escalation --- a false-positive deny.
-  Ranking the shorthand-vs-shorthand comparison left the *same false-positive class* alive one branch over: a shorthand baseline compared against an explicit dict still coerced the baseline to `{}`, so every dict key looked newly added --- `write-all -> {contents: read}`, itself a downgrade, was still denied.
-  That sibling case is not one the review comment named;
-  it turned up only from testing the shorthand-vs-dict boundary directly, not from re-reading the fix.
-  Fixing it introduced the floor: a shorthand baseline was treated as granting its own rank on every dict key it was compared against, so a key was flagged only if it outranked the floor.
-  `write-all`'s floor equalled the rank scale's maximum, so after a `write-all` baseline no dict key could ever be flagged --- including `id-token: write`, which GitHub's workflow-syntax reference documents as accepting only `write` or `none` (never `read`), so `read-all` provably cannot grant it, and whether `write-all` covers it is documented nowhere.
-  `write-all -> {id-token: write}` is a real escalation that the pre-floor code denied correctly and the floor silently allowed, caught by asking what the floor newly permitted rather than by re-running the false positive it was built to fix.
+- **Example**: see [`mistake-patterns.cases.md`](mistake-patterns.cases.md) Pattern 55 for the 2026-09-08 `guard-slide-major-tag.py` case (commit `26b154478`).
 - **Canonical Rule**: `shared/workflow/metacognitive-monitoring.md`'s "an unexamined default gets named and decided" and Pattern 15 in [`mistake-patterns.cases.md`](mistake-patterns.cases.md) (widening a fail-closed exemption needs a base-parity proof).
   This pattern is the case where the widening is a numeric floor rather than a text exemption, so the check that catches it is a reachability comparison over the rank domain, not only a corpus diff --- a corpus-parity sweep can miss it entirely if the corpus never happens to combine that specific key with that specific baseline.
 - **Fix**: before shipping a baseline/floor/ceiling abstraction, enumerate what it newly allows, not only what false positive it removes.
@@ -1251,8 +1224,17 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
 
 ## Pattern 58: Inline Markdown Code Spans Crossing Block-Level Constructs
 
-- **Mistake**: using a regex for inline code spans that only excludes blank lines (`\r?\n(?![ \t]*\r?\n)`), allowing unclosed or multiline inline spans to cross paragraph-interrupting block structures (such as ATX headings `#{1,6}`, verdict lines, fences, or blockquotes).
-- **Direction of failure**: in security/authorization guards (like `no-push-without-self-review.py`), a stray unclosed backtick before a real blocking verdict (e.g. `### Verdict: Needs more work`) can pair with a backtick after it, swallowing the blocking heading as code content and allowing an earlier, superseded clean verdict to win.
-- **Example**: 2026-09-24, `Morrison-Lab/ai-config#3963` (issue #3961). The initial fix added `CODE_SPAN` from `scripts/lib/fences.py`. Claude Code Review flagged that `CODE_SPAN` only refused to cross blank lines, reproducing a bypass where `Some notes `stray open\n### Verdict: Needs more work\n...stray close`` blanked out the blocking verdict and returned `clean`.
-- **Canonical Rule**: in CommonMark, blocks take precedence over inlines, and ATX headings interrupt paragraphs. Inline code spans cannot cross block boundaries.
-- **Fix**: in inline code span regexes, ensure line continuation lookaheads forbid crossing any paragraph-interrupting construct: `(?![ \t]*(?:\r?\n|$|[#>`]|Verdict\b|<!--))`.
+- **Mistake**: using a regex for inline code spans that only excludes blank lines (`\r?\n(?![ \t]*\r?\n)`),
+  allowing unclosed or multiline inline spans to cross paragraph-interrupting block structures
+  (such as ATX headings `#{1,6}`, verdict lines, fences, or blockquotes).
+- **Direction of failure**: in security/authorization guards (like `no-push-without-self-review.py`),
+  a stray unclosed backtick before a real blocking verdict (e.g. `### Verdict: Needs more work`) can pair with a backtick after it,
+  swallowing the blocking heading as code content and allowing an earlier, superseded clean verdict to win.
+- **Example**: 2026-09-24, `Morrison-Lab/ai-config#3963` (issue #3961).
+  The initial fix added `CODE_SPAN` from `scripts/lib/fences.py`.
+  Claude Code Review flagged that `CODE_SPAN` only refused to cross blank lines,
+  reproducing a bypass where `Some notes `stray open\n### Verdict: Needs more work\n...stray close`` blanked out the blocking verdict and returned `clean`.
+- **Canonical Rule**: in CommonMark, blocks take precedence over inlines, and ATX headings interrupt paragraphs.
+  Inline code spans cannot cross block boundaries.
+- **Fix**: in inline code span regexes, ensure line continuation lookaheads forbid crossing any paragraph-interrupting construct:
+  `(?![ \t]*(?:\r?\n|$|[#>`]|Verdict\b|<!--))`.

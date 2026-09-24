@@ -142,3 +142,35 @@ That was true of the conjunction and false of one half taken alone.
 Applying only the producer half --- registering `agentId` --- in a scratch copy of `hooks/`, then re-running the guard against the session's own real transcript, still produced a denial on the same branch.
 The self-authorization risk lived entirely in the consumer half (reading a `peer` origin as a verdict source).
 So the blanket "do not make this unprompted" blocked a change measurement showed was safe.
+
+## Pattern 53: Gating an Authoritative Parser on an Unsound Raw Text Pre-Filter
+
+- **1st occurrence, 2026-09-07** (`Morrison-Lab/ai-config#3304`, `hooks/guard-slide-major-tag.py`).
+  Commit `6694317a0` added a pre-filter skipping any workflow file whose text lacked the substring `workflow_call`;
+  commit `a401ea0eb` reordered it away after review.
+  The bypass needs an ESCAPE, not merely quoting --- a plainly double-quoted key still contains the substring,
+  so it would not have tripped anything:
+
+  ```python
+  >>> "workflow_call" in 'on:\n  "workflow_call":\n'
+  True
+  >>> "workflow_call" in 'on:\n  "\\u0077orkflow_call":\n'
+  False
+  >>> yaml.safe_load('on:\n  "\\u0077orkflow_call":\n')
+  {True: {'workflow_call': None}}
+  ```
+
+  `\u0077` is `w`, so PyYAML and GitHub Actions both resolve the key, while the raw text never carries it.
+  An added `checks: read` job permission passed the guard.
+
+## Pattern 55: A baseline/floor abstraction's "covers everything" claim needs domain verification
+
+- **1st occurrence, 2026-09-08** (`Morrison-Lab/ai-config#3304`, `hooks/guard-slide-major-tag.py`, commit `26b154478`).
+  A reviewer finding: shorthand permissions (`read-all`/`write-all`) were compared with a plain inequality while dict-form permissions used a rank ordering, so a strict downgrade (`write-all` -> `read-all`) was flagged as an escalation --- a false-positive deny.
+  Ranking the shorthand-vs-shorthand comparison left the *same false-positive class* alive one branch over: a shorthand baseline compared against an explicit dict still coerced the baseline to `{}`, so every dict key looked newly added --- `write-all -> {contents: read}`, itself a downgrade, was still denied.
+  That sibling case is not one the review comment named;
+  it turned up only from testing the shorthand-vs-dict boundary directly, not from re-reading the fix.
+  Fixing it introduced the floor: a shorthand baseline was treated as granting its own rank on every dict key it was compared against, so a key was flagged only if it outranked the floor.
+  `write-all`'s floor equalled the rank scale's maximum, so after a `write-all` baseline no dict key could ever be flagged --- including `id-token: write`, which GitHub's workflow-syntax reference documents as accepting only `write` or `none` (never `read`), so `read-all` provably cannot grant it, and whether `write-all` covers it is documented nowhere.
+  `write-all -> {id-token: write}` is a real escalation that the pre-floor code denied correctly and the floor silently allowed, caught by asking what the floor newly permitted rather than by re-running the false positive it was built to fix.
+

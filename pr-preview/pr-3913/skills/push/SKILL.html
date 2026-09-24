@@ -83,9 +83,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-3e9b1289f5f353c49b617ce48ad2bc38.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-a515e054079012129989d5397ee3c9c1.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-3e9b1289f5f353c49b617ce48ad2bc38.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-55617497126496852ff9f5a59253c640.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-90b0ccabdf50233fb893b00cd6e33405.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-55617497126496852ff9f5a59253c640.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -486,7 +486,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="proactive-hook-compliance" class="level2">
 <h2 class="anchored" data-anchor-id="proactive-hook-compliance">Proactive hook compliance</h2>
 <ul>
-<li><strong><code>no-push-without-self-review.py</code></strong>: Blocks <code>git push</code> unless a clean verdict for the exact commit being pushed (<code>Reviewed-Commit: &lt;HEAD_SHA&gt;</code>) came from an adversarial self-review subagent, or from a review by a CLI the guard recognizes, which today means <code>agy --print</code> and no other. Pushes to <code>Morrison-Lab/mln</code>, <code>mlg</code> and <code>mlr</code> are exempt (the hook’s <code>EXEMPT_REPOS</code>). Dispatch the reviewer in the foreground and resolve all findings before pushing. Use <code>ALLOW_UNREVIEWED_PUSH=1</code> only for the empty <code>pr-on-claim</code> commit or documented exceptions.</li>
+<li><strong><code>no-push-without-self-review.py</code></strong>: Blocks <code>git push</code> unless a clean verdict for the exact commit being pushed (<code>Reviewed-Commit: &lt;HEAD_SHA&gt;</code>) came from an adversarial self-review subagent, or from a review by a CLI the guard recognizes, which today means <code>agy --print</code> and no other. Pushes to <code>Morrison-Lab/mln</code>, <code>mlg</code> and <code>mlr</code> are exempt (listed in the hook’s exempt-repository constant). Dispatch the reviewer in the foreground and resolve all findings before pushing. Use <code>ALLOW_UNREVIEWED_PUSH=1</code> only for the empty <code>pr-on-claim</code> commit or documented exceptions.</li>
 <li><strong><code>no-clobbering-push.py</code></strong>: Denies bare <code>git push -f</code>/<code>--force</code> and warns if remote tip has diverged. Always run <code>git ls-remote --heads origin &lt;branch&gt;</code> immediately before pushing, and use <code>--force-with-lease --force-if-includes</code>.</li>
 <li><strong><code>no-unshipped-commit.py</code></strong>: Stop guard that blocks turn completion when unpushed commits remain on the branch.</li>
 </ul>

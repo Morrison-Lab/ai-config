@@ -6980,6 +6980,42 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         _mb_verdict == "clean" and _mb_secs < 1.0,
     )
 
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, eighth round: the shape above still
+    # includes a `<details>...</details>` after every block, so each
+    # block's own END search finds `<details` almost immediately and
+    # never exercises the actual regression. A body with many
+    # marker+heading blocks and NO `<details` anywhere ran that END
+    # search all the way to end-of-string for EVERY block instead --
+    # `_COPILOT_DETAILS_OPEN.search()` never matches, and a regex search
+    # that fails to match still costs O(remaining length) to conclude
+    # that, making the total cost O(blocks x body-length). Measured
+    # before the fix (bounding each block's END search at the next
+    # block's own start, since blocks come from one ordered `finditer`),
+    # at a fixed 262,144 characters: 10 blocks 0.0002s, 100 blocks
+    # 0.0076s, 500 blocks 0.1874s, ~2,570 blocks (the full 262,144-char
+    # fill) 4.68s -- clearly super-linear, and this test fails at
+    # ec596d5f. After the fix, the same ~2,570-block body runs in
+    # ~0.01-0.1s depending on entry point.
+    _many_blocks_no_details_unit = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n\n"
+    )
+    _many_blocks_no_details_reps = (
+        262144 // len(_many_blocks_no_details_unit)
+    )
+    _many_blocks_no_details_body = (
+        _many_blocks_no_details_unit * _many_blocks_no_details_reps
+    )
+    _mbnd_secs, _mbnd_verdict = best_of_three(
+        checker.copilot_verdict, _many_blocks_no_details_body
+    )
+    check(
+        "copilot_verdict on 262,144 characters of 500+ separate "
+        "marker+heading blocks with NO <details anywhere scales "
+        "linearly (well under 1s), not O(blocks x body-length)",
+        _mbnd_verdict == "clean" and _mbnd_secs < 1.0,
+    )
+
     # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, thirteenth round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
     # Copilot review): COPILOT_FINDINGS_LINE was unanchored, matching
     # `**Findings:**` anywhere in the body -- mid-sentence prose quoting an

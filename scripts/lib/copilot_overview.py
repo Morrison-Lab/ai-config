@@ -265,12 +265,34 @@ def _copilot_overview_block_spans(scan: str) -> List[Tuple[int, int]]:
     details-region exclusions use, so sharing the one already-sorted list
     keeps every lookup O(log k) without paying for
     `_find_html_comment_spans`'s own O(n) scan twice.
+
+    Each block's END search is bounded at the NEXT valid block's own
+    START (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, eighth round): a body with
+    many marker+heading blocks and no `<details` anywhere ran the
+    `<details`/`##` END search all the way to end-of-string for EVERY
+    block, since `_COPILOT_DETAILS_OPEN.search()` never matches and a
+    regex search that fails to match still costs O(remaining length) to
+    conclude that -- making the total cost O(blocks x body-length), not
+    O(body-length) (measured before this fix, at a fixed 262,144
+    characters: 10 blocks 0.0002s, 100 blocks 0.0076s, 500 blocks
+    0.1874s, ~2,570 blocks 4.68s, clearly super-linear). Since blocks
+    come from one ordered `finditer` pass, the valid starts are collected
+    FIRST, in order, and each block's END search is then capped at the
+    position where the next valid block begins -- nothing past that
+    point can matter to the CURRENT block's own end, because a search
+    that finds nothing within `[search_from, next_start)` still has the
+    next block's own start as a safe fallback end (the next block cannot
+    have started without leaving this one behind). That makes each
+    region of `scan` scanned by at most a small constant number of
+    bounded searches (one per pattern, from the previous block's end to
+    the next block's start), so the total cost across every block is
+    O(body-length) again, regardless of block count.
     """
     comment_spans = _find_html_comment_spans(scan)
     comment_span_starts = [s for s, _ in comment_spans]
     details_regions = _find_details_regions(scan, comment_spans, comment_span_starts)
     details_region_starts = [s for s, _ in details_regions]
-    spans: List[Tuple[int, int]] = []
+    valid_starts: List[Tuple[int, int]] = []
     for start_m in _COPILOT_OVERVIEW_START.finditer(scan):
         start = start_m.start()
         # strict=True: the marker text is itself a complete HTML comment,
@@ -284,11 +306,20 @@ def _copilot_overview_block_spans(scan: str) -> List[Tuple[int, int]]:
             continue
         if _position_in_spans(start, details_region_starts, details_regions):
             continue
-        search_from = start_m.end()
-        end = len(scan)
+        valid_starts.append((start, start_m.end()))
+    scan_len = len(scan)
+    spans: List[Tuple[int, int]] = []
+    for i, (start, search_from) in enumerate(valid_starts):
+        limit = valid_starts[i + 1][0] if i + 1 < len(valid_starts) else scan_len
+        end = limit
         for pattern in (_COPILOT_DETAILS_OPEN, _COPILOT_NEXT_HEADING):
             m = _search_outside_comments(
-                pattern, scan, search_from, comment_spans, comment_span_starts
+                pattern,
+                scan,
+                search_from,
+                comment_spans,
+                comment_span_starts,
+                endpos=limit,
             )
             if m is not None and m.start() < end:
                 end = m.start()
@@ -331,24 +362,40 @@ def _search_outside_comments(
     pos: int,
     comment_spans: List[Tuple[int, int]],
     comment_span_starts: List[int],
+    endpos: Optional[int] = None,
 ) -> Optional["re.Match[str]"]:
-    """Return the first match of `pattern` in `scan` at or after `pos`
-    whose own start does NOT fall inside any span in `comment_spans`, or
-    None if every match from `pos` onward is inside one (PR
-    [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, seventh round).
+    """Return the first match of `pattern` in `scan[:endpos]` at or after
+    `pos` whose own start does NOT fall inside any span in
+    `comment_spans`, or None if every match from `pos` onward (within
+    that bound) is inside one (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review,
+    seventh round).
 
-    Shared by every boundary search in this module that must not be
-    fooled by a comment-hidden candidate: `_copilot_overview_block_spans`
-    for both the marker+heading start and the `<details`/`##` block-end
-    search. Each rejected candidate advances `pos` to that match's own
-    end before retrying, so -- exactly like `_find_html_comment_spans`
-    and `_find_details_regions` -- the cursor only ever moves forward and
-    the total work across every call from one starting `pos` is O(n),
-    regardless of how many comment-hidden candidates are skipped along
-    the way.
+    `endpos` defaults to `len(scan)` (the whole rest of the string, via
+    `re.Pattern.search`'s own `endpos` parameter) and is otherwise passed
+    straight through to it -- the caller does the bounding, this function
+    only threads the bound to every retry so a rejected match's own
+    `endpos` doesn't silently widen back out.
+
+    Used by `_copilot_overview_block_spans` for its `<details`/`##`
+    block-end search ONLY -- that function's marker+heading START check
+    uses `_position_in_spans(..., strict=True)` directly instead (PR
+    [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, eighth round, correcting an earlier
+    version of this docstring that claimed both call sites shared this
+    helper): the marker-start check needs the strict variant documented
+    on `_position_in_spans` itself, for the marker's own self-comment
+    self-match, and `strict` has no meaning for a moving `pattern.search`
+    match the way it does for a single fixed position, so this helper
+    was never a fit for that call site to begin with.
+
+    Each rejected candidate advances `pos` to that match's own end before
+    retrying, so -- exactly like `_find_html_comment_spans` and
+    `_find_details_regions` -- the cursor only ever moves forward and the
+    total work across every call from one starting `pos` is O(endpos -
+    pos), regardless of how many comment-hidden candidates are skipped
+    along the way.
     """
     while True:
-        m = pattern.search(scan, pos)
+        m = pattern.search(scan, pos, endpos if endpos is not None else len(scan))
         if m is None:
             return None
         if not _position_in_spans(m.start(), comment_span_starts, comment_spans):

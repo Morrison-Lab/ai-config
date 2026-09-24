@@ -335,7 +335,18 @@ def main():
         return
 
     # Common fields for Claude payload
-    transcript_path = payload.get("transcriptPath")
+    transcript_path = payload.get("transcriptPath") or payload.get("transcript_path")
+    session_id = (
+        payload.get("session_id")
+        or payload.get("sessionId")
+        or payload.get("sessionID")
+        or payload.get("conversation_id")
+        or payload.get("conversationId")
+    )
+    if not session_id and isinstance(transcript_path, str):
+        m = re.search(r"[/\\](?:brain|conversations)[/\\]([0-9a-fA-F-]{36})", transcript_path)
+        if m:
+            session_id = m.group(1)
 
     if event_type == "PreToolUse":
         tool_call = payload.get("toolCall") or {}
@@ -529,6 +540,13 @@ def main():
 
         flattened_hooks = []
         for hooks_list, c_payload, cwd, desc in tasks_to_run:
+            if session_id:
+                c_payload.setdefault("session_id", session_id)
+                c_payload.setdefault("sessionId", session_id)
+                c_payload.setdefault("conversation_id", session_id)
+                c_payload.setdefault("conversationId", session_id)
+            if transcript_path:
+                c_payload.setdefault("transcript_path", transcript_path)
             for hook in hooks_list:
                 resolved = resolve_cmd_and_timeout(hook, repo_root)
                 if resolved is None:
@@ -598,6 +616,11 @@ def main():
         }
         if transcript_path:
             stop_payload["transcript_path"] = transcript_path
+        if session_id:
+            stop_payload["session_id"] = session_id
+            stop_payload["sessionId"] = session_id
+            stop_payload["conversation_id"] = session_id
+            stop_payload["conversationId"] = session_id
             
         hooks_to_run = extract_hook_list(stop_groups)
         warn_messages = []
@@ -673,6 +696,11 @@ def main():
         }
         if transcript_path:
             ups_payload["transcript_path"] = transcript_path
+        if session_id:
+            ups_payload["session_id"] = session_id
+            ups_payload["sessionId"] = session_id
+            ups_payload["conversation_id"] = session_id
+            ups_payload["conversationId"] = session_id
 
         injected_messages = []
         total_injected_bytes = 0

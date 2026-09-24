@@ -88,6 +88,25 @@ What does not: the Mistake, Canonical Rule, Fix, or Do/Don't lines, which are wh
 
 ## Pattern 43: Auto-Mode Push-Guard Deadlock
 
+- **1st occurrence, 2026-09-01** (`Lacaedemon/sparta` [PR #1459](https://github.com/Lacaedemon/sparta/pull/1459), GIA sweep;
+  tracked as [ai-config#2899](https://github.com/Morrison-Lab/ai-config/issues/2899);
+  previously `ucdavis/bcs` 2026-08-28 [ai-config#2544](https://github.com/Morrison-Lab/ai-config/issues/2544), closed by [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820)):
+  In an auto-permission-mode plugin-consumer session where no `adversarial-reviewer` agent is registered (`Agent type not found`),
+  the session treated `hooks/no-push-without-self-review.py`'s refusal as solvable in-session by repeatedly rephrasing the sanctioned `ALLOW_UNREVIEWED_PUSH=1` override or by patching the running hook file ---
+  when the auto-mode permission classifier pattern-matches every such attempt as a guard bypass and denies it,
+  and repeated varied attempts make the classifier (correctly) more suspicious,
+  until it denies even legitimately-shaped review dispatches.
+  The hook's sanctioned escape valve is exactly what the classifier reads as a bypass, so the two mechanisms compose into a lockout neither intends.
+  Both discharge paths were unreachable at once:
+  the plugin's shipped agents were absent from the session's Agent registry
+  (writing `.claude/agents/adversarial-reviewer.md` into the repo mid-session does not register it immediately or reliably --- definitions load at session start, and the one measured mid-session appearance came about fifty minutes after the write, by a mechanism not yet identified),
+  and the classifier denied the override in all three phrasings tried (Bash chained, Bash standalone, PowerShell `$env:`) --- consistent denials, not stochastic ones.
+  A fourth phrasing, `env VAR=1 command`, was not tried here and later succeeded on its first attempt in a separate 2026-09-06 incident where the inline `VAR=1 command` form had just been denied --- see [`claude-code-transcripts.md`](claude-code-transcripts.md)'s "A shared session's transcript can carry a genuinely later, genuinely unrelated verdict" for that record, which draws no conclusion from the single data point about why the `env` form passed.
+  The [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820) fallback, merged earlier that same day, was ALSO unreachable, for a distinct reason:
+  the harness runs the hook from the plugin CACHE snapshot (`~/.claude/plugins/cache/Morrison-Lab/ai-config/<rev>/hooks/`, via `${CLAUDE_PLUGIN_ROOT}`),
+  which predated the fix (rev `a3e0fdb`, no `FALLBACK_AGENT_NAME`);
+  pulling the marketplace clone (`git -C ~/.claude/plugins/marketplaces/Morrison-Lab pull --ff-only origin main`, to `79def2e`) succeeded but changed nothing the harness executes,
+  and copying the updated hook onto the cache copy was itself classifier-denied (reasonably --- an agent rewriting its own active guard).
 - **2nd occurrence of the misidentified-hook-copy class, 2026-09-03** ([#3141](https://github.com/Morrison-Lab/ai-config/issues/3141), recorded in [#3156](https://github.com/Morrison-Lab/ai-config/issues/3156)), and it is an occurrence of **this bullet's own Fix step being skipped** rather than of a new mechanism.
   `hooks/no-unreviewed-pr.py` demanded a Copilot review while the moratorium ran to `2026-12-01`, and the session identified "the loaded copy" as the newest per-commit directory under `~/.claude/plugins/cache/` --- the exact proxy Pattern 43's Fix step, in [`mistake-patterns.md`](mistake-patterns.md), rules out.
   Several cache directories carried the same value, so newest isolated nothing --- derive the count rather than citing one, since the cache is garbage-collected and it fell from nine to five between 2026-09-03 and 2026-09-04 with no edit in between.
@@ -142,3 +161,35 @@ That was true of the conjunction and false of one half taken alone.
 Applying only the producer half --- registering `agentId` --- in a scratch copy of `hooks/`, then re-running the guard against the session's own real transcript, still produced a denial on the same branch.
 The self-authorization risk lived entirely in the consumer half (reading a `peer` origin as a verdict source).
 So the blanket "do not make this unprompted" blocked a change measurement showed was safe.
+
+## Pattern 53: Gating an Authoritative Parser on an Unsound Raw Text Pre-Filter
+
+- **1st occurrence, 2026-09-07** (`Morrison-Lab/ai-config#3304`, `hooks/guard-slide-major-tag.py`).
+  Commit `6694317a0` added a pre-filter skipping any workflow file whose text lacked the substring `workflow_call`;
+  commit `a401ea0eb` reordered it away after review.
+  The bypass needs an ESCAPE, not merely quoting --- a plainly double-quoted key still contains the substring,
+  so it would not have tripped anything:
+
+  ```python
+  >>> "workflow_call" in 'on:\n  "workflow_call":\n'
+  True
+  >>> "workflow_call" in 'on:\n  "\\u0077orkflow_call":\n'
+  False
+  >>> yaml.safe_load('on:\n  "\\u0077orkflow_call":\n')
+  {True: {'workflow_call': None}}
+  ```
+
+  `\u0077` is `w`, so PyYAML and GitHub Actions both resolve the key, while the raw text never carries it.
+  An added `checks: read` job permission passed the guard.
+
+## Pattern 55: A baseline/floor abstraction's "covers everything" claim needs domain verification
+
+- **1st occurrence, 2026-09-08** (`Morrison-Lab/ai-config#3304`, `hooks/guard-slide-major-tag.py`, commit `26b154478`).
+  A reviewer finding: shorthand permissions (`read-all`/`write-all`) were compared with a plain inequality while dict-form permissions used a rank ordering, so a strict downgrade (`write-all` -> `read-all`) was flagged as an escalation --- a false-positive deny.
+  Ranking the shorthand-vs-shorthand comparison left the *same false-positive class* alive one branch over: a shorthand baseline compared against an explicit dict still coerced the baseline to `{}`, so every dict key looked newly added --- `write-all -> {contents: read}`, itself a downgrade, was still denied.
+  That sibling case is not one the review comment named;
+  it turned up only from testing the shorthand-vs-dict boundary directly, not from re-reading the fix.
+  Fixing it introduced the floor: a shorthand baseline was treated as granting its own rank on every dict key it was compared against, so a key was flagged only if it outranked the floor.
+  `write-all`'s floor equalled the rank scale's maximum, so after a `write-all` baseline no dict key could ever be flagged --- including `id-token: write`, which GitHub's workflow-syntax reference documents as accepting only `write` or `none` (never `read`), so `read-all` provably cannot grant it, and whether `write-all` covers it is documented nowhere.
+  `write-all -> {id-token: write}` is a real escalation that the pre-floor code denied correctly and the floor silently allowed, caught by asking what the floor newly permitted rather than by re-running the false positive it was built to fix.
+

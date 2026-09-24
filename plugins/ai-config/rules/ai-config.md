@@ -30,11 +30,17 @@ These instructions define standardized operating rules for Antigravity operating
     if you disagree,
     say so.
     Always consider whether you agree before responding and/or acting.
+15. **Terminate superseded background tasks:** Actively kill diagnostic commands, searches, and jobs once answered or superseded;
+    sweep active tasks before declaring completion.
 
 ## Antigravity Workflow Conventions
 
 - **Reactive Wakeup vs Background Task Polling:** In Antigravity, background commands, subagents, and schedules resume execution reactively via incoming messages (`MESSAGE_PRIORITY_HIGH`).
   Do NOT poll `manage_task(Action='status')` in a loop.
   End the tool turn and let the system wake up when ready.
+- **Terminate Superseded and Diagnostic Tasks Proactively:** Background tasks
+  (e.g. `run_command`, asynchronous search/grep, monitors) consume CPU, disk I/O, and log space until killed.
+  As soon as a question is answered or a probe is superseded, cancel it immediately using `manage_task(Action='kill')`.
+  Always sweep and confirm zero unneeded background tasks (`manage_task(Action='list')`) before declaring a milestone or session complete.
 - **Subagent Review Asynchrony:** `invoke_subagent` returns immediately and runs in the background.
   Once the subagent finishes and returns a verified clean review report and fingerprint, use `ALLOW_UNREVIEWED_PUSH=1` for the `git push` invocation.

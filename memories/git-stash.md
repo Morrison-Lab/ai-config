@@ -136,3 +136,32 @@ Because the pop conflicted, the entry was retained and still reads as
   and the retried drop passes.
   Tell the user the tag exists;
   remove it with `git tag -d backup/stash-<topic>` once confident.
+
+## A stash of somebody else's work rots when the base moves under it
+
+The two sections above are about a stash that was **wrong when taken** --- one that saved nothing, or one dropped without checking what it held.
+This is the stash that was *right* when taken and decayed while it sat.
+
+Measured 2026-09-23 on `Morrison-Lab/mlg`.
+A session found one uncommitted file in the user's checkout, stashed it to cut a clean branch, and got on with its own work.
+Roughly two hours later that branch merged, and restoring the stash failed: an unrelated PR had rewritten the same file in the meantime (223 lines changed), so `git stash apply` left `UU` and a conflict in a file the session had never intended to touch.
+
+The stash itself was fine.
+What broke it was holding it across a base change --- and a stash is the one piece of git state that carries no branch, no upstream, and no record of what it was taken against beyond a one-line `WIP on <branch>: <subject>` label.
+Nothing warns you, because from git's point of view nothing happened.
+
+It is worse than losing your own work, for two reasons.
+The user did not ask for their file to be moved, so they have no reason to be watching for it.
+And the session that stashed it is the only thing that knows it exists --- `git status` on a dirty-turned-clean tree looks exactly like a tree that was always clean, which is the same indistinguishability the first section above describes from the other direction.
+
+**Recovery, when it has already happened.**
+Do not `pop`, which drops the stash on success and can leave you mid-conflict with it half-consumed.
+`git stash show -p stash@{0}` first and read what it actually holds --- in the measured case a single line setting a Google Form id, which was then applied by hand onto the rewritten file in seconds.
+`git stash apply` only after you know the change is small enough to re-derive if it conflicts, and reset the unmerged path (`git reset HEAD <path>` then `git checkout -- <path>`) rather than `git checkout --` alone, which refuses on an unmerged path.
+Drop the stash only once the change is verifiably back in the tree.
+
+- **Do:** restore a stash of somebody else's work in the same turn you took it, or commit their change to a branch of its own instead of stashing it.
+- **Do:** read `git stash show -p` before applying a stash you have held across any merge or pull.
+- **Do:** say in your reply that you stashed something of theirs, so the debt is visible to someone other than you.
+- **Don't:** stash a dirty file to clear the way for your own branch and leave it stashed while you work --- the base moves, and the conflict lands in a file you had no business touching.
+- **Don't:** `git stash pop` a stash held across a base change; `apply`, verify, then drop.

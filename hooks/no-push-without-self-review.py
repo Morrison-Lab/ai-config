@@ -79,6 +79,14 @@ WHERE IT DELIBERATELY DOES NOT FIRE
   `push_files`) commit straight to a remote branch with no local commit to
   fingerprint, so nothing here can check them. They are an open gap, tracked as
   ai-config#1929, not a decision that they are safe.
+- A push whose every resolved push URL ends in an `EXEMPT_REPOS` entry
+  (Morrison-Lab's mln, mlg and mlr) passes with no verdict and no override.
+  Only a github.com URL (https or ssh) on a configured remote counts, and only
+  for a plain push in a plain command (`[cd DIR &&] git ... [| tail N]`): no
+  `-c`, no environment setting of any kind, and no ssh command, proxy, exec
+  path or receive-pack program that could deliver the pack elsewhere. A
+  push URL on any other host, a local path, a literal URL in the remote
+  position, or anything else is still gated.
 
 Authorized override: `ALLOW_UNREVIEWED_PUSH=1`, as an environment assignment on
 the pushing command itself.
@@ -499,6 +507,40 @@ OVERRIDE_ENV = re.compile(r"\AALLOW_UNREVIEWED_PUSH=1\Z")
 # working guard would have caught, while a false DENY has no escape at all --
 # a PreToolUse deny is not user-overridable.
 DEGRADED_OVERRIDE = re.compile(r"(?:^|[;&|`(\s])ALLOW_UNREVIEWED_PUSH=1\s")
+
+# Repositories whose pushes this guard does not gate at all, as lowercase
+# `owner/repo`. A push is exempt only when EVERY URL it would push to names one
+# of these (see `push_is_exempt`), so the list narrows the guard by
+# destination and never by what the command says about itself.
+#
+# Morrison-Lab's DATA 571 course repositories, at the owner's request
+# (2026-09-23): their agent sessions push feature branches under a standing
+# grant, and the harness there backgrounds every reviewer dispatch, so the
+# guard could never see a verdict (ai-config#3045) and every push ended in the
+# override. A constant rather than an environment variable or a file in the
+# pushed repository, because both of those are writable by the session the
+# guard is checking; widening this list is a reviewed change to this file.
+EXEMPT_REPOS = frozenset({
+    "morrison-lab/mln",
+    "morrison-lab/mlg",
+    "morrison-lab/mlr",
+})
+
+# `owner/repo` of a push URL, accepted only on github.com: `https://` (with
+# or without credentials), scp-style `git@github.com:owner/repo`, or
+# `ssh://git@github.com/owner/repo`. Each form takes exactly the separator git
+# itself reads it with -- `git@github.com/owner/repo` is a local path to git,
+# and `ssh://git@github.com:owner/repo` drops the owner from the path it
+# requests -- so neither is matched. Matching the trailing path alone let one
+# inline `-c remote.origin.pushurl=https://any.host/x/Morrison-Lab/mln` read
+# as exempt while shipping somewhere else, so the host is part of the match.
+# The host is case-insensitive, as DNS is; any other host or a local path is
+# never exempt.
+_URL_OWNER_REPO = re.compile(
+    r"(?:(?i:https://(?:[^@/\s]+@)?github\.com/)"
+    r"|(?i:git@github\.com:)"
+    r"|(?i:ssh://git@github\.com/))"
+    r"([^/:\s]+)/([^/:\s]+?)(?:\.git)?/*")
 
 # Options after which no single reviewed commit can describe the push.
 # `--branches` is git's own documented alias of `--all` (`git push -h`), so it
@@ -1405,6 +1447,148 @@ def _push_remote(directory: str | None, argv: list[str],
     return "origin"
 
 
+def _owner_repo(url: str) -> str | None:
+    """Lowercase `owner/repo` of a github.com push URL, or None."""
+    m = _URL_OWNER_REPO.fullmatch(url.strip())
+    return f"{m.group(1)}/{m.group(2)}".lower() if m else None
+
+
+# What can send a push somewhere its URL does not name. `git remote get-url`
+# reports the URL after `insteadOf`/`pushurl` rewriting, but a command git runs
+# to reach it (an ssh wrapper, a proxy, a replaced remote helper, a
+# `--receive-pack` program) can deliver the pack anywhere while git still
+# prints the github.com URL. So a push that carries or inherits any of these is
+# never exempt. Disabling TLS verification belongs here too: with it off, any
+# HTTP proxy in the path can answer for github.com.
+#
+# An HTTP proxy and a custom CA bundle are deliberately NOT refused, because
+# the cloud sessions this exemption exists for need both (HTTPS_PROXY and
+# GIT_SSL_CAINFO are set in every one). The exemption therefore trusts the
+# session's configured proxy and CA store. It is not a sandbox against a
+# session that sets up a hostile transport in an earlier command: `main`
+# already fails open on errors, MCP pushes are ungated (#1929), and the
+# override exists, so that threat was never in this hook's scope.
+TRANSPORT_ENV = frozenset({
+    "GIT_SSH", "GIT_SSH_COMMAND", "GIT_SSH_VARIANT", "GIT_PROXY_COMMAND",
+    "GIT_EXEC_PATH", "GIT_SSL_NO_VERIFY",
+})
+TRANSPORT_CONFIG = (r"^(core\.sshcommand|core\.gitproxy"
+                    r"|remote\..*\.(receivepack|vcs)"
+                    r"|http\.(.*\.)?sslverify)$")
+
+
+def _is_plain_command(command: str) -> bool:
+    """True when the whole Bash command is `[cd DIR &&]... git ... [2>&1] [| tail|head N]`.
+
+    `iter_pushes` reports only the environment PREFIX of a push, so anything
+    that sets the push's environment another way -- `export X=... &&`, an
+    `env -i X=... git push` wrapper whose assignments `_strip_env` skips, a
+    sourced file, a function, a substitution -- is invisible to
+    `_is_plain_push`. Rather than enumerate those, the exemption accepts only
+    this one shape and sends every other command to the ordinary review check.
+
+    `#` is refused anywhere. shlex treats it as a comment wherever it appears,
+    while bash starts a comment only at the beginning of a word, so
+    `git push origin main#z && touch x` lexes here as one bare push while bash
+    runs both commands. A `#` is legal in a ref name, so this is reachable.
+    """
+    if re.search(r"[$`;()<#\n\\]", command):
+        return False
+    try:
+        lex = shlex.shlex(command, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        toks = list(lex)
+    except ValueError:
+        return False
+    i = 0
+    while toks[i:i + 1] == ["cd"]:
+        if len(toks) < i + 3 or toks[i + 2] != "&&" or not _is_word(toks[i + 1]):
+            return False
+        i += 3
+    if toks[i:i + 1] != ["git"]:
+        return False
+    j = i + 1
+    while (j < len(toks) and _is_word(toks[j])
+           and toks[j:j + 3] != ["2", ">&", "1"]):
+        j += 1
+    rest = toks[j:]
+    if rest[:3] == ["2", ">&", "1"]:
+        rest = rest[3:]
+    if not rest:
+        return True
+    return (rest[0] == "|" and rest[1:2] in (["tail"], ["head"])
+            and all(re.fullmatch(r"-n|-?\d+", t) for t in rest[2:]))
+
+
+def _is_word(tok: str) -> bool:
+    """A shlex token that is not shell punctuation."""
+    return not re.fullmatch(r"[|&;<>()]+", tok)
+
+
+def _is_plain_push(directory: str | None, argv: list[str],
+                   env: list[str]) -> bool:
+    """True when nothing in or around this push can redirect its transport.
+
+    Plain means: no environment prefix at all, no git global option but `-C`,
+    no `--receive-pack`/`--exec`, none of TRANSPORT_ENV in the inherited
+    environment, and none of TRANSPORT_CONFIG in the repository's resolved
+    config. Stricter than it needs to be on purpose: an exempt push that is
+    not plain just goes through the ordinary review check.
+    """
+    if env or any(os.environ.get(k) for k in TRANSPORT_ENV):
+        return False
+    i = 1
+    while i < len(argv) and argv[i] != "push":
+        if argv[i] != "-C" or i + 1 >= len(argv):
+            return False
+        i += 2
+    for tok in argv[i + 1:]:
+        # git accepts any unambiguous prefix of a long option, so match the
+        # prefixes that can only mean these two (`--rec`, `--ex`).
+        if tok.startswith(("--rec", "--ex")):
+            return False
+    return not _run_git(directory, env, "config", "--get-regexp",
+                        TRANSPORT_CONFIG)
+
+
+def push_is_exempt(directory: str | None, argv: list[str],
+                   env: list[str], command: str) -> bool:
+    """True when every URL this push would write to is in EXEMPT_REPOS.
+
+    Only a plain command (`_is_plain_command`) running a plain push
+    (`_is_plain_push`) qualifies, so no `-c`, environment setting or transport
+    command is in play. The remote is resolved the way
+    `_push_remote` resolves it, and its URLs are read with
+    `git remote get-url --push --all`, so `pushurl` and `insteadOf` rewrites
+    in the repository's config are seen as git will apply them.
+    A remote with several push URLs is exempt only if all of them are. A
+    command naming a URL or path instead of a configured remote is never
+    exempt: `git remote get-url` cannot resolve it, and git still applies
+    `insteadOf`/`pushInsteadOf` to it, so its literal text says nothing
+    reliable about where the push goes.
+
+    Anything unresolvable is NOT exempt, which leaves the push to the ordinary
+    review check: the exemption can only ever narrow the guard by destination.
+    That includes running out of the shared time budget, and any parse error:
+    `_run_git` raises `TimeoutError` then, and letting any exception escape
+    here would reach `main`'s fail-open `except` -- a silent allow for the
+    whole command, which is what `push_refspecs` guards against the same way.
+    """
+    try:
+        if not (_is_plain_command(command)
+                and _is_plain_push(directory, argv, env)):
+            return False
+        remote = _push_remote(directory, argv, env)
+        if not remote:
+            return False
+        listed = _run_git(directory, env,
+                          "remote", "get-url", "--push", "--all", remote)
+    except Exception:  # TimeoutError included; see above.
+        return False
+    urls = [u.strip() for u in (listed or "").splitlines() if u.strip()]
+    return bool(urls) and all(_owner_repo(u) in EXEMPT_REPOS for u in urls)
+
+
 def _rev_parse_ref(directory: str | None, env: list[str], *args: str) -> str | None:
     name = _run_git(directory, env, "rev-parse", *args)
     return name if name and name != "HEAD" else None
@@ -2281,6 +2465,8 @@ def main() -> int:
                      "(`--git-dir`/`--work-tree`/`GIT_DIR`/`GIT_WORK_TREE`), "
                      "so a verdict naming a commit in this one cannot cover it")
                 return 0
+            if push_is_exempt(directory, argv, env, cmd):
+                continue
             # Coerce before `os.path.exists` rather than after. `or ""` rescues
             # only the FALSY non-`str` values: a truthy `list` or `dict` reaches
             # `os.path.exists`, which raises `TypeError` (it catches `OSError`

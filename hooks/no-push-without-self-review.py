@@ -156,6 +156,18 @@ VERDICT_LINE = re.compile(
 # that is anchored and indented exactly like the real thing.
 FENCE = re.compile(r"^[ \t]{0,3}(`{3,}|~{3,}).*$", re.M)
 
+# An inline code span is also quoted material. Blanking code spans ensures
+# that literal comment openers (like `<!--`) or spoofed verdict lines inside
+# inline code are not mistaken for live HTML comments or verdicts.
+# Matches backtick runs of equal length that do not span blank lines or
+# paragraph-interrupting block constructs (ATX headings, verdict lines,
+# fences, blockquotes, or HTML comment openers), per CommonMark
+# (ai-config#3961).
+CODE_SPAN = re.compile(
+    r"(?<!`)(`+)(?!`)(?:[^\n\r]|\r?\n(?![ \t]*(?:\r?\n|$|[#>`]|Verdict\b|<!--)))*?(?<!`)\1(?!`)",
+    re.I,
+)
+
 # The reviewer's statement of what it read, required to appear AFTER the
 # verdict it belongs to: that ordering is what makes a truncated report fail,
 # and it is why this is searched forward from the verdict rather than globally.
@@ -1730,31 +1742,23 @@ def _iter_blocks(record: dict):
 
 
 def _blank_quoted_regions(text: str) -> tuple[str, bool]:
-    """Blank fenced code AND HTML comments in one render-faithful pass.
+    """Blank fenced code, HTML comments, and code spans in one render-faithful pass.
 
-    Two sequential linear passes cannot be correct in both directions: with
-    fences first, a fence that swallows a comment's opener leaves the
-    comment interior live (a spoofed verdict "hidden" there decides the
-    report), and a fence that swallows only the true closer makes the
-    comment pass pair the opener with a later decoy arrow, exposing
-    whatever follows the decoy (both measured in the #2479 review rounds).
-    Comments first fails the mirror cases. CommonMark resolves the
-    ambiguity by ORDER: whichever construct opens first swallows the
-    other's markers until its own closer, so this scanner walks the text
-    once and enters whichever region begins next -- a fence per FENCE's
-    dialect (closing only on a same-character, at-least-as-long BARE
-    marker: positional pairing mis-pairs the moment fences nest, e.g. an
-    outer 4-tick fence quoting an inner 3-tick pair), or a comment at
-    ``<!--``
-    (closing only at the first literal ``-->``, fence markers inside
-    swallowed, matching how a renderer treats an open comment). The
-    blanked region is then exactly what a renderer hides, and any live
-    verdict line is one a reader of the rendered report would see.
+    Linear passes cannot be correct across interleaved constructs: CommonMark
+    resolves ambiguity by ORDER: whichever construct opens first swallows the
+    other's markers until its own closer. This scanner walks the text once and
+    enters whichever region begins next:
+    - a fence per FENCE's dialect (closing only on a same-character,
+      at-least-as-long BARE marker; blocks take precedence over inlines),
+    - an inline code span per CODE_SPAN (closing on an identical backtick run),
+    - or an HTML comment at ``<!--`` (closing at ``-->``).
 
-    An unclosed fence or comment at end of text reports True, and
-    parse_report fails the report closed: a structure that cannot be
-    resolved is a verdict that cannot be read, and truncation mid-region
-    leaves exactly this state. Offsets are preserved throughout.
+    The blanked region is then what a renderer hides, ensuring literal
+    comment openers in inline code (e.g. `<!--`) do not blank subsequent
+    verdicts (ai-config#3961).
+
+    An unclosed fence or comment at end of text reports True, and parse_report
+    fails closed. Offsets are preserved throughout.
     """
     out = list(text)
     n = len(text)
@@ -1767,11 +1771,34 @@ def _blank_quoted_regions(text: str) -> tuple[str, bool]:
     pos = 0
     while pos < n:
         fence = FENCE.search(text, pos)
+        span = CODE_SPAN.search(text, pos)
         comment_at = text.find("<!--", pos)
-        if fence is None and comment_at == -1:
+
+        # A block fence takes precedence over any inline code span that
+        # starts at or spans across the fence opener.
+        span_start = None
+        if span is not None and (fence is None or fence.start() >= span.end()):
+            span_start = span.start()
+
+        fence_start = fence.start() if fence is not None else None
+        comment_start = comment_at if comment_at != -1 else None
+
+        candidates: list[tuple[int, str]] = []
+        if fence_start is not None:
+            candidates.append((fence_start, "fence"))
+        if span_start is not None:
+            candidates.append((span_start, "span"))
+        if comment_start is not None:
+            candidates.append((comment_start, "comment"))
+
+        if not candidates:
             break
-        if comment_at == -1 or (fence is not None
-                                and fence.start() < comment_at):
+
+        candidates.sort(key=lambda c: c[0])
+        chosen = candidates[0][1]
+
+        if chosen == "fence":
+            assert fence is not None
             open_char = fence.group(1)[0]
             open_len = len(fence.group(1))
             close = None
@@ -1791,6 +1818,10 @@ def _blank_quoted_regions(text: str) -> tuple[str, bool]:
                 return "".join(out), True
             blank(fence.start(), close.end())
             pos = close.end()
+        elif chosen == "span":
+            assert span is not None
+            blank(span.start(), span.end())
+            pos = span.end()
         else:
             close_at = text.find("-->", comment_at + 4)
             if close_at == -1:

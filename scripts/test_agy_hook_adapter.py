@@ -2479,5 +2479,80 @@ class TestAgyHookAdapter(unittest.TestCase):
             _, kwargs = mock_run.call_args
             self.assertEqual(kwargs.get("creationflags"), 0x08000000)
 
+    def test_session_id_forwarded_to_pre_tool_use(self):
+        adapter = load_adapter()
+        payload = {
+            "toolCall": {"name": "run_command", "args": {"CommandLine": "ls"}},
+            "transcriptPath": "/Users/fake/.gemini/antigravity/brain/12345678-1234-1234-1234-123456789abc/.system_generated/logs/transcript.jsonl",
+        }
+        with patch.object(adapter, "find_repo_root", return_value=ROOT), \
+             patch("builtins.open", mock_open(read_data=json.dumps(MOCK_HOOKS_DEF))), \
+             patch("os.path.exists", return_value=True), \
+             patch.object(adapter, "run_hook_command") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='{"decision": "allow"}', stderr="")
+            with patch("sys.stdin", io.StringIO(json.dumps(payload))), patch("sys.stdout", new_callable=io.StringIO):
+                adapter.main()
+            self.assertTrue(mock_run.called)
+            called_payload = mock_run.call_args[0][1]
+            self.assertEqual(called_payload.get("session_id"), "12345678-1234-1234-1234-123456789abc")
+            self.assertEqual(called_payload.get("transcript_path"), payload["transcriptPath"])
+
+    def test_session_id_forwarded_to_stop_hook(self):
+        adapter = load_adapter()
+        payload = {
+            "terminationReason": "user_cancelled",
+            "conversation_id": "87654321-4321-4321-4321-cba987654321",
+        }
+        mock_hooks = {
+            "hooks": {
+                "Stop": [
+                    {
+                        "hooks": [
+                            {"type": "command", "command": "python3 fake_stop.py", "timeout": 5}
+                        ]
+                    }
+                ]
+            }
+        }
+        with patch.object(adapter, "find_repo_root", return_value=ROOT), \
+             patch("builtins.open", mock_open(read_data=json.dumps(mock_hooks))), \
+             patch("os.path.exists", return_value=True), \
+             patch.object(adapter, "run_hook_command") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='{}', stderr="")
+            with patch("sys.stdin", io.StringIO(json.dumps(payload))), patch("sys.stdout", new_callable=io.StringIO):
+                adapter.main()
+            self.assertTrue(mock_run.called)
+            called_payload = mock_run.call_args[0][1]
+            self.assertEqual(called_payload.get("session_id"), "87654321-4321-4321-4321-cba987654321")
+
+    def test_session_id_forwarded_to_pre_invocation_hook(self):
+        adapter = load_adapter()
+        payload = {
+            "invocationNum": 1,
+            "sessionId": "abcdef01-2345-6789-abcd-ef0123456789",
+            "messages": [{"role": "user", "content": "hello"}],
+        }
+        mock_hooks = {
+            "hooks": {
+                "UserPromptSubmit": [
+                    {
+                        "hooks": [
+                            {"type": "command", "command": "python3 fake_ups.py", "timeout": 5}
+                        ]
+                    }
+                ]
+            }
+        }
+        with patch.object(adapter, "find_repo_root", return_value=ROOT), \
+             patch("builtins.open", mock_open(read_data=json.dumps(mock_hooks))), \
+             patch("os.path.exists", return_value=True), \
+             patch.object(adapter, "run_hook_command") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='{"systemMessage": "hi"}', stderr="")
+            with patch("sys.stdin", io.StringIO(json.dumps(payload))), patch("sys.stdout", new_callable=io.StringIO):
+                adapter.main()
+            self.assertTrue(mock_run.called)
+            called_payload = mock_run.call_args[0][1]
+            self.assertEqual(called_payload.get("session_id"), "abcdef01-2345-6789-abcd-ef0123456789")
+
 if __name__ == "__main__":
     unittest.main()

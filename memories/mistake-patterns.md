@@ -851,24 +851,7 @@ A clean automated review from every available provider evaluating the current HE
   classifier can start denying a plainly innocuous, unrelated command too
   (e.g. `gh run list -R ... --json ...`), which is a widened blast radius
   the earlier occurrences in [`mistake-patterns.cases.md`](mistake-patterns.cases.md) did not record.
-- **Example**: 2026-09-01, `Lacaedemon/sparta` [PR #1459](https://github.com/Lacaedemon/sparta/pull/1459) (GIA sweep), tracked as [ai-config#2899](https://github.com/Morrison-Lab/ai-config/issues/2899);
-  previously `ucdavis/bcs` 2026-08-28 ([ai-config#2544](https://github.com/Morrison-Lab/ai-config/issues/2544), closed by [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820)).
-  In an auto-permission-mode plugin-consumer session where no `adversarial-reviewer` agent is registered (`Agent type not found`),
-  the session treated `hooks/no-push-without-self-review.py`'s refusal as solvable in-session by repeatedly rephrasing the sanctioned `ALLOW_UNREVIEWED_PUSH=1` override or by patching the running hook file ---
-  when the auto-mode permission classifier pattern-matches every such attempt as a guard bypass and denies it,
-  and repeated varied attempts make the classifier (correctly) more suspicious,
-  until it denies even legitimately-shaped review dispatches.
-  The hook's sanctioned escape valve is exactly what the classifier reads as a bypass, so the two mechanisms compose into a lockout neither intends.
-  Both discharge paths were unreachable at once:
-  the plugin's shipped agents were absent from the session's Agent registry
-  (writing `.claude/agents/adversarial-reviewer.md` into the repo mid-session does not register it immediately or reliably --- definitions load at session start, and the one measured mid-session appearance came about fifty minutes after the write, by a mechanism not yet identified),
-  and the classifier denied the override in all three phrasings tried (Bash chained, Bash standalone, PowerShell `$env:`) --- consistent denials, not stochastic ones.
-  A fourth phrasing, `env VAR=1 command`, was not tried here and later succeeded on its first attempt in a separate 2026-09-06 incident where the inline `VAR=1 command` form had just been denied --- see [`claude-code-transcripts.md`](claude-code-transcripts.md)'s "A shared session's transcript can carry a genuinely later, genuinely unrelated verdict" for that record, which draws no conclusion from the single data point about why the `env` form passed.
-  The [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820) fallback, merged earlier that same day, was ALSO unreachable, for a distinct reason:
-  the harness runs the hook from the plugin CACHE snapshot (`~/.claude/plugins/cache/Morrison-Lab/ai-config/<rev>/hooks/`, via `${CLAUDE_PLUGIN_ROOT}`),
-  which predated the fix (rev `a3e0fdb`, no `FALLBACK_AGENT_NAME`);
-  pulling the marketplace clone (`git -C ~/.claude/plugins/marketplaces/Morrison-Lab pull --ff-only origin main`, to `79def2e`) succeeded but changed nothing the harness executes,
-  and copying the updated hook onto the cache copy was itself classifier-denied (reasonably --- an agent rewriting its own active guard).
+- **Example**: see [`mistake-patterns.cases.md`](mistake-patterns.cases.md) Pattern 43 for the 2026-09-01 `Lacaedemon/sparta` [PR #1459](https://github.com/Lacaedemon/sparta/pull/1459) case (tracked as [ai-config#2899](https://github.com/Morrison-Lab/ai-config/issues/2899)).
 - **Canonical Rule**: [`adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md) (the override's sanctioned scope),
   [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py) (the fallback contract),
   and [`keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md) (the plugin hook path is the cache snapshot, not the marketplace clone).
@@ -1116,27 +1099,7 @@ A clean automated review from every available provider evaluating the current HE
   Nothing errors; the input is simply skipped.
   On a blocking guard that is the expensive direction, because the guard
   reports success while not having looked.
-- **Example**: 2026-09-07, `Morrison-Lab/ai-config` PR
-  [#3304](https://github.com/Morrison-Lab/ai-config/pull/3304),
-  `hooks/guard-slide-major-tag.py`.
-  Commit `6694317a0` added a pre-filter skipping any workflow file whose text
-  lacked the substring `workflow_call`; commit `a401ea0eb` reordered it away
-  after review.
-  The bypass needs an ESCAPE, not merely quoting --- a plainly double-quoted
-  key still contains the substring, so it would not have tripped anything:
-
-  ```python
-  >>> "workflow_call" in 'on:\n  "workflow_call":\n'
-  True
-  >>> "workflow_call" in 'on:\n  "\\u0077orkflow_call":\n'
-  False
-  >>> yaml.safe_load('on:\n  "\\u0077orkflow_call":\n')
-  {True: {'workflow_call': None}}
-  ```
-
-  `\u0077` is `w`, so PyYAML and GitHub Actions both resolve the key, while
-  the raw text never carries it.
-  An added `checks: read` job permission passed the guard.
+- **Example**: see [`mistake-patterns.cases.md`](mistake-patterns.cases.md) Pattern 53 for the 2026-09-07 `guard-slide-major-tag.py` case (PR #3304).
 - **Fix**: it is an ordering problem, not a matching problem.
   Parse first, and let the parsed structure be the sole test for anything
   that parses.
@@ -1207,14 +1170,7 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
   When the floor's rank equals the comparison's maximum, every key ranked at or under it becomes permanently unreachable by the escalation check: not merely covered for the cases that motivated the fix, but silently dead for every case past them.
 - **Direction of failure**: the repair for a false-positive DENY opened a false-negative ALLOW, the more dangerous direction for a security guard.
   This is Pattern 15's inversion produced by a different mechanism: not a widened text exemption, but a numeric floor pinned at the max rank.
-- **Example**: 2026-09-08, `Morrison-Lab/ai-config#3304`, `hooks/guard-slide-major-tag.py` (commit `26b154478`).
-  A reviewer finding: shorthand permissions (`read-all`/`write-all`) were compared with a plain inequality while dict-form permissions used a rank ordering, so a strict downgrade (`write-all` -> `read-all`) was flagged as an escalation --- a false-positive deny.
-  Ranking the shorthand-vs-shorthand comparison left the *same false-positive class* alive one branch over: a shorthand baseline compared against an explicit dict still coerced the baseline to `{}`, so every dict key looked newly added --- `write-all -> {contents: read}`, itself a downgrade, was still denied.
-  That sibling case is not one the review comment named;
-  it turned up only from testing the shorthand-vs-dict boundary directly, not from re-reading the fix.
-  Fixing it introduced the floor: a shorthand baseline was treated as granting its own rank on every dict key it was compared against, so a key was flagged only if it outranked the floor.
-  `write-all`'s floor equalled the rank scale's maximum, so after a `write-all` baseline no dict key could ever be flagged --- including `id-token: write`, which GitHub's workflow-syntax reference documents as accepting only `write` or `none` (never `read`), so `read-all` provably cannot grant it, and whether `write-all` covers it is documented nowhere.
-  `write-all -> {id-token: write}` is a real escalation that the pre-floor code denied correctly and the floor silently allowed, caught by asking what the floor newly permitted rather than by re-running the false positive it was built to fix.
+- **Example**: see [`mistake-patterns.cases.md`](mistake-patterns.cases.md) Pattern 55 for the 2026-09-08 `guard-slide-major-tag.py` case (commit `26b154478`).
 - **Canonical Rule**: `shared/workflow/metacognitive-monitoring.md`'s "an unexamined default gets named and decided" and Pattern 15 in [`mistake-patterns.cases.md`](mistake-patterns.cases.md) (widening a fail-closed exemption needs a base-parity proof).
   This pattern is the case where the widening is a numeric floor rather than a text exemption, so the check that catches it is a reachability comparison over the rank domain, not only a corpus diff --- a corpus-parity sweep can miss it entirely if the corpus never happens to combine that specific key with that specific baseline.
 - **Fix**: before shipping a baseline/floor/ceiling abstraction, enumerate what it newly allows, not only what false positive it removes.
@@ -1248,3 +1204,39 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
 - **Mistake**: judging a fix dangerous from what the WHOLE change would do, when only the conjunction of its halves carries the risk and one half is safe alone (measured case in [`mistake-patterns.cases.md`](mistake-patterns.cases.md)).
 - **Do:** apply each half of a multi-part fix separately, in a scratch copy, and re-run the check against real input before pronouncing the whole dangerous.
 - **Don't:** let a true claim about the conjunction stand for both halves --- it can block a half that measurement shows is safe.
+
+## Pattern 58: Inline Markdown Code Spans Crossing Block-Level Constructs
+
+- **Mistake**: using a regex for inline code spans that only excludes blank lines (`\r?\n(?![ \t]*\r?\n)`),
+  allowing unclosed or multiline inline spans to cross paragraph-interrupting block structures
+  (such as ATX headings `#{1,6}`, verdict lines, fences, or blockquotes).
+- **Direction of failure**: in security/authorization guards (like `no-push-without-self-review.py`),
+  a stray unclosed backtick before a real blocking verdict (e.g. `### Verdict: Needs more work`) can pair with a backtick after it,
+  swallowing the blocking heading as code content and allowing an earlier, superseded clean verdict to win.
+- **Example**: 2026-09-24, `Morrison-Lab/ai-config#3963` (issue #3961).
+  The initial fix added `CODE_SPAN` from `scripts/lib/fences.py`.
+  Claude Code Review flagged that `CODE_SPAN` only refused to cross blank lines,
+  reproducing a bypass where `Some notes `stray open\n### Verdict: Needs more work\n...stray close`` blanked out the blocking verdict and returned `clean`.
+- **Canonical Rule**: in CommonMark, blocks take precedence over inlines, and ATX headings interrupt paragraphs.
+  Inline code spans cannot cross block boundaries.
+- **Fix**: in inline code span regexes, ensure line continuation lookaheads forbid crossing any paragraph-interrupting construct:
+  `(?![ \t]*(?:\r?\n|$|[#>`]|Verdict\b|<!--))`.
+
+## Pattern 59: Abandoning Diagnostic or Superseded Background Tasks
+
+- **Mistake**: launching background tasks, asynchronous command executions, monitors, or subagents to inspect, search, or diagnose an issue, and leaving them running indefinitely after their question has been answered or superseded.
+- **Direction of failure**: asynchronous commands that exceed synchronous execution limits
+  (such as recursive `grep`, `find`, or test suites) continue consuming CPU, disk I/O, and writing large log files in the background.
+  Leaving them active pollutes session state and results in ambiguous task status when concluding a session.
+- **Example**: 2026-09-24 session: exploratory recursive `grep` commands across SQLite databases
+  and large directories ran in the background for over an hour, accumulating >110MB log files each.
+  When asked "session done?", the tasks were still running unmonitored.
+- **Canonical Rule**: `AGENTS.md` ("Terminate superseded and abandoned background tasks"), [`shared/workflow/terminate-superseded-tasks.md`](../shared/workflow/terminate-superseded-tasks.md).
+- **Fix**: actively terminate diagnostic tasks and subagents (`manage_task(Action='kill')`)
+  the moment their finding arrives or is superseded;
+  sweep running tasks before declaring milestone or session completion.
+
+- **Do:** kill diagnostic searches, greps, and test processes the moment their question has been answered or superseded.
+- **Do:** run an active task and subagent sweep (`manage_task(Action='list')`, `manage_subagents(Action='list')`) before declaring a milestone or session complete.
+- **Don't:** leave broad searches running in the background after moving on to fixing the code or writing documentation.
+- **Don't:** answer "session done" or conclude a session while transient background tasks are still running.

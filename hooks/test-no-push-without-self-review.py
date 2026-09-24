@@ -3159,6 +3159,21 @@ def exempt_repo_cases() -> tuple[int, int]:
         check(f"`_is_plain_command({command!r})` is {want} (got {got!r})",
               got is want)
 
+    # `_is_plain_command` already refuses an environment prefix (its first
+    # token is not `cd` or `git`), so no end-to-end row can reach
+    # `_is_plain_push`'s own `env` check. Call it directly so that backstop
+    # cannot be deleted unnoticed. A non-empty `env` returns before any git
+    # call, so the shared time budget is never consulted.
+    check("`_is_plain_command` refuses an environment prefix",
+          mod._is_plain_command("GIT_TRACE=1 git push origin main") is False)
+    try:
+        got = mod._is_plain_push(None, ["git", "push", "origin", "main"],
+                                 ["GIT_TRACE=1"])
+    except Exception as exc:
+        got = f"raised {type(exc).__name__}"
+    check(f"`_is_plain_push` refuses a push with an environment prefix "
+          f"(got {got!r})", got is False)
+
     hook_env = {k: v for k, v in os.environ.items()
                 if k not in mod.TRANSPORT_ENV}
     hook_env.update({"GIT_CONFIG_GLOBAL": os.devnull,

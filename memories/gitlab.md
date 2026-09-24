@@ -143,6 +143,11 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   - `glab api --method POST "/projects/<TARGET_ID>/job_token_scope/allowlist" -f "target_project_id=<SOURCE_ID>"`
   - `include:` (for CI templates) works independently of the API allowlist
   - Check existing: `glab api "/projects/<ID>/job_token_scope/allowlist"`
+  - Decode `access_level` with GitLab's versioned role mapping.
+    In GitLab 19.0.2, `40` means Maintainer (`30` is Developer);
+    verify effective access with `GET /projects/<ID>/members/all?query=<username>`
+    or the corresponding group endpoint before ruling out a maintainer-only repair.
+    (Measured 2026-09-23 while diagnosing HACR job-token access.)
 
 ## GitLab returns 404, not 403, for a project the token cannot SEE
 

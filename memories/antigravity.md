@@ -226,7 +226,7 @@ The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-anti
   (Observed in live Antigravity sessions 2026-09-19 on PR #3797.)
 - **No parentheses in `gh pr merge` commit subjects or arguments:**
   `enforce-mwc-review-gate.py` bans command-chaining and substitution characters in `CHAIN_CHARS` (including semicolons, ampersands, pipes, newlines, dollar-parentheses, backticks, and parentheses).
-  Passing parenthetical issue references in arguments (such as `--subject "fix: description #1234"`) trips the guard and blocks the merge.
+  Passing parenthetical issue references in arguments (such as `--subject "fix: description (#1234)"`) trips the guard and blocks the merge.
   Execute `gh pr merge -R <repo> <PR> --squash --delete-branch` without parentheses.
 - **Rerun cancelled concurrency checks to unblock fully-clean rollup:**
   When a prior workflow run is cancelled by a higher-priority check or concurrency group (e.g. `review / preempt-previous`), it registers as `cancelled` in the statusCheckRollup, blocking `check-pr-fully-clean.py` and MWC merge.

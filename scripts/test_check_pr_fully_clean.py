@@ -6785,7 +6785,9 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     )
     # Negative control, alongside the four rejections above: the real
     # overview block itself must still classify clean, proving the region
-    # restriction excludes the fake lines without excluding the real one.
+    # restriction excludes the fake ZERO lines without excluding the real
+    # one. (A fake NONZERO line outside every block is no longer excluded;
+    # see the note after this check.)
     check(
         "copilot_verdict: the real overview block's own 'Findings: None' "
         "still classifies clean alongside a LATER, fake one in a "
@@ -6811,10 +6813,10 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "block follows",
         checker.copilot_verdict(
             "``<!-- ccr-overview-v2 -->``\n\n## Copilot review overview\n\n"
-            "### Approval recommended\n\n**Findings:** 5\n\n"
+            "### Approval recommended\n\n**Findings:** 5 <picture><img></picture>\n\n"
             "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
             "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
-        ) != "clean",
+        ) == "not-clean",
     )
     check(
         "copilot_verdict: an uncited top-level nonzero Findings line in a "

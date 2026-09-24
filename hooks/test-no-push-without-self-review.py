@@ -748,6 +748,15 @@ CASES = [
      "a report with only a code-span-quoted verdict states no verdict",
      "no verdict came back"),
     (PUSH, reviewed(
+        "### Verdict: Ready for merge\n"
+        f"Reviewed-Commit: {HEAD}\n\n"
+        "Some notes `stray open\n"
+        "### Verdict: Needs more work\n"
+        f"Reviewed-Commit: {HEAD}\n"
+        "stray close` end of notes\n"), True,
+     "a stray inline backtick cannot swallow an intervening ATX verdict heading",
+     "returned a blocking verdict"),
+    (PUSH, reviewed(
         "### Verdict: Needs more work\n"
         f"Reviewed-Commit: {HEAD}\n\n"
         "<!--\n```\n-->\n```\n"

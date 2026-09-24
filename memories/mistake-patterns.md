@@ -1248,3 +1248,11 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
 - **Mistake**: judging a fix dangerous from what the WHOLE change would do, when only the conjunction of its halves carries the risk and one half is safe alone (measured case in [`mistake-patterns.cases.md`](mistake-patterns.cases.md)).
 - **Do:** apply each half of a multi-part fix separately, in a scratch copy, and re-run the check against real input before pronouncing the whole dangerous.
 - **Don't:** let a true claim about the conjunction stand for both halves --- it can block a half that measurement shows is safe.
+
+## Pattern 58: Inline Markdown Code Spans Crossing Block-Level Constructs
+
+- **Mistake**: using a regex for inline code spans that only excludes blank lines (`\r?\n(?![ \t]*\r?\n)`), allowing unclosed or multiline inline spans to cross paragraph-interrupting block structures (such as ATX headings `#{1,6}`, verdict lines, fences, or blockquotes).
+- **Direction of failure**: in security/authorization guards (like `no-push-without-self-review.py`), a stray unclosed backtick before a real blocking verdict (e.g. `### Verdict: Needs more work`) can pair with a backtick after it, swallowing the blocking heading as code content and allowing an earlier, superseded clean verdict to win.
+- **Example**: 2026-09-24, `Morrison-Lab/ai-config#3963` (issue #3961). The initial fix added `CODE_SPAN` from `scripts/lib/fences.py`. Claude Code Review flagged that `CODE_SPAN` only refused to cross blank lines, reproducing a bypass where `Some notes `stray open\n### Verdict: Needs more work\n...stray close`` blanked out the blocking verdict and returned `clean`.
+- **Canonical Rule**: in CommonMark, blocks take precedence over inlines, and ATX headings interrupt paragraphs. Inline code spans cannot cross block boundaries.
+- **Fix**: in inline code span regexes, ensure line continuation lookaheads forbid crossing any paragraph-interrupting construct: `(?![ \t]*(?:\r?\n|$|[#>`]|Verdict\b|<!--))`.

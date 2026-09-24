@@ -159,10 +159,13 @@ FENCE = re.compile(r"^[ \t]{0,3}(`{3,}|~{3,}).*$", re.M)
 # An inline code span is also quoted material. Blanking code spans ensures
 # that literal comment openers (like `<!--`) or spoofed verdict lines inside
 # inline code are not mistaken for live HTML comments or verdicts.
-# Matches backtick runs of equal length that do not span blank lines,
-# per CommonMark (ai-config#3961).
+# Matches backtick runs of equal length that do not span blank lines or
+# paragraph-interrupting block constructs (ATX headings, verdict lines,
+# fences, blockquotes, or HTML comment openers), per CommonMark
+# (ai-config#3961).
 CODE_SPAN = re.compile(
-    r"(?<!`)(`+)(?!`)(?:[^\n\r]|\r?\n(?![ \t]*\r?\n))*?(?<!`)\1(?!`)"
+    r"(?<!`)(`+)(?!`)(?:[^\n\r]|\r?\n(?![ \t]*(?:\r?\n|$|[#>`]|Verdict\b|<!--)))*?(?<!`)\1(?!`)",
+    re.I,
 )
 
 # The reviewer's statement of what it read, required to appear AFTER the

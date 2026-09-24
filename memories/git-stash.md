@@ -147,7 +147,8 @@ A session found one uncommitted file in the user's checkout, stashed it to cut a
 Roughly two hours later that branch merged, and restoring the stash failed: an unrelated PR had rewritten the same file in the meantime (223 lines changed), so `git stash apply` left `UU` and a conflict in a file the session had never intended to touch.
 
 The stash itself was fine.
-What broke it was holding it across a base change --- and a stash is the one piece of git state that carries no branch, no upstream, and no record of what it was taken against beyond a one-line `WIP on <branch>: <subject>` label.
+What broke it was holding it across a base change.
+While a stash commit records its base commit in `stash@{0}^1` and in its `WIP on <branch>: <shortsha> <subject>` label, git has no concept of branch tracking for stashes and never checks whether the base has moved forward when you `apply` or `pop`.
 Nothing warns you, because from git's point of view nothing happened.
 
 It is worse than losing your own work, for two reasons.

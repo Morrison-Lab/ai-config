@@ -79,6 +79,29 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   Masking affects logs, not this API response, and variables available to an
   unprotected merge-request pipeline are readable by that pipeline's source
   code.
+- **Treat GitLab CI job traces as credential-bearing material.**
+  On HC2, observed 2026-09-23, `glab ci trace` rendered a runner
+  `Downloading artifacts from coordinator` line with an opaque `token=` value,
+  even though no CI variable was printed.
+  Do not fetch or render raw traces in an agent-visible terminal without
+  explicit authorization for that log.
+  Diagnose from job metadata, pipeline status, and narrowly scoped artifacts
+  first.
+  Do not rely on a line-oriented redaction filter after fetching a trace:
+  GitLab ANSI control sequences can split `token=` from its value and bypass
+  that pattern.
+  If a trace must be inspected under explicit authorization,
+  remove ANSI escapes before scanning and redact before any terminal output.
+- **A project CI/CD variable overrides a job-level YAML variable.**
+  GitLab's documented variable-precedence order, checked 2026-09-23, places
+  project variables above variables declared in `.gitlab-ci.yml`.
+  An included job that must select its `CI_JOB_TOKEN` fallback therefore needs
+  `before_script: unset NAME` for every higher-precedence alias it consumes;
+  setting `NAME: ""` in the job YAML does not suppress a project variable.
+  GitLab runs `before_script` and `script` in the same shell, so that unset
+  reaches the inherited script.
+  Recheck this behavior against
+  <https://docs.gitlab.com/ci/variables/> when upgrading GitLab.
 - **Use the paginated MR notes endpoint as the authoritative unresolved-inline-comment sweep.**
   `GET /projects/:id/merge_requests/:iid/notes` can return resolvable unresolved `DiffNote`s that a Discussions API sweep does not expose as an unresolved discussion.
   Filter every page on `.resolvable == true and .resolved == false`, then use the Discussions API only to locate and resolve the corresponding thread.

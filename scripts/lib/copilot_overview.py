@@ -337,7 +337,10 @@ def _copilot_overview_block_spans(
     unconditionally 0 in every caller, and the marker-to-heading bridge
     always crosses at least one -- checking each piece separately is what
     makes the check reachable at all, not merely a stricter version of a
-    whole-match check.
+    whole-match check. Its reach is exactly the caller's mask: a code
+    span whose backtick delimiters sit on their own lines is not marked
+    cited by `_citation_mask` today, so a marker quoted that way still
+    opens a block ([ai-config#3956](https://github.com/Morrison-Lab/ai-config/issues/3956)).
     """
     comment_spans = _find_html_comment_spans(scan)
     comment_span_starts = [s for s, _ in comment_spans]

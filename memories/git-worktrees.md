@@ -69,6 +69,17 @@ there.
   `cd` out to the parent repo (or a sibling worktree)
   first, *then* remove.
 
+## Git (Windows) --- worktrees created on Windows have `.git` files containing Windows drive paths that break in Git Bash / MSYS2
+
+- Linked worktrees created on Windows write a `.git` pointer file containing an absolute Windows drive path (e.g. `gitdir: C:/...` or `gitdir: D:/...`).
+- When shell scripts like `check-diff-scoped.sh` run under Git Bash or MSYS2, POSIX path translation mismatches on the Windows drive path in `.git` cause `git rev-parse --is-inside-work-tree` to exit non-zero with `fatal: not a git repository (or any of the parent directories): .git`.
+  This triggers `check-diff-scoped.sh`'s `die()` message: `check-diff-scoped: not inside a git work tree.`.
+- **Do:** run individual composite checker scripts directly via Python in PowerShell (e.g. `NLB_BASE_REF=origin/main python3 check-new-line-breaks/check-new-line-breaks.py`) rather than running `bash check-diff-scoped.sh` from a Windows-linked worktree.
+- **Don't:** assume `check-diff-scoped: not inside a git work tree.` indicates an invalid worktree or corrupt repo;
+  the underlying git repository and worktree are valid under native Windows git.
+  (Measured 2026-09-24 in a local linked worktree on Windows during test execution;
+  no linked issue or PR.)
+
 ## Git --- `checkout -B` in a linked worktree silently bypasses the already-checked-out guard
 - Plain `git checkout main` in a linked worktree correctly refuses when `main`
   is checked out in the primary (or any other) worktree: `fatal: 'main' is

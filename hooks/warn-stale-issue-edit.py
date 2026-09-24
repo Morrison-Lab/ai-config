@@ -94,7 +94,12 @@ _LIB = os.path.join(ROOT, "scripts", "lib")
 if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
 try:
-    from transcript_meta import is_skill_load_meta
+    from transcript_meta import (
+        is_harness_meta,
+        is_hook_feedback,
+        is_hook_feedback_text,
+        is_skill_load_meta,
+    )
 except Exception as _exc:  # broken install: degrade, do not fail open silently
     print(f"warn-stale-issue-edit: cannot load scripts/lib/transcript_meta.py "
           f"({_exc}); is_user_prose will not recognize a loaded skill body, "
@@ -102,6 +107,15 @@ except Exception as _exc:  # broken install: degrade, do not fail open silently
           file=sys.stderr)
 
     def is_skill_load_meta(entry):  # noqa: D103 -- fail-open fallback
+        return False
+
+    def is_harness_meta(entry):  # noqa: D103 -- fail-open fallback
+        return False
+
+    def is_hook_feedback(entry):  # noqa: D103 -- fail-open fallback
+        return False
+
+    def is_hook_feedback_text(text):  # noqa: D103 -- fail-open fallback
         return False
 
 WRITE_TOOLS = frozenset({
@@ -341,6 +355,8 @@ def find_issue_ref(text):
     """
     if not text or not isinstance(text, str):
         return None
+    if is_hook_feedback_text(text):
+        return None
     # Drop pull URLs so a PR-only request cannot arm this guard via a
     # coincidental later owner/repo#N in the same blob.
     stripped = RX_PULL_URL.sub("", text)
@@ -454,10 +470,25 @@ def is_user_prose(entry):
         # elapsed time -- see scripts/lib/transcript_meta.py for the
         # transcript survey that pins the discriminator.
         return False
+    if is_harness_meta(entry):
+        # Harness-injected metadata (isMeta: true, no sourceToolUseID, no
+        # promptSource: "sdk") contains hook feedback or system notifications.
+        # ai-config#3914.
+        return False
+    if is_hook_feedback(entry):
+        # Hook feedback or system notifications injected without isMeta
+        # (e.g. fixtures, adapters) matching recognized hook preambles.
+        # ai-config#3914.
+        return False
     blocks = _content_blocks(entry)
     if not blocks:
         return False
     if any(block.get("type") == "tool_result" for block in blocks):
+        return False
+    text = user_text(entry)
+    if not text.strip():
+        return False
+    if is_hook_feedback_text(text):
         return False
     return any(
         block.get("type") == "text" and isinstance(block.get("text"), str)

@@ -639,12 +639,13 @@ Here that mechanism is itself one of at least three candidates, so the first rea
 
 **The marker is per-repository, so a grant in one repo authorizes nothing in another.**
 `check_mwc_active()` looks for `<git-common-dir>/ai-sessions/<session>.mwc`,
-resolved from the current working directory and `CLAUDE_PROJECT_DIR`.
-Enabling MWC while working in repo A therefore leaves a merge in repo B blocked,
+resolved from the session's working directory (`cwd`) and `CLAUDE_PROJECT_DIR`
+(where the merge command executes), which may differ from the repository named in a `-R` target.
+Enabling MWC while working in repo A therefore leaves a merge issued from repo B blocked,
 which is correct and easy to misread as the guard malfunctioning.
 It also requires `AI_SESSION_ID` or `CLAUDE_SESSION_ID` to be set; with neither
 set the function returns `False` and the guard denies even with a valid marker.
-Run `check-mwc` from the repo you intend to merge in, not merely once per session.
+Run `enable-mwc` and `check-mwc` from the repository of the session's working directory (where the merge command runs), not merely once per session or from the `-R` target repository.
 
 **The grant does not expire, but its LIVENESS PROOF does, and a long session loses merge authority mid-session because of it.**
 This is the property most likely to bite, because the two facts that produce it are individually reassuring.

@@ -204,7 +204,7 @@ COPILOT_FINDINGS_LINE = re.compile(
 # is real and constructible, and is exactly the shape a body describing
 # the ccr-overview-v2 format in prose would use.
 _COPILOT_OVERVIEW_START = re.compile(
-    r"(?:^|\n)[ ]{0,3}(<!--\s*ccr-overview-v2\s*-->)"
+    r"(?:^|\n)[ ]{0,3}(<!--[ \t]*ccr-overview-v2[ \t]*-->)"
     r"(?:[ \t]*\r?\n)+"
     r"[ ]{0,3}(##[ \t]+Copilot review overview[ \t]*)(?=\r?\n|$)",
     re.IGNORECASE,

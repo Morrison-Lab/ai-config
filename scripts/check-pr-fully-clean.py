@@ -2286,7 +2286,7 @@ COPILOT_SUPPRESSED_BLOCK = re.compile(r"\bSuppressed\s+comments\b", re.IGNORECAS
 # the occurrence as present but unparseable rather than as a clean 0 --
 # see `copilot_verdict`'s combine rule.
 COPILOT_COMMENT_GENERATED = re.compile(
-    r"\bComments\s+generated:\**[ \t]*", re.IGNORECASE
+    r"\bComments[ \t]+generated:\**[ \t]*", re.IGNORECASE
 )
 COPILOT_COMMENT_COUNT = re.compile(
     r"(?<!\d)([0-9]{1,6})(?=(?:[ \t]+new\b)?[ \t]*(?:\r?\n|$))"

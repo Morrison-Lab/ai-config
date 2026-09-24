@@ -6874,6 +6874,25 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             "**Findings:** several\n"
         ) == "",
     )
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
+    # Copilot review, eleventh round: both fields are one-line constructs in
+    # every real body, so a line break inside either is malformed prose and
+    # must not be trusted as the real field.
+    check(
+        "copilot_verdict: a legacy 'Comments generated' phrase split across "
+        "a line break is not a zero-count source",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\nComments\ngenerated: 0\n"
+        ) != "clean",
+    )
+    check(
+        "copilot_verdict: a line-broken '<!--\\nccr-overview-v2\\n-->' "
+        "comment does not open a v2 block",
+        checker.copilot_verdict(
+            "<!--\nccr-overview-v2\n-->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) != "clean",
+    )
 
     # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, seventeenth round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
     # Copilot review, second round on `_copilot_overview_block_spans`):

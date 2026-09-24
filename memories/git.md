@@ -64,6 +64,78 @@ ordering was right and the interval understated by four weeks.
 The graft decoration and the `--git-dir` failure above were reproduced
 directly, on a `--depth 3` clone of this repo plus a linked worktree.)
 
+## A shallow clone answers a POPULATION question agreeably, and agreement reads as a result
+
+The section above governs **attribution** --- which commit introduced a thing
+--- and its check fires because the question names one commit, so a wrong
+answer is at least the kind of thing you can go and look at.
+A measurement whose subject is the **whole history** has no such tell.
+`git log` over a graft returns a smaller corpus, exits 0, prints no warning,
+and every number derived from it is internally consistent, so nothing about
+the output reads as truncated.
+
+The bias runs the wrong way, which is what makes this worse than an ordinary
+undercount.
+A smaller population is likelier to show two detectors agreeing, and agreement
+reads as a stable result rather than as a question --- so the truncated
+reading is the one least likely to prompt a re-check.
+That is the same vacuous pass
+[`fail-fast`](../shared/principles/fail-fast.md) is about, arriving through
+the checkout rather than through the code.
+
+**Measured 2026-09-23**, in a remote container's clone of this repository, at
+one ref (`origin/main` at `b96c640f`):
+
+| | commits | multi-line bodies | narrow | current | same set? |
+| --- | --- | --- | --- | --- | --- |
+| shallow fragment | not recoverable | 111 | 54 | 54 | yes |
+| complete | 2753 | 2539 | 677 | 680 | no |
+
+The fragment's own depth cannot be read back once the clone is unshallowed,
+which is part of the hazard rather than a gap in the record: the truncation
+leaves nothing behind to measure afterwards.
+What is re-derivable is the reading, and a log-order prefix of 119 commits
+reproduces it exactly --- 111 multi-line bodies, 54 flagged under each
+vocabulary, sets identical.
+Sweeping prefixes at that same ref, agreement still holds at 300 commits and
+has already failed by 375, so the shallow answer was not a near miss.
+
+The comparison inverted.
+`scripts/measure-cardinality-vocabulary.py` exists to answer one question ---
+does widening the vocabulary move the set of flagged commit bodies --- and the
+fragment answered no while the full history answers yes, 3 bodies newly
+flagged and none lost.
+
+The same clone also produced a false **absence** claim that reached a tracking
+issue.
+[ai-config#3907](https://github.com/Morrison-Lab/ai-config/issues/3907)'s
+aside said this repository's history carries no approximate `hundred`
+phrasing.
+At full depth five bodies carry `a hundred`, `several hundred` or
+`a few hundred`, and two of those yield a `hundred` claim.
+One of them, `documented a few hundred lines up`, sits 1889 commits deep ---
+outside the fragment entirely --- and is one of the three newly-flagged
+bodies, so it is a third of the whole measured change.
+
+The remedy is the same one-line check as above, run before the measurement
+rather than before an attribution query.
+The durable form is a refusal inside the instrument, so nobody has to remember
+it: `commit_bodies` in that script exits with `--unshallow` named as the
+remedy rather than measuring a fragment, and
+`scripts/test_measure_cardinality_vocabulary.py` pins both directions --- a
+shallow clone refused, and a complete one measured, since a guard mutated to
+refuse every clone would satisfy the first case alone.
+
+- **Do:** run `git rev-parse --is-shallow-repository` before any measurement
+  whose subject is the history rather than a commit in it, counts and
+  set comparisons alike.
+- **Do:** build the check into the instrument when one exists, since a
+  population claim is usually made by a script somebody else will run next.
+- **Don't:** read "the two readings agree" as a result --- on a truncated
+  population it is the likeliest wrong answer, not the reassuring one.
+- **Don't:** assert that a corpus contains no instance of something from a
+  clone you have not measured the depth of.
+
 ## `git log -S`/`-G` on one half of a coordinated multi-part change finds the wrong commit
 
 Some states are produced by **two or more separate edits landing together**:
@@ -1153,3 +1225,12 @@ echo "rc=$?"
 - **Do:** print `rc=$?` on the commit's own line, and confirm with `git log --oneline -1` plus `git status --short` before reporting a commit as made.
 - **Don't:** feed `git commit -F -` from a heredoc inside a compound command.
 - **Don't:** report a commit landed on the strength of having issued the command.
+
+## A `.gitattributes` extension pattern is case-sensitive wherever the checkout is
+
+`*.jpg binary` does not match `GATES.JPG` on a case-sensitive checkout, and macOS hides that:
+a default macOS checkout runs `core.ignorecase=true`, so the pattern appears to match there,
+while a Linux CI checkout defaults to `core.ignorecase=false` and the same pattern silently stops matching.
+This is the shape that passes local testing and review and only fails once CI (or a Linux collaborator) checks it out.
+Verify with `git check-attr <attr> -- <path>` against the real filename's actual case rather than trusting a local merge/diff test.
+See [`configure-gitattributes`](../skills/configure-gitattributes/SKILL.md) step 3 for the full write-up.

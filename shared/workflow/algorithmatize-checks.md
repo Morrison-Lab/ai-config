@@ -2938,3 +2938,69 @@ The repo's own `BASH_CAT_PATH` fixture ("a path resembling the endpoint is not a
   This one found a defect that three gates, a 50-case suite and the author's own reading had all passed.
 - **Don't:** post a fix recipe for another session to apply and call it validated on a positive case alone.
   A recipe carries the same standard as a push and is harder to retract --- here a peer session committed it before the adversarial pass caught it, and the correction landed on `9fd7e424`.
+
+## One assertion on two handlers' shared message prefix covers neither
+
+The section above is about a matcher widened with only a positive case.
+This one is about a case that looks like the negative half and is not:
+it exercises real code, it produces a real refusal, and it still cannot
+tell the two code paths apart, because the string it asserts on is the
+prefix they share.
+
+Measured 2026-09-23 in this repository.
+`scripts/measure-cardinality-vocabulary.py`'s `load_hook()` refuses two ways:
+
+```python
+except FileNotFoundError:
+    sys.exit(f"cannot load {HOOK}: no such file.")
+except Exception as exc:  # noqa: BLE001 -- re-raised as a refusal
+    sys.exit(f"cannot load {HOOK}: {type(exc).__name__}: {exc}")
+```
+
+Its suite asserted `"cannot load" in msg` against a nonexistent path.
+Delete either handler and that case still passes, because whichever one
+survives catches the other's exception and emits the same stem.
+An adversarial reviewer found it; the author had not.
+
+**It is a different failure from the vacuous case.**
+A vacuous case walks no guarded path at all, so the code under test is
+never reached.
+Here the code is reached and the refusal is genuine.
+What is missing is *discrimination*, and nothing about the case's own
+output says so --- the message is correct, the exit is correct, and the
+coverage arithmetic reads two handlers, one test.
+
+**The tell is structural rather than about any particular string.**
+Whenever two branches end in messages built from a shared stem --- an
+f-string prefix, a common `sys.exit` wrapper, a fallback that re-emits the
+caller's framing --- one assertion on that stem covers neither branch.
+So ask, of each handler, what string **only** it can produce, and assert on
+that: `no such file.` for the first arm above, `SyntaxError` for the second.
+
+**The fix needs a second case, not a sharper one**, and that is the part
+that gets skipped.
+Tightening the existing assertion still leaves one case, and one case can
+only ever reach one handler --- so the other arm stays uncovered while the
+suite now *looks* precise.
+A `try` block with N `except` arms needs N cases, each built to land in its
+own arm: here a nonexistent path for `FileNotFoundError`, and a real file
+carrying a syntax error for the general handler, since a `SyntaxError` is
+not a `FileNotFoundError` and nothing else in the function raises one.
+
+**Confirm each by mutation, one handler at a time.**
+Deleting handler i must redden case i and leave the others green;
+if deleting it reddens two cases, or none, the mapping is not what the
+suite claims.
+Back the file up with `cp` and restore from that copy --- `git checkout --`
+restores from the index, which silently discards the very fix the mutation
+is testing.
+
+- **Do:** assert on the substring only one branch can emit.
+- **Do:** write one case per `except` arm, each constructed to raise that
+  arm's own exception type.
+- **Do:** delete each handler separately and confirm exactly one named case
+  goes red.
+- **Don't:** assert on a message prefix a sibling handler, a fallback, or a
+  shared wrapper also emits.
+- **Don't:** count a `try` block with several `except` arms as covered by
+  one case, however precisely that case is worded.

@@ -118,6 +118,16 @@ import time
 
 NO_WINDOW = {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)} if sys.platform == "win32" else {}
 
+# Save an independent duplicate of stdout (fd 1) as early as possible, so that
+# any subsequent closure, poisoning, or redirection of fd 1 (e.g. from open(1))
+# does not silence a denial decision into a silent allow (ai-config#3756).
+try:
+    _ORIGINAL_STDOUT_FD: int | None = os.dup(1)
+except Exception:
+    _ORIGINAL_STDOUT_FD = None
+
+_DENIAL_ISSUED: list[bool] = [False]
+
 # --- what counts as a verdict ----------------------------------------------
 
 # Anchored at line start, optionally as a Markdown heading. Anchoring is what
@@ -2314,7 +2324,8 @@ DENY_TAIL = (
 
 
 def deny(reason: str) -> None:
-    print(json.dumps({
+    _DENIAL_ISSUED[0] = True
+    payload = json.dumps({
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
@@ -2322,7 +2333,49 @@ def deny(reason: str) -> None:
                 f"git push blocked by the pre-push self-review policy:\n{reason}{DENY_TAIL}"
             ),
         }
-    }))
+    }) + "\n"
+
+    # Attempt 1: If fd 1 was closed or redirected, restore it using our saved duplicate
+    if _ORIGINAL_STDOUT_FD is not None:
+        try:
+            os.dup2(_ORIGINAL_STDOUT_FD, 1)
+        except Exception:
+            pass
+
+    # Attempt 2: Write via standard sys.stdout
+    written = False
+    try:
+        sys.stdout.write(payload)
+        sys.stdout.flush()
+        written = True
+    except Exception:
+        pass
+
+    # Attempt 3: If standard sys.stdout write failed, write directly to the saved descriptor
+    if not written and _ORIGINAL_STDOUT_FD is not None:
+        try:
+            os.write(_ORIGINAL_STDOUT_FD, payload.encode("utf-8"))
+            written = True
+        except Exception:
+            pass
+
+    # Attempt 4: If emission to stdout could not succeed, we have already decided
+    # to deny the push. Failing open into return 0 would silently permit an unauthorized
+    # push. Emit an emergency failure log to stderr and fail closed (exit 2).
+    if not written:
+        try:
+            sys.stdout = open(os.devnull, "w")
+        except Exception:
+            pass
+        try:
+            sys.stderr.write(
+                "no-push-without-self-review: FATAL: denial could not be written to stdout;\n"
+                f"blocking push. Denial reason:\n{reason}\n"
+            )
+            sys.stderr.flush()
+        except Exception:
+            pass
+        sys.exit(2)
 
 
 def _read_payload() -> tuple[dict, bool]:
@@ -2444,9 +2497,12 @@ def main() -> int:
             # no longer emit. Naming "all three" without naming WHICH three read
             # as a count of the pinned matrix, which has five (round 9).
             #
-            # `isinstance` closes this instance and NOT the class. Any failure
-            # inside `deny()` is a silent allow by the same route, a residue
-            # this line does not address -- ai-config#3756.
+            # `isinstance` closes this instance. For the wider class of failures
+            # (stdout closure, bad file descriptors, broken pipes, or serialization
+            # errors), `deny()` duplicates fd 1 at startup to restore stdout or
+            # write directly, tracks `_DENIAL_ISSUED`, and fails closed (exit 2)
+            # if stdout cannot be written or if an exception occurs after a denial
+            # decision, closing the silent-allow bypass (ai-config#3756).
             _tp = payload.get("transcript_path")
             transcript_path = _tp if isinstance(_tp, str) else ""
             if not os.path.exists(transcript_path):
@@ -2470,7 +2526,20 @@ def main() -> int:
                 deny(reason)
                 return 0
         return 0
-    except Exception:
+    except Exception as exc:
+        if _DENIAL_ISSUED[0]:
+            try:
+                sys.stdout = open(os.devnull, "w")
+            except Exception:
+                pass
+            try:
+                sys.stderr.write(
+                    f"no-push-without-self-review: exception raised after denial decision: {exc}\n"
+                )
+                sys.stderr.flush()
+            except Exception:
+                pass
+            return 2
         # Fail open, deliberately and in the same direction as the parse-failure
         # rule in the docstring: a guard that crashed closed would block every
         # push in the session, which is a worse failure than missing one review.

@@ -160,36 +160,69 @@ COPILOT_FINDINGS_LINE = re.compile(
 )
 
 
-def _findings_line_cite_start(m: "re.Match[str]") -> int:
-    """The position to check citedness FROM, for a `COPILOT_FINDINGS_LINE`
-    match -- the line's own first character, not `m.start()` ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899)
-    review finding).
+def match_content_start(m: "re.Match[str]") -> int:
+    """The position to check citedness FROM, for a match of a LINE-ANCHORED
+    pattern -- the line's own first CONTENT character, past any consumed
+    newline and any leading run of spaces/tabs, rather than `m.start()`
+    ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding; generalised from the narrower
+    `_findings_line_cite_start` this replaces, which only skipped the
+    newline).
 
-    The pattern's own leading `(?:^|\\n)` consumes the PRECEDING
-    line-ending character whenever the match isn't at the very start of
-    the string, so `m.start()` then points at that newline rather than
-    at the line's own first character. The citation mask this module's
-    caller builds (`strip_cited_finding_vocab_with_mask`) never marks a
-    newline offset as cited -- by that mask's own design, every newline
-    position is unconditionally 0 (see `_copilot_overview_block_spans`'s
-    docstring, "the mask's newline positions are unconditionally 0 in
-    every caller") -- so `match_is_cited(cited, m.start(), m.end())`
-    always finds an uncited newline inside the checked range and reports
-    the WHOLE match as uncited, even when every real character of the
-    line itself sits inside a double-backtick code span: a whole
-    ` ``**Findings:** None`` ` line still read as a live, uncited zero.
-    Every other caller in this module checks a piece that does not cross
-    a line break (the marker, the heading, a single `**Findings:**` line
-    with no leading anchor consumed), which is why this gap is specific
-    to this one pattern.
+    A pattern anchored with a leading `(?:^|\\n)` (every heading and
+    marker pattern in this module and its caller uses this shape, e.g.
+    `COPILOT_FINDINGS_LINE`, `_COPILOT_HEADING_PREFIX`,
+    `_COPILOT_OVERVIEW_START`, `_COPILOT_DETAILS_OPEN`,
+    `_COPILOT_NEXT_HEADING`) consumes the PRECEDING line-ending character
+    whenever the match isn't at the very start of the string, so
+    `m.start()` then points at that newline rather than at the line's own
+    first character. The citation mask this module's caller builds
+    (`strip_cited_finding_vocab_with_mask`) never marks a newline offset
+    as cited -- by that mask's own design, every newline position is
+    unconditionally 0 (see `_copilot_overview_block_spans`'s docstring,
+    "the mask's newline positions are unconditionally 0 in every
+    caller") -- so `match_is_cited(cited, m.start(), m.end())` always
+    finds an uncited newline inside the checked range and reports the
+    WHOLE match as uncited, even when every real character of the line
+    itself sits inside a double-backtick code span: a whole
+    ` ``**Findings:** None`` ` line, or a whole ` ``### Approval
+    recommended`` ` heading on a non-first line, still read as live.
+
+    Markdown also allows a few columns of literal leading indentation
+    before a line's real content (`COPILOT_FINDINGS_LINE` permits up to 3
+    spaces, `_COPILOT_HEADING_PREFIX` any run of spaces or tabs) -- and
+    unlike a newline, that indentation IS an ordinary character the
+    citation mask tracks correctly (cited when it genuinely sits inside a
+    code span, uncited otherwise). It still needs to be skipped here,
+    though: a citation's opening delimiter sits immediately before the
+    line's real content, not before its indentation, so a match whose
+    indentation is genuinely OUTSIDE a code span while its actual content
+    is wholly INSIDE one (`  ``**Findings:** None```, two literal leading
+    spaces then a double-backtick-quoted line) still reports the whole
+    match as uncited if the indentation offset is left in the checked
+    range.
 
     When the match starts with the consumed `\\n` (`m.group(0)[:1] ==
-    "\\n"`), the content begins one character later; at the very start
-    of the string the zero-width `^` branch matched instead, consuming
-    nothing, so `m.start()` already IS the line's own first character
-    and needs no adjustment.
+    "\\n"`), the content begins one character later; at the very start of
+    the string the zero-width `^` branch matched instead, consuming
+    nothing, so `m.start()` already IS the line's own first character and
+    needs no adjustment there. Either way, any run of literal spaces/tabs
+    right after that point is then skipped too.
+
+    A match with no such prefix -- an unanchored pattern, or one already
+    at the string's start -- needs no adjustment at all: this function
+    only ever advances past characters that are literally `\\n`, ` `, or
+    `\\t` starting at `m.start()`, so it is always a safe drop-in
+    replacement for `m.start()` at a citedness check, whether or not the
+    pattern being checked is actually line-anchored.
     """
-    return m.start() + 1 if m.group(0)[:1] == "\n" else m.start()
+    text = m.string
+    end = m.end()
+    start = m.start()
+    if start < end and text[start] == "\n":
+        start += 1
+    while start < end and text[start] in (" ", "\t"):
+        start += 1
+    return start
 
 
 # Locate every actual Copilot v2 overview block rather than searching the
@@ -388,7 +421,9 @@ def _copilot_overview_block_spans(
     """
     comment_spans = _find_html_comment_spans(scan)
     comment_span_starts = [s for s, _ in comment_spans]
-    details_regions = _find_details_regions(scan, comment_spans, comment_span_starts)
+    details_regions = _find_details_regions(
+        scan, comment_spans, comment_span_starts, cited, match_is_cited
+    )
     details_region_starts = [s for s, _ in details_regions]
     valid_starts: List[Tuple[int, int]] = []
     for start_m in _COPILOT_OVERVIEW_START.finditer(scan):
@@ -421,6 +456,8 @@ def _copilot_overview_block_spans(
                 search_from,
                 comment_spans,
                 comment_span_starts,
+                cited,
+                match_is_cited,
                 endpos=limit,
             )
             if m is not None and m.start() < end:
@@ -464,13 +501,16 @@ def _search_outside_comments(
     pos: int,
     comment_spans: List[Tuple[int, int]],
     comment_span_starts: List[int],
+    cited: bytearray,
+    match_is_cited: Callable[[bytearray, int, int], bool],
     endpos: Optional[int] = None,
 ) -> Optional["re.Match[str]"]:
     """Return the first match of `pattern` in `scan[:endpos]` at or after
     `pos` whose own start does NOT fall inside any span in
-    `comment_spans`, or None if every match from `pos` onward (within
-    that bound) is inside one (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review,
-    seventh round).
+    `comment_spans` AND that is not wholly cited, or None if every match
+    from `pos` onward (within that bound) is one or the other (PR
+    [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, seventh round; citedness added
+    [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twenty-fourth round).
 
     `endpos` defaults to `len(scan)` (the whole rest of the string, via
     `re.Pattern.search`'s own `endpos` parameter) and is otherwise passed
@@ -489,18 +529,33 @@ def _search_outside_comments(
     match the way it does for a single fixed position, so this helper
     was never a fit for that call site to begin with.
 
+    Both patterns this is called with (`_COPILOT_DETAILS_OPEN`,
+    `_COPILOT_NEXT_HEADING`) share the SAME `(?:^|\\n)[ ]{0,3}` anchor as
+    `_find_details_regions`'s own opener scan, and this search had the
+    same gap: it checked comment spans but never the `cited` mask, so a
+    body describing the block-end shapes in prose -- a double-backtick-
+    quoted `` ``<details>`` `` or `` ``## some heading`` `` sitting between
+    a genuine block's start and its real end -- was read as a live
+    boundary and truncated the block early, same as an unfixed
+    `_find_details_regions` closer would. `match_content_start` is used
+    for the citedness check (not the raw match start) for the same reason
+    it is used everywhere else in this module: the anchor consumes a
+    preceding newline the mask never marks cited.
+
     Each rejected candidate advances `pos` to that match's own end before
     retrying, so -- exactly like `_find_html_comment_spans` and
     `_find_details_regions` -- the cursor only ever moves forward and the
     total work across every call from one starting `pos` is O(endpos -
-    pos), regardless of how many comment-hidden candidates are skipped
-    along the way.
+    pos), regardless of how many comment-hidden or cited candidates are
+    skipped along the way.
     """
     while True:
         m = pattern.search(scan, pos, endpos if endpos is not None else len(scan))
         if m is None:
             return None
-        if not _position_in_spans(m.start(), comment_span_starts, comment_spans):
+        if not _position_in_spans(
+            m.start(), comment_span_starts, comment_spans
+        ) and not match_is_cited(cited, match_content_start(m), m.end()):
             return m
         pos = m.end()
 
@@ -509,6 +564,8 @@ def _find_details_regions(
     scan: str,
     comment_spans: List[Tuple[int, int]],
     comment_span_starts: List[int],
+    cited: bytearray,
+    match_is_cited: Callable[[bytearray, int, int], bool],
 ) -> List[Tuple[int, int]]:
     """Find every `<details>...</details>` region in `scan`, one linear
     pass, so a marker+heading pair sitting inside an already-open
@@ -519,6 +576,24 @@ def _find_details_regions(
     review" listing -- itself containing a full marker+heading+Findings
     sequence, since that is exactly what a re-review quotes -- was
     trusted as a genuine, current block.
+
+    Both the opener and closer scans below ALSO reject a candidate that is
+    wholly CITED, not only one hidden inside an HTML comment ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899)
+    review finding, twenty-fourth round): a double-backtick-quoted example
+    of the syntax -- `` ``</details>`` `` sitting inside a genuine, live
+    `<details>` region, ahead of that region's own real closer -- used to
+    be read as the real closer, ending the region there and reading
+    everything after it (including a genuine marker+heading+Findings
+    sequence still nested inside the real `<details>`) as a top-level
+    block. The opener scan gets the identical treatment for symmetry with
+    the closer, and because `_COPILOT_DETAILS_OPEN` is exactly as
+    quotable in prose as the closing tag is. The opener match's own start
+    is checked via `match_content_start`, not the raw match start,
+    because the pattern's `(?:^|\\n)` anchor consumes a preceding newline
+    the citation mask never marks cited -- the same reason every other
+    citedness check in this module goes through that helper. The closer
+    candidate comes from a plain `str.find`, with no anchor to consume, so
+    its own literal start/end are checked directly.
 
     The opening `<details` is located with the same line-anchored
     `_COPILOT_DETAILS_OPEN` pattern the block-end search already uses, so
@@ -613,6 +688,8 @@ def _find_details_regions(
     for m in _COPILOT_DETAILS_OPEN.finditer(scan):
         if _position_in_spans(m.start(), comment_span_starts, comment_spans):
             continue
+        if match_is_cited(cited, match_content_start(m), m.end()):
+            continue
         opens.append(m.start())
 
     # The closer search must be case-insensitive too, matching
@@ -645,6 +722,8 @@ def _find_details_regions(
             break
         search_from = candidate + close_len
         if _position_in_spans(candidate, comment_span_starts, comment_spans):
+            continue
+        if match_is_cited(cited, candidate, search_from):
             continue
         closes.append((candidate, search_from))
 
@@ -982,7 +1061,7 @@ def _copilot_v2_findings_count(
     saw_unparseable = False
     for block_start, block_end in blocks:
         for m in COPILOT_FINDINGS_LINE.finditer(scan, block_start, block_end):
-            if match_is_cited(cited, _findings_line_cite_start(m), m.end()):
+            if match_is_cited(cited, match_content_start(m), m.end()):
                 continue
             if _position_in_spans(m.start(), comment_span_starts, comment_spans):
                 continue
@@ -1015,13 +1094,13 @@ def _copilot_v2_findings_count(
     for m in COPILOT_FINDINGS_LINE.finditer(scan):
         if _position_in_spans(m.start(), block_starts, blocks):
             continue
-        if match_is_cited(cited, _findings_line_cite_start(m), m.end()):
+        if match_is_cited(cited, match_content_start(m), m.end()):
             continue
         if orphan_comment_spans is None:
             orphan_comment_spans = _find_html_comment_spans(scan)
             orphan_comment_starts = [a for a, _ in orphan_comment_spans]
             orphan_details = _find_details_regions(
-                scan, orphan_comment_spans, orphan_comment_starts
+                scan, orphan_comment_spans, orphan_comment_starts, cited, match_is_cited
             )
             orphan_details_starts = [a for a, _ in orphan_details]
         if _position_in_spans(m.start(), orphan_comment_starts, orphan_comment_spans):

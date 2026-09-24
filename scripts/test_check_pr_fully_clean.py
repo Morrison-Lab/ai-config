@@ -6817,9 +6817,10 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     # every real character of the line sat inside a double-backtick code
     # span: a whole `` **Findings:** None `` line, wrapped in double
     # backticks, still read as a live, uncited zero. Fixed with
-    # `_findings_line_cite_start`, which checks citedness from the
-    # line's own first character (skipping the consumed leading
-    # newline), in BOTH the block scan and the orphan scan.
+    # `match_content_start` (originally `_findings_line_cite_start`,
+    # generalised twenty-fourth round below), which checks citedness from
+    # the line's own first CONTENT character (skipping the consumed
+    # leading newline), in BOTH the block scan and the orphan scan.
     check(
         "copilot_verdict: an affirmative heading plus a double-backtick-"
         "wrapped '**Findings:** None' line (no other real field) states "
@@ -6829,6 +6830,186 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             "### \U0001f7e2 Approval recommended\n\n"
             + B + B + "**Findings:** None" + B + B + "\n"
         ) == "",
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twenty-fourth round ("fix the class, not
+    # only the three instances" directive): item (c) above fixed ONE
+    # occurrence of a class that recurred through several more surfaces --
+    # a citedness check reading a span that starts on a character the
+    # `cited` mask never marks (a consumed newline or leading
+    # indentation), or a structural tag scan that ignores citedness
+    # entirely. `match_content_start` is now the ONE shared helper for
+    # the first half, applied at every citedness check in both this file
+    # and copilot_overview.py that touches a line-anchored pattern
+    # (`_has_valid_match`/`_has_live_match` here, the VERDICT_CLEAN_
+    # PATTERNS and FINDING_PATTERNS prose scans here, and
+    # `COPILOT_FINDINGS_LINE`'s own two call sites in copilot_overview.py
+    # -- see (c) above); `_find_details_regions`'s opener AND closer scans
+    # and `_search_outside_comments`'s block-end scan now also consult the
+    # `cited` mask at all, for the second half. Each check below reproduces
+    # a distinct site; every one classified WRONG on `origin/main`
+    # (verified against the pre-fix source directly, not inferred).
+
+    # Site 1a: COPILOT_AFFIRMATIVE_HEADER via `_has_live_match`, the exact
+    # heading-prefix counterpart to (c) above -- never fixed for the
+    # heading patterns even though `_findings_line_cite_start` fixed it
+    # for the Findings line two rounds ago. A double-backtick-cited
+    # `### Approval recommended` heading (no other verdict field in the
+    # body at all) used to read as a genuine, live affirmative heading,
+    # and combined with a real, live v2 `**Findings:** None` block
+    # elsewhere in the body -- with nothing that actually states approval
+    # -- misclassified the whole thing clean.
+    check(
+        "copilot_verdict: a double-backtick-cited affirmative heading on a "
+        "non-first line, with no other approval signal, states no verdict "
+        "rather than clean",
+        checker.copilot_verdict(
+            "Some preceding narration line.\n\n"
+            + B + B + "### \U0001f7e2 Approval recommended" + B + B + "\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "**Findings:** None\n"
+        ) == "",
+    )
+
+    # Site 1b: COPILOT_NEGATIVE_HEADER via `_has_valid_match`, the same
+    # gap on the sibling pattern `_has_valid_match` itself already covers.
+    # A double-backtick-cited `### Changes recommended` used to read as a
+    # genuine, live blocking heading and won over a real, live affirmative
+    # heading plus a real, live zero Findings block -- misclassifying a
+    # genuinely clean review as not-clean (the safe direction, but still
+    # the wrong answer for a review that never said "Changes recommended"
+    # at all).
+    check(
+        "copilot_verdict: a double-backtick-cited negative heading on a "
+        "non-first line does not block a genuinely clean review",
+        checker.copilot_verdict(
+            "Some preceding narration line.\n\n"
+            + B + B + "### \U0001f534 Changes recommended" + B + B + "\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Findings:** None\n"
+        ) == "clean",
+    )
+
+    # Site 2: `COPILOT_FINDINGS_LINE` itself still had a narrower gap even
+    # after (c)'s fix: `_findings_line_cite_start` only skipped the
+    # consumed newline, not the up-to-3 literal leading spaces the pattern
+    # also permits. Two literal indentation spaces (genuinely OUTSIDE the
+    # double-backtick citation) ahead of a wholly-cited
+    # `` **Findings:** None `` line made `match_is_cited` check from an
+    # uncited indentation offset and report the whole line uncited, live,
+    # zero -- misclassifying a body with no real overview field at all as
+    # clean.
+    check(
+        "copilot_verdict: two leading indentation spaces before a "
+        "double-backtick-wrapped '**Findings:** None' line still states "
+        "no verdict rather than clean",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "  " + B + B + "**Findings:** None" + B + B + "\n"
+        ) == "",
+    )
+
+    # Site 3: `_find_details_regions`'s CLOSER scan checked comment spans
+    # but never the `cited` mask at all -- a double-backtick-quoted
+    # `` </details> `` sitting inside a genuinely open `<details>` region,
+    # ahead of that region's own real closer, was accepted as the real
+    # closer and truncated the region there. Content still nested inside
+    # the real `<details>` (a full marker+heading+Findings:None sequence,
+    # exactly what a re-review's "Resolved since last review" listing
+    # quotes) then read as OUTSIDE any details region and was trusted as a
+    # genuine, current, top-level block -- misclassifying purely
+    # historical/quoted content as a real clean verdict.
+    check(
+        "copilot_verdict: a double-backtick-cited fake </details> closer "
+        "inside a live <details> region does not expose the quoted "
+        "marker+heading+Findings sequence nested past it as a real block",
+        checker.copilot_verdict(
+            "<details>\n<summary>Resolved since last review (1)</summary>\n\n"
+            + B + B + "</details>" + B + B + "\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+            "</details>\n"
+        ) == "",
+    )
+
+    # Site 3, opener half: the OPENER scan had the identical gap,
+    # symmetrically. A double-backtick-cited `` <details> `` used to be
+    # accepted as a real opener and paired with the NEXT genuine
+    # `</details>` closer, however far away, engulfing a real, live,
+    # nonzero marker+heading+Findings block in between -- dropping a real
+    # not-clean finding down to no-verdict, the dangerous direction (the
+    # same shape PR #3906's fifth round already fixed for an opener hidden
+    # inside an HTML comment).
+    check(
+        "copilot_verdict: a double-backtick-cited fake <details> opener "
+        "does not pair with a later real </details> and engulf a real "
+        "nonzero block between them",
+        checker.copilot_verdict(
+            B + B + "<details>" + B + B + "\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n\n"
+            "<details>\nx\n</details>"
+        ) == "not-clean",
+    )
+
+    # Site 4: `_search_outside_comments`, used for `_copilot_overview_
+    # block_spans`'s own block-END search over `_COPILOT_DETAILS_OPEN` /
+    # `_COPILOT_NEXT_HEADING`, had the same gap as the details-region scans
+    # above -- it checked comment spans but never the `cited` mask. A
+    # double-backtick-quoted `` <details> `` mid-body, describing the
+    # format in prose rather than opening a region, was still read as a
+    # live block-end marker and truncated the v2 block there, before it
+    # ever reached the real `**Findings:**` line -- reading a genuinely
+    # clean review as no verdict at all.
+    check(
+        "copilot_verdict: a double-backtick-cited <details> mention "
+        "between an overview heading and its real Findings line does not "
+        "truncate the block early",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            + B + B + "<details>" + B + B + "\n\n"
+            "**Findings:** None\n"
+        ) == "clean",
+    )
+
+    # Site 5: `VERDICT_CLEAN_PATTERNS`'s Anthropic-plugin clean template is
+    # `^[ \t]*(?:\*{1,3})?No\s+issues\s+found\...` under MULTILINE -- `^`
+    # is zero-width so it never consumes a newline, but the match still
+    # includes any literal leading `[ \t]*` indentation it permits. Two
+    # literal indentation spaces (genuinely outside a double-backtick
+    # citation) ahead of an otherwise wholly-cited
+    # `` No issues found. Checked for bugs and CLAUDE.md compliance. ``
+    # line made `match_is_cited` check from an uncited indentation offset
+    # and misclassify a mere citation of the template as a real clean
+    # verdict.
+    check(
+        "classify_verdict: two leading indentation spaces before a "
+        "double-backtick-wrapped clean-template citation do not classify "
+        "clean",
+        checker.classify_verdict(
+            "  " + B + B
+            + "No issues found. Checked for bugs and CLAUDE.md compliance."
+            + B + B + "\n"
+        ) == "",
+    )
+
+    # Site 6: `FINDING_PATTERNS` carries two more line-anchored entries --
+    # `(?:^|\n)[ \t]*\*\*Nits?\*\*` and `(?:^|\n)[ \t]*\*\*Non-blocking\*\*`
+    # -- with the identical newline-consumption gap as (c) and site 1
+    # above, reached through `_unresolved_finding_pattern` rather than
+    # `copilot_verdict`. A double-backtick-cited `**Nits**` heading on a
+    # non-first line, with nothing else in the body, used to read as a
+    # real unresolved finding.
+    check(
+        "_unresolved_finding_pattern: a double-backtick-cited '**Nits**' "
+        "heading on a non-first line is not an unresolved finding",
+        checker._unresolved_finding_pattern(
+            "Some preceding line of review prose.\n\n"
+            + B + B + "**Nits**" + B + B + "\n"
+        ) is None,
     )
 
     # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twelfth round: COPILOT_COMMENT_COUNT's

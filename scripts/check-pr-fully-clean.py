@@ -80,6 +80,7 @@ from copilot_overview import (  # noqa: E402
     _copilot_v2_findings_count,
     _find_html_comment_spans,
     _position_in_spans,
+    match_content_start,
 )
 # Test-only re-export: not called anywhere in this file, but
 # scripts/test_check_pr_fully_clean.py reaches it as
@@ -2340,8 +2341,25 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
         scan, cited = strip_cited_finding_vocab_with_mask(body)
 
     def _has_valid_match(pattern, text):
+        """Return the first uncited match of `pattern`, or None.
+
+        Checks citedness from `match_content_start(m)`, not `m.start()`
+        ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twenty-fourth round): both
+        COPILOT_NEGATIVE_HEADER and COPILOT_FINDINGS_LINE (two of this
+        helper's three callers below) are line-anchored with a leading
+        `(?:^|\n)`, which consumes the PRECEDING newline whenever the
+        match isn't at the very start of the body -- and the citation
+        mask never marks a newline offset as cited, by design. Checking
+        from the raw `m.start()` then always found that uncited newline
+        in range and reported the WHOLE match as uncited, even when the
+        heading itself sat wholly inside a code span (a double-backtick-
+        cited `### Changes recommended` on any line but the first). The
+        third caller (COPILOT_SUPPRESSED_BLOCK) is not line-anchored, so
+        `match_content_start` is a no-op for it -- see the function's own
+        docstring for why it is always a safe drop-in for `m.start()`.
+        """
         for m in pattern.finditer(text):
-            if not match_is_cited(cited, m.start(), m.end()):
+            if not match_is_cited(cited, match_content_start(m), m.end()):
                 return m
         return None
 
@@ -2373,9 +2391,22 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
         only: see the comment at its one call site for why the NEGATIVE
         heading deliberately keeps using the citation-only `_has_valid_match`
         instead.
+
+        The citedness check itself is from `match_content_start(m)`, not
+        `m.start()`, for the same reason `_has_valid_match` above now uses
+        it: COPILOT_AFFIRMATIVE_HEADER is line-anchored, so `m.start()` on
+        any match past the first line is the consumed newline, which the
+        citation mask never marks cited -- a double-backtick-cited
+        `### Approval recommended` on a non-first line used to read as
+        live regardless of the quoting ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding,
+        twenty-fourth round). The HTML-comment containment check just
+        below keeps using the raw `m.start()`: a comment span is a plain
+        character range with no "always uncited at a newline" quirk, so a
+        newline genuinely inside an open HTML comment is correctly found
+        inside it either way, and there is no matching gap to close here.
         """
         for m in pattern.finditer(text):
-            if match_is_cited(cited, m.start(), m.end()):
+            if match_is_cited(cited, match_content_start(m), m.end()):
                 continue
             if _position_in_spans(m.start(), comment_span_starts, comment_spans):
                 continue
@@ -2544,7 +2575,19 @@ def classify_verdict(body: str, state: str = "", author: str = "") -> str:
 
     for pat in VERDICT_CLEAN_PATTERNS:
         for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
-            if match_is_cited(cited, match.start(), match.end()):
+            # `match_content_start`, not `match.start()`: the "No issues
+            # found." pattern above is `^[ \t]*...` under MULTILINE, so a
+            # match with real leading indentation checks citedness from
+            # that indentation rather than from the line's actual content
+            # -- a `  ``No issues found. ...`` ` line (two literal
+            # indentation spaces the citation does not cover, then the
+            # rest wholly inside a double-backtick span) used to read as
+            # uncited on the strength of those two uncited spaces alone
+            # ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twenty-fourth round, generalising
+            # the same fix already applied to COPILOT_FINDINGS_LINE).
+            # `match_content_start` is a no-op for this loop's other,
+            # unanchored patterns.
+            if match_is_cited(cited, match_content_start(match), match.end()):
                 continue
             # Position and negation are about how the phrase is INTRODUCED, so
             # they apply only to a bare phrase -- a `Verdict:` label is itself
@@ -2723,7 +2766,18 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
     scan_body, cited = strip_cited_finding_vocab_with_mask(body)
     for pat in FINDING_PATTERNS:
         for match in re.finditer(pat, scan_body, re.IGNORECASE | re.MULTILINE):
-            if match_is_cited(cited, match.start(), match.end()):
+            # `match_content_start`, not `match.start()` ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review
+            # finding, twenty-fourth round): two entries in this list --
+            # `(?:^|\n)[ \t]*\*\*Nits?\*\*` and
+            # `(?:^|\n)[ \t]*\*\*Non-blocking\*\*` -- are line-anchored the
+            # same way COPILOT_FINDINGS_LINE is, so a match on any line but
+            # the first consumes the preceding newline into `match.start()`,
+            # and the citation mask never marks a newline offset as cited.
+            # A double-backtick-cited `**Nits**` heading on a non-first
+            # line used to read as a live, uncited finding regardless of
+            # the quoting. `match_content_start` is a no-op for every
+            # other, unanchored pattern in this list.
+            if match_is_cited(cited, match_content_start(match), match.end()):
                 continue
             if pat in BARE_NOT_CLEAN_PATTERNS:
                 if not _is_marked_or_in_verdict_section(scan_body, match.start()):

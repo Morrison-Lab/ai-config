@@ -71,9 +71,9 @@ git merge origin/main      # MERGE_BRANCH — should now auto-resolve where it p
 If a merge that used to need manual resolution now completes with
 `Auto-merging <file>` and no conflict markers, the driver is working.
 
-**A pattern attributing a binary/text extension is case-sensitive wherever the checkout is** — `*.jpg binary` does not match `GATES.JPG`, and macOS hides that from you.
+**A pattern attributing a binary/text extension is case-sensitive wherever the checkout is** --- `*.jpg binary` does not match `GATES.JPG`, and macOS hides that from you.
 On a default macOS checkout (`core.ignorecase=true`), Git resolves attribute patterns case-insensitively at the filesystem layer, so `*.jpg binary` appears to match a file actually named `GATES.JPG` in local testing.
-Linux CI checkouts default `core.ignorecase=false`, so the same pattern silently stops matching there — the exact shape that passes local review and fails only once it reaches CI.
+Linux CI checkouts default `core.ignorecase=false`, so the same pattern silently stops matching there --- the exact shape that passes local review and fails only once it reaches CI.
 Verify with `git check-attr binary -- path/to/GATES.JPG` (or the attribute you set) rather than trusting a local merge/diff test alone, and either list every case variant of the extension the repo actually has, or match case-insensitively where the tool you're configuring supports it.
 
 **If the PR's rationale for keeping a risky `merge=union` attribute leans on

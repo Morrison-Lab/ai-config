@@ -927,10 +927,21 @@ def vocabulary_checks(mod):
           mod.find_claims("Ninety-nine files still fail."),
           [("cardinality", "Ninety-nine files")])
     # Dies when the compound alternative admits anything after the hyphen
-    # (`-[a-z]+` rather than the ones words). A hedged approximation is not a
-    # count anyone could have got wrong -- "twenty-odd" names a band, not a
-    # figure to check -- which is the same reasoning that exempts a negated
-    # `no` above.
+    # (`-[a-z]+` rather than the ones words), which is the whole of why this
+    # string yields nothing: `odd` is not a ones word, so the compound
+    # alternative rejects it exactly as it would reject `Twenty-purple`.
+    #
+    # An earlier revision of this comment read the outcome as a designed
+    # exemption for hedged approximations, on the same reasoning that exempts
+    # a negated `no` above. That reading is wrong twice over, and
+    # ai-config#3907 measures both halves. Nothing in `CARDINALITY_RE`
+    # recognises a hedge: `Roughly fifty files` and `Several hundred files`
+    # both flag, because the match begins at the count itself. And the cost
+    # runs the opposite way from `no` -- the hook exists to catch a figure
+    # nobody counted, and "roughly" is what an author writes when they did
+    # not count -- so an exemption here would remove recall rather than
+    # protect trust. So this case pins the OUTCOME, which the mutation below
+    # makes worth pinning, and asserts nothing about hedges.
     #
     # Two earlier drafts of this case tested nothing, and both read as
     # discriminating. "The twenty-first commit touched it" carries no plural
@@ -941,7 +952,7 @@ def vocabulary_checks(mod):
     # dropped one step later than before and just as silently. Measured under
     # the mutation, this phrasing yields
     # [("cardinality", "Twenty-odd files")]; under the real pattern, [].
-    check("a hedged compound is not a count",
+    check("a compound with a non-ones word after the hyphen is not a count",
           mod.find_claims("Twenty-odd files still carry it."), [])
     # Dies when CARDINALITY_RE's LEADING \b is removed, which lets a number
     # word embedded at the end of an ordinary word start a match. This guard

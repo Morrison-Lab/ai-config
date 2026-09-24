@@ -1,75 +1,73 @@
 #!/usr/bin/env python3
 """Measure what widening `CARDINALITY_COUNT` past `twelve` costs in precision.
 
-`hooks/flag-uncounted-comment-claims.py` extended its cardinality vocabulary
-from `twelve` to `hundred` on 2026-09-23. The justification for doing so
-without narrowing any guard is that the wider vocabulary yields a cardinality
-claim in no MORE of this repository's own commit bodies than the twelve-word
-one did, so the widening buys recall without flagging a body the narrow
-vocabulary left alone.
-
-That is a claim about a population, so it belongs in an instrument rather
-than in a comment nobody can re-run. This script is that instrument: it
-loads the hook, swaps the narrow vocabulary back in, and reports what each
-vocabulary finds alongside the size of the population it examined.
-
-    python3 scripts/measure-cardinality-vocabulary.py
-
-IT MEASURES `find_claims`, NOT THE WARNING THE HOOK EMITS. `evaluate()` runs
-a discharge step afterwards, so a body counted here may produce no warning at
-all: 7 of the 54 flagged bodies discharge under `_derived_in_body(body,
-need_count=True)` (measured 2026-09-23 against origin/main). Reaching
-`evaluate()` would mean reconstructing each body's originating command, which
-the git history does not carry, so the proxy is deliberate -- read a flagged
-body as "yields a cardinality claim", never as "warns".
-
 THE INVARIANT IS THE SET OF FLAGGED BODIES, AND ONLY THAT SET. A warning
 fires per body, so a set that moves is a population change worth a human
 look, and exit status 1 reports that. The set rather than its size: one body
 losing its only claim while another gains its first leaves the COUNT
-unchanged over a population that moved.
+unchanged over a population that moved, which is why neither the flagged
+count nor the corpus size is the thing being asserted.
 
-Exit status 1 is not that report on its own, though. Seven refusals share it
--- an unloadable hook, a missing `git`, an unreadable history, a vocabulary
-the substitution can no longer find, a NARROW baseline identical to the live
-one, an empty corpus, and an empty detection -- each with its own message, so
-read the message rather than the status.
+`hooks/flag-uncounted-comment-claims.py` extended its cardinality vocabulary
+from `twelve` to `hundred` on 2026-09-23, without narrowing any guard. That
+is a claim about a population, so it belongs in an instrument rather than in
+a comment nobody can re-run. This script is that instrument: it loads the
+hook, swaps the narrow vocabulary back in, and reports what each vocabulary
+finds alongside the size of the population it examined.
 
-The body is also the coarser of the hook's two real units. A warning
-enumerates the individual claims that produced it, so the claim counts below
-are not a secondary statistic: they are the finer unit, and a precision claim
-stated only at body level says nothing about them.
+    python3 scripts/measure-cardinality-vocabulary.py
+
+THE SET DOES MOVE, and saying otherwise was this script's own first finding
+about itself. Measured 2026-09-24 against origin/main at b96c640f over a
+COMPLETE clone: 2753 commits, 2539 multi-line bodies, 677 flagged under the
+narrow vocabulary and 680 under the current one, with 3 bodies newly flagged
+and none lost. An earlier revision reported 54 of 111 bodies identical under
+both -- the same ref, read from a SHALLOW clone of 619 commits, whose
+grafted fragment `git log` reports with no warning and exit 0. The truncated
+and complete readings disagreed on the one thing this script asserts, so
+`commit_bodies` now refuses a shallow clone outright.
+
+Exit status 1 is not that report on its own, though. Eight refusals share it
+-- an unloadable hook, a missing `git`, an unreadable history, a shallow
+clone, a vocabulary the substitution can no longer find, a NARROW baseline
+identical to the live one, an empty corpus, and an empty detection -- each
+with its own message, so read the message rather than the status.
+
+IT MEASURES `find_claims`, NOT THE WARNING THE HOOK EMITS. `evaluate()` runs
+a discharge step afterwards, so a body counted here may produce no warning at
+all: 20 of the 680 flagged bodies discharge under `_derived_in_body(body,
+need_count=True)`. Reaching `evaluate()` would mean reconstructing each
+body's originating command, which the git history does not carry, so the
+proxy is deliberate -- read a flagged body as "yields a cardinality claim",
+never as "warns".
 
 A moved set is not by itself a precision cost, and the exit status does not
 claim it is. A body the wide vocabulary flags and the narrow one does not is
-the recall gain the widening exists to produce -- the founding case is a
-SENTENCE of that shape, `Fourteen such references remain in text at this
-head`, and whether the body carrying it was already flagged by some other
-claim was never established -- while a body no longer flagged is a recall
-loss.
-Whether either is a FALSE positive is a judgment this script cannot make, so
-it names the direction and asks for the reading rather than announcing a
-verdict.
+the recall gain the widening exists to produce; a body no longer flagged is a
+recall loss. Whether either is a FALSE positive is a judgment this script
+cannot make, so it names the direction and asks for the reading rather than
+announcing a verdict.
 
-The CLAIM counts are reported too, and are expected to differ. Reporting only
-bodies hid that: measured 2026-09-23 against origin/main, both vocabularies
-flagged 54 of 111 multi-line bodies while the claim totals were 319 and 325,
-so the headline number was structurally blind to every claim the widening
-gained or lost inside an already-flagged body. Both directions are worth
-seeing, and on this corpus neither direction is the recall the widening was
-written for:
+The body is also the coarser of the hook's two real units. A warning
+enumerates the individual claims that produced it, so the claim counts are
+not a secondary statistic: they are the finer unit, and a precision claim
+stated only at body level says nothing about them. On this corpus the claim
+totals are 1937 narrow against 1965 current, 29 gained and 1 lost, and the
+two directions read differently:
 
-  - All 7 gained claims are positional line references (`fifty lines`,
-    `thirty-six lines`, `TWENTY LINES`), which name a location rather than a
-    count anyone could have got wrong. So this corpus carries no instance of
-    the real miscount the widening was written for, and its recall gain is
-    unrepresented here. Calling all 7 false positives would overstate that in
-    two directions at once: whether a positional reference deserves a warning
-    is the judgment named above, and 2 of the 7 sit in bodies
-    `_derived_in_body` discharges, so those two produce no warning under
-    either vocabulary (measured 2026-09-23 against origin/main).
-  - The single lost claim is `six lines`, which the narrow pattern quoted out
-    of `thirty-six lines` -- the exact "surfaced figure the author never
+  - 19 of the 29 gained claims are positional line references (`forty
+    lines`, `thirty-six lines`, `TWENTY LINES`), which name a location
+    rather than a count anyone could have got wrong. All 3 newly flagged
+    bodies are of this kind.
+  - The other 10 are counts of things -- `Fourteen markdown files`,
+    `Fifteen tests`, `Nineteen of those cases`, `seventeen stale memories`
+    -- which is exactly the shape of miscount the widening was written for,
+    so the recall gain IS represented on this corpus. Whether each deserved
+    a warning is the judgment named above, and 4 of the 29 sit in bodies
+    `_derived_in_body` discharges, so those produce no warning under either
+    vocabulary.
+  - The single lost claim is `six lines`, which the narrow pattern quoted
+    out of `thirty-six lines` -- the exact "surfaced figure the author never
     wrote" failure the hook's own comment describes, so the widening
     corrected it.
 
@@ -109,11 +107,24 @@ SAMPLE = 10
 
 
 def load_hook():
+    """The hook module, or a refusal naming why it could not be imported.
+
+    `spec_from_file_location` returns a populated spec for a path that does
+    not exist, so the `spec is None` guard below is not what catches a
+    missing or renamed hook -- `exec_module` is, by raising. An earlier
+    revision had only that guard, and a missing hook produced an uncaught
+    traceback while this script's own docstring promised a refusal message.
+    """
     spec = importlib.util.spec_from_file_location("flag_uncounted", HOOK)
     if spec is None or spec.loader is None:
-        sys.exit(f"cannot load {HOOK}")
+        sys.exit(f"cannot load {HOOK}: no import spec.")
     mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    try:
+        spec.loader.exec_module(mod)
+    except FileNotFoundError:
+        sys.exit(f"cannot load {HOOK}: no such file.")
+    except Exception as exc:  # noqa: BLE001 -- re-raised as a refusal
+        sys.exit(f"cannot load {HOOK}: {type(exc).__name__}: {exc}")
     return mod
 
 
@@ -145,7 +156,43 @@ def commit_bodies(ref):
             + (f" git said: {detail}" if detail else "")
             + " Fetch that ref, or pass --ref."
         )
+    if is_shallow_clone():
+        # The population is the whole point of the comparison, and a shallow
+        # clone truncates it silently: `git log` reports the grafted
+        # fragment with no warning and exits 0, so every count below is a
+        # true statement about a history nobody chose. Measured 2026-09-24,
+        # this repository read 619 commits shallow and 2753 unshallowed, and
+        # the two disagreed on the one thing the script asserts -- the
+        # fragment reported the body sets IDENTICAL under both vocabularies
+        # and the full history reported them different. That is the vacuous
+        # pass this script's refusals exist to prevent, arriving through the
+        # clone rather than through the substitution.
+        sys.exit(
+            "cannot measure a population from a shallow clone: `git log` "
+            "would report the grafted fragment as the whole history. Run "
+            "`git fetch --unshallow origin` first."
+        )
     return [b.strip("\n") for b in out.split("\x00") if b.strip()]
+
+
+def is_shallow_clone():
+    """Whether this checkout's history is truncated.
+
+    Probed after the log read rather than before it, so a missing `git` or
+    an unreadable ref is still reported by the handlers above, which name
+    the actual remedy. A `git` too old for `--is-shallow-repository` (before
+    2.15) exits non-zero; that reads as not-shallow, which keeps the script
+    usable and is the direction that loses only this guard rather than the
+    whole measurement.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--is-shallow-repository"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return False
+    return out == "true"
 
 
 def claims_per_body(mod, bodies, vocabulary):

@@ -174,6 +174,88 @@ check(
     isinstance(status, str) and "EITHER vocabulary" in status,
 )
 
+status, out, err = with_fake(r"three|four", r"three", corpus=[])
+check(
+    "an empty corpus is refused",
+    # The corpus is what every number below is a statement about, so a run
+    # over nothing must not print agreeable zeros. This is also the only
+    # case that exercises `with_fake`'s `corpus` parameter: it was added
+    # with a default and never overridden, so until this case existed the
+    # parameter was dead and the refusal untested.
+    isinstance(status, str) and "no multi-line commit bodies" in status,
+)
+
+saved_hook_path = mcv.HOOK
+try:
+    mcv.HOOK = mcv.pathlib.Path("/nonexistent/flag-uncounted-comment-claims.py")
+    try:
+        mcv.load_hook()
+        msg = ""
+    except SystemExit as exc:
+        msg = str(exc.code)
+    except Exception as exc:
+        # Caught rather than propagated so that removing the handler reports
+        # as a named failure instead of killing the run. This is the shape
+        # the defect actually had: `spec_from_file_location` returns a
+        # populated spec for a path that does not exist, so the `spec is
+        # None` guard never fired and `exec_module` raised uncaught.
+        msg = f"uncaught {type(exc).__name__}"
+finally:
+    mcv.HOOK = saved_hook_path
+check(
+    "an unloadable hook is refused rather than raising",
+    "cannot load" in msg and "uncaught" not in msg,
+)
+
+saved_run = mcv.subprocess.run
+try:
+    def shallow(*a, **k):
+        if "rev-parse" in a[0]:
+            return mcv.subprocess.CompletedProcess(a[0], 0, stdout="true\n")
+        return mcv.subprocess.CompletedProcess(
+            a[0], 0, stdout="\x00Subject\n\nthree files carry it.")
+    mcv.subprocess.run = shallow
+    try:
+        mcv.commit_bodies("HEAD")
+        msg = ""
+    except SystemExit as exc:
+        msg = str(exc.code)
+finally:
+    mcv.subprocess.run = saved_run
+check(
+    "a shallow clone is refused rather than measured",
+    # `git log` reports a grafted fragment with no warning and exits 0, so
+    # without this the script states a population verdict over a history
+    # nobody chose -- and measured on this repository the truncated and full
+    # readings disagreed on that verdict.
+    "shallow clone" in msg,
+)
+
+saved_run = mcv.subprocess.run
+try:
+    def not_shallow(*a, **k):
+        if "rev-parse" in a[0]:
+            return mcv.subprocess.CompletedProcess(a[0], 0, stdout="false\n")
+        return mcv.subprocess.CompletedProcess(
+            a[0], 0, stdout="\x00Subject\n\nthree files carry it.")
+    mcv.subprocess.run = not_shallow
+    try:
+        bodies = mcv.commit_bodies("HEAD")
+    except SystemExit:
+        # Caught so that a guard mutated to refuse EVERY clone reports as a
+        # named failure rather than killing the run, per the same reasoning
+        # the missing-git case below states.
+        bodies = None
+finally:
+    mcv.subprocess.run = saved_run
+check(
+    "a complete clone is measured rather than refused",
+    # The negative control the case above needs: a guard that refused every
+    # clone would satisfy it just as well, and would make the script
+    # unrunnable everywhere.
+    bodies is not None and len(bodies) == 1,
+)
+
 # --------------------------------------------------------------- DIRECTION
 
 status, out, err = with_fake(r"zzz-absent", r"three|four")

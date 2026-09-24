@@ -100,6 +100,43 @@ NEGATED_PHRASES = (
     "addressed in the fix.\n"
 ) % NOT_CLEAN
 
+# The OVER-correction of the negation fix. The negator is real, but it is
+# broken off from the disposition by a semicolon or a conjunction, so it
+# governs a different clause. A blind scan back to the sentence start
+# silenced all three; a second-round adversarial review reproduced them.
+# These are POSITIVE cases: each is an ordinary round-two disposition.
+# The review's own table offered "None are deferred; all five are addressed
+# in `f120e5a`" as a fourth row. It is not one: `classify_verdict()` returns
+# `''` for that body whatever verdict form it carries, so gate 3 stops it
+# before the window is consulted and it cannot pin this fix. The semicolon
+# separator is pinned by the fixture below instead.
+NEGATOR_IN_OTHER_CLAUSE = (
+    "### Verdict\n**%s**\n\n"
+    "Nothing was deferred; the retry ceiling is addressed in `f120e5a`.\n"
+) % NOT_CLEAN
+
+HEDGE_IN_OTHER_CLAUSE = (
+    "### Verdict\n**%s**\n\n"
+    "You should hold off on #99, but all five are addressed in `abc123`.\n"
+) % NOT_CLEAN
+
+NEGATOR_IN_PRIOR_BULLET = (
+    "### Verdict\n**%s**\n\n"
+    "- No further pushes planned\n"
+    "- Addressed in `f120e5a`\n"
+) % NOT_CLEAN
+
+# A formal review SUBMITTED through the review surface, carrying ARD labels
+# because it re-reports one item as fixed, and its own not-clean verdict.
+# Fire condition 5 exists to leave this alone; the inherited MCP tuple
+# reached it until the two review surfaces were subtracted by name.
+FORMAL_REVIEW_BODY = (
+    "### Findings\n\n"
+    "**1. Addressed.** The caller now re-reads the ref.\n"
+    "**2.** The retry loop still has no ceiling.\n\n"
+    "### Verdict: %s\n"
+) % NOT_CLEAN
+
 # A closed markdown-italic ARD label. `_` is a word character, so the verb
 # has no word boundary after it and a `\b`-terminated pattern cannot match.
 ITALIC_ARD_LABEL = (
@@ -258,6 +295,19 @@ def main():
         True,
     )
 
+    check("a negator in a neighbouring clause still warns",
+          mcp(NEGATOR_IN_OTHER_CLAUSE), True)
+    check("a hedge in a neighbouring clause still warns",
+          mcp(HEDGE_IN_OTHER_CLAUSE), True)
+    check("a negator in a previous bullet still warns",
+          mcp(NEGATOR_IN_PRIOR_BULLET), True)
+    check("a heredoc-written body is read, not called unreadable",
+          fired("Bash", {"command":
+                         "cat > /tmp/vb.md <<'EOF'\n%s\nEOF\n"
+                         "gh pr comment 49 --body-file /tmp/vb.md"
+                         % ECHO_DISPOSITION}),
+          True)
+
     print("Negative cases (must stay silent):")
     check("a genuine self-review stating its own verdict",
           mcp(SELF_REVIEW), False)
@@ -273,6 +323,13 @@ def main():
     check("prose about the rule with no disposition vocabulary",
           mcp(DOCS_ABOUT_THE_RULE), False)
     check("an empty body", mcp(""), False)
+    check("a formal review is not bound to the review surface",
+          "mcp__github__pull_request_review_write" not in mod.MCP_POST_TOOLS
+          and "mcp__github__discussion_comment_write" not in mod.MCP_POST_TOOLS,
+          True)
+    check("a tab-led backtick run is indented code, not a fence",
+          "```" in mod.authored_text("a\n\t```\nb\n\t```\nc\n"), True)
+
     check("a non-comment Bash command",
           fired("Bash", {"command": "git status"}), False)
     check("an unrelated tool",

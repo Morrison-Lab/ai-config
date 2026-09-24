@@ -72,15 +72,31 @@ FIRE CONDITION (all of)
      discriminator that separates a disposition ANSWERING findings from a
      self-review STATING them -- `shared/workflow/self-review-fallback.md`
      requires the second to carry a real verdict, including a not-clean one,
-     and warning on those is how a guard gets switched off.
-  6. That vocabulary is not NEGATED or hedged within its own clause. "None of
-     the findings are addressed yet" is the honest sentence a self-review
-     writes when it has found work and not done it, and an earlier draft
-     warned on it -- which is condition 5's own failure reached from the
-     other side. The disqualifiers are the ones `classify_verdict()` applies
-     to its own bare patterns, reused rather than re-derived, and the window
-     errs toward disqualifying: a missed warning costs one unguarded
-     comment, a false one teaches the author to ignore the hook.
+     and warning on those is how a guard gets switched off. The two MCP
+     surfaces a review is SUBMITTED through (`pull_request_review_write`,
+     `discussion_comment_write`) are subtracted from the inherited tool
+     tuple for the same reason: a second-round review reproduced a formal
+     REQUEST_CHANGES review warning through the first of them.
+  6. That vocabulary is not NEGATED or hedged by a word that GRAMMATICALLY
+     REACHES it. "None of the findings are addressed yet" is the honest
+     sentence a self-review writes when it has found work and not done it,
+     and an earlier draft warned on it -- which is condition 5's own failure
+     reached from the other side. Two bounds do this, and the second is what
+     an earlier draft lacked: the search runs back only to the last sentence
+     end or blank line, and inside that window `_hedge_attaches` (reused
+     from `flag-clean-claim-over-findings.py`, not re-derived) requires the
+     nearest hit to attach, so a negator broken off by a comma, a semicolon
+     or a conjunction does not govern. Without it, "None are deferred; all
+     five are addressed in `f120e5a`" went silent -- a second-round review
+     reproduced four such bodies.
+
+     The hedge vocabulary IS `classify_verdict()`'s own
+     (`PREFIX_DISQUALIFY_RX`, imported). The negator set is this file's,
+     because the instrument's `NOT_CLEAN_NEGATION_PREFIX` is end-anchored to
+     at most two intervening words and this hook's phrases run longer. Where
+     either bound is ambiguous the result errs toward disqualifying: a
+     missed warning costs one unguarded comment, a false one teaches the
+     author to ignore the hook.
 
 It WARNS and never blocks. Whether an echo is the author's own call is a
 judgment the lexical condition only approximates, and refusing to post a
@@ -132,6 +148,13 @@ _rebuttal = _sibling("flag-uncited-rebuttal.py", "_sib_verdict_echo_rebuttal")
 _disclosure = _sibling("require-agent-disclosure.py", "_sib_verdict_echo_disclosure")
 _clean_claim = _sibling("flag-clean-claim-over-findings.py",
                         "_sib_verdict_echo_clean_claim")
+_stamp = _sibling("flag-unmeasured-timestamp.py", "_sib_verdict_echo_stamp")
+# The write-then-post heredoc is this corpus's own convention for a
+# backtick-heavy body -- CLAUDE.md's PowerShell/backtick rule sends exactly
+# this hook's target there -- and at PreToolUse time the file the heredoc
+# writes does not exist yet, so a disk read cannot reach it.
+# `flag-unmeasured-digest.py:731` already made this fallback; reused here.
+_extract_heredoc_bodies = getattr(_stamp, "_extract_heredoc_bodies", None)
 _checker = _instrument()
 
 classify_verdict = getattr(_checker, "classify_verdict", None)
@@ -143,14 +166,28 @@ _INHERITED_POST_TOOLS = tuple(getattr(_disclosure, "MCP_POST_TOOLS", (
     "mcp__github__add_issue_comment",
     "mcp__github__add_reply_to_pull_request_comment",
 )))
+# The surfaces a REVIEW is submitted through, subtracted from the inherited
+# tuple. `require-agent-disclosure.py` wants them, because every one of them
+# posts text that must carry the marker; this hook must not have them, because
+# fire condition 5 exists to leave a self-review alone and these are exactly
+# how one is filed. A second-round adversarial review reproduced a formal
+# REQUEST_CHANGES review, carrying ARD labels and its own not-clean verdict,
+# warning through `pull_request_review_write` -- the population the docstring
+# promises to exclude, and the direction that gets a guard switched off.
+# Subtracted by name rather than re-listing the comment tools, so a comment
+# surface added to the sibling still reaches this hook.
+MCP_REVIEW_TOOLS = (
+    "mcp__github__pull_request_review_write",
+    "mcp__github__discussion_comment_write",
+)
 # EDITING a comment is this hook's case as much as posting one: the incident's
 # first two attempted fixes were edits. The sibling's tuple already carries
 # some of these, so the union is deduplicated in order rather than concatenated
 # -- an adversarial review found `add_comment_to_pending_review` listed twice.
-MCP_POST_TOOLS = tuple(dict.fromkeys(_INHERITED_POST_TOOLS + (
+MCP_POST_TOOLS = tuple(t for t in dict.fromkeys(_INHERITED_POST_TOOLS + (
     "mcp__github__update_issue_comment",
     "mcp__github__add_comment_to_pending_review",
-)))
+)) if t not in MCP_REVIEW_TOOLS)
 
 BASH_TOOL_NAMES = ("Bash", "bash", "run_command", "execute_command", "terminal", "shell")
 
@@ -163,7 +200,7 @@ BASH_TOOL_NAMES = ("Bash", "bash", "run_command", "execute_command", "terminal",
 # shape, reached through a quoted payload instead of quoted prose.
 RX_REVIEW_PAYLOAD = re.compile(r"review-data\s*:", re.I)
 
-RX_FENCE = re.compile(r"^\s{0,3}(?P<d>`{3,}|~{3,})\s*(?P<info>.*)$")
+RX_FENCE = re.compile(r"^ {0,3}(?P<d>`{3,}|~{3,})\s*(?P<info>.*)$")
 
 
 def authored_text(body):
@@ -271,6 +308,13 @@ def _bash_body(command, cwd):
         body = extract_body_text(segment, cwd)
         if body is None:
             body = extract_body_text(command, cwd)
+        if body is None and _extract_heredoc_bodies is not None:
+            try:
+                joined = "\n".join(_extract_heredoc_bodies(command))
+            except Exception:
+                joined = ""
+            if joined.strip():
+                body = joined
         if body is None:
             return "unreadable", None
         return "body", body
@@ -312,6 +356,13 @@ _FALLBACK_PREFIX_DISQUALIFY = re.compile(
     r"(?i)\b(?:should|would|could|might|may|claims?|says?|said|saying|"
     r"seems?|apparently|maybe|perhaps|if|unless|hypothetically)\b"
 )
+# The clause-ATTACHMENT test, reused rather than re-derived: the sibling
+# already solved "a negator in a neighbouring clause must not govern this
+# phrase", and a second copy here would be free to drift out of step with
+# it. `None` when the sibling cannot be loaded; `_disqualified` then falls
+# back to the plain window scan, which errs toward disqualifying.
+_hedge_attaches = getattr(_clean_claim, "_hedge_attaches", None)
+
 PREFIX_DISQUALIFY_RX = (getattr(_clean_claim, "PREFIX_DISQUALIFY_RX", None)
                         or _FALLBACK_PREFIX_DISQUALIFY)
 NEGATION_RX = re.compile(
@@ -331,18 +382,37 @@ RX_CLAUSE_START = re.compile(r"[.!?]|\n\s*\n")
 
 
 def _disqualified(prose, match_start):
-    """True when a negator or hedge governs the phrase at `match_start`.
+    """True when a negator or hedge GOVERNS the phrase at `match_start`.
 
-    The window is the phrase's own CLAUSE -- back to the nearest sentence
-    end or line break -- so a negation in a previous sentence does not
-    reach it. Where that window is ambiguous this errs toward
-    disqualifying, which is the cheap direction here: a missed warning
-    costs one un-guarded comment, while a false warning lands on a genuine
-    self-review and teaches the author to ignore the hook.
+    Two bounds, and both are needed. The window start is the last sentence
+    end or blank line before the phrase (`RX_CLAUSE_START`). Inside that
+    window, `_hedge_attaches` decides whether the nearest hit actually
+    reaches the phrase, or is broken off from it by a comma, a semicolon
+    or a conjunction.
+
+    The window alone is not enough, and shipping it alone reproduced a
+    defect `flag-clean-claim-over-findings.py:759` documents having
+    already fixed: a blind "is this word anywhere in the sentence" scan
+    silenced "None are deferred; all five are addressed in `f120e5a`",
+    because the negator sits in the same SENTENCE but a different CLAUSE.
+    A second-round adversarial review reproduced four such bodies going
+    silent. Reusing the sibling's `_attaches`/`RX_LEADING_SEPARATOR` pair
+    is what tells that apart from "none of the findings are addressed
+    yet", where the negator genuinely attaches.
+
+    A missing sibling fails toward DISQUALIFYING, which costs a missed
+    warning rather than a false one that teaches the author to ignore the
+    hook.
     """
     starts = [m.end() for m in RX_CLAUSE_START.finditer(prose, 0, match_start)]
-    window = prose[(starts[-1] if starts else 0):match_start]
-    return bool(NEGATION_RX.search(window) or PREFIX_DISQUALIFY_RX.search(window))
+    window_start = starts[-1] if starts else 0
+    if _hedge_attaches is None:
+        window = prose[window_start:match_start]
+        return bool(NEGATION_RX.search(window)
+                    or PREFIX_DISQUALIFY_RX.search(window))
+    return bool(_hedge_attaches(prose, window_start, match_start, NEGATION_RX)
+                or _hedge_attaches(prose, window_start, match_start,
+                                   PREFIX_DISQUALIFY_RX))
 
 
 def echoed_verdict(body):

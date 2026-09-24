@@ -300,6 +300,7 @@ Not candidates are a workflow with genuinely repo-specific logic gha does not mo
 Take the inventory from gha's README "Available reusable workflows" table and each capability's tag from its Versioning section, since `@v1` was frozen and the recommended tag varies per workflow.
 File the migration as its own issue and PR rather than folding it into whatever brought you to the repo.
 Full rule, including the migration hazards and the review-guard case: [`shared/workflow/upgrade-to-gha.md`](shared/workflow/upgrade-to-gha.md).
+The same fragment's "new repo" counterpart: when creating a repository, ship gha-backed CI (the baseline set plus whatever fits the repo type) in the same first PR, not later.
 
 ## Manage quota, including the structural kind
 

@@ -2241,12 +2241,32 @@ COPILOT_SUPPRESSED_BLOCK = re.compile(r"\bSuppressed\s+comments\b", re.IGNORECAS
 # `(?![0-9])`, because the following character genuinely isn't in the
 # `[0-9]` class -- but it plainly IS more digit, just not an ASCII one,
 # and a real Copilot count is never followed by another digit of any
-# script. `(?!\d)` correctly rejects it: `\d` sees the full-width digit as
-# a digit even though `[0-9]` in the capture does not.
+# script.
+#
+# A trailing `\d` lookaround alone still only guards against MORE DIGITS,
+# not against arbitrary trailing text of any other kind: `(?!\d)` lets
+# `Comments generated: 0oops` match `0` as a complete count too, since `o`
+# is not a digit either (PR ai-config#3906 Copilot review, second finding
+# on the same class -- shape-by-shape patching of "what can follow the
+# count" was the wrong level to fix this at, the same lesson already
+# learned for the v2 grammar parser). The actual field never has anything
+# but whitespace, end of line, end of body, or the literal word `new`
+# after the digits -- checked against every legacy fixture in
+# scripts/test_check_pr_fully_clean.py, which show only `0 new`, `2`
+# (nothing after), and `0` at the very end of the body, never any other
+# suffix -- so the trailing condition now requires the token to actually
+# END there: optionally `[ \t]+new\b`, then only whitespace up to a
+# newline or the end of the string. Anything else (a random word, a
+# non-ASCII digit sitting right after, a stray character) fails the whole
+# match, not just a same-shaped variant of it, and the caller then treats
+# the occurrence as present but unparseable rather than as a clean 0 --
+# see `copilot_verdict`'s combine rule.
 COPILOT_COMMENT_GENERATED = re.compile(
     r"\bComments\s+generated:\**[ \t]*", re.IGNORECASE
 )
-COPILOT_COMMENT_COUNT = re.compile(r"(?<!\d)([0-9]{1,6})(?!\d)")
+COPILOT_COMMENT_COUNT = re.compile(
+    r"(?<!\d)([0-9]{1,6})(?=(?:[ \t]+new\b)?[ \t]*(?:\r?\n|$))"
+)
 
 
 def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str:

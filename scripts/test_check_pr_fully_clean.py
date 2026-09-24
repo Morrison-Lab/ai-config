@@ -6346,26 +6346,36 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     # now combined with the same fail-closed rule the multi-line v2 scan
     # already uses: any nonzero wins, otherwise any unparseable yields no
     # verdict, zero only when every present source reads zero.
+    # ai-config#3899 review finding, sixteenth round: the v2 Findings-line
+    # search is now restricted to the actual overview block (the marker
+    # through the first `<details>`/next `##` heading -- see
+    # scripts/lib/copilot_overview.py), so these three bodies need the
+    # marker+heading and the Findings line ahead of the `<details>` block
+    # that carries the legacy field, matching where a real body would put
+    # each one, for the v2 side to still be found at all.
     _legacy0_v2_3_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
         "### \U0001f7e2 Approval recommended\n\n"
+        f"**Review effort:** Lite  \n**Findings:** 3 {_v2_picture}\n\n"
         "<details>\n<summary>Review details</summary>\n\n"
         "- **Comments generated:** 0\n"
-        "</details>\n\n"
-        f"**Review effort:** Lite  \n**Findings:** 3 {_v2_picture}"
+        "</details>"
     )
     _legacy3_v2_none_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
         "### \U0001f7e2 Approval recommended\n\n"
+        "**Review effort:** Lite  \n**Findings:** None\n\n"
         "<details>\n<summary>Review details</summary>\n\n"
         "- **Comments generated:** 3\n"
-        "</details>\n\n"
-        "**Review effort:** Lite  \n**Findings:** None"
+        "</details>"
     )
     _legacy0_v2_none_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
         "### \U0001f7e2 Approval recommended\n\n"
+        "**Review effort:** Lite  \n**Findings:** None\n\n"
         "<details>\n<summary>Review details</summary>\n\n"
         "- **Comments generated:** 0\n"
-        "</details>\n\n"
-        "**Review effort:** Lite  \n**Findings:** None"
+        "</details>"
     )
     check(
         "copilot_verdict: a legacy 'Comments generated: 0' no longer "
@@ -6425,6 +6435,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "copilot_verdict: a v2 'Findings:' count immediately followed by "
         "a full-width digit is not read as a complete zero count",
         checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
             "### \U0001f7e2 Approval recommended\n\n"
             f"**Review effort:** Lite  \n**Findings:** 0５ {_v2_picture}"
         ) != "clean",
@@ -6464,6 +6475,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "copilot_verdict: a 'Findings:' line reading 'None but actually N "
         "<badge>' states no verdict rather than reading as clean",
         checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
             "### \U0001f7e2 Approval recommended\n\n"
             f"**Findings:** None but actually 5 {_v2_picture}"
         ) == "",
@@ -6501,6 +6513,107 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) != "clean",
     )
 
+    # ai-config#3899 review finding, sixteenth round (PR ai-config#3906
+    # Copilot review, "fix the class" directive): two more fail-open
+    # shapes, one per item in the review.
+    #
+    # Item 1: `(?!\d)` on COPILOT_COMMENT_COUNT only guards against MORE
+    # DIGITS following the count, not against arbitrary trailing text of
+    # any other kind -- `Comments generated: 0oops` matched `0` as a
+    # complete count, since `o` is not a digit either. Checked every
+    # legacy fixture in this file for what actually follows a real count:
+    # only whitespace, end of line, end of body, or the literal word
+    # `new` ever appear (`0 new`, bare `2`, bare `0` at the end of the
+    # body) -- never anything else -- so the fix requires the token to
+    # actually END there rather than merely not be followed by one more
+    # digit.
+    check(
+        "copilot_verdict: a legacy 'Comments generated: 0oops' does not "
+        "read as a complete zero count",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "<details>\n- **Comments generated:** 0oops\n</details>"
+        ) != "clean",
+    )
+    #
+    # Item 2: even a correctly-anchored, correctly-unindented-per-the-old-
+    # rule `**Findings:**` line can still be non-rendered content: an
+    # indented CommonMark code block (4+ spaces), or hidden inside a
+    # multi-line HTML comment starting at column zero -- neither of which
+    # a citation mask (fences/quotes/code-spans only) or a bare line
+    # anchor excludes. The fix is structural: `COPILOT_FINDINGS_LINE` is
+    # now bounded to at most 3 leading spaces, and the search is further
+    # restricted to the actual overview block
+    # (`_copilot_overview_block_span` in scripts/lib/copilot_overview.py)
+    # with any match landing inside an HTML comment rejected outright.
+    # These four constructed bodies all carry a REAL overview block (the
+    # marker and heading are present and correctly formed) with the fake
+    # `**Findings:** None` specifically placed to trip one of the four
+    # new rules: 4-space indentation, an HTML comment, after the block's
+    # own `<details>`, and in a later `##` section.
+    check(
+        "copilot_verdict: a 4-space-indented '**Findings:** None' (a "
+        "CommonMark code block) inside a real overview block is not read "
+        "as the real field",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "Real content, no genuine Findings field.\n\n"
+            "    **Findings:** None\n\n"
+            "<details>\n<summary>x</summary>\ny\n</details>"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: a '**Findings:** None' hidden inside a "
+        "multi-line HTML comment inside a real overview block is not "
+        "read as the real field",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "Real content, no genuine Findings field.\n\n"
+            "<!--\n**Findings:** None\n-->\n\n"
+            "<details>\n<summary>x</summary>\ny\n</details>"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: a '**Findings:** None' placed AFTER the block's "
+        "own <details> section is not read as the real field",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "Real content.\n\n"
+            "<details>\n<summary>x</summary>\ny\n</details>\n\n"
+            "**Findings:** None\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: a '**Findings:** None' in a LATER '##' section "
+        "is not read as the real field",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "Real content.\n\n"
+            "## Something else\n\n"
+            "**Findings:** None\n"
+        ) == "",
+    )
+    # Negative control, alongside the four rejections above: the real
+    # overview block itself must still classify clean, proving the region
+    # restriction excludes the fake lines without excluding the real one.
+    check(
+        "copilot_verdict: the real overview block's own 'Findings: None' "
+        "still classifies clean alongside a LATER, fake one in a "
+        "different section",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Findings:** None\n\n"
+            "<details>\n<summary>x</summary>\ny\n</details>\n\n"
+            "## Something else\n\n"
+            "**Findings:** 5 <picture><img></picture>\n"
+        ) == "clean",
+    )
+
     # ai-config#3899 review finding, thirteenth round (PR ai-config#3906
     # Copilot review): COPILOT_FINDINGS_LINE was unanchored, matching
     # `**Findings:**` anywhere in the body -- mid-sentence prose quoting an
@@ -6530,8 +6643,10 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     )
     check(
         "copilot_verdict: the real overview shape ('**Findings:**' as its "
-        "own line) still classifies clean after the anchoring fix",
+        "own line, inside the real block) still classifies clean after "
+        "the anchoring fix",
         checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
             "### \U0001f7e2 Approval recommended\n\n"
             "**Review effort:** Lite  \n**Findings:** None"
         ) == "clean",
@@ -6565,7 +6680,13 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     # entirely, so this now also guards the replacement: one linear
     # tokenisation pass plus one linear grammar walk, not a scan whose cost
     # depends on the run's length or position.
+    # Carries the marker+heading (ai-config#3899 review finding, sixteenth
+    # round) so the v2 Findings-line search actually reaches this line's
+    # scan rather than short-circuiting at "no overview block found" --
+    # the timing guard needs to exercise the same linear scan a real body
+    # would, not a faster-but-different code path.
     _adversarial_findings_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
         "### \U0001f7e2 Approval recommended\n\n" "**Findings:** " + "1" * 65536
     )
     _av_secs, _av_verdict = best_of_three(
@@ -6587,6 +6708,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     # instead of resuming past it to rescan for the next one -- means this
     # now costs one `str.find` call, not one per opener.
     _unclosed_picture_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
         "### \U0001f7e2 Approval recommended\n\n**Findings:** " + "<picture " * 7280
     )
     _up_secs, _up_verdict = best_of_three(
@@ -6604,14 +6726,24 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     # advance past each completed badge.
     _closed_badges_line = " · ".join(["1 <picture></picture>"] * 8000)
     _closed_badges_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
         "### \U0001f7e2 Approval recommended\n\n**Findings:** " + _closed_badges_line
     )
     _cb_secs, _cb_verdict = best_of_three(
         checker.copilot_verdict, _closed_badges_body
     )
+    # Budget widened from 0.1s to 0.5s (ai-config#3899 review finding,
+    # sixteenth round): the block-region and HTML-comment-span detection
+    # this round added run once per call on top of the existing scan, and
+    # measured 0.07-0.09s across ten runs on this machine for this ~190KB
+    # body -- comfortably linear (matching the "many well-formed entries"
+    # timing test's own 0.5s budget for a similarly-sized adversarial
+    # shape just below), but too close to 0.1s to stay non-flaky under
+    # load; this was observed to intermittently fail a full-suite run at
+    # the old threshold even though the underlying scan is still linear.
     check(
-        "copilot_verdict on 8000+ repeated CLOSED badges scales linearly (< 0.1s)",
-        _cb_verdict == "not-clean" and _cb_secs < 0.1,
+        "copilot_verdict on 8000+ repeated CLOSED badges scales linearly (< 0.5s)",
+        _cb_verdict == "not-clean" and _cb_secs < 0.5,
     )
 
     # ai-config#3899 review finding, sixth round: a digit sitting INSIDE a
@@ -6656,6 +6788,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     _many_entries_reps = 262144 // len(_many_entries_unit)
     _many_entries_line = (_many_entries_unit * _many_entries_reps).rstrip(" ·")
     _many_entries_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
         "### \U0001f7e2 Approval recommended\n\n**Findings:** " + _many_entries_line
     )
     _me_secs, _me_verdict = best_of_three(

@@ -143,15 +143,22 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   - `glab api --method POST "/projects/<TARGET_ID>/job_token_scope/allowlist" -f "target_project_id=<SOURCE_ID>"`
   - `include:` (for CI templates) works independently of the API allowlist
   - Check existing: `glab api "/projects/<ID>/job_token_scope/allowlist"`
-  - A Maintainer cannot always temporarily disable a target project's
-    inbound scope for an access A/B.
+  - For cross-project Git transport, do not interpolate `CI_JOB_TOKEN` into
+    a remote URL.
+    An authentication failure can echo a credential-bearing URL.
+    Use a short-lived, mode-700 `GIT_ASKPASS` helper that reads the inherited
+    job token, keep `GIT_TERMINAL_PROMPT=0`, disable shell tracing during
+    authentication, and remove the helper on exit.
+    (Measured 2026-09-23 while testing HACR access from `test.hac`.)
+  - A Maintainer cannot always temporarily disable a target project's inbound
+    scope for an access A/B.
     If `PATCH /projects/<ID>/job_token_scope` with `enabled=false` returns
     "Job token scope cannot be disabled ... enforced for the instance,"
     the setting is instance-enforced and only an instance administrator can change it.
     Verify the subsequent `GET` still reports
     `inbound_enabled: true`; do not retry the CI job under a claimed bypass.
-    (Measured 2026-09-23 while diagnosing access from `test.hac`
-    to HACR (`health-analytics-core/hacr`).)
+    (Measured 2026-09-23 while diagnosing access from `test.hac` to HACR
+    (`health-analytics-core/hacr`).)
   - Decode `access_level` with GitLab's versioned role mapping.
     In GitLab 19.0.2, `40` means Maintainer (`30` is Developer);
     verify effective access with `GET /projects/<ID>/members/all?query=<username>`

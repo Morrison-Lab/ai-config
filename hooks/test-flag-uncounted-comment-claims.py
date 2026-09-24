@@ -868,14 +868,20 @@ def vocabulary_checks(mod):
     where the true figure was 23. It matched nothing, because the vocabulary
     stopped at `twelve`.
 
-    The widening costs nothing in precision on this corpus AT THE BODY LEVEL.
-    `scripts/measure-cardinality-vocabulary.py` is the instrument, and what it
-    holds fixed is the SET of commit bodies yielding a cardinality claim,
-    which is the same under either vocabulary -- not a count this docstring
-    would then have to keep in step with the history. The CLAIM counts do
-    differ inside those bodies, and the script reports both directions. The
-    hook's own comment beside `CARDINALITY_COUNT` carries the figures and the
-    two things that claim does not say.
+    The widening MOVES the set rather than holding it fixed, which is the
+    reading to carry away from it.
+    `scripts/measure-cardinality-vocabulary.py` is the instrument, and
+    measured 2026-09-24 against origin/main at b96c640f over a complete clone
+    the narrow vocabulary flags 677 commit bodies and the current one 680.
+    3 bodies are newly flagged and none are lost, so the script exits 1 and
+    asks for a human reading rather than reporting the vocabularies
+    equivalent.
+    The hook's own comment beside `CARDINALITY_COUNT` owns those figures, and
+    two things about them decide whether the widening earned its place:
+    all three newly flagged bodies carry a positional line reference rather
+    than a count, and 10 of the 29 gained claims are counts of things
+    (`Fourteen markdown files`, `Fifteen tests`) -- the shape the widening was
+    written for.
 
     Every case here was confirmed by mutation to go red, and the note on each
     names the mutation that kills it. Two earlier drafts of this block --

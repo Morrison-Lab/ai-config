@@ -412,7 +412,8 @@ ENUM_SEPARATOR = r"\s*/?(?:,|(?<=\s)/|/(?=\s))\s*"
 # written for, which is where its case actually comes from.
 #
 # An earlier revision of this comment read "the same 54 of 111 bodies",
-# measured at that same ref from a SHALLOW clone of 619 commits. `git log`
+# measured at that same ref from a SHALLOW clone carrying 111 of the 2539
+# multi-line bodies -- a fragment whose own depth is unrecoverable. `git log`
 # reports a grafted fragment with no warning and exits 0, so the figures were
 # true statements about a history nobody chose, and they inverted the
 # conclusion. The script now refuses a shallow clone.

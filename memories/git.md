@@ -86,10 +86,19 @@ the checkout rather than through the code.
 **Measured 2026-09-24**, in a remote container's clone of this repository, at
 one ref (`origin/main` at `b96c640f`):
 
-| | commits | narrow vocabulary | current vocabulary | same set? |
-| --- | --- | --- | --- | --- |
-| shallow | 619 | --- | --- | yes |
-| unshallowed | 2753 | 677 bodies | 680 bodies | no |
+| | commits | multi-line bodies | narrow | current | same set? |
+| --- | --- | --- | --- | --- | --- |
+| shallow fragment | not recoverable | 111 | 54 | 54 | yes |
+| complete | 2753 | 2539 | 677 | 680 | no |
+
+The fragment's own depth cannot be read back once the clone is unshallowed,
+which is part of the hazard rather than a gap in the record: the truncation
+leaves nothing behind to measure afterwards.
+What is re-derivable is the reading, and a log-order prefix of 119 commits
+reproduces it exactly --- 111 multi-line bodies, 54 flagged under each
+vocabulary, sets identical.
+Sweeping prefixes at that same ref, agreement still holds at 300 commits and
+has already failed by 375, so the shallow answer was not a near miss.
 
 The comparison inverted.
 `scripts/measure-cardinality-vocabulary.py` exists to answer one question ---

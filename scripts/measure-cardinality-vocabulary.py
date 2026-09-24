@@ -22,8 +22,8 @@ about itself. Measured 2026-09-24 against origin/main at b96c640f over a
 COMPLETE clone: 2753 commits, 2539 multi-line bodies, 677 flagged under the
 narrow vocabulary and 680 under the current one, with 3 bodies newly flagged
 and none lost. An earlier revision reported 54 of 111 bodies identical under
-both -- the same ref, read from a SHALLOW clone of 619 commits, whose
-grafted fragment `git log` reports with no warning and exit 0. The truncated
+both -- the same ref, read from a SHALLOW clone whose fragment carried 111
+of those 2539 bodies, and which `git log` reports with no warning and exit 0. The truncated
 and complete readings disagreed on the one thing this script asserts, so
 `commit_bodies` now refuses a shallow clone outright.
 
@@ -230,7 +230,8 @@ def claim_delta(narrow, wide):
     Compared per body with a multiset difference rather than a set one. That
     is defensive rather than load-bearing: `find_claims` dedupes within a
     body by `(kind, quote.lower())`, so no body can yield the same text
-    twice today (measured: 0 of 111) and the Counter difference degenerates
+    twice today (measured at full depth: 0 of 2539) and the Counter difference
+    degenerates
     to a set one on every input the callee can currently produce. It is
     written this way so that removing that dedup does not silently collapse a
     repeated claim to a single instance here.

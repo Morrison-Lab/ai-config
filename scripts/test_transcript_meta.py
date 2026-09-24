@@ -92,9 +92,9 @@ SCHEDULED_CONTINUATION = {
 
 # Shape 3: harness "Stop hook feedback" / system-notification injections. NO
 # `sourceToolUseID`, no `promptSource`. 694/1072 in the survey -- the
-# majority shape. Out of scope for this predicate (see module docstring):
-# narrowing the #3860 carve-out to the skill-load shape is the point, not
-# broadening it to cover every harness-injected shape.
+# majority shape. Not a skill load (does not match is_skill_load_meta);
+# recognized as harness meta and hook feedback by is_harness_meta and
+# is_hook_feedback (ai-config#3914).
 HOOK_FEEDBACK = {
     "type": "user",
     "isMeta": True,

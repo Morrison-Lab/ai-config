@@ -25,7 +25,10 @@ so every hook is inert there
 
 ## Contents
 
-- `.claude-plugin/plugin.json`: the manifest.
+- `plugin.json.parked`: the manifest, renamed out of `.claude-plugin/`
+  because the claude.ai sync still failed with it there
+  ([#3948](https://github.com/Morrison-Lab/ai-config/issues/3948)).
+  Restore it to `.claude-plugin/plugin.json` only in a new home outside this repo's plugin tree.
   The plugin bundles no skills, so the skills in `skills/`
   are not registered a second time under an `ai-config-hooks:` prefix.
 - `hooks/hooks.json`: **generated** by

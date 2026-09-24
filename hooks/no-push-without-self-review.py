@@ -490,6 +490,32 @@ OVERRIDE_ENV = re.compile(r"\AALLOW_UNREVIEWED_PUSH=1\Z")
 # a PreToolUse deny is not user-overridable.
 DEGRADED_OVERRIDE = re.compile(r"(?:^|[;&|`(\s])ALLOW_UNREVIEWED_PUSH=1\s")
 
+# Repositories whose pushes this guard does not gate at all, as lowercase
+# `owner/repo`. A push is exempt only when EVERY URL it would push to names one
+# of these (see `push_is_exempt`), so the list narrows the guard by
+# destination and never by what the command says about itself.
+#
+# Morrison-Lab's DATA 571 course repositories, at the owner's request
+# (2026-09-23): their agent sessions push feature branches under a standing
+# grant, and the harness there backgrounds every reviewer dispatch, so the
+# guard could never see a verdict (ai-config#3045) and every push ended in the
+# override. A constant rather than an environment variable or a file in the
+# pushed repository, because both of those are writable by the session the
+# guard is checking; widening this list is a reviewed change to this file.
+EXEMPT_REPOS = frozenset({
+    "morrison-lab/mln",
+    "morrison-lab/mlg",
+    "morrison-lab/mlr",
+})
+
+# The trailing `owner/repo` of a remote URL or path, whatever the transport:
+# `https://host/owner/repo(.git)`, `git@host:owner/repo.git`,
+# `ssh://git@host/owner/repo`, a proxy path ending in `/owner/repo`, or a
+# local path. The host is not checked, deliberately: cloud sessions push
+# through a local git proxy whose URL is not github.com, and the exemption is
+# about which repository is pushed, not where it is hosted.
+_URL_OWNER_REPO = re.compile(r"([^/:\s]+)/([^/:\s]+?)(?:\.git)?/*\Z")
+
 # Options after which no single reviewed commit can describe the push.
 # `--branches` is git's own documented alias of `--all` (`git push -h`), so it
 # ships every branch while looking like an ordinary unknown option.
@@ -1395,6 +1421,48 @@ def _push_remote(directory: str | None, argv: list[str],
     return "origin"
 
 
+def _owner_repo(url: str) -> str | None:
+    """Lowercase `owner/repo` at the end of a remote URL or path, or None."""
+    m = _URL_OWNER_REPO.search(url.strip())
+    return f"{m.group(1)}/{m.group(2)}".lower() if m else None
+
+
+def push_is_exempt(directory: str | None, argv: list[str],
+                   env: list[str]) -> bool:
+    """True when every URL this push would write to is in EXEMPT_REPOS.
+
+    The remote is resolved the way `_push_remote` resolves it, and its URLs are
+    read with `git remote get-url --push --all` under the pushing command's own
+    `-c` overrides and environment prefix, so `pushurl`, `pushInsteadOf` and an
+    inline `-c remote.origin.pushurl=...` are all seen as git will apply them.
+    A remote with several push URLs is exempt only if all of them are. A
+    command naming a URL or path instead of a remote is matched on that value.
+
+    Anything unresolvable is NOT exempt, which leaves the push to the ordinary
+    review check: the exemption can only ever narrow the guard by destination.
+    That includes running out of the shared time budget. `_run_git` raises
+    `TimeoutError` then, and letting it escape here would reach `main`'s
+    fail-open `except` -- a silent allow, which the budget exists to prevent.
+    """
+    try:
+        remote = _push_remote(directory, argv, env)
+        if not remote:
+            return False
+        listed = _run_git(directory, env, *_config_overrides(argv),
+                          "remote", "get-url", "--push", "--all", remote)
+    except TimeoutError:
+        return False
+    urls = [u.strip() for u in (listed or "").splitlines() if u.strip()]
+    if not urls:
+        # Not a configured remote name. git accepts a URL or path in the
+        # remote position, so only something shaped like one is matched; a
+        # bare name that failed to resolve is a remote git will reject.
+        if "/" not in remote and ":" not in remote:
+            return False
+        urls = [remote]
+    return all(_owner_repo(u) in EXEMPT_REPOS for u in urls)
+
+
 def _rev_parse_ref(directory: str | None, env: list[str], *args: str) -> str | None:
     name = _run_git(directory, env, "rev-parse", *args)
     return name if name and name != "HEAD" else None
@@ -2228,6 +2296,8 @@ def main() -> int:
                      "(`--git-dir`/`--work-tree`/`GIT_DIR`/`GIT_WORK_TREE`), "
                      "so a verdict naming a commit in this one cannot cover it")
                 return 0
+            if push_is_exempt(directory, argv, env):
+                continue
             # Coerce before `os.path.exists` rather than after. `or ""` rescues
             # only the FALSY non-`str` values: a truthy `list` or `dict` reaches
             # `os.path.exists`, which raises `TypeError` (it catches `OSError`

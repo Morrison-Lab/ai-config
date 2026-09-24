@@ -1448,13 +1448,23 @@ def _owner_repo(url: str) -> str | None:
 # to reach it (an ssh wrapper, a proxy, a replaced remote helper, a
 # `--receive-pack` program) can deliver the pack anywhere while git still
 # prints the github.com URL. So a push that carries or inherits any of these is
-# never exempt.
+# never exempt. Disabling TLS verification belongs here too: with it off, any
+# HTTP proxy in the path can answer for github.com.
+#
+# An HTTP proxy and a custom CA bundle are deliberately NOT refused, because
+# the cloud sessions this exemption exists for need both (HTTPS_PROXY and
+# GIT_SSL_CAINFO are set in every one). The exemption therefore trusts the
+# session's configured proxy and CA store. It is not a sandbox against a
+# session that sets up a hostile transport in an earlier command: `main`
+# already fails open on errors, MCP pushes are ungated (#1929), and the
+# override exists, so that threat was never in this hook's scope.
 TRANSPORT_ENV = frozenset({
     "GIT_SSH", "GIT_SSH_COMMAND", "GIT_SSH_VARIANT", "GIT_PROXY_COMMAND",
-    "GIT_EXEC_PATH",
+    "GIT_EXEC_PATH", "GIT_SSL_NO_VERIFY",
 })
 TRANSPORT_CONFIG = (r"^(core\.sshcommand|core\.gitproxy"
-                    r"|remote\..*\.(receivepack|vcs))$")
+                    r"|remote\..*\.(receivepack|vcs)"
+                    r"|http\.(.*\.)?sslverify)$")
 
 
 def _is_plain_command(command: str) -> bool:

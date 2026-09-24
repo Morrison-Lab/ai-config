@@ -960,3 +960,23 @@ When testing hooks or mocking commands on Windows:
   (`dir/symlink/../..` resolves to `dir` rather than `target/..`).
   Tests asserting symlinked plugin root traversal must guard with `os.path.exists()`
   on platforms without lexical traversal.
+
+## PreToolUse denial emission hardening: distinguishing guard crashes from authorized pushes (#3756)
+
+When a PreToolUse hook decides to deny an action (such as an unreviewed git push):
+- **Distinguish pre-decision crashes from post-decision failures:**
+  PreToolUse guards typically wrap inspection in a fail-open handler (`return 0`)
+  so unhandled parser crashes or missing metadata do not wedge ordinary shell execution.
+  However, once a denial decision is issued (`permissionDecision: deny`),
+  any subsequent exception or write failure must fail closed (exit code 2) rather than failing open.
+  Failing open after a denial decision silently converts a blocked command into an authorized one.
+- **Save unpoisoned stdout fd at module initialization:**
+  Inspecting Python scripts or external modules can inadvertently close stdout
+  (e.g., via `open(True)` because `isinstance(True, int)` evaluates to True and opens fd 1).
+  Save `_ORIGINAL_STDOUT_FD = os.dup(1)` during initial module load before running inspection helpers.
+  In `deny()`, restore stdout with `os.dup2(_ORIGINAL_STDOUT_FD, 1)` or write directly to `_ORIGINAL_STDOUT_FD`.
+- **Fail closed when stdout is completely unwriteable:**
+  If stdout cannot be written or restored,
+  log the full denial reason to stderr and exit with code 2.
+  Harnesses (such as Claude Code) treat exit code 2 as a hook execution failure and block the tool,
+  preventing a silent bypass when output streaming is broken.

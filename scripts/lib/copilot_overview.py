@@ -235,25 +235,61 @@ def _copilot_overview_block_spans(scan: str) -> List[Tuple[int, int]]:
     completely genuine sequence by every OTHER check here, so without
     this it would be trusted as a current block. A genuinely later block
     that starts AFTER a `<details>` region has already closed still
-    counts, since its start position falls outside every region. Reuses
-    `_find_details_regions` / `_position_in_spans` -- the same
-    bisect-backed containment check the HTML-comment exclusion already
-    uses -- rather than a second, differently-shaped detector, and stays
-    linear the same way: the regions are computed once, sorted by
-    construction, and each block-start lookup costs O(log k) rather than
-    a scan of every region.
+    counts, since its start position falls outside every region.
+
+    Every boundary search this function drives -- the marker+heading
+    START itself, and the `<details`/`##` END search -- is ALSO checked
+    against `_find_html_comment_spans`, symmetrically with the details
+    -region search below (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, seventh
+    round, closing a sweep the sixth round's fix prompted): a marker+
+    heading pair swallowed by an EARLIER unclosed `<!--` (which
+    `_find_html_comment_spans` already treats as extending to the end of
+    the string, the same fail-closed convention as everywhere else in
+    this module) was still trusted as real; and a fake, line-anchored
+    `<details>` or `##` heading hidden inside a comment BETWEEN a genuine
+    marker+heading and its own real `**Findings:**` line truncated the
+    block's END before ever reaching that line, silently losing it
+    (measured: an affirmative body with a real `**Findings:** None` line
+    read as no verdict instead of clean, because the truncated block
+    never contained the line at all). `_search_outside_comments` is the
+    shared helper for the second case: it re-searches past any candidate
+    match that itself falls inside a comment, the same forward-only
+    cursor discipline `_find_html_comment_spans`/`_find_details_regions`
+    already use, so this stays linear regardless of how many fake
+    candidates are skipped.
+
+    Comment spans are computed ONCE here and threaded into
+    `_find_details_regions` as a parameter, rather than recomputed a
+    second time inside it -- `_position_in_spans` is the same
+    bisect-backed containment check both the comment and the
+    details-region exclusions use, so sharing the one already-sorted list
+    keeps every lookup O(log k) without paying for
+    `_find_html_comment_spans`'s own O(n) scan twice.
     """
-    details_regions = _find_details_regions(scan)
+    comment_spans = _find_html_comment_spans(scan)
+    comment_span_starts = [s for s, _ in comment_spans]
+    details_regions = _find_details_regions(scan, comment_spans, comment_span_starts)
     details_region_starts = [s for s, _ in details_regions]
     spans: List[Tuple[int, int]] = []
     for start_m in _COPILOT_OVERVIEW_START.finditer(scan):
         start = start_m.start()
+        # strict=True: the marker text is itself a complete HTML comment,
+        # so a non-strict check would always match a genuine marker's own
+        # self-comment and exclude every real block. See
+        # _position_in_spans' own docstring for why this call needs it
+        # and no other caller does.
+        if _position_in_spans(
+            start, comment_span_starts, comment_spans, strict=True
+        ):
+            continue
         if _position_in_spans(start, details_region_starts, details_regions):
             continue
         search_from = start_m.end()
         end = len(scan)
         for pattern in (_COPILOT_DETAILS_OPEN, _COPILOT_NEXT_HEADING):
-            m = pattern.search(scan, search_from)
+            m = _search_outside_comments(
+                pattern, scan, search_from, comment_spans, comment_span_starts
+            )
             if m is not None and m.start() < end:
                 end = m.start()
         spans.append((start, end))
@@ -289,7 +325,42 @@ def _find_html_comment_spans(text: str) -> List[Tuple[int, int]]:
     return spans
 
 
-def _find_details_regions(scan: str) -> List[Tuple[int, int]]:
+def _search_outside_comments(
+    pattern: "re.Pattern[str]",
+    scan: str,
+    pos: int,
+    comment_spans: List[Tuple[int, int]],
+    comment_span_starts: List[int],
+) -> Optional["re.Match[str]"]:
+    """Return the first match of `pattern` in `scan` at or after `pos`
+    whose own start does NOT fall inside any span in `comment_spans`, or
+    None if every match from `pos` onward is inside one (PR
+    [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, seventh round).
+
+    Shared by every boundary search in this module that must not be
+    fooled by a comment-hidden candidate: `_copilot_overview_block_spans`
+    for both the marker+heading start and the `<details`/`##` block-end
+    search. Each rejected candidate advances `pos` to that match's own
+    end before retrying, so -- exactly like `_find_html_comment_spans`
+    and `_find_details_regions` -- the cursor only ever moves forward and
+    the total work across every call from one starting `pos` is O(n),
+    regardless of how many comment-hidden candidates are skipped along
+    the way.
+    """
+    while True:
+        m = pattern.search(scan, pos)
+        if m is None:
+            return None
+        if not _position_in_spans(m.start(), comment_span_starts, comment_spans):
+            return m
+        pos = m.end()
+
+
+def _find_details_regions(
+    scan: str,
+    comment_spans: List[Tuple[int, int]],
+    comment_span_starts: List[int],
+) -> List[Tuple[int, int]]:
     """Find every `<details>...</details>` region in `scan`, one linear
     pass, so a marker+heading pair sitting inside an already-open
     `<details>` section can be excluded from
@@ -328,12 +399,33 @@ def _find_details_regions(scan: str) -> List[Tuple[int, int]]:
     `copilot_verdict` returns no verdict rather than a wrong clean -- but
     it is asymmetric with the containment check this same round already
     added for a marker+heading pair, and it silently drops a genuine
-    not-clean finding down to no-verdict. Checked with the same
-    bisect-backed `_position_in_spans` helper against
-    `_find_html_comment_spans(scan)`, computed once up front.
+    not-clean finding down to no-verdict.
+
+    The CLOSING `</details>` search carries the same guard, symmetrically
+    (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, sixth round): a real
+    `<details>` containing a commented-out `<!-- </details> -->` before
+    its own genuine closer would otherwise have `str.find` land on that
+    fake closer, truncating the region early -- content still inside the
+    real `<details>` (between the fake closer and the true one) would
+    then read as OUTSIDE any details region, and a marker+heading pair
+    there would be wrongly treated as a genuine top-level block rather
+    than one still nested inside the details section. This could not by
+    itself produce a false CLEAN (the truncated-in content is exactly
+    what a re-review quotes, so at worst it adds a spurious candidate
+    block whose own combine-rule participation still requires an
+    affirmative reading to matter), but it is the same asymmetry as the
+    opener fix above and is closed the same way: `close_pos` now loops
+    forward past any candidate `</details>` that itself falls inside a
+    comment span, rather than accepting the first occurrence
+    unconditionally.
+
+    `comment_spans`/`comment_span_starts` are precomputed by the caller
+    (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, seventh round) rather than
+    recomputed here with a second `_find_html_comment_spans(scan)` call:
+    `_copilot_overview_block_spans` needs the same list for its own
+    marker-start and block-end checks, and one shared O(n) scan is
+    strictly better than two.
     """
-    comment_spans = _find_html_comment_spans(scan)
-    comment_span_starts = [s for s, _ in comment_spans]
     regions: List[Tuple[int, int]] = []
     pos = 0
     n = len(scan)
@@ -342,7 +434,17 @@ def _find_details_regions(scan: str) -> List[Tuple[int, int]]:
             continue
         if _position_in_spans(m.start(), comment_span_starts, comment_spans):
             continue
-        close_pos = scan.find("</details>", m.end())
+        search_from = m.end()
+        close_pos = -1
+        while True:
+            candidate = scan.find("</details>", search_from)
+            if candidate == -1:
+                break
+            if _position_in_spans(candidate, comment_span_starts, comment_spans):
+                search_from = candidate + len("</details>")
+                continue
+            close_pos = candidate
+            break
         if close_pos == -1:
             regions.append((m.start(), n))
             break
@@ -352,7 +454,11 @@ def _find_details_regions(scan: str) -> List[Tuple[int, int]]:
 
 
 def _position_in_spans(
-    pos: int, span_starts: List[int], spans: List[Tuple[int, int]]
+    pos: int,
+    span_starts: List[int],
+    spans: List[Tuple[int, int]],
+    *,
+    strict: bool = False,
 ) -> bool:
     """True when `pos` falls inside any (start, end) span in `spans`.
 
@@ -370,11 +476,28 @@ def _position_in_spans(
     comment, so the comment-span list grows with the block count, and
     this function ran once per Findings-line match -- measured at a fixed
     262,144 characters: 1000 blocks 0.053s, 2000 blocks 0.188s.
+
+    `strict=True` requires `pos` to fall AFTER a span's own start (`start
+    < pos`, not `start <= pos`), for exactly one caller (PR
+    [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, seventh round): checking whether a v2
+    marker's OWN start position is "inside a comment" is a trap the other
+    callers of this function do not have, because the marker text
+    `<!-- ccr-overview-v2 -->` is ITSELF a complete, self-contained HTML
+    comment -- `_find_html_comment_spans` finds it and reports a span
+    whose start EQUALS the marker's own start, so the default (`start <=
+    pos`) trivially matches every genuine, standalone marker as "inside
+    its own comment" and excludes it outright. What the marker-start
+    check actually needs to catch is a marker whose `<!--` was consumed
+    as the CLOSE of some EARLIER, different, unclosed comment (so the
+    comment span found there starts strictly BEFORE the marker, not AT
+    it) -- `strict=True` is exactly that distinction.
     """
     i = bisect.bisect_right(span_starts, pos) - 1
     if i < 0:
         return False
     start, end = spans[i]
+    if strict:
+        return start < pos < end
     return start <= pos < end
 
 

@@ -6582,6 +6582,80 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             "<details>\nx\n</details>"
         ) == "not-clean",
     )
+
+    # ai-config#3899 review finding, twenty-second round (PR ai-config#3906
+    # Copilot review, sixth round): the CLOSER search in
+    # `_find_details_regions` was asymmetric with the opener guard just
+    # added -- `scan.find("</details>", ...)` accepted the FIRST literal
+    # `</details>` it found, even one hidden inside a comment. A real
+    # `<details>` containing a commented-out `<!-- </details> -->` before
+    # its own genuine closer then truncated the region early, so content
+    # still inside the real details section -- including a QUOTED
+    # marker+heading+Findings sequence, exactly what a re-review's
+    # "Resolved since last review" listing carries -- read as outside any
+    # region and was wrongly treated as a genuine top-level block. Fixed
+    # by looping the closer search past any candidate that itself falls
+    # inside a comment. This is the reviewer's own reprex.
+    check(
+        "copilot_verdict: a real <details> containing a commented-out "
+        "fake </details> before its true closer still correctly excludes "
+        "a quoted marker+heading inside it",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n\n"
+            "<details>\n<summary>Resolved since last review (1)</summary>\n\n"
+            "<!-- </details> -->\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n\n"
+            "</details>\n"
+        ) == "clean",
+    )
+
+    # ai-config#3899 review finding, twenty-second round: sweeping every
+    # OTHER boundary search in copilot_overview.py for the same
+    # comment-blindness (per the review's own instruction) found two more
+    # genuine gaps, neither previously covered by any test:
+    #
+    # (a) The marker+heading START search itself (`_COPILOT_OVERVIEW_START`
+    # in `_copilot_overview_block_spans`) never checked its own match
+    # against comment spans at all. A marker whose own `<!--` got consumed
+    # as the CLOSE of an EARLIER, unrelated, unclosed comment (which
+    # `_find_html_comment_spans` already treats as extending to the end of
+    # the string, matching every other unterminated-comment handling in
+    # this module) was still trusted as a real block start.
+    check(
+        "copilot_verdict: a marker swallowed by an earlier unclosed HTML "
+        "comment is not trusted as a real block start",
+        checker.copilot_verdict(
+            "<!-- unterminated comment with no close\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n"
+        ) == "",
+    )
+    # (b) The block-END search (`<details`/`##`, via `.search()`) also
+    # never checked its own candidate against comment spans. A fake,
+    # line-anchored `<details>` hidden inside a comment BETWEEN a genuine
+    # marker+heading and its own real `**Findings:**` line truncated the
+    # block before ever reaching that line, silently losing a real clean
+    # finding down to no verdict. Both are fixed with the new
+    # `_search_outside_comments` helper (the marker-start check needed a
+    # STRICT containment variant, since a marker's own text IS a complete
+    # HTML comment and a non-strict check would exclude every genuine
+    # marker as "inside its own comment" -- see `_position_in_spans`'s own
+    # docstring).
+    check(
+        "copilot_verdict: a fake <details> hidden inside a comment "
+        "between a real marker+heading and its own real Findings line "
+        "does not truncate the block before reaching that line",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "<!--\n<details>\n-->\n\n"
+            "**Findings:** None\n\n"
+            "<details>\nreal content\n</details>"
+        ) == "clean",
+    )
+
     # The FIRST block reads zero here, deliberately (PR ai-config#3906
     # Copilot review, fifth round on this same pair of tests): the
     # previous version put the nonzero finding in the FIRST block, so the

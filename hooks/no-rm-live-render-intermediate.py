@@ -114,6 +114,20 @@ different and heavier check (a filesystem walk from an unknown cwd) than
 the text-only match every other branch here uses. Left as a gap rather than
 folded in under review pressure, the same call `warn-blanket-worktree-
 force-remove.py`'s docstring makes about its own known-limitation section.
+
+`_resolve_program`'s post-wrapper lookahead is bounded by
+`WRAPPER_ARG_WINDOW` (6 tokens, imported from `shellcmd.py`), the same bound
+`strip_env`/`command_program` already accept for the identical class of
+scan. A wrapper carrying 6 or more of its OWN argument tokens ahead of the
+real program defeats detection -- measured,
+`sudo -u me -H -E -i -n rm paper.rmarkdown` (5 wrapper-option tokens) is not
+denied, while `sudo -u me -H rm paper.rmarkdown` (2) is. Unlike the
+`git clean -fdx` gap above, there is no principled fix that stays a
+text-only match: widening the window only moves the same boundary rather
+than removing it, and `shellcmd.py`'s own comment for `WRAPPER_ARG_WINDOW`
+gives the reason to leave it shared rather than growing it here alone --
+"bounds the scan so an unrelated command running git much later on the
+line is not mistaken for a wrapped one."
 """
 from __future__ import annotations
 

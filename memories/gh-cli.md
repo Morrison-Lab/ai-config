@@ -947,8 +947,8 @@
   When commenting on a pull request from a workflow job or token with only `issues: write` scope, `gh issue comment <pr-number>` fails with an authorization error.
   This happens because `gh issue comment` calls GraphQL's `addComment` mutation under the hood, and GitHub's GraphQL schema requires `pull_requests: write` whenever the commented issue is a pull request.
   In contrast, the REST endpoint `POST /repos/{owner}/{repo}/issues/{issue_number}/comments` with `Content-Type: application/json` accepts either `issues: write` or `pull_requests: write`.
-  - **Do:** in workflows with `issues: write` commenting on PRs (e.g. comment-triggered dispatchers), use the REST endpoint piping JSON through stdin to avoid backtick expansion vulnerabilities:
-    `printf '%s\n' "$BODY" | jq -Rs '{body: .}' | gh api --method POST "repos/{owner}/{repo}/issues/{issue_number}/comments" --input -`.
+  - **Do:** in workflows with `issues: write` commenting on PRs (e.g. comment-triggered dispatchers), use the REST endpoint piping JSON through stdin without an added newline and with explicit JSON content-type:
+    `printf '%s' "$BODY" | jq -Rs '{body: .}' | gh api "repos/{owner}/{repo}/issues/{issue_number}/comments" --method POST -H "Content-Type: application/json" --input -`.
   - **Don't:** use `gh issue comment` in jobs lacking `pull_requests: write` when commenting on pull requests, or pass raw markdown bodies via unescaped `-f body=...` flags.
   (Measured 2026-09-24 on [Morrison-Lab/gha#931](https://github.com/Morrison-Lab/gha/issues/931) ([PR #933](https://github.com/Morrison-Lab/gha/pull/933)).)
 

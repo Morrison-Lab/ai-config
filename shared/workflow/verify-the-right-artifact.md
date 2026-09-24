@@ -1954,19 +1954,21 @@ This one swaps a document for its **filesystem metadata**, which resembles it no
 Measured 2026-09-23 on [`Morrison-Lab/mlg`](https://github.com/Morrison-Lab/mlg) PR 20.
 A vendored mirror of Stanford's CS229 was described as "Autumn 2008" in two repositories' READMEs, in two directory names (`cs229-stanford-2008`, `cs229-see-2008`), in three commit messages and in four issue comments.
 No document said so.
-`practice-midterm.pdf` heads itself "CS 229, Autumn 2007"; all four problem sets and all four solution keys head themselves "CS 229, Public Course" and name no term at all; the mirror's own course page names only the instructor, and its sole `2007` and `2008` strings sit inside markup rather than visible text.
+`practice-midterm.pdf` heads itself "CS 229, Autumn 2007";
+all four problem sets and all four solution keys head themselves "CS 229, Public Course" and name no term at all;
+the mirror's own course page names only the instructor, and its sole `2007` and `2008` strings sit inside markup rather than visible text.
 
 The year came from `ls -la` --- the files' October 2008 modification dates.
 That is a real measurement of a real property, and it answers a different question: **when this copy was written**, not **which offering produced it**.
-The two answers are both dates attached to the same file, which is what makes the substitution invisible; and a publication date being later than the term it publishes is the normal case rather than a warning sign.
+The two answers are both dates attached to the same file, which is what makes the substitution invisible;
+and a publication date being later than the term it publishes is the normal case rather than a warning sign.
 
 Three things made it durable rather than a passing slip.
 The claim was written into directory *names*, so every later reference restated it as established fact.
 The files had been handled extensively --- checksummed, sized, typed, moved --- so the session had every feeling of familiarity with them and had still never opened one.
 And `file` was run, which reports a PDF's page-tree metadata: on a 26 MB, 1098-page book it said "3 pages", which is the same metadata-for-content confusion one level down.
 
-The general form is worth stating because it is not specific to dates:
-**a property that a file *has* is not a property the file *asserts*.**
+The general form is worth stating because it is not specific to dates: **a property that a file *has* is not a property the file *asserts*.**
 Size, mtime, permissions, path, and the filename itself are all facts about the copy in front of you.
 Provenance --- who made it, when, for which offering, under what licence --- is a claim, and a claim has to be read out of the content or its source page.
 A filename that encodes provenance (`Bishop-...-2006.pdf`) is somebody else's undocumented claim, not a source.
@@ -1977,4 +1979,5 @@ It deliberately does not count a `WebFetch` as evidence --- the measured session
 - **Do:** extract the document's own text (`pdftotext -f 1 -l 1 <file> -`) before writing any provenance claim about it, and quote what it returned.
 - **Do:** treat a filename that encodes a date or a term as a claim needing the same check, not as the check.
 - **Don't:** derive a provenance fact from an mtime, a size, or a path --- those describe the copy, not the work.
-- **Don't:** read familiarity with a file as having read it; checksumming, moving and typing a file all leave its content unopened.
+- **Don't:** read familiarity with a file as having read it;
+  checksumming, moving and typing a file all leave its content unopened.

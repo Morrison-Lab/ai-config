@@ -395,7 +395,11 @@ RX_HEREDOC = re.compile(
     # dropped the verdict echo below it (review finding 14). `$` under
     # MULTILINE anchors the line end. There is no DOTALL here and no `.` for
     # it to act on -- an earlier comment claimed otherwise, and
-    # `RX_HEREDOC.flags` is `re.MULTILINE` alone (round 5, finding 7).
+    # `RX_HEREDOC.flags & re.DOTALL` is 0 (round 5, finding 7). Do not
+    # write that as "`flags` is `re.MULTILINE` alone": the value is 40,
+    # because Python sets `re.UNICODE` implicitly on every `str` pattern,
+    # so the stated check would not reproduce for a reader who ran it
+    # (round 6, finding 7).
     #
     # Indentation is conditional on the dash, because bash's is. A plain
     # `<<EOF` ends only on a delimiter at column 0, so an indented `    EOF`
@@ -444,10 +448,17 @@ RX_HEREDOC = re.compile(
 # writes: a verdict echo whose prose used `$((1 << 0))` 33 times exempted
 # itself. Openers are counted with the same shape `RX_HEREDOC` opens on
 # instead, so body prose no longer votes.
+#
+# The opener pattern stops at the delimiter word and does NOT run to the end
+# of the line. `findall` is non-overlapping, so a trailing `[^\n]*\n` folds
+# every opener sharing a line into one match -- 3200 of them counted as 1
+# (round 6, finding 1). The bound then stopped bounding while looking
+# untouched, and `RX_HEREDOC`, which restarts at each `<<WORD` within a line,
+# ran its quadratic scan unchecked: 13.35 s on a 6463-byte command here,
+# paid as a stall of the Bash call this hook gates. Counting the token alone
+# keeps the counter and the scanner agreeing about what an opener is.
 MAX_HEREDOC_OPENERS = 32
-RX_HEREDOC_OPENER = re.compile(
-    r"<<-?[ \t]*['\"]?[A-Za-z_][A-Za-z0-9_]*['\"]?[^\n]*\n"
-)
+RX_HEREDOC_OPENER = re.compile(r"<<-?[ \t]*['\"]?[A-Za-z_][A-Za-z0-9_]*")
 
 
 def _heredoc_body_for(command, segment):
@@ -596,15 +607,31 @@ _ATTACHES = getattr(_clean_claim, "_ATTACHES", None)
 # these eighteen words as its own list, so fourteen clause breaks were still
 # being eaten as asides (finding 2). The words are named once here and both
 # patterns are built from the name.
-_CLAUSE_OPENERS = (
-    r"but|and|or|so|however|though|although|while|whereas"
+# The split into coordinators and subordinators is load-bearing, not tidying:
+# the two classes need DIFFERENT aside tests (see `RX_ASIDE`). A coordinator
+# joins two independent clauses and so can never open an appositive; a
+# subordinator can do either.
+_COORDINATORS = r"but|and|or|so"
+_SUBORDINATORS = (
+    r"however|though|although|while|whereas"
     r"|after|before|until|since|because|once|unless|if|now\s+that"
 )
-# `yet` and `nor` open a clause the same way but are NOT scope breaks here,
-# for the reason given just above. Standing ALONE between two commas they are
-# still a clause boundary rather than an aside, so the aside test takes the
-# union and the scope test does not.
-_ASIDE_OPENERS = _CLAUSE_OPENERS + r"|yet|nor"
+_CLAUSE_OPENERS = _COORDINATORS + r"|" + _SUBORDINATORS
+# `yet` and `nor` are deliberately absent from BOTH lists, which reverses an
+# earlier decision here. They are not scope breaks: `yet` is also an adverb
+# inside the negated clause ("Nothing is yet addressed"), and `nor` is
+# already a member of `NEGATION_RX`. Rounds 4 and 5 additionally kept them
+# out of the ASIDE test, reasoning that `, yet,` between two commas is a
+# clause boundary rather than an appositive. That reasoning is sound and the
+# behaviour it bought was wrong, because eliding is leftmost-first: refusing
+# the `, yet,` span spends the elision on the NEXT comma pair instead, and
+# that pair is the genuine aside whose removal was carrying a real scope
+# break. Measured over ten sentences, dropping the union flips exactly one --
+# "Nothing is blocking, yet, because of the rename, all five are addressed"
+# goes from silent to warning, correctly -- and leaves every honest control
+# silent (round 6, finding 8). The counter-intuitive half is that eliding
+# MORE warns MORE, so this is not a relaxation.
+_ASIDE_COORDINATORS = _COORDINATORS
 
 SCOPE_BREAK_RX = re.compile(
     r"--|[;:|]"
@@ -627,22 +654,35 @@ SCOPE_BREAK_RX = re.compile(
 # the clause after it (review finding 2). Skipping that pair makes the NEXT
 # pair, the real aside, the match.
 #
-# The test is that the span IS the connector, not that it opens with one.
-# Round 4 wrote the opening form, which disqualifies every genuine aside
-# beginning with a subordinator: `, though small and fiddly,` is an
-# appositive whose `though` belongs to it, and refusing to elide it leaves
-# `SCOPE_BREAK_RX` finding that `though` and warning on an honest
-# self-review. Requiring the closing comma to follow the word immediately
-# separates the two shapes without a second vocabulary.
+# The disqualifying test differs by class, and collapsing the two is how
+# rounds 4 and 5 each broke the other's case.
+#
+# A COORDINATOR disqualifies the span whenever it OPENS it. It cannot open an
+# appositive, so nothing is lost, and the opening form is what catches an
+# adverbial following it: `, and as noted,` is the same clause boundary as
+# `, and,`. Round 5 narrowed this to "the span IS the connector" and thereby
+# silenced three natural comma splices that round 4 warned on -- whether a
+# comma happens to follow `and` is punctuation taste, not grammar (round 6,
+# finding 2).
+#
+# A SUBORDINATOR disqualifies only when it IS the span. `, though small and
+# fiddly,` is a genuine appositive whose `though` belongs to it, and refusing
+# to elide it leaves `SCOPE_BREAK_RX` finding that `though` and warning on an
+# honest self-review. That harm is reachable only over a vocabulary that
+# CONTAINS subordinators, which round 4's six-word list did not -- an earlier
+# comment here blamed round 4's opening form for it, and round 4 is in fact
+# silent on the cited sentence (round 6, finding 6).
+_BRACKETED = r"\([^()]*\)|\[[^\[\]]*\]"
 RX_ASIDE = re.compile(
-    r"\([^()]*\)|\[[^\[\]]*\]"
-    r"|,(?!\s*(?:" + _ASIDE_OPENERS + r")\s*,)[^,.;:!?]*,",
+    _BRACKETED
+    + r"|,(?!\s*(?:" + _ASIDE_COORDINATORS + r")\b"
+      r"|\s*(?:" + _SUBORDINATORS + r")\s*,)[^,.;:!?]*,",
     re.I,
 )
 # Parentheses and brackets alone. Their extent is unambiguous, so they may be
 # blanked anywhere; a comma span's extent is a GUESS, and the wrong guess
 # deletes the sentence's own subject (see `_governs`).
-RX_ASIDE_BRACKETED = re.compile(r"\([^()]*\)|\[[^\[\]]*\]")
+RX_ASIDE_BRACKETED = re.compile(_BRACKETED)
 
 
 def _blank(rx, text):

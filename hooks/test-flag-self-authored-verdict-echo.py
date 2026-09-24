@@ -179,6 +179,31 @@ ECHO_CONJUNCTION_COMMA_PAIR_AND = (
     "Nothing is blocking, and, as noted, all five are addressed in `f120e5a`.\n"
 ) % NOT_CLEAN
 
+# Round 6, finding 2: the same clause boundary with an adverbial between the
+# conjunction and its comma. Only punctuation separates these from
+# ECHO_CONJUNCTION_COMMA_PAIR_AND above.
+ECHO_COORD_ADVERBIAL_AND = (
+    "### Verdict\n**%s**\n\n"
+    "Nothing is blocking, and as noted, all five are addressed in `f120e5a`.\n"
+) % NOT_CLEAN
+
+ECHO_COORD_ADVERBIAL_BUT = (
+    "### Verdict\n**%s**\n\n"
+    "Nothing is blocking, but in the end, all five are addressed in `f120e5a`.\n"
+) % NOT_CLEAN
+
+ECHO_COORD_ADVERBIAL_SO = (
+    "### Verdict\n**%s**\n\n"
+    "Nothing is blocking, so after review, all five are addressed in `f120e5a`.\n"
+) % NOT_CLEAN
+
+# Round 6, finding 8: a `yet` boundary followed by a genuine comma aside.
+ECHO_YET_BEFORE_ASIDE = (
+    "### Verdict\n**%s**\n\n"
+    "Nothing is blocking, yet, because of the rename, all five are addressed"
+    " in `f120e5a`.\n"
+) % NOT_CLEAN
+
 ECHO_CONJUNCTION_COMMA_PAIR_BUT = (
     "### Verdict\n**%s**\n\n"
     "None of it is done, but, crucially, all five are addressed in `f120e5a`.\n"
@@ -497,6 +522,26 @@ def main():
           mcp(ECHO_BARE_HOWEVER_COMMA_PAIR), True)
     check("a `, and,` pair is a clause boundary, not an aside",
           mcp(ECHO_CONJUNCTION_COMMA_PAIR_AND), True)
+    # Round 6, finding 2. Round 5 narrowed the aside lookahead from "the span
+    # OPENS with a connector" to "the span IS the connector", which made a
+    # comma after `and` decide the verdict: `, and,` warned while `, and as
+    # noted,` went silent. That is punctuation taste, not grammar, and all
+    # three of these warned before the narrowing. A coordinator cannot open
+    # an appositive, so it takes the opening form; only a subordinator needs
+    # the IS form, which is what keeps `, though small and fiddly,` elidable.
+    check("a coordinator plus an adverbial is still a clause boundary (and)",
+          mcp(ECHO_COORD_ADVERBIAL_AND), True)
+    check("a coordinator plus an adverbial is still a clause boundary (but)",
+          mcp(ECHO_COORD_ADVERBIAL_BUT), True)
+    check("a coordinator plus an adverbial is still a clause boundary (so)",
+          mcp(ECHO_COORD_ADVERBIAL_SO), True)
+    # Round 6, finding 8. `_ASIDE_COORDINATORS` carried `|yet|nor`, which no
+    # case pinned: dropping it left the whole suite green. It was also the
+    # wrong answer, because eliding is leftmost-first -- refusing the
+    # `, yet,` span spent the elision on the NEXT comma pair, and that pair
+    # was the genuine aside carrying a real scope break.
+    check("a yet-clause boundary ahead of a real aside still warns",
+          mcp(ECHO_YET_BEFORE_ASIDE), True)
     check("a `, but,` pair is a clause boundary, not an aside",
           mcp(ECHO_CONJUNCTION_COMMA_PAIR_BUT), True)
     # Two heredocs, and the one the post reads is the SECOND. An earlier draft
@@ -542,6 +587,19 @@ def main():
                "gh pr comment 1 --body-file /tmp/v.md\n" % ECHO_DISPOSITION)
     check("a command past the opener bound is refused rather than scanned",
           mod._heredoc_body_for(_many, _many) is None, True)
+    # Round 6, finding 1. `_many` puts one opener per line, so it passed
+    # while the counter's trailing `[^\n]*\n` folded every opener SHARING a
+    # line into one match: 3200 counted as 1, the bound stopped bounding, and
+    # `RX_HEREDOC`'s quadratic scan ran unchecked for 13.35 s on a 6463-byte
+    # command -- paid as a stall of the Bash call this hook gates. The axis
+    # the defect lives on is openers-per-line, which no case varied.
+    check("openers sharing one line are counted individually",
+          len(mod.RX_HEREDOC_OPENER.findall("x <<A <<B <<C\n")), 3)
+    _oneline = ("x " + "<<EOF " * (mod.MAX_HEREDOC_OPENERS + 1) + "\n"
+                + "cat > /tmp/v.md <<'A'\n%s\nA\n"
+                  "gh pr comment 1 --body-file /tmp/v.md\n" % ECHO_DISPOSITION)
+    check("a one-line command past the opener bound is refused too",
+          mod._heredoc_body_for(_oneline, _oneline) is None, True)
     # Round 5, finding 3. The bound counted every `<<` in the raw command,
     # including the ones the BODY writes, so a verdict echo whose prose
     # quoted a shift operator 33 times exempted itself -- silently, because

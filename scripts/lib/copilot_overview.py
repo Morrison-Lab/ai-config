@@ -141,9 +141,7 @@ comment span is read as that block's field. A live match OUTSIDE every
 block (not cited, not in a comment, not in a ``<details>`` region) is
 an orphan: typically a block whose own marker was excluded as cited
 while its content was not. A nonzero orphan is decisive, an
-unparseable one gives no verdict, and a zero one is ignored. Only when
-such an orphan exists does a second, whole-body comment and details
-scan run.
+unparseable one gives no verdict, and a zero one is ignored.
 """
 from __future__ import annotations
 
@@ -868,12 +866,14 @@ def _copilot_v2_findings_count(
     The main search is restricted to the actual overview block(s)
     (`_copilot_overview_block_spans`, see the module docstring's last
     section), and a match landing inside an HTML comment within a block
-    is skipped, not counted. A second, orphan scan then reads live lines
-    outside every block: nonzero is decisive, unparseable gives no
-    verdict, zero is ignored (see the comment above that loop) -- both are structural fixes for non-rendered
+    is skipped, not counted -- both are structural fixes for non-rendered
     content (an indented pseudo-code-block field, or one hidden inside a
     multi-line `<!-- ... -->` comment) reading as the real field
-    ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review). No
+    ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review).
+    A second, orphan scan then reads live lines outside every block, so
+    a real block whose own marker was excluded is not silently dropped:
+    nonzero is decisive, unparseable gives no verdict, zero is ignored
+    (see the comment above that loop). No
     block found at all means this body carries no v2 overview -- absent,
     not merely unparseable -- so this returns None exactly as it already
     does when a recognisable line is missing.

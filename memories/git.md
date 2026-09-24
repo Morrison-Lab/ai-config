@@ -1225,3 +1225,12 @@ echo "rc=$?"
 - **Do:** print `rc=$?` on the commit's own line, and confirm with `git log --oneline -1` plus `git status --short` before reporting a commit as made.
 - **Don't:** feed `git commit -F -` from a heredoc inside a compound command.
 - **Don't:** report a commit landed on the strength of having issued the command.
+
+## A `.gitattributes` extension pattern is case-sensitive wherever the checkout is
+
+`*.jpg binary` does not match `GATES.JPG` on a case-sensitive checkout, and macOS hides that:
+a default macOS checkout runs `core.ignorecase=true`, so the pattern appears to match there,
+while a Linux CI checkout defaults to `core.ignorecase=false` and the same pattern silently stops matching.
+This is the shape that passes local testing and review and only fails once CI (or a Linux collaborator) checks it out.
+Verify with `git check-attr <attr> -- <path>` against the real filename's actual case rather than trusting a local merge/diff test.
+See [`configure-gitattributes`](../skills/configure-gitattributes/SKILL.md) step 3 for the full write-up.

@@ -6614,6 +6614,108 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) == "clean",
     )
 
+    # ai-config#3899 review finding, seventeenth round (PR ai-config#3906
+    # Copilot review, second round on `_copilot_overview_block_spans`):
+    # the marker and heading were two INDEPENDENTLY optional block-start
+    # signals rather than one combined requirement, and the marker had no
+    # line anchor.
+    check(
+        "copilot_verdict: a bare marker with no heading following it "
+        "opens no block",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n### \U0001f7e2 Approval recommended\n\n"
+            "prose\n\n**Findings:** None\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: a marker followed (much later, past an "
+        "unrelated section) by the heading opens no block",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n### \U0001f7e2 Approval recommended\n\n"
+            "prose\n\n## Some unrelated section\n\nmore prose\n\n"
+            "## Copilot review overview\n\n**Findings:** None\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: a blockquoted marker does not open a block",
+        checker.copilot_verdict(
+            "> <!-- ccr-overview-v2 -->\n> \n> ## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: a mid-line marker (quoted in prose) does not "
+        "open a block",
+        checker.copilot_verdict(
+            "Quoting: <!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: a marker whose heading is separated from it by "
+        "a line of prose does not open a block",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\nSome prose in between.\n"
+            "## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: the real fixture shape (marker immediately "
+        "followed by its heading, blank line between) still classifies "
+        "clean",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Review effort:** Lite  \n**Findings:** None\n\n"
+            "<details>\n<summary>x</summary>\ny\n</details>"
+        ) == "clean",
+    )
+    check(
+        "copilot_verdict: a marker directly adjacent to its heading (no "
+        "blank line at all) still opens a block",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None"
+        ) == "clean",
+    )
+    # Several marker+heading pairs: the any-nonzero-wins rule already
+    # combining several Findings lines WITHIN one block extends across
+    # separate blocks with no additional logic, since every block's
+    # candidate lines feed the same combine loop.
+    check(
+        "copilot_verdict: two blocks, first 'None' then second nonzero, "
+        "is not clean (order does not matter)",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n\n"
+            "<details>\nx\n</details>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n"
+        ) == "not-clean",
+    )
+    check(
+        "copilot_verdict: two blocks, first nonzero then second 'None', "
+        "is not clean (order does not matter)",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n\n"
+            "<details>\nx\n</details>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "not-clean",
+    )
+    check(
+        "copilot_verdict: two blocks, both 'None', is clean",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n\n"
+            "<details>\nx\n</details>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "clean",
+    )
+
     # ai-config#3899 review finding, thirteenth round (PR ai-config#3906
     # Copilot review): COPILOT_FINDINGS_LINE was unanchored, matching
     # `**Findings:**` anywhere in the body -- mid-sentence prose quoting an

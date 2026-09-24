@@ -93,24 +93,51 @@ The fix is structural rather than a further pattern exclusion, per the
 same reasoning that already replaced this module's counting logic with a
 grammar: restrict the SEARCH REGION to the actual overview block, and
 independently reject any match that lands inside an HTML comment even
-within that region. ``_copilot_overview_block_span`` locates that region:
-it starts at the ``<!-- ccr-overview-v2 -->`` marker if present, or the
-``## Copilot review overview`` heading if not (both are seen across the
-real #1635 fixtures, always together and in that order; using EITHER as
-a fallback start keeps this robust to a future body that drops one), and
-ends immediately before the first ``<details`` tag or the next ``##``
-heading that follows -- whichever comes first -- treating the block's own
-``## Copilot review overview`` heading (when it follows a marker) as part
-of the start, not as "the next heading" that would immediately end the
-block at itself. ``_find_html_comment_spans`` then locates every
-``<!--...-->`` span in the body with a linear ``str.find``-based scan
-(not a lazy-dot regex, which would reintroduce the exact
-"every unclosed opener rescans to the end" quadratic trap this module's
-tokenizer already avoids for tag matching -- an unclosed ``<!--`` is
-treated as extending to the end of the string, which is also the correct
-fail-closed direction: content after a comment that never closes should
-not be trusted as real). A ``**Findings:**`` match is accepted only when
-it falls within the block span AND outside every comment span.
+within that region.
+
+``_copilot_overview_block_spans`` locates every such region (PR
+ai-config#3906 Copilot review, second round on this same function: a
+bare marker with no heading, or a heading found much later past an
+unrelated section, both used to open a "trusted" block on their own).
+The block START is now ONE combined pattern requiring the marker AND the
+``## Copilot review overview`` heading immediately after it, with only
+blank/whitespace-only lines allowed between them -- not two independently
+optional signals. The marker is also now line-anchored, like every
+sibling boundary pattern in this module, so it cannot open a block from
+inside a blockquote or mid-sentence prose quoting an earlier round's
+marker. There is no heading-only fallback: every real ccr-overview-v2
+fixture (the transcribed Lacaedemon/sparta#1635 bodies, and every
+constructed fixture in scripts/test_check_pr_fully_clean.py) carries the
+marker, so a body with the heading but no marker is not a shape any real
+fixture needs to support, and treating it as a block start would revive
+exactly the "one signal alone is enough" gap this round closes. A body
+with no marker+heading pair at all yields no block, meaning no v2
+verdict -- the same as before.
+
+Several marker+heading pairs can appear in one body (an earlier round's
+overview quoted ahead of the current one, or vice versa), so
+``_copilot_overview_block_spans`` returns every one found, each with its
+own end -- the first ``<details`` tag or next ``##`` heading following
+THAT pair, not a single body-wide end. ``_copilot_v2_findings_count``
+then searches every block's own span, and the existing any-nonzero-wins
+combine rule (already scanning every uncited ``**Findings:**`` line
+within one block) needs no separate cross-block rule: it already applies
+across the concatenated set of candidate lines from every block, exactly
+as if they had all been in a single region, so a nonzero finding in a
+LATER block still overrides an earlier block's zero, and vice versa.
+
+``_find_html_comment_spans`` locates every ``<!--...-->`` span in the
+body with a linear ``str.find``-based scan (not a lazy-dot regex, which
+would reintroduce the exact "every unclosed opener rescans to the end"
+quadratic trap this module's tokenizer already avoids for tag matching --
+an unclosed ``<!--`` is treated as extending to the end of the string,
+which is also the correct fail-closed direction: content after a comment
+that never closes should not be trusted as real), computed once up to
+the FURTHEST block's end (not once per block, and not over the whole
+body) so its cost stays bounded by the total blocks' own extent rather
+than compounding per block or tracking unrelated trailing content. A
+``**Findings:**`` match is accepted only when it falls within some
+block's span AND outside every comment span.
 """
 from __future__ import annotations
 
@@ -120,14 +147,28 @@ from typing import Callable, List, Optional, Tuple
 COPILOT_FINDINGS_LINE = re.compile(
     r"(?:^|\n)[ ]{0,3}\*\*Findings:\*\*[ \t]*(?P<rest>[^\n\r]*)", re.IGNORECASE
 )
-# Locate the actual Copilot v2 overview block rather than searching the
-# whole body -- see the module docstring's last section for why. All three
+# Locate every actual Copilot v2 overview block rather than searching the
+# whole body -- see the module docstring's last section for why. All
 # patterns are simple bounded literals/alternations with no lazy-dot or
-# self-ambiguous repetition, so each `.search()` call is a single linear
-# scan (shared/coding/regex-backtracking-pitfalls.md).
-_COPILOT_OVERVIEW_MARKER = re.compile(r"<!--\s*ccr-overview-v2\s*-->")
-_COPILOT_OVERVIEW_HEADING = re.compile(
-    r"(?:^|\n)[ ]{0,3}##[ \t]+Copilot review overview\b", re.IGNORECASE
+# self-ambiguous repetition, so each `.search()`/`.finditer()` call is a
+# single linear scan (shared/coding/regex-backtracking-pitfalls.md).
+#
+# The marker and the heading are ONE combined pattern, not two
+# independently optional signals (PR ai-config#3906 Copilot review,
+# second round): line-anchored like every sibling boundary here (so a
+# blockquoted or mid-sentence quote of an earlier round's marker cannot
+# open a block), and requiring the heading immediately after the marker
+# with only blank/whitespace-only lines between -- `(?:[ \t]*\n)+`
+# consumes the marker's own line ending plus any number of blank lines,
+# and stops (with no backtracking needed) the instant it reaches a
+# non-blank line, so a real heading right after matches in one pass and
+# a marker with no adjacent heading, or one found only much later past
+# an unrelated section, matches nothing at all.
+_COPILOT_OVERVIEW_START = re.compile(
+    r"(?:^|\n)[ ]{0,3}<!--\s*ccr-overview-v2\s*-->"
+    r"(?:[ \t]*\n)+"
+    r"[ ]{0,3}##[ \t]+Copilot review overview\b",
+    re.IGNORECASE,
 )
 _COPILOT_DETAILS_OPEN = re.compile(r"(?:^|\n)[ ]{0,3}<details\b", re.IGNORECASE)
 _COPILOT_NEXT_HEADING = re.compile(r"(?:^|\n)[ ]{0,3}##[ \t]")
@@ -148,39 +189,32 @@ _COPILOT_WS_ONLY = re.compile(r"^[ \t]*$")
 _COPILOT_NONE_LINE = re.compile(r"^[ \t]*None[ \t]*$", re.IGNORECASE)
 
 
-def _copilot_overview_block_span(scan: str) -> Optional[Tuple[int, int]]:
-    """Return the (start, end) character span of the Copilot v2 overview
-    block in `scan`, or None if no block start (marker or heading) is
-    found at all -- meaning this body carries no v2 overview, and any
-    `**Findings:**`-looking text elsewhere is not a real field.
+def _copilot_overview_block_spans(scan: str) -> List[Tuple[int, int]]:
+    """Return the (start, end) character span of every Copilot v2 overview
+    block in `scan` -- normally zero or one, but a body can legitimately
+    quote an earlier round's overview ahead of (or after) its own current
+    one, each carrying a genuine marker+heading pair.
 
     See the module docstring's last section for the block boundary rule.
-    The block's own `## Copilot review overview` heading, when it follows
-    a found marker, is consumed as part of the start rather than left for
-    the "next heading" search: since it is located with the SAME
-    heading-specific pattern, whatever `_COPILOT_OVERVIEW_HEADING` finds
-    after the marker cannot be a DIFFERENT heading by construction, so
-    there is no ambiguity to resolve with a distance heuristic.
+    Each block starts where `_COPILOT_OVERVIEW_START` matches (the marker
+    immediately followed by its heading, with only blank lines between --
+    a bare marker with no heading, or a heading found later past some
+    other content, matches nothing and opens no block) and ends
+    immediately before the first `<details` tag or next `##` heading that
+    follows THAT block's own start, not a single body-wide end. An empty
+    list means this body carries no v2 overview at all.
     """
-    marker = _COPILOT_OVERVIEW_MARKER.search(scan)
-    if marker is not None:
-        start = marker.start()
-        search_from = marker.end()
-        own_heading = _COPILOT_OVERVIEW_HEADING.search(scan, search_from)
-        if own_heading is not None:
-            search_from = own_heading.end()
-    else:
-        heading = _COPILOT_OVERVIEW_HEADING.search(scan)
-        if heading is None:
-            return None
-        start = heading.start()
-        search_from = heading.end()
-    end = len(scan)
-    for pattern in (_COPILOT_DETAILS_OPEN, _COPILOT_NEXT_HEADING):
-        m = pattern.search(scan, search_from)
-        if m is not None and m.start() < end:
-            end = m.start()
-    return (start, end)
+    spans: List[Tuple[int, int]] = []
+    for start_m in _COPILOT_OVERVIEW_START.finditer(scan):
+        start = start_m.start()
+        search_from = start_m.end()
+        end = len(scan)
+        for pattern in (_COPILOT_DETAILS_OPEN, _COPILOT_NEXT_HEADING):
+            m = pattern.search(scan, search_from)
+            if m is not None and m.start() < end:
+                end = m.start()
+        spans.append((start, end))
+    return spans
 
 
 def _find_html_comment_spans(text: str) -> List[Tuple[int, int]]:
@@ -407,27 +441,28 @@ def _copilot_v2_findings_count(
     but in neither recognised shape (a future format this function does
     not know).
 
-    The search is restricted to the actual overview block
-    (`_copilot_overview_block_span`, see the module docstring's last
-    section), and a match landing inside an HTML comment within that
-    block is skipped, not counted -- both are structural fixes for
-    non-rendered content (an indented pseudo-code-block field, or one
-    hidden inside a multi-line `<!-- ... -->` comment) reading as the real
-    field (ai-config#3899 review finding, PR ai-config#3906 Copilot
-    review). No block found at all means this body carries no v2 overview
-    -- absent, not merely unparseable -- so this returns None exactly as
-    it already does when a recognisable line is missing.
+    The search is restricted to the actual overview block(s)
+    (`_copilot_overview_block_spans`, see the module docstring's last
+    section), and a match landing inside an HTML comment within a block
+    is skipped, not counted -- both are structural fixes for non-rendered
+    content (an indented pseudo-code-block field, or one hidden inside a
+    multi-line `<!-- ... -->` comment) reading as the real field
+    (ai-config#3899 review finding, PR ai-config#3906 Copilot review). No
+    block found at all means this body carries no v2 overview -- absent,
+    not merely unparseable -- so this returns None exactly as it already
+    does when a recognisable line is missing.
 
-    Scans every uncited line within the block rather than committing to
+    Scans every uncited line across every block rather than committing to
     the first (ai-config#3899 review finding), the same way the caller
     scans every uncited match of its own negative/affirmative heading and
     legacy count patterns: a body carrying two uncited `**Findings:**`
     lines -- `None` followed by a genuine `5 <picture...>` from a later
-    round, or the reverse order -- must not let either line's zero win
-    over the other's nonzero. A nonzero count on any uncited line is
-    decisive and returned immediately; failing that, any unparseable line
-    makes the whole result None; only when every uncited line parses to
-    exactly zero does this return 0.
+    round, or the reverse order, whether within one block or across two
+    separate marker+heading pairs -- must not let either line's zero win
+    over the other's nonzero. A nonzero count on any uncited line, in any
+    block, is decisive and returned immediately; failing that, any
+    unparseable line makes the whole result None; only when every uncited
+    line across every block parses to exactly zero does this return 0.
 
     `match_is_cited` is injected rather than imported: it is the caller's
     own general-purpose citation-span check (used for several other
@@ -435,43 +470,43 @@ def _copilot_v2_findings_count(
     so keeping it in the caller and passing it in here avoids a reverse
     dependency from this library module back onto its only consumer.
     """
-    block = _copilot_overview_block_span(scan)
-    if block is None:
+    blocks = _copilot_overview_block_spans(scan)
+    if not blocks:
         return None
-    block_start, block_end = block
-    # Bounded to `scan[:block_end]`, not the whole body: a comment span
-    # this function needs to know about can only matter if it overlaps
-    # [block_start, block_end), so scanning past block_end wastes time
-    # proportional to whatever unrelated content follows the block (a
-    # measured 780KB body with a small real block and a huge trailing
-    # section cost ~0.2s scanning for comments that could not possibly
-    # affect the block, against ~0.09s for a comparably-sized body whose
-    # content stayed within the block). A comment that opens before
-    # block_end and closes AFTER it is still handled correctly: slicing
-    # at block_end makes it look "unterminated" within the slice, which
-    # is the same conclusion (its span "extends to block_end" and beyond)
-    # this function only ever needs, since nothing past block_end is
-    # ever checked for containment. Starting the slice at 0 rather than
-    # block_start also keeps a comment that OPENS before the block and
-    # remains open across the boundary correctly detected.
-    comment_spans = _find_html_comment_spans(scan[:block_end])
+    # Comment spans are computed ONCE, up to the FURTHEST block's end, not
+    # once per block: a per-block `scan[:block_end]` call would repeat an
+    # O(distance-from-start) scan for every block, which is quadratic-ish
+    # when many marker+heading pairs are scattered through a large body
+    # (block N's own scan would re-walk everything blocks 1..N-1 already
+    # covered). One bounded scan up to `max(end for _, end in blocks)`
+    # both avoids that and keeps the earlier-established property that a
+    # comment opening before a block and extending into it is still
+    # detected, for every block, not just the first (a measured 780KB
+    # body with a small real block and a huge trailing section cost
+    # ~0.2s scanning for comments that could not possibly affect the
+    # block, against ~0.09s for a comparably-sized body whose content
+    # stayed within the block, before this bound was added; the max-end
+    # form preserves that fix across multiple blocks).
+    max_end = max(end for _, end in blocks)
+    comment_spans = _find_html_comment_spans(scan[:max_end])
     saw_line = False
     saw_unparseable = False
-    for m in COPILOT_FINDINGS_LINE.finditer(scan, block_start, block_end):
-        if match_is_cited(cited, m.start(), m.end()):
-            continue
-        if _position_in_spans(m.start(), comment_spans):
-            continue
-        saw_line = True
-        rest = m.group("rest")
-        if _COPILOT_NONE_LINE.match(rest):
-            continue
-        count = _copilot_v2_line_findings_count(rest)
-        if count is None:
-            saw_unparseable = True
-            continue
-        if count != 0:
-            return count
+    for block_start, block_end in blocks:
+        for m in COPILOT_FINDINGS_LINE.finditer(scan, block_start, block_end):
+            if match_is_cited(cited, m.start(), m.end()):
+                continue
+            if _position_in_spans(m.start(), comment_spans):
+                continue
+            saw_line = True
+            rest = m.group("rest")
+            if _COPILOT_NONE_LINE.match(rest):
+                continue
+            count = _copilot_v2_line_findings_count(rest)
+            if count is None:
+                saw_unparseable = True
+                continue
+            if count != 0:
+                return count
     if not saw_line or saw_unparseable:
         return None
     return 0

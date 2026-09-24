@@ -1486,8 +1486,13 @@ def _is_plain_command(command: str) -> bool:
     sourced file, a function, a substitution -- is invisible to
     `_is_plain_push`. Rather than enumerate those, the exemption accepts only
     this one shape and sends every other command to the ordinary review check.
+
+    `#` is refused anywhere. shlex treats it as a comment wherever it appears,
+    while bash starts a comment only at the beginning of a word, so
+    `git push origin main#z && touch x` lexes here as one bare push while bash
+    runs both commands. A `#` is legal in a ref name, so this is reachable.
     """
-    if re.search(r"[$`;()<\n\\]", command):
+    if re.search(r"[$`;()<#\n\\]", command):
         return False
     try:
         lex = shlex.shlex(command, posix=True, punctuation_chars=True)

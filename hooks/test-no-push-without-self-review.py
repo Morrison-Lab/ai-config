@@ -3155,8 +3155,11 @@ def exempt_repo_cases() -> tuple[int, int]:
         ("cd && git push origin main", False),
         ("git push 'origin main", False),
         ("git push origin main\ngit push other main", False),
-        # A trailing comment is inert to bash, and shlex drops it the same way.
-        ("git push origin main # note", True),
+        # `#` is refused anywhere: shlex reads it as a comment even mid-word,
+        # where bash does not, so a chained command could hide behind it.
+        ("git push origin main # note", False),
+        ("git push origin refs/heads/main#z && touch pwned", False),
+        ("git push origin a#b", False),
     ):
         try:
             got = mod._is_plain_command(command)
@@ -3308,6 +3311,9 @@ def exempt_repo_cases() -> tuple[int, int]:
          origin_mln, [], "push origin main", None, "true && {git}", True),
         ("an exempt push followed by `;` is denied",
          origin_mln, [], "push origin main", None, "{git}; true", True),
+        ("an exempt push chained behind a mid-word `#` is denied",
+         origin_mln, [], "push origin refs/heads/main#z", None,
+         "{git} && true", True),
     ):
         try:
             rc, denied = run_e2e(remotes, configs, args, env, shape)

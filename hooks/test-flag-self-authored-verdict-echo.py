@@ -248,6 +248,20 @@ HONEST_BREAK_IN_PARENTHETICAL = (
     "Nothing (and this matters) is addressed in this branch.\n"
 ) % NOT_CLEAN
 
+# Round 9, finding 5. `_disqualified` elides code spans before scanning, and
+# nothing pinned it: mutating that call to pass the raw prose through changed
+# the verdict on 0 of the 40 fixture bodies, so the whole step could be
+# deleted in silence. It is load-bearing because a span routinely carries
+# punctuation the scope scan reads as structure -- a path's `.` is a sentence
+# end to `RX_CLAUSE_START`, so an unelided `scripts/check.py` cuts the window
+# between this sentence's negator and its disposition phrase and the honest
+# line warns. Measured: with the elision the body is silent, without it both
+# `Changes requested` and `Blocked` report `addressed in`.
+HONEST_NEGATOR_ACROSS_CODE_SPAN = (
+    "### Verdict\n**%s**\n\n"
+    "Nothing in `scripts/check.py` is addressed in `f120e5a`.\n"
+) % NOT_CLEAN
+
 # Round 5, finding 1. Round 4 blanked comma asides across the WHOLE window,
 # and the alternation is leftmost-first, so it paired the comma CLOSING an
 # introductory phrase with the comma OPENING the real appositive -- deleting
@@ -543,6 +557,8 @@ def main():
           mcp(HONEST_BREAK_IN_COMMA_ASIDE), False)
     check("a break token inside a parenthetical does not sever the negator",
           mcp(HONEST_BREAK_IN_PARENTHETICAL), False)
+    check("punctuation inside a code span does not sever the negator",
+          mcp(HONEST_NEGATOR_ACROSS_CODE_SPAN), False)
     check("a negator inside a parenthetical does not govern the sentence",
           mcp(ECHO_NEGATOR_IN_PARENTHETICAL), True)
     check("a negator inside a bracket does not govern the sentence",
@@ -687,14 +703,12 @@ def main():
           mod._scan_budget("x <<EOF\n" * 200)[0] > mod.MAX_HEREDOC_OPENERS,
           True)
     # Round 8, finding 1. A THIRD cost axis the other two cannot see: an
-    # untied opener makes `RX_HEREDOC` scan to the end of the string, so the
-    # cost is untied count times total length. Measured at 3.6 MB of
-    # 4-character lines, 0 untied took 0.33s and 31 took 33.84s while the
-    # restart cost moved by 3000 and the opener count stayed inside its
-    # bound -- 35s against a registered 10-second timeout. Each untied
-    # opener is charged the whole command length now. Asserted as a
-    # comparison rather than a wall-clock measurement, which would be a
-    # flaky test of a fast machine.
+    # untied opener makes `RX_HEREDOC` scan to the end of the string.
+    # Measured at 3.6 MB of 4-character lines, 0 untied took 0.33s and 31
+    # took 33.84s while the restart cost moved by 3000 and the opener count
+    # stayed inside its bound -- 35s against a registered 10-second timeout.
+    # Asserted as a comparison rather than a wall-clock measurement, which
+    # would be a flaky test of a fast machine.
     # ONE-character lines on purpose. The restart cost is the sum of the
     # SQUARES of the line lengths, so 4-character lines already score more
     # than the command's own length and the assertion below passes with the
@@ -714,6 +728,34 @@ def main():
     # pass the check above and silence that case.
     check("a tied heredoc pays no length term",
           _tied_cost < 1000 and _untied_cost > 1000 * _tied_cost, True)
+    # Round 9, finding 1. That measurement held the opener's LINE at 4
+    # characters, so it could not see which factor the term scales with, and
+    # the term it produced -- untied COUNT times total length -- was wrong.
+    # `RX_HEREDOC` opens with `([^\n]*)`, which matches empty, so `finditer`
+    # restarts at every character of the untied opener's line rather than
+    # once per opener sitting on it. Varying the line length instead, at
+    # 200000 trailing lines, L=400/800/1600/2400 took
+    # 5.60s/11.26s/22.78s/34.40s and all four were admitted.
+    #
+    # Isolated against a no-opener control of the same shape, so the sum of
+    # squares -- which grows with the line length too -- cannot carry the
+    # assertion. The remainder is the term itself, and the two remainders
+    # stand in the ratio of the two line lengths only under the line-length
+    # model; under the count model both equal the command length.
+    _pad = "x" * 990
+    _short_term = (mod._scan_budget("cat <<NOPE\n" + _body)[1]
+                   - mod._scan_budget("cat ppNOPE\n" + _body)[1])
+    _long_term = (mod._scan_budget("cat <<NOPE " + _pad + "\n" + _body)[1]
+                  - mod._scan_budget("cat ppNOPE " + _pad + "\n" + _body)[1])
+    check("the untied term scales with the opener LINE's length",
+          _long_term > 50 * _short_term, True)
+    # ... and once per line, not once per opener. Both lines are 13
+    # characters, so every other term is identical and only the count model
+    # separates them.
+    _one_opener = mod._scan_budget("cat <<A ppppp\n" + _body)[1]
+    _two_openers = mod._scan_budget("cat <<A <<B q\n" + _body)[1]
+    check("two untied openers on one line cost what one does",
+          _one_opener == _two_openers, True)
     # Round 7, finding 5. `-F body=@-` and `--body-file -` name STDIN, not a
     # file, so the heredoc feeding them is the single-heredoc case. Adding
     # the `-F/--field` branch captured `-` as a filename and silenced the

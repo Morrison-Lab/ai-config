@@ -107,6 +107,33 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("9 pass.")], True,
      "a bare count with nothing disclosed still blocks"),
+    # Round 9, finding 6. `pending`, `queued`, `in progress`, `in flight` and
+    # `still running` are ordinary English about anything at all, so matching
+    # them bare let four sentences that disclose no pending CHECK work exempt
+    # a bare count. The exemption is the thing that stops this guard firing,
+    # so a false exemption is the expensive direction. The polysemous half
+    # now needs a count or a check noun; the state half -- "not fully clean",
+    # "still failing", "not a clean stopping point" -- does not, because none
+    # of those has a sense that is not about the work.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("9 pass. Merge pending your approval.")], True,
+     "'pending your approval' is not a disclosed pending check"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("12 pass. The release is queued for Friday.")], True,
+     "a queued RELEASE is not a disclosed pending check"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("9 pass. The write-up is still in progress.")], True,
+     "a write-up in progress is not a disclosed pending check"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("9 pass. Her application is pending.")], True,
+     "an application pending is not a disclosed pending check"),
+    # ... and the check-context forms the narrowing must keep.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("9 pass. Checks are still running.")], False,
+     "a check noun governing the vocabulary still exempts"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("9 pass, but the PR is not fully clean.")], False,
+     "the state half needs no check noun to exempt"),
 
     ([READ_FILE_QUERY, READ_FILE_RESULT, say("Checked the file contents.")], False,
      "reading script source containing failure text must not trip query block"),

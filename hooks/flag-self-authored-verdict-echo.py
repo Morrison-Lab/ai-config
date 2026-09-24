@@ -483,14 +483,25 @@ RX_HEREDOC = re.compile(
 #
 # There is a THIRD axis, and bounding the first two left it open: an
 # UNTERMINATED opener makes `RX_HEREDOC` scan from that opener to the end of
-# the string, so the cost is the untied count multiplied by the total
-# length. Neither of the other two sees it. Measured here at 3.6 MB of
+# the string. Neither of the other two sees it. Measured here at 3.6 MB of
 # 4-character lines, 0 untied openers took 0.33s and 31 took 33.84s while
 # the restart cost moved by 3000 and the opener count stayed inside its
 # bound -- 35s against a registered 10-second timeout (round 8, finding 1).
-# So each untied opener is charged the whole command length. A TIED heredoc
-# costs nothing under this term, which is what keeps the 64 KiB body case
-# above admitted; the worst input the bound now admits takes 6.73s.
+#
+# That measurement held the opener's LINE at 4 characters, and the term it
+# produced -- untied count times total length -- was wrong for exactly that
+# reason. `RX_HEREDOC` opens with `([^\n]*)`, which matches empty, so
+# `finditer` restarts at every character of the untied opener's line rather
+# than once per opener sitting on it. Varying the line length instead, at
+# 200000 trailing lines, L=400/800/1600/2400 took 5.60s/11.26s/22.78s/34.40s
+# and all four were admitted at an opener count of 1 (round 9, finding 1).
+#
+# So the charge is the untied LINE's length, once per line, times the total
+# length: two untied openers sharing a line cost what one does, and a long
+# opener line costs what its length says. A TIED heredoc costs nothing under
+# this term, which is what keeps the 64 KiB body case above admitted. The
+# worst input the bound now admits is one untied opener on a 12-character
+# line above 799988 one-character lines, at 0.46s (max of five).
 MAX_HEREDOC_OPENERS = 32
 MAX_SCAN_COST = 20_000_000
 RX_HEREDOC_OPENER = re.compile(r"<<(-)?[ \t]*['\"]?([A-Za-z_][A-Za-z0-9_]*)")
@@ -507,8 +518,8 @@ def _scan_budget(command):
     A body is skipped only when its terminator is actually found. An
     UNTERMINATED heredoc has no body to skip -- and is the pathological case
     itself, since its scan runs to the end of the string -- so its lines are
-    counted like any other AND it is charged the whole command length, which
-    is the only term that sees the untied-count-times-length axis.
+    counted like any other AND that line's own length is charged against the
+    whole command length, which is the only term that sees the third axis.
 
     The opener bound is tested as the scan proceeds and returns early, which
     is what keeps the terminator searches bounded: at most one per admitted
@@ -518,7 +529,7 @@ def _scan_budget(command):
     total = len(lines)
     chars = len(command)
     openers = 0
-    untied = 0
+    untied_span = 0
     cost = 0
     i = 0
     while i < total:
@@ -537,10 +548,13 @@ def _scan_budget(command):
                     break
                 k += 1
             if k >= total:
-                untied += len(found) - nth
+                # This LINE's length, once, not this opener's count. The
+                # restarts are positions on the line, so two untied openers
+                # sharing a line cost what one does (round 9, finding 1).
+                untied_span += len(line)
                 break
             i = k + 1
-    return openers, cost + untied * chars
+    return openers, cost + untied_span * chars
 
 
 def _heredoc_body_for(command, segment):

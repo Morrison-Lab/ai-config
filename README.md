@@ -753,6 +753,17 @@ meets the collision again is pointed at the rule rather than left to
 re-derive it.
 That scope is the whole of it, and an earlier revision of this paragraph
 stated the exemption without it (round 8, finding 6).
+"Disclosed" is narrower than it first reads, too.
+A state the message names outright --- not fully clean, still failing, not a
+clean stopping point --- exempts on its own, because none of those phrases
+has a sense that is not about the work.
+The pending vocabulary does: `pending`, `queued`, `in progress`, `in flight`
+and `still running` are ordinary English about anything at all, so each needs
+a count or a check noun beside it before it discloses anything about a check.
+Without that, "Merge pending your approval" and "Her application is pending"
+each turned a bare count into an exempt progress report, and a false
+exemption is the expensive direction here, since the exemption is what stops
+the guard firing (round 9, finding 6).
 The same hook's *staleness* branch --- the one that fires when the last
 query predates the last push --- is deliberately not exempt, because
 disclosing pending work answers the first branch's question and not the

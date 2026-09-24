@@ -47,10 +47,38 @@ RX_BARE_COUNT = re.compile(r"^\d+\s+pass$", re.I)
 # The discriminator is self-disclosure: a message that STATES its own pending
 # or failing work is reporting progress, whatever counts it also carries, and
 # cannot be concealing the thing this guard exists to surface.
+#
+# Round 9, finding 6. The vocabulary splits in two, and the first draft ran
+# them together. One half STATES a not-clean or failing state outright and
+# has no everyday sense that could reach it by accident. The other half is
+# polysemous -- `pending`, `queued`, `in progress`, `in flight`, `still
+# running` are all ordinary English about anything at all -- so on its own it
+# discloses nothing about a check, and four sentences disclosing no pending
+# CHECK work at all were exempting themselves: "Merge pending your approval",
+# "The release is queued for Friday", "The write-up is still in progress" and
+# "Her application is pending" each turned a bare "9 pass" into an exempt
+# progress report. That is the expensive direction here, since the exemption
+# is what stops this guard firing.
+#
+# So the polysemous half must sit in CHECK context: a count adjacent to it,
+# which is the prescribed progress form the exemption exists for, or a check
+# noun governing it. The two forms this exemption was added to admit are
+# unaffected -- "13 pass, 5 pending" matches on the count and "2 runs still
+# in progress" on the count and the noun together.
+_DISCLOSES_STATE = (
+    r"\bnot (?:yet )?(?:fully )?clean\b|\bstill failing\b|"
+    r"\bnot a clean stopping point\b"
+)
+_PENDING_WORD = r"in[- ]progress|still running|pending|queued|in flight"
+_CHECK_NOUN = (
+    r"check(?:-runs?|s)?|runs?|jobs?|workflows?|pipelines?|reviews?|CI"
+)
 RX_DISCLOSES_PENDING = re.compile(
-    r"\bin[- ]progress\b|\bstill running\b|\bpending\b|\bqueued\b|"
-    r"\bin flight\b|\bnot (?:yet )?(?:fully )?clean\b|\bstill failing\b|"
-    r"\bnot a clean stopping point\b",
+    _DISCLOSES_STATE
+    + r"|\b\d+\s+(?:(?:%s)\s+)?(?:still\s+)?(?:%s)\b"
+    % (_CHECK_NOUN, _PENDING_WORD)
+    + r"|\b(?:%s)\s+(?:(?:are|is|remain|remains)\s+)?(?:still\s+)?(?:%s)\b"
+    % (_CHECK_NOUN, _PENDING_WORD),
     re.I,
 )
 
@@ -558,14 +586,15 @@ def main() -> int:
             # form rather than a clean claim. A non-count assert in the same
             # message still blocks -- disclosing one PR's pending checks does
             # not license calling another PR clean.
-            fail_hit = None
-            for cand in RX_ASSERT.finditer(text):
-                if _is_negated(text, cand):
-                    continue
-                if RX_BARE_COUNT.match(cand.group(0).strip()):
-                    continue
-                fail_hit = cand
-                break
+            # Round 9, finding 7. This was a hand-rolled copy of
+            # `all_unnegated_asserts` with a filter bolted on, so the
+            # negation rule existed in two places and only one of them was
+            # the helper every other caller uses.
+            fail_hit = next(
+                (cand for cand in all_unnegated_asserts(text)
+                 if not RX_BARE_COUNT.match(cand.group(0).strip())),
+                None,
+            )
         if fail_hit is not None:
             print(json.dumps({
                 "decision": "block",

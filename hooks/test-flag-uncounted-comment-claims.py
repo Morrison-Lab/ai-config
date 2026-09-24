@@ -848,9 +848,11 @@ def run_hook(command, cwd=None, tpath=""):
     try:
         payload = {"tool_name": "Bash", "tool_input": {"command": command},
                    "cwd": cwd or os.getcwd(), "transcript_path": tpath}
+        child_env = dict(os.environ, TMPDIR=tmpdir, TMP=tmpdir, TEMP=tmpdir)
+        child_env.pop("ANTIGRAVITY_AGENT", None)
         proc = subprocess.run([sys.executable, SUBJECT], input=json.dumps(payload),
                               capture_output=True, text=True,
-                              env=dict(os.environ, TMPDIR=tmpdir))
+                              env=child_env)
         return proc.stdout.strip()
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
@@ -1005,6 +1007,12 @@ def unit_checks(mod):
     # Regression: bug 2 (routine review-summary phrasing must stay silent).
     check("find_claims silent on routine 'found N issues'/'N commits' phrasing",
           mod.find_claims(ROUTINE_REVIEW_PHRASING), [])
+
+    # Review-housekeeping words (findings, PRs, commits, issues, fixes, bugs)
+    # are deliberately excluded from LISTABLE_NOUN_PATTERN (ai-config#3901).
+    for excluded in ("findings", "PRs", "commits", "issues", "fixes", "bugs"):
+        check(f"LISTABLE_NOUN_RE excludes review-housekeeping noun '{excluded}'",
+              bool(mod.LISTABLE_NOUN_RE.fullmatch(excluded)), False)
 
     # Regression: bug 2's path-citation variant, both shapes.
     check("find_claims silent on a skills/<slug>/SKILL.md path citation",

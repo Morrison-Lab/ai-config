@@ -77,7 +77,8 @@ there.
 - **Do:** run individual composite checker scripts directly via Python in PowerShell (e.g. `NLB_BASE_REF=origin/main python3 check-new-line-breaks/check-new-line-breaks.py`) rather than running `bash check-diff-scoped.sh` from a Windows-linked worktree.
 - **Don't:** assume `check-diff-scoped: not inside a git work tree.` indicates an invalid worktree or corrupt repo;
   the underlying git repository and worktree are valid under native Windows git.
-  (Measured 2026-09-24 during local test validation of [Morrison-Lab/gha#931](https://github.com/Morrison-Lab/gha/issues/931) ([PR #933](https://github.com/Morrison-Lab/gha/pull/933)) in a linked worktree.)
+  (Measured 2026-09-24 in a local linked worktree on Windows during test execution;
+  no linked issue or PR.)
 
 ## Git --- `checkout -B` in a linked worktree silently bypasses the already-checked-out guard
 - Plain `git checkout main` in a linked worktree correctly refuses when `main`

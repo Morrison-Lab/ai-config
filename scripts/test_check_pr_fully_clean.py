@@ -6796,8 +6796,47 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             "**Findings:** None\n\n"
             "<details>\n<summary>x</summary>\ny\n</details>\n\n"
             "## Something else\n\n"
-            "**Findings:** 5 <picture><img></picture>\n"
+            "**Findings:** None\n"
         ) == "clean",
+    )
+    # The fake line above is a ZERO on purpose. An uncited top-level
+    # NONZERO Findings line outside every block is decisive (see
+    # _copilot_v2_findings_count's orphan scan), because it can be a real
+    # block's own content orphaned by a cited marker -- the PR
+    # [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
+    # adversarial review's regression, pinned below.
+    check(
+        "copilot_verdict: a real block orphaned by a code-span-cited marker "
+        "still counts its nonzero Findings line, even when a later clean "
+        "block follows",
+        checker.copilot_verdict(
+            "``<!-- ccr-overview-v2 -->``\n\n## Copilot review overview\n\n"
+            "### Approval recommended\n\n**Findings:** 5\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) != "clean",
+    )
+    check(
+        "copilot_verdict: an uncited top-level nonzero Findings line in a "
+        "LATER section is decisive, not ignored",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Findings:** None\n\n"
+            "## Something else\n\n"
+            "**Findings:** 5 <picture><img></picture>\n"
+        ) != "clean",
+    )
+    check(
+        "copilot_verdict: an uncited top-level UNPARSEABLE Findings line "
+        "outside every block gives no verdict",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Findings:** None\n\n"
+            "## Something else\n\n"
+            "**Findings:** several\n"
+        ) == "",
     )
 
     # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, seventeenth round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)

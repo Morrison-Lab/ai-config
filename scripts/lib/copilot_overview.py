@@ -926,6 +926,48 @@ def _copilot_v2_findings_count(
                 continue
             if count != 0:
                 return count
+    # A live, uncited `**Findings:**` line OUTSIDE every recognised block
+    # is one this function cannot place: typically a block whose own
+    # marker was excluded (cited) while its real content was not, so that
+    # content is orphaned before the next block. A line inside a
+    # `<details>` region is skipped here for the same reason a block start
+    # there is: that region quotes an earlier round's overview.
+    # Its nonzero count is still decisive, and an unparseable one makes
+    # the result None, rather than letting a later clean block speak for
+    # the whole body. A zero one is ignored, exactly as before this scan
+    # existed: it cannot make a body clean (only a recognised block's own
+    # line can), so it cannot fail open either. The whole-body
+    # comment and details scans run only when such a line exists, keeping
+    # the common single-block body bounded at `max_end` as above.
+    block_starts = [b for b, _ in blocks]
+    orphan_comment_spans: Optional[List[Tuple[int, int]]] = None
+    orphan_comment_starts: List[int] = []
+    orphan_details: List[Tuple[int, int]] = []
+    orphan_details_starts: List[int] = []
+    for m in COPILOT_FINDINGS_LINE.finditer(scan):
+        if _position_in_spans(m.start(), block_starts, blocks):
+            continue
+        if match_is_cited(cited, m.start(), m.end()):
+            continue
+        if orphan_comment_spans is None:
+            orphan_comment_spans = _find_html_comment_spans(scan)
+            orphan_comment_starts = [a for a, _ in orphan_comment_spans]
+            orphan_details = _find_details_regions(
+                scan, orphan_comment_spans, orphan_comment_starts
+            )
+            orphan_details_starts = [a for a, _ in orphan_details]
+        if _position_in_spans(m.start(), orphan_comment_starts, orphan_comment_spans):
+            continue
+        if _position_in_spans(m.start(), orphan_details_starts, orphan_details):
+            continue
+        rest = m.group("rest")
+        if _COPILOT_NONE_LINE.match(rest):
+            continue
+        count = _copilot_v2_line_findings_count(rest)
+        if count is None:
+            saw_unparseable = True
+        elif count != 0:
+            return count
     if not saw_line or saw_unparseable:
         return None
     return 0

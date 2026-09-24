@@ -175,7 +175,7 @@ A sibling repo of the same shape almost certainly already has this worked out.
 `Morrison-Lab/mln`'s `.github/` is a private-repo Quarto-site example carrying the whole baseline set plus `check-equation-renders.yml`, `check-new-line-breaks.yml`, `check-ai-tells.yml`, and the Quarto preview/publish chain;
 a private R-package repo would instead start from `Morrison-Lab/gha`'s own `examples/` stubs or from `Morrison-Lab/qwt`/`rpt` template repos (see `Morrison-Lab/gha`'s own CLAUDE.md, "Test changes against a template repo").
 Copy the caller stubs wholesale and then adapt only what is genuinely repo-specific --- the `claude-bot.yml` header comment naming the repo's own visibility posture, a `review-workflow-file:` value, any `install-quarto`/`setup-r` flags the new repo's content actually needs.
-Do not copy blind: a caller file carries prose that describes the repo it came from, and leaving that prose unedited in the new repo is a smaller version of the same problem `check-the-renders.md` names for a stale claim about a different artifact.
+Do not copy blind: a caller file carries prose that describes the repo it came from, and leaving that prose unedited in the new repo is a smaller version of the same problem [`check-the-renders`](check-the-renders.md) names for a stale claim about a different artifact.
 
 - **Do:** add `.github/workflows/` in the repo's first PR, alongside its first real content, not in a later PR.
 - **Do:** start from the baseline set (`claude-review` + `claude-bot`, `check-secrets`, `check-junk-files`, `check-typos`, `lint-workflows` with `zizmor.yml` and `dependabot.yml`), then add what the repo's type needs.

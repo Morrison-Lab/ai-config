@@ -356,6 +356,82 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("14 pass. No findings remain;3 jobs queued.")], False,
      "a clause starting flush against its breaker is its own clause"),
+    # Round 15, finding 3: the round-14 SUFFIX scan ran to the next value
+    # break, so any negator anywhere in the tail cancelled the disclosure.
+    # Each of these discloses pending work in its first phrase and reports
+    # something ABSENT in a second, independent one, and round 14 read the
+    # second as denying the first -- blocking an honest progress report. The
+    # trailing negator is anchored to the match now, so a preposition or a
+    # second verb between them ends its reach.
+    #
+    # The finding's OWN sentence cannot pin that, and saying so is the point:
+    # "no failures" is itself a non-bare clean claim, so the re-aim finds it
+    # and the hook blocks whichever way the exemption goes -- the same
+    # twice-over shape as the "0 failures" row above. The three rows after it
+    # isolate the anchor, because "nothing else outstanding", "none of the
+    # release jobs" and "zero drama" assert nothing about this PR's checks.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 3 checks pending with no failures.")], True,
+     "the finding's own sentence blocks either way, on its second claim"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 3 checks pending with nothing else outstanding.")], False,
+     "...for each word in the negator set, not just the commonest one"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 3 checks pending on none of the release jobs.")], False,
+     "...and for a negator that is the object of that preposition"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 3 checks pending with zero drama.")], False,
+     "...including the bare-zero arm, which reads no differently"),
+    # Round 15, finding 2: a failing count says nothing about what it counts,
+    # so an unattached one bought the whole exemption and let the clean claim
+    # in front of it through. The count now has to land on a clause end or on
+    # a word that keeps it current. The middle row is a count of something
+    # that is not a check at all; the last two pin the admitted side, one
+    # landing on a state word and one on the end of the text.
+    #
+    # The sentence has to carry a BARE count and nothing else, because the
+    # re-aim blocks on any non-bare assert regardless: with "fully clean" in
+    # front of it the defect is invisible, and a row written that way would
+    # have passed at both commits. Measured against the parent commit: these
+    # two do not block there and do here.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. I fixed 3 errors in the docs.")], True,
+     "a failing count re-targeted by a preposition buys no exemption"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. I corrected 2 failures of imagination.")], True,
+     "...whatever the count is actually counting"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. 3 errors remain.")], False,
+     "...while a word that keeps the count current still discloses"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. 2 failures outstanding")], False,
+     "...at the end of the text, where there is no terminator to land on"),
+    # That row lands on a state WORD, so it says nothing about the tail's
+    # end-of-text arm; this one has neither a terminator nor a state word
+    # after it, and dropping `\Z` flips it alone.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. 3 failures")], False,
+     "...and a bare failing count ending the text still discloses"),
+    # Three rows found by mutating the round-15 code rather than by the
+    # review, each pinning a boundary the sentences above cannot reach.
+    #
+    # A negator sitting EXACTLY on a clause start is the one index where the
+    # two bisect sides disagree about the negator list, and a line break is
+    # how that happens in ordinary writing: the breaker ends on the capital.
+    # Reading right past it turns a denial into a disclosure, which is the
+    # direction that switches the guard off.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass.\nNo checks pending.")], True,
+     "a denial opening its own line still denies"),
+    # The decimal guard on the clause breaker is load-bearing in BOTH
+    # directions, and only this one is dangerous. Round 14 recorded the false
+    # ALARM: splitting inside `v1.0` left a window whose leading `0` read as
+    # a denial. Splitting also SHORTENS the window, which drops a real
+    # negator out of it -- here the `no` that denies the pending checks --
+    # and the guard then goes silent on the count in front of it.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, no v1.0 checks pending.")], True,
+     "a version number inside a denial does not split it into two clauses"),
 
     ([READ_FILE_QUERY, READ_FILE_RESULT, say("Checked the file contents.")], False,
      "reading script source containing failure text must not trip query block"),

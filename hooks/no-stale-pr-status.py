@@ -95,10 +95,31 @@ RX_BARE_COUNT = re.compile(r"^\d+\s+pass$", re.I)
 # NOTHING matched, so dropping the exclusion left the suite at 159/159. Only
 # the mutation sweep could see it, since a row that is right at both commits
 # has no prior-commit baseline to fail against.
+# The failing count has to LAND on a clause end or on a word that keeps it
+# current, because the count alone says nothing about what it counts. Round
+# 15, finding 2: "All 14 checks pass. I fixed 3 errors in the docs." bought
+# the whole disclosed-pending exemption on "3 errors", so the clean claim in
+# front of it went unblocked over a failing status query -- the guard silent
+# on exactly the sentence it exists to surface. That is the expensive
+# direction, since a missed disclosure only costs the author a rewording
+# while a false exemption costs the guard its purpose.
+#
+# What the tail admits is a terminator, the end of the text, or a small
+# closed set of words that leave the count describing present state
+# ("3 errors remain", "2 failures outstanding"). A preposition or a second
+# verb re-targets the count at something that is not this PR's check state,
+# and is refused. The known cost is a real disclosure phrased as
+# "3 checks failed on main", which no branch of this pattern now matches;
+# writing it as "3 checks failed." works, and the block message says so.
+_FAILING_TAIL = (
+    r"(?=[ \t]*(?:[.,;:!?)\]\u2014\u2013]|\n|\Z"
+    r"|(?:remain(?:s|ing)?|outstanding|left|still)(?![-\w])))"
+)
 _DISCLOSES_STATE = (
     r"\bnot (?:yet )?(?:fully )?clean\b|\bstill failing\b|"
     r"\bnot a clean stopping point\b|"
     r"\b(?!0+(?!\d))\d+\s+(?:fail(?:ures?|ing|ed|s)?|error(?:s|ed)?)\b"
+    + _FAILING_TAIL
 )
 _PENDING_WORD = r"in[- ]progress|still running|pending|queued|in flight"
 _CHECK_NOUN = (
@@ -133,12 +154,12 @@ _CHECK_NOUN = (
 # hyphen is a non-word character, so `\bno\b` matches inside `no-op` and
 # `\bzero\b` inside `zero-findings`, and in a NEGATOR set a spurious match
 # silences the exemption with nothing red.
-_PENDING_NEGATOR = re.compile(
+_NEGATOR_ALT = (
     r"(?<![-\w])(?:no|none|zero|nothing|neither|not)(?![-\w])"
     r"(?!\s+longer(?![-\w]))"
-    r"|(?<![-\w.])0+(?![-\w])(?!\.\d)",
-    re.I,
+    r"|(?<![-\w.])0+(?![-\w])(?!\.\d)"
 )
+_PENDING_NEGATOR = re.compile(_NEGATOR_ALT, re.I)
 # Clause-scoped rather than sentence-scoped, and that is the whole
 # difficulty. A negator inverts only the phrase it governs, so a
 # sentence-wide window lets an unrelated earlier negation suppress a genuine
@@ -173,14 +194,6 @@ _PENDING_NEGATOR = re.compile(
 #
 # Hence `(?<!\d)\.(?!\d)`: a dot flanked by digits is a decimal point rather
 # than a clause terminator. The other terminators need no such guard.
-# Two break classes, not one, because a colon binds in one direction only.
-# The PREFIX scan treats a colon as a clause break: "No findings: 2 checks
-# pending" discloses two pending checks, and reading the earlier denial as
-# governing them would suppress it. The SUFFIX scan must not, because
-# "Checks pending: 0" is a label and its value -- the colon is what ATTACHES
-# the zero to the noun it denies, so breaking there hid the negator and left
-# that denial exempt (round 14, finding 1).
-#
 # `and` / `but` join independent clauses without a comma, so "no checks
 # pending and 3 jobs queued" read as one clause and its genuine disclosure
 # was suppressed by the earlier denial (round 14, finding 8). They are
@@ -191,8 +204,37 @@ _PENDING_CONJUNCTION = r"(?<![-\w])(?:and|but)(?![-\w])"
 RX_PENDING_CLAUSE_BREAK = re.compile(
     r"(?<!\d)\.(?!\d)|[!?;:,\u2014\u2013]|\n|" + _PENDING_CONJUNCTION
 )
-RX_PENDING_VALUE_BREAK = re.compile(
-    r"(?<!\d)\.(?!\d)|[!?;,\u2014\u2013]|\n|" + _PENDING_CONJUNCTION
+# The trailing negator is ANCHORED to the match rather than scanned over the
+# rest of the clause, and that difference is the whole of round 15, finding
+# 3. Round 14 read a trailing denial by slicing to the next value break,
+# which let any negator anywhere in the tail vote: "3 checks pending with no
+# failures" discloses three pending checks AND reports nothing failing, and
+# the `no` in that second, independent phrase cancelled the disclosure --
+# turning an honest progress report into a block. "with nothing else
+# outstanding", "on none of the jobs" and "with zero drama" did the same.
+#
+# A denial that really governs the phrase follows it IMMEDIATELY: as the
+# value of a label ("Checks pending: 0"), as a bare value ("checks pending
+# 0"), or as a copular predicate ("checks pending are none"). Those are the
+# three round-14 shapes this has to keep refusing, and each is reachable
+# from the match's own end without looking at the rest of the sentence.
+# Anything after a preposition or a second verb is a separate claim.
+#
+# Anchoring also retires the second break class. Round 14 needed one because
+# a colon binds in one direction only -- it breaks BEFORE ("No findings: 2
+# checks pending" discloses) and attaches AFTER ("Checks pending: 0" denies)
+# -- and one class could not do both. The colon now lives in this pattern's
+# own optional `:?`, so `RX_PENDING_VALUE_BREAK`, the clause ENDS it
+# computed, and the `j < len(ends)` guard that could never be false (round
+# 15, finding 6) are all gone with it.
+#
+# The two `[ \t]*` runs are unbounded and still O(n) in total: matches are
+# non-overlapping and ordered, so a given run of spaces is scanned by at
+# most one hit's tail. A count would have been an unexplained magic number.
+_PENDING_TRAILING_NEGATOR = re.compile(
+    r"[ \t]*:?[ \t]*(?:(?:are|is|was|were|remain|remains)[ \t]+)?"
+    r"(?:" + _NEGATOR_ALT + r")",
+    re.I,
 )
 RX_DISCLOSES_PENDING = re.compile(
     _DISCLOSES_STATE
@@ -204,8 +246,8 @@ RX_DISCLOSES_PENDING = re.compile(
 )
 
 
-def _clause_edges(text, breaker):
-    """Every clause start and end under `breaker`, in ONE pass over `text`.
+def _clause_starts(text, breaker):
+    """Every clause start under `breaker`, in ONE pass over `text`.
 
     The round-13 shape called a helper per hit that re-scanned the whole
     prefix from index 0 each time, so cost was O(hits x length): measured
@@ -214,16 +256,14 @@ def _clause_edges(text, breaker):
     reads as approval (round 14, finding 4). Scanning once and bisecting per
     hit is O(n + k log n) and needs no threshold to be safe.
     """
-    starts, ends = [0], []
+    starts = [0]
     for boundary in breaker.finditer(text):
-        ends.append(boundary.start())
         starts.append(boundary.end())
-    ends.append(len(text))
-    return starts, ends
+    return starts
 
 
 def discloses_pending(text):
-    """True if `text` states its own pending or failing work.
+    r"""True if `text` states its own pending or failing work.
 
     A match whose own clause carries a negator does not count: it DENIES the
     pending work rather than disclosing it, and reading that as a disclosure
@@ -237,18 +277,38 @@ def discloses_pending(text):
     keeps `_DISCLOSES_STATE`'s own negative idioms working -- "not yet
     clean" carries a negator inside the match and is a disclosure, so a
     window spanning the match would deny every one of them.
+
+    Neither side is read by SLICING any more. Round 14 cut the clause prefix
+    out of `text` per hit and searched the copy, which is O(clause) twice
+    over per hit and so quadratic on the shape that has no clause breaks at
+    all -- one long line. Measured on the round-14 code: 0.04s at 4288
+    characters, 0.18s at 8584 and 0.73s at 17152, doubling the length
+    quadrupling the time, on a hook registered at a 10-second timeout (round
+    15, finding 1). Every negator in `text` is now found in ONE pass, and
+    each hit asks by bisection whether one of them lies wholly inside its
+    own clause prefix. The trailing side is anchored and costs O(1).
+
+    Scanning the whole text rather than a slice also FIXES the lookbehind at
+    a clause start, which a slice could not see: `0` directly after a `.`
+    is the tail of a version number rather than a count, and on a slice
+    beginning at that `0` the `(?<![-\w.])` bound had nothing to look at.
     """
-    starts, _ = _clause_edges(text, RX_PENDING_CLAUSE_BREAK)
-    _, ends = _clause_edges(text, RX_PENDING_VALUE_BREAK)
+    starts = _clause_starts(text, RX_PENDING_CLAUSE_BREAK)
+    negs = [(mo.start(), mo.end()) for mo in _PENDING_NEGATOR.finditer(text)]
+    neg_starts = [begin for begin, _ in negs]
     for hit in RX_DISCLOSES_PENDING.finditer(text):
-        i = bisect.bisect_right(starts, hit.start()) - 1
-        j = bisect.bisect_left(ends, hit.end())
-        prefix = text[starts[i]:hit.start()]
-        suffix = text[hit.end():ends[j]] if j < len(ends) else ""
-        if _PENDING_NEGATOR.search(prefix) or _PENDING_NEGATOR.search(suffix):
+        clause = starts[bisect.bisect_right(starts, hit.start()) - 1]
+        # The FIRST negator at or after the clause start decides the prefix:
+        # matches are non-overlapping and ordered, so if that one ends past
+        # the hit, every later one does too.
+        k = bisect.bisect_left(neg_starts, clause)
+        if k < len(negs) and negs[k][1] <= hit.start():
+            continue
+        if _PENDING_TRAILING_NEGATOR.match(text, hit.end()):
             continue
         return True
     return False
+
 
 # What makes a count a claim about THIS PR/MR rather than about a local run.
 # Proximity, not presence anywhere in the message: a recap routinely mentions

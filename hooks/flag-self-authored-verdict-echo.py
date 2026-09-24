@@ -363,10 +363,20 @@ _ARD_LABEL = r"(?:\d+(?:[ \t]*(?:--|-|to)[ \t]*\d+)?[ \t]*[.):][ \t]*)?"
 # against 0.20s, so the narrowing was pinned by nothing at all. A body CAN
 # tell them apart -- the label's own gap has to span the line break, which
 # `\s` crosses and `[ \t]` does not. `LABEL_GAP_SPANS_NEWLINE` in the suite
-# is that body, and reverting any of these three slots turns it red.
+# is that body.
 #
-# The measurement was right and its generalization was wrong: 302 bodies
-# agreeing is evidence about those bodies, not about every body.
+# It pins ONE of the gaps, not all of them. The label has FOUR `[ \t]` slots
+# -- before the range dash, after it, before the punctuation, and after it --
+# and round 14's comment here said three and claimed each was covered. Round
+# 15, finding 4. Measured by widening one slot at a time to `[\s]*` and
+# running the suite against each: slots 1, 2 and 4 leave it at 125/125, and
+# only slot 3 turns `LABEL_GAP_SPANS_NEWLINE` red at 124/125. The other
+# three are guarded by the cost ceiling alone, which the paragraph above
+# says is not enough. Pinning them is ai-config#3982 rather than a widening
+# bolted onto a comment fix.
+#
+# The original measurement was right and its generalization was wrong: 302
+# bodies agreeing is evidence about those bodies, not about every body.
 RX_DISPOSITION = re.compile(
     r"(?:^|\n)[ \t]{0,4}(?:[-*+][ \t]+(?:\[[ xX]\][ \t]+)?)?(?:\d+[.)][ \t]+)?"
     r"(?:\*{1,2}|_{1,2})?[ \t]*" + _ARD_LABEL +

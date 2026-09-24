@@ -687,16 +687,20 @@ CLEAN_DISPOSITION = (
     "14 check runs, 13 success and 1 skipped.\n"
 )
 
-# The ONE body the two `_ARD_LABEL` spellings answer differently, and the
-# reason that narrowing is not pinned by the cost ceiling. Round 13 narrowed
-# the label's three gaps from `\s` to `[ \t]` and justified it by cost; a
-# round-14 review measured the revert and found the suite still 124/124 and
-# the ceiling 0.16s against 0.20s, so nothing in this file could see it. The
-# gap here spans a newline, which `\s` crosses and `[ \t]` does not: a "3"
-# alone on one line and a ". Rebutted" on the next is not a numbered
-# disposition, and reading it as one warns on a body that echoes nothing.
-# Measured: shipped returns None, and the pattern with `\s` restored in all
-# three slots returns "3 . Rebutted".
+# The ONE body that answers differently, and the reason that narrowing is
+# not pinned by the cost ceiling. Round 13 narrowed the label's gaps from
+# `\s` to `[ \t]` and justified it by cost; a round-14 review measured the
+# revert and found the suite still 124/124 and the ceiling 0.16s against
+# 0.20s, so nothing in this file could see it. The gap here spans a newline,
+# which `\s` crosses and `[ \t]` does not: a "3" alone on one line and a
+# ". Rebutted" on the next is not a numbered disposition, and reading it as
+# one warns on a body that echoes nothing.
+#
+# It covers the THIRD of the label's four gaps -- the one before the
+# punctuation -- and not the other three, which round 14's comment here got
+# wrong in both the count and the coverage (round 15, finding 4). Measured
+# by widening one slot at a time: slot 3 takes this row to 124/125 and slots
+# 1, 2 and 4 leave the suite untouched. ai-config#3982 tracks the rest.
 #
 # The disposition word is `Rebutted` deliberately. The first draft used
 # `Addressed` and fired under BOTH spellings, because `RX_DISPOSITION` has

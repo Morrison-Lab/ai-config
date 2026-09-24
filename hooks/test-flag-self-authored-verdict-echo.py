@@ -394,9 +394,23 @@ NEGATED_PHRASES = (
 # That reason was false for the fixture as written: interpolating `NOT_CLEAN`
 # here leaves the suite at 124/124, the row being too far away to suppress
 # anything. The real reason is that `Changes requested` is a verdict family no
-# other fixture in this file carries -- every one of the other 67 interpolates
-# `NOT_CLEAN` -- so this row is what pins the fix outside `Needs ... work`,
+# other fixture in this file carries -- so this row is what pins the fix
+# outside `Needs ... work`,
 # under a verdict the 60-character window never reaches at any separation.
+# The count that used to sit in that sentence was wrong, and wrong in the
+# way the sentence is about. It read "every one of the other 67
+# interpolates `NOT_CLEAN`", which named the interpolating SUBSET and
+# presented it as the whole population. Derived from the file on
+# 2026-09-24, at the commit that corrects it: 72 module-level fixture
+# constants (excluding `HOOK`, `ROOT`, `NOT_CLEAN`, `FAILURES` and
+# `EXAMINED`), so 71 others; 68 interpolate `NOT_CLEAN` and four do not
+# (`HONEST_COORD_ASIDES`, `REVIEWER_ROW` itself, `DESCRIBED_NOT_ECHOED`,
+# `CLEAN_DISPOSITION`). The load-bearing half was true throughout and is
+# what the sentence now rests on: no other FIXTURE in this file carries
+# `Changes requested`, which is narrower than "nowhere else in this file"
+# -- several comments here name it, this one included. A figure that has to be re-derived to stay true is
+# better left out of a claim that does not need it (round 14, finding 6).
+#
 # Measuring one form, or one body shape, and generalizing to all of them is the
 # population-vs-recall failure this corpus names repeatedly; the row is adopted
 # below rather than dropped.
@@ -673,6 +687,29 @@ CLEAN_DISPOSITION = (
     "14 check runs, 13 success and 1 skipped.\n"
 )
 
+# The ONE body the two `_ARD_LABEL` spellings answer differently, and the
+# reason that narrowing is not pinned by the cost ceiling. Round 13 narrowed
+# the label's three gaps from `\s` to `[ \t]` and justified it by cost; a
+# round-14 review measured the revert and found the suite still 124/124 and
+# the ceiling 0.16s against 0.20s, so nothing in this file could see it. The
+# gap here spans a newline, which `\s` crosses and `[ \t]` does not: a "3"
+# alone on one line and a ". Rebutted" on the next is not a numbered
+# disposition, and reading it as one warns on a body that echoes nothing.
+# Measured: shipped returns None, and the pattern with `\s` restored in all
+# three slots returns "3 . Rebutted".
+#
+# The disposition word is `Rebutted` deliberately. The first draft used
+# `Addressed` and fired under BOTH spellings, because `RX_DISPOSITION` has
+# later alternatives that need no label at all and `\baddressed\s+in\b`
+# matched the sentence outright -- a row that cannot see the construct it
+# names, which is this suite's own vacuous-assertion failure.
+LABEL_GAP_SPANS_NEWLINE = (
+    "## Round 2\n\n"
+    "The reviewer's call was **%s**, quoted here from its report.\n\n"
+    "3\n"
+    ". Rebutted, for the reason set out below.\n"
+) % NOT_CLEAN
+
 # Prose about the mechanism with no disposition vocabulary at all.
 DOCS_ABOUT_THE_RULE = (
     "The scanner reads a line-start verdict label as authored. A body stating\n"
@@ -886,6 +923,8 @@ def main():
     check("the call described rather than reproduced",
           mcp(DESCRIBED_NOT_ECHOED), False)
     check("a clean disposition", mcp(CLEAN_DISPOSITION), False)
+    check("an ARD label whose own gap spans a newline is not a disposition",
+          mcp(LABEL_GAP_SPANS_NEWLINE), False)
     check("prose about the rule with no disposition vocabulary",
           mcp(DOCS_ABOUT_THE_RULE), False)
     check("an empty body", mcp(""), False)

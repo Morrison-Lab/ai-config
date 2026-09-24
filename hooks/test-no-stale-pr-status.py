@@ -279,6 +279,12 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("14 pass. v1.0 has 3 checks pending.")], False,
      "a version's zero is not a zero count"),
+    # ...and the same for a version whose zero LEADS it, which the round-14
+    # narrowing of that bound could have reopened: `0.9012` must still not
+    # read as a denial, while `0.` ending a sentence must.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Bumped to 0.9012 with 3 checks pending.")], False,
+     "a version's LEADING zero is not a zero count either"),
     # A hyphen is a non-word character, so `\bno\b` matches inside `no-op`
     # and `\bzero\b` inside `zero-findings`. In a NEGATOR set that silences
     # the exemption with nothing red, so the bounds are `(?<![-\w])` /
@@ -286,6 +292,70 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("14 pass. The no-op rebase left 2 checks pending.")], False,
      "a negator inside a hyphenated compound is not a negator"),
+
+    # Round 14, finding 1: the round-13 window was the clause PREFIX, which
+    # is not the clause its own docstring claimed. A negator that TRAILS the
+    # phrase it governs was never scanned, so each of these denials bought
+    # the exemption and switched the guard off. The negator is now looked
+    # for on both sides of the match and never inside it -- inside is what
+    # `not yet clean` needs, and the row below pins that it still works.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, checks pending 0.")], True,
+     "a zero TRAILING the check noun denies it"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, checks pending are none.")], True,
+     "a word negator trailing the check noun denies it"),
+    # A colon is a clause break for the PREFIX scan and must not be one for
+    # the SUFFIX scan: here it is what attaches the zero to the noun it
+    # denies, so breaking there hid the negator entirely.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending: 0.")], True,
+     "a label's colon does not hide the value that denies it"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. No findings: 2 checks pending.")], False,
+     "...while the prefix scan still breaks on that same colon"),
+    # Round 14, finding 2: round 13 excluded a zero from the count slot and
+    # reopened the false positive the exemption exists to prevent. These are
+    # honest progress reports whose pending count has genuinely drained to
+    # zero while a failure stands, and round 13 blocked all of them.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 1 fail, 0 pending.")], False,
+     "a disclosed failing count is a disclosure, zero pending or not"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 2 failed, 0 checks pending.")], False,
+     "...in its inflected forms too"),
+    # The NOUN forms were missing from the first draft of that alternative,
+    # so this row -- the commonest spelling of a failing count there is --
+    # was still blocked, and the zero row below passed vacuously because
+    # `failures` matched nothing at all rather than being excluded as a zero.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 1 failure, 0 pending.")], False,
+     "...and in its noun forms, which is how a failing count is usually written"),
+    # Two rows, because the obvious one cannot isolate the zero-exclusion.
+    # "0 failures" is itself a non-bare clean assertion, so the re-aim finds
+    # it and blocks whether or not the exemption fired -- dropping the
+    # exclusion left the whole suite green. "0 failed" is not an assertion,
+    # so there the exemption alone decides and the mutation flips the row.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 0 failed, 0 pending.")], True,
+     "a ZERO failing count discloses nothing, so the exemption stays shut"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 0 failures, 0 pending.")], True,
+     "...and its noun form is covered twice over, being a clean claim itself"),
+    # Round 14, finding 8: `and` and `but` join independent clauses without
+    # a comma, so this read as one clause and the leading denial suppressed
+    # a genuine disclosure of three queued jobs.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. No checks pending and 3 jobs queued.")], False,
+     "a conjunction breaks the clause as a comma does"),
+    # A breaker with no space after it puts the match's own start exactly ON
+    # a clause start, which is the one index where bisect_right and
+    # bisect_left disagree: left hands back the PREVIOUS clause, so the
+    # earlier denial governs a disclosure it has nothing to do with. Found by
+    # mutating the search, which the rest of the suite could not see.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. No findings remain;3 jobs queued.")], False,
+     "a clause starting flush against its breaker is its own clause"),
 
     ([READ_FILE_QUERY, READ_FILE_RESULT, say("Checked the file contents.")], False,
      "reading script source containing failure text must not trip query block"),

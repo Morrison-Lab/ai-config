@@ -731,12 +731,9 @@ paragraph naming three.
 
 ### A guard's prescribed remedy is a claim about every other guard
 
-A blocking hook usually tells you how to comply: state the pending work,
-re-run the query, name the input.
-That sentence is not advice about the world --- it is an assertion that the
-form it prescribes trips nothing else, and nothing in this repo checks it.
-The hooks are written one at a time, by whoever met the failure that motivated
-one, and several bind the same event.
+A blocking hook usually tells you how to comply: state the pending work, re-run the query, name the input.
+That sentence is not advice about the world --- it is an assertion that the form it prescribes trips nothing else, and nothing in this repo checks it.
+The hooks are written one at a time, by whoever met the failure that motivated one, and several bind the same event.
 So two of them can be individually correct and jointly unsatisfiable.
 
 Measured 2026-09-24, on two `Stop` hooks that both read the reply text.
@@ -744,39 +741,22 @@ Measured 2026-09-24, on two `Stop` hooks that both read the reply text.
 
 > `"13 pass, 5 pending"` trips nothing
 
-`no-stale-pr-status.py`'s `RX_ASSERT` matched `13 pass` inside that exact
-string, so writing the form the first hook asks for produced a block from the
-second.
-The trap is that the block reads as a finding about the reply rather than as a
-collision, and conceding it means retracting a claim the evidence supports ---
-see [`challenge-the-assignment`](shared/workflow/challenge-the-assignment.md)'s
-"A guard's own blocking message" shape.
-The fix was on the second hook: a bare count alongside a disclosed pending
-state is now exempt **on the branch that fires when a query returned a
-failing state**, and its message names the sibling by file, so a reader who
-meets the collision again is pointed at the rule rather than left to
-re-derive it.
-That scope is the whole of it, and an earlier revision of this paragraph
-stated the exemption without it (round 8, finding 6).
+`no-stale-pr-status.py`'s `RX_ASSERT` matched `13 pass` inside that exact string, so writing the form the first hook asks for produced a block from the second.
+The trap is that the block reads as a finding about the reply rather than as a collision, and conceding it means retracting a claim the evidence supports --- see [`challenge-the-assignment`](shared/workflow/challenge-the-assignment.md)'s "A guard's own blocking message" shape.
+The fix was on the second hook: a bare count alongside a disclosed pending state is now exempt **on the branch that fires when a query returned a failing state**, and its message names the sibling by file, so a reader who meets the collision again is pointed at the rule rather than left to re-derive it.
+That scope is the whole of it, and an earlier revision of this paragraph stated the exemption without it (round 8, finding 6).
 "Disclosed" is narrower than it first reads, too.
-A state the message names outright --- not fully clean, still failing, not a
-clean stopping point --- exempts on its own, because none of those phrases
-has a sense that is not about the work.
-The pending vocabulary does: `pending`, `queued`, `in progress`, `in flight`
-and `still running` are ordinary English about anything at all, so each needs
-a count or a check noun beside it before it discloses anything about a check.
-Without that, "Merge pending your approval" and "Her application is pending"
-each turned a bare count into an exempt progress report, and a false
-exemption is the expensive direction here, since the exemption is what stops
-the guard firing (round 9, finding 6).
-The same hook's *staleness* branch --- the one that fires when the last
-query predates the last push --- is deliberately not exempt, because
-disclosing pending work answers the first branch's question and not the
-second's: a count taken before a push may describe a commit that is no
-longer the head whatever the message says about it.
-That branch names its own escape, which is to re-query and state the head
-SHA, so the two guards are not jointly unsatisfiable there --- which is the
-property this section is about, and it is a weaker claim than exemption.
+A state the message names outright --- not fully clean, still failing, not a clean stopping point --- exempts on its own, because none of those phrases has a sense that is not about the work.
+The pending vocabulary does: `pending`, `queued`, `in progress`, `in flight` and `still running` are ordinary English about anything at all, so each needs a count or a check noun beside it before it discloses anything about a check.
+
+It is narrower in a second way, added in round 14: the disclosure has to be affirmative and non-zero.
+A denial names the same vocabulary --- "0 checks queued", "no checks pending", "checks pending: 0" --- while asserting the opposite of a disclosure, so reading one as exempt switches the guard off on exactly the clean claim it exists to surface.
+The negator is looked for on both sides of the phrase and never inside it, which is what keeps "not yet clean" working while "checks pending 0" does not.
+When the pending count has genuinely drained to zero, a disclosed failing count ("14 pass, 1 fail, 0 pending") is what carries the exemption instead;
+when nothing is pending and nothing is failing, there is no progress to report and re-querying is the escape.
+Without that, "Merge pending your approval" and "Her application is pending" each turned a bare count into an exempt progress report, and a false exemption is the expensive direction here, since the exemption is what stops the guard firing (round 9, finding 6).
+The same hook's *staleness* branch --- the one that fires when the last query predates the last push --- is deliberately not exempt, because disclosing pending work answers the first branch's question and not the second's: a count taken before a push may describe a commit that is no longer the head whatever the message says about it.
+That branch names its own escape, which is to re-query and state the head SHA, so the two guards are not jointly unsatisfiable there --- which is the property this section is about, and it is a weaker claim than exemption.
 
 Two properties make this hard to notice.
 A guard's prescribed form is **prose**, so no test asserts it --- the suite

@@ -197,11 +197,11 @@ whose silence is an approval.
 - **Do:** bound the start count AND the span each start scans.
 - **Do:** compute either bound over the region the matcher rescans, so the
   input's own inert bulk does not vote.
-- **Don't:** read "rewriting the quantifier changed nothing" as evidence you
-  have not found the construct --- it is evidence the cost is elsewhere.
 - **Do:** ask whether any construct in the pattern can scan past the region a
   bound is computed over -- an unterminated opener, an unclosed delimiter, a
   lookahead with no floor -- and charge it its own term.
+- **Don't:** read "rewriting the quantifier changed nothing" as evidence you
+  have not found the construct --- it is evidence the cost is elsewhere.
 - **Don't:** treat a length cap as a proxy for the start count, or the start
   count as a proxy for length; they are independent, and a measurement that
   varied only one of them cannot say the other is inert.

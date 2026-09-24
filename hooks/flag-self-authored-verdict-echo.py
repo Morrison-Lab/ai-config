@@ -352,12 +352,21 @@ _ARD_LABEL = r"(?:\d+(?:[ \t]*(?:--|-|to)[ \t]*\d+)?[ \t]*[.):][ \t]*)?"
 # body by accident. Narrowing both gaps makes the same series 0.11s,
 # 0.14s, 0.18s and 0.29s.
 #
-# Nothing about the VERDICT changes: a label whose prefix spans a line
-# break is not a disposition on a line, so the newline was never wanted
-# there. Measured directly rather than argued -- 302 bodies (every string
-# in the test suite plus nine synthetic line-break shapes) give identical
-# answers under both patterns. That is exactly why the guard against a
-# reintroduced `\s` has to be a cost ceiling: no body can tell them apart.
+# Nothing about the VERDICT changes for any body this suite carried at the
+# time: 302 of them (every string in the test suite plus nine synthetic
+# line-break shapes) gave identical answers under both patterns, which is
+# why the original claim here was that only a cost ceiling could guard the
+# narrowing.
+#
+# That claim was too strong, and a round-14 review measured it: reverting
+# `_ARD_LABEL` alone left the suite at 124/124 AND the ceiling at 0.16s
+# against 0.20s, so the narrowing was pinned by nothing at all. A body CAN
+# tell them apart -- the label's own gap has to span the line break, which
+# `\s` crosses and `[ \t]` does not. `LABEL_GAP_SPANS_NEWLINE` in the suite
+# is that body, and reverting any of these three slots turns it red.
+#
+# The measurement was right and its generalization was wrong: 302 bodies
+# agreeing is evidence about those bodies, not about every body.
 RX_DISPOSITION = re.compile(
     r"(?:^|\n)[ \t]{0,4}(?:[-*+][ \t]+(?:\[[ xX]\][ \t]+)?)?(?:\d+[.)][ \t]+)?"
     r"(?:\*{1,2}|_{1,2})?[ \t]*" + _ARD_LABEL +

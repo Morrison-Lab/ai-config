@@ -18,6 +18,7 @@ hook rather than a rule to remember:
 Fails OPEN on any parse trouble, and fires at most once per distinct message,
 so it cannot wedge a session.
 """
+import bisect
 import hashlib
 import json
 import os
@@ -75,9 +76,29 @@ RX_BARE_COUNT = re.compile(r"^\d+\s+pass$", re.I)
 # noun governing it. The two forms this exemption was added to admit are
 # unaffected -- "13 pass, 5 pending" matches on the count and "2 runs still
 # in progress" on the count and the noun together.
+# The failing-count alternative is round 14, finding 2. Round 13 excluded a
+# zero from the COUNT slot so "0 checks queued" could not buy the exemption,
+# and that reopened the very false positive the exemption exists to prevent:
+# "14 pass, 1 fail, 0 pending." is an honest progress report whose pending
+# count has genuinely drained to zero, and it lost its exemption because
+# nothing here recognised "1 fail" as a disclosure in its own right. It
+# carries the same zero-exclusion as the count slot, so "0 failures" is not a
+# disclosure of anything.
+#
+# The noun forms are in the alternation because the first draft omitted them
+# and nothing red said so. `fail(?:ing|ed|s)?` matches `fail`, `failing`,
+# `failed` and `fails`, and `failures` is none of those -- the trailing `\b`
+# refuses `fail` inside it. So "14 pass, 1 failure, 0 pending." was still
+# blocked, which is finding 2's own false positive surviving its fix in the
+# commonest spelling there is. The row written to pin the zero-exclusion was
+# vacuous for the same reason: it said "0 failures" and blocked because
+# NOTHING matched, so dropping the exclusion left the suite at 159/159. Only
+# the mutation sweep could see it, since a row that is right at both commits
+# has no prior-commit baseline to fail against.
 _DISCLOSES_STATE = (
     r"\bnot (?:yet )?(?:fully )?clean\b|\bstill failing\b|"
-    r"\bnot a clean stopping point\b"
+    r"\bnot a clean stopping point\b|"
+    r"\b(?!0+(?!\d))\d+\s+(?:fail(?:ures?|ing|ed|s)?|error(?:s|ed)?)\b"
 )
 _PENDING_WORD = r"in[- ]progress|still running|pending|queued|in flight"
 _CHECK_NOUN = (
@@ -115,7 +136,7 @@ _CHECK_NOUN = (
 _PENDING_NEGATOR = re.compile(
     r"(?<![-\w])(?:no|none|zero|nothing|neither|not)(?![-\w])"
     r"(?!\s+longer(?![-\w]))"
-    r"|(?<![-\w.])0+(?![-\w.])",
+    r"|(?<![-\w.])0+(?![-\w])(?!\.\d)",
     re.I,
 )
 # Clause-scoped rather than sentence-scoped, and that is the whole
@@ -134,9 +155,17 @@ _PENDING_NEGATOR = re.compile(
 # `checks`, where the slot never sees the zero at all. Dropping it reopened
 # exactly one of the four leaks this fix is for.
 #
-# Its bounds exclude a dot on BOTH sides so a version is not read as a zero
-# count -- and that is only sound because the clause breaker below refuses to
-# split inside one. With a bare `.` in the break class, "14 pass. v1.0 has 3
+# Its LEADING bound excludes a dot so a version is not read as a zero count,
+# and its trailing bound excludes only a dot that a DIGIT follows. Round 13
+# excluded a trailing dot outright, which also excluded the commonest shape
+# there is: a zero ending a sentence. "14 pass, checks pending 0." was then
+# not a denial at all, and the two rows added for round 14's finding 1
+# failed on that alone -- a guard written for `v1.0` swallowing `0.` is the
+# hazard `shared/writing/examples-are-scanned.md` names, met in a regex.
+# `(?!\.\d)` keeps `0.9012` and `1.0` out while letting `0.` back in.
+#
+# The leading bound is only sound because the clause breaker below refuses
+# to split inside a decimal. With a bare `.` in the break class, "14 pass. v1.0 has 3
 # checks pending." left a window of "0 has ", whose leading 0 is the tail of
 # `v1.0` with its dot already consumed as a boundary, so the negator fired
 # and blocked a genuine disclosure. A version in a recap is common here, so
@@ -144,7 +173,27 @@ _PENDING_NEGATOR = re.compile(
 #
 # Hence `(?<!\d)\.(?!\d)`: a dot flanked by digits is a decimal point rather
 # than a clause terminator. The other terminators need no such guard.
-RX_PENDING_CLAUSE_BREAK = re.compile(r"(?<!\d)\.(?!\d)|[!?;:,\u2014\u2013]|\n")
+# Two break classes, not one, because a colon binds in one direction only.
+# The PREFIX scan treats a colon as a clause break: "No findings: 2 checks
+# pending" discloses two pending checks, and reading the earlier denial as
+# governing them would suppress it. The SUFFIX scan must not, because
+# "Checks pending: 0" is a label and its value -- the colon is what ATTACHES
+# the zero to the noun it denies, so breaking there hid the negator and left
+# that denial exempt (round 14, finding 1).
+#
+# `and` / `but` join independent clauses without a comma, so "no checks
+# pending and 3 jobs queued" read as one clause and its genuine disclosure
+# was suppressed by the earlier denial (round 14, finding 8). They are
+# bounded with `(?<![-\w])` rather than `\b` for the reason `_PENDING_NEGATOR`
+# is: a hyphen is a non-word character, so `\band \b` would match inside
+# `and-then`-shaped compounds.
+_PENDING_CONJUNCTION = r"(?<![-\w])(?:and|but)(?![-\w])"
+RX_PENDING_CLAUSE_BREAK = re.compile(
+    r"(?<!\d)\.(?!\d)|[!?;:,\u2014\u2013]|\n|" + _PENDING_CONJUNCTION
+)
+RX_PENDING_VALUE_BREAK = re.compile(
+    r"(?<!\d)\.(?!\d)|[!?;,\u2014\u2013]|\n|" + _PENDING_CONJUNCTION
+)
 RX_DISCLOSES_PENDING = re.compile(
     _DISCLOSES_STATE
     + r"|\b(?!0+(?!\d))\d+\s+(?:(?:%s)\s+)?(?:still\s+)?(?:%s)\b"
@@ -155,12 +204,22 @@ RX_DISCLOSES_PENDING = re.compile(
 )
 
 
-def _pending_clause_start(text, start):
-    """Start of the clause containing `start`, for the negator scan."""
-    at = 0
-    for boundary in RX_PENDING_CLAUSE_BREAK.finditer(text, 0, start):
-        at = boundary.end()
-    return at
+def _clause_edges(text, breaker):
+    """Every clause start and end under `breaker`, in ONE pass over `text`.
+
+    The round-13 shape called a helper per hit that re-scanned the whole
+    prefix from index 0 each time, so cost was O(hits x length): measured
+    8.98s at 117 KB and 20.55s at 175 KB against this hook's registered
+    10-second timeout, and a timed-out Stop hook is a guard whose silence
+    reads as approval (round 14, finding 4). Scanning once and bisecting per
+    hit is O(n + k log n) and needs no threshold to be safe.
+    """
+    starts, ends = [0], []
+    for boundary in breaker.finditer(text):
+        ends.append(boundary.start())
+        starts.append(boundary.end())
+    ends.append(len(text))
+    return starts, ends
 
 
 def discloses_pending(text):
@@ -169,10 +228,24 @@ def discloses_pending(text):
     A match whose own clause carries a negator does not count: it DENIES the
     pending work rather than disclosing it, and reading that as a disclosure
     switches this guard off on the claim it exists to surface.
+
+    The negator is looked for on BOTH sides of the match and never inside it.
+    Round 13 scanned the clause PREFIX only, which is not the clause the
+    docstring claimed: "checks pending 0" and "Checks pending: 0" are
+    denials whose negator trails the phrase it governs, and both stayed
+    exempt (round 14, finding 1). Excluding the match's own span is what
+    keeps `_DISCLOSES_STATE`'s own negative idioms working -- "not yet
+    clean" carries a negator inside the match and is a disclosure, so a
+    window spanning the match would deny every one of them.
     """
+    starts, _ = _clause_edges(text, RX_PENDING_CLAUSE_BREAK)
+    _, ends = _clause_edges(text, RX_PENDING_VALUE_BREAK)
     for hit in RX_DISCLOSES_PENDING.finditer(text):
-        window = text[_pending_clause_start(text, hit.start()):hit.start()]
-        if _PENDING_NEGATOR.search(window):
+        i = bisect.bisect_right(starts, hit.start()) - 1
+        j = bisect.bisect_left(ends, hit.end())
+        prefix = text[starts[i]:hit.start()]
+        suffix = text[hit.end():ends[j]] if j < len(ends) else ""
+        if _PENDING_NEGATOR.search(prefix) or _PENDING_NEGATOR.search(suffix):
             continue
         return True
     return False
@@ -869,7 +942,13 @@ def main() -> int:
                     "If this is a progress report, state the pending work in the same message -- "
                     "a bare \"N pass\" count alongside a disclosed in-progress or pending state is "
                     "the form `no-incomplete-check-enumeration.py` prescribes, and no longer fires "
-                    "ON THIS BRANCH. The staleness branch below is NOT exempt and still fires on "
+                    "ON THIS BRANCH. The disclosure has to be AFFIRMATIVE and non-zero to count: "
+                    "\"0 checks pending\" and \"no checks pending\" deny pending work rather than "
+                    "disclosing it, so they do not exempt anything. When the pending count really "
+                    "has drained to zero, disclose what is still failing instead -- "
+                    "\"14 pass, 1 fail, 0 pending\" is exempt on the failing count. When nothing "
+                    "is pending AND nothing is failing, this branch is not the one to escape: "
+                    "re-query and state what you read. The staleness branch below is NOT exempt and still fires on "
                     "that same form, deliberately: disclosing pending work answers the question "
                     "THIS branch asks and not that one, since a reading taken before your last "
                     "push may describe a commit that is no longer the head whatever it discloses. "

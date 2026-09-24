@@ -152,6 +152,40 @@ from typing import Callable, List, Optional, Tuple
 COPILOT_FINDINGS_LINE = re.compile(
     r"(?:^|\n)[ ]{0,3}\*\*Findings:\*\*[ \t]*(?P<rest>[^\n\r]*)", re.IGNORECASE
 )
+
+
+def _findings_line_cite_start(m: "re.Match[str]") -> int:
+    """The position to check citedness FROM, for a `COPILOT_FINDINGS_LINE`
+    match -- the line's own first character, not `m.start()` ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899)
+    review finding).
+
+    The pattern's own leading `(?:^|\\n)` consumes the PRECEDING
+    line-ending character whenever the match isn't at the very start of
+    the string, so `m.start()` then points at that newline rather than
+    at the line's own first character. The citation mask this module's
+    caller builds (`strip_cited_finding_vocab_with_mask`) never marks a
+    newline offset as cited -- by that mask's own design, every newline
+    position is unconditionally 0 (see `_copilot_overview_block_spans`'s
+    docstring, "the mask's newline positions are unconditionally 0 in
+    every caller") -- so `match_is_cited(cited, m.start(), m.end())`
+    always finds an uncited newline inside the checked range and reports
+    the WHOLE match as uncited, even when every real character of the
+    line itself sits inside a double-backtick code span: a whole
+    ` ``**Findings:** None`` ` line still read as a live, uncited zero.
+    Every other caller in this module checks a piece that does not cross
+    a line break (the marker, the heading, a single `**Findings:**` line
+    with no leading anchor consumed), which is why this gap is specific
+    to this one pattern.
+
+    When the match starts with the consumed `\\n` (`m.group(0)[:1] ==
+    "\\n"`), the content begins one character later; at the very start
+    of the string the zero-width `^` branch matched instead, consuming
+    nothing, so `m.start()` already IS the line's own first character
+    and needs no adjustment.
+    """
+    return m.start() + 1 if m.group(0)[:1] == "\n" else m.start()
+
+
 # Locate every actual Copilot v2 overview block rather than searching the
 # whole body -- see the module docstring's last section for why. All
 # patterns are simple bounded literals/alternations with no lazy-dot or
@@ -575,10 +609,38 @@ def _find_details_regions(
             continue
         opens.append(m.start())
 
+    # The closer search must be case-insensitive too, matching
+    # `_COPILOT_DETAILS_OPEN`'s own `re.IGNORECASE` ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review
+    # finding): a plain `scan.find(close_tag, ...)` never matches
+    # `</DETAILS>`, so an opener genuinely closed that way found NO closer
+    # at all and fell to the unterminated-details fail-closed path below
+    # -- extending the region all the way to the end of the string and
+    # wrongly absorbing every marker+heading pair AND every orphan
+    # `**Findings:**` line after it (a real nonzero orphan finding
+    # swallowed this way reads as no finding at all, the unsafe
+    # direction: see `_copilot_v2_findings_count`'s orphan scan).
+    #
+    # `scan.lower()` is computed ONCE rather than lowering each
+    # candidate slice, and reused for every closer search in this loop --
+    # `str.lower()` preserves character-for-character length for the
+    # ASCII `<`, `/`, letters, `>` this tag is made of, so a position
+    # found in the lowered string is the SAME position in `scan` itself,
+    # with no separate coordinate mapping needed. That assumption is not
+    # universal (a handful of non-ASCII characters, e.g. Turkish
+    # dotted capital "I" (U+0130), case-fold to MORE than one character),
+    # so it is checked explicitly rather than trusted: when it fails, this
+    # falls back to the original case-sensitive `scan.find`, which is
+    # already the fail-closed direction documented above (an unrecognised-
+    # case closer is treated as absent, extending the region to the end of
+    # the string, rather than risking a position drawn from a
+    # differently-indexed lowered string).
+    _lowered = scan.lower()
+    scan_for_close = _lowered if len(_lowered) == len(scan) else scan
+
     closes: List[Tuple[int, int]] = []
     search_from = 0
     while True:
-        candidate = scan.find(close_tag, search_from)
+        candidate = scan_for_close.find(close_tag, search_from)
         if candidate == -1:
             break
         search_from = candidate + close_len
@@ -920,7 +982,7 @@ def _copilot_v2_findings_count(
     saw_unparseable = False
     for block_start, block_end in blocks:
         for m in COPILOT_FINDINGS_LINE.finditer(scan, block_start, block_end):
-            if match_is_cited(cited, m.start(), m.end()):
+            if match_is_cited(cited, _findings_line_cite_start(m), m.end()):
                 continue
             if _position_in_spans(m.start(), comment_span_starts, comment_spans):
                 continue
@@ -953,7 +1015,7 @@ def _copilot_v2_findings_count(
     for m in COPILOT_FINDINGS_LINE.finditer(scan):
         if _position_in_spans(m.start(), block_starts, blocks):
             continue
-        if match_is_cited(cited, m.start(), m.end()):
+        if match_is_cited(cited, _findings_line_cite_start(m), m.end()):
             continue
         if orphan_comment_spans is None:
             orphan_comment_spans = _find_html_comment_spans(scan)

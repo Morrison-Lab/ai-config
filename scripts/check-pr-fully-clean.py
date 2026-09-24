@@ -2345,29 +2345,70 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
                 return m
         return None
 
-    # Checked first: a negative heading is a verdict on its own, and reading it
-    # before the affirmative test means a body carrying both spellings (a
-    # re-review quoting its own earlier round) cannot resolve to clean. This
-    # also covers a v2 negative heading whose `**Findings:** None` line would
-    # otherwise read as finding-free: the heading itself already decided.
-    if _has_valid_match(COPILOT_NEGATIVE_HEADER, scan):
-        return "not-clean"
-    if not _has_valid_match(COPILOT_AFFIRMATIVE_HEADER, scan):
-        return ""
-    if _has_valid_match(COPILOT_SUPPRESSED_BLOCK, scan):
-        return "not-clean"
-    counts = []
     # The `cited` mask (fences/quotes/code-spans) is not the only citation
     # shape: an HTML comment is invisible to it too, exactly the gap the
     # v2 path was fixed for two rounds ago ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding,
     # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, fourth round) -- `<!--\n-
     # **Comments generated:** 0\n-->` counted as a real zero, since only
-    # `match_is_cited` was checked. Reusing `_find_html_comment_spans` /
-    # `_position_in_spans` from copilot_overview (the same linear,
-    # bisect-backed helpers the v2 path already uses) closes it here too,
-    # rather than inventing a second HTML-comment detector.
-    legacy_comment_spans = _find_html_comment_spans(scan)
-    legacy_comment_span_starts = [s for s, _ in legacy_comment_spans]
+    # `match_is_cited` was checked. Computed once, up front, and reused by
+    # every scan below that needs it (the affirmative-heading scan and the
+    # legacy `Comments generated:` scan further down -- previously a second,
+    # separate `_find_html_comment_spans(scan)` call right before that loop)
+    # via `_find_html_comment_spans`/`_position_in_spans` from
+    # copilot_overview (the same linear, bisect-backed helpers the v2 path
+    # already uses), rather than inventing a second HTML-comment detector.
+    comment_spans = _find_html_comment_spans(scan)
+    comment_span_starts = [s for s, _ in comment_spans]
+
+    def _has_live_match(pattern, text):
+        """Like `_has_valid_match`, but ALSO rejects a match whose own start
+        falls inside an HTML comment ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, PR
+        [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review): a commented-out
+        `<!--\n### \U0001f7e2 Approval recommended\n-->` followed by a live,
+        uncited `Comments generated: 0` line used to read as a real
+        affirmative heading -- the `cited` mask that `_has_valid_match` alone
+        checks covers only backtick/quote citation shapes, not an HTML
+        comment, exactly the same gap the legacy `Comments generated:` scan
+        below was already fixed for. Reserved for the AFFIRMATIVE heading
+        only: see the comment at its one call site for why the NEGATIVE
+        heading deliberately keeps using the citation-only `_has_valid_match`
+        instead.
+        """
+        for m in pattern.finditer(text):
+            if match_is_cited(cited, m.start(), m.end()):
+                continue
+            if _position_in_spans(m.start(), comment_span_starts, comment_spans):
+                continue
+            return m
+        return None
+
+    # Checked first: a negative heading is a verdict on its own, and reading it
+    # before the affirmative test means a body carrying both spellings (a
+    # re-review quoting its own earlier round) cannot resolve to clean. This
+    # also covers a v2 negative heading whose `**Findings:** None` line would
+    # otherwise read as finding-free: the heading itself already decided.
+    #
+    # Deliberately still `_has_valid_match`, NOT the comment-aware
+    # `_has_live_match` the affirmative heading uses just below ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899)
+    # review finding): making the NEGATIVE heading comment-aware too would
+    # let a commented-out `### Changes recommended` stop blocking, and this
+    # function cannot tell that apart from a live blocking heading whose
+    # `<!--`/`-->` delimiters themselves got mangled or partly stripped by
+    # some upstream rendering step. The fail-closed choice is to keep
+    # treating ANY occurrence of the negative heading -- comment-hidden or
+    # not -- as blocking: at worst a truly stale, commented-out negative
+    # heading costs a real clean round a wrongly-conservative "not-clean"
+    # rather than the unsafe direction of a real blocking heading silently
+    # stopping being read as blocking.
+    if _has_valid_match(COPILOT_NEGATIVE_HEADER, scan):
+        return "not-clean"
+    if not _has_live_match(COPILOT_AFFIRMATIVE_HEADER, scan):
+        return ""
+    if _has_valid_match(COPILOT_SUPPRESSED_BLOCK, scan):
+        return "not-clean"
+    counts = []
+    legacy_comment_spans = comment_spans
+    legacy_comment_span_starts = comment_span_starts
     for gm in COPILOT_COMMENT_GENERATED.finditer(scan):
         if match_is_cited(cited, gm.start(), gm.end()):
             continue

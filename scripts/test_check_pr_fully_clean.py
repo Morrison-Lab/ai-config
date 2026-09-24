@@ -6717,6 +6717,103 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) == "not-clean",
     )
 
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twenty-third round: three more fail-open
+    # gaps, each in a surface the twenty-second round's comment-blindness
+    # sweep did not reach.
+    #
+    # (a) `copilot_verdict`'s AFFIRMATIVE-heading scan (`_has_valid_match`
+    # over `COPILOT_AFFIRMATIVE_HEADER`) checked only the `cited`
+    # backtick/quote mask, never HTML comment spans -- unlike the legacy
+    # `Comments generated:` scan a few lines below it, already fixed for
+    # exactly this gap. A commented-out `### Approval recommended`
+    # followed by a live, uncited `Comments generated: 0` line was read
+    # as a genuine affirmative heading and classified clean, with no live
+    # heading anywhere in the body at all. Fixed with a new
+    # comment-aware `_has_live_match`, used ONLY for the affirmative
+    # heading -- see the fail-closed rationale in the comment above the
+    # (deliberately unchanged) negative-heading check in
+    # `copilot_verdict` for why the negative heading keeps the
+    # citation-only scan: making IT comment-aware too would let a
+    # commented-out `### Changes recommended` stop blocking, which is the
+    # unsafe direction.
+    check(
+        "copilot_verdict: a commented-out affirmative heading does not "
+        "pair with a live 'Comments generated: 0' to read as clean, with "
+        "no live heading anywhere in the body",
+        checker.copilot_verdict(
+            "<!--\n### \U0001f7e2 Approval recommended\n-->\n\n"
+            "Comments generated: 0\n"
+        ) == "",
+    )
+    # The fail-closed choice from (a) stated explicitly: a commented-out
+    # NEGATIVE heading must still count as blocking, alongside a live
+    # affirmative heading -- reversing this (making the negative heading
+    # comment-aware too) is the change this round deliberately did NOT
+    # make.
+    check(
+        "copilot_verdict: a commented-out negative heading still blocks "
+        "(fail-closed) even alongside a live affirmative heading and a "
+        "live zero count",
+        checker.copilot_verdict(
+            "<!--\n### \U0001f534 Changes recommended\n-->\n\n"
+            "### \U0001f7e2 Approval recommended\n\nComments generated: 0\n"
+        ) == "not-clean",
+    )
+    #
+    # (b) `_find_details_regions`'s CLOSER search (scripts/lib/
+    # copilot_overview.py) was `scan.find("</details>", ...)` -- plain,
+    # case-SENSITIVE -- while its own opener pattern
+    # (`_COPILOT_DETAILS_OPEN`) is `re.IGNORECASE`. A real `</DETAILS>`
+    # (uppercase) closer was never recognised, so that `<details>`
+    # region silently extended to the end of the string, swallowing
+    # every marker+heading pair AND every orphan `**Findings:**` line
+    # after it -- including a genuine, live, nonzero one, which is the
+    # unsafe direction (a real not-clean signal disappearing rather than
+    # a real clean one appearing). Fixed with a length-guarded
+    # `scan.lower()` closer search (case-insensitive, matching the
+    # opener), falling back to the original case-sensitive search --
+    # already fail-closed -- when `len(scan.lower()) != len(scan)` (a
+    # rare Unicode case-folding expansion breaks the 1:1 position
+    # mapping a lowered copy otherwise gives for free).
+    check(
+        "copilot_verdict: an uppercase </DETAILS> closer is still "
+        "recognised, so a real nonzero orphan Findings line after it is "
+        "not swallowed into 'clean'",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Review effort:** Lite  \n**Findings:** None\n\n"
+            "<details>\n<summary>Resolved since last review</summary>\n\n"
+            "- some quoted content\n</DETAILS>\n\n"
+            f"**Findings:** 5 {_v2_picture}\n"
+        ) == "not-clean",
+    )
+    #
+    # (c) `COPILOT_FINDINGS_LINE`'s own leading `(?:^|\n)` consumes the
+    # PRECEDING newline when the match is not at the very start of the
+    # string, so `m.start()` then points at that newline rather than at
+    # the line's own first character. The citation mask never marks a
+    # newline offset as cited (by design -- see
+    # `_copilot_overview_block_spans`'s docstring), so
+    # `match_is_cited(cited, m.start(), m.end())` always found an uncited
+    # newline in range and reported the WHOLE line as uncited, even when
+    # every real character of the line sat inside a double-backtick code
+    # span: a whole `` **Findings:** None `` line, wrapped in double
+    # backticks, still read as a live, uncited zero. Fixed with
+    # `_findings_line_cite_start`, which checks citedness from the
+    # line's own first character (skipping the consumed leading
+    # newline), in BOTH the block scan and the orphan scan.
+    check(
+        "copilot_verdict: an affirmative heading plus a double-backtick-"
+        "wrapped '**Findings:** None' line (no other real field) states "
+        "no verdict rather than clean",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            + B + B + "**Findings:** None" + B + B + "\n"
+        ) == "",
+    )
+
     # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twelfth round: COPILOT_COMMENT_COUNT's
     # `(\d+)` was unbounded, and `int()` on a run past a few thousand
     # digits raises ValueError uncaught -- pre-existing on main, crashing

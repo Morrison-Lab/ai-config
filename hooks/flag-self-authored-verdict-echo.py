@@ -72,23 +72,31 @@ FIRE CONDITION (all of)
      discriminator that separates a disposition ANSWERING findings from a
      self-review STATING them -- `shared/workflow/self-review-fallback.md`
      requires the second to carry a real verdict, including a not-clean one,
-     and warning on those is how a guard gets switched off. The two MCP
+     and warning on those is how a guard gets switched off. The three MCP
      surfaces a review is SUBMITTED through (`pull_request_review_write`,
-     `discussion_comment_write`) are subtracted from the inherited tool
-     tuple for the same reason: a second-round review reproduced a formal
-     REQUEST_CHANGES review warning through the first of them.
+     `discussion_comment_write`, `add_comment_to_pending_review`) are
+     subtracted from the inherited tool tuple for the same reason: a
+     second-round review reproduced a formal REQUEST_CHANGES review warning
+     through the first of them. That subtraction is by SURFACE, so it says
+     nothing about a review posted as a plain comment: a fallback
+     self-review written with `add_issue_comment` still warns, which is a
+     residual rather than an oversight and is tracked as ai-config#3938.
   6. That vocabulary is not NEGATED or hedged by a word that GRAMMATICALLY
      REACHES it. "None of the findings are addressed yet" is the honest
      sentence a self-review writes when it has found work and not done it,
      and an earlier draft warned on it -- which is condition 5's own failure
      reached from the other side. Two bounds do this, and the second is what
      an earlier draft lacked: the search runs back only to the last sentence
-     end or blank line, and inside that window `_hedge_attaches` (reused
-     from `flag-clean-claim-over-findings.py`, not re-derived) requires the
-     nearest hit to attach, so a negator broken off by a comma, a semicolon
-     or a conjunction does not govern. Without it, "None are deferred; all
-     five are addressed in `f120e5a`" went silent -- a second-round review
-     reproduced four such bodies.
+     end or blank line, and inside that window the nearest hit must attach,
+     so a negator broken off by a comma, a semicolon or a conjunction does
+     not govern. Without it, "None are deferred; all five are addressed in
+     `f120e5a`" went silent -- a second-round review reproduced four such
+     bodies. The attach TEST is reused from
+     `flag-clean-claim-over-findings.py` (`_ATTACHES`); its separator
+     VOCABULARY is not, because that hook's set is tuned to a hedge rather
+     than to a negator, and reusing both shipped a measured regression -- a
+     third-round review reproduced four honest self-review sentences
+     starting to warn. `SCOPE_BREAK_RX` is this hook's own set.
 
      The hedge vocabulary IS `classify_verdict()`'s own
      (`PREFIX_DISQUALIFY_RX`, imported). The negator set is this file's,
@@ -148,13 +156,6 @@ _rebuttal = _sibling("flag-uncited-rebuttal.py", "_sib_verdict_echo_rebuttal")
 _disclosure = _sibling("require-agent-disclosure.py", "_sib_verdict_echo_disclosure")
 _clean_claim = _sibling("flag-clean-claim-over-findings.py",
                         "_sib_verdict_echo_clean_claim")
-_stamp = _sibling("flag-unmeasured-timestamp.py", "_sib_verdict_echo_stamp")
-# The write-then-post heredoc is this corpus's own convention for a
-# backtick-heavy body -- CLAUDE.md's PowerShell/backtick rule sends exactly
-# this hook's target there -- and at PreToolUse time the file the heredoc
-# writes does not exist yet, so a disk read cannot reach it.
-# `flag-unmeasured-digest.py:731` already made this fallback; reused here.
-_extract_heredoc_bodies = getattr(_stamp, "_extract_heredoc_bodies", None)
 _checker = _instrument()
 
 classify_verdict = getattr(_checker, "classify_verdict", None)
@@ -176,9 +177,15 @@ _INHERITED_POST_TOOLS = tuple(getattr(_disclosure, "MCP_POST_TOOLS", (
 # promises to exclude, and the direction that gets a guard switched off.
 # Subtracted by name rather than re-listing the comment tools, so a comment
 # surface added to the sibling still reaches this hook.
+# `add_comment_to_pending_review` is step 2 of the three-call sequence
+# CLAUDE.md's own MCP table documents for filing a formal review (create the
+# pending review, add each comment, submit), so it belongs here by the
+# criterion above. A third-round adversarial review found it in the POST
+# tuple instead, which contradicted that criterion.
 MCP_REVIEW_TOOLS = (
     "mcp__github__pull_request_review_write",
     "mcp__github__discussion_comment_write",
+    "mcp__github__add_comment_to_pending_review",
 )
 # EDITING a comment is this hook's case as much as posting one: the incident's
 # first two attempted fixes were edits. The sibling's tuple already carries
@@ -186,19 +193,41 @@ MCP_REVIEW_TOOLS = (
 # -- an adversarial review found `add_comment_to_pending_review` listed twice.
 MCP_POST_TOOLS = tuple(t for t in dict.fromkeys(_INHERITED_POST_TOOLS + (
     "mcp__github__update_issue_comment",
-    "mcp__github__add_comment_to_pending_review",
 )) if t not in MCP_REVIEW_TOOLS)
+
+# What the subtraction above does NOT reach, stated rather than implied: a
+# self-review posted as a PLAIN COMMENT. `self-review-fallback.md` prescribes
+# exactly that route ("post it as a PR comment"), and its own text notes that
+# `gh pr comment` files an issue comment rather than a review object -- so no
+# surface distinguishes it, and only fire conditions 5 and 6 stand between
+# such a body and a warning. A review that labels its findings with ARD
+# disposition words still warns on that route. Tracked as ai-config#3938;
+# the direction is a spurious warning on a real artifact, which is the
+# expensive one, so it is a residual rather than an accepted cost.
 
 BASH_TOOL_NAMES = ("Bash", "bash", "run_command", "execute_command", "terminal", "shell")
 
-# A real review emits this marker beside its verdict, so a body carrying its
-# OWN one is a review rather than a disposition. It is matched against the
-# authored view only: a disposition may quote the reviewer's payload back to
-# explain what was said, and an adversarial review found that a quoted payload
-# exempted the comment from this warning while `classify_verdict()` still read
-# that same embedded payload as the comment's own verdict -- the incident's own
-# shape, reached through a quoted payload instead of quoted prose.
-RX_REVIEW_PAYLOAD = re.compile(r"review-data\s*:", re.I)
+# A real review emits a `review-data` payload beside its verdict, so a body
+# carrying its OWN one is a review rather than a disposition.
+#
+# Read with the instrument's own extractor rather than a regex here. A
+# hand-rolled `review-data\s*:` substring test shipped first and was
+# unanchored and case-insensitive, so any MENTION of the marker exempted the
+# comment -- and this corpus writes that string constantly, in the README row
+# this hook adds, in this very comment, and in both `why` fields. A third-round
+# adversarial review reproduced the bypass by appending one sentence naming the
+# mechanism. `extract_structured_review` requires the payload to open its own
+# line and masks fences, code spans AND indented blocks, so it returns None for
+# a mention, for a blockquoted payload and for an indented one, and a dict only
+# for a payload the body actually carries.
+#
+# It also makes the hook's headline claim -- that it imports the instrument
+# rather than inventing a second detector -- true of this gate as well as of
+# `classify_verdict`. `None` when the instrument cannot be loaded, and the
+# gate then exempts nothing, which errs toward warning on this gate alone;
+# every other fallback in this file errs the other way, because this one
+# cannot fabricate a payload that is not there.
+extract_structured_review = getattr(_checker, "extract_structured_review", None)
 
 RX_FENCE = re.compile(r"^ {0,3}(?P<d>`{3,}|~{3,})\s*(?P<info>.*)$")
 
@@ -291,6 +320,55 @@ def _split_segments(text):
     return [seg for seg in re.split(r"(?<![\\])[;&|]+", text) if seg.strip()]
 
 
+# The write-then-post heredoc is this corpus's own convention for a
+# backtick-heavy body -- CLAUDE.md's PowerShell/backtick rule sends exactly
+# this hook's target there -- and at PreToolUse time the file the heredoc
+# writes does not exist yet, so a disk read cannot reach it.
+#
+# `flag-unmeasured-timestamp.py`'s `_extract_heredoc_bodies` was used here
+# first and cannot serve: it returns the bodies and discards the redirect
+# TARGET, so the only thing to do with several of them is join them. A
+# third-round adversarial review reproduced both directions of that. Writing
+# the reviewer's report and the disposition in one Bash call and posting the
+# disposition went SILENT, because the report's `review-data` payload joined
+# the body and exempted it -- and the reviewer's report is the commonest
+# neighbour a disposition has. Posting a file written in an earlier call, with
+# an unrelated heredoc elsewhere in the command, warned about a body that was
+# not being posted.
+#
+# So the target is captured and the heredoc is tied to the `--body-file` the
+# posting segment names. No tie, no body: an untied heredoc reads as
+# unreadable rather than as a guess.
+RX_BODY_FILE = re.compile(r"--body-file[=\s]+(\S+)")
+RX_HEREDOC = re.compile(
+    r"([^\n]*)<<-?[ \t]*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?[^\n]*\n"
+    r"(.*?)\n[ \t]*\2\b",
+    re.DOTALL,
+)
+
+
+def _heredoc_body_for(command, segment):
+    """The heredoc body the posting `segment` would send, or None.
+
+    With a `--body-file` target the heredoc must name it, and exactly one
+    must. Without one -- a `--body "$(cat <<EOF ...)"` form -- a single
+    heredoc in the command is unambiguous and is taken; several are not.
+    """
+    docs = [(m.group(1), m.group(3)) for m in RX_HEREDOC.finditer(command)]
+    if not docs:
+        return None
+    target = RX_BODY_FILE.search(segment) or RX_BODY_FILE.search(command)
+    if target:
+        name = os.path.basename(target.group(1).strip("'\"")).strip("'\"")
+        if not name:
+            return None
+        hits = [b for pre, b in docs if name in pre]
+        return hits[0] if len(hits) == 1 and hits[0].strip() else None
+    if len(docs) == 1 and docs[0][1].strip():
+        return docs[0][1]
+    return None
+
+
 def _bash_body(command, cwd):
     """(kind, body) for a Bash command that posts a comment, else (None, None)."""
     if RX_COMMENT_POST is None or extract_body_text is None:
@@ -308,13 +386,8 @@ def _bash_body(command, cwd):
         body = extract_body_text(segment, cwd)
         if body is None:
             body = extract_body_text(command, cwd)
-        if body is None and _extract_heredoc_bodies is not None:
-            try:
-                joined = "\n".join(_extract_heredoc_bodies(command))
-            except Exception:
-                joined = ""
-            if joined.strip():
-                body = joined
+        if body is None:
+            body = _heredoc_body_for(command, segment)
         if body is None:
             return "unreadable", None
         return "body", body
@@ -356,12 +429,57 @@ _FALLBACK_PREFIX_DISQUALIFY = re.compile(
     r"(?i)\b(?:should|would|could|might|may|claims?|says?|said|saying|"
     r"seems?|apparently|maybe|perhaps|if|unless|hypothetically)\b"
 )
-# The clause-ATTACHMENT test, reused rather than re-derived: the sibling
-# already solved "a negator in a neighbouring clause must not govern this
-# phrase", and a second copy here would be free to drift out of step with
-# it. `None` when the sibling cannot be loaded; `_disqualified` then falls
-# back to the plain window scan, which errs toward disqualifying.
-_hedge_attaches = getattr(_clean_claim, "_hedge_attaches", None)
+# The clause-ATTACHMENT test, split into the part that transfers and the
+# part that does not. `_attaches` is the MECHANISM -- does anything between
+# a hit and the phrase break its scope -- and it transfers unchanged.
+# `RX_LEADING_SEPARATOR` is a VOCABULARY, chosen for the sibling's verdict
+# phrases, and it does not.
+#
+# Reusing both, which is what `_hedge_attaches` does, shipped a measured
+# regression: that set counts `yet`, a bare comma and parentheses as clause
+# breaks, and this hook's negators reach their phrase across exactly those
+# tokens. "The root cause has not yet been addressed in the fix." warned,
+# as did three more ordinary self-review sentences whose only offence was an
+# appositive or a parenthetical. `check-purpose-before-reusing.md` names the
+# shape: the structure fitted and the purpose did not.
+#
+# `None` when the sibling cannot be loaded; `_disqualified` then falls back
+# to the plain window scan, which errs toward disqualifying.
+_ATTACHES = getattr(_clean_claim, "_ATTACHES", None)
+
+# This hook's own separator vocabulary. It keeps every token that genuinely
+# opens a new clause and drops the three that do not, here:
+#
+#   `yet`   -- an adverb inside the negated clause ("has not yet been
+#              addressed"), not the coordinating conjunction it is in the
+#              sibling's phrases.
+#   `(` `)` `[` `]`
+#           -- an aside interrupts a clause without ending it.
+#   a bare `,`
+#           -- an appositive comma does the same. A comma that really does
+#              open a clause is followed by a conjunction, which is matched
+#              on its own below.
+#
+# The cost of dropping the bare comma is a comma splice ("Nothing was
+# deferred, all five are addressed in `f120e5a`"), which now reads as
+# governed and goes quiet. That is a missed warning, the cheap direction
+# for a warn-only hook, and the docstring's stated asymmetry.
+SCOPE_BREAK_RX = re.compile(
+    r"--|[;:|]"
+    r"|[\u2013\u2014\u2192\u2026]|\s[-/]\s"
+    r"|\n[ \t]*[-*+>#]"
+    r"|\b(?:but|and|or|so|however|though|although|while|whereas"
+    r"|after|before|until|since|because|once|unless|if|now\s+that)\b",
+    re.I,
+)
+
+# An aside is removed from the connector BEFORE the scope test, so a
+# conjunction inside it cannot break a scope it never left: "None of them
+# (three blockers and two nits) are addressed" must stay governed by
+# `None`, and its `and` belongs to the parenthetical. The paired-comma form
+# is an appositive; it requires two commas and stops at sentence
+# punctuation, so a comma splice is not silently swallowed by it.
+RX_ASIDE = re.compile(r"\([^()]*\)|\[[^\[\]]*\]|,[^,.;:!?]*,")
 
 PREFIX_DISQUALIFY_RX = (getattr(_clean_claim, "PREFIX_DISQUALIFY_RX", None)
                         or _FALLBACK_PREFIX_DISQUALIFY)
@@ -381,14 +499,42 @@ NEGATION_RX = re.compile(
 RX_CLAUSE_START = re.compile(r"[.!?]|\n\s*\n")
 
 
+def _governs(prose, window_start, match_start, rx):
+    """True when the LAST `rx` hit in the window reaches `match_start`.
+
+    The same shape as `flag-clean-claim-over-findings.py`'s
+    `_hedge_attaches`, and deliberately not a call to it: that function
+    hard-codes the sibling's `RX_LEADING_SEPARATOR`, which is the half that
+    does not transfer (see `SCOPE_BREAK_RX` above). The mechanism it
+    delegates to, `_attaches`, is reused unchanged.
+
+    Asides are stripped from the connector first, so a conjunction inside a
+    parenthetical or an appositive cannot break a scope it never left.
+
+    A missing hit is vacuously "does not apply". A missing `_attaches`
+    falls back to True, which DISQUALIFIES -- a missed warning rather than
+    a false one.
+    """
+    window = prose[window_start:match_start]
+    last = None
+    for last in rx.finditer(window):
+        pass
+    if last is None:
+        return False
+    connector = RX_ASIDE.sub(" ", window[last.end():])
+    if _ATTACHES is None:
+        return not SCOPE_BREAK_RX.search(connector)
+    return bool(_ATTACHES(connector, SCOPE_BREAK_RX))
+
+
 def _disqualified(prose, match_start):
     """True when a negator or hedge GOVERNS the phrase at `match_start`.
 
     Two bounds, and both are needed. The window start is the last sentence
     end or blank line before the phrase (`RX_CLAUSE_START`). Inside that
-    window, `_hedge_attaches` decides whether the nearest hit actually
-    reaches the phrase, or is broken off from it by a comma, a semicolon
-    or a conjunction.
+    window, `_governs` decides whether the nearest hit actually reaches the
+    phrase, or is broken off from it by a semicolon, a dash, a new list
+    item or a conjunction.
 
     The window alone is not enough, and shipping it alone reproduced a
     defect `flag-clean-claim-over-findings.py:759` documents having
@@ -396,9 +542,13 @@ def _disqualified(prose, match_start):
     silenced "None are deferred; all five are addressed in `f120e5a`",
     because the negator sits in the same SENTENCE but a different CLAUSE.
     A second-round adversarial review reproduced four such bodies going
-    silent. Reusing the sibling's `_attaches`/`RX_LEADING_SEPARATOR` pair
-    is what tells that apart from "none of the findings are addressed
-    yet", where the negator genuinely attaches.
+    silent.
+
+    The attachment test alone is not enough either, and shipping the
+    sibling's vocabulary with it reproduced the mirror defect in round
+    three: "The root cause has not yet been addressed in the fix." warned,
+    because `yet` is a clause separator for the sibling's phrases and an
+    adverb in this hook's. `SCOPE_BREAK_RX` is this hook's own set.
 
     A missing sibling fails toward DISQUALIFYING, which costs a missed
     warning rather than a false one that teaches the author to ignore the
@@ -406,13 +556,9 @@ def _disqualified(prose, match_start):
     """
     starts = [m.end() for m in RX_CLAUSE_START.finditer(prose, 0, match_start)]
     window_start = starts[-1] if starts else 0
-    if _hedge_attaches is None:
-        window = prose[window_start:match_start]
-        return bool(NEGATION_RX.search(window)
-                    or PREFIX_DISQUALIFY_RX.search(window))
-    return bool(_hedge_attaches(prose, window_start, match_start, NEGATION_RX)
-                or _hedge_attaches(prose, window_start, match_start,
-                                   PREFIX_DISQUALIFY_RX))
+    return bool(_governs(prose, window_start, match_start, NEGATION_RX)
+                or _governs(prose, window_start, match_start,
+                            PREFIX_DISQUALIFY_RX))
 
 
 def echoed_verdict(body):
@@ -425,8 +571,12 @@ def echoed_verdict(body):
     except Exception:
         return None
     prose = authored_text(body)
-    if RX_REVIEW_PAYLOAD.search(prose):
-        return None
+    if extract_structured_review is not None:
+        try:
+            if extract_structured_review(body) is not None:
+                return None
+        except Exception:
+            pass
     for hit in RX_DISPOSITION.finditer(prose):
         # The bullet branch starts at the preceding newline, so the clause
         # window would otherwise be the LINE ABOVE the bullet. Anchor on the

@@ -106,10 +106,27 @@ NEGATED_PHRASES = (
 # silenced all three; a second-round adversarial review reproduced them.
 # These are POSITIVE cases: each is an ordinary round-two disposition.
 # The review's own table offered "None are deferred; all five are addressed
-# in `f120e5a`" as a fourth row. It is not one: `classify_verdict()` returns
-# `''` for that body whatever verdict form it carries, so gate 3 stops it
-# before the window is consulted and it cannot pin this fix. The semicolon
-# separator is pinned by the fixture below instead.
+# in `f120e5a`" as a fourth row, and it IS one -- an earlier revision of this
+# comment claimed `classify_verdict()` returns `''` for it "whatever verdict
+# form it carries", which is false and was corrected by a later review round.
+# Measured: `Changes requested`, `Blocked`, `Not ready to merge` and
+# `Not clean` all classify `not-clean`, so the row reaches gate 4 and pins
+# this fix under each of them. It returns `''` under exactly one form, this
+# suite's own `NOT_CLEAN` ("Needs more work"), because of the paragraph
+# window on `classify_verdict()`'s `Needs ... work` suffix guard
+# (ai-config#3937) -- which is why the fixture below spells its verdict out
+# instead of interpolating `NOT_CLEAN`. Measuring one form and generalizing
+# to all of them is the population-vs-recall failure this corpus names
+# repeatedly; the row is adopted below rather than dropped.
+# The reviewer's own fourth row. Its verdict is spelled out rather than
+# interpolated from `NOT_CLEAN`, per the comment above: under "Needs more
+# work" this body is stopped at gate 3 by ai-config#3937 and would pin
+# nothing.
+REVIEWER_ROW = (
+    "### Verdict\n**Changes requested**\n\n"
+    "None are deferred; all five are addressed in `f120e5a`.\n"
+)
+
 NEGATOR_IN_OTHER_CLAUSE = (
     "### Verdict\n**%s**\n\n"
     "Nothing was deferred; the retry ceiling is addressed in `f120e5a`.\n"
@@ -301,6 +318,8 @@ def main():
           mcp(HEDGE_IN_OTHER_CLAUSE), True)
     check("a negator in a previous bullet still warns",
           mcp(NEGATOR_IN_PRIOR_BULLET), True)
+    check("the reviewer's own semicolon row still warns",
+          mcp(REVIEWER_ROW), True)
     check("a heredoc-written body is read, not called unreadable",
           fired("Bash", {"command":
                          "cat > /tmp/vb.md <<'EOF'\n%s\nEOF\n"
@@ -323,10 +342,20 @@ def main():
     check("prose about the rule with no disposition vocabulary",
           mcp(DOCS_ABOUT_THE_RULE), False)
     check("an empty body", mcp(""), False)
-    check("a formal review is not bound to the review surface",
-          "mcp__github__pull_request_review_write" not in mod.MCP_POST_TOOLS
-          and "mcp__github__discussion_comment_write" not in mod.MCP_POST_TOOLS,
-          True)
+    # Fire condition 5 leaves a SUBMITTED formal review alone. Each review
+    # surface is subtracted from the post tuple by name, and the body itself
+    # is checked through each of them -- the tuple assertion alone would pass
+    # against a guard that never looked at the body at all.
+    for _surface in ("mcp__github__pull_request_review_write",
+                     "mcp__github__discussion_comment_write",
+                     "mcp__github__add_comment_to_pending_review"):
+        check("%s is not a post surface" % _surface,
+              _surface not in mod.MCP_POST_TOOLS, True)
+        check("a formal review on %s is left alone" % _surface,
+              fired(_surface, {"body": FORMAL_REVIEW_BODY}), False)
+    # The plain-comment route is a deliberate residual, not an oversight: a
+    # fallback self-review posted with `add_issue_comment` still warns.
+    # Tracked as ai-config#3938 rather than asserted quiet here.
     check("a tab-led backtick run is indented code, not a fence",
           "```" in mod.authored_text("a\n\t```\nb\n\t```\nc\n"), True)
 

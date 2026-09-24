@@ -88,6 +88,25 @@ What does not: the Mistake, Canonical Rule, Fix, or Do/Don't lines, which are wh
 
 ## Pattern 43: Auto-Mode Push-Guard Deadlock
 
+- **1st occurrence, 2026-09-01** (`Lacaedemon/sparta` [PR #1459](https://github.com/Lacaedemon/sparta/pull/1459), GIA sweep;
+  tracked as [ai-config#2899](https://github.com/Morrison-Lab/ai-config/issues/2899);
+  previously `ucdavis/bcs` 2026-08-28 [ai-config#2544](https://github.com/Morrison-Lab/ai-config/issues/2544), closed by [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820)):
+  In an auto-permission-mode plugin-consumer session where no `adversarial-reviewer` agent is registered (`Agent type not found`),
+  the session treated `hooks/no-push-without-self-review.py`'s refusal as solvable in-session by repeatedly rephrasing the sanctioned `ALLOW_UNREVIEWED_PUSH=1` override or by patching the running hook file ---
+  when the auto-mode permission classifier pattern-matches every such attempt as a guard bypass and denies it,
+  and repeated varied attempts make the classifier (correctly) more suspicious,
+  until it denies even legitimately-shaped review dispatches.
+  The hook's sanctioned escape valve is exactly what the classifier reads as a bypass, so the two mechanisms compose into a lockout neither intends.
+  Both discharge paths were unreachable at once:
+  the plugin's shipped agents were absent from the session's Agent registry
+  (writing `.claude/agents/adversarial-reviewer.md` into the repo mid-session does not register it immediately or reliably --- definitions load at session start, and the one measured mid-session appearance came about fifty minutes after the write, by a mechanism not yet identified),
+  and the classifier denied the override in all three phrasings tried (Bash chained, Bash standalone, PowerShell `$env:`) --- consistent denials, not stochastic ones.
+  A fourth phrasing, `env VAR=1 command`, was not tried here and later succeeded on its first attempt in a separate 2026-09-06 incident where the inline `VAR=1 command` form had just been denied --- see [`claude-code-transcripts.md`](claude-code-transcripts.md)'s "A shared session's transcript can carry a genuinely later, genuinely unrelated verdict" for that record, which draws no conclusion from the single data point about why the `env` form passed.
+  The [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820) fallback, merged earlier that same day, was ALSO unreachable, for a distinct reason:
+  the harness runs the hook from the plugin CACHE snapshot (`~/.claude/plugins/cache/Morrison-Lab/ai-config/<rev>/hooks/`, via `${CLAUDE_PLUGIN_ROOT}`),
+  which predated the fix (rev `a3e0fdb`, no `FALLBACK_AGENT_NAME`);
+  pulling the marketplace clone (`git -C ~/.claude/plugins/marketplaces/Morrison-Lab pull --ff-only origin main`, to `79def2e`) succeeded but changed nothing the harness executes,
+  and copying the updated hook onto the cache copy was itself classifier-denied (reasonably --- an agent rewriting its own active guard).
 - **2nd occurrence of the misidentified-hook-copy class, 2026-09-03** ([#3141](https://github.com/Morrison-Lab/ai-config/issues/3141), recorded in [#3156](https://github.com/Morrison-Lab/ai-config/issues/3156)), and it is an occurrence of **this bullet's own Fix step being skipped** rather than of a new mechanism.
   `hooks/no-unreviewed-pr.py` demanded a Copilot review while the moratorium ran to `2026-12-01`, and the session identified "the loaded copy" as the newest per-commit directory under `~/.claude/plugins/cache/` --- the exact proxy Pattern 43's Fix step, in [`mistake-patterns.md`](mistake-patterns.md), rules out.
   Several cache directories carried the same value, so newest isolated nothing --- derive the count rather than citing one, since the cache is garbage-collected and it fell from nine to five between 2026-09-03 and 2026-09-04 with no edit in between.

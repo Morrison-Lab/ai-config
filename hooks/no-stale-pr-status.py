@@ -116,11 +116,7 @@ def _check_push(tool_name: str, args: any) -> tuple[bool, str]:
     if RX_MCP_PUSH.search(tool_lower):
         return True, tool_name
 
-    # 2. Local file tools only modify the working tree on disk -- they never push.
-    if tool_lower in LOCAL_FILE_TOOLS:
-        return False, ""
-
-    # 3. Extract shell command string if present.
+    # 2. Extract shell command string if present.
     cmd_str = None
     if isinstance(args, dict):
         cmd_str = args.get("command") or args.get("CommandLine") or args.get("cmd")
@@ -146,7 +142,7 @@ def _check_push(tool_name: str, args: any) -> tuple[bool, str]:
             return True, summary
         return False, ""
 
-    # 4. Fallback for non-dict args or unrecognized tool wrappers.
+    # 3. Fallback for non-dict args or unrecognized tool wrappers.
     blob = (tool_name or "") + " " + json.dumps(args or {})
     m = RX_PUSH.search(blob)
     if m:

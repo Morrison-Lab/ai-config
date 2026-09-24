@@ -730,6 +730,13 @@
             "timeout": 10,
             "script": "flag-unmeasured-digest.py",
             "why": "CLAUDE.md 'Timestamp recaps in local time' / deterministic-tools, generalized from a clock time to a digest (ai-config#3779; measured 2026-09-18: an issue body cited `3e2b9e10...` as the md5 of two files, which no command in the session had produced). Warns, never blocks, when a body about to leave through `gh` (a comment, or an issue or PR being created or edited) or `glab` (whose body is `-d`/`--description`) carries a digest-shaped token -- 7 to 64 hex characters bounded on both sides with at least one a-f, that is a canonical length (32/40/64), or truncated with an ellipsis, or preceded within 48 characters by a boundary-anchored digest word -- and no prior `user` transcript record (message or toolUseResult) contains a hex run having that token as a prefix. The prefix rule keeps a legitimate abbreviation quiet, so a short SHA quoted from `git log` discharges and one typed from memory does not. The body is read from `--body-file`, `-b`, `-F`, `-d`, or -- the case the first version missed -- a heredoc in the same command, which is this corpus's own convention for a backtick-safe body and leaves no file on disk at PreToolUse time. Because body extraction is imported from flag-unmeasured-timestamp.py, a `cat >>` append to a session notebook or memory file reaches its notebook branch and warns too. Warns because a digest quoted from an upstream advisory, a lockfile, or a vendor release page is legitimate and not distinguishable by the body alone."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/flag-self-authored-verdict-echo.py\"'",
+            "timeout": 10,
+            "script": "flag-self-authored-verdict-echo.py",
+            "why": "Morrison-Lab/mln#49, measured 2026-09-24. Warns, never blocks, when a `gh pr comment`/`gh issue comment`/`gh api .../comments` body about to post classifies as a NOT-CLEAN verdict by scripts/check-pr-fully-clean.py's own classify_verdict() while reading as a disposition ANSWERING findings rather than a review stating them. The incident: a disposition comment opened by reproducing the reviewer's call at line start so the reply could answer each finding, and the scanner read that line as the AUTHOR's own verdict -- which per ai-config#2274 a later clean verdict from a different reviewer cannot supersede, so the PR scored not fully clean on a head with 14 check runs green and a live clean review verdict. Silent, and in the blocking direction. Two adjacent remedies were measured and both fail, so the message names them: blockquoting the line (classify_verdict reads a blockquoted line exactly as a bare one) and a backtick code span of either length once the span crosses a line break (the per-line citation scan cannot close it). It imports the instrument's own classifier rather than hand-rolling a second detector, per no-handrolled-verdict-parse.py, and stays silent on a body carrying a `review-data:` payload or lacking ARD disposition vocabulary, so a genuine self-review per shared/workflow/self-review-fallback.md is never warned about. Warns because whether an echo is the author's own call is a judgment the lexical condition only approximates."
           }
         ]
       },
@@ -914,6 +921,13 @@
             "timeout": 10,
             "script": "flag-unmeasured-digest.py",
             "why": "The MCP half of the Bash entry above, for a remote session with no `gh` on PATH. NOT full parity: it inherits MCP_POST_TOOLS from require-agent-disclosure.py, which covers the comment and review tools, so an issue or PR CREATED through mcp__github__issue_write or mcp__github__create_pull_request is not seen. That is the very case the Bash entry exists for, and closing it means widening the shared tool tuple rather than this hook's own list (ai-config#3779)."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/flag-self-authored-verdict-echo.py\"'",
+            "timeout": 10,
+            "script": "flag-self-authored-verdict-echo.py",
+            "why": "The MCP half of the Bash entry above, following flag-unmeasured-timestamp.py's precedent. hooks.json matches by tool name, so the Bash entry never sees a comment posted through mcp__github__add_issue_comment / add_reply_to_pull_request_comment / update_issue_comment / add_comment_to_pending_review -- which is how the mln#49 comments went out, from a remote session with no `gh` on PATH. Same script, same warn-only behaviour, reading tool_input.body directly. The edit tool is covered deliberately: the incident's first attempted fix was an edit to the offending comment, and it did not clear the reading."
           }
         ]
       },

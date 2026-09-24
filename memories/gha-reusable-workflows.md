@@ -278,12 +278,15 @@ so the pattern is load-bearing rather than a workaround invented for this PR.
   (Measured 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826).)
 
 - **A `changelog.d/<slug>.<category>.md` fragment is scanned by gha's own `new-line-breaks` and `diff-scoped-guard` jobs, the same as any other `.md`/`.qmd` file.**
-There is no changelog-fragment exemption in either job's globs or paths-ignore.
-  A fragment written as one long bullet line fails `new-line-breaks` and triggers an avoidable `claude-review` round, exactly as a long line anywhere else would.
+  There is no changelog-fragment exemption in either job's globs or paths-ignore.
+  `check-new-line-breaks` in `Morrison-Lab/gha` is configured via the `NLB_BASE_REF` environment variable (e.g. `NLB_BASE_REF=origin/main`).
+  It flags markdown lines containing more than one sentence or clause, strictly enforcing Semantic Line Breaks (SemBr) across all `.md` files, including changelog fragments (`changelog.d/*.md`).
+  A fragment written as one long bullet line fails `new-line-breaks` and triggers an avoidable review round, exactly as a long line anywhere else would.
   Every sibling fragment in the directory is already clause-broken, which is the tell that the convention is enforced rather than merely stylistic.
-  - **Do:** write the fragment at clause boundaries like its siblings, and run gha's own checker from the worktree before pushing: `NLB_GLOBS='*.md *.qmd' NLB_BASE_REF=origin/main python3 check-new-line-breaks/check-new-line-breaks.py`.
+  - **Do:** write the fragment at clause boundaries like its siblings, placing each sentence on its own line, and run gha's own checker from the worktree before pushing: `NLB_GLOBS='*.md *.qmd' NLB_BASE_REF=origin/main python3 check-new-line-breaks/check-new-line-breaks.py`.
   - **Don't:** write a changelog bullet as one unbroken line on the reasoning that it is "just a changelog" and outside the line-break convention's scope.
-  (Measured 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826).)
+  (2nd occurrence, 2026-09-24 on [Morrison-Lab/gha#931](https://github.com/Morrison-Lab/gha/issues/931) ([PR #933](https://github.com/Morrison-Lab/gha/pull/933));
+  prior: 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826).)
 
 - **Historically, `check-new-line-breaks` did not see a sentence that opens with a digit or an opening parenthesis, so a two-sentence line passed silently.**
   Its `_SENT_BREAK_RE` lookahead class was `` [A-Z"'`*\[] ``, which admitted an uppercase letter or a markup character --- and neither a digit nor `(`.

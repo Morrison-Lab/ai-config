@@ -69,6 +69,16 @@ there.
   `cd` out to the parent repo (or a sibling worktree)
   first, *then* remove.
 
+## Git (Windows) --- worktrees created on Windows have `.git` files containing Windows drive paths that break in Git Bash / MSYS2
+
+- Linked worktrees created on Windows write a `.git` pointer file containing an absolute Windows drive path (e.g. `gitdir: C:/...` or `gitdir: D:/...`).
+- When shell scripts (such as `check-diff-scoped.sh` in `Morrison-Lab/gha`) or POSIX tools execute under MSYS2 or Git Bash, path resolution between POSIX paths (`/c/...`) and Windows drive formats (`C:/...`) can fail.
+  As a result, `git rev-parse --is-inside-work-tree` or git operations can report `fatal: not inside a git work tree` or `fatal: not a git repository`.
+- **Do:** be aware of path translation mismatches when invoking bash scripts in Windows worktrees;
+  verify working directory paths or invoke git commands via native PowerShell / Windows binaries when MSYS2 path translation fails.
+- **Don't:** assume a failure like `fatal: not inside a git work tree` under Git Bash indicates repository corruption when running inside a valid Windows linked worktree.
+  (Measured 2026-09-24 on `Morrison-Lab/gha`.)
+
 ## Git --- `checkout -B` in a linked worktree silently bypasses the already-checked-out guard
 - Plain `git checkout main` in a linked worktree correctly refuses when `main`
   is checked out in the primary (or any other) worktree: `fatal: 'main' is

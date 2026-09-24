@@ -1445,7 +1445,10 @@ def push_is_exempt(directory: str | None, argv: list[str],
     `-c` overrides and environment prefix, so `pushurl`, `pushInsteadOf` and an
     inline `-c remote.origin.pushurl=...` are all seen as git will apply them.
     A remote with several push URLs is exempt only if all of them are. A
-    command naming a URL or path instead of a remote is matched on that value.
+    command naming a URL or path instead of a configured remote is never
+    exempt: `git remote get-url` cannot resolve it, and git still applies
+    `insteadOf`/`pushInsteadOf` to it, so its literal text says nothing
+    reliable about where the push goes.
 
     Anything unresolvable is NOT exempt, which leaves the push to the ordinary
     review check: the exemption can only ever narrow the guard by destination.
@@ -1462,14 +1465,7 @@ def push_is_exempt(directory: str | None, argv: list[str],
     except TimeoutError:
         return False
     urls = [u.strip() for u in (listed or "").splitlines() if u.strip()]
-    if not urls:
-        # Not a configured remote name. git accepts a URL or path in the
-        # remote position, so only something shaped like one is matched; a
-        # bare name that failed to resolve is a remote git will reject.
-        if "/" not in remote and ":" not in remote:
-            return False
-        urls = [remote]
-    return all(_owner_repo(u) in EXEMPT_REPOS for u in urls)
+    return bool(urls) and all(_owner_repo(u) in EXEMPT_REPOS for u in urls)
 
 
 def _rev_parse_ref(directory: str | None, env: list[str], *args: str) -> str | None:

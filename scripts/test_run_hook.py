@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for skills/ai-config-hooks/run-hook.sh (ai-config#2004).
+"""Tests for plugins/ai-config-hooks/run-hook.sh (ai-config#2004).
 
 The runner must pass the hook payload through on stdin, and must stand down
 only when the marketplace plugin is enabled under Claude Code's scope
@@ -13,7 +13,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-RUNNER = ROOT / "skills" / "ai-config-hooks" / "run-hook.sh"
+RUNNER = ROOT / "plugins" / "ai-config-hooks" / "run-hook.sh"
 
 passes = 0
 failures = 0

@@ -317,55 +317,26 @@ def main() -> int:
             len(errs) == 1 and "over the marketplace" in errs[0],
         )
 
-    # --- skills-directory plugin exemption (ai-config#2004) ---
+    # --- a plugin manifest under skills/ breaks the marketplace sync ---
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)
         plugin = tmp / "skills" / "hooks-only"
         (plugin / ".claude-plugin").mkdir(parents=True)
-        manifest = plugin / ".claude-plugin" / "plugin.json"
-        manifest.write_text(
+        (plugin / ".claude-plugin" / "plugin.json").write_text(
             json.dumps({"name": "hooks-only", "description": "d"}),
             encoding="utf-8",
-        )
-        errors, _ = run_skills_check(tmp)
-        check("skills-dir plugin without SKILL.md is not an error", errors == [])
-
-        manifest.write_text(
-            json.dumps({"name": "other", "description": "d"}), encoding="utf-8"
         )
         errors, _ = run_skills_check(tmp)
         check(
-            "skills-dir plugin whose name != directory is an error",
-            any("!= directory" in e for e in errors),
+            "skills-dir plugin under skills/ is one sync error",
+            len(errors) == 1 and "marketplace sync" in errors[0],
         )
 
-        manifest.write_text(
-            json.dumps({"name": "hooks-only", "description": "d"}),
-            encoding="utf-8",
-        )
         (tmp / "skills" / "bare").mkdir()
         errors, _ = run_skills_check(tmp)
         check(
             "skill dir with neither SKILL.md nor manifest is still an error",
             any("no SKILL.md" in e for e in errors),
-        )
-        (tmp / "skills" / "bare").rmdir()
-
-        manifest.write_text(
-            json.dumps({"name": "hooks-only", "description": ""}),
-            encoding="utf-8",
-        )
-        errors, _ = run_skills_check(tmp)
-        check(
-            "skills-dir plugin with an empty description is an error",
-            any("empty description" in e for e in errors),
-        )
-
-        manifest.write_text("{not json", encoding="utf-8")
-        errors, _ = run_skills_check(tmp)
-        check(
-            "skills-dir plugin with invalid manifest JSON is one error",
-            len(errors) == 1 and "invalid JSON" in errors[0],
         )
 
 

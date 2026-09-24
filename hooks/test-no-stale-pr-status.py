@@ -441,6 +441,23 @@ def run(events):
 # a detector that is right about the important part and wrong about the
 # visible part survives a green suite.
 ATTRIBUTION = [
+    # The comparison behind this block is by TIME alone: the most recent
+    # status query against the most recent push, with no notion of which
+    # repository or branch either touched. A push to a DIFFERENT repo
+    # therefore trips it over a reading that was perfectly current. Firing
+    # there is the safe direction and stays, but the message must not assert
+    # the premise -- an earlier wording said flatly that the reading
+    # "describes a commit that is no longer the head", which is false in that
+    # case, and the author conceded a retraction the evidence did not support.
+    ("All checks green on the four PRs.",
+     "by TIME, not by repository or branch",
+     "the message discloses that the comparison is repo-blind"),
+    ("All checks green on the four PRs.",
+     "MAY describe a commit",
+     "the staleness is stated as possible, not asserted"),
+    ("All checks green on the four PRs.",
+     "do not write a retraction the evidence does not support",
+     "the message warns against over-conceding to it"),
     ("Local suite: 33 pass.",
      "states a pass/fail count",
      "a bare count with no PR reference reads as possibly-local"),

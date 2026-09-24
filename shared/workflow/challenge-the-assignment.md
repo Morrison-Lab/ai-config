@@ -93,6 +93,60 @@ Re-deriving the measurement, not just re-reading it, is what a supplied
 number needs before it can settle anything --- check each PR's state at the
 time the call ran, not just the aggregate count.
 
+**A guard's own blocking message.**
+This sits above every shape on the ladder, because it is not a person's
+assertion at all: it is an instrument's output, in a corpus whose standing
+policy is [`deterministic-tools`](../principles/deterministic-tools.md) ---
+instruments over model reasoning, precisely because an algorithm can be read
+before it runs and re-run to the same answer.
+So a block reads as a check that has already been performed.
+What it actually is, is a check performed on the inputs the guard happens to
+have, wrapped in prose about the world.
+`hooks/no-stale-pr-status.py` compares the most recent status query in the
+transcript against the most recent push, **by timestamp alone**: it holds no
+notion of which repository either one touched, or which branch, or which PR
+your claim is about.
+A push to one repo therefore fires it over a reading of four PRs in another,
+and the message that arrives says your reading may describe a commit that is
+no longer the head.
+That sentence is true of the guard's inputs and says nothing about the claim
+it just blocked.
+
+The asymmetry is the opposite of the posed-choice one, and worse for it.
+Challenging a brief looks like diligence; challenging a guard looks like
+arguing with the safety rail, which is the move this corpus spends most of
+its pages ruling out.
+So the cheap response is to concede --- and conceding is not free, because the
+correction you then write is itself a claim, published with the guard's
+authority behind it and none of its evidence.
+Retracting a reading that was current is a false retraction, and it lands in
+the reply the user reads.
+
+The check costs one comparison, not one query: ask whether the guard's inputs
+can reach your claim at all.
+Re-query anyway, because confirming that a current reading is still current is
+one call --- but decide what to *write* from the re-query, never from the fact
+that something fired.
+
+- **Do:** read a block as a fact about the guard's inputs, and name the input
+  it actually compared.
+- **Do:** re-run the check the guard asks for, and report what the re-run
+  found.
+- **Don't:** write the correction the message proposes before establishing
+  that its premise reaches your claim.
+- **Don't:** treat firing broadly as a defect in the guard --- a guard that
+  cannot tell repos apart is right to fire on both, and the judgment it
+  cannot make is yours to make.
+
+This composes with
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "The guard's own
+prose is usually what supplies the false generality", which governs the
+neighbouring failure: there the guard's decision is *true* and you widen it
+into a claim about the world, here the guard's premise is *unestablished* for
+your case and you adopt it.
+Both begin by quoting the guard's sentence back; they differ in whether the
+sentence was ever about you.
+
 ## The check
 
 Keep it bounded, or it becomes paralysis and gets dropped.

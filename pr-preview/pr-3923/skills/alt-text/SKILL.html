@@ -404,16 +404,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Before proceeding, identify the project context and read the relevant reference. Check for a <code>_pkgdown.yml</code> file in the project root to detect a pkgdown site:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ls</span> _pkgdown.yml <span class="dv">2</span><span class="op">&gt;</span>/dev/null <span class="kw">&amp;&amp;</span> <span class="bu">echo</span> <span class="st">"pkgdown"</span> <span class="kw">||</span> <span class="bu">echo</span> <span class="st">"not pkgdown"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
-<li><strong>pkgdown site</strong> (<code>_pkgdown.yml</code> present) → read <code>references/pkgdown.md</code></li>
-<li><strong>Quarto documents</strong> (no <code>_pkgdown.yml</code>, <code>.qmd</code> files present) → read <code>references/quarto.md</code></li>
+<li><strong>pkgdown site</strong> (<code>_pkgdown.yml</code> present) -&gt; read <code>references/pkgdown.md</code></li>
+<li><strong>Quarto documents</strong> (no <code>_pkgdown.yml</code>, <code>.qmd</code> files present) -&gt; read <code>references/quarto.md</code></li>
 </ul>
 <p>If the context is still ambiguous, ask the user which format they are working in.</p>
 </section>
 <section id="key-advantage-source-code-access" class="level2">
 <h2 class="anchored" data-anchor-id="key-advantage-source-code-access">Key advantage: source code access</h2>
 <p>Unlike typical alt text scenarios where you only see an image, <strong>we have access to the code that generates each chart</strong>. Use this to extract precise details:</p>
-<p><strong>From plotting code:</strong> - Variable mappings → exact variable names for axes - Color/fill mappings → what color encodes - Plot type functions → scatter, histogram, line chart, etc. - Trend lines or fitted curves → overlaid statistical fits - Faceting/subplots → number of panels and what varies - Color scales → encoding scheme (sequential, diverging, categorical) - Axis labels and titles → customized labels</p>
-<p><strong>From data generation code:</strong> - Random distributions → expected distribution shape - Transformations → what was done to data - Feature engineering → preprocessing applied - Filtering/subsetting → what subset is shown</p>
+<p><strong>From plotting code:</strong> - Variable mappings -&gt; exact variable names for axes - Color/fill mappings -&gt; what color encodes - Plot type functions -&gt; scatter, histogram, line chart, etc. - Trend lines or fitted curves -&gt; overlaid statistical fits - Faceting/subplots -&gt; number of panels and what varies - Color scales -&gt; encoding scheme (sequential, diverging, categorical) - Axis labels and titles -&gt; customized labels</p>
+<p><strong>From data generation code:</strong> - Random distributions -&gt; expected distribution shape - Transformations -&gt; what was done to data - Feature engineering -&gt; preprocessing applied - Filtering/subsetting -&gt; what subset is shown</p>
 <p><strong>From surrounding prose:</strong> - Text before/after the chunk explains the <strong>purpose</strong> and <strong>key insight</strong> - Chapter context tells you what the figure is meant to teach - This is often the best source for the “key insight” part of alt text</p>
 </section>
 <section id="three-part-structure-amy-cesals-formula" class="level2">
@@ -431,7 +431,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="content-rules" class="level2">
 <h2 class="anchored" data-anchor-id="content-rules">Content rules</h2>
 <p><strong>Include:</strong> - Chart type as first words - Axis labels and what they represent - Specific values/ranges when code reveals them (e.g., “peaks between 25–50”) - Number of panels/facets - What color/size encodes if used - The key pattern that supports the surrounding point</p>
-<p><strong>Exclude:</strong> - “Image of…” or “Chart showing…” (screen readers announce this) - Decorative color descriptions (unless color encodes data) - Information already in the caption - Implementation details (package names, function internals)</p>
+<p><strong>Exclude:</strong> - Openers like “Image of” or “Chart showing” (screen readers announce this) - Decorative color descriptions (unless color encodes data) - Information already in the caption - Implementation details (package names, function internals)</p>
 </section>
 <section id="length-guidelines" class="level2">
 <h2 class="anchored" data-anchor-id="length-guidelines">Length guidelines</h2>
@@ -483,7 +483,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="template-patterns">Template patterns</h2>
 <p><strong>Scatter chart:</strong></p>
 <pre><code>Scatter chart. [X var] along the x-axis, [Y var] along the y-axis.
-[Shape: linear/curved/clustered]. [Specific pattern, e.g., "peaks when X is 25–50"].
+[Shape: linear/curved/clustered]. [Specific pattern, e.g., "peaks when X is 25--50"].
 [Any overlaid fits or annotations].</code></pre>
 <p><strong>Histogram:</strong></p>
 <pre><code>Histogram of [variable]. [Shape: right-skewed/bimodal/normal/uniform].

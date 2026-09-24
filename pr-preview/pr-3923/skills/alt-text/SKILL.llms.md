@@ -18,8 +18,8 @@ Before proceeding, identify the project context and read the relevant reference.
 ls _pkgdown.yml 2>/dev/null && echo "pkgdown" || echo "not pkgdown"
 ```
 
-- **pkgdown site** (`_pkgdown.yml` present) → read `references/pkgdown.md`
-- **Quarto documents** (no `_pkgdown.yml`, `.qmd` files present) → read `references/quarto.md`
+- **pkgdown site** (`_pkgdown.yml` present) -\> read `references/pkgdown.md`
+- **Quarto documents** (no `_pkgdown.yml`, `.qmd` files present) -\> read `references/quarto.md`
 
 If the context is still ambiguous, ask the user which format they are working in.
 
@@ -27,9 +27,9 @@ If the context is still ambiguous, ask the user which format they are working in
 
 Unlike typical alt text scenarios where you only see an image, **we have access to the code that generates each chart**. Use this to extract precise details:
 
-**From plotting code:** - Variable mappings → exact variable names for axes - Color/fill mappings → what color encodes - Plot type functions → scatter, histogram, line chart, etc. - Trend lines or fitted curves → overlaid statistical fits - Faceting/subplots → number of panels and what varies - Color scales → encoding scheme (sequential, diverging, categorical) - Axis labels and titles → customized labels
+**From plotting code:** - Variable mappings -\> exact variable names for axes - Color/fill mappings -\> what color encodes - Plot type functions -\> scatter, histogram, line chart, etc. - Trend lines or fitted curves -\> overlaid statistical fits - Faceting/subplots -\> number of panels and what varies - Color scales -\> encoding scheme (sequential, diverging, categorical) - Axis labels and titles -\> customized labels
 
-**From data generation code:** - Random distributions → expected distribution shape - Transformations → what was done to data - Feature engineering → preprocessing applied - Filtering/subsetting → what subset is shown
+**From data generation code:** - Random distributions -\> expected distribution shape - Transformations -\> what was done to data - Feature engineering -\> preprocessing applied - Filtering/subsetting -\> what subset is shown
 
 **From surrounding prose:** - Text before/after the chunk explains the **purpose** and **key insight** - Chapter context tells you what the figure is meant to teach - This is often the best source for the “key insight” part of alt text
 
@@ -47,7 +47,7 @@ Read the caption (`fig-cap`, `fig.cap`) first. Alt text should **complement, not
 
 **Include:** - Chart type as first words - Axis labels and what they represent - Specific values/ranges when code reveals them (e.g., “peaks between 25–50”) - Number of panels/facets - What color/size encodes if used - The key pattern that supports the surrounding point
 
-**Exclude:** - “Image of…” or “Chart showing…” (screen readers announce this) - Decorative color descriptions (unless color encodes data) - Information already in the caption - Implementation details (package names, function internals)
+**Exclude:** - Openers like “Image of” or “Chart showing” (screen readers announce this) - Decorative color descriptions (unless color encodes data) - Information already in the caption - Implementation details (package names, function internals)
 
 ## Length guidelines
 
@@ -78,7 +78,7 @@ Uses plain language (avoid jargon like “geom” or “aesthetic”)
 **Scatter chart:**
 
     Scatter chart. [X var] along the x-axis, [Y var] along the y-axis.
-    [Shape: linear/curved/clustered]. [Specific pattern, e.g., "peaks when X is 25–50"].
+    [Shape: linear/curved/clustered]. [Specific pattern, e.g., "peaks when X is 25--50"].
     [Any overlaid fits or annotations].
 
 **Histogram:**

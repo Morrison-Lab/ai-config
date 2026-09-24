@@ -291,6 +291,7 @@ Actively query current-head CI/pipeline status (`gh pr checks` / `glab ci list` 
 - **`no-push-without-self-review.py`**: Blocks `git push` unless a clean verdict for the exact commit
   being pushed (`Reviewed-Commit: <HEAD_SHA>`) came from an adversarial self-review subagent, or from
   a review by a CLI the guard recognizes, which today means `agy --print` and no other.
+  Pushes to `Morrison-Lab/mln`, `mlg` and `mlr` are exempt (the hook's `EXEMPT_REPOS`).
   Dispatch the reviewer in the foreground and resolve all findings before pushing.
   Use `ALLOW_UNREVIEWED_PUSH=1` only for the empty `pr-on-claim` commit or documented exceptions.
 - **`no-clobbering-push.py`**: Denies bare `git push -f`/`--force` and warns if remote tip has diverged.

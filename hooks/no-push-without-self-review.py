@@ -79,6 +79,11 @@ WHERE IT DELIBERATELY DOES NOT FIRE
   `push_files`) commit straight to a remote branch with no local commit to
   fingerprint, so nothing here can check them. They are an open gap, tracked as
   ai-config#1929, not a decision that they are safe.
+- A push whose every resolved push URL ends in an `EXEMPT_REPOS` entry
+  (Morrison-Lab's mln, mlg and mlr) passes with no verdict and no override.
+  The match is on the trailing `owner/repo` of each URL or path, host
+  unchecked, so a local path ending in one of those names matches too; that
+  admits nothing `ALLOW_UNREVIEWED_PUSH=1` does not already admit.
 
 Authorized override: `ALLOW_UNREVIEWED_PUSH=1`, as an environment assignment on
 the pushing command itself.

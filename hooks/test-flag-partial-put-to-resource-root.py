@@ -34,7 +34,9 @@ def check(name, got, want_fire):
                         f"got {'fire' if fired else 'silence'}")
     if fired:
         try:
-            json.loads(got)
+            payload = json.loads(got)
+            if not isinstance(payload, dict) or "systemMessage" not in payload:
+                FAILURES.append(f"{name}: expected 'systemMessage' in payload, got {payload!r}")
         except Exception as exc:
             FAILURES.append(f"{name}: stdout not valid JSON ({exc})")
 

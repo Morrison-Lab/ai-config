@@ -84,8 +84,8 @@ Alt text should **complement, not duplicate** it:
 - What color/size encodes if used
 - The key pattern that supports the surrounding point
 
+**Exclude:**
 - Openers like "Image of" or "Chart showing" (screen readers announce this)
-- "Image of..." or "Chart showing..." (screen readers announce this)
 - Decorative color descriptions (unless color encodes data)
 - Information already in the caption
 - Implementation details (package names, function internals)

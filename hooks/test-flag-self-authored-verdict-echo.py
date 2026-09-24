@@ -59,6 +59,16 @@ ECHO_CODE_SPAN = (
     "**1. Addressed.** The gate was wrong.\n"
 ) % NOT_CLEAN.lower()
 
+# The ARD bullet form with no "addressed in" phrase anywhere -- the shape an
+# earlier draft of RX_DISPOSITION missed, which made the payload-exemption
+# negative below pass for the wrong reason.
+ECHO_BULLET_ONLY = (
+    "## Round 3\n\n"
+    "Verdict: **%s**, two findings.\n\n"
+    "**1. Addressed.** The gate was wrong.\n"
+    "**2. Rebutted.** The cited line does not exist.\n"
+) % NOT_CLEAN.lower()
+
 # A genuine self-review. States its own verdict; answers nothing.
 SELF_REVIEW = (
     "## Self-review at `abc1234`\n\n"
@@ -73,7 +83,9 @@ REVIEW_WITH_PAYLOAD = (
     "<details><summary>Structured Review Data (JSON)</summary>\n"
     '<!-- review-data: {"schema_version": "1.1", "verdict": "NOT_CLEAN"} -->\n'
     "</details>\n\n"
-    "**1. Addressed.** Irrelevant; the payload decides.\n"
+    "**1. Addressed.** Carried deliberately: this body has disposition\n"
+    "vocabulary AND a not-clean verdict, so only the payload exemption keeps\n"
+    "the guard silent. Without that, the case would pass for the wrong reason.\n"
 ) % NOT_CLEAN
 
 # The rendering that works: the call described, never reproduced.
@@ -183,6 +195,8 @@ def main():
     check("line-start echo in a disposition", mcp(ECHO_DISPOSITION), True)
     check("blockquoting does not exempt it", mcp(ECHO_BLOCKQUOTED), True)
     check("a code span does not exempt it", mcp(ECHO_CODE_SPAN), True)
+    check("the ARD bullet form alone is disposition vocabulary",
+          mcp(ECHO_BULLET_ONLY), True)
     check("an edit to an existing comment is covered",
           mcp(ECHO_DISPOSITION, "mcp__github__update_issue_comment"), True)
     check(

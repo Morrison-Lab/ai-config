@@ -141,8 +141,15 @@ BASH_TOOL_NAMES = ("Bash", "bash", "run_command", "execute_command", "terminal",
 RX_REVIEW_PAYLOAD = re.compile(r"review-data\s*:", re.I)
 
 # ARD disposition vocabulary. The point is a body that ANSWERS findings.
+# The ARD bullet label is the commonest form by far and the easiest to miss:
+# a disposition writes `**1. Addressed.**` or `**1--2. Rebutted.**`, so the
+# numeric label sits INSIDE the bold run, between it and the verb. An earlier
+# draft allowed the bold run but not the label, and a review fixture using only
+# that form was silently unmatched -- which made a negative case pass for the
+# wrong reason.
+_ARD_LABEL = r"(?:\d+(?:\s*(?:--|-|to)\s*\d+)?\s*[.):]\s*)?"
 RX_DISPOSITION = re.compile(
-    r"(?:^|\n)\s{0,4}(?:[-*+]\s+|\d+[.)]\s+|\*\*)?\s*"
+    r"(?:^|\n)\s{0,4}(?:[-*+]\s+|\d+[.)]\s+|\*{1,2}|_{1,2})?\s*" + _ARD_LABEL +
     r"(?:Addressed|Rebutted|Deferred)\b"
     r"|\b(?:are|all|each|both|every one|five|four|three|two)\s+"
     r"(?:\w+\s+){0,3}addressed\b"

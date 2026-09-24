@@ -582,7 +582,13 @@ def main() -> int:
                     "a claim the evidence supports.\n\n"
                     "If this is a progress report, state the pending work in the same message -- "
                     "a bare \"N pass\" count alongside a disclosed in-progress or pending state is "
-                    "the form `no-incomplete-check-enumeration.py` prescribes, and no longer fires."
+                    "the form `no-incomplete-check-enumeration.py` prescribes, and no longer fires "
+                    "ON THIS BRANCH. The staleness branch below is NOT exempt and still fires on "
+                    "that same form, deliberately: disclosing pending work answers the question "
+                    "THIS branch asks and not that one, since a reading taken before your last "
+                    "push may describe a commit that is no longer the head whatever it discloses. "
+                    "Its own escape is to re-query and state the head SHA, so the two are not "
+                    "jointly unsatisfiable."
                 ),
             }))
             return 0

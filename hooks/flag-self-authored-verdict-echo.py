@@ -90,18 +90,24 @@ FIRE CONDITION (all of)
      reached from the other side. Two bounds do this, and the second is what
      an earlier draft lacked: the search runs back only to the last sentence
      end or blank line, and inside that window the nearest hit must attach,
-     so a negator broken off by a comma, a semicolon or a conjunction does
-     not govern. Without it, "None are deferred; all five are addressed in
-     `f120e5a`" went silent -- a second-round review reproduced four such
-     bodies. The attach TEST is reused from
+     so a negator broken off by a semicolon or a conjunction does not
+     govern. A bare comma is deliberately NOT a break (see
+     `SCOPE_BREAK_RX`), so a comma splice goes quiet. Without the second
+     bound, "None are deferred; all five are addressed in `f120e5a`" went
+     silent -- a second-round review reproduced four such bodies. The attach TEST is reused from
      `flag-clean-claim-over-findings.py` (`_ATTACHES`); its separator
      VOCABULARY is not, because that hook's set is tuned to a hedge rather
      than to a negator, and reusing both shipped a measured regression -- a
      third-round review reproduced four honest self-review sentences
      starting to warn. `SCOPE_BREAK_RX` is this hook's own set.
 
-     The hedge vocabulary IS `classify_verdict()`'s own
-     (`PREFIX_DISQUALIFY_RX`, imported). The negator set is this file's,
+     The hedge vocabulary is the instrument's own, reached through the
+     sibling: `PREFIX_DISQUALIFY_RX` is imported from
+     `flag-clean-claim-over-findings.py`, which binds it from
+     `check-pr-fully-clean.py`'s `_PREFIX_DISQUALIFY_RE`. That name belongs
+     to `_item_is_resolved()`, NOT to `classify_verdict()`, which an earlier
+     revision of this line asserted (round 8, finding 5). The negator set is
+     this file's,
      because the instrument's `NOT_CLEAN_NEGATION_PREFIX` is end-anchored to
      at most two intervening words and this hook's phrases run longer. Where
      either bound is ambiguous the result errs toward disqualifying: a
@@ -474,6 +480,17 @@ RX_HEREDOC = re.compile(
 # length cap, which is what makes it safe for the case a length cap would
 # have broken: a single heredoc carrying a 64 KiB body on ONE line scores
 # 1810, because a heredoc BODY is not scanned at all.
+#
+# There is a THIRD axis, and bounding the first two left it open: an
+# UNTERMINATED opener makes `RX_HEREDOC` scan from that opener to the end of
+# the string, so the cost is the untied count multiplied by the total
+# length. Neither of the other two sees it. Measured here at 3.6 MB of
+# 4-character lines, 0 untied openers took 0.33s and 31 took 33.84s while
+# the restart cost moved by 3000 and the opener count stayed inside its
+# bound -- 35s against a registered 10-second timeout (round 8, finding 1).
+# So each untied opener is charged the whole command length. A TIED heredoc
+# costs nothing under this term, which is what keeps the 64 KiB body case
+# above admitted; the worst input the bound now admits takes 6.73s.
 MAX_HEREDOC_OPENERS = 32
 MAX_SCAN_COST = 20_000_000
 RX_HEREDOC_OPENER = re.compile(r"<<(-)?[ \t]*['\"]?([A-Za-z_][A-Za-z0-9_]*)")
@@ -490,7 +507,8 @@ def _scan_budget(command):
     A body is skipped only when its terminator is actually found. An
     UNTERMINATED heredoc has no body to skip -- and is the pathological case
     itself, since its scan runs to the end of the string -- so its lines are
-    counted like any other.
+    counted like any other AND it is charged the whole command length, which
+    is the only term that sees the untied-count-times-length axis.
 
     The opener bound is tested as the scan proceeds and returns early, which
     is what keeps the terminator searches bounded: at most one per admitted
@@ -498,7 +516,9 @@ def _scan_budget(command):
     """
     lines = command.split("\n")
     total = len(lines)
+    chars = len(command)
     openers = 0
+    untied = 0
     cost = 0
     i = 0
     while i < total:
@@ -509,7 +529,7 @@ def _scan_budget(command):
         if openers > MAX_HEREDOC_OPENERS:
             return openers, cost
         i += 1
-        for dash, word in found:
+        for nth, (dash, word) in enumerate(found):
             k = i
             while k < total:
                 probe = lines[k].rstrip("\r")
@@ -517,9 +537,10 @@ def _scan_budget(command):
                     break
                 k += 1
             if k >= total:
+                untied += len(found) - nth
                 break
             i = k + 1
-    return openers, cost
+    return openers, cost + untied * chars
 
 
 def _heredoc_body_for(command, segment):
@@ -846,6 +867,49 @@ def _governs(prose, window_start, match_start, rx):
     return bool(_ATTACHES(connector, SCOPE_BREAK_RX))
 
 
+# ai-config#3953 round 8, finding 3. `authored_text` blanks fences and
+# blockquotes and leaves INLINE code spans intact, and `RX_CLAUSE_START`
+# splits on any `.` -- so the dot in a backticked path ends the sentence and
+# the window loses the sentence's own negator. Measured on the committed
+# hook: three pairs differing ONLY in a dotted citation, where the dotted row
+# warned and the plain row stayed silent. That is the direction this hook's
+# own docstring calls expensive, and the shape is everywhere in this corpus
+# (11017 backticked spans carrying a dot, across 636 of 744 markdown files).
+#
+# `scripts/lib/fences.py`'s `CODE_SPAN_RE` is the corpus's own span matcher
+# and is what `check-pr-fully-clean.py` already blanks with, so it is imported
+# rather than re-derived. It measures the opening backtick RUN and closes on a
+# run of equal length, which a bare `` `[^`]*` `` cannot do: that pattern
+# matches the empty span between the two opening backticks of a double-backtick
+# span and leaks the contents, the same defect `gha`'s own notes record twice.
+#
+# The fallback is deliberately the same shape rather than a looser one. Failing
+# open here would restore exactly the false warning this closes.
+_FALLBACK_CODE_SPAN = re.compile(
+    r"(?<!`)(`+)(?!`)(?:[^\n\r]|\r?\n(?![ \t]*\r?\n))*?(?<!`)\1(?!`)"
+)
+
+
+def _code_span_rx():
+    """`CODE_SPAN_RE` from `scripts/lib/fences.py`, or an equal-shape fallback."""
+    path = os.path.join(ROOT, "scripts", "lib", "fences.py")
+    try:
+        spec = importlib.util.spec_from_file_location("_sib_fences", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return getattr(mod, "CODE_SPAN_RE", None) or _FALLBACK_CODE_SPAN
+    except Exception:
+        return _FALLBACK_CODE_SPAN
+
+
+RX_CODE_SPAN = _code_span_rx()
+
+
+def _elide_code_spans(text):
+    """Blank inline code spans, preserving length so offsets stay valid."""
+    return _blank(RX_CODE_SPAN, text)
+
+
 def _disqualified(prose, match_start):
     """True when a negator or hedge GOVERNS the phrase at `match_start`.
 
@@ -873,10 +937,15 @@ def _disqualified(prose, match_start):
     predicate `_ATTACHES` computes (see its docstring). The fallback is
     equivalent, not conservative.
     """
-    starts = [m.end() for m in RX_CLAUSE_START.finditer(prose, 0, match_start)]
+    # Spans are blanked ONCE, length-preservingly, and the blanked text
+    # feeds both the clause split and `_governs`. Blanking for the split
+    # alone would still let a negator inside a span claim a scope it
+    # never had, which is the mirror of the round-4 bracketed-aside bug.
+    scanned = _elide_code_spans(prose)
+    starts = [m.end() for m in RX_CLAUSE_START.finditer(scanned, 0, match_start)]
     window_start = starts[-1] if starts else 0
-    return bool(_governs(prose, window_start, match_start, NEGATION_RX)
-                or _governs(prose, window_start, match_start,
+    return bool(_governs(scanned, window_start, match_start, NEGATION_RX)
+                or _governs(scanned, window_start, match_start,
                             PREFIX_DISQUALIFY_RX))
 
 

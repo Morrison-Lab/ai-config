@@ -200,8 +200,16 @@ ECHO_COORD_ADVERBIAL_SO = (
 # Round 7, finding 2: the six honest self-reviews round 6's widening cost.
 # Each negator governs its clause ACROSS an interrupting comma aside that
 # happens to open with a coordinator, which is a shape ordinary prose writes
-# constantly -- the reviewer counted 2383 such spans in `shared/*.md` against
-# five of the bare `, and,` form the widening was aimed at.
+# constantly, and far commoner than the bare `, and,` form the widening was
+# aimed at. Round 8, finding 8: the earlier figures here cited `shared/*.md`,
+# a glob that matches ZERO files in this repo, so the ratio was unverifiable
+# as written. Re-derived 2026-09-24 over `shared/**/*.md` (158 files), with
+# the patterns given so the numbers can be checked rather than taken:
+#
+#   aside = r",\s*(?:so|and|or|but|yet|nor)\b[^,\n]{0,120},"   -> 1497
+#   bare  = r",\s*(?:and|or|but|so)\s*,"                      ->    6
+#
+# 250 to 1, and the direction is what matters rather than the magnitude.
 HONEST_COORD_ASIDES = (
     ("a bare adverbial (so far)",
      "No finding, so far, is addressed in `f120e5a`."),
@@ -431,9 +439,18 @@ def mcp(body, tool="mcp__github__add_issue_comment", tmpdir=None):
 
 
 FAILURES = []
+# Every `check` call increments this, so the summary reports the population
+# examined rather than only the verdict over it. A suite that prints "all
+# passed" and nothing else reads identically whether it ran 84 cases or two,
+# which is the shape `algorithmatize-checks.md` and gha's own suites both
+# rule out -- report what was examined, not only what was found (round 8,
+# finding 7).
+EXAMINED = 0
 
 
 def check(name, got, want):
+    global EXAMINED
+    EXAMINED += 1
     if got != want:
         FAILURES.append(f"{name}: expected fired={want}, got fired={got}")
     print(f"  {'ok  ' if got == want else 'FAIL'}  {name}")
@@ -669,6 +686,34 @@ def main():
     check("an unterminated heredoc's lines still count toward the bound",
           mod._scan_budget("x <<EOF\n" * 200)[0] > mod.MAX_HEREDOC_OPENERS,
           True)
+    # Round 8, finding 1. A THIRD cost axis the other two cannot see: an
+    # untied opener makes `RX_HEREDOC` scan to the end of the string, so the
+    # cost is untied count times total length. Measured at 3.6 MB of
+    # 4-character lines, 0 untied took 0.33s and 31 took 33.84s while the
+    # restart cost moved by 3000 and the opener count stayed inside its
+    # bound -- 35s against a registered 10-second timeout. Each untied
+    # opener is charged the whole command length now. Asserted as a
+    # comparison rather than a wall-clock measurement, which would be a
+    # flaky test of a fast machine.
+    # ONE-character lines on purpose. The restart cost is the sum of the
+    # SQUARES of the line lengths, so 4-character lines already score more
+    # than the command's own length and the assertion below passes with the
+    # length term deleted -- a vacuous case, confirmed by mutation. At width
+    # 1 the sum of squares is half the length, so only the term can carry it
+    # over.
+    _body = "\n".join(["x"] * 300000)
+    _untied = "cat <<NOPE\n" + _body
+    _tied = "cat <<NOPE\n" + _body + "\nNOPE\n"
+    _untied_cost = mod._scan_budget(_untied)[1]
+    _tied_cost = mod._scan_budget(_tied)[1]
+    check("an untied opener is charged the whole command length",
+          _untied_cost > len(_untied), True)
+    # ... and a TIED one is not, which is what keeps the 64 KiB body above
+    # admitted. Its body is skipped, so it scores a few hundred against the
+    # untied form's millions. Charging the term per opener regardless would
+    # pass the check above and silence that case.
+    check("a tied heredoc pays no length term",
+          _tied_cost < 1000 and _untied_cost > 1000 * _tied_cost, True)
     # Round 7, finding 5. `-F body=@-` and `--body-file -` name STDIN, not a
     # file, so the heredoc feeding them is the single-heredoc case. Adding
     # the `-F/--field` branch captured `-` as a filename and silenced the
@@ -726,6 +771,19 @@ def main():
           fired("Bash", {"command":
                          "cat > /tmp/v.md <<'EOF'\nExample heredoc:\n"
                          "    EOF\n%s\nEOF\n"
+                         "gh pr comment 1 --body-file /tmp/v.md"
+                         % ECHO_DISPOSITION}),
+          True)
+    # The case above indents with SPACES, so it survives a mutation that
+    # strips TABS unconditionally -- the delimiter still fails to match, for
+    # the wrong reason. Round 8, finding 2. Only a TAB-indented delimiter
+    # inside a PLAIN heredoc separates the conditional `(?(2)[\t]*)` from an
+    # unconditional `[\t]*`: bash strips leading tabs for `<<-` alone, so
+    # here the tabbed line is body text and the body runs on to the echo.
+    check("a tab-indented delimiter does not terminate a plain heredoc",
+          fired("Bash", {"command":
+                         "cat > /tmp/v.md <<'EOF'\nExample heredoc:\n"
+                         "\tEOF\n%s\nEOF\n"
                          "gh pr comment 1 --body-file /tmp/v.md"
                          % ECHO_DISPOSITION}),
           True)
@@ -810,11 +868,12 @@ def main():
         shutil.rmtree(shared, ignore_errors=True)
 
     if FAILURES:
-        print("\nFAILURES:")
+        print(f"\n{EXAMINED - len(FAILURES)}/{EXAMINED} passed")
+        print("FAILURES:")
         for f in FAILURES:
             print("  -", f)
         return 1
-    print("\nAll cases passed.")
+    print(f"\n{EXAMINED}/{EXAMINED} passed")
     return 0
 
 

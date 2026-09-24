@@ -96,6 +96,14 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("#3928 has 2 checks still in progress. #49 is fully clean.")], True,
      "disclosing one PR's pending work does not license calling another clean"),
+    # ... and the exemption is scoped to THIS branch. The staleness branch
+    # still fires on the sibling's prescribed form, deliberately: disclosure
+    # answers "did a query report failure", not "is your reading older than
+    # your push". Round 8, finding 6 --- the hook's message and README both
+    # claimed the exemption unscoped, and every case above exercises the
+    # failing-query branch, so nothing pinned which branch it reached.
+    ([QUERY, PUSH, say("13 pass, 5 pending.")], True,
+     "the disclosure exemption does not reach the staleness branch"),
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("9 pass.")], True,
      "a bare count with nothing disclosed still blocks"),

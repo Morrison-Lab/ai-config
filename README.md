@@ -747,9 +747,20 @@ collision, and conceding it means retracting a claim the evidence supports ---
 see [`challenge-the-assignment`](shared/workflow/challenge-the-assignment.md)'s
 "A guard's own blocking message" shape.
 The fix was on the second hook: a bare count alongside a disclosed pending
-state is now exempt, and its message names the sibling by file, so a reader
-who meets the collision again is pointed at the rule rather than left to
+state is now exempt **on the branch that fires when a query returned a
+failing state**, and its message names the sibling by file, so a reader who
+meets the collision again is pointed at the rule rather than left to
 re-derive it.
+That scope is the whole of it, and an earlier revision of this paragraph
+stated the exemption without it (round 8, finding 6).
+The same hook's *staleness* branch --- the one that fires when the last
+query predates the last push --- is deliberately not exempt, because
+disclosing pending work answers the first branch's question and not the
+second's: a count taken before a push may describe a commit that is no
+longer the head whatever the message says about it.
+That branch names its own escape, which is to re-query and state the head
+SHA, so the two guards are not jointly unsatisfiable there --- which is the
+property this section is about, and it is a weaker claim than exemption.
 
 Two properties make this hard to notice.
 A guard's prescribed form is **prose**, so no test asserts it --- the suite

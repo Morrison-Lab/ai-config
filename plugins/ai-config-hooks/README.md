@@ -8,10 +8,12 @@ with no marketplace and no install step.
 `.claude/skills` is a symlink to `skills/`, so this folder was that plugin
 while it lived in `skills/`.
 
-**Parked.** It moved to `plugins/` because a plugin manifest under
-`skills/` is the suspected cause of the claude.ai marketplace sync failure
-(no sync since 2026-09-02, "No plugins in this marketplace"). Here it does
-not load in place, so hooks are inert again in ai-config's own sessions.
+**Parked.**
+It moved to `plugins/` because a plugin manifest under `skills/`
+is the suspected cause of the claude.ai marketplace sync failure
+(no sync since 2026-09-02, "No plugins in this marketplace").
+Here it does not load in place,
+so hooks are inert again in ai-config's own sessions.
 
 It exists because the canonical hook catalog,
 [`hooks/hooks.json`](../../hooks/hooks.json),

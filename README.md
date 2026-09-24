@@ -831,6 +831,22 @@ Neither reaches anyone else before merge --- a branch's `hooks/hooks.json`
 never reaches a consumer, and `--fix` only edits the running machine --- so the
 *script* existing is harmless while merging its entry is activation.
 
+**`hooks/hooks.json` has a generated mirror, and registering in one without the other fails CI.**
+`skills/ai-config-hooks/hooks/hooks.json` is generated from it by `scripts/gen-hooks-plugin.py`, and `validate` runs that script with `--check`.
+So the registration step is two files, not one:
+
+```bash
+python3 scripts/gen-hooks-plugin.py          # regenerate the mirror
+python3 scripts/gen-hooks-plugin.py --check  # confirm; exits 1 when out of sync
+```
+
+Never hand-edit the generated copy --- run the script, which is also the fix when `--check` fails.
+
+Worth stating here rather than leaving to the check, because the check is the only thing that says so and it speaks after a push.
+The paragraphs above describe `hooks/hooks.json` as *the* plugin activation path, which reads as complete;
+a first-time hook author follows it exactly, registers correctly, and still burns a red CI cycle on a file the instructions never mentioned.
+Measured 2026-09-23 while adding `flag-unsourced-term-attribution.py` (ai-config#3915): the hook, its tests and its `hooks.json` entry were all correct, and `validate` failed on the mirror alone.
+
 On the plugin path a hook now behaves like a skill --- both go live on merge.
 [`record-learnings`](skills/record-learnings/SKILL.md) lists "the skill becomes available locally immediately" as a feature.
 That described a symlinked non-plugin skill install, which `bootstrap.sh` no longer performs (see *Use these skills* above), so it no longer applies to a fresh machine.

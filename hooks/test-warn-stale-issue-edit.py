@@ -699,6 +699,100 @@ check(
 
 
 # ---------------------------------------------------------------------------
+# Hook feedback and preambles are not user prose (ai-config#3914)
+# ---------------------------------------------------------------------------
+
+HOOK_PROSE = (
+    "Measured 2026-08-19 on ucdavis/bcs#651 at a5f4f3f2: "
+    "`gh pr checks` printed 21 rows, all passing, while the "
+    "commit endpoint returned 24 runs."
+)
+
+STOP_HOOK_FEEDBACK_TEXT = "Stop hook feedback:\n" + HOOK_PROSE
+STOP_HOOK_FEEDBACK_ENTRY = {
+    "type": "user",
+    "message": {"role": "user", "content": [
+        {"type": "text", "text": STOP_HOOK_FEEDBACK_TEXT}
+    ]},
+}
+
+check(
+    "is_user_prose rejects Stop hook feedback entry (ai-config#3914)",
+    subject.is_user_prose(STOP_HOOK_FEEDBACK_ENTRY),
+    False,
+)
+check(
+    "find_issue_ref returns None on Stop hook feedback text (ai-config#3914)",
+    subject.find_issue_ref(STOP_HOOK_FEEDBACK_TEXT),
+    None,
+)
+
+HOOK_BRACKET_ENTRY = {
+    "type": "user",
+    "message": {"role": "user", "content": [
+        {"type": "text", "text": "[hook: no-incomplete-check-enumeration] " + HOOK_PROSE}
+    ]},
+}
+check(
+    "is_user_prose rejects [hook: <name>] entry (ai-config#3914)",
+    subject.is_user_prose(HOOK_BRACKET_ENTRY),
+    False,
+)
+
+PRE_TOOL_USE_ENTRY = {
+    "type": "user",
+    "message": {"role": "user", "content": [
+        {"type": "text", "text": "PreToolUse:Write hook additional context:\n" + HOOK_PROSE}
+    ]},
+}
+check(
+    "is_user_prose rejects PreToolUse hook additional context entry (ai-config#3914)",
+    subject.is_user_prose(PRE_TOOL_USE_ENTRY),
+    False,
+)
+
+# Harness meta shape (isMeta: True, no sourceToolUseID, no promptSource)
+HARNESS_META_ENTRY = {
+    "type": "user",
+    "isMeta": True,
+    "message": {"role": "user", "content": [
+        {"type": "text", "text": HOOK_PROSE}
+    ]},
+}
+check(
+    "is_user_prose rejects harness meta entry without preamble (ai-config#3914)",
+    subject.is_user_prose(HARNESS_META_ENTRY),
+    False,
+)
+
+# End-to-end: a transcript containing only hook feedback does NOT arm the write guard
+stop_hook_transcript = write_transcript([STOP_HOOK_FEEDBACK_ENTRY])
+out = run_hook(stop_hook_transcript)
+check(
+    "Stop hook feedback quoting an issue does not arm the write guard (ai-config#3914)",
+    warned(out),
+    False,
+)
+
+# End-to-end retargeting check: user names issue #2282, fresh checks are performed,
+# then another hook fires citing ucdavis/bcs#651. The session must NOT retarget
+# to ucdavis/bcs#651 and must stay clean/silent for #2282!
+RETARGET_PREVENTION_TRANSCRIPT = write_transcript([
+    NAMING,
+    tool("Bash", {"command": "gh issue view 2282"}, "v1"),
+    result("title: foo\nstate: open\n", "v1"),
+    FETCH,
+    STOP_HOOK_FEEDBACK_ENTRY,
+])
+out = run_hook(RETARGET_PREVENTION_TRANSCRIPT)
+check(
+    "hook feedback does not retarget the session away from the user's issue (ai-config#3914)",
+    warned(out),
+    False,
+)
+
+
+# ---------------------------------------------------------------------------
 # Mapping MCP spelling, GitLab, ls-remote; unrelated tools stay silent
 # ---------------------------------------------------------------------------
 

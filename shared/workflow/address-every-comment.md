@@ -1114,13 +1114,21 @@ was measured under one form and was false.
 The row classifies `not-clean` under `Changes requested`, `Blocked`,
 `Not ready to merge` and `Not clean`, and reaches the window under each of
 them.
-It returns `''` under exactly one form, `Needs more work`, which happened to
-be the constant the test file already defined -- and that is a separate
-defect in `classify_verdict()`'s own suffix guard, filed as
+The row suppresses a verdict under one family, `Needs ... work`, which
+happened to be the constant the test file already defined -- and that is a
+separate defect in `classify_verdict()`'s own suffix guard, filed as
 [ai-config#3937](https://github.com/Morrison-Lab/ai-config/issues/3937),
 rather than a property of the row.
-A later review round caught the generalization, and the row is now a fixture
-with its verdict spelled out.
+Eight verdict forms were measured with the row and again without it, and the
+row changes the answer for `Needs more work` and `Needs work` and for no
+other.
+That second measurement is the one the first correction still lacked: the
+first pass replaced "every verdict form" with "exactly one form", which is
+another claim about a population, made from four forms tried by hand.
+Naming the population and the count is what makes either statement
+checkable.
+A later review round caught the original generalization, and the row is now a
+fixture with its verdict spelled out.
 The finding itself was real throughout and reproduced on three further
 constructions.)
 

@@ -111,11 +111,14 @@ NEGATED_PHRASES = (
 # form it carries", which is false and was corrected by a later review round.
 # Measured: `Changes requested`, `Blocked`, `Not ready to merge` and
 # `Not clean` all classify `not-clean`, so the row reaches gate 4 and pins
-# this fix under each of them. It returns `''` under exactly one form, this
-# suite's own `NOT_CLEAN` ("Needs more work"), because of the paragraph
-# window on `classify_verdict()`'s `Needs ... work` suffix guard
-# (ai-config#3937) -- which is why the fixture below spells its verdict out
-# instead of interpolating `NOT_CLEAN`. Measuring one form and generalizing
+# this fix under each of them. The row suppresses a verdict under one family,
+# `Needs ... work` -- which is this suite's own `NOT_CLEAN` -- because of the
+# paragraph window on `classify_verdict()`'s suffix guard (ai-config#3937).
+# Eight forms were measured with the row and without it, and the row changes
+# the answer for `Needs more work` and `Needs work` and no other; `Request
+# changes` and `Do not merge` return `''` with or without it, being no
+# recognized verdict at all. That is why the fixture below spells its verdict
+# out instead of interpolating `NOT_CLEAN`. Measuring one form and generalizing
 # to all of them is the population-vs-recall failure this corpus names
 # repeatedly; the row is adopted below rather than dropped.
 # The REGRESSION the fix for the over-correction above shipped, and the four

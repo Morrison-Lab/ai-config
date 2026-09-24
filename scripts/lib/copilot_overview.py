@@ -149,6 +149,12 @@ import bisect
 import re
 from typing import Callable, List, Optional, Tuple
 
+# A-Z -> a-z only. Length-preserving by construction, unlike `str.lower()`
+# (see `_find_details_regions`).
+_ASCII_LOWER = str.maketrans(
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"
+)
+
 COPILOT_FINDINGS_LINE = re.compile(
     r"(?:^|\n)[ ]{0,3}\*\*Findings:\*\*[ \t]*(?P<rest>[^\n\r]*)", re.IGNORECASE
 )
@@ -620,22 +626,16 @@ def _find_details_regions(
     # swallowed this way reads as no finding at all, the unsafe
     # direction: see `_copilot_v2_findings_count`'s orphan scan).
     #
-    # `scan.lower()` is computed ONCE rather than lowering each
-    # candidate slice, and reused for every closer search in this loop --
-    # `str.lower()` preserves character-for-character length for the
-    # ASCII `<`, `/`, letters, `>` this tag is made of, so a position
-    # found in the lowered string is the SAME position in `scan` itself,
-    # with no separate coordinate mapping needed. That assumption is not
-    # universal (a handful of non-ASCII characters, e.g. Turkish
-    # dotted capital "I" (U+0130), case-fold to MORE than one character),
-    # so it is checked explicitly rather than trusted: when it fails, this
-    # falls back to the original case-sensitive `scan.find`, which is
-    # already the fail-closed direction documented above (an unrecognised-
-    # case closer is treated as absent, extending the region to the end of
-    # the string, rather than risking a position drawn from a
-    # differently-indexed lowered string).
-    _lowered = scan.lower()
-    scan_for_close = _lowered if len(_lowered) == len(scan) else scan
+    # The closer is matched case-insensitively against an ASCII-only
+    # lowercased copy of `scan`, computed ONCE and reused for every search
+    # in this loop. `str.translate` with an A-Z -> a-z table maps each
+    # character to exactly one character, so the copy always has the same
+    # length and every position found in it is the same position in
+    # `scan`. `str.lower()` would not do: some non-ASCII characters (e.g.
+    # U+0130, Turkish dotted capital I) lower to TWO characters, which
+    # shifts every later position. The closer tag itself is pure ASCII,
+    # so folding only ASCII letters loses nothing.
+    scan_for_close = scan.translate(_ASCII_LOWER)
 
     closes: List[Tuple[int, int]] = []
     search_from = 0

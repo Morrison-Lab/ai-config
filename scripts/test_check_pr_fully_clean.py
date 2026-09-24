@@ -6769,12 +6769,10 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     # every marker+heading pair AND every orphan `**Findings:**` line
     # after it -- including a genuine, live, nonzero one, which is the
     # unsafe direction (a real not-clean signal disappearing rather than
-    # a real clean one appearing). Fixed with a length-guarded
-    # `scan.lower()` closer search (case-insensitive, matching the
-    # opener), falling back to the original case-sensitive search --
-    # already fail-closed -- when `len(scan.lower()) != len(scan)` (a
-    # rare Unicode case-folding expansion breaks the 1:1 position
-    # mapping a lowered copy otherwise gives for free).
+    # a real clean one appearing). Fixed with a case-insensitive closer
+    # search over an ASCII-only lowercased copy (`str.translate`, always
+    # length-preserving), matching the opener; the U+0130 check below
+    # pins why `str.lower()` could not be used.
     check(
         "copilot_verdict: an uppercase </DETAILS> closer is still "
         "recognised, so a real nonzero orphan Findings line after it is "
@@ -6786,6 +6784,25 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             "<details>\n<summary>Resolved since last review</summary>\n\n"
             "- some quoted content\n</DETAILS>\n\n"
             f"**Findings:** 5 {_v2_picture}\n"
+        ) == "not-clean",
+    )
+    # The adversarial review of the fix above found its `str.lower()`
+    # length guard reachable: one U+0130 anywhere in the body changed the
+    # lowered length, fell back to the case-sensitive search, and let the
+    # same uppercase closer swallow a real nonzero block again.
+    check(
+        "copilot_verdict: a U+0130 (dotted capital I) elsewhere in the body "
+        "does not disable the case-insensitive </DETAILS> closer match",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "No unresolved review issues remain (reviewer İlker).\n\n"
+            "**Findings:** None\n\n"
+            "<details>\n<summary>Resolved since last review (1)</summary>\n\n"
+            "- item\n</DETAILS>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Findings:** 5 <picture><img></picture>\n"
         ) == "not-clean",
     )
     #

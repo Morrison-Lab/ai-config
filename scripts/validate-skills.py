@@ -554,6 +554,22 @@ def check_plugin_sources(marketplace_rel: str) -> None:
             )
 
 
+def check_nested_plugin_manifests() -> None:
+    """A .claude-plugin/ below the repo root is the suspected cause of the
+    claude.ai marketplace sync failure (#3948): the plugin ships the whole
+    repo (source "./"), so a second manifest sits inside it."""
+    out = subprocess.run(
+        ["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=True
+    ).stdout.decode()
+    for path in sorted(p for p in out.split("\0") if p):
+        parts = path.split("/")
+        if ".claude-plugin" in parts[1:-1]:
+            errors.append(
+                f"{path}: a plugin manifest below the repo root breaks the "
+                "claude.ai marketplace sync; park it outside a "
+                ".claude-plugin/ directory (see plugins/ai-config-hooks/)")
+
+
 def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -568,6 +584,7 @@ def main() -> None:
     check_json(".claude-plugin/marketplace.json", ["name", "owner", "plugins"])
     check_plugin_sources(".claude-plugin/marketplace.json")
     check_json(".claude-plugin/plugin.json", ["name"])
+    check_nested_plugin_manifests()
     check_json(".cursor-plugin/marketplace.json", ["name", "owner", "plugins"])
     check_plugin_sources(".cursor-plugin/marketplace.json")
     check_json(".cursor-plugin/plugin.json", ["name"])

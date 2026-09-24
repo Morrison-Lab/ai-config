@@ -11,6 +11,7 @@ error).
 """
 import importlib.util
 import json
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -337,6 +338,31 @@ def main() -> int:
         check(
             "skill dir with neither SKILL.md nor manifest is still an error",
             any("no SKILL.md" in e for e in errors),
+        )
+
+        # A manifest in any .claude-plugin/ below the root is an error;
+        # the root one and a parked manifest outside such a dir are not.
+        repo = tmp / "nested"
+        repo.mkdir()
+        for rel in (".claude-plugin/plugin.json",
+                    "plugins/hooks/.claude-plugin/plugin.json",
+                    "plugins/parked/plugin.json.parked"):
+            (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+            (repo / rel).write_text("{}", encoding="utf-8")
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+        subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+        original_root = vs.ROOT
+        vs.ROOT = repo
+        vs.errors.clear()
+        try:
+            vs.check_nested_plugin_manifests()
+            errors = list(vs.errors)
+        finally:
+            vs.ROOT = original_root
+        check(
+            "nested .claude-plugin manifest is exactly one sync error",
+            len(errors) == 1
+            and errors[0].startswith("plugins/hooks/.claude-plugin/"),
         )
 
 

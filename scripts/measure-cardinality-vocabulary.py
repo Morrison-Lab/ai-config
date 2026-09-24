@@ -18,14 +18,15 @@ finds alongside the size of the population it examined.
     python3 scripts/measure-cardinality-vocabulary.py
 
 THE SET DOES MOVE, and saying otherwise was this script's own first finding
-about itself. Measured 2026-09-24 against origin/main at b96c640f over a
+about itself. Measured 2026-09-23 against origin/main at b96c640f over a
 COMPLETE clone: 2753 commits, 2539 multi-line bodies, 677 flagged under the
 narrow vocabulary and 680 under the current one, with 3 bodies newly flagged
 and none lost. An earlier revision reported 54 of 111 bodies identical under
 both -- the same ref, read from a SHALLOW clone whose fragment carried 111
-of those 2539 bodies, and which `git log` reports with no warning and exit 0. The truncated
-and complete readings disagreed on the one thing this script asserts, so
-`commit_bodies` now refuses a shallow clone outright.
+of those 2539 bodies. `git log` reports such a fragment with no warning and
+exit 0, so nothing in its output says the history was truncated. The
+truncated and complete readings disagreed on the one thing this script
+asserts, so `commit_bodies` now refuses a shallow clone outright.
 
 Exit status 1 is not that report on its own, though. Eight refusals share it
 -- an unloadable hook, a missing `git`, an unreadable history, a shallow
@@ -109,15 +110,16 @@ SAMPLE = 10
 def load_hook():
     """The hook module, or a refusal naming why it could not be imported.
 
-    `spec_from_file_location` returns a populated spec for a path that does
-    not exist, so the `spec is None` guard below is not what catches a
-    missing or renamed hook -- `exec_module` is, by raising. An earlier
-    revision had only that guard, and a missing hook produced an uncaught
-    traceback while this script's own docstring promised a refusal message.
+    `spec_from_file_location` returns a populated spec, loader and all, for
+    any path ending `.py` whether or not it exists -- measured against
+    CPython 3.11.15, where only a non-`.py` extension returns None. `HOOK` is a
+    constant ending `.py`, so a spec guard here could never fire; what
+    catches a missing or renamed hook is `exec_module`, by raising. An
+    earlier revision had only the unreachable guard, and a missing hook
+    produced an uncaught traceback while this script's own docstring
+    promised a refusal message.
     """
     spec = importlib.util.spec_from_file_location("flag_uncounted", HOOK)
-    if spec is None or spec.loader is None:
-        sys.exit(f"cannot load {HOOK}: no import spec.")
     mod = importlib.util.module_from_spec(spec)
     try:
         spec.loader.exec_module(mod)
@@ -160,9 +162,12 @@ def commit_bodies(ref):
         # The population is the whole point of the comparison, and a shallow
         # clone truncates it silently: `git log` reports the grafted
         # fragment with no warning and exits 0, so every count below is a
-        # true statement about a history nobody chose. Measured 2026-09-24,
-        # this repository read 619 commits shallow and 2753 unshallowed, and
-        # the two disagreed on the one thing the script asserts -- the
+        # true statement about a history nobody chose. Measured 2026-09-23,
+        # this repository read a fragment carrying 111 of the 2539 multi-line
+        # bodies, against 2753 commits once unshallowed. The fragment's own
+        # depth cannot be read back afterwards, which is part of the hazard;
+        # a 119-commit log-order prefix at that ref reproduces its reading.
+        # The two disagreed on the one thing the script asserts -- the
         # fragment reported the body sets IDENTICAL under both vocabularies
         # and the full history reported them different. That is the vacuous
         # pass this script's refusals exist to prevent, arriving through the
@@ -184,13 +189,24 @@ def is_shallow_clone():
     2.15) exits non-zero; that reads as not-shallow, which keeps the script
     usable and is the direction that loses only this guard rather than the
     whole measurement.
+
+    That fallback is announced on stderr rather than taken silently. A
+    silent one disables the refusal this whole block exists for and prints
+    the vacuous pass unchanged, which is indistinguishable from a complete
+    clone -- exactly the failure the refusal was written to make visible.
     """
     try:
         out = subprocess.run(
             ["git", "rev-parse", "--is-shallow-repository"],
             capture_output=True, text=True, check=True,
         ).stdout.strip()
-    except (FileNotFoundError, subprocess.CalledProcessError):
+    except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+        print(
+            f"warning: cannot tell whether this clone is shallow "
+            f"({type(exc).__name__}); proceeding as if it is complete, so "
+            f"the counts below may describe a grafted fragment.",
+            file=sys.stderr,
+        )
         return False
     return out == "true"
 

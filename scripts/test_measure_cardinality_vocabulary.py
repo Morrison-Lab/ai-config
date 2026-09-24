@@ -31,6 +31,7 @@ import importlib.util
 import io
 import re
 import sys
+import tempfile
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
@@ -186,25 +187,51 @@ check(
 )
 
 saved_hook_path = mcv.HOOK
-try:
-    mcv.HOOK = mcv.pathlib.Path("/nonexistent/flag-uncounted-comment-claims.py")
+
+
+def hook_refusal(path):
+    """`load_hook`'s message for a `HOOK` pointing at `path`, or a marker.
+
+    Returned rather than asserted in place, so that `load_hook`'s two error
+    handlers can be pinned by two cases rather than one. An uncaught
+    exception comes back as a named marker instead of killing the run, which
+    is the shape the original defect had: `spec_from_file_location` returns a
+    populated spec for a path that does not exist, so the `spec is None`
+    guard never fired and `exec_module` raised uncaught.
+    """
     try:
-        mcv.load_hook()
-        msg = ""
-    except SystemExit as exc:
-        msg = str(exc.code)
-    except Exception as exc:
-        # Caught rather than propagated so that removing the handler reports
-        # as a named failure instead of killing the run. This is the shape
-        # the defect actually had: `spec_from_file_location` returns a
-        # populated spec for a path that does not exist, so the `spec is
-        # None` guard never fired and `exec_module` raised uncaught.
-        msg = f"uncaught {type(exc).__name__}"
-finally:
-    mcv.HOOK = saved_hook_path
+        mcv.HOOK = mcv.pathlib.Path(path)
+        try:
+            mcv.load_hook()
+            return ""
+        except SystemExit as exc:
+            return str(exc.code)
+        except Exception as exc:  # noqa: BLE001 -- reported, not propagated
+            return f"uncaught {type(exc).__name__}"
+    finally:
+        mcv.HOOK = saved_hook_path
+
+
+msg = hook_refusal("/nonexistent/flag-uncounted-comment-claims.py")
 check(
-    "an unloadable hook is refused rather than raising",
-    "cannot load" in msg and "uncaught" not in msg,
+    # Matched on the specific wording, not on the shared `cannot load`
+    # prefix: both handlers emit that prefix, so a case testing it alone
+    # passes with either handler deleted, because whichever one survives
+    # catches the other's exception and says `cannot load` too.
+    "a missing hook is refused by name rather than raising",
+    "no such file." in msg and "uncaught" not in msg,
+)
+
+with tempfile.TemporaryDirectory() as tmp:
+    broken = Path(tmp) / "flag-uncounted-comment-claims.py"
+    broken.write_text("def (:\n", encoding="utf-8")
+    msg = hook_refusal(broken)
+check(
+    # The other handler, and the only case that can reach it: a syntax error
+    # is not a `FileNotFoundError`, so the general handler is what turns it
+    # into a refusal, and deleting that handler leaves it uncaught.
+    "a hook that fails to import is refused rather than raising",
+    "cannot load" in msg and "SyntaxError" in msg and "uncaught" not in msg,
 )
 
 saved_run = mcv.subprocess.run

@@ -871,7 +871,7 @@ def vocabulary_checks(mod):
     The widening MOVES the set rather than holding it fixed, which is the
     reading to carry away from it.
     `scripts/measure-cardinality-vocabulary.py` is the instrument, and
-    measured 2026-09-24 against origin/main at b96c640f over a complete clone
+    measured 2026-09-23 against origin/main at b96c640f over a complete clone
     the narrow vocabulary flags 677 commit bodies and the current one 680.
     3 bodies are newly flagged and none are lost, so the script exits 1 and
     asks for a human reading rather than reporting the vocabularies
@@ -910,7 +910,12 @@ def vocabulary_checks(mod):
     check("a tens number word is a cardinality claim",
           mod.find_claims("Ninety rows were rewritten."),
           [("cardinality", "Ninety rows")])
-    # Dies with the tens branch too; `hundred` is the widening's upper end.
+    # Dies when the `|hundred` alternative is dropped, while the tens case
+    # stays green -- measured in both directions, so these two are pinned
+    # separately rather than together. They share one source line
+    # (`|{CARDINALITY_TENS}|hundred`), which is what made an earlier revision
+    # of this comment claim the tens branch killed this case too; dropping
+    # that branch alone leaves `|hundred` intact and this case passing.
     check("`hundred` is a cardinality claim",
           mod.find_claims("A hundred files still carry it."),
           [("cardinality", "hundred files")])

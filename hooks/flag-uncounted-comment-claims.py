@@ -377,16 +377,24 @@ ENUM_SEPARATOR = r"\s*/?(?:,|(?<=\s)/|/(?=\s))\s*"
 # constant -- `remind-brief-premises.py`'s own Agent-brief use of "no" is a
 # different population (a brief instructing an agent, not review-comment
 # prose) and is out of scope for this hook's fix.
-# The number words run to `hundred`, not to `twelve`, because a number word
-# above twelve is if anything a stronger signal than a digit run: prose
-# spells out a count someone holds in mind and writes digits for one they
-# just read off a command.
+# The number words run to `hundred`, not to `twelve`, but the two halves of
+# that range are included on different grounds, and only the first half has
+# the obvious argument behind it. For the teens and the tens, a spelled-out
+# number is if anything a stronger signal than a digit run: prose spells out
+# a count someone holds in mind and writes digits for one they just read off
+# a command. `hundred` is the exception to that, and it is the weaker
+# addition: it is the one vocabulary word that is overwhelmingly approximate
+# in ordinary prose (`a few hundred lines up`), so it buys recall at a real
+# cost in precision, and one of the three bodies this widening newly flags in
+# this repository is exactly that phrasing. What settles `hundred` is the
+# corpus measurement below, never the spelled-out-means-counted argument,
+# which does not reach it.
 #
 # The widening's founding anecdote does NOT support it, and saying so is the
 # point of writing it down. "Fourteen such references remain in text at this
 # head" -- a real miscount, whose true figure was 23 -- did match nothing
 # while the vocabulary stopped at twelve. But it was posted as a PULL-REQUEST
-# BODY, and this hook watches comment bodies only: measured 2026-09-24,
+# BODY, and this hook watches comment bodies only: measured 2026-09-23,
 # `gh pr create --body` and `gh issue create --body` carrying that sentence
 # each yield `[]` from `evaluate()`, where the `gh pr comment` and
 # `gh issue comment` forms yield a cardinality claim. It also carried its own
@@ -402,7 +410,7 @@ ENUM_SEPARATOR = r"\s*/?(?:,|(?<=\s)/|/(?=\s))\s*"
 # claim actually is. Restating any of that here is what let two copies drift
 # apart inside a single commit, which is the argument for keeping one.
 #
-# The headline the hook itself depends on: measured 2026-09-24 against
+# The headline the hook itself depends on: measured 2026-09-23 against
 # origin/main at b96c640f over a COMPLETE clone -- 2753 commits, 2539
 # multi-line bodies -- the narrow vocabulary flags 677 and the current one
 # 680, so the SET MOVED. 3 bodies are newly flagged and none lost, and all
@@ -442,7 +450,7 @@ ENUM_SEPARATOR = r"\s*/?(?:,|(?<=\s)/|/(?=\s))\s*"
 # three scripts remain" each yield a cardinality claim, because
 # `CARDINALITY_RE` begins its match at the count itself and never reads the
 # word before it. It predates the widening rather than following from it --
-# measured 2026-09-24, the pre-widening vocabulary flags both identically,
+# measured 2026-09-23, the pre-widening vocabulary flags both identically,
 # since `ten` and `three` were always in it -- so narrowing `hundred` back
 # would not recover either.
 #
@@ -451,8 +459,10 @@ ENUM_SEPARATOR = r"\s*/?(?:,|(?<=\s)/|/(?=\s))\s*"
 # one, so the pattern rejects that string for the same reason it would reject
 # `Twenty-purple files`. Nothing in the pattern recognises an approximation.
 # `hooks/test-flag-uncounted-comment-claims.py` pins the OUTCOME, which is
-# worth pinning; its own comment then reads a design into that outcome, and
-# ai-config#3907 is where the reading is refuted rather than here.
+# worth pinning, and its own comment now says so in those terms: an earlier
+# revision of it read a designed hedge exemption into the outcome, and the
+# comment refutes that reading rather than carrying it. ai-config#3907
+# measures both halves of the refutation.
 #
 # The cost also runs the OPPOSITE way from the `no` exclusion above, which is
 # what makes the analogy wrong rather than merely loose. Quoting #3907:
@@ -462,10 +472,11 @@ ENUM_SEPARATOR = r"\s*/?(?:,|(?<=\s)/|/(?=\s))\s*"
 # So flagging a hedged count is the safe direction, and exempting one is what
 # would cost the recall this hook exists for.
 #
-# The widening raises those stakes, because `hundred` is the one vocabulary
-# word that is overwhelmingly approximate in ordinary prose. #3907 adds that
-# this repository's history carries no such phrasing, and that aside is
-# wrong. Measured 2026-09-24 over the 2753 commit bodies at `origin/main`,
+# The widening raises those stakes, for the reason already given above:
+# `hundred` is the vocabulary's one overwhelmingly approximate word.
+# #3907 adds that this repository's history carries no such phrasing, and
+# that aside is wrong.
+# Measured 2026-09-23 over the 2753 commit bodies at `origin/main`,
 # five carry `a hundred`, `several hundred` or `a few hundred`, and two of
 # those yield a `hundred` claim. One is `documented a few hundred lines up`,
 # which is one of the THREE bodies the widening newly flags -- so the corpus
@@ -474,8 +485,9 @@ ENUM_SEPARATOR = r"\s*/?(?:,|(?<=\s)/|/(?=\s))\s*"
 # a body the narrow vocabulary already flagged, so the body-set instrument is
 # silent about it, which is what #3907's second clause describes. The aside
 # is consistent with a shallow-clone measurement: the `a few hundred` body
-# sits 1889 commits deep, outside the 619-commit fragment this checkout
-# carried before `git fetch --unshallow`.
+# sits 1889 commits deep, far outside the fragment this checkout carried
+# before `git fetch --unshallow`, which held 111 of the 2539 multi-line
+# bodies and is reproduced by a 119-commit log-order prefix.
 #
 # #3907's candidate fix is a negative lookbehind over a closed set of lead-ins
 # (`about`, `roughly`, `around`, `nearly`, `some`, `several`, `a few`). Its

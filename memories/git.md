@@ -83,7 +83,7 @@ That is the same vacuous pass
 [`fail-fast`](../shared/principles/fail-fast.md) is about, arriving through
 the checkout rather than through the code.
 
-**Measured 2026-09-24**, in a remote container's clone of this repository, at
+**Measured 2026-09-23**, in a remote container's clone of this repository, at
 one ref (`origin/main` at `b96c640f`):
 
 | | commits | multi-line bodies | narrow | current | same set? |

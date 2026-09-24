@@ -6559,7 +6559,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             "</details>\n"
         ) == "not-clean",
     )
-    # ai-config#3899 review finding, twenty-first round (PR ai-config#3906
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twenty-first round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
     # Copilot review, fifth round): `_find_details_regions` matched a
     # `<details` opener wherever it appeared, including inside an HTML
     # comment. A fake `<!--\n<details>\n-->` opener then paired with the
@@ -6583,7 +6583,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) == "not-clean",
     )
 
-    # ai-config#3899 review finding, twenty-second round (PR ai-config#3906
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twenty-second round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
     # Copilot review, sixth round): the CLOSER search in
     # `_find_details_regions` was asymmetric with the opener guard just
     # added -- `scan.find("</details>", ...)` accepted the FIRST literal
@@ -6611,7 +6611,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) == "clean",
     )
 
-    # ai-config#3899 review finding, twenty-second round: sweeping every
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twenty-second round: sweeping every
     # OTHER boundary search in copilot_overview.py for the same
     # comment-blindness (per the review's own instruction) found two more
     # genuine gaps, neither previously covered by any test:
@@ -6656,7 +6656,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) == "clean",
     )
 
-    # The FIRST block reads zero here, deliberately (PR ai-config#3906
+    # The FIRST block reads zero here, deliberately (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
     # Copilot review, fifth round on this same pair of tests): the
     # previous version put the nonzero finding in the FIRST block, so the
     # test passed regardless of whether the second block was read at all
@@ -6930,6 +6930,167 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             "<!-- ccr-overview-v2 -->\r\n\r\n## Copilot review overview\r\n\r\n"
             "### \U0001f7e2 Approval recommended\r\n\r\n**Findings:** None"
         ) == "clean",
+    )
+
+    # This PR's own review, finding 1: `_COPILOT_DETAILS_OPEN` used a
+    # trailing `\b`, which only asserts a transition between a word and
+    # non-word character -- `<details:evil>` and `<details-evil>` both
+    # satisfy that at the character right after "details" (":" and "-"
+    # are equally non-word), so either malformed shape was accepted as a
+    # real `<details>` opener. Since it has no matching `</details>`
+    # anywhere, the (fail-closed) unterminated-opener handling then
+    # extends a bogus details region all the way to the end of the
+    # string, and a genuine marker+heading pair following it gets
+    # wrongly excluded as "inside an already-open details region" --
+    # hiding a real, uncited, would-be-clean v2 block down to no verdict.
+    # Fixed with a lookahead requiring a real tag-name delimiter
+    # (whitespace, `/`, or `>`), the same set `_copilot_tag_name` already
+    # uses for a badge's own tag name.
+    check(
+        "copilot_verdict: a malformed '<details:evil>' opener does not "
+        "exclude a genuine block that follows it",
+        checker.copilot_verdict(
+            "<details:evil>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "clean",
+    )
+    check(
+        "copilot_verdict: a malformed '<details-evil>' opener does not "
+        "exclude a genuine block that follows it",
+        checker.copilot_verdict(
+            "<details-evil>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "clean",
+    )
+    # A genuine `<details open>`/`<details/>` opener must still match
+    # (the delimiter set admits whitespace and `/`, not just `>`).
+    check(
+        "copilot_verdict: a marker+heading pair still nested inside a "
+        "genuine '<details open>' region is still excluded",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n\n"
+            "<details open>\n<summary>Resolved since last review (1)</summary>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+            "</details>\n"
+        ) == "not-clean",
+    )
+
+    # This PR's own review, finding 2: the marker+heading block-start
+    # scan (`_COPILOT_OVERVIEW_START.finditer` inside
+    # `_copilot_overview_block_spans`) never checked its own match
+    # against the caller's `cited` mask (fences/quotes/code-spans) at
+    # all -- only the details-region and HTML-comment exclusions were
+    # applied there. A single-line two-backtick code span wrapping just
+    # the marker (` ``<!-- ccr-overview-v2 --> `` `) or just the heading
+    # (` ``## Copilot review overview`` `) on its own line is a genuine
+    # citation: `strip_cited_finding_vocab_with_mask`'s inline-code pass
+    # only strips the SINGLE backtick pairs (consuming each doubled
+    # backtick as an empty span), leaving the quoted text itself intact
+    # in `scan` with the mask correctly marking it cited -- exactly the
+    # shape a body describing the ccr-overview-v2 format in prose would
+    # produce. Checking the mask against the WHOLE combined multi-line
+    # match would never fire (a mask's newline positions are always 0,
+    # and the marker-to-heading bridge always crosses one), so the fix
+    # checks the marker's own span and the heading's own span
+    # separately, rejecting the block start if EITHER is wholly cited.
+    check(
+        "copilot_verdict: a marker cited as a single-line code span "
+        "does not open a real block, even with a genuine affirmative "
+        "heading and an uncited 'Findings: None' line following it",
+        checker.copilot_verdict(
+            "``<!-- ccr-overview-v2 -->``\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) != "clean",
+    )
+    check(
+        "copilot_verdict: a heading cited as a single-line code span "
+        "does not open a real block, even with a genuine affirmative "
+        "heading and an uncited 'Findings: None' line following it",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n``## Copilot review overview``\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) != "clean",
+    )
+    check(
+        "copilot_verdict: a marker/heading pair BOTH cited as separate "
+        "single-line code spans does not open a real block",
+        checker.copilot_verdict(
+            "``<!-- ccr-overview-v2 -->``\n\n``## Copilot review overview``\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) != "clean",
+    )
+    # A genuine, uncited marker+heading must still open a real block --
+    # the fix must not exclude every block outright.
+    check(
+        "copilot_verdict: an uncited marker+heading pair still opens a "
+        "real block after the citation-mask fix",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "clean",
+    )
+
+    # This PR's own review, finding 3: `_find_details_regions` closed an
+    # OUTER `<details>` at the FIRST `</details>` found after it, which
+    # for a NESTED body is the INNER details' own closer, not the
+    # outer's true one. Content between that inner closer and the
+    # outer's real closer then read as OUTSIDE any details region at
+    # all, so a marker+heading pair placed there -- still genuinely
+    # nested inside the outer `<details>`, exactly what a re-review's
+    # own "Resolved since last review" listing can quote -- was wrongly
+    # treated as a real top-level block. Fixed by tracking depth across
+    # a merged, position-ordered walk of every opening and closing tag,
+    # so a region only closes when depth returns to 0 and a nested
+    # opening never starts a region of its own. The nonzero finding
+    # sits ONLY in the wrongly-included block, discriminating exactly
+    # like the "twentieth round" single-level-nesting test above: if the
+    # depth tracking regresses to closing on the first inner
+    # `</details>` again, this reads not-clean instead of clean.
+    check(
+        "copilot_verdict: a marker+heading pair placed after an INNER "
+        "</details> but before its OUTER </details> is still excluded "
+        "as a real top-level block",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n\n"
+            "<details>\n<summary>Outer</summary>\n\n"
+            "<details>\n<summary>Inner (nested)</summary>\n\ninner content\n"
+            "</details>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n"
+            "</details>\n"
+        ) == "clean",
+    )
+
+    # Timing regression test for the depth-tracking merge above: a
+    # single `<details>` nested ~12,000 levels deep, at a fixed 262,144
+    # characters, so a future reimplementation that sorts the combined
+    # open/close event list (O(m log m)) or re-scans per level (O(n^2))
+    # regresses this rather than silently shipping.
+    _deep_nest_header = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n\n"
+    )
+    _deep_nest_open = "<details>\n"
+    _deep_nest_close = "</details>\n"
+    _deep_nest_depth = (
+        262144 - len(_deep_nest_header) - len("x\n")
+    ) // (len(_deep_nest_open) + len(_deep_nest_close))
+    _deep_nest_body = (
+        _deep_nest_header
+        + _deep_nest_open * _deep_nest_depth
+        + "x\n"
+        + _deep_nest_close * _deep_nest_depth
+    )
+    _dn_secs, _dn_verdict = best_of_three(checker.copilot_verdict, _deep_nest_body)
+    check(
+        "copilot_verdict on a single <details> nested ~12,000 levels "
+        "deep at 262,144 characters scales linearly (< 1s)",
+        _dn_verdict == "clean" and _dn_secs < 1.0,
     )
 
     # Timing regression tests ([ai-config#3917](https://github.com/Morrison-Lab/ai-config/issues/3917), PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot

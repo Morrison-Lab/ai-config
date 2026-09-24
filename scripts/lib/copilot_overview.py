@@ -186,13 +186,39 @@ COPILOT_FINDINGS_LINE = re.compile(
 # whitespace between the heading text and the end of its line (or the
 # end of the string), so any real trailing content -- a word, a colon
 # and more heading text, anything -- fails the match outright.
+# The marker and heading are each their own capturing group (PR
+# [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, tenth round) so the block-start scan can
+# check EACH one's own citedness against the caller's `cited` mask,
+# separately from the other -- checking the WHOLE combined match would
+# never fire, since the mask's newline positions are unconditionally 0
+# (every line-splitting/rejoining pass in check-pr-fully-clean.py's
+# strip_cited_finding_vocab_with_mask leaves the separator `\n` at mask
+# 0), and this pattern's own marker-to-heading bridge always crosses at
+# least one newline. A single-line citation of EITHER piece alone (a
+# genuine two-backtick code span wrapping just `<!-- ccr-overview-v2 -->`
+# on its own line, or just `## Copilot review overview` on its own line)
+# is real and constructible, and is exactly the shape a body describing
+# the ccr-overview-v2 format in prose would use.
 _COPILOT_OVERVIEW_START = re.compile(
-    r"(?:^|\n)[ ]{0,3}<!--\s*ccr-overview-v2\s*-->"
+    r"(?:^|\n)[ ]{0,3}(<!--\s*ccr-overview-v2\s*-->)"
     r"(?:[ \t]*\r?\n)+"
-    r"[ ]{0,3}##[ \t]+Copilot review overview[ \t]*(?=\r?\n|$)",
+    r"[ ]{0,3}(##[ \t]+Copilot review overview[ \t]*)(?=\r?\n|$)",
     re.IGNORECASE,
 )
-_COPILOT_DETAILS_OPEN = re.compile(r"(?:^|\n)[ ]{0,3}<details\b", re.IGNORECASE)
+# A lookahead for a real tag-name delimiter, not a trailing `\b` (PR
+# [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, ninth round): `\b` only asserts a
+# transition between a word and non-word character, which "details:evil"
+# and "details-evil" both satisfy at the character right after "details"
+# (":" and "-" are equally non-word), so either malformed shape opened a
+# real `<details>` region and could hide a genuine v2 block inside it.
+# `_copilot_tag_name` already draws this same line for a BADGE's own tag
+# name (a real opening tag's name is always followed by whitespace, `/`,
+# or `>`); this mirrors that same delimiter set here, for consistency, so
+# `<details:evil>`/`<details-evil>` are rejected outright while
+# `<details>`, `<details open>`, and `<details/>` still match.
+_COPILOT_DETAILS_OPEN = re.compile(
+    r"(?:^|\n)[ ]{0,3}<details(?=[ \t/>])", re.IGNORECASE
+)
 _COPILOT_NEXT_HEADING = re.compile(r"(?:^|\n)[ ]{0,3}##[ \t]")
 # `[0-9]`, not `\d`: Python's `\d` matches every Unicode `Nd`-category
 # digit, not just ASCII -- a full-width digit (U+FF15, "5") would
@@ -211,7 +237,11 @@ _COPILOT_WS_ONLY = re.compile(r"^[ \t]*$")
 _COPILOT_NONE_LINE = re.compile(r"^[ \t]*None[ \t]*$", re.IGNORECASE)
 
 
-def _copilot_overview_block_spans(scan: str) -> List[Tuple[int, int]]:
+def _copilot_overview_block_spans(
+    scan: str,
+    cited: bytearray,
+    match_is_cited: Callable[[bytearray, int, int], bool],
+) -> List[Tuple[int, int]]:
     """Return the (start, end) character span of every Copilot v2 overview
     block in `scan` -- normally zero or one, but a body can legitimately
     quote an earlier round's overview ahead of (or after) its own current
@@ -287,6 +317,27 @@ def _copilot_overview_block_spans(scan: str) -> List[Tuple[int, int]]:
     bounded searches (one per pattern, from the previous block's end to
     the next block's start), so the total cost across every block is
     O(body-length) again, regardless of block count.
+
+    The marker's own span (`start_m.span(1)`) and the heading's own span
+    (`start_m.span(2)`) are ALSO checked against the caller's `cited`
+    mask, independently of each other (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review,
+    tenth round): a body describing the ccr-overview-v2 format in prose
+    can genuinely cite one piece as a single-line two-backtick code span
+    (` ``<!-- ccr-overview-v2 --> `` ` or ` ``## Copilot review
+    overview`` ` on its own line), which `strip_cited_finding_vocab_with_
+    mask` leaves in place -- its inline-code-stripping pass only removes
+    the SINGLE backtick pairs, so the marker/heading text itself survives
+    in `scan` unmodified and still matches `_COPILOT_OVERVIEW_START`,
+    with the caller's mask correctly marking that text cited. Without
+    this check, an affirmative heading elsewhere in the body plus a real,
+    uncited `**Findings:** None` line following the cited pair read as a
+    clean v2 block, even though the pair citing the format is not a live
+    overview at all. `match_is_cited` on the WHOLE combined match would
+    never fire here (or anywhere): the mask's newline positions are
+    unconditionally 0 in every caller, and the marker-to-heading bridge
+    always crosses at least one -- checking each piece separately is what
+    makes the check reachable at all, not merely a stricter version of a
+    whole-match check.
     """
     comment_spans = _find_html_comment_spans(scan)
     comment_span_starts = [s for s, _ in comment_spans]
@@ -305,6 +356,10 @@ def _copilot_overview_block_spans(scan: str) -> List[Tuple[int, int]]:
         ):
             continue
         if _position_in_spans(start, details_region_starts, details_regions):
+            continue
+        if match_is_cited(cited, *start_m.span(1)) or match_is_cited(
+            cited, *start_m.span(2)
+        ):
             continue
         valid_starts.append((start, start_m.end()))
     scan_len = len(scan)
@@ -421,18 +476,48 @@ def _find_details_regions(
     The opening `<details` is located with the same line-anchored
     `_COPILOT_DETAILS_OPEN` pattern the block-end search already uses, so
     "what counts as a details opening" stays consistent between the two
-    call sites; the closing `</details>` is then found with `str.find`
-    from there (not line-anchored -- matching `_find_html_comment_spans`'s
-    own convention for its closing marker). An opening whose region
-    already covers a later opening (a nested `<details>`, which real
-    Copilot markup does not produce but this does not assume) is skipped
-    rather than treated as a second region, and an opening with no
-    closing `</details>` anywhere after it is treated as extending to the
-    end of the string -- the same fail-closed direction
-    `_find_html_comment_spans` already takes for an unterminated comment.
-    `pos`/`finditer`'s own cursor only ever advance forward past a region
-    already found or skipped, so this stays linear regardless of how many
-    `<details>` sections (nested or not) the body contains.
+    call sites; the closing `</details>` is then found via a linear
+    `str.find` sweep (not line-anchored -- matching
+    `_find_html_comment_spans`'s own convention for its closing marker).
+    An opening with no closing `</details>` anywhere after it is treated
+    as extending to the end of the string -- the same fail-closed
+    direction `_find_html_comment_spans` already takes for an
+    unterminated comment.
+
+    NESTED `<details>` are tracked by DEPTH, not skipped (PR
+    [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, eleventh round -- this function's own
+    earlier version closed an OUTER opening at the FIRST `</details>`
+    found after it, which for a nested body is the INNER details' own
+    closer, not the outer's; everything between that inner closer and
+    the outer's TRUE closer then read as outside any region at all, so a
+    marker+heading pair placed there -- still nested inside the outer
+    `<details>`, exactly what a re-review's own listing quotes -- was
+    wrongly treated as a genuine top-level block, contradicting this
+    docstring's own stated purpose). Every opening and every closing tag
+    is collected first (each list already in left-to-right order, since
+    both come from a single forward-only scan), then merged by a
+    two-pointer walk that advances whichever list's next candidate sits
+    first: an opening at depth 0 starts a NEW region and increments
+    depth; a closing at depth 0 has no opener in effect and is ignored;
+    any other closing decrements depth, and CLOSES the current region
+    only when depth returns to 0. `region_start` therefore survives
+    across any number of nested opens/closes in between, and a nested
+    opening never starts a region of its own -- it is absorbed into its
+    enclosing one, matching this docstring's stated purpose (a nested
+    `<details>`, which real Copilot markup does not produce but this
+    does not assume, contributes no separate region). If depth is still
+    above 0 once every event is consumed, the outermost still-open
+    chain's own `region_start` is used for one final region extending to
+    the end of the string -- the same fail-closed direction as an
+    unterminated single `<details>`.
+
+    Both list-building passes and the merge walk are each a single
+    forward-only scan (`finditer`'s own cursor, `str.find`'s own
+    advancing `pos`, and the two-pointer walk's own advancing indices
+    never revisit a position already consumed), so the whole function
+    stays linear in `len(scan)` regardless of nesting depth or how many
+    `<details>` sections the body contains -- unlike a merge via
+    `sorted()`, which would cost O(m log m) in the event count.
 
     An opening whose own START falls inside an HTML comment is skipped
     entirely, not paired with whatever `</details>` follows (PR
@@ -473,30 +558,53 @@ def _find_details_regions(
     marker-start and block-end checks, and one shared O(n) scan is
     strictly better than two.
     """
-    regions: List[Tuple[int, int]] = []
-    pos = 0
     n = len(scan)
+    close_tag = "</details>"
+    close_len = len(close_tag)
+
+    opens: List[int] = []
     for m in _COPILOT_DETAILS_OPEN.finditer(scan):
-        if m.start() < pos:
-            continue
         if _position_in_spans(m.start(), comment_span_starts, comment_spans):
             continue
-        search_from = m.end()
-        close_pos = -1
-        while True:
-            candidate = scan.find("</details>", search_from)
-            if candidate == -1:
-                break
-            if _position_in_spans(candidate, comment_span_starts, comment_spans):
-                search_from = candidate + len("</details>")
-                continue
-            close_pos = candidate
+        opens.append(m.start())
+
+    closes: List[Tuple[int, int]] = []
+    search_from = 0
+    while True:
+        candidate = scan.find(close_tag, search_from)
+        if candidate == -1:
             break
-        if close_pos == -1:
-            regions.append((m.start(), n))
-            break
-        regions.append((m.start(), close_pos + len("</details>")))
-        pos = close_pos + len("</details>")
+        search_from = candidate + close_len
+        if _position_in_spans(candidate, comment_span_starts, comment_spans):
+            continue
+        closes.append((candidate, search_from))
+
+    # Two-pointer merge of two already-ordered lists (each produced by a
+    # single forward-only scan above), walking a depth counter rather
+    # than sorting the combined event list -- sorting would cost
+    # O(m log m) in the total open+close count, and a merge of two
+    # sorted lists is O(m).
+    regions: List[Tuple[int, int]] = []
+    depth = 0
+    region_start = -1
+    i = j = 0
+    n_opens, n_closes = len(opens), len(closes)
+    while i < n_opens or j < n_closes:
+        if j >= n_closes or (i < n_opens and opens[i] < closes[j][0]):
+            if depth == 0:
+                region_start = opens[i]
+            depth += 1
+            i += 1
+        else:
+            _, close_end = closes[j]
+            j += 1
+            if depth == 0:
+                continue  # a closing tag with no opener currently in effect
+            depth -= 1
+            if depth == 0:
+                regions.append((region_start, close_end))
+    if depth > 0:
+        regions.append((region_start, n))
     return regions
 
 
@@ -777,7 +885,7 @@ def _copilot_v2_findings_count(
     so keeping it in the caller and passing it in here avoids a reverse
     dependency from this library module back onto its only consumer.
     """
-    blocks = _copilot_overview_block_spans(scan)
+    blocks = _copilot_overview_block_spans(scan, cited, match_is_cited)
     if not blocks:
         return None
     # Comment spans are computed ONCE, up to the FURTHEST block's end, not

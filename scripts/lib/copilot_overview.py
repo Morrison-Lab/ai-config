@@ -944,9 +944,7 @@ def _copilot_v2_findings_count(
     # the result None, rather than letting a later clean block speak for
     # the whole body. A zero one is ignored, exactly as before this scan
     # existed: it cannot make a body clean (only a recognised block's own
-    # line can), so it cannot fail open either. The whole-body
-    # comment and details scans run only when such a line exists, keeping
-    # the common single-block body bounded at `max_end` as above.
+    # line can), so it cannot fail open either.
     block_starts = [b for b, _ in blocks]
     orphan_comment_spans: Optional[List[Tuple[int, int]]] = None
     orphan_comment_starts: List[int] = []

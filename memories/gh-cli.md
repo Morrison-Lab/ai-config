@@ -947,13 +947,14 @@
   When commenting on a pull request from a workflow job or token with only `issues: write` scope, `gh issue comment <pr-number>` fails with an authorization error.
   This happens because `gh issue comment` calls GraphQL's `addComment` mutation under the hood, and GitHub's GraphQL schema requires `pull_requests: write` whenever the commented issue is a pull request.
   In contrast, the REST endpoint `POST /repos/{owner}/{repo}/issues/{issue_number}/comments` with `Content-Type: application/json` accepts either `issues: write` or `pull_requests: write`.
-  - **Do:** in workflows with `issues: write` commenting on PRs (e.g. comment-triggered dispatchers), use the REST endpoint via `gh api --method POST /repos/{owner}/{repo}/issues/{issue_number}/comments -f body=...` (or pass JSON with `jq -Rs '{body: .}'`).
-  - **Don't:** use `gh issue comment` in jobs lacking `pull_requests: write` when commenting on pull requests.
+  - **Do:** in workflows with `issues: write` commenting on PRs (e.g. comment-triggered dispatchers), use the REST endpoint piping JSON through stdin to avoid backtick expansion vulnerabilities:
+    `printf '%s\n' "$BODY" | jq -Rs '{body: .}' | gh api --method POST "repos/{owner}/{repo}/issues/{issue_number}/comments" --input -`.
+  - **Don't:** use `gh issue comment` in jobs lacking `pull_requests: write` when commenting on pull requests, or pass raw markdown bodies via unescaped `-f body=...` flags.
   (Measured 2026-09-24 on [Morrison-Lab/gha#931](https://github.com/Morrison-Lab/gha/issues/931) ([PR #933](https://github.com/Morrison-Lab/gha/pull/933)).)
 
 - **`gh workflow run` without `--ref` queries GraphQL `repository.defaultBranchRef`, failing when missing `contents: read`.**
   Calling `gh workflow run <file.yml>` without an explicit `--ref` causes `gh` to attempt determining the default branch by querying GraphQL `repository.defaultBranchRef`.
-  On private repositories or with limited-permission tokens (such as a GitHub Actions job with only `actions: write`), this query fails with `GraphQL: Resource not accessible by integration: unable to determine default branch`.
+  On private repositories or with limited-permission tokens (such as a GitHub Actions job with only `actions: write`), this query fails with `unable to determine default branch for <owner>/<repo>: GraphQL: Resource not accessible by integration (repository.defaultBranchRef)`.
   Explicitly passing `--ref "$DEFAULT_BRANCH"` (or `--ref <branch>`) skips the GraphQL query entirely and allows workflow dispatch under `actions: write` alone.
   - **Do:** always pass `--ref "$DEFAULT_BRANCH"` or `--ref <branch>` to `gh workflow run` on fallback dispatch paths and in automated workflow steps.
   - **Don't:** omit `--ref` in automated `gh workflow run` calls and rely on `gh` to query the default branch dynamically.

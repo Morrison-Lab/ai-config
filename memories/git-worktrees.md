@@ -72,12 +72,12 @@ there.
 ## Git (Windows) --- worktrees created on Windows have `.git` files containing Windows drive paths that break in Git Bash / MSYS2
 
 - Linked worktrees created on Windows write a `.git` pointer file containing an absolute Windows drive path (e.g. `gitdir: C:/...` or `gitdir: D:/...`).
-- When shell scripts (such as `check-diff-scoped.sh` in `Morrison-Lab/gha`) or POSIX tools execute under MSYS2 or Git Bash, path resolution between POSIX paths (`/c/...`) and Windows drive formats (`C:/...`) can fail.
-  As a result, `git rev-parse --is-inside-work-tree` or git operations can report `fatal: not inside a git work tree` or `fatal: not a git repository`.
-- **Do:** be aware of path translation mismatches when invoking bash scripts in Windows worktrees;
-  verify working directory paths or invoke git commands via native PowerShell / Windows binaries when MSYS2 path translation fails.
-- **Don't:** assume a failure like `fatal: not inside a git work tree` under Git Bash indicates repository corruption when running inside a valid Windows linked worktree.
-  (Measured 2026-09-24 on `Morrison-Lab/gha`.)
+- When shell scripts like `check-diff-scoped.sh` run under Git Bash or MSYS2, POSIX path translation mismatches on the Windows drive path in `.git` cause `git rev-parse --is-inside-work-tree` to exit non-zero with `fatal: not a git repository (or any of the parent directories): .git`.
+  This triggers `check-diff-scoped.sh`'s `die()` message: `check-diff-scoped: not inside a git work tree.`.
+- **Do:** run individual composite checker scripts directly via Python in PowerShell (e.g. `NLB_BASE_REF=origin/main python3 check-new-line-breaks/check-new-line-breaks.py`) rather than running `bash check-diff-scoped.sh` from a Windows-linked worktree.
+- **Don't:** assume `check-diff-scoped: not inside a git work tree.` indicates an invalid worktree or corrupt repo;
+  the underlying git repository and worktree are valid under native Windows git.
+  (Measured 2026-09-24 on `Morrison-Lab/gha` in a linked worktree.)
 
 ## Git --- `checkout -B` in a linked worktree silently bypasses the already-checked-out guard
 - Plain `git checkout main` in a linked worktree correctly refuses when `main`

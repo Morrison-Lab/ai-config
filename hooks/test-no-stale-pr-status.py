@@ -49,6 +49,40 @@ READ_FILE_QUERY = {"type": "assistant", "message": {"content": [
 READ_FILE_RESULT = {"type": "user", "message": {"content": [
     {"type": "tool_result", "tool_use_id": "t2", "content": "print('\u274c PR is NOT fully clean:')"}]}}
 
+# A push ATTEMPT and the four shapes its result can take. The guard used to set
+# `last_push` from the tool_use alone, so a push the harness refused counted as
+# a push that happened -- invalidating a reading that was still current.
+PUSH_ATTEMPT = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "p1", "input": {"command": "git push -q"}}]}}
+PUSH_BLOCKED = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "p1", "is_error": True,
+     "content": "PreToolUse:Bash [python3 hooks/no-push-without-self-review.py]"
+                " hook error: git push blocked by the pre-push self-review policy"}]}}
+PUSH_DENIED = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "p1", "is_error": True,
+     "content": "Permission for this action was denied by the Claude Code"
+                " auto-mode classifier."}]}}
+# A non-zero EXIT is not a refusal: `git push && something-else` can fail after
+# the push has already moved the branch.
+PUSH_EXIT_FAILED = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "p1", "is_error": True,
+     "content": "Exit code 1\nerror: failed to push some refs"}]}}
+# The refusal wording QUOTED rather than reported. This corpus writes about
+# blocked pushes constantly, so an unanchored match would read a transcript
+# discussing one as a push that never ran.
+PUSH_QUOTES_REFUSAL = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "p1",
+     "content": "Exit code 0\nThe docstring says: PreToolUse:Bash hook error:"
+                " git push blocked by the pre-push self-review policy"}]}}
+# An explicit `is_error: false` overrides the text: a result the harness marked
+# successful DID run, whatever it happens to quote. An ABSENT `is_error` is not
+# read as false, so a transcript format omitting the field keeps the fix.
+PUSH_MARKED_OK = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "p1", "is_error": False,
+     "content": "PreToolUse:Bash hook error: git push blocked"}]}}
+PUSH_SECOND_ATTEMPT = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "p2", "input": {"command": "git push -q"}}]}}
+
 # (events, should_block, label)
 CASES = [
     ([QUERY, PUSH, say("493 is green, conflict-free.")], True,
@@ -107,6 +141,29 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("9 pass.")], True,
      "a bare count with nothing disclosed still blocks"),
+    # A push the harness REFUSED moved no commit, so the earlier query is not
+    # stale. The guard read the tool_use and never the result, so every
+    # refused push counted -- 79 of them in one session's own transcript.
+    # Queries already tracked their tool_use_id and read the matching result;
+    # the push side simply never did.
+    ([QUERY, PUSH_ATTEMPT, PUSH_BLOCKED, say("All checks pass.")], False,
+     "a push blocked by a PreToolUse hook does not make a query stale"),
+    ([QUERY, PUSH_ATTEMPT, PUSH_DENIED, say("All checks pass.")], False,
+     "a push denied by the permission classifier does not make a query stale"),
+    # The other direction, which is the expensive one: dropping a push that DID
+    # run licenses a merge on a stale reading, so every shape that is not an
+    # unambiguous refusal still counts.
+    ([QUERY, PUSH_ATTEMPT, PUSH_EXIT_FAILED, say("All checks pass.")], True,
+     "a push that ran and exited non-zero still makes a query stale"),
+    ([QUERY, PUSH_ATTEMPT, PUSH_QUOTES_REFUSAL, say("All checks pass.")], True,
+     "a result QUOTING the refusal wording is not a refusal"),
+    ([QUERY, PUSH, say("All checks pass.")], True,
+     "a push with no tool_use id at all still makes a query stale"),
+    ([QUERY, PUSH_ATTEMPT, PUSH_MARKED_OK, say("All checks pass.")], True,
+     "an explicit is_error false overrides the refusal wording"),
+    ([QUERY, PUSH_ATTEMPT, PUSH_BLOCKED, PUSH_SECOND_ATTEMPT,
+      say("All checks pass.")], True,
+     "a real push after a blocked one still makes a query stale"),
     # Round 9, finding 6. `pending`, `queued`, `in progress`, `in flight` and
     # `still running` are ordinary English about anything at all, so matching
     # them bare let four sentences that disclose no pending CHECK work exempt

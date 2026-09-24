@@ -126,6 +126,21 @@ RX_ASSERT = re.compile("|".join(ASSERT), re.I)
 # A push invalidates any earlier reading.
 RX_PUSH = re.compile(r"git\s+push|create_or_update_file|push_files", re.I)
 
+# A tool_result saying the call NEVER RAN. A push the harness refused moved no
+# commit, so counting it as a push invalidates a reading that is still current
+# and fires this guard on a premise that was never true.
+#
+# Anchored at the start of the result, deliberately. Both strings are harness
+# prefixes on a refusal, and this corpus quotes them constantly -- an unanchored
+# match would read a transcript DISCUSSING a blocked push as one. The two shapes
+# are the only unambiguous ones: a runtime `Exit code N` still counts as a push,
+# because `git push && something-else` can fail after the push succeeded.
+RX_NEVER_RAN = re.compile(
+    r"^\s*(?:\\n)*\s*PreToolUse:[^\n]*hook error:"
+    r"|^\s*(?:\\n)*\s*Permission for this action was denied",
+    re.I,
+)
+
 # A fresh reading. Covers the CLI and the MCP surfaces for both GitHub and GitLab (#2667).
 RX_QUERY = re.compile(
     r"gh\s+pr\s+checks|statusCheckRollup|get_check_runs|"
@@ -492,12 +507,49 @@ def find_unnegated_assert(text):
     return None
 
 
+def _result_text(block):
+    """The tool_result's text, whichever of the three shapes it arrived in."""
+    content = block.get("content")
+    if content is None:
+        content = block.get("text") or ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for part in content:
+            if isinstance(part, dict):
+                parts.append(part.get("text") or "")
+            elif isinstance(part, str):
+                parts.append(part)
+        return "\n".join(parts)
+    return ""
+
+
+def _never_ran(block):
+    """True when this tool_result says the call was refused before it ran.
+
+    An explicit `is_error: false` overrides the text: a result the harness
+    marked successful did run, whatever it quotes. An ABSENT `is_error` is
+    not read as false, because a transcript format that omits the field
+    would otherwise reinstate the bug this function exists to fix.
+    """
+    if block.get("is_error") is False:
+        return False
+    return bool(RX_NEVER_RAN.search(_result_text(block)))
+
+
 def scan(path):
     """Return (last_push_idx, last_query_idx, last_failing_query_idx, last_assistant_text)."""
-    last_push = last_query = last_failing_query = -1
+    last_query = last_failing_query = -1
     text = ""
     i = 0
     query_tool_use_ids = set()
+    # (line index, tool_use id) per push ATTEMPT, plus the ids the harness
+    # refused. `last_push` is resolved at the end from the difference, because
+    # the refusal arrives in a later block than the request.
+    push_attempts = []
+    push_tool_use_ids = set()
+    blocked_push_ids = set()
     with open(path, errors="ignore") as fh:
         for line in fh:
             i += 1
@@ -521,7 +573,9 @@ def scan(path):
                         blob = tool_name + " " + json.dumps(args)
                         tool_id = tc.get("id") or str(id(tc))
                         if RX_PUSH.search(blob):
-                            last_push = i
+                            push_attempts.append((i, tool_id))
+                            if tool_id:
+                                push_tool_use_ids.add(tool_id)
                         if RX_QUERY.search(blob):
                             last_query = i
                             if tool_id:
@@ -544,7 +598,9 @@ def scan(path):
                         blob = tool_name + " " + json.dumps(b.get("input") or {})
                         tool_id = b.get("id") or b.get("tool_use_id") or ""
                         if RX_PUSH.search(blob):
-                            last_push = i
+                            push_attempts.append((i, tool_id))
+                            if tool_id:
+                                push_tool_use_ids.add(tool_id)
                         if RX_QUERY.search(blob):
                             last_query = i
                             if tool_id:
@@ -555,11 +611,21 @@ def scan(path):
                             content_text = json.dumps(b.get("content") or b.get("text") or "")
                             if RX_FAIL_QUERY.search(content_text):
                                 last_failing_query = i
+                        if tool_id and tool_id in push_tool_use_ids:
+                            if _never_ran(b):
+                                blocked_push_ids.add(tool_id)
                     elif b.get("type") == "text" and role == "assistant":
                         if b.get("text", "").strip():
                             text = b["text"]
             elif isinstance(blocks, str) and role == "assistant" and blocks.strip():
                 text = blocks
+    # A push whose result says it never ran moved nothing. An attempt with no
+    # tool_use id at all still counts: a missed push is the expensive
+    # direction for this guard, since it licenses a merge on a stale reading.
+    last_push = max(
+        (idx for idx, tid in push_attempts if tid not in blocked_push_ids),
+        default=-1,
+    )
     return last_push, last_query, last_failing_query, text
 
 

@@ -300,6 +300,14 @@ _COPILOT_OVERVIEW_START = re.compile(
 _COPILOT_DETAILS_OPEN = re.compile(
     r"(?:^|\n)[ ]{0,3}<details(?=[ \t>]|/>)", re.IGNORECASE
 )
+# Line-anchored closing tag matching `_COPILOT_DETAILS_OPEN`'s line anchor
+# (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, twelfth round): a closer quoted in
+# a blockquote (` > </details>`) or appearing mid-line in text does not
+# close the region, so content still nested inside `<details>` cannot leak
+# out as a top-level clean overview.
+_COPILOT_DETAILS_CLOSE = re.compile(
+    r"(?:^|\n)[ ]{0,3}</details[ \t]*>", re.IGNORECASE
+)
 _COPILOT_NEXT_HEADING = re.compile(r"(?:^|\n)[ ]{0,3}##[ \t]")
 # `[0-9]`, not `\d`: Python's `\d` matches every Unicode `Nd`-category
 # digit, not just ASCII -- a full-width digit (U+FF15, "5") would
@@ -591,20 +599,21 @@ def _find_details_regions(
     sequence still nested inside the real `<details>`) as a top-level
     block. The opener scan gets the identical treatment for symmetry with
     the closer, and because `_COPILOT_DETAILS_OPEN` is exactly as
-    quotable in prose as the closing tag is. The opener match's own start
-    is checked via `match_content_start`, not the raw match start,
-    because the pattern's `(?:^|\\n)` anchor consumes a preceding newline
-    the citation mask never marks cited -- the same reason every other
-    citedness check in this module goes through that helper. The closer
-    candidate comes from a plain `str.find`, with no anchor to consume, so
-    its own literal start/end are checked directly.
+    quotable in prose as the closing tag is. Both the opener and closer
+    match starts are checked via `match_content_start`, not the raw match
+    start, because each pattern's `(?:^|\\n)` anchor consumes a preceding
+    newline the citation mask never marks cited -- the same reason every other
+    citedness check in this module goes through that helper.
 
     The opening `<details` is located with the same line-anchored
     `_COPILOT_DETAILS_OPEN` pattern the block-end search already uses, so
     "what counts as a details opening" stays consistent between the two
-    call sites; the closing `</details>` is then found via a linear
-    `str.find` sweep (not line-anchored -- matching
-    `_find_html_comment_spans`'s own convention for its closing marker).
+    call sites; the closing `</details>` is located with the line-anchored
+    `_COPILOT_DETAILS_CLOSE` pattern (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review,
+    twelfth round), so blockquoted (` > </details>`) or mid-line occurrences
+    are rejected and cannot prematurely close the region. Like the opener,
+    its citedness is checked via `match_content_start` to skip past any
+    consumed leading newline or indentation.
     An opening with no closing `</details>` anywhere after it is treated
     as extending to the end of the string -- the same fail-closed
     direction `_find_html_comment_spans` already takes for an
@@ -685,8 +694,6 @@ def _find_details_regions(
     strictly better than two.
     """
     n = len(scan)
-    close_tag = "</details>"
-    close_len = len(close_tag)
 
     opens: List[int] = []
     for m in _COPILOT_DETAILS_OPEN.finditer(scan):
@@ -696,40 +703,21 @@ def _find_details_regions(
             continue
         opens.append(m.start())
 
-    # The closer search must be case-insensitive too, matching
-    # `_COPILOT_DETAILS_OPEN`'s own `re.IGNORECASE` ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review
-    # finding): a plain `scan.find(close_tag, ...)` never matches
-    # `</DETAILS>`, so an opener genuinely closed that way found NO closer
-    # at all and fell to the unterminated-details fail-closed path below
-    # -- extending the region all the way to the end of the string and
-    # wrongly absorbing every marker+heading pair AND every orphan
-    # `**Findings:**` line after it (a real nonzero orphan finding
-    # swallowed this way reads as no finding at all, the unsafe
-    # direction: see `_copilot_v2_findings_count`'s orphan scan).
-    #
-    # The closer is matched case-insensitively against an ASCII-only
-    # lowercased copy of `scan`, computed ONCE and reused for every search
-    # in this loop. `str.translate` with an A-Z -> a-z table maps each
-    # character to exactly one character, so the copy always has the same
-    # length and every position found in it is the same position in
-    # `scan`. `str.lower()` would not do: some non-ASCII characters (e.g.
-    # U+0130, Turkish dotted capital I) lower to TWO characters, which
-    # shifts every later position. The closer tag itself is pure ASCII,
-    # so folding only ASCII letters loses nothing.
-    scan_for_close = scan.translate(_ASCII_LOWER)
-
+    # The closer search is line-anchored via `_COPILOT_DETAILS_CLOSE` (PR
+    # [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, twelfth round), so blockquoted
+    # (` > </details>`) or mid-line occurrences are rejected and do not
+    # prematurely close the region. It is compiled with `re.IGNORECASE` to
+    # match case-insensitively ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding) without
+    # manual translation tables.
     closes: List[Tuple[int, int]] = []
-    search_from = 0
-    while True:
-        candidate = scan_for_close.find(close_tag, search_from)
-        if candidate == -1:
-            break
-        search_from = candidate + close_len
-        if _position_in_spans(candidate, comment_span_starts, comment_spans):
+    for m in _COPILOT_DETAILS_CLOSE.finditer(scan):
+        if _position_in_spans(m.start(), comment_span_starts, comment_spans) or _position_in_spans(
+            match_content_start(m), comment_span_starts, comment_spans
+        ):
             continue
-        if match_is_cited(cited, candidate, search_from):
+        if match_is_cited(cited, match_content_start(m), m.end()):
             continue
-        closes.append((candidate, search_from))
+        closes.append((m.start(), m.end()))
 
     # Two-pointer merge of two already-ordered lists (each produced by a
     # single forward-only scan above), walking a depth counter rather

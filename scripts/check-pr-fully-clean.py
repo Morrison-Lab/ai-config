@@ -78,6 +78,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from copilot_overview import (  # noqa: E402
     COPILOT_FINDINGS_LINE,
     _copilot_v2_findings_count,
+    _find_details_regions,
     _find_html_comment_spans,
     _position_in_spans,
     match_content_start,
@@ -2377,20 +2378,23 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
     # already uses), rather than inventing a second HTML-comment detector.
     comment_spans = _find_html_comment_spans(scan)
     comment_span_starts = [s for s, _ in comment_spans]
+    details_spans = _find_details_regions(
+        scan, comment_spans, comment_span_starts, cited, match_is_cited
+    )
+    details_span_starts = [s for s, _ in details_spans]
 
     def _has_live_match(pattern, text):
         """Like `_has_valid_match`, but ALSO rejects a match whose own start
         falls inside an HTML comment ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, PR
-        [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review): a commented-out
-        `<!--\n### \U0001f7e2 Approval recommended\n-->` followed by a live,
-        uncited `Comments generated: 0` line used to read as a real
-        affirmative heading -- the `cited` mask that `_has_valid_match` alone
-        checks covers only backtick/quote citation shapes, not an HTML
-        comment, exactly the same gap the legacy `Comments generated:` scan
-        below was already fixed for. Reserved for the AFFIRMATIVE heading
-        only: see the comment at its one call site for why the NEGATIVE
-        heading deliberately keeps using the citation-only `_has_valid_match`
-        instead.
+        [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review) or an already-open `<details>` region
+        (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, twelfth round): a commented-out
+        `<!--\n### \U0001f7e2 Approval recommended\n-->` or a details-nested
+        affirmative heading from a prior round quoted inside `<details>` used
+        to satisfy the affirmative heading test while the legacy count loop
+        accepted the `Comments generated: 0` inside that same details section.
+        Reserved for the AFFIRMATIVE heading only: see the comment at its one
+        call site for why the NEGATIVE heading deliberately keeps using the
+        citation-only `_has_valid_match` instead.
 
         The citedness check itself is from `match_content_start(m)`, not
         `m.start()`, for the same reason `_has_valid_match` above now uses
@@ -2399,16 +2403,22 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
         citation mask never marks cited -- a double-backtick-cited
         `### Approval recommended` on a non-first line used to read as
         live regardless of the quoting ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding,
-        twenty-fourth round). The HTML-comment containment check just
-        below keeps using the raw `m.start()`: a comment span is a plain
-        character range with no "always uncited at a newline" quirk, so a
-        newline genuinely inside an open HTML comment is correctly found
-        inside it either way, and there is no matching gap to close here.
+        twenty-fourth round). The HTML-comment and details containment checks
+        just below keep using the raw `m.start()`: comment and details spans
+        are plain character ranges with no "always uncited at a newline" quirk,
+        so a newline genuinely inside an open span is correctly found inside
+        it either way, and there is no matching gap to close here.
         """
         for m in pattern.finditer(text):
             if match_is_cited(cited, match_content_start(m), m.end()):
                 continue
             if _position_in_spans(m.start(), comment_span_starts, comment_spans):
+                continue
+            if _position_in_spans(
+                m.start(), details_span_starts, details_spans
+            ) or _position_in_spans(
+                match_content_start(m), details_span_starts, details_spans
+            ):
                 continue
             return m
         return None

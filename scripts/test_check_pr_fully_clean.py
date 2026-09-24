@@ -6940,7 +6940,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     # `</details>` closer, however far away, engulfing a real, live,
     # nonzero marker+heading+Findings block in between -- dropping a real
     # not-clean finding down to no-verdict, the dangerous direction (the
-    # same shape PR #3906's fifth round already fixed for an opener hidden
+    # same shape PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)'s fifth round already fixed for an opener hidden
     # inside an HTML comment).
     check(
         "copilot_verdict: a double-backtick-cited fake <details> opener "
@@ -7354,7 +7354,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) == "clean",
     )
     # A malformed `<details/evil>` opener must NOT open a details region
-    # (PR #3906 Copilot review, eleventh round): accepting any trailing slash
+    # (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, eleventh round): accepting any trailing slash
     # in `_COPILOT_DETAILS_OPEN` let `<details/evil>` hide later nonzero
     # findings down to a false clean.
     check(
@@ -7636,7 +7636,60 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             "0 <picture:evil></picture>"
         ) is None,
     )
-    # PR #3906 Copilot review, eleventh round: `_copilot_tag_name` accepted
+
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, twelfth round: an affirmative
+    # heading nested inside `<details>` must NOT satisfy the affirmative heading
+    # check -- a quoted prior-round approval inside `<details>` does not classify
+    # clean when no live current-round approval exists.
+    check(
+        "copilot_verdict: a prior-round affirmative heading nested inside "
+        "<details> with a zero legacy count is not classified as clean",
+        checker.copilot_verdict(
+            "<details>\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "- **Comments generated:** 0\n"
+            "</details>\n"
+        ) == "",
+    )
+    # A live legacy review with an affirmative heading outside <details> and
+    # a zero legacy count inside <details> remains classified as clean.
+    check(
+        "copilot_verdict: a live affirmative heading outside <details> with "
+        "legacy count inside <details> is classified clean",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "<details>\n"
+            "- **Comments generated:** 0\n"
+            "</details>\n"
+        ) == "clean",
+    )
+
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, twelfth round: the closer sweep
+    # must reject blockquoted ` > </details>` so nested content inside `<details>`
+    # does not prematurely close the region and leak out as a top-level clean overview.
+    check(
+        "copilot_verdict: a blockquoted ' > </details>' does not prematurely "
+        "close a details region and leak a nested overview block",
+        checker.copilot_verdict(
+            "<details>\n"
+            " > </details>\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+            "</details>\n"
+        ) == "",
+    )
+    # Case-insensitive line-anchored closer still closes the details region.
+    check(
+        "copilot_verdict: case-insensitive '</DETAILS>' closes details region",
+        checker.copilot_verdict(
+            "<details>\n"
+            "some details content\n"
+            "</DETAILS>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "clean",
+    )
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, eleventh round: `_copilot_tag_name` accepted
     # any slash after the tag name, so `<img/evil>` and `<picture/evil>`
     # scanned as valid tags. Requiring `/` to be followed by `>` fails them closed.
     check(

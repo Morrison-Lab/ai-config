@@ -737,6 +737,13 @@
             "timeout": 10,
             "script": "flag-unmeasured-digest.py",
             "why": "CLAUDE.md 'Timestamp recaps in local time' / deterministic-tools, generalized from a clock time to a digest (ai-config#3779; measured 2026-09-18: an issue body cited `3e2b9e10...` as the md5 of two files, which no command in the session had produced). Warns, never blocks, when a body about to leave through `gh` (a comment, or an issue or PR being created or edited) or `glab` (whose body is `-d`/`--description`) carries a digest-shaped token -- 7 to 64 hex characters bounded on both sides with at least one a-f, that is a canonical length (32/40/64), or truncated with an ellipsis, or preceded within 48 characters by a boundary-anchored digest word -- and no prior `user` transcript record (message or toolUseResult) contains a hex run having that token as a prefix. The prefix rule keeps a legitimate abbreviation quiet, so a short SHA quoted from `git log` discharges and one typed from memory does not. The body is read from `--body-file`, `-b`, `-F`, `-d`, or -- the case the first version missed -- a heredoc in the same command, which is this corpus's own convention for a backtick-safe body and leaves no file on disk at PreToolUse time. Because body extraction is imported from flag-unmeasured-timestamp.py, a `cat >>` append to a session notebook or memory file reaches its notebook branch and warns too. Warns because a digest quoted from an upstream advisory, a lockfile, or a vendor release page is legitimate and not distinguishable by the body alone."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-partial-put-to-resource-root.py\"",
+            "timeout": 10,
+            "script": "flag-partial-put-to-resource-root.py",
+            "why": "A partial PUT to a REST resource ROOT can null fields the body never named, returning 200 either way. Measured 2026-09-24: a Canvas course PUT setting one boolean also cleared start_at and end_at, and four restore attempts returned 200 and changed nothing. Warns, never blocks."
           }
         ]
       },
@@ -1238,6 +1245,18 @@
             "timeout": 10,
             "script": "no-binary-file-read.py",
             "why": "Warns when `cat`/`head`/`tail`/`less`/`more` is applied to a path that exists on disk and whose first ~8KB contain a NUL byte -- a whole-file read of a binary file, which dumps raw bytes into the conversation for no benefit (ai-config#3771). `strings` is deliberately not flagged, and `head -c N`/`tail -c N` are exempt as an already-bounded read."
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__claude-in-chrome__javascript_tool",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-partial-put-to-resource-root.py\"",
+            "timeout": 10,
+            "script": "flag-partial-put-to-resource-root.py",
+            "why": "A partial PUT to a REST resource ROOT can null fields the body never named, returning 200 either way. Measured 2026-09-24: a Canvas course PUT setting one boolean also cleared start_at and end_at, and four restore attempts returned 200 and changed nothing. Warns, never blocks."
           }
         ]
       }

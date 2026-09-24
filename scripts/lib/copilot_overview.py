@@ -6,7 +6,7 @@ Copilot formal review's own inline-finding count so it can decide whether
 an affirmative overview heading (``### Approval recommended``) is
 genuinely finding-free. The legacy body format states that count as
 ``Comments generated: N``; the newer ``ccr-overview-v2`` format
-(ai-config#3899) states it instead as a ``**Findings:**`` line: either the
+([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899)) states it instead as a ``**Findings:**`` line: either the
 word ``None``, or one or more ``<n> <severity-badge>`` pairs (an inline
 ``<picture>`` or ``<img>`` element per severity) that need summing when
 several severities appear on the same line, e.g. ``2 <picture ...>
@@ -72,12 +72,12 @@ CommonMark INDENTED CODE BLOCK (four spaces is the threshold; the anchor
 alone does not exclude this, hence the ``{0,3}`` bound). Any of these
 would otherwise be read as the real v2 zero-count source for an
 affirmative review that carries no genuine overview field at all, reading
-clean (ai-config#3899 review finding). This matches the real overview
-shape in the Lacaedemon/sparta#1635 fixtures, where ``**Findings:**``
+clean ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding). This matches the real overview
+shape in the [Lacaedemon/sparta#1635](https://github.com/Lacaedemon/sparta/pull/1635) fixtures, where ``**Findings:**``
 always starts its own line, unindented.
 
-A further structural gap (ai-config#3899 review finding, PR
-ai-config#3906 Copilot review): even a correctly-anchored, correctly
+A further structural gap ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, PR
+[ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review): even a correctly-anchored, correctly
 unindented ``**Findings:**`` line can still be NON-RENDERED content --
 sitting inside an HTML comment (``<!-- ... **Findings:** None ... -->``,
 which can itself span multiple lines and start at column zero), or simply
@@ -96,7 +96,7 @@ independently reject any match that lands inside an HTML comment even
 within that region.
 
 ``_copilot_overview_block_spans`` locates every such region (PR
-ai-config#3906 Copilot review, second round on this same function: a
+[ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, second round on this same function: a
 bare marker with no heading, or a heading found much later past an
 unrelated section, both used to open a "trusted" block on their own).
 The block START is now ONE combined pattern requiring the marker AND the
@@ -106,7 +106,7 @@ optional signals. The marker is also now line-anchored, like every
 sibling boundary pattern in this module, so it cannot open a block from
 inside a blockquote or mid-sentence prose quoting an earlier round's
 marker. There is no heading-only fallback: every real ccr-overview-v2
-fixture (the transcribed Lacaedemon/sparta#1635 bodies, and every
+fixture (the transcribed [Lacaedemon/sparta#1635](https://github.com/Lacaedemon/sparta/pull/1635) bodies, and every
 constructed fixture in scripts/test_check_pr_fully_clean.py) carries the
 marker, so a body with the heading but no marker is not a shape any real
 fixture needs to support, and treating it as a block start would revive
@@ -155,7 +155,7 @@ COPILOT_FINDINGS_LINE = re.compile(
 # single linear scan (shared/coding/regex-backtracking-pitfalls.md).
 #
 # The marker and the heading are ONE combined pattern, not two
-# independently optional signals (PR ai-config#3906 Copilot review,
+# independently optional signals (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review,
 # second round): line-anchored like every sibling boundary here (so a
 # blockquoted or mid-sentence quote of an earlier round's marker cannot
 # open a block), and requiring the heading immediately after the marker
@@ -165,7 +165,7 @@ COPILOT_FINDINGS_LINE = re.compile(
 # non-blank line, so a real heading right after matches in one pass and
 # a marker with no adjacent heading, or one found only much later past
 # an unrelated section, matches nothing at all. `\r?\n`, not a bare
-# `\n` (ai-config#3917 item 2, PR ai-config#3906 Copilot review, third
+# `\n` ([ai-config#3917](https://github.com/Morrison-Lab/ai-config/issues/3917) item 2, PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, third
 # round): a CRLF body's marker line ends in `\r\n`, and the bare `\n`
 # form cannot consume the `\r` (it is neither `[ \t]` nor `\n` itself),
 # so the bridge failed to match at all and the whole body read as
@@ -178,7 +178,7 @@ COPILOT_FINDINGS_LINE = re.compile(
 # that did not.
 #
 # The heading is anchored at ITS end too -- `[ \t]*(?=\r?\n|$)`, not a
-# trailing `\b` (ai-config#3906 Copilot review, third round): a word
+# trailing `\b` ([ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, third round): a word
 # boundary only asserts a transition between a word and non-word
 # character, which the space before "quoted" in "## Copilot review
 # overview quoted" already satisfies, so that suffixed line opened a
@@ -205,7 +205,7 @@ _COPILOT_WS_ONLY = re.compile(r"^[ \t]*$")
 # only checked the START of the line, so `**Findings:** None but actually 5
 # <picture></picture>` satisfied it and read as zero -- the word boundary
 # after "None" is satisfied by the following space regardless of what comes
-# after it (ai-config#3899 review finding). Requiring the whole line to be
+# after it ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding). Requiring the whole line to be
 # `None` (plus optional surrounding whitespace) means any trailing content
 # falls through to the grammar parser instead, which fails it closed.
 _COPILOT_NONE_LINE = re.compile(r"^[ \t]*None[ \t]*$", re.IGNORECASE)
@@ -225,10 +225,31 @@ def _copilot_overview_block_spans(scan: str) -> List[Tuple[int, int]]:
     immediately before the first `<details` tag or next `##` heading that
     follows THAT block's own start, not a single body-wide end. An empty
     list means this body carries no v2 overview at all.
+
+    A marker+heading pair whose own START falls inside an already-open
+    `<details>...</details>` region is excluded ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review
+    finding, PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, fourth round): such a
+    region is exactly what a re-review's "Resolved since last review" or
+    "Open (N)" listing quotes, and a PRIOR round's overview -- marker,
+    heading, and its own `**Findings:**` line all included -- is a
+    completely genuine sequence by every OTHER check here, so without
+    this it would be trusted as a current block. A genuinely later block
+    that starts AFTER a `<details>` region has already closed still
+    counts, since its start position falls outside every region. Reuses
+    `_find_details_regions` / `_position_in_spans` -- the same
+    bisect-backed containment check the HTML-comment exclusion already
+    uses -- rather than a second, differently-shaped detector, and stays
+    linear the same way: the regions are computed once, sorted by
+    construction, and each block-start lookup costs O(log k) rather than
+    a scan of every region.
     """
+    details_regions = _find_details_regions(scan)
+    details_region_starts = [s for s, _ in details_regions]
     spans: List[Tuple[int, int]] = []
     for start_m in _COPILOT_OVERVIEW_START.finditer(scan):
         start = start_m.start()
+        if _position_in_spans(start, details_region_starts, details_regions):
+            continue
         search_from = start_m.end()
         end = len(scan)
         for pattern in (_COPILOT_DETAILS_OPEN, _COPILOT_NEXT_HEADING):
@@ -268,6 +289,48 @@ def _find_html_comment_spans(text: str) -> List[Tuple[int, int]]:
     return spans
 
 
+def _find_details_regions(scan: str) -> List[Tuple[int, int]]:
+    """Find every `<details>...</details>` region in `scan`, one linear
+    pass, so a marker+heading pair sitting inside an already-open
+    `<details>` section can be excluded from
+    `_copilot_overview_block_spans` ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, PR
+    [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, fourth round): without this, a block
+    quoted inside a PRIOR round's `<details>` "Resolved since last
+    review" listing -- itself containing a full marker+heading+Findings
+    sequence, since that is exactly what a re-review quotes -- was
+    trusted as a genuine, current block.
+
+    The opening `<details` is located with the same line-anchored
+    `_COPILOT_DETAILS_OPEN` pattern the block-end search already uses, so
+    "what counts as a details opening" stays consistent between the two
+    call sites; the closing `</details>` is then found with `str.find`
+    from there (not line-anchored -- matching `_find_html_comment_spans`'s
+    own convention for its closing marker). An opening whose region
+    already covers a later opening (a nested `<details>`, which real
+    Copilot markup does not produce but this does not assume) is skipped
+    rather than treated as a second region, and an opening with no
+    closing `</details>` anywhere after it is treated as extending to the
+    end of the string -- the same fail-closed direction
+    `_find_html_comment_spans` already takes for an unterminated comment.
+    `pos`/`finditer`'s own cursor only ever advance forward past a region
+    already found or skipped, so this stays linear regardless of how many
+    `<details>` sections (nested or not) the body contains.
+    """
+    regions: List[Tuple[int, int]] = []
+    pos = 0
+    n = len(scan)
+    for m in _COPILOT_DETAILS_OPEN.finditer(scan):
+        if m.start() < pos:
+            continue
+        close_pos = scan.find("</details>", m.end())
+        if close_pos == -1:
+            regions.append((m.start(), n))
+            break
+        regions.append((m.start(), close_pos + len("</details>")))
+        pos = close_pos + len("</details>")
+    return regions
+
+
 def _position_in_spans(
     pos: int, span_starts: List[int], spans: List[Tuple[int, int]]
 ) -> bool:
@@ -281,7 +344,7 @@ def _position_in_spans(
     after the previous span's end), so the only span that could contain
     `pos` is the one with the rightmost start <= pos -- found with
     `bisect_right` in O(log k) rather than scanning every span in O(k)
-    (ai-config#3917 item 1, PR ai-config#3906 Copilot review, third
+    ([ai-config#3917](https://github.com/Morrison-Lab/ai-config/issues/3917) item 1, PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, third
     round). The prior linear scan made the OVERALL cost O(blocks x
     findings): each block's own marker is itself a complete HTML
     comment, so the comment-span list grows with the block count, and
@@ -313,7 +376,7 @@ def _tokenize_copilot_line(rest: str) -> Optional[List[Tuple[str, str]]]:
     (`<img alt="a>5">` would otherwise end at the `>` inside the quotes),
     which both mis-tokenizes legitimate markup and lets a `<`/`>` hidden
     inside a quoted value silently evade the nested-tag/unterminated-tag
-    checks above (ai-config#3899 review finding). While scanning for a
+    checks above ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding). While scanning for a
     tag's own `>`, a `"` or `'` toggles an in-quote state, and any `<`/`>`
     encountered while in that state is ordinary attribute content, not a
     tag boundary; a quote left open when the scan runs off the end of the
@@ -370,7 +433,7 @@ def _copilot_tag_name(tag: str) -> Optional[str]:
     doesn't start with a letter right after `<`, or where the character
     right after the scanned name isn't a valid tag-name delimiter.
 
-    That last check is required, not merely stricter (ai-config#3899
+    That last check is required, not merely stricter ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899)
     review finding): stopping the alnum scan at the first non-alnum
     character without also checking what that character IS let
     `<img:evil>` and `<picture:evil>` -- neither a real tag -- scan as
@@ -419,15 +482,25 @@ def _consume_copilot_badge(tokens: List[Tuple[str, str]], i: int) -> Optional[in
         if val.lower() == "</picture>":
             return i + 1
         inner_name = _copilot_tag_name(val)
-        if inner_name == "source":
+        # A `<source>` is only valid BEFORE the fallback `<img>` -- real
+        # `<picture>` markup requires `<source>` elements to precede the
+        # `<img>` they fall back from, and the grammar in this module's
+        # docstring says the same ("any number of `<source ...>` and AT
+        # MOST one `<img ...>`", in that order). `not saw_img` enforces
+        # it: `0 <picture><img><source></picture>` used to accept the
+        # `<source>` unconditionally, regardless of position
+        # ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot
+        # review, fourth round).
+        if inner_name == "source" and not saw_img:
             i += 1
             continue
         if inner_name == "img" and not saw_img:
             saw_img = True
             i += 1
             continue
-        return None  # any other tag, including a second <img> or a nested
-        # <picture>, is disallowed inside a picture badge
+        return None  # any other tag -- a second <img>, a <source> after
+        # the <img>, or a nested <picture> -- is disallowed inside a
+        # picture badge
 
 
 def _copilot_v2_line_findings_count(rest: str) -> Optional[int]:
@@ -491,13 +564,13 @@ def _copilot_v2_findings_count(
     is skipped, not counted -- both are structural fixes for non-rendered
     content (an indented pseudo-code-block field, or one hidden inside a
     multi-line `<!-- ... -->` comment) reading as the real field
-    (ai-config#3899 review finding, PR ai-config#3906 Copilot review). No
+    ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review). No
     block found at all means this body carries no v2 overview -- absent,
     not merely unparseable -- so this returns None exactly as it already
     does when a recognisable line is missing.
 
     Scans every uncited line across every block rather than committing to
-    the first (ai-config#3899 review finding), the same way the caller
+    the first ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding), the same way the caller
     scans every uncited match of its own negative/affirmative heading and
     legacy count patterns: a body carrying two uncited `**Findings:**`
     lines -- `None` followed by a genuine `5 <picture...>` from a later

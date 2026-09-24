@@ -78,6 +78,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from copilot_overview import (  # noqa: E402
     COPILOT_FINDINGS_LINE,
     _copilot_v2_findings_count,
+    _find_html_comment_spans,
+    _position_in_spans,
 )
 # Test-only re-export: not called anywhere in this file, but
 # scripts/test_check_pr_fully_clean.py reaches it as
@@ -2216,7 +2218,7 @@ COPILOT_SUPPRESSED_BLOCK = re.compile(r"\bSuppressed\s+comments\b", re.IGNORECAS
 # body-only classifier, and its absence is not evidence of zero.
 #
 # Split into two regexes rather than one, and the digit group is bounded
-# (ai-config#3899 review finding): the field's own real counts are always
+# ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding): the field's own real counts are always
 # small, and an unbounded `(\d+)` let `int()` on a >4300-digit run raise
 # ValueError uncaught, crashing the merge-gate classifier instead of
 # failing closed. `COPILOT_COMMENT_GENERATED` matches just the phrase
@@ -2233,7 +2235,7 @@ COPILOT_SUPPRESSED_BLOCK = re.compile(r"\bSuppressed\s+comments\b", re.IGNORECAS
 # The boundary lookarounds use `\d` (Unicode-aware in Python's `re` by
 # default, matching every Unicode `Nd`-category digit) rather than
 # `[0-9]`, even though the CAPTURE stays ASCII-only `[0-9]{1,6}`
-# (ai-config#3899 review finding, PR ai-config#3906 Copilot review): an
+# ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review): an
 # `[0-9]`-only boundary lets a non-ASCII digit sit right where the
 # boundary is checked without tripping it, since `[0-9]` doesn't
 # recognise it as a digit at all. `Comments generated: 0５` (a
@@ -2246,7 +2248,7 @@ COPILOT_SUPPRESSED_BLOCK = re.compile(r"\bSuppressed\s+comments\b", re.IGNORECAS
 # A trailing `\d` lookaround alone still only guards against MORE DIGITS,
 # not against arbitrary trailing text of any other kind: `(?!\d)` lets
 # `Comments generated: 0oops` match `0` as a complete count too, since `o`
-# is not a digit either (PR ai-config#3906 Copilot review, second finding
+# is not a digit either (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, second finding
 # on the same class -- shape-by-shape patching of "what can follow the
 # count" was the wrong level to fix this at, the same lesson already
 # learned for the v2 grammar parser). The actual field never has anything
@@ -2280,7 +2282,7 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
 
     The inline-finding count is read from EVERY uncited legacy
     `Comments generated: N` occurrence and every uncited `ccr-overview-v2`
-    `**Findings:**` line (ai-config#3899), not just the first of either --
+    `**Findings:**` line ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899)), not just the first of either --
     a body reading "Comments generated: 0 ... Comments generated: 3"
     used to classify clean off the first match alone, a pre-existing gap
     of the same class this function's v2 handling was already fixed for.
@@ -2333,8 +2335,23 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
     if _has_valid_match(COPILOT_SUPPRESSED_BLOCK, scan):
         return "not-clean"
     counts = []
+    # The `cited` mask (fences/quotes/code-spans) is not the only citation
+    # shape: an HTML comment is invisible to it too, exactly the gap the
+    # v2 path was fixed for two rounds ago ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding,
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, fourth round) -- `<!--\n-
+    # **Comments generated:** 0\n-->` counted as a real zero, since only
+    # `match_is_cited` was checked. Reusing `_find_html_comment_spans` /
+    # `_position_in_spans` from copilot_overview (the same linear,
+    # bisect-backed helpers the v2 path already uses) closes it here too,
+    # rather than inventing a second HTML-comment detector.
+    legacy_comment_spans = _find_html_comment_spans(scan)
+    legacy_comment_span_starts = [s for s, _ in legacy_comment_spans]
     for gm in COPILOT_COMMENT_GENERATED.finditer(scan):
         if match_is_cited(cited, gm.start(), gm.end()):
+            continue
+        if _position_in_spans(
+            gm.start(), legacy_comment_span_starts, legacy_comment_spans
+        ):
             continue
         dm = COPILOT_COMMENT_COUNT.match(scan, gm.end())
         if dm is not None and not match_is_cited(cited, dm.start(), dm.end()):

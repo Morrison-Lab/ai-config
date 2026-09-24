@@ -6110,14 +6110,14 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         checker.copilot_verdict("## \"Approval recommended\"? No.\n\n- **Comments generated:** 0") == "",
     )
 
-    # ai-config#3899: Copilot's `ccr-overview-v2` body format drops the
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899): Copilot's `ccr-overview-v2` body format drops the
     # `Comments generated:` field the checks above rely on in favor of a
     # `**Findings:**` line -- `None`, or one or more `<n> <severity-badge>`
     # pairs. Fixture provenance, per fixtures-are-not-evidence.md:
     # `v2_approval_none_body` and `v2_approval_nonzero_body` below are
     # transcribed, INCLUDING their trailing `<details>` blocks ("Resolved
     # since last review" / "Open (1)"), from Copilot's real reviews on
-    # Lacaedemon/sparta#1635, fetched 2026-09-23 -- reviews 5295055730 (the
+    # [Lacaedemon/sparta#1635](https://github.com/Lacaedemon/sparta/pull/1635), fetched 2026-09-23 -- reviews 5295055730 (the
     # `None` approval) and 5294462601 (the single-finding approval). Only the
     # repeated severity-badge markup inside each `<picture>` element is
     # replaced with the `_v2_picture` placeholder, so the classifier is
@@ -6163,7 +6163,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "Mixed-severity findings remain.\n\n"
         f"**Review effort:** Lite  \n**Findings:** 2 {_v2_picture} · 1 {_v2_picture}"
     )
-    # ai-config#3899 review finding: a bare `\d{1,4}` still matches inside a
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding: a bare `\d{1,4}` still matches inside a
     # longer digit run by taking only its last 1-4 digits, so `10000` was
     # misread as `0000` (sums to 0, the unsafe fail-open direction) and
     # `12345` as `2345`. A five-digit finding count is not realistic Copilot
@@ -6176,7 +6176,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "A five-digit finding count is not realistic, but must not parse as 0.\n\n"
         f"**Review effort:** Lite  \n**Findings:** 10000 {_v2_picture}"
     )
-    # ai-config#3899 review finding, second round: a digit-boundary lookaround
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, second round: a digit-boundary lookaround
     # alone still let a thousands or decimal separator reset the boundary --
     # `1,000 <picture>` and `10,000 <picture>` both parsed as their trailing
     # `000` (three digits, since `,`/`.` are not `\d`), summing to 0 exactly
@@ -6185,7 +6185,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     _v2_comma_thousand_rest = f"1,000 {_v2_picture}"
     _v2_comma_ten_thousand_rest = f"10,000 {_v2_picture}"
     _v2_decimal_rest = f"1.000 {_v2_picture}"
-    # ai-config#3899 review finding, third round: `_copilot_v2_findings_count`
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, third round: `_copilot_v2_findings_count`
     # committed to the FIRST uncited `**Findings:**` match, so a body quoting
     # an earlier round's `**Findings:** None` ahead of its own current
     # `**Findings:** 5 <picture...>` -- or the reverse order -- let the
@@ -6253,7 +6253,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "'1.000 <picture'",
         checker._copilot_v2_line_findings_count(_v2_decimal_rest) is None,
     )
-    # ai-config#3899 review finding, fifth round: `str.find(close_token, ...)`
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, fifth round: `str.find(close_token, ...)`
     # lands on whichever close marker comes FIRST, so nested/malformed
     # `<picture>` markup lets it land on an INNER `</picture>` and silently
     # swallow whatever count sits between the two openers, undercounting
@@ -6285,7 +6285,30 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "<picture> legitimately wraps an <img> fallback",
         checker._copilot_v2_line_findings_count("2 <picture><img></picture>") == 2,
     )
-    # Three fail-closed paths with no prior direct coverage (ai-config#3899
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, nineteenth round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
+    # Copilot review, fourth round): `_consume_copilot_badge` accepted a
+    # `<source>` tag unconditionally, regardless of whether an `<img>` had
+    # already been seen -- `0 <picture><img><source></picture>` parsed as
+    # a real zero-finding badge, even though the documented grammar says
+    # `<source>` elements come before the `<img>` fallback (matching real
+    # `<picture>` markup, where a `<source>` after the `<img>` is invalid
+    # too). `not saw_img` now gates the `<source>` branch the same way it
+    # already gated the `<img>` branch.
+    check(
+        "_copilot_v2_line_findings_count fails closed on a <source> "
+        "appearing AFTER the <img> fallback",
+        checker._copilot_v2_line_findings_count(
+            "0 <picture><img><source></picture>"
+        ) is None,
+    )
+    check(
+        "_copilot_v2_line_findings_count still counts a badge whose "
+        "<source> elements correctly precede the <img> fallback",
+        checker._copilot_v2_line_findings_count(
+            "2 <picture><source><source><img></picture>"
+        ) == 2,
+    )
+    # Three fail-closed paths with no prior direct coverage ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899)
     # review finding): a badge with no leading count at all, stray text
     # between two badges that is not itself a count, and a trailing count
     # after the last badge with no badge following it.
@@ -6337,7 +6360,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         checker.classify_verdict(v2_approval_nonzero_body, "COMMENTED", "copilot") == "not-clean",
     )
 
-    # ai-config#3899 review finding, seventh round (FAIL-OPEN): the legacy
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, seventh round (FAIL-OPEN): the legacy
     # `Comments generated: N` field and the v2 `**Findings:**` line are NOT
     # mutually exclusive, and treating the legacy field as authoritative
     # whenever present let an uncited `Comments generated: 0` phrase --
@@ -6346,7 +6369,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     # now combined with the same fail-closed rule the multi-line v2 scan
     # already uses: any nonzero wins, otherwise any unparseable yields no
     # verdict, zero only when every present source reads zero.
-    # ai-config#3899 review finding, sixteenth round: the v2 Findings-line
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, sixteenth round: the v2 Findings-line
     # search is now restricted to the actual overview block (the marker
     # through the first `<details>`/next `##` heading -- see
     # scripts/lib/copilot_overview.py), so these three bodies need the
@@ -6393,7 +6416,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         checker.copilot_verdict(_legacy0_v2_none_body) == "clean",
     )
 
-    # ai-config#3899 review finding, eighth round: Python's `\d` matches
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, eighth round: Python's `\d` matches
     # every Unicode `Nd`-category digit, not just ASCII, contradicting the
     # grammar's own stated "1-4 ASCII digits" rule -- a full-width digit
     # (U+FF15, "5") would otherwise parse as a real count.
@@ -6405,7 +6428,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) is None,
     )
 
-    # ai-config#3899 review finding, fifteenth round (PR ai-config#3906
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, fifteenth round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
     # Copilot review): the legacy COPILOT_COMMENT_COUNT regex's boundary
     # lookarounds were `[0-9]`-only, not `\d`, so a non-ASCII digit sitting
     # right after an ASCII digit never tripped the "not immediately
@@ -6441,7 +6464,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) != "clean",
     )
 
-    # ai-config#3899 review finding, ninth round: the tokenizer ended a tag
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, ninth round: the tokenizer ended a tag
     # at the first '>' even inside a quoted attribute value, so
     # `<img alt="a>5">` truncated mid-attribute and a `>` hidden inside a
     # quoted value could evade the nested-tag/unterminated-tag checks
@@ -6463,7 +6486,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) is None,
     )
 
-    # ai-config#3899 review finding, tenth round (FAIL-OPEN, new in this
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, tenth round (FAIL-OPEN, new in this
     # PR): `_COPILOT_NONE_LINE`'s predecessor was `re.match(r"[ \t]*None\b",
     # rest, ...)`, which only checked the START of the line -- the word
     # boundary after "None" is satisfied by the following space regardless
@@ -6481,7 +6504,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) == "",
     )
 
-    # ai-config#3899 review finding, eleventh round: the legacy path used
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, eleventh round: the legacy path used
     # `_has_valid_match`, which returns only the FIRST uncited match --
     # pre-existing on main, the same class of bug this PR already fixed
     # for the v2 multi-line scan. "Comments generated: 0 ... Comments
@@ -6497,7 +6520,58 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) == "not-clean",
     )
 
-    # ai-config#3899 review finding, twelfth round: COPILOT_COMMENT_COUNT's
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twentieth round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
+    # Copilot review, fourth round): the legacy `Comments generated:` loop
+    # only checked the `cited` mask (fences/quotes/code-spans), not an
+    # HTML comment -- exactly the gap the v2 Findings-line path was fixed
+    # for two rounds ago. `<!--\n- **Comments generated:** 0\n-->` counted
+    # as a real zero. Now reuses `_find_html_comment_spans` /
+    # `_position_in_spans` from copilot_overview, the same helpers the v2
+    # path already uses, rather than a second detector.
+    check(
+        "copilot_verdict: a legacy 'Comments generated:' occurrence "
+        "hidden inside an HTML comment is not read as a real zero count",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "<!--\n- **Comments generated:** 0\n-->\n"
+        ) == "",
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twentieth round: `_copilot_overview_
+    # block_spans` trusted a marker+heading pair sitting inside an
+    # already-open `<details>...</details>` region -- exactly what a
+    # re-review's "Resolved since last review" listing quotes, since that
+    # listing can carry a PRIOR round's complete marker+heading+Findings
+    # sequence, genuine by every other check. Now excludes any pair whose
+    # own start falls inside a `<details>` region (`_find_details_regions`
+    # / `_position_in_spans`, reusing the same bisect-backed containment
+    # check), while a genuinely later TOP-LEVEL block -- one that starts
+    # AFTER a `<details>` region has already closed -- still counts.
+    check(
+        "copilot_verdict: a marker+heading pair nested inside an "
+        "already-open <details> region is not counted as a real block",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n\n"
+            "<details>\n<summary>Resolved since last review (1)</summary>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+            "</details>\n"
+        ) == "not-clean",
+    )
+    check(
+        "copilot_verdict: a genuinely later top-level block AFTER a "
+        "CLOSED <details> region still counts",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n\n"
+            "<details>\n<summary>x</summary>\ny\n</details>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "not-clean",
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twelfth round: COPILOT_COMMENT_COUNT's
     # `(\d+)` was unbounded, and `int()` on a run past a few thousand
     # digits raises ValueError uncaught -- pre-existing on main, crashing
     # the merge-gate classifier instead of failing closed. Now bounded to
@@ -6513,7 +6587,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) != "clean",
     )
 
-    # ai-config#3899 review finding, sixteenth round (PR ai-config#3906
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, sixteenth round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
     # Copilot review, "fix the class" directive): two more fail-open
     # shapes, one per item in the review.
     #
@@ -6614,7 +6688,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) == "clean",
     )
 
-    # ai-config#3899 review finding, seventeenth round (PR ai-config#3906
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, seventeenth round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
     # Copilot review, second round on `_copilot_overview_block_spans`):
     # the marker and heading were two INDEPENDENTLY optional block-start
     # signals rather than one combined requirement, and the marker had no
@@ -6716,14 +6790,14 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) == "clean",
     )
 
-    # ai-config#3899 review finding, eighteenth round (PR ai-config#3906
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, eighteenth round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
     # Copilot review, third round): the heading in `_COPILOT_OVERVIEW_START`
     # was only `\b`-bounded, so `## Copilot review overview quoted` --
     # extra text after the real heading words -- still satisfied the word
     # boundary (the space before "quoted" already is one) and opened a
     # trusted block. Anchored the heading to the end of its own line
     # instead (`[ \t]*(?=\r?\n|$)`), so any real trailing content fails
-    # the match. Also fixed ai-config#3917 item 2 while touching this same
+    # the match. Also fixed [ai-config#3917](https://github.com/Morrison-Lab/ai-config/issues/3917) item 2 while touching this same
     # pattern: the marker-to-heading bridge required a bare `\n`, so a
     # CRLF body's marker line (ending `\r\n`) could never satisfy it --
     # the `\r` is neither `[ \t]` nor `\n` -- and the whole body read as
@@ -6746,7 +6820,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) == "clean",
     )
 
-    # Timing regression tests (ai-config#3917, PR ai-config#3906 Copilot
+    # Timing regression tests ([ai-config#3917](https://github.com/Morrison-Lab/ai-config/issues/3917), PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot
     # review, third round): `_position_in_spans` scanned every HTML-comment
     # span linearly for every Findings-line match, making the OVERALL cost
     # O(comments x findings) -- and since each block's own marker is
@@ -6757,7 +6831,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     # super-linear. Two adversarial shapes, both at 262,144 characters:
     # many small HTML comments interleaved with many Findings lines
     # within ONE block (stresses a large comment-span list against many
-    # lookups), and many separate marker+heading blocks (the exact #3917
+    # lookups), and many separate marker+heading blocks (the exact [#3917](https://github.com/Morrison-Lab/ai-config/issues/3917)
     # reprex shape).
     _many_comments_unit = "<!-- c -->\n**Findings:** None\n"
     _many_comments_header = (
@@ -6789,18 +6863,18 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     )
     check(
         "copilot_verdict on 262,144 characters of many separate "
-        "marker+heading blocks (the #3917 reprex shape) scales linearly "
+        "marker+heading blocks (the [#3917](https://github.com/Morrison-Lab/ai-config/issues/3917) reprex shape) scales linearly "
         "(< 1s)",
         _mb_verdict == "clean" and _mb_secs < 1.0,
     )
 
-    # ai-config#3899 review finding, thirteenth round (PR ai-config#3906
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, thirteenth round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
     # Copilot review): COPILOT_FINDINGS_LINE was unanchored, matching
     # `**Findings:**` anywhere in the body -- mid-sentence prose quoting an
     # earlier round's overview, or a blockquoted copy -- and reading it as
     # the real v2 zero-count source for an affirmative review that carries
     # no genuine overview field. Anchored to the start of a Markdown line
-    # (optional leading whitespace only, matching the real #1635 fixture
+    # (optional leading whitespace only, matching the real [#1635](https://github.com/Lacaedemon/sparta/pull/1635) fixture
     # shape), so neither case matches any more and the affirmative heading
     # states no verdict instead of clean.
     check(
@@ -6832,7 +6906,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) == "clean",
     )
 
-    # ai-config#3899 review finding, fourteenth round: `_copilot_tag_name`
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, fourteenth round: `_copilot_tag_name`
     # stopped its alnum scan at the first non-alnum character without
     # checking that character was a valid tag-name delimiter, so
     # `<img:evil>` and `<picture:evil>` -- neither a real tag -- scanned as
@@ -6851,7 +6925,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) is None,
     )
 
-    # Timing regression test (ai-config#3899 review finding): the original
+    # Timing regression test ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding): the original
     # unbounded `\d+` counting regex backtracked quadratically on a long
     # digit run with no trailing `<picture`/`<img` -- 25s for the isolated
     # regex and 19.6s end to end through copilot_verdict() at 65,536 digits.
@@ -6860,7 +6934,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     # entirely, so this now also guards the replacement: one linear
     # tokenisation pass plus one linear grammar walk, not a scan whose cost
     # depends on the run's length or position.
-    # Carries the marker+heading (ai-config#3899 review finding, sixteenth
+    # Carries the marker+heading ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, sixteenth
     # round) so the v2 Findings-line search actually reaches this line's
     # scan rather than short-circuiting at "no overview block found" --
     # the timing guard needs to exercise the same linear scan a real body
@@ -6877,7 +6951,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         _av_verdict == "" and _av_secs < 1.0,
     )
 
-    # Timing regression test (ai-config#3899 review finding, fourth round): a
+    # Timing regression test ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, fourth round): a
     # lazy-dot `<picture\b.*?</picture>` alternative re-scanned to the end of
     # the line at EVERY unclosed `<picture ` opener, since DOTALL's `.`
     # crosses further openers looking for a `</picture>` that never comes.
@@ -6912,7 +6986,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     _cb_secs, _cb_verdict = best_of_three(
         checker.copilot_verdict, _closed_badges_body
     )
-    # Budget widened from 0.1s to 0.5s (ai-config#3899 review finding,
+    # Budget widened from 0.1s to 0.5s ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding,
     # sixteenth round): the block-region and HTML-comment-span detection
     # this round added run once per call on top of the existing scan, and
     # measured 0.07-0.09s across ten runs on this machine for this ~190KB
@@ -6926,7 +7000,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         _cb_verdict == "not-clean" and _cb_secs < 0.5,
     )
 
-    # ai-config#3899 review finding, sixth round: a digit sitting INSIDE a
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, sixth round: a digit sitting INSIDE a
     # malformed tag (a second `<` opening before the first tag's own `>`)
     # was silently skipped rather than rejected, since `str.find` treated
     # the whole `<picture 5 <img>` span as one opaque tag. The coordinator's

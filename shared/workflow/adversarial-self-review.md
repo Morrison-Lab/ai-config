@@ -925,8 +925,7 @@ The fix is the same one this section already gives: state the required line expl
 - **Don't:** ask the reviewer for a verdict in your own vocabulary ("end with clean / not clean") --- the brief overrides the persona's format, the reviewer answers `### Verdict: clean`, and that parses as no verdict.
 - **Don't:** review two repositories in one dispatch --- `parse_report` returns one `(verdict, Reviewed-Commit)` pair per report, so one report cannot clear both pushes.
 
-(Measured 2026-09-24 on Morrison-Lab/mlg#41 and Morrison-Lab/mln#92:
-two clean rounds reporting `### Verdict: clean` were invisible to the guard, which kept an earlier `Needs more work`.
+(Measured 2026-09-24 on Morrison-Lab/mlg#41 and Morrison-Lab/mln#92: two clean rounds reporting `### Verdict: clean` were invisible to the guard, which kept an earlier `Needs more work`.
 Both briefs asked for "clean / not clean" and covered both repositories.
 One dispatch per repository, left to the persona's own format, cleared each once it was the latest verdict.)
 

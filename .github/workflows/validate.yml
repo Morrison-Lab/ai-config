@@ -102,6 +102,13 @@ jobs:
         run: python3 scripts/check-python-escapes.py
       - name: Run invalid-escape check tests
         run: python3 scripts/test_check_python_escapes.py
+      - name: Run cardinality-vocabulary measurement tests
+        # ai-config#3904: `scripts/measure-cardinality-vocabulary.py`'s failure
+        # mode is a VACUOUS PASS -- a comparison reporting perfect stability
+        # over a population it never examined -- so that script's refusals,
+        # not its arithmetic, are what this suite pins. A refusal that stops
+        # firing turns no number wrong.
+        run: python3 scripts/test_measure_cardinality_vocabulary.py
       - name: Run git command regex helper tests
         run: python3 scripts/test_git_cmd.py
       - name: Run hook path resolution tests

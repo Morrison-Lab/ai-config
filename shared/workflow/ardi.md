@@ -1195,6 +1195,46 @@ reading a matching count as "the guard doesn't need this fix".
 See [`ardi.cases.md`](ardi.cases.md), "A mutation test whose reverted run
 never reached its assertion".
 
+**A mutation that SURVIVES on a mechanism this branch authored is a missing
+case, and the corpus gives you two ways to excuse it that do not apply
+there.**
+One says to read a survivor as a question about the mutation first --- it may
+have been mis-aimed, changing a branch no case exercises.
+The other says a survivor can mean a second gate still holds, so the
+behaviour is defended twice and only mutating both together kills it.
+Both are true, and both describe code that was already there.
+Neither reaches the mechanism you wrote on this branch, because a mechanism
+introduced to close a finding has no second gate behind it yet and no
+pre-existing case aimed at it --- its mutation is aimed by construction, at
+the one branch the finding is about.
+
+The pull toward the two excuses is strongest exactly there.
+A green suite over a fix you just reasoned through reads as confirmation, and
+both excuses are phrased as diligence, so reaching for one feels like the
+more careful reading rather than the more comfortable one.
+The discriminator is ownership, and it is mechanical: ask whether the mutated
+line is in the diff.
+If it is, the survivor is a missing case until you have named which existing
+case was supposed to kill it and shown why it could not.
+
+Derive the missing case rather than recalling it.
+A fix is made against inputs you measured at the time, and those are the ones
+memory offers back --- which is how a case gets written that pins the
+construction you happened to try instead of the one the mechanism turns on.
+Run candidate inputs under both the mutated and the unmutated mechanism, keep
+the ones whose verdicts differ, and let that set decide how many cases the fix
+needs: two mechanisms fixing one finding need two cases, because either alone
+leaves the other's mutation alive.
+
+- **Do:** check whether the mutated line is in your own diff before reading a
+  survivor as mis-aimed or as doubly defended.
+- **Do:** derive the pinning case by running candidates under both states and
+  keeping the ones that differ.
+- **Don't:** accept a green suite over a mechanism whose mutation survived,
+  on the strength of having reasoned the fix through.
+- **Don't:** assume one case covers a finding fixed by two mechanisms --- run
+  a mutation per mechanism and count the kills.
+
 **A systematic audit done by skimming is worse than the one-at-a-time
 version it replaces.**
 

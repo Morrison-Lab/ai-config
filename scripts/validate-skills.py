@@ -7,9 +7,9 @@ jeremylongshore/claude-code-plugins-plus-skills (`validate-skills-schema.py`).
 No source was copied; see CREDITS.md.
 
 Checks:
-  * every skills/<name>/ has a SKILL.md with parseable YAML frontmatter,
-    except a skills-directory plugin (a .claude-plugin/plugin.json and no
-    SKILL.md), whose manifest must name its directory
+  * every skills/<name>/ has a SKILL.md with parseable YAML frontmatter;
+    a skills-directory plugin (a .claude-plugin/plugin.json) there is an
+    error, as the suspected cause of the marketplace sync failure
   * frontmatter has non-empty `name` and `description`
   * `name` matches the directory name
   * `user-invocable` (if present) is a bool

@@ -43,23 +43,25 @@ so every hook is inert there
   an `ai-config@<marketplace>` entry decides, and a `false` there wins),
   per [`memories/claude-code-settings.md`](../../memories/claude-code-settings.md).
 
-## How the paths work
+## How the paths worked
 
-The generated commands point at
-`${CLAUDE_PLUGIN_ROOT}/../../hooks/<script>`,
-which resolves through the `.claude/skills` symlink
+While the folder sat under `.claude/skills`, the generated commands
+pointed at `${CLAUDE_PLUGIN_ROOT}/../../hooks/<script>`,
+which resolved through that symlink
 to the checkout's own `hooks/` directory.
-The hooks that fire are therefore the ones in the working tree,
+The hooks that fired were the ones in the working tree,
 including uncommitted edits on a PR branch,
 rather than a cache snapshot pinned at install time
 ([#2439](https://github.com/Morrison-Lab/ai-config/issues/2439)).
+The move keeps the folder at the same depth,
+so the same relative path resolves if a later home loads it again.
 
-## Two limits
+## Limits of the skills-directory route
 
 - A project-scope skills-directory plugin loads only after the workspace
   trust gate, and only from the session's primary working directory.
-  Whether a cloud session passes that gate at plugin-scan time
-  is settled by starting one on a branch carrying this folder
-  and checking that the local-time line appears on the first prompt.
 - `hooks/` changes need `/reload-plugins` or a restart;
   only `SKILL.md` edits take effect live.
+
+The replacement home is tracked in
+[#3950](https://github.com/Morrison-Lab/ai-config/issues/3950).

@@ -35,6 +35,25 @@ import tempfile
 # `algorithmatize-checks`'s "Limits" failure arriving through the remedy.
 RX_BARE_COUNT = re.compile(r"^\d+\s+pass$", re.I)
 
+# A bare count is what `no-incomplete-check-enumeration.py` PRESCRIBES as the
+# safe progress-report form -- its blocking message says verbatim that
+# "13 pass, 5 pending" trips nothing, and its source carries the same claim as
+# a comment. `find_unnegated_assert` matched `13 pass` in that exact string,
+# so one guard's remedy was the other's trigger, using the first guard's own
+# example. Measured 2026-09-24: a message reading "9 pass, 8 skipped, 2 runs
+# still in progress, none failing" was blocked as a clean assertion by the
+# failing-query branch, which sits above the softening path below and so
+# reached neither RX_BARE_COUNT nor RX_PR_NEARBY.
+# The discriminator is self-disclosure: a message that STATES its own pending
+# or failing work is reporting progress, whatever counts it also carries, and
+# cannot be concealing the thing this guard exists to surface.
+RX_DISCLOSES_PENDING = re.compile(
+    r"\bin[- ]progress\b|\bstill running\b|\bpending\b|\bqueued\b|"
+    r"\bin flight\b|\bnot (?:yet )?(?:fully )?clean\b|\bstill failing\b|"
+    r"\bnot a clean stopping point\b",
+    re.I,
+)
+
 # What makes a count a claim about THIS PR/MR rather than about a local run.
 # Proximity, not presence anywhere in the message: a recap routinely mentions
 # a PR/MR number paragraphs away from an unrelated test count.
@@ -532,15 +551,41 @@ def main() -> int:
 
     # If the last status query reported a failing or not-clean state, block clean assertions.
     if last_failing_query > last_query and last_failing_query > last_push:
-        print(json.dumps({
-            "decision": "block",
-            "reason": (
-                f"Your message asserts a PR's clean state -- \"{hit.group(0).strip()}\" -- "
-                "but the most recent status query tool result in this transcript reported a FAILING or IN-PROGRESS check state. "
-                "You cannot declare a PR fully clean when a status query returned failure or in-progress checks."
-            ),
-        }))
-        return 0
+        fail_hit = hit
+        if RX_DISCLOSES_PENDING.search(text):
+            # Re-aim past every bare count: the message already discloses its
+            # own pending work, so a count in it is the prescribed progress
+            # form rather than a clean claim. A non-count assert in the same
+            # message still blocks -- disclosing one PR's pending checks does
+            # not license calling another PR clean.
+            fail_hit = None
+            for cand in RX_ASSERT.finditer(text):
+                if _is_negated(text, cand):
+                    continue
+                if RX_BARE_COUNT.match(cand.group(0).strip()):
+                    continue
+                fail_hit = cand
+                break
+        if fail_hit is not None:
+            print(json.dumps({
+                "decision": "block",
+                "reason": (
+                    f"Your message asserts a PR's clean state -- \"{fail_hit.group(0).strip()}\" -- "
+                    "but the most recent status query tool result in this transcript reported a FAILING or IN-PROGRESS check state. "
+                    "You cannot declare a PR fully clean when a status query returned failure or in-progress checks.\n\n"
+                    "This match is by TEXT and TIME, not by pull request: the failing query may "
+                    "concern a DIFFERENT PR from the one your sentence is about, and a message "
+                    "covering several PRs trips it on any one of them. So check that premise "
+                    "rather than conceding it -- if the failing reading is about another PR, the "
+                    "claim may stand and the correction you owe is none. Re-query the PR the "
+                    "sentence names, because confirming that costs one query, but do not retract "
+                    "a claim the evidence supports.\n\n"
+                    "If this is a progress report, state the pending work in the same message -- "
+                    "a bare \"N pass\" count alongside a disclosed in-progress or pending state is "
+                    "the form `no-incomplete-check-enumeration.py` prescribes, and no longer fires."
+                ),
+            }))
+            return 0
 
     # Nothing pushed this session, so no reading can have gone stale.
     if last_push < 0:

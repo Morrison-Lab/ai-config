@@ -75,6 +75,31 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT, say("PR #1167 is fully clean.")], True,
      "claiming fully clean when check-pr-fully-clean.py returned NOT fully clean"),
 
+    # `no-incomplete-check-enumeration.py` PRESCRIBES the bare-count form as
+    # the safe progress report -- its blocking message says verbatim that
+    # "13 pass, 5 pending" trips nothing, and its source repeats the claim as
+    # a comment. This guard's ASSERT list matched `13 pass` in that exact
+    # string, so following one guard's remedy tripped the other, using the
+    # first guard's own example. Measured 2026-09-24 on a message reading
+    # "9 pass, 8 skipped, 2 runs still in progress, none failing", which the
+    # failing-query branch blocked as a clean assertion.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("13 pass, 5 pending.")], False,
+     "the sibling guard's own prescribed progress form must not block here"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("19 checks on #3928: 9 pass, 8 skipped, 2 still in progress, "
+          "none failing.")], False,
+     "a count in a message disclosing its own pending work is a progress report"),
+    # The exemption is self-disclosure, not the presence of a count: a message
+    # may disclose ONE PR's pending checks and still call ANOTHER clean, and
+    # that second claim is exactly what this branch exists to catch.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("#3928 has 2 checks still in progress. #49 is fully clean.")], True,
+     "disclosing one PR's pending work does not license calling another clean"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("9 pass.")], True,
+     "a bare count with nothing disclosed still blocks"),
+
     ([READ_FILE_QUERY, READ_FILE_RESULT, say("Checked the file contents.")], False,
      "reading script source containing failure text must not trip query block"),
 
@@ -523,15 +548,37 @@ def check_query_forms():
     return failures
 
 
-def check_attribution():
+# The failing-query branch is PR-blind in the same way the staleness branch is
+# repo-blind: it pairs any unnegated ASSERT in the message against any failing
+# query in the transcript, without checking they concern the same PR. Firing
+# is still the safe direction; the message must say what it matched.
+ATTRIBUTION_FAILING_QUERY = [
+    ("#3928 has 2 checks still in progress. #49 is fully clean.",
+     "by TEXT and TIME, not by pull request",
+     "the message discloses that the match is PR-blind"),
+    ("#3928 has 2 checks still in progress. #49 is fully clean.",
+     "may concern a DIFFERENT PR",
+     "it names the specific way the premise can miss"),
+    ("#3928 has 2 checks still in progress. #49 is fully clean.",
+     "do not retract a claim the evidence supports",
+     "it warns against over-conceding, as the staleness branch does"),
+    ("#3928 has 2 checks still in progress. #49 is fully clean.",
+     "no longer fires",
+     "it names the progress-report form that is now exempt"),
+]
+
+
+def check_attribution(table=None, events=None, prefix="attribution"):
     """Each warning must describe what it matched, not what it assumed."""
     failures = 0
-    for message, expected, label in ATTRIBUTION:
+    table = ATTRIBUTION if table is None else table
+    events = (QUERY, PUSH) if events is None else events
+    for message, expected, label in table:
         td = tempfile.mkdtemp()
         try:
             path = os.path.join(td, "transcript.jsonl")
             with open(path, "w", encoding="utf-8") as fh:
-                for e in (QUERY, PUSH, say(message)):
+                for e in tuple(events) + (say(message),):
                     fh.write(json.dumps(e) + "\n")
             env = dict(os.environ, TMPDIR=td, TEMP=td, TMP=td)
             out = subprocess.run(
@@ -542,7 +589,7 @@ def check_attribution():
             reason = (json.loads(out).get("reason") if out else "") or ""
             ok = expected in reason
             failures += 0 if ok else 1
-            print(f"{'ok  ' if ok else 'FAIL'}  attribution: {label}")
+            print(f"{'ok  ' if ok else 'FAIL'}  {prefix}: {label}")
         finally:
             shutil.rmtree(td, ignore_errors=True)
     return failures
@@ -558,6 +605,11 @@ def main():
         print(f"{'ok  ' if ok else 'FAIL'}  "
               f"{'block' if want_block else 'allow'}: {label}")
     failures += check_attribution()
+    failures += check_attribution(
+        ATTRIBUTION_FAILING_QUERY,
+        (CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT),
+        "attribution (failing-query)",
+    )
     failures += check_query_forms()
     total = len(CASES) + len(ATTRIBUTION) + len(QUERY_FORMS)
     print(f"\n{total - failures}/{total} passed")

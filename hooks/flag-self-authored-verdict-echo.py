@@ -63,10 +63,12 @@ FIRE CONDITION (all of)
   3. `classify_verdict(body)` returns "not-clean".
   4. The body carries no `review-data:` machine payload OF ITS OWN -- a real
      review emits one, so a body with one is a review stating its own verdict
-     and is none of this hook's business. Tested against the body with fenced
-     and blockquoted lines blanked, because a disposition may quote the
-     reviewer's payload back to say what the review concluded, and a quoted
-     one is not this author's verdict.
+     and is none of this hook's business. Tested against the RAW body by
+     `extract_structured_review`, which does its own fence, code-span and
+     indented-block masking -- the blanking step this condition used to
+     describe was removed in favour of the instrument (review finding 8).
+     A disposition may quote the reviewer's payload back to say what the
+     review concluded, and a quoted one is not this author's verdict.
   5. The body carries ARD disposition vocabulary (Addressed / Rebutted /
      Deferred, "addressed in", "closed in", "answered below"). This is the
      discriminator that separates a disposition ANSWERING findings from a
@@ -177,10 +179,12 @@ _INHERITED_POST_TOOLS = tuple(getattr(_disclosure, "MCP_POST_TOOLS", (
 # promises to exclude, and the direction that gets a guard switched off.
 # Subtracted by name rather than re-listing the comment tools, so a comment
 # surface added to the sibling still reaches this hook.
-# `add_comment_to_pending_review` is step 2 of the three-call sequence
-# CLAUDE.md's own MCP table documents for filing a formal review (create the
-# pending review, add each comment, submit), so it belongs here by the
-# criterion above. A third-round adversarial review found it in the POST
+# `add_comment_to_pending_review` is step 2 of the three-call sequence for
+# filing a formal review (create the pending review, add each comment,
+# submit), so it belongs here by the criterion above. That sequence is
+# documented in `Morrison-Lab/gha`'s CLAUDE.md, not in this repo's -- an
+# earlier comment cited the latter, where the name does not appear at all
+# (review finding 12). A third-round adversarial review found it in the POST
 # tuple instead, which contradicted that criterion.
 MCP_REVIEW_TOOLS = (
     "mcp__github__pull_request_review_write",
@@ -218,15 +222,32 @@ BASH_TOOL_NAMES = ("Bash", "bash", "run_command", "execute_command", "terminal",
 # adversarial review reproduced the bypass by appending one sentence naming the
 # mechanism. `extract_structured_review` requires the payload to open its own
 # line and masks fences, code spans AND indented blocks, so it returns None for
-# a mention, for a blockquoted payload and for an indented one, and a dict only
-# for a payload the body actually carries.
+# a mention and for a blockquoted payload, and a dict only for a payload the
+# body actually carries.
+#
+# "Indented" there means an indented CODE BLOCK -- four spaces or more.
+# Measured: 0, 1, 2 and 3 leading spaces all return a payload; 4 returns None.
+# An earlier comment said flatly that an indented payload returns None, which
+# is false for 1-3 (review finding 6). The residual is live and is accepted
+# rather than patched here: a disposition quoting a REVIEWER'S payload at 1-3
+# spaces of indent is exempted by this gate while `classify_verdict` still
+# reads the same body as not-clean. Narrowing it would mean re-deriving the
+# instrument's own indent rule in this file, which is the second detector
+# this gate exists to avoid; the divergence belongs in the instrument.
 #
 # It also makes the hook's headline claim -- that it imports the instrument
 # rather than inventing a second detector -- true of this gate as well as of
-# `classify_verdict`. `None` when the instrument cannot be loaded, and the
-# gate then exempts nothing, which errs toward warning on this gate alone;
-# every other fallback in this file errs the other way, because this one
-# cannot fabricate a payload that is not there.
+# `classify_verdict`.
+#
+# The `getattr` default is reachable only if `_checker` fails to load, since
+# that module defines this name unconditionally -- so `None` here means "the
+# sibling script is missing or unimportable", not "this attribute is absent".
+# Round 4 called the default dead (finding 17); it is not dead, but it is
+# narrower than the earlier comment implied, which said only "cannot be
+# loaded" without saying that the attribute itself always exists. When it
+# does fire the gate exempts nothing, which errs toward warning on this gate
+# alone; every other fallback in this file errs the other way, because this
+# one cannot fabricate a payload that is not there.
 extract_structured_review = getattr(_checker, "extract_structured_review", None)
 
 RX_FENCE = re.compile(r"^ {0,3}(?P<d>`{3,}|~{3,})\s*(?P<info>.*)$")
@@ -323,7 +344,12 @@ def _split_segments(text):
 # The write-then-post heredoc is this corpus's own convention for a
 # backtick-heavy body -- CLAUDE.md's PowerShell/backtick rule sends exactly
 # this hook's target there -- and at PreToolUse time the file the heredoc
-# writes does not exist yet, so a disk read cannot reach it.
+# writes usually does not exist yet, so a disk read cannot reach it. Usually,
+# not always: a stale scratch file or a retried command leaves a file at that
+# path, and `_bash_body` prefers the disk read, so the guard then scans the
+# OLD content. Measured in review round 4 (finding 15). The tie below is what
+# makes the fresh-path case readable at all; it does not make the disk read
+# wrong when a file genuinely is there.
 #
 # `flag-unmeasured-timestamp.py`'s `_extract_heredoc_bodies` was used here
 # first and cannot serve: it returns the bodies and discards the redirect
@@ -339,30 +365,74 @@ def _split_segments(text):
 # So the target is captured and the heredoc is tied to the `--body-file` the
 # posting segment names. No tie, no body: an untied heredoc reads as
 # unreadable rather than as a guess.
-RX_BODY_FILE = re.compile(r"--body-file[=\s]+(\S+)")
-RX_HEREDOC = re.compile(
-    r"([^\n]*)<<-?[ \t]*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?[^\n]*\n"
-    r"(.*?)\n[ \t]*\2\b",
-    re.DOTALL,
+# `extract_body_text` in this same file already handles `-F body=@<path>` and
+# `--field body=@<path>`, and CLAUDE.md prescribes exactly those spellings for
+# a backtick-carrying body -- so recognizing only `--body-file` left one
+# concept handled in one place and not the other, and a heredoc written to a
+# `-F body=@` path went unscanned (review finding 13).
+RX_BODY_FILE = re.compile(
+    r"--body-file[=\s]+(\S+)"
+    r"|(?:-F|--field)[=\s]+body=@(\S+)"
 )
+RX_HEREDOC = re.compile(
+    # The body spans newlines via a negated class rather than DOTALL, which
+    # is equivalent here and does not pretend to fix the cost below.
+    r"([^\n]*)<<-?[ \t]*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?[^\n]*\n"
+    # The terminator must stand ALONE on its line. `\2\b` matched a body line
+    # merely BEGINNING with the delimiter word, so a body whose second line
+    # read "EOF is the delimiter" truncated to its first line and silently
+    # dropped the verdict echo below it (review finding 14). `$` under
+    # MULTILINE anchors the line end; DOTALL keeps `.` spanning newlines.
+    r"([^\x00]*?)\n[ \t]*\2[ \t]*$",
+    re.MULTILINE,
+)
+
+
+# Every `<<` in the command is a scan start, and an UNTERMINATED one scans to
+# the end of the string, so the total cost is quadratic in the number of
+# openers -- measured in round 4 at 0.023s/0.365s/1.381s for 200/800/1600
+# heredoc-like tokens, and 4.7s at 3200 (finding 18). Rewriting the body
+# quantifier does NOT fix that: the cost is in the restart positions, not in
+# one match's backtracking, and the same measurement reproduces after the
+# rewrite. What bounds it is refusing to scan an implausible command at all.
+#
+# The bound is on the OPENER COUNT rather than on the command length, because
+# the count is what drives the cost: one heredoc carrying a full 64 KiB
+# comment body is a single scan and is linear, while 3200 empty openers in a
+# 25 KiB command took 4.6s. A length cap would have penalized the legitimate
+# large body and still admitted the pathological small one. A real
+# write-then-post command opens one heredoc, or two when it writes release
+# notes beside the body; 32 is far above that and far below where the cost
+# is noticeable. Past it the tie returns None, which reads as "body
+# unreadable" and WARNS, rather than as an exemption.
+MAX_HEREDOC_OPENERS = 32
 
 
 def _heredoc_body_for(command, segment):
     """The heredoc body the posting `segment` would send, or None.
 
     With a `--body-file` target the heredoc must name it, and exactly one
-    must. Without one -- a `--body "$(cat <<EOF ...)"` form -- a single
+    must. Without one, a single
     heredoc in the command is unambiguous and is taken; several are not.
     """
+    if command.count("<<") > MAX_HEREDOC_OPENERS:
+        return None
     docs = [(m.group(1), m.group(3)) for m in RX_HEREDOC.finditer(command)]
     if not docs:
         return None
     target = RX_BODY_FILE.search(segment) or RX_BODY_FILE.search(command)
     if target:
-        name = os.path.basename(target.group(1).strip("'\"")).strip("'\"")
+        raw = next(g for g in target.groups() if g)
+        name = os.path.basename(raw.strip("'\"")).strip("'\"")
         if not name:
             return None
-        hits = [b for pre, b in docs if name in pre]
+        # A path boundary, not substring containment: `--body-file /tmp/vb.md`
+        # matched a heredoc writing `/tmp/vb.md.bak` and the guard scanned a
+        # body that is never posted (review finding 5). The name must end the
+        # token it appears in, so `vb.md` matches `> /tmp/vb.md` and `vb.md"`
+        # but not `vb.md.bak`.
+        name_rx = re.compile(re.escape(name) + r"(?=['\"]?(?:\s|$))")
+        hits = [b for pre, b in docs if name_rx.search(pre)]
         return hits[0] if len(hits) == 1 and hits[0].strip() else None
     if len(docs) == 1 and docs[0][1].strip():
         return docs[0][1]
@@ -443,8 +513,13 @@ _FALLBACK_PREFIX_DISQUALIFY = re.compile(
 # appositive or a parenthetical. `check-purpose-before-reusing.md` names the
 # shape: the structure fitted and the purpose did not.
 #
-# `None` when the sibling cannot be loaded; `_disqualified` then falls back
-# to the plain window scan, which errs toward disqualifying.
+# `None` when the sibling cannot be loaded. `_governs` then evaluates
+# `not SCOPE_BREAK_RX.search(connector)` inline -- the SAME predicate
+# `_ATTACHES` computes over the same connector, not a weaker one. An earlier
+# comment here claimed the fallback "errs toward disqualifying" and named a
+# "plain window scan" that this branch deleted; measured over 11 connectors
+# the two paths return identical verdicts, 0 differences, so there is no
+# asymmetry in either direction (review finding 4).
 _ATTACHES = getattr(_clean_claim, "_ATTACHES", None)
 
 # This hook's own separator vocabulary. It keeps every token that genuinely
@@ -479,7 +554,21 @@ SCOPE_BREAK_RX = re.compile(
 # `None`, and its `and` belongs to the parenthetical. The paired-comma form
 # is an appositive; it requires two commas and stops at sentence
 # punctuation, so a comma splice is not silently swallowed by it.
-RX_ASIDE = re.compile(r"\([^()]*\)|\[[^\[\]]*\]|,[^,.;:!?]*,")
+# A paired-comma span that OPENS with a coordinating conjunction is not an
+# appositive -- `, and, as noted,` is a clause boundary wearing an aside's
+# punctuation, and the alternation is leftmost-first, so it ate the `and`
+# that `SCOPE_BREAK_RX` retains as a scope break and left the negator
+# governing the clause after it (review finding 2). Requiring the span not
+# to open with one makes the NEXT pair, the real aside, the match.
+RX_ASIDE = re.compile(
+    r"\([^()]*\)|\[[^\[\]]*\]"
+    r"|,(?!\s*(?:and|but|or|so|yet|nor)\b)[^,.;:!?]*,"
+)
+
+
+def _elide_asides(text):
+    """Blank every aside, preserving length so offsets stay valid."""
+    return RX_ASIDE.sub(lambda m: " " * (m.end() - m.start()), text)
 
 PREFIX_DISQUALIFY_RX = (getattr(_clean_claim, "PREFIX_DISQUALIFY_RX", None)
                         or _FALLBACK_PREFIX_DISQUALIFY)
@@ -508,20 +597,33 @@ def _governs(prose, window_start, match_start, rx):
     does not transfer (see `SCOPE_BREAK_RX` above). The mechanism it
     delegates to, `_attaches`, is reused unchanged.
 
-    Asides are stripped from the connector first, so a conjunction inside a
-    parenthetical or an appositive cannot break a scope it never left.
+    Asides are blanked from the whole window first, so a conjunction inside a
+    parenthetical or an appositive cannot break a scope it never left, and a
+    NEGATOR inside one cannot claim a scope it never had.
 
-    A missing hit is vacuously "does not apply". A missing `_attaches`
-    falls back to True, which DISQUALIFIES -- a missed warning rather than
-    a false one.
+    A missing hit is vacuously "does not apply". A missing `_ATTACHES`
+    falls back to `not SCOPE_BREAK_RX.search(connector)`, which is the same
+    predicate `_ATTACHES` computes -- measured identical over 11 connectors,
+    so the fallback is equivalent rather than safe-in-a-direction.
     """
-    window = prose[window_start:match_start]
+    # Asides are blanked from the WHOLE window before the negator is located,
+    # not just from the connector after it. Blanking only the connector left a
+    # negator that sits INSIDE an aside eligible to be `last`, so
+    # "Two findings (none of which matter) are addressed" read as governed by
+    # the parenthetical's own `none` and went silent (review finding 1).
+    # A negator inside an aside qualifies the aside, never the sentence; the
+    # sentence is governed by a negator outside every aside, or by none.
+    # That is also what keeps "Nothing (not even the rename) is addressed"
+    # disqualified -- blanking promotes its outer `Nothing` to `last`, where
+    # the connector-only form had picked the inner `not`. The substitution is
+    # length-preserving so `window_start`-relative offsets stay valid.
+    window = _elide_asides(prose[window_start:match_start])
     last = None
     for last in rx.finditer(window):
         pass
     if last is None:
         return False
-    connector = RX_ASIDE.sub(" ", window[last.end():])
+    connector = window[last.end():]
     if _ATTACHES is None:
         return not SCOPE_BREAK_RX.search(connector)
     return bool(_ATTACHES(connector, SCOPE_BREAK_RX))
@@ -550,9 +652,9 @@ def _disqualified(prose, match_start):
     because `yet` is a clause separator for the sibling's phrases and an
     adverb in this hook's. `SCOPE_BREAK_RX` is this hook's own set.
 
-    A missing sibling fails toward DISQUALIFYING, which costs a missed
-    warning rather than a false one that teaches the author to ignore the
-    hook.
+    A missing sibling changes no verdict: `_governs` falls back to the same
+    predicate `_ATTACHES` computes (see its docstring). The fallback is
+    equivalent, not conservative.
     """
     starts = [m.end() for m in RX_CLAUSE_START.finditer(prose, 0, match_start)]
     window_start = starts[-1] if starts else 0
@@ -576,6 +678,17 @@ def echoed_verdict(body):
             if extract_structured_review(body) is not None:
                 return None
         except Exception:
+            # An explicit, bounded, stated fallback, per
+            # `shared/principles/fail-fast.md`: a raising instrument means
+            # "no payload was recognized", so the scan below still runs and
+            # the hook can still warn. That is the direction a warn-only
+            # guard wants -- swallowing toward EXEMPTING would turn a crash
+            # in someone else's parser into silence here, which is the
+            # failure this hook exists to prevent. The exception is not
+            # narrowed because the instrument is a sibling script whose
+            # raising types are not this file's to enumerate; what bounds
+            # it is that only this one call sits inside the try, and its
+            # only effect is to skip an exemption (review finding 16).
             pass
     for hit in RX_DISPOSITION.finditer(prose):
         # The bullet branch starts at the preceding newline, so the clause

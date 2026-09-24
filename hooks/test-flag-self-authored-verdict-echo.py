@@ -113,7 +113,10 @@ NEGATED_PHRASES = (
 # `Not clean` all classify `not-clean`, so the row reaches gate 4 and pins
 # this fix under each of them. The row suppresses a verdict under one family,
 # `Needs ... work` -- which is this suite's own `NOT_CLEAN` -- because of the
-# paragraph window on `classify_verdict()`'s suffix guard (ai-config#3937).
+# 60-CHARACTER suffix window on `classify_verdict()`'s `Needs ... work` guard
+# (`check-pr-fully-clean.py:2347`, `scan[match.end():match.end() + 60]`;
+# ai-config#3937). An earlier revision of this comment called it a paragraph
+# window, which named the wrong mechanism (review finding 10).
 # Eight forms were measured with the row and without it, and the row changes
 # the answer for `Needs more work` and `Needs work` and no other; `Request
 # changes` and `Do not merge` return `''` with or without it, being no
@@ -144,6 +147,41 @@ HONEST_PARENTHETICAL = (
 HONEST_BREAK_IN_COMMA_ASIDE = (
     "### Verdict\n**%s**\n\n"
     "None of these, though small and fiddly, are addressed in this push.\n"
+) % NOT_CLEAN
+
+# A negator INSIDE an aside qualifies the aside, never the sentence. Each of
+# these five is an affirmative verdict echo wearing one: the sentence claims
+# the work IS addressed, and only the parenthetical, bracket, or appositive
+# carries a negator. Blanking asides from the connector alone left that inner
+# negator eligible as `last`, so all five went silent (review round 4,
+# findings 1 and 2). Their controls are the four HONEST_* fixtures above,
+# where the negator sits OUTSIDE the aside and must keep governing.
+ECHO_NEGATOR_IN_PARENTHETICAL = (
+    "### Verdict\n**%s**\n\n"
+    "Two findings (none of which matter) are addressed in `f120e5a`.\n"
+) % NOT_CLEAN
+
+ECHO_NEGATOR_IN_BRACKET = (
+    "### Verdict\n**%s**\n\n"
+    "The blockers [none are new] are addressed in `f120e5a`.\n"
+) % NOT_CLEAN
+
+ECHO_NEGATOR_IN_COMMA_ASIDE = (
+    "### Verdict\n**%s**\n\n"
+    "Five items, none trivial, are addressed in `f120e5a`.\n"
+) % NOT_CLEAN
+
+# `, and,` and `, but,` are clause boundaries wearing an aside's punctuation.
+# RX_ASIDE is leftmost-first, so it ate the conjunction SCOPE_BREAK_RX retains
+# as a break and left the negator governing the clause after it.
+ECHO_CONJUNCTION_COMMA_PAIR_AND = (
+    "### Verdict\n**%s**\n\n"
+    "Nothing is blocking, and, as noted, all five are addressed in `f120e5a`.\n"
+) % NOT_CLEAN
+
+ECHO_CONJUNCTION_COMMA_PAIR_BUT = (
+    "### Verdict\n**%s**\n\n"
+    "None of it is done, but, crucially, all five are addressed in `f120e5a`.\n"
 ) % NOT_CLEAN
 
 HONEST_BREAK_IN_PARENTHETICAL = (
@@ -405,9 +443,71 @@ def main():
           mcp(HONEST_BREAK_IN_COMMA_ASIDE), False)
     check("a break token inside a parenthetical does not sever the negator",
           mcp(HONEST_BREAK_IN_PARENTHETICAL), False)
+    check("a negator inside a parenthetical does not govern the sentence",
+          mcp(ECHO_NEGATOR_IN_PARENTHETICAL), True)
+    check("a negator inside a bracket does not govern the sentence",
+          mcp(ECHO_NEGATOR_IN_BRACKET), True)
+    check("a negator inside a comma appositive does not govern the sentence",
+          mcp(ECHO_NEGATOR_IN_COMMA_ASIDE), True)
+    check("a `, and,` pair is a clause boundary, not an aside",
+          mcp(ECHO_CONJUNCTION_COMMA_PAIR_AND), True)
+    check("a `, but,` pair is a clause boundary, not an aside",
+          mcp(ECHO_CONJUNCTION_COMMA_PAIR_BUT), True)
     # Two heredocs, and the one the post reads is the SECOND. An earlier draft
     # took whichever heredoc came first, so this body was read through the
     # release notes and reported unreadable.
+    # Review round 4, findings 5, 13 and 14: the tie was an unanchored
+    # substring, the terminator was not end-anchored, and only one of the
+    # three body-file spellings was recognized. Each failed silently -- a
+    # body scanned that is never posted, a body truncated above its own
+    # verdict echo, a body never scanned at all.
+    check("a basename collision does not tie to the wrong heredoc",
+          fired("Bash", {"command":
+                         "cat > /tmp/vb.md.bak <<'A'\n%s\nA\n"
+                         "gh pr comment 49 --body-file /tmp/vb.md"
+                         % ECHO_DISPOSITION}),
+          False)
+    check("a body line beginning with the delimiter word does not truncate",
+          fired("Bash", {"command":
+                         "cat > /tmp/v.md <<'EOF'\nIntro line.\n"
+                         "EOF is the delimiter we use.\n%s\nEOF\n"
+                         "gh pr comment 1 --body-file /tmp/v.md"
+                         % ECHO_DISPOSITION}),
+          True)
+    check("a heredoc tied through -F body=@ is read",
+          fired("Bash", {"command":
+                         "cat > /tmp/notes.md <<'A'\nRelease notes.\nA\n"
+                         "cat > /tmp/v.md <<'B'\n%s\nB\n"
+                         "gh api repos/o/r/issues/1/comments -F body=@/tmp/v.md"
+                         % ECHO_DISPOSITION}),
+          True)
+    # Review finding 18: every `<<` is a scan start, and an unterminated one
+    # scans to the end, so cost is quadratic in the OPENER COUNT -- 3200
+    # openers in a 25 KiB command took 4.6s in a hook that runs on every Bash
+    # call. The bound is on the count and not the length, so the pair below
+    # is the point: the pathological small command is refused, and a single
+    # heredoc carrying a full-size comment body still ties.
+    # The command below carries a REAL, tie-able heredoc, so without the bound
+    # it returns that body. An earlier draft used openers with no terminator,
+    # which returns None with or without the bound -- a case that passes under
+    # its own mutation and therefore tests nothing.
+    _many = ("x <<EOF\n" * (mod.MAX_HEREDOC_OPENERS + 1)
+             + "cat > /tmp/v.md <<'A'\n%s\nA\n"
+               "gh pr comment 1 --body-file /tmp/v.md\n" % ECHO_DISPOSITION)
+    check("a command past the opener bound is refused rather than scanned",
+          mod._heredoc_body_for(_many, _many) is None, True)
+    _big = ("cat > /tmp/v.md <<'A'\n" + "filler line\n" * 5000
+            + ECHO_DISPOSITION + "\nA\ngh pr comment 1 --body-file /tmp/v.md\n")
+    _tied = mod._heredoc_body_for(_big, _big)
+    check("one heredoc carrying a 60 KiB body still ties",
+          _tied is not None and "f120e5a" in _tied, True)
+    check("a heredoc tied through --field body=@ is read",
+          fired("Bash", {"command":
+                         "cat > /tmp/notes.md <<'A'\nRelease notes.\nA\n"
+                         "cat > /tmp/v.md <<'B'\n%s\nB\n"
+                         "gh api repos/o/r/issues/1/comments --field body=@/tmp/v.md"
+                         % ECHO_DISPOSITION}),
+          True)
     check("the heredoc tied to --body-file is the one read",
           fired("Bash", {"command":
                          "cat > /tmp/notes.md <<'A'\nRelease notes.\nA\n"

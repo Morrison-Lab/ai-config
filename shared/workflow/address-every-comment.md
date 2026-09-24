@@ -1109,8 +1109,8 @@ widen the sweep before dropping the row rather than after.
 A review found the guard's negation window over-broad, and offered
 "None are deferred; all five are addressed in `f120e5a`" among its rows.
 That row was reported as not an instance, on the stated ground that
-`classify_verdict()` returns `''` for it "under every verdict form" -- which
-was measured under one form and was false.
+`classify_verdict()` returns `''` for it "whatever verdict form it carries"
+-- which was measured under one form and was false.
 The row classifies `not-clean` under `Changes requested`, `Blocked`,
 `Not ready to merge` and `Not clean`, and reaches the window under each of
 them.

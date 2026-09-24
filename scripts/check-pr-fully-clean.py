@@ -78,8 +78,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from copilot_overview import (  # noqa: E402
     COPILOT_FINDINGS_LINE,
     _copilot_v2_findings_count,
-    _copilot_v2_line_findings_count,
 )
+# Test-only re-export: not called anywhere in this file, but
+# scripts/test_check_pr_fully_clean.py reaches it as
+# `checker._copilot_v2_line_findings_count` (matching how the test file
+# already gets at every other lib helper -- e.g. `checker.extract_structured_review`
+# for review_payload.py's function -- rather than importing straight from
+# the lib module). Deleting this import as dead code would silently break
+# those 12+ call sites. The `# noqa: F401` documents intent for a human
+# reader (and any future flake8 run); bare `python -m pyflakes` does not
+# honor `# noqa` at all -- that suppression is a flake8-only convention --
+# so this line still shows in a bare pyflakes run, same as this file's
+# pre-existing `# noqa: E402` markers do.
+from copilot_overview import _copilot_v2_line_findings_count  # noqa: E402,F401
 from fences import (  # noqa: E402
     CODE_SPAN_RE,
     find_fence_spans,

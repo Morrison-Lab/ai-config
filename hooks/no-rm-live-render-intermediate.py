@@ -1,0 +1,435 @@
+#!/usr/bin/env python3
+"""PreToolUse guard: deleting a Quarto/knitr render intermediate while a
+render is live.
+
+## The incident
+
+2026-09-24, `health-analytics-core/abridge`, a report worktree. The agent
+deleted a gitignored `inst/analysis/paper/paper-with-supplement.rmarkdown`,
+reasoning it was a leftover from its own failed render. It was not: the user
+was rendering that exact worktree from their own terminal at the time, and
+Quarto CREATES that intermediate at the START of every render, not only at
+the end. The render had already knitted all 251 chunks (~10 minutes,
+including a forced analysis-cache rebuild) when it then failed with `cannot
+open file 'paper-with-supplement.qmd'` -- the file the agent had just
+deleted out from under it.
+
+`AGENTS.md`'s "Subagent worktrees are assigned" section already states the
+rule this violated: "Verify a dispatched agent's liveness before touching a
+worktree you did not just create -- never infer it from a snapshot." That
+prose rule existed before the incident and did not fire at composition
+time, because a passive rule only fires if the agent happens to recall it at
+the moment it types the command -- see `no-heavy-work-on-head-node.py`'s
+docstring for the same argument made about a different rule. So the check
+has to run at the command, independent of whether the moment felt like it
+called for one.
+
+## What this guards, and why the file being gitignored is not evidence
+
+`*.rmarkdown`, `*.knit.md`, `*.knit.qmd`, `*_files` directories,
+`*.quarto_ipynb`, and `.quarto/` are all render INTERMEDIATES: Quarto and
+knitr generate every one of them fresh at the start of a render, and remove
+or overwrite them again at the end. Because they are regenerated rather than
+hand-maintained, they are almost always gitignored -- which is exactly what
+makes one look like safe-to-delete clutter to an agent that finds it sitting
+in a worktree with no obvious owner. `git status --short` cannot rule out
+that a file belongs to a render in progress, because a render's own
+intermediates never appear as untracked changes worth reporting -- they are
+already ignored. The only way to know a directory is safely idle is to check
+for a live process using it, not to check whether the file looks orphaned.
+
+## Why this checks the whole MACHINE, not the worktree
+
+A render process's cwd is not visible from the command being denied, and
+grepping for the worktree's own path in `ps` output would miss the ordinary
+case: an interactive `quarto preview` launched from a plain terminal, whose
+argv is `quarto preview` with no path argument at all (see the incident --
+the render was launched from "their own terminal," not from this session).
+So `live_render_process()` asks whether ANY render is running anywhere on
+the machine, and the deny message tells the agent to confirm the worktree
+is unrelated rather than asserting that it is. That is a broader net than
+the one worktree at risk, and deliberately so: a false positive here costs
+one wait-or-confirm; a false negative reproduces the incident.
+
+## Why this WARNS-as-DENY rather than only adding context
+
+Unlike `no-clobbering-push.py`'s warn path, there is no cheap, ALWAYS-safe
+remedy to a git push divergence read as a suggestion -- pushing anyway is a
+click away. Here the dangerous action (`rm`) is irreversible the moment it
+runs, and the render that reproduces the incident takes ~10 CPU-minutes to
+fail. So this DENIES rather than warns, with a single, deliberately
+cheap override (`ALLOW_RM_RENDER_INTERMEDIATE=1`) for the case the agent
+has actually confirmed the directory is unrelated to the running render.
+
+## Scope
+
+Matches a `rm`, `trash`, `find ... -delete`, or `git clean` invocation (via
+`scripts/lib/shellcmd.py`'s argv split, including any interpreter `-c`
+piece `shell_c_expansions` can see) whose targets -- non-option arguments
+for `rm`/`trash`, every token after `find`, and non-option pathspecs for
+`git clean` -- name one of the intermediate families above, by filename
+suffix or directory-component match. `git clean` additionally requires no
+`-n`/`--dry-run` flag, and is skipped (not matched) with one, since a dry
+run deletes nothing.
+
+Text that merely MENTIONS an intermediate -- inside an `echo`, a `grep`
+pattern, a commit message -- never matches, because the match is over
+individual argv TOKENS of a parsed `rm`/`trash`/`find`/`git clean`
+invocation, not over the raw command string.
+
+Denies only when a live render process is ALSO found; with none, the
+deletion is allowed silently, on the same reasoning
+`no-heavy-work-on-head-node.py` uses for "already on a compute node -- there
+is nothing to fix here."
+
+`live_render_process()` is a free function, replaced wholesale in tests
+(`guard.live_render_process = lambda: "..."` / `lambda: None`), the same
+seam `no-heavy-work-on-head-node.py`'s `compute_nodes()` uses.
+
+Fails OPEN on any parse trouble, when `scripts/lib/shellcmd.py` cannot be
+imported, and when the process check itself cannot run (no `pgrep` on this
+machine, or a timeout) -- a guard that cannot look for a live render has no
+basis for denying on one.
+
+## Known limitation
+
+`git clean` with no explicit pathspec (`git clean -fdx`) is not matched even
+though it may delete intermediates incidentally: this guard's target
+extraction, like `rm`'s, only sees pathspecs actually named on the command
+line, and a bare invocation names none. Catching that would mean asking
+whether the CURRENT directory contains a matching intermediate, which is a
+different and heavier check (a filesystem walk from an unknown cwd) than
+the text-only match every other branch here uses. Left as a gap rather than
+folded in under review pressure, the same call `warn-blanket-worktree-
+force-remove.py`'s docstring makes about its own known-limitation section.
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+import sys
+
+try:
+    _LIB = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+        "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from shellcmd import shell_c_expansions, simple_commands, git_subcommand
+except Exception as _exc:  # broken install: degrade, do not fail open further
+    print(f"no-rm-live-render-intermediate: cannot load "
+          f"scripts/lib/shellcmd.py ({_exc}); not evaluating",
+          file=sys.stderr)
+    shell_c_expansions = simple_commands = git_subcommand = None
+
+import subprocess
+
+OVERRIDE = "ALLOW_RM_RENDER_INTERMEDIATE"
+ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+
+# The programs whose non-option arguments this guard treats as deletion
+# TARGETS. `find` is handled separately below, since its "targets" include
+# option VALUES (`-name '*.knit.md'`), not only bare operands.
+DELETE_PROGRAMS = {"rm", "trash"}
+
+# Filename SUFFIXES that mark a render intermediate. Checked with `endswith`
+# against the final path component, so both a literal name
+# (`report.knit.md`) and a simple glob (`*.knit.md`) match -- the asterisk
+# is a prefix in the glob case, and `endswith` does not care what precedes
+# the suffix.
+INTERMEDIATE_SUFFIXES = (".rmarkdown", ".knit.md", ".knit.qmd",
+                          ".quarto_ipynb")
+
+# Directory-shaped intermediates, checked against every PATH COMPONENT
+# rather than only the final one, since a target may name a file nested
+# inside one of these (`paper_files/figure-html/plot-1.png`) rather than
+# the directory itself.
+INTERMEDIATE_DIR_SUFFIX = "_files"
+INTERMEDIATE_DIR_NAME = ".quarto"
+
+
+def _matches_intermediate(token: str) -> bool:
+    """Whether TOKEN (a literal path, or a simple glob naming one) refers to
+    a Quarto/knitr render intermediate."""
+    token = token.strip()
+    if not token or token.startswith("-"):
+        return False
+    parts = [p for p in token.rstrip("/").split("/") if p]
+    if not parts:
+        return False
+    last = parts[-1]
+    if any(last.endswith(suf) for suf in INTERMEDIATE_SUFFIXES):
+        return True
+    return any(p.endswith(INTERMEDIATE_DIR_SUFFIX) or p == INTERMEDIATE_DIR_NAME
+               for p in parts)
+
+
+def _lead_prefix(argv):
+    """`(index of the first real word, override present)` for ARGV.
+
+    Mirrors `no-clobbering-push.py`'s `_lead_prefix`, narrowed to the one
+    override this guard has: leading `VAR=value` assignments are skipped,
+    and `ALLOW_RM_RENDER_INTERMEDIATE=1` among them is reported so the
+    caller can clear the deny for THIS simple command specifically -- a
+    mention of the string elsewhere (a comment, an unrelated echo) is not a
+    real assignment and does not count.
+    """
+    i, override = 0, False
+    while i < len(argv) and ASSIGNMENT.match(argv[i]):
+        if argv[i] == f"{OVERRIDE}=1":
+            override = True
+        i += 1
+    return i, override
+
+
+def _find_targets(argv):
+    """Every token after `find` worth matching against an intermediate.
+
+    `find`'s own predicates (`-delete`, `-type`, `f`, `-mtime`, `0`, ...)
+    never coincidentally end in one of `INTERMEDIATE_SUFFIXES` or
+    `_files`/`.quarto`, so scanning every token -- rather than modelling
+    which ones are `-name`/`-path` VALUES versus bare search roots -- finds
+    a real target wherever it appears (`find . -name '*.knit.md' -delete`,
+    `find .quarto -delete`) without a second parser for `find`'s own
+    expression grammar.
+    """
+    return argv[1:]
+
+
+def _rm_targets(argv):
+    """Non-option arguments of an `rm`/`trash` invocation."""
+    targets, end_of_opts = [], False
+    for tok in argv[1:]:
+        if end_of_opts:
+            targets.append(tok)
+            continue
+        if tok == "--":
+            end_of_opts = True
+            continue
+        if tok.startswith("-") and tok != "-":
+            continue
+        targets.append(tok)
+    return targets
+
+
+def _git_clean_targets(argv):
+    """Non-option pathspecs of a `git clean` invocation, or `None` when the
+    invocation is a dry run (`-n`/`--dry-run`) and therefore deletes
+    nothing."""
+    sub = git_subcommand(argv)
+    if sub is None:
+        return None
+    subcommand, rest, _env = sub
+    if subcommand != "clean":
+        return None
+    if "-n" in rest or "--dry-run" in rest:
+        return None
+    targets, end_of_opts = [], False
+    for tok in rest:
+        if end_of_opts:
+            targets.append(tok)
+            continue
+        if tok == "--":
+            end_of_opts = True
+            continue
+        if tok.startswith("-") and tok != "-":
+            continue
+        targets.append(tok)
+    return targets
+
+
+def _matching_deletion(command):
+    """`(display_segment, matched_target)` for the first deletion in COMMAND
+    that targets a render intermediate, honouring an inline override on that
+    same simple command -- or `None`.
+
+    Every piece `shell_c_expansions` can see (the command itself, plus any
+    interpreter `-c` argument reachable from it) is scanned, since a
+    deletion wrapped in `sh -c "..."` is just as real as a bare one.
+    """
+    if shell_c_expansions is None or simple_commands is None:
+        return None
+    for piece in shell_c_expansions(command):
+        argvs = simple_commands(piece)
+        if argvs is None:
+            continue
+        for argv in argvs:
+            lead, override = _lead_prefix(argv)
+            head = argv[lead:]
+            if not head:
+                continue
+            program = os.path.basename(head[0])
+
+            if program in DELETE_PROGRAMS:
+                targets = _rm_targets(head)
+            elif program == "find" and "-delete" in head[1:]:
+                targets = _find_targets(head)
+            elif program == "git" and git_subcommand is not None:
+                targets = _git_clean_targets(head)
+                if targets is None:
+                    continue
+            else:
+                continue
+
+            if override:
+                continue
+
+            for target in targets:
+                if _matches_intermediate(target):
+                    return " ".join(argv), target
+    return None
+
+
+# The programs and argument shapes `live_render_process` looks for. `pgrep`
+# does its own coarse text match first (so the subprocess call costs
+# nothing extra to broaden), and `RENDER_PROCESS_RE` then classifies each
+# matching line precisely -- two passes rather than trusting `pgrep`'s own
+# regex engine to encode the exact shape, which differs across platforms.
+PGREP_FILTER = "quarto|rmarkdown|knitr|rmd_render|deno"
+
+RENDER_PROCESS_RE = re.compile(
+    r"quarto\s+(render|preview)\b"
+    r"|quarto\.js"
+    r"|\bdeno\b.*\brender\b"
+    r"|(?:^|/)(?:R|Rscript)\b.*\b(?:knitr|rmarkdown|rmd_render)\b",
+    re.IGNORECASE,
+)
+
+
+def live_render_process(timeout=5):
+    """A short `pid  command` description of a running Quarto/knitr render
+    process, or `None` if none is found (or the check could not run at
+    all -- fails open, like the rest of this guard).
+
+    Replaced wholesale in tests, the same seam
+    `no-heavy-work-on-head-node.py`'s `compute_nodes()` uses, because a
+    guard whose only path to a verdict is "spawn `pgrep`" cannot be tested
+    for both branches without either a real render running or a stub.
+    """
+    try:
+        out = subprocess.run(
+            ["pgrep", "-fl", PGREP_FILTER],
+            capture_output=True, text=True, timeout=timeout,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None  # no pgrep here; cannot prove a render is running
+    # pgrep exits 1 when nothing matches its own filter -- a normal outcome,
+    # not a failure. Anything else (2: usage error, 3: fatal error) means the
+    # check did not run and this fails open the same way a missing binary
+    # does.
+    if out.returncode not in (0, 1):
+        return None
+    for line in out.stdout.splitlines():
+        line = line.strip()
+        if line and RENDER_PROCESS_RE.search(line):
+            return line
+    return None
+
+
+DENY = (
+    "This deletes `{target}`, which matches a Quarto/knitr render "
+    "intermediate ({family}). A live render process is running:\n\n"
+    "    {process}\n\n"
+    "  command:  {segment}\n\n"
+    "Quarto and knitr RECREATE this kind of file at the START of every "
+    "render, not only at the end, so what looks like an orphaned leftover "
+    "may belong to the render above -- deleting it out from under that "
+    "render can make a long-running render (chunks already knitted, caches "
+    "already rebuilt) fail partway through with a missing-file error, with "
+    "no way to tell from the deletion alone that a render was using it.\n\n"
+    "`git status --short` cannot rule this out: files in this family are "
+    "almost always gitignored, so a render's own intermediates never show "
+    "up as untracked changes worth reporting.\n\n"
+    "Wait for the render above to finish, or confirm -- by checking the "
+    "process's own working directory or arguments -- that it is not using "
+    "this worktree or directory, before deleting.\n\n"
+    "If you have already confirmed that, clear this with:\n\n"
+    "    {override}=1 {segment}"
+)
+
+
+def _family(target: str) -> str:
+    parts = [p for p in target.rstrip("/").split("/") if p]
+    last = parts[-1] if parts else target
+    for suf in INTERMEDIATE_SUFFIXES:
+        if last.endswith(suf):
+            return suf
+    if any(p == INTERMEDIATE_DIR_NAME for p in parts):
+        return INTERMEDIATE_DIR_NAME + "/"
+    return "*" + INTERMEDIATE_DIR_SUFFIX
+
+
+def _read_payload():
+    """Parse payload from sys.argv (--dry-run / --simulate) or sys.stdin.
+
+    Same shape as `no-heavy-work-on-head-node.py`'s `_read_payload` and
+    `warn-blanket-worktree-force-remove.py`'s, kept local rather than
+    shared because each of the three copies predates a payload-reading
+    module and none is large enough on its own to justify extracting one
+    here ahead of the eight-hook `_simple_commands` migration
+    (ai-config#3178) this file's own splitter reuse already rides on.
+    """
+    args = sys.argv[1:]
+    is_dry_run = "--dry-run" in args or "--simulate" in args
+    if is_dry_run:
+        positional = [a for a in args if not a.startswith("-")]
+        if positional:
+            raw_cmd = positional[0].strip()
+            if raw_cmd.startswith("{") and raw_cmd.endswith("}"):
+                try:
+                    return json.loads(raw_cmd), True
+                except Exception:
+                    pass
+            return {"tool_name": "Bash", "tool_input": {"command": raw_cmd}}, True
+
+    try:
+        payload = json.load(sys.stdin)
+        return (payload if isinstance(payload, dict) else {}), is_dry_run
+    except Exception as exc:
+        print(f"no-rm-live-render-intermediate: unreadable hook input ({exc})",
+              file=sys.stderr)
+        return {}, is_dry_run
+
+
+def main() -> int:
+    payload, is_dry_run = _read_payload()
+    if not payload:
+        return 0
+
+    if payload.get("tool_name") != "Bash":
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
+        return 0
+
+    inp = payload.get("tool_input")
+    inp = inp if isinstance(inp, dict) else {}
+    command = inp.get("command") or ""
+
+    hit = _matching_deletion(command)
+    if not hit:
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
+        return 0
+
+    process = live_render_process()
+    if not process:
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
+        return 0
+
+    segment, target = hit
+    reason = DENY.format(target=target, family=_family(target), process=process,
+                         segment=segment, override=OVERRIDE)
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }
+    }))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

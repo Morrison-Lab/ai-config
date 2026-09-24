@@ -165,7 +165,7 @@ network policy allowlists the Julia download hosts. See
 [`docs/julia-setup.md`](docs/julia-setup.md) for the allowlist and a
 build-time alternative.
 
-### Hooks in this repo's own web sessions (`skills/ai-config-hooks/`)
+### Hooks in this repo's own web sessions (`plugins/ai-config-hooks/`)
 
 The paragraph above covers skills and commands.
 Hooks are different: `hooks/hooks.json` reaches Claude Code only through the
@@ -173,19 +173,22 @@ ai-config **plugin**, and a session that opens this checkout itself never
 installs that plugin, so every enforcement hook was inert in ai-config's own
 web sessions ([#2004](https://github.com/Morrison-Lab/ai-config/issues/2004)).
 
-[`skills/ai-config-hooks/`](skills/ai-config-hooks/README.md) closes that
-gap as a hooks-only **skills-directory plugin**: a folder under
-`.claude/skills/` (a symlink to `skills/`) that carries a
-`.claude-plugin/plugin.json` and loads in place as
-`ai-config-hooks@skills-dir`, with no marketplace and no install step.
-Its `hooks/hooks.json` is generated from the canonical catalog by
+[`plugins/ai-config-hooks/`](plugins/ai-config-hooks/README.md) holds a
+hooks-only plugin meant to close that gap.
+It used to live in `skills/`, where it loaded in place as
+`ai-config-hooks@skills-dir` through the `.claude/skills` symlink.
+It is parked outside `skills/` because a plugin manifest there is the
+suspected cause of the claude.ai marketplace sync failing since 2026-09-02,
+which dropped ai-config from every cloud session;
+`scripts/validate-skills.py` now refuses one.
+So the gap is open again until the plugin has a home that does not ship
+inside `skills/`.
+Its `hooks/hooks.json` is still generated from the canonical catalog by
 `scripts/gen-hooks-plugin.py` (CI fails when the two drift), and each
 command runs through `run-hook.sh`, which stands down when an `ai-config@*`
 plugin is enabled under Claude Code's scope precedence (local, project, then
 user settings) so no hook fires twice on a machine that has the marketplace
 install.
-Verify it in a fresh web session by checking that the first prompt carries
-the `Current time -- local:` line `inject-local-time.sh` injects.
 
 ## Use these skills in another repo's web sessions (plugin marketplace)
 
@@ -483,6 +486,7 @@ The payload gaps that remain and the per-guard status are in
 | `flag-stale-clean-tree-claim.py` | `Stop` | warns, never blocks, when a message asserts a clean working tree or clean stopping point after a path-writing git command (`git checkout <ref> -- <path>`, `git restore`, `git stash pop`, `git apply`) ran without an intervening `git status` or `git diff` check (ai-config#3821) |
 | `no-unauthorized-merge.py` | `PreToolUse` (Bash, mcp__github__.*) | blocks a PR/MR merge command (`gh pr merge`, `glab mr merge`, `gh api .../merge`, or GitHub MCP merge tools) unless an explicit `ALLOW_MERGE=1` assertion or active /mwc accompanies it |
 | `no-whole-file-punct-replace.py` | `PreToolUse` (Bash) | blocks a whole-file glyph replace, which converts pre-existing glyphs on untouched lines and buries the real change in a mechanical diff |
+| `no-find-root-on-windows.py` | `PreToolUse` (Bash) | blocks a find command starting at `/` or bare drive roots (`/c`, `C:/`, `C:\`, `/cygdrive/c`) in Git Bash / MSYS on Windows, preventing whole-system traversals that crash paging and spawn long-running orphaned processes (ai-config#3897); bypassable with `ALLOW_FIND_ROOT=1` |
 | `flag-cop-out-offer.py` | `Stop` | warns when a reply *closes* on an offer to do work (`say the word`, `want me to`, `unless you'd rather`), so the author answers whether the action was already authorized; warns rather than blocks because authorization is not lexically decidable and asking before a merge or force-push is correct, and is tail-anchored because the failure is a recap that closes on an offer |
 | `no-placeholder-reply.py` | `Stop` | blocks a reply whose whole content is a placeholder (`No response requested.`, `N/A`, a bare acknowledgement), anchored on the whole message since this corpus quotes the banned string constantly, and deliberately silent on a claim about the *work* (`Nothing to report.`), which the same rule requires |
 | `no-clean-stop-with-live-agent.py` | `Stop` | blocks a **clean** stopping-point declaration when a subagent was dispatched in the session and no liveness check (`ListAgents`, or a `git worktree list` query) appears after both the most recent task-notification and the most recent dispatch. Keying on the notification alone left it silent in the standard sidecar shape -- dispatch, read the result, check liveness, dispatch a sidecar, declare clean -- where the sidecar is live and has never notified, so the guard fired only once that agent had finished. A completion notification is not terminal -- the harness fires one each time an agent stops with no live children, and the same task-id may notify more than once -- so a session can act on a notified result, merge the resulting PR, and declare the session finished while the agent runs on and opens another PR (ai-config#3689, measured). Neither sibling catches it: `require-stopping-point.py` only checks that a declaration exists, and `no-unshipped-commit.py` sees nothing because the agent's commits sit in its own worktree on its own branch. A count of outstanding notifications also cannot decide it, since in the measured case every agent HAD already notified; what was missing was a check taken *after* the last one. Identifies a notification by the record's `origin.kind`, never by the literal marker text appearing in a block -- substring matching is spoofable, and self-spoofing is not hypothetical here, since this row, the hook's source, and its test file all contain that string, so reading any of them would otherwise reset the baseline and falsely block a correctly-checked declaration (the reuse `no-push-without-self-review.py` had already made for the same reason). Monitors are deliberately out of scope: a monitor watching an already-merged PR is not outstanding work, and a guard that fires on one gets switched off. `Not a clean stopping point` never fires it. Fails open on any parse trouble |
@@ -508,7 +512,7 @@ The payload gaps that remain and the per-guard status are in
 | `warn-status-read-after-pipe.py` | `PreToolUse` (Bash) | warns, never blocks, when an expandable `$?` sits in the segment immediately after a pipeline carrying no `pipefail`, so the status read belongs to the trailing formatter rather than to the command. Excludes single-quoted spans, heredoc bodies and `#` comments so the corpus's own documentation of the bug cannot trip it, which also means a `bash -c '...'` one-liner gets no warning |
 | `warn-stderr-suppressed-then-parsed.py` | `PreToolUse` (Bash) | warns, never blocks, when a command both suppresses stderr (`2>/dev/null`, `2>>/dev/null`, or `2>&-`) and consumes its own stdout (piped, captured, or redirected), because silencing the one channel carrying a failure turns a diagnosable error into an empty result indistinguishable from a legitimately empty one (measured ai-config#2998) |
 | `warn-verdict-line-filter.py` | `PreToolUse` (Bash) | warns, never blocks, when a review round is read through a verdict-line jq filter that drops non-blocking findings in the body and in the review-data JSON findings array (ai-config#3493, 2026-09-09) |
-| `no-push-without-self-review.py` | `PreToolUse` (Bash) | blocks `git push` unless a clean verdict whose `Reviewed-Commit:` fingerprint matches the commits the push would ship (refspec resolved) came either from a separate `adversarial-reviewer` subagent's own call result or from a `Bash` call matching the guard's external-reviewer pattern, which today recognizes `agy --print` and none of the other delegation CLIs, or unless the push itself is prefixed with `ALLOW_UNREVIEWED_PUSH=1`; a verdict quoted anywhere else --- in another file, or in this guard's own denial --- does not count |
+| `no-push-without-self-review.py` | `PreToolUse` (Bash) | blocks `git push` unless a clean verdict whose `Reviewed-Commit:` fingerprint matches the commits the push would ship (refspec resolved) came either from a separate `adversarial-reviewer` subagent's own call result or from a `Bash` call matching the guard's external-reviewer pattern, which today recognizes `agy --print` and none of the other delegation CLIs, or unless the push itself is prefixed with `ALLOW_UNREVIEWED_PUSH=1`, or unless every URL the push resolves to is one of the repositories in its `EXEMPT_REPOS` constant (today `Morrison-Lab/mln`, `mlg` and `mlr`); a verdict quoted anywhere else --- in another file, or in this guard's own denial --- does not count |
 | `flag-uncited-rebuttal.py` | `PreToolUse` (Bash) | warns, never blocks, when a PR/issue comment about to be posted disputes a finding whose most recently fetched citation named an external URL that no earlier `WebFetch`/`WebSearch` in the transcript touched -- ai-config#2070's wrong rebuttal, retracted two rounds later once the URL was finally fetched |
 | `warn-claim-without-comments-read.py` | `PreToolUse` (Bash) | warns, never blocks, when `gh issue comment <N>` / `glab issue note <N>` posts a claim-shaped body ("claiming", "is working on this", "picking this up", "grabbing this", "please hold off") and no earlier command in the transcript read that issue's COMMENTS (`gh issue view <N> --comments`/`--json comments`, `glab issue view\|show <N> --comments`, `gh api .../issues/<N>/comments` GET, or a GitHub MCP `issue_read` with `method=get_comments`) -- a plain `gh issue view <N>` with no comments flag does NOT discharge it, since reading the body alone was the measured failure: Lacaedemon/sparta#1544 (2026-09-18), where a claim posted after reading only the issue's body missed a diagnosis already merged and an escalation already recorded in its comments, wasting the claim and a draft PR |
 | `require-agent-disclosure.py` | `PreToolUse` (Bash, mcp__github__.*) | warns, never blocks, on a `gh`/`glab` command or MCP call that posts a forge comment without the agent-disclosure marker -- such a comment carries the account holder's own login and reads as `type: User`, indistinguishable from one they typed. Three verdicts, not one: the marker is missing, the body is somewhere the check cannot read (`--body-file`, `--editor`, `$BODY`) so it says so rather than accusing, or the body discloses with the robot emoji, which `check-pr-fully-clean.py` matches as a review-body marker |
@@ -516,6 +520,7 @@ The payload gaps that remain and the per-guard status are in
 | `flag-unmeasured-timestamp.py` | `PreToolUse` (Bash, mcp__github__.*, Write, Edit, NotebookEdit) | warns, never blocks, when a `gh pr comment`/`gh issue comment`/`gh pr review`/`gh api .../comments` body, or an MCP comment tool body, or a `Write`/`Edit`/Bash append to a session notebook (`session-*.md`) or memory file (`memory/*.md`), about to execute states a Pacific clock time (or `ish` suffix) and no clock read appears in the transcript since the current turn began, or the stamp runs ahead of the harness's injected reading (ai-config#2900, #2903, #2947) |
 | `flag-unmeasured-digest.py` | `PreToolUse` (Bash, mcp__github__.*) | warns, never blocks, when a body about to leave through `gh` (a comment, or an issue or PR being created or edited), `glab` (`-d`/`--description`), an MCP comment tool, or a `cat >>` append to a session notebook or memory file cites a digest-shaped token -- 7 to 64 hex characters bounded on both sides with at least one `a`-`f`, at a canonical length (32/40/64), truncated with an ellipsis, or near a boundary-anchored digest word -- that no prior `user` transcript record contains as a prefix, so a legitimate abbreviation of a measured hash stays quiet while an invented one does not. Reads the body from `--body-file`, `-b`, `-F`, `-d`, or a heredoc in the same command (ai-config#3779). Carries a second, independent surface for a **pinning argument** -- `expected_head_sha`, `expectedHeadSha`, or `--match-head-commit` -- which needs none of the digest shaping above, since the flag already establishes the value is a commit SHA, so it warns on any such value the transcript never observed and names the padded prefix where one was. Matched against shell **words** after heredoc and comment stripping, so a `--body` that merely quotes a pin is prose rather than a pin, and evaluated independently of any body with no fire-once sentinel, since a pinning SHA cannot legitimately originate outside the session (ai-config#3392) |
 | `flag-unread-commit-citation.py` | `PreToolUse` (Bash, mcp__github__.*, Write, Edit, NotebookEdit) | warns, never blocks, when a forge comment/review body about to post, or a `Write`/`Edit`/`NotebookEdit` to a non-scratch prose file (`.md`/`.markdown`/`.txt`/`.rst`/`.qmd`/`.rmd`/`.ipynb`), cites a commit SHA and no command reading that commit (`git show`/`git diff`/`git cat-file -p`/`git log -p`/`gh api .../commits/<sha>`/`gh api .../pulls/N/commits`/`mcp__github__get_commit`) appears in the transcript since the current turn began -- a `git log --oneline`, or a `git show -s`/`--stat` printing no patch, does not count, nor does a position-report phrasing ("pushed at `X`", "MERGED (squash, `X`)") that reports the artifact's own state rather than asserting what the commit did (ai-config#3471) |
+| `flag-unsourced-term-attribution.py` | `PreToolUse` (Write, Edit, NotebookEdit) | warns, never blocks, when new content pins a term-and-year to an unread document file |
 | `warn-stale-issue-edit.py` | `PreToolUse` (Write, Edit, NotebookEdit) | warns, never blocks, when an issue-driven `Write`/`Edit` has no fresh VIEW_ISSUE and remote/default-branch check after the request that named the issue, or when the latest view shows the issue closed |
 | `warn-new-line-breaks-on-push.py` | `PreToolUse` (Bash) | warns, never blocks, before a `git push` carrying newly-added Markdown lines that violate semantic line breaks against the default base branch (e.g. `origin/main`), naming the file and line to fix before pushing |
 | `warn-new-line-breaks-on-edit.py` | `PreToolUse` (Write, Edit) | warns, never blocks, before a `Write`'s full `content` or an `Edit`'s `new_string` composes a `.md`/`.markdown` prose line packing more than one sentence/clause onto one line -- catches the violation at composition time, ahead of `warn-new-line-breaks-on-push.py`'s own push-time check. Reuses that hook's target-repo checker resolution via the same sibling-import pattern, so it shares its limitation: a repo that only consumes `Morrison-Lab/gha`'s `check-new-line-breaks` reusable workflow with no locally vendored checker script gets no warning from either hook -- which includes `Morrison-Lab/qbt`, whose 2026-09-14/15 incident (a PR's own fix commit for 6 such lines introduced fresh ones while narrating the fix) motivated this hook and would not have been caught by it (`ai-config#3747` tracks closing that gap) |
@@ -829,6 +834,22 @@ For a non-plugin install, `install-hooks.py --fix` registers it in
 Neither reaches anyone else before merge --- a branch's `hooks/hooks.json`
 never reaches a consumer, and `--fix` only edits the running machine --- so the
 *script* existing is harmless while merging its entry is activation.
+
+**`hooks/hooks.json` has a generated mirror, and registering in one without the other fails CI.**
+`plugins/ai-config-hooks/hooks/hooks.json` is generated from it by `scripts/gen-hooks-plugin.py`, and `validate` runs that script with `--check`.
+So the registration step is two files, not one:
+
+```bash
+python3 scripts/gen-hooks-plugin.py          # regenerate the mirror
+python3 scripts/gen-hooks-plugin.py --check  # confirm; exits 1 when out of sync
+```
+
+Never hand-edit the generated copy --- run the script, which is also the fix when `--check` fails.
+
+Worth stating here rather than leaving to the check, because the check is the only thing that says so and it speaks after a push.
+The paragraphs above describe `hooks/hooks.json` as *the* plugin activation path, which reads as complete;
+a first-time hook author follows it exactly, registers correctly, and still burns a red CI cycle on a file the instructions never mentioned.
+Measured 2026-09-23 while adding `flag-unsourced-term-attribution.py` (ai-config#3915): the hook, its tests and its `hooks.json` entry were all correct, and `validate` failed on the mirror alone.
 
 On the plugin path a hook now behaves like a skill --- both go live on merge.
 [`record-learnings`](skills/record-learnings/SKILL.md) lists "the skill becomes available locally immediately" as a feature.

@@ -1066,6 +1066,36 @@ def main() -> int:
         checker.classify_verdict(needs_work_none_comment["body"]) == "clean",
     )
 
+    # Regression (ai-config#3937): NOT_CLEAN_NEGATION_SUFFIX must not cross a
+    # blank line / paragraph break into a next-paragraph "None ...".
+    # Stated not-clean verdicts must remain not-clean.
+    base_nwn = "### Verdict\n**Needs more work**\n\n%s\n"
+    check(
+        "classify_verdict: next-paragraph 'None are deferred...' does NOT blank not-clean verdict (#3937)",
+        checker.classify_verdict(base_nwn % "None are deferred; all five are addressed.") == "not-clean",
+    )
+    check(
+        "classify_verdict: next-paragraph 'None are blocked.' does NOT blank not-clean verdict (#3937)",
+        checker.classify_verdict(base_nwn % "None are blocked.") == "not-clean",
+    )
+    check(
+        "classify_verdict: next-paragraph 'Nothing is deferred.' does NOT blank not-clean verdict (#3937)",
+        checker.classify_verdict(base_nwn % "Nothing is deferred.") == "not-clean",
+    )
+    unbolded_nwn = "### Verdict\nNeeds more work\n\nNone are blocked.\n"
+    check(
+        "classify_verdict: unbolded next-paragraph 'None are blocked.' does NOT blank not-clean verdict (#3937)",
+        checker.classify_verdict(unbolded_nwn) == "not-clean",
+    )
+    check(
+        "classify_verdict: same-line '**Needs more work**: none' classifies without not-clean verdict (#3937)",
+        checker.classify_verdict("**Needs more work**: none\n") != "not-clean",
+    )
+    check(
+        "classify_verdict: next-line 'Needs more work:\\n  none' classifies without not-clean verdict (#3937)",
+        checker.classify_verdict("Needs more work:\n  none\n") != "not-clean",
+    )
+
     # Regression (PR #2180 round 13): '### Findings\n\nNo new high-confidence bugs...' evaluates to clean
     findings_none_comment = {
         "createdAt": "2026-08-06T00:00:00Z",
@@ -5794,6 +5824,10 @@ Found defects.
     payload_only = ('<!-- review-data: {"verdict": "CLEAN", "findings": []} -->')
     check("REVIEW_BODY_MARKERS: carries a review-data entry",
           "review-data:" in checker.REVIEW_BODY_MARKERS)
+    check("REVIEW_BODY_MARKERS: carries ## verdict entry",
+          "## verdict" in checker.REVIEW_BODY_MARKERS)
+    check("has_review_body_marker: recognizes ## verdict",
+          checker.has_review_body_marker("## Verdict\n\nReady for merge"))
     check("has_review_body_marker: a payload-only body is a review body",
           checker.has_review_body_marker(payload_only))
     check("is_non_review_notice: a dispatch notice carrying a payload is not excluded",

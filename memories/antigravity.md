@@ -37,6 +37,16 @@ That leaves one correct form, an unquoted absolute interpreter path followed by 
 - **Do:** re-run `bootstrap.sh` rather than hand-editing the staged `hooks.json`, since a hand repair is what introduced the quoting.
 - **Don't:** quote a path in a Windows hook command, however correctly the JSON escapes it.
 
+### Windows plugin entry paths in `plugins.json` must be clean without quotes or escape characters
+
+Measured 2026-09-23 in an Antigravity Windows session:
+When a plugin path entry in `~/.gemini/config/plugins.json` or its command wrapper carries literal double quotes (e.g. from copy-pasting or nested JSON escaping), Node.js on Windows preserves literal quotes in `argv[1]`.
+Because the argument begins with a quote rather than a drive letter (e.g. `"C:\...` instead of `C:\...`), `path.isAbsolute()` evaluates to false, Node treats the path as relative to cwd, and every subsequent pre-tool hook execution crashes with `MODULE_NOT_FOUND`.
+Keeping `plugins.json` entries strictly formatted as standard unquoted JSON string paths (e.g. `{"entries": [{"path": "C:/Users/.../ai-config"}]}`) immediately restores hook dispatch.
+
+- **Do:** format `plugins.json` paths cleanly without extraneous quotes or escape wrappers.
+- **Don't:** leave quotes inside entry path strings in `plugins.json`.
+
 ### A hooked-tool failure leaves headless `agy` reporting success
 
 Same measurement ([ai-config#3091](https://github.com/Morrison-Lab/ai-config/issues/3091)), and it is why the quoting bug survived a full dispatch unnoticed.
@@ -214,3 +224,16 @@ The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-anti
   The merge gate must ignore `CANCELLED` conclusions only when superseded by a later `SUCCESS` entry in the same workflow;
   otherwise, benign concurrency cancellation permanently blocks automated merge under MWC.
   (Observed in live Antigravity sessions 2026-09-19 on PR #3797.)
+- **No parentheses in `gh pr merge` commit subjects or arguments:**
+  `enforce-mwc-review-gate.py` bans command-chaining and substitution characters in `CHAIN_CHARS` (including semicolons, ampersands, pipes, newlines, dollar-parentheses, backticks, and parentheses).
+  Passing parenthetical issue references in arguments (such as `--subject "fix: description (#1234)"`) trips the guard and blocks the merge.
+  Execute `gh pr merge -R <repo> <PR> --squash --delete-branch` without parentheses.
+- **Rerun cancelled concurrency checks to unblock fully-clean rollup:**
+  When a prior workflow run is cancelled by a higher-priority check or concurrency group (e.g. `review / preempt-previous`), it registers as `cancelled` in the statusCheckRollup, blocking `check-pr-fully-clean.py` and MWC merge.
+  Rerunning the failed/cancelled job via `gh run rerun -R <repo> <run-id> --failed` re-executes the check and clears the cancelled status without requiring a new commit or push.
+- **Verdict heading levels in `enforce-mwc-review-gate.py` (ai-config#3918):**
+  Review bodies commonly format their verdict section as `## Verdict` (H2) or `### Verdict` (H3).
+  `VERDICT_MARKER_RE` must match `#{2,4}\s*Verdict\b` rather than strictly requiring `### Verdict`;
+  otherwise, reviews with `## Verdict` are ignored by the gate and fall back to older comments, resulting in false `stale` merge denials.
+
+

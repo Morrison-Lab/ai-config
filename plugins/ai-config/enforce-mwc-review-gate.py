@@ -69,7 +69,7 @@ GRAPHQL_MERGE_RE = re.compile(
 GH_API_MERGE_RE = re.compile(
     r"\bgh api\b[^|;&\n]*?repos/(\S+?/\S+?)/pulls/(\d+)/merge\b"
 )
-VERDICT_MARKER_RE = re.compile(r"^\s*### Verdict", re.MULTILINE)
+VERDICT_MARKER_RE = re.compile(r"^\s*#{2,4}\s*Verdict\b", re.MULTILINE)
 # Logins the review workflows post verdicts under (memories/gh-cli.md: the
 # login varies by repo and run). GraphQL review/comment payloads report bot
 # logins bare (no [bot] suffix); REST reports the suffixed form.

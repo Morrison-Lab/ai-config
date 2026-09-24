@@ -61,13 +61,43 @@ idea and almost no wording.
 So list the directories, read the titles, and grep for the stable part of the
 concept rather than the volatile part.
 
-The two mechanisms by which a well-intentioned grep misses text that is
+Two mechanisms by which a well-intentioned grep misses text that is
 genuinely present --- a wrong guessed spelling, and a phrase spanning a
 semantic line break --- are already written up in
 [`memories/debugging.md`](../../memories/debugging.md), under "An empty grep
 for one spelling is not evidence the concept is absent".
 Read that rather than re-deriving them; this fragment is about the inference
 drawn from the null result, not about the query that produced it.
+
+**A third mechanism sits between those two: an enumerated disjunction that
+covers the concept's synonyms but not its inflections.**
+A sweep for a premise about a repository's public status used
+`go public|going public|become public|made public` --- four wordings, chosen
+to be thorough about *phrasing*.
+It missed a file that said "goes public", because that string is not a
+substring of any alternative in the pattern: `grep` matches literally, so the
+third-person-singular verb form is a fifth alternative the list never
+enumerated, not a variant of the ones it did.
+The other two mechanisms above don't cover this case --- the pattern named
+the right stem and the match doesn't span a line break --- so a query built
+from either checklist alone would still miss it.
+The tell is the same as the wrong-guessed-spelling case (an alternation
+encodes an assumption about which forms the text takes), but the fix is
+different: enumerate the verb's actual conjugations (`go`/`goes`/`going`/
+`went`) and noun/plural forms, or drop the alternation for a single
+lemma-level tool (`grep -E` against a stemmed corpus, or a case- and
+form-insensitive search) rather than adding one more guessed wording to the
+list.
+Caught by an adversarial reviewer, not by re-reading the sweep's own output,
+which reported a clean zero exactly as it would have if the concept were
+genuinely absent.
+
+- **Do:** when enumerating a disjunction to sweep for a concept, list every
+  grammatical inflection of each verb or noun in it, not just its
+  synonyms.
+- **Don't:** read a multi-alternative grep as thorough because it already
+  names several wordings --- each wording still needs its own inflections
+  covered.
 
 ## Name the mechanism in the query, not the remedy you are about to prescribe
 

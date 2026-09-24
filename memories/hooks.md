@@ -71,7 +71,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 | [`warn-nonglobal-substitution.py`](../hooks/warn-nonglobal-substitution.py) | Warn | Warns on in-place `perl -i` / `sed -i` substitutions lacking the global `g` flag or occurrence specifier. | Ensure substitution expressions include `g` (e.g. `s/pattern/replacement/g`) when replacing across files. | None. |
 | [`warn-dupe-check-chained-to-create.py`](../hooks/warn-dupe-check-chained-to-create.py) | Warn | Warns when a duplicate search and a `gh pr create` / `gh issue create` share the same Bash command string. | Execute the search command first, inspect the results, and then execute the create command in a separate, subsequent tool call. | None. |
 | [`warn-status-read-after-pipe.py`](../hooks/warn-status-read-after-pipe.py) | Warn | Warns when checking `$?` immediately after a pipeline without `pipefail` enabled. | Add `set -o pipefail` before executing pipelines whose non-tail exit status must be checked, or use `$PIPESTATUS`. | None. |
-| [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py) | **Block** | Blocks `git push` unless a clean verdict for the exact commit being pushed came from an adversarial self-review subagent or from a review by a CLI the guard recognizes (today `agy --print`, and no other). | Dispatch the `adversarial-reviewer` subagent against `HEAD`, address any findings, and obtain a clean verdict matching `Reviewed-Commit: <HEAD_SHA>` before pushing. | Set `ALLOW_UNREVIEWED_PUSH=1 git push ...` for initial empty PR branches, a review by a CLI the guard does not recognize, or unregistered personas. An `agy --print` review needs no override: the guard admits it directly. Out-of-band publish routes (GitHub Contents API, GraphQL mutations, MCP `push_files`) bypass the guard without an auditable trail and are strictly prohibited when blocked (ai-config#3601; technical guard gap tracked in ai-config#1929). |
+| [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py) | **Block** | Blocks `git push` unless a clean verdict for the exact commit being pushed came from an adversarial self-review subagent or from a review by a CLI the guard recognizes (today `agy --print`, and no other). A push whose every resolved URL is in the hook's `EXEMPT_REPOS` constant (`Morrison-Lab/mln`, `mlg`, `mlr`) is not gated at all. | Dispatch the `adversarial-reviewer` subagent against `HEAD`, address any findings, and obtain a clean verdict matching `Reviewed-Commit: <HEAD_SHA>` before pushing. | Set `ALLOW_UNREVIEWED_PUSH=1 git push ...` for initial empty PR branches, a review by a CLI the guard does not recognize, or unregistered personas. An `agy --print` review needs no override: the guard admits it directly. Out-of-band publish routes (GitHub Contents API, GraphQL mutations, MCP `push_files`) bypass the guard without an auditable trail and are strictly prohibited when blocked (ai-config#3601; technical guard gap tracked in ai-config#1929). |
 | [`flag-uncited-rebuttal.py`](../hooks/flag-uncited-rebuttal.py) | Warn | Warns when posting a comment disputing a finding that cites an external URL when no `WebFetch` or `WebSearch` fetched that URL. | Fetch and inspect the external URL cited by the reviewer before posting a rebuttal comment. | None. |
 | [`require-agent-disclosure.py`](../hooks/require-agent-disclosure.py) | Warn | Warns when posting a forge comment lacking the agent disclosure trailer. | Append `\n\n_Posted by <Agent Name> (AI agent) --- not written by a human._` to every posted comment. Never use the robot emoji. | None. |
 | [`flag-uncounted-comment-claims.py`](../hooks/flag-uncounted-comment-claims.py) | Warn | Warns when a forge comment asserts file counts or lists identifiers without a deriving command. | Run deriving commands (`grep -c`, `wc -l`, `ls`, etc.) in the session and cite the deriving command when stating cardinality. | None. |
@@ -79,6 +79,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 | [`flag-cd-into-main-checkout.py`](../hooks/flag-cd-into-main-checkout.py) | Warn | Warns when a worktree-rooted session `cd`s into the primary/main checkout of the repository. | Keep all file edits and command executions rooted within the dedicated worktree directory. | None. |
 | [`warn-unlabelled-agent-issue.py`](../hooks/warn-unlabelled-agent-issue.py) | Warn | Warns when `gh issue create` / `glab issue create` runs with no `ai-authored` label in the command. | Pass `--label ai-authored --label "model:<model-id>"` (both CLIs also accept the comma-separated `--label "ai-authored,model:<model-id>"`) in the creating command, per `shared/workflow/issue-first.md`. | None. |
 | [`no-mutation-in-read-only-reviewer.py`](../hooks/no-mutation-in-read-only-reviewer.py) | **Block** | Blocks mutating git commands (`commit`, `checkout`, `switch`, `restore`, `stash`, `merge`, `reset`, `rebase`, `branch`, `tag`, `add`, `stage`, `pull`, `push`) and write tools when executing in read-only personas (`adversarial-reviewer`, `Explore`, `Plan`). | Reviewer personas must stay strictly read-only and report findings to the authoring session rather than mutating working tree or branch state. | Set `ALLOW_READ_ONLY_MUTATION=1 <cmd>` if mutation is explicitly intended. |
+| [`no-find-root-on-windows.py`](../hooks/no-find-root-on-windows.py) | **Block** | Blocks `find` or `find.exe` starting at `/` or bare drive roots on Windows/MSYS. Disambiguates Windows `find.exe` text search (e.g. `find /c "needle" file.txt`), which does not traverse directories. | Search a bounded path (`find . -name ...`, `find src/ ...`, `~/.claude`, `find /c/Users/dougm/repo`), or use `command -v`, `where.exe`, or `gh api` to locate files or binaries. | Set `ALLOW_FIND_ROOT=1 <cmd>` if a whole-system search is intentional. |
 
 ### 2.2 Agent, Task & SendMessage Interceptors
 
@@ -960,3 +961,23 @@ When testing hooks or mocking commands on Windows:
   (`dir/symlink/../..` resolves to `dir` rather than `target/..`).
   Tests asserting symlinked plugin root traversal must guard with `os.path.exists()`
   on platforms without lexical traversal.
+
+## PreToolUse denial emission hardening: distinguishing guard crashes from authorized pushes (#3756)
+
+When a PreToolUse hook decides to deny an action (such as an unreviewed git push):
+- **Distinguish pre-decision crashes from post-decision failures:**
+  PreToolUse guards typically wrap inspection in a fail-open handler (`return 0`)
+  so unhandled parser crashes or missing metadata do not wedge ordinary shell execution.
+  However, once a denial decision is issued (`permissionDecision: deny`),
+  any subsequent exception or write failure must fail closed (exit code 2) rather than failing open.
+  Failing open after a denial decision silently converts a blocked command into an authorized one.
+- **Save unpoisoned stdout fd at module initialization:**
+  Inspecting Python scripts or external modules can inadvertently close stdout
+  (e.g., via `open(True)` because `isinstance(True, int)` evaluates to True and opens fd 1).
+  Save `_ORIGINAL_STDOUT_FD = os.dup(1)` during initial module load before running inspection helpers.
+  In `deny()`, restore stdout with `os.dup2(_ORIGINAL_STDOUT_FD, 1)` or write directly to `_ORIGINAL_STDOUT_FD`.
+- **Fail closed when stdout is completely unwriteable:**
+  If stdout cannot be written or restored,
+  log the full denial reason to stderr and exit with code 2.
+  Harnesses (such as Claude Code) treat exit code 2 as a hook execution failure and block the tool,
+  preventing a silent bypass when output streaming is broken.

@@ -325,6 +325,14 @@ class TestEvaluate(unittest.TestCase):
         state = pr(comments=[NEEDS_WORK_VERDICT, CLEAN_VERDICT])
         self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
 
+    def test_verdict_heading_levels_allow(self):
+        """Review comments using ## Verdict or #### Verdict must be recognized."""
+        for level in ("## Verdict", "### Verdict", "#### Verdict"):
+            c = comment(f"**Claude finished review**\n\n{level}\n**Ready for merge**\n\nReviewed commit: {HEAD}")
+            state = pr(comments=[NEEDS_WORK_VERDICT, c])
+            self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow", f"Failed on {level}")
+
+
     def test_verdict_order_latest_wins(self):
         state = pr(comments=[CLEAN_VERDICT, NEEDS_WORK_VERDICT])
         self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "deny")

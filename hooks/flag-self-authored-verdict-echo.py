@@ -228,7 +228,8 @@ BASH_TOOL_NAMES = ("Bash", "bash", "run_command", "execute_command", "terminal",
 # "Indented" there means an indented CODE BLOCK -- four spaces or more.
 # Measured: 0, 1, 2 and 3 leading spaces all return a payload; 4 returns None.
 # An earlier comment said flatly that an indented payload returns None, which
-# is false for 1-3 (review finding 6). The residual is live and is accepted
+# is false for 1-3 (review finding 6). The residual is live, is tracked as
+# ai-config#3944, and is accepted
 # rather than patched here: a disposition quoting a REVIEWER'S payload at 1-3
 # spaces of indent is exempted by this gate while `classify_verdict` still
 # reads the same body as not-clean. Narrowing it would mean re-deriving the
@@ -242,12 +243,19 @@ BASH_TOOL_NAMES = ("Bash", "bash", "run_command", "execute_command", "terminal",
 # The `getattr` default is reachable only if `_checker` fails to load, since
 # that module defines this name unconditionally -- so `None` here means "the
 # sibling script is missing or unimportable", not "this attribute is absent".
-# Round 4 called the default dead (finding 17); it is not dead, but it is
-# narrower than the earlier comment implied, which said only "cannot be
-# loaded" without saying that the attribute itself always exists. When it
-# does fire the gate exempts nothing, which errs toward warning on this gate
-# alone; every other fallback in this file errs the other way, because this
-# one cannot fabricate a payload that is not there.
+# Round 4 called the default dead (finding 17); round 5 found that rebuttal
+# half wrong (finding 8). `classify_verdict` comes from the same module, so
+# when `_checker` itself fails to load BOTH names are `None` and
+# `echoed_verdict` returns on `classify_verdict is None` before this gate is
+# reached -- measured by recompiling the module with `_checker = None`. The
+# default is reachable only under attribute skew: the module loads and this
+# one name is absent or renamed. Narrow, and not dead.
+#
+# The earlier comment also claimed "every other fallback in this file errs
+# the other way". This same round corrected the `_ATTACHES` fallback to
+# equivalent-rather-than-conservative, so the claim was false as written. It
+# is dropped rather than repaired: one fallback's direction is not evidence
+# about another's.
 extract_structured_review = getattr(_checker, "extract_structured_review", None)
 
 RX_FENCE = re.compile(r"^ {0,3}(?P<d>`{3,}|~{3,})\s*(?P<info>.*)$")
@@ -347,9 +355,10 @@ def _split_segments(text):
 # writes usually does not exist yet, so a disk read cannot reach it. Usually,
 # not always: a stale scratch file or a retried command leaves a file at that
 # path, and `_bash_body` prefers the disk read, so the guard then scans the
-# OLD content. Measured in review round 4 (finding 15). The tie below is what
-# makes the fresh-path case readable at all; it does not make the disk read
-# wrong when a file genuinely is there.
+# OLD content. Measured in review round 4 (finding 15) and tracked as
+# ai-config#3943. The tie below is what makes the fresh-path case readable
+# at all; it does not make the disk read wrong when a file genuinely is
+# there.
 #
 # `flag-unmeasured-timestamp.py`'s `_extract_heredoc_bodies` was used here
 # first and cannot serve: it returns the bodies and discards the redirect
@@ -365,8 +374,10 @@ def _split_segments(text):
 # So the target is captured and the heredoc is tied to the `--body-file` the
 # posting segment names. No tie, no body: an untied heredoc reads as
 # unreadable rather than as a guess.
-# `extract_body_text` in this same file already handles `-F body=@<path>` and
-# `--field body=@<path>`, and CLAUDE.md prescribes exactly those spellings for
+# `extract_body_text`, defined in `flag-uncited-rebuttal.py` and imported
+# here by `getattr` above, already handles `-F body=@<path>` and
+# `--field body=@<path>` (round 5, finding 9 -- an earlier comment placed it
+# "in this same file"). CLAUDE.md prescribes exactly those spellings for
 # a backtick-carrying body -- so recognizing only `--body-file` left one
 # concept handled in one place and not the other, and a heredoc written to a
 # `-F body=@` path went unscanned (review finding 13).
@@ -377,13 +388,29 @@ RX_BODY_FILE = re.compile(
 RX_HEREDOC = re.compile(
     # The body spans newlines via a negated class rather than DOTALL, which
     # is equivalent here and does not pretend to fix the cost below.
-    r"([^\n]*)<<-?[ \t]*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?[^\n]*\n"
-    # The terminator must stand ALONE on its line. `\2\b` matched a body line
+    r"([^\n]*)<<(-)?[ \t]*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?[^\n]*\n"
+    # The terminator must stand ALONE on its line. `\3\b` matched a body line
     # merely BEGINNING with the delimiter word, so a body whose second line
     # read "EOF is the delimiter" truncated to its first line and silently
     # dropped the verdict echo below it (review finding 14). `$` under
-    # MULTILINE anchors the line end; DOTALL keeps `.` spanning newlines.
-    r"([^\x00]*?)\n[ \t]*\2[ \t]*$",
+    # MULTILINE anchors the line end. There is no DOTALL here and no `.` for
+    # it to act on -- an earlier comment claimed otherwise, and
+    # `RX_HEREDOC.flags` is `re.MULTILINE` alone (round 5, finding 7).
+    #
+    # Indentation is conditional on the dash, because bash's is. A plain
+    # `<<EOF` ends only on a delimiter at column 0, so an indented `    EOF`
+    # inside the body is body TEXT -- verified by running bash rather than
+    # reasoned about. Terminating there truncated a body that quoted an
+    # indented delimiter above its own verdict echo: finding 14 again through
+    # a second door (round 5, finding 6). `<<-EOF` strips leading TABS only,
+    # never spaces, so the conditional branch is `[\t]*` and not `[ \t]*`.
+    #
+    # `\r?$` rather than `$`: `$` under MULTILINE matches before `\n` and at
+    # end of string, never before `\r`, so end-anchoring alone made every
+    # CRLF command unreadable where the old `\3\b` had read it (round 5,
+    # finding 4). Nothing else may follow the delimiter, because bash
+    # compares the whole line.
+    r"([^\x00]*?)\n(?(2)[\t]*)\3\r?$",
     re.MULTILINE,
 )
 
@@ -403,9 +430,24 @@ RX_HEREDOC = re.compile(
 # large body and still admitted the pathological small one. A real
 # write-then-post command opens one heredoc, or two when it writes release
 # notes beside the body; 32 is far above that and far below where the cost
-# is noticeable. Past it the tie returns None, which reads as "body
-# unreadable" and WARNS, rather than as an exemption.
+# is noticeable.
+#
+# Past the bound the tie returns None, the kind is "unreadable", and `main`
+# maps that to no vocabulary and exits SILENT. The bound is an EXEMPTION, not
+# a warning. An earlier comment here claimed the opposite, and that claim was
+# the whole safety argument for the bound (round 5, finding 3). It stays an
+# exemption because the alternative -- warning on every unreadable body -- is
+# the expensive direction this hook exists not to take.
+#
+# What made the exemption reachable was counting `<<` in the raw command,
+# which counts herestrings, arithmetic shifts, and every `<<` the BODY itself
+# writes: a verdict echo whose prose used `$((1 << 0))` 33 times exempted
+# itself. Openers are counted with the same shape `RX_HEREDOC` opens on
+# instead, so body prose no longer votes.
 MAX_HEREDOC_OPENERS = 32
+RX_HEREDOC_OPENER = re.compile(
+    r"<<-?[ \t]*['\"]?[A-Za-z_][A-Za-z0-9_]*['\"]?[^\n]*\n"
+)
 
 
 def _heredoc_body_for(command, segment):
@@ -415,9 +457,9 @@ def _heredoc_body_for(command, segment):
     must. Without one, a single
     heredoc in the command is unambiguous and is taken; several are not.
     """
-    if command.count("<<") > MAX_HEREDOC_OPENERS:
+    if len(RX_HEREDOC_OPENER.findall(command)) > MAX_HEREDOC_OPENERS:
         return None
-    docs = [(m.group(1), m.group(3)) for m in RX_HEREDOC.finditer(command)]
+    docs = [(m.group(1), m.group(4)) for m in RX_HEREDOC.finditer(command)]
     if not docs:
         return None
     target = RX_BODY_FILE.search(segment) or RX_BODY_FILE.search(command)
@@ -426,12 +468,22 @@ def _heredoc_body_for(command, segment):
         name = os.path.basename(raw.strip("'\"")).strip("'\"")
         if not name:
             return None
-        # A path boundary, not substring containment: `--body-file /tmp/vb.md`
-        # matched a heredoc writing `/tmp/vb.md.bak` and the guard scanned a
-        # body that is never posted (review finding 5). The name must end the
-        # token it appears in, so `vb.md` matches `> /tmp/vb.md` and `vb.md"`
-        # but not `vb.md.bak`.
-        name_rx = re.compile(re.escape(name) + r"(?=['\"]?(?:\s|$))")
+        # A path boundary on BOTH edges, not substring containment:
+        # `--body-file /tmp/vb.md` matched a heredoc writing `/tmp/vb.md.bak`
+        # and the guard scanned a body that is never posted (review finding
+        # 5). Anchoring the right edge alone closed that direction and left
+        # its mirror open -- `/tmp/v.md` still matched a heredoc writing
+        # `/tmp/backup-v.md`, and a second heredoc writing `/tmp/prev-v.md`
+        # collided with the real one into `len(hits) != 1` and silence
+        # (round 5, finding 5). The name must now start at a path or token
+        # boundary as well as end its token.
+        #
+        # Residual: two heredocs whose basenames are equal in different
+        # directories still collide, because `basename` throws the directory
+        # away. That direction is silence, which is the cheap one.
+        name_rx = re.compile(
+            r"(?:^|[\s/=>'\"])" + re.escape(name) + r"(?=['\"]?(?:\s|$))"
+        )
         hits = [b for pre, b in docs if name_rx.search(pre)]
         return hits[0] if len(hits) == 1 and hits[0].strip() else None
     if len(docs) == 1 and docs[0][1].strip():
@@ -539,12 +591,26 @@ _ATTACHES = getattr(_clean_claim, "_ATTACHES", None)
 # deferred, all five are addressed in `f120e5a`"), which now reads as
 # governed and goes quiet. That is a missed warning, the cheap direction
 # for a warn-only hook, and the docstring's stated asymmetry.
+#
+# One vocabulary, two consumers. Round 5 found `RX_ASIDE` restating four of
+# these eighteen words as its own list, so fourteen clause breaks were still
+# being eaten as asides (finding 2). The words are named once here and both
+# patterns are built from the name.
+_CLAUSE_OPENERS = (
+    r"but|and|or|so|however|though|although|while|whereas"
+    r"|after|before|until|since|because|once|unless|if|now\s+that"
+)
+# `yet` and `nor` open a clause the same way but are NOT scope breaks here,
+# for the reason given just above. Standing ALONE between two commas they are
+# still a clause boundary rather than an aside, so the aside test takes the
+# union and the scope test does not.
+_ASIDE_OPENERS = _CLAUSE_OPENERS + r"|yet|nor"
+
 SCOPE_BREAK_RX = re.compile(
     r"--|[;:|]"
     r"|[\u2013\u2014\u2192\u2026]|\s[-/]\s"
     r"|\n[ \t]*[-*+>#]"
-    r"|\b(?:but|and|or|so|however|though|although|while|whereas"
-    r"|after|before|until|since|because|once|unless|if|now\s+that)\b",
+    r"|\b(?:" + _CLAUSE_OPENERS + r")\b",
     re.I,
 )
 
@@ -554,21 +620,44 @@ SCOPE_BREAK_RX = re.compile(
 # `None`, and its `and` belongs to the parenthetical. The paired-comma form
 # is an appositive; it requires two commas and stops at sentence
 # punctuation, so a comma splice is not silently swallowed by it.
-# A paired-comma span that OPENS with a coordinating conjunction is not an
-# appositive -- `, and, as noted,` is a clause boundary wearing an aside's
-# punctuation, and the alternation is leftmost-first, so it ate the `and`
-# that `SCOPE_BREAK_RX` retains as a scope break and left the negator
-# governing the clause after it (review finding 2). Requiring the span not
-# to open with one makes the NEXT pair, the real aside, the match.
+# A paired-comma span that IS a bare conjunction is not an appositive --
+# `, and, as noted,` is a clause boundary wearing an aside's punctuation, and
+# the alternation is leftmost-first, so it ate the `and` that
+# `SCOPE_BREAK_RX` retains as a scope break and left the negator governing
+# the clause after it (review finding 2). Skipping that pair makes the NEXT
+# pair, the real aside, the match.
+#
+# The test is that the span IS the connector, not that it opens with one.
+# Round 4 wrote the opening form, which disqualifies every genuine aside
+# beginning with a subordinator: `, though small and fiddly,` is an
+# appositive whose `though` belongs to it, and refusing to elide it leaves
+# `SCOPE_BREAK_RX` finding that `though` and warning on an honest
+# self-review. Requiring the closing comma to follow the word immediately
+# separates the two shapes without a second vocabulary.
 RX_ASIDE = re.compile(
     r"\([^()]*\)|\[[^\[\]]*\]"
-    r"|,(?!\s*(?:and|but|or|so|yet|nor)\b)[^,.;:!?]*,"
+    r"|,(?!\s*(?:" + _ASIDE_OPENERS + r")\s*,)[^,.;:!?]*,",
+    re.I,
 )
+# Parentheses and brackets alone. Their extent is unambiguous, so they may be
+# blanked anywhere; a comma span's extent is a GUESS, and the wrong guess
+# deletes the sentence's own subject (see `_governs`).
+RX_ASIDE_BRACKETED = re.compile(r"\([^()]*\)|\[[^\[\]]*\]")
+
+
+def _blank(rx, text):
+    """`text` with each `rx` match replaced by spaces of the same length."""
+    return rx.sub(lambda m: " " * (m.end() - m.start()), text)
 
 
 def _elide_asides(text):
     """Blank every aside, preserving length so offsets stay valid."""
-    return RX_ASIDE.sub(lambda m: " " * (m.end() - m.start()), text)
+    return _blank(RX_ASIDE, text)
+
+
+def _elide_bracketed(text):
+    """Blank parenthetical and bracketed asides only, length-preserving."""
+    return _blank(RX_ASIDE_BRACKETED, text)
 
 PREFIX_DISQUALIFY_RX = (getattr(_clean_claim, "PREFIX_DISQUALIFY_RX", None)
                         or _FALLBACK_PREFIX_DISQUALIFY)
@@ -597,33 +686,50 @@ def _governs(prose, window_start, match_start, rx):
     does not transfer (see `SCOPE_BREAK_RX` above). The mechanism it
     delegates to, `_attaches`, is reused unchanged.
 
-    Asides are blanked from the whole window first, so a conjunction inside a
-    parenthetical or an appositive cannot break a scope it never left, and a
-    NEGATOR inside one cannot claim a scope it never had.
+    Bracketed asides are blanked from the whole window, so a negator inside
+    one cannot claim a scope it never had. Comma asides are blanked from the
+    connector only, because their extent is a guess and the wrong guess
+    deletes the sentence's own subject.
 
     A missing hit is vacuously "does not apply". A missing `_ATTACHES`
     falls back to `not SCOPE_BREAK_RX.search(connector)`, which is the same
     predicate `_ATTACHES` computes -- measured identical over 11 connectors,
     so the fallback is equivalent rather than safe-in-a-direction.
     """
-    # Asides are blanked from the WHOLE window before the negator is located,
-    # not just from the connector after it. Blanking only the connector left a
-    # negator that sits INSIDE an aside eligible to be `last`, so
-    # "Two findings (none of which matter) are addressed" read as governed by
-    # the parenthetical's own `none` and went silent (review finding 1).
-    # A negator inside an aside qualifies the aside, never the sentence; the
-    # sentence is governed by a negator outside every aside, or by none.
-    # That is also what keeps "Nothing (not even the rename) is addressed"
-    # disqualified -- blanking promotes its outer `Nothing` to `last`, where
-    # the connector-only form had picked the inner `not`. The substitution is
-    # length-preserving so `window_start`-relative offsets stay valid.
-    window = _elide_asides(prose[window_start:match_start])
+    # BRACKETED asides are blanked from the WHOLE window before the negator
+    # is located. Blanking only the connector left a negator that sits INSIDE
+    # one eligible to be `last`, so "Two findings (none of which matter) are
+    # addressed" read as governed by the parenthetical's own `none` and went
+    # silent (review round 4, finding 1). A negator inside an aside qualifies
+    # the aside, never the sentence. Blanking is also what keeps "Nothing
+    # (not even the rename) is addressed" disqualified: it promotes the outer
+    # `Nothing` to `last`, where the connector-only form had picked the inner
+    # `not`. The substitution is length-preserving so `window_start`-relative
+    # offsets stay valid.
+    #
+    # COMMA asides are deliberately NOT blanked here, only from the connector
+    # below. A parenthesis has one possible extent; a comma span has as many
+    # as the sentence has commas, and the leftmost-first guess pairs the comma
+    # that CLOSES an introductory phrase with the comma that OPENS the real
+    # appositive -- deleting the sentence's own subject. Round 4 blanked them
+    # window-wide and five honest self-reviews began warning, among them
+    # "Of the 18 findings, none, including #9, are addressed in `f120e5a`."
+    # (round 5, finding 1). That is the direction the docstring calls
+    # expensive: warning on a self-review is how a guard gets switched off.
+    #
+    # The price is one accepted miss, tracked as ai-config#3947 and pinned
+    # as a fixture: an echo whose only
+    # negator sits inside a comma aside, "Five items, none trivial, are
+    # addressed", now reads as governed and goes silent. Silence is the cheap
+    # direction, and no regex separates that sentence from the five above
+    # without knowing which noun the verb agrees with.
+    window = _elide_bracketed(prose[window_start:match_start])
     last = None
     for last in rx.finditer(window):
         pass
     if last is None:
         return False
-    connector = window[last.end():]
+    connector = _elide_asides(window[last.end():])
     if _ATTACHES is None:
         return not SCOPE_BREAK_RX.search(connector)
     return bool(_ATTACHES(connector, SCOPE_BREAK_RX))

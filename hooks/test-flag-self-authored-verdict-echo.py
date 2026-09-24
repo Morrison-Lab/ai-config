@@ -189,6 +189,38 @@ HONEST_BREAK_IN_PARENTHETICAL = (
     "Nothing (and this matters) is addressed in this branch.\n"
 ) % NOT_CLEAN
 
+# Round 5, finding 1. Round 4 blanked comma asides across the WHOLE window,
+# and the alternation is leftmost-first, so it paired the comma CLOSING an
+# introductory phrase with the comma OPENING the real appositive -- deleting
+# the sentence's own negator. Both of these are honest dispositions saying
+# the work is NOT done, and both began warning. Measured against `00085a22`:
+# the first reported `are addressed`, the second `addressed in`.
+#
+# They are the control the suite lacked. Every HONEST_* fixture above puts
+# the negator at the start of its clause; only a comma BEFORE the negator
+# reaches the mis-pairing, so none of them could catch it.
+HONEST_INTRO_COMMA_BEFORE_NEGATOR = (
+    "### Verdict\n**%s**\n\n"
+    "Of the 18 findings, none, including #9, are addressed in `f120e5a`.\n"
+) % NOT_CLEAN
+
+HONEST_INTRO_COMMA_NEGATED_NOUN = (
+    "### Verdict\n**%s**\n\n"
+    "Per the brief, no finding, however minor, is addressed in `f120e5a`.\n"
+) % NOT_CLEAN
+
+# Round 5, finding 2. `RX_ASIDE` restated four of `SCOPE_BREAK_RX`'s eighteen
+# clause openers as its own list, so `, however,` -- a clause boundary
+# wearing an aside's punctuation, exactly like `, and,` below -- was elided
+# and the negator went on governing the clause after it. Silent at
+# `00085a22`, measured. Its control is HONEST_BREAK_IN_COMMA_ASIDE above,
+# where the same class of word opens a span with real content after it and
+# must still be elided.
+ECHO_BARE_HOWEVER_COMMA_PAIR = (
+    "### Verdict\n**%s**\n\n"
+    "Nothing is blocking, however, all five are addressed in `f120e5a`.\n"
+) % NOT_CLEAN
+
 # The reviewer's own fourth row. Its verdict is spelled out rather than
 # interpolated from `NOT_CLEAN`, per the comment above: under "Needs more
 # work" this body is stopped at gate 3 by ai-config#3937 and would pin
@@ -447,8 +479,22 @@ def main():
           mcp(ECHO_NEGATOR_IN_PARENTHETICAL), True)
     check("a negator inside a bracket does not govern the sentence",
           mcp(ECHO_NEGATOR_IN_BRACKET), True)
-    check("a negator inside a comma appositive does not govern the sentence",
-          mcp(ECHO_NEGATOR_IN_COMMA_ASIDE), True)
+    # ACCEPTED MISS, and pinned as one rather than deleted. Round 4 made this
+    # warn by blanking comma asides window-wide; round 5 measured that the
+    # same blanking warns on five honest self-reviews (the two HONEST_INTRO_*
+    # fixtures above are two of them), because a comma span's extent is a
+    # guess. No regex separates "Five items, none trivial, are addressed"
+    # from "Of the 18 findings, none, including #9, are addressed" without
+    # knowing which noun the verb agrees with, so the tie goes to silence --
+    # the cheap direction for a warn-only hook. Tracked as ai-config#3947.
+    check("a negator in a lone comma appositive is an accepted miss",
+          mcp(ECHO_NEGATOR_IN_COMMA_ASIDE), False)
+    check("an intro comma before the negator stays silent",
+          mcp(HONEST_INTRO_COMMA_BEFORE_NEGATOR), False)
+    check("an intro comma before a negated noun stays silent",
+          mcp(HONEST_INTRO_COMMA_NEGATED_NOUN), False)
+    check("a bare `, however,` pair is a clause boundary, not an aside",
+          mcp(ECHO_BARE_HOWEVER_COMMA_PAIR), True)
     check("a `, and,` pair is a clause boundary, not an aside",
           mcp(ECHO_CONJUNCTION_COMMA_PAIR_AND), True)
     check("a `, but,` pair is a clause boundary, not an aside",
@@ -496,10 +542,69 @@ def main():
                "gh pr comment 1 --body-file /tmp/v.md\n" % ECHO_DISPOSITION)
     check("a command past the opener bound is refused rather than scanned",
           mod._heredoc_body_for(_many, _many) is None, True)
+    # Round 5, finding 3. The bound counted every `<<` in the raw command,
+    # including the ones the BODY writes, so a verdict echo whose prose
+    # quoted a shift operator 33 times exempted itself -- silently, because
+    # an unreadable body warns about nothing. Openers are counted with the
+    # opener SHAPE now, so this body is read and warns.
+    _shifty = ("cat > /tmp/v.md <<'A'\n%s\n" % ECHO_DISPOSITION
+               + "The sample writes `$((1 << 0))` on this line.\n"
+               * (mod.MAX_HEREDOC_OPENERS + 1)
+               + "A\ngh pr comment 1 --body-file /tmp/v.md\n")
+    check("shift operators in the body do not reach the opener bound",
+          fired("Bash", {"command": _shifty}), True)
+    # Round 5, finding 4. `$` under MULTILINE matches before `\n` and at end
+    # of string, never before `\r`, so end-anchoring the terminator made
+    # every CRLF command unreadable -- and CLAUDE.md routes backtick-carrying
+    # bodies into exactly this heredoc form on the platform most likely to
+    # deliver CRLF.
+    _crlf = ("cat > /tmp/v.md <<'A'\n%s\nA\n"
+             "gh pr comment 1 --body-file /tmp/v.md\n"
+             % ECHO_DISPOSITION).replace("\n", "\r\n")
+    check("a CRLF write-then-post command is still read",
+          fired("Bash", {"command": _crlf}), True)
+    # Round 5, finding 5. The tie anchored the basename's right edge only, so
+    # the mirror of finding 5 was still open: `--body-file /tmp/v.md` matched
+    # a heredoc writing `/tmp/backup-v.md` and scanned a body that is never
+    # posted. Its sibling below is the collision the same gap caused in the
+    # other direction -- two hits, `len(hits) != 1`, and silence on a body
+    # that plainly warrants the warning.
+    check("a left-edge basename collision does not tie to the wrong heredoc",
+          fired("Bash", {"command":
+                         "cat > /tmp/backup-v.md <<'A'\n%s\nA\n"
+                         "gh pr comment 1 --body-file /tmp/v.md"
+                         % ECHO_DISPOSITION}),
+          False)
+    check("a same-suffix neighbour does not collide the real heredoc away",
+          fired("Bash", {"command":
+                         "cat > /tmp/prev-v.md <<'A'\nEarlier notes.\nA\n"
+                         "cat > /tmp/v.md <<'B'\n%s\nB\n"
+                         "gh pr comment 1 --body-file /tmp/v.md"
+                         % ECHO_DISPOSITION}),
+          True)
+    # Round 5, finding 6. Bash ends a plain `<<EOF` only on a delimiter at
+    # column 0 -- verified by running it -- so an indented `    EOF` inside
+    # the body is body TEXT. Terminating there truncated the body above its
+    # own verdict echo, which is finding 14 through a second door.
+    check("an indented delimiter does not terminate a plain heredoc",
+          fired("Bash", {"command":
+                         "cat > /tmp/v.md <<'EOF'\nExample heredoc:\n"
+                         "    EOF\n%s\nEOF\n"
+                         "gh pr comment 1 --body-file /tmp/v.md"
+                         % ECHO_DISPOSITION}),
+          True)
+    # ... and the dash form still ends on a TAB-indented one, which is the
+    # only indentation bash strips.
+    check("a tab-indented delimiter terminates a `<<-` heredoc",
+          fired("Bash", {"command":
+                         "cat > /tmp/v.md <<-'EOF'\n%s\n\tEOF\n"
+                         "gh pr comment 1 --body-file /tmp/v.md"
+                         % ECHO_DISPOSITION}),
+          True)
     _big = ("cat > /tmp/v.md <<'A'\n" + "filler line\n" * 5000
             + ECHO_DISPOSITION + "\nA\ngh pr comment 1 --body-file /tmp/v.md\n")
     _tied = mod._heredoc_body_for(_big, _big)
-    check("one heredoc carrying a 60 KiB body still ties",
+    check("one heredoc carrying a 60,000-byte body still ties",
           _tied is not None and "f120e5a" in _tied, True)
     check("a heredoc tied through --field body=@ is read",
           fired("Bash", {"command":

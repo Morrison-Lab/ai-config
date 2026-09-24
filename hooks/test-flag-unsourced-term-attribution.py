@@ -15,7 +15,7 @@ import subprocess
 import sys
 import tempfile
 
-HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+HOOK = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                     "flag-unsourced-term-attribution.py")
 
 FAILURES = []

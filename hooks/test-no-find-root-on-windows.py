@@ -87,6 +87,7 @@ def test_positives() -> None:
         ("bare find C:/ without args", "find C:/"),
         (r"bare find 'C:\' without args", "find 'C:\\'"),
         ("find with multiple paths including /c", "find /home /c"),
+        ("find /c with unquoted path argument", "find /c dir1"),
         ("find with multiple paths including /", "find . / -name foo"),
         ("double slash root", "find // -name foo"),
         ("bare backslash root (single quoted)", "find '\\' -name foo"),
@@ -144,6 +145,12 @@ def test_negatives() -> None:
         ("cd command to root", "cd /"),
         ("windows find string searcher", 'find "needle" haystack.txt'),
         ("windows find.exe string searcher with flag", 'find /I "needle" haystack.txt'),
+        ("windows find.exe /c count flag", 'find /c "needle" file.txt'),
+        ("windows find.exe /C uppercase count flag", 'find /C "needle" file.txt'),
+        ("windows find.exe combined /i /c flags", 'find /i /c "needle" file.txt'),
+        ("windows find.exe combined /v /c flags", 'find /v /c "needle" file.txt'),
+        ("windows find.exe single quoted needle", "find /c 'needle' file.txt"),
+        ("windows find.exe /c stdin search", 'find /c "needle"'),
     ]
 
     for label, cmd in allowed_cases:

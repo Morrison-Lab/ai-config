@@ -69,8 +69,20 @@ CYGDRIVE_ROOT_RE = re.compile(r"\A/(?:cygdrive|proc)/[a-zA-Z][/\\]?\Z")
 # 4. Windows native drive root: C:, C:/, C:\, d:, d:/, d:\
 WIN_DRIVE_ROOT_RE = re.compile(r"\A[a-zA-Z]:[/\\]?\Z")
 
-# Windows find.exe text search flags (e.g. find /I "needle" file.txt)
-WIN_FIND_FLAGS = {"/i", "/v", "/n", "/off", "/offline"}
+# Windows find.exe text search flags (e.g. find /I "needle" file.txt, find /c "needle" file.txt)
+WIN_FIND_FLAGS = {
+    "/i", "/v", "/n", "/c", "/off", "/offline",
+    "\\i", "\\v", "\\n", "\\c", "\\off", "\\offline",
+}
+
+WIN_FIND_STRING_RE = re.compile(
+    r"""(?xi)
+    \bfind(?:\.exe)?\b
+    (?:[ \t]+[/\\](?:i|v|n|c|off(?:line)?))*
+    [ \t]+
+    (?P<quote>["'])(?P<search>.*?)(?P=quote)
+    """
+)
 
 # Leading environment assignment or override regex
 ENV_ASSIGNMENT = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*=")
@@ -125,8 +137,6 @@ def is_prohibited_root(path: str) -> bool:
     p = path.strip()
     if not p:
         return False
-    if p.lower() in WIN_FIND_FLAGS:
-        return False
     if ROOT_PATH_RE.match(p):
         return True
     if CYGDRIVE_ROOT_RE.match(p):
@@ -142,6 +152,40 @@ def is_find_executable(prog: str) -> bool:
     """True if program name is find or find.exe."""
     base = os.path.basename(prog).lower()
     return base in ("find", "find.exe")
+
+
+def is_windows_find_invocation(cmd: list[str], raw_command: str) -> bool:
+    """True if cmd is an invocation of Windows cmd.exe find.exe text search.
+
+    Windows find.exe syntax is:
+        FIND [/V] [/C] [/N] [/I] [/OFF[LINE]] "string" [[drive:][path]filename[ ...]]
+    Unlike GNU find, Windows find.exe:
+      - requires a quoted string to search for (unquoted strings raise a parameter error)
+      - does not accept GNU expressions or predicates (-name, -type, -maxdepth, etc.)
+      - never walks directory trees recursively
+    """
+    if not cmd or not is_find_executable(cmd[0]):
+        return False
+    # GNU predicates/options begin with '-' or are '(', ')', '!'
+    if any(tok.startswith("-") or tok in ("(", ")", "!") for tok in cmd[1:]):
+        return False
+    # Consume leading Windows find.exe flags (/i, /v, /n, /c, /off, /offline)
+    idx = 1
+    while idx < len(cmd) and cmd[idx].lower() in WIN_FIND_FLAGS:
+        idx += 1
+    # Must have at least one non-flag argument (the search string)
+    if idx >= len(cmd):
+        return False
+    search_term = cmd[idx]
+    # The search string must not be a bare prohibited root path
+    if is_prohibited_root(search_term):
+        return False
+    # In Windows find.exe, the search string must be quoted
+    if WIN_FIND_STRING_RE.search(raw_command):
+        return True
+    if f'"{search_term}"' in raw_command or f"'{search_term}'" in raw_command:
+        return True
+    return False
 
 
 def extract_find_paths(argv: list[str]) -> list[str]:
@@ -222,6 +266,9 @@ def evaluate_command(command: str, is_windows: bool | None = None) -> tuple[str,
             continue
 
         if not is_find_executable(cmd[0]):
+            continue
+
+        if is_windows_find_invocation(cmd, command):
             continue
 
         paths = extract_find_paths(cmd[1:])

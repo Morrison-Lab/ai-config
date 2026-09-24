@@ -5794,6 +5794,10 @@ Found defects.
     payload_only = ('<!-- review-data: {"verdict": "CLEAN", "findings": []} -->')
     check("REVIEW_BODY_MARKERS: carries a review-data entry",
           "review-data:" in checker.REVIEW_BODY_MARKERS)
+    check("REVIEW_BODY_MARKERS: carries ## verdict entry",
+          "## verdict" in checker.REVIEW_BODY_MARKERS)
+    check("has_review_body_marker: recognizes ## verdict",
+          checker.has_review_body_marker("## Verdict\n\nReady for merge"))
     check("has_review_body_marker: a payload-only body is a review body",
           checker.has_review_body_marker(payload_only))
     check("is_non_review_notice: a dispatch notice carrying a payload is not excluded",

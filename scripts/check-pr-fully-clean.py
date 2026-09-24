@@ -453,6 +453,7 @@ REVIEW_BODY_MARKERS = (
     "### \U0001f916",
     "code review",
     "**claude finished",
+    "## verdict",
     "### verdict",
     "_posted by codex (ai agent)",
     "_posted by opencode (ai agent)",

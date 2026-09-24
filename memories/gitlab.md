@@ -87,6 +87,11 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   explicit authorization for that log.
   Diagnose from job metadata, pipeline status, and narrowly scoped artifacts
   first.
+  Do not rely on a line-oriented redaction filter after fetching a trace:
+  GitLab ANSI control sequences can split `token=` from its value and bypass
+  that pattern.
+  If a trace must be inspected under explicit authorization,
+  remove ANSI escapes before scanning and redact before any terminal output.
 - **A project CI/CD variable overrides a job-level YAML variable.**
   GitLab's documented variable-precedence order, checked 2026-09-23, places
   project variables above variables declared in `.gitlab-ci.yml`.

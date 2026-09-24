@@ -23,16 +23,30 @@ need_count=True)` (measured 2026-09-23 against origin/main). Reaching
 the git history does not carry, so the proxy is deliberate -- read a flagged
 body as "yields a cardinality claim", never as "warns".
 
-THE INVARIANT IS THE SET OF FLAGGED BODIES, AND ONLY THAT SET. A body is
-what the hook acts on, so a set that moves is a population change worth a
-human look, and exit status 1 reports that. The set rather than its size:
-one body losing its only claim while another gains its first leaves the
-COUNT unchanged over a population that moved.
+THE INVARIANT IS THE SET OF FLAGGED BODIES, AND ONLY THAT SET. A warning
+fires per body, so a set that moves is a population change worth a human
+look, and exit status 1 reports that. The set rather than its size: one body
+losing its only claim while another gains its first leaves the COUNT
+unchanged over a population that moved.
+
+Exit status 1 is not that report on its own, though. Seven refusals share it
+-- an unloadable hook, a missing `git`, an unreadable history, a vocabulary
+the substitution can no longer find, a NARROW baseline identical to the live
+one, an empty corpus, and an empty detection -- each with its own message, so
+read the message rather than the status.
+
+The body is also the coarser of the hook's two real units. A warning
+enumerates the individual claims that produced it, so the claim counts below
+are not a secondary statistic: they are the finer unit, and a precision claim
+stated only at body level says nothing about them.
 
 A moved set is not by itself a precision cost, and the exit status does not
 claim it is. A body the wide vocabulary flags and the narrow one does not is
-the recall gain the widening exists to produce -- the founding case is
-exactly that shape -- while a body no longer flagged is a recall loss.
+the recall gain the widening exists to produce -- the founding case is a
+SENTENCE of that shape, `Fourteen such references remain in text at this
+head`, and whether the body carrying it was already flagged by some other
+claim was never established -- while a body no longer flagged is a recall
+loss.
 Whether either is a FALSE positive is a judgment this script cannot make, so
 it names the direction and asks for the reading rather than announcing a
 verdict.
@@ -42,13 +56,18 @@ bodies hid that: measured 2026-09-23 against origin/main, both vocabularies
 flagged 54 of 111 multi-line bodies while the claim totals were 319 and 325,
 so the headline number was structurally blind to every claim the widening
 gained or lost inside an already-flagged body. Both directions are worth
-seeing, and on this corpus BOTH are false positives rather than recall:
+seeing, and on this corpus neither direction is the recall the widening was
+written for:
 
   - All 7 gained claims are positional line references (`fifty lines`,
     `thirty-six lines`, `TWENTY LINES`), which name a location rather than a
     count anyone could have got wrong. So this corpus carries no instance of
     the real miscount the widening was written for, and its recall gain is
-    unrepresented here.
+    unrepresented here. Calling all 7 false positives would overstate that in
+    two directions at once: whether a positional reference deserves a warning
+    is the judgment named above, and 2 of the 7 sit in bodies
+    `_derived_in_body` discharges, so those two produce no warning under
+    either vocabulary (measured 2026-09-23 against origin/main).
   - The single lost claim is `six lines`, which the narrow pattern quoted out
     of `thirty-six lines` -- the exact "surfaced figure the author never
     wrote" failure the hook's own comment describes, so the widening
@@ -109,13 +128,22 @@ def commit_bodies(ref):
             ["git", "log", ref, "--format=%x00%B"],
             capture_output=True, text=True, check=True,
         ).stdout
+    except FileNotFoundError:
+        sys.exit("cannot read history: git is not on PATH.")
     except subprocess.CalledProcessError as exc:
-        # Named rather than raised: an unfetched `origin/main`, or a clone
-        # whose remote is not called `origin`, is the DEFAULT state for the
-        # reader the hook's comment sends here.
+        # git's own stderr is quoted rather than replaced, because the advice
+        # this handler can offer covers only the cases it can guess at -- an
+        # unfetched `origin/main`, or a clone whose remote is not called
+        # `origin`. Run outside a repository at all, git says `not a git
+        # repository` and both of those remedies are inapplicable, so
+        # dropping its line would substitute a wrong diagnosis for a right
+        # one.
+        detail = (exc.stderr or "").strip()
         sys.exit(
             f"cannot read history from {ref!r}: git log exited "
-            f"{exc.returncode}. Fetch that ref, or pass --ref."
+            f"{exc.returncode}."
+            + (f" git said: {detail}" if detail else "")
+            + " Fetch that ref, or pass --ref."
         )
     return [b.strip("\n") for b in out.split("\x00") if b.strip()]
 
@@ -181,6 +209,19 @@ def main():
     args = ap.parse_args()
 
     mod = load_hook()
+    if NARROW == mod.CARDINALITY_COUNT:
+        # The substitution guard in `claims_per_body` cannot see this case:
+        # for the narrow call `vocabulary != mod.CARDINALITY_COUNT` is False,
+        # so a no-op substitution passes it. Both columns would then measure
+        # one vocabulary twice and report perfect stability -- which is what
+        # a REVERT of the widening looks like from here, and is the reading
+        # this script exists to make impossible.
+        sys.exit(
+            "CARDINALITY_COUNT is byte-identical to this script's NARROW "
+            "baseline, so there are not two vocabularies to compare. Either "
+            "the widening was reverted, or NARROW needs updating to whatever "
+            "baseline the comparison is now against."
+        )
     bodies = commit_bodies(args.ref)
     multi = [b for b in bodies if len(b.strip().splitlines()) > 1]
     if not multi:
@@ -192,11 +233,18 @@ def main():
     # The SETS, not their sizes -- see the module docstring.
     narrow_set = {i for i, c in enumerate(narrow) if c}
     wide_set = {i for i, c in enumerate(wide) if c}
-    if not wide_set:
+    if not wide_set and not narrow_set:
         # Two empty sets compare equal, so a detector that matches nothing
         # reports perfect stability over a population it never examined.
         # The `multi` guard above catches an empty CORPUS; this catches an
         # empty DETECTION, which is what a hook refactor actually produces.
+        #
+        # BOTH sets, because the message asserts about both. Gating on
+        # `wide_set` alone fires in the commonest case -- a refactor that
+        # breaks the current vocabulary while the hard-coded NARROW literal
+        # still works -- and then says something false about the narrow one,
+        # while preempting the direction report below, which would have named
+        # the loss correctly.
         sys.exit(
             f"no cardinality claim found under EITHER vocabulary over "
             f"{len(multi)} multi-line bodies; the detector rather than the "
@@ -225,6 +273,12 @@ def main():
     for label, value in rows:
         print(f"{label + ':':<{width}}{value}")
 
+    # The vocabulary in force, printed rather than named. `WIDE_LABEL` is
+    # deliberately generic so a later widening does not leave every row
+    # naming a vocabulary nobody runs, and that genericness removes the one
+    # output signal that would show which vocabulary was actually measured.
+    print(f"\n  {WIDE_LABEL} vocabulary: {mod.CARDINALITY_COUNT}")
+
     for label, texts in (("gained", gained), ("lost", lost)):
         if not texts:
             continue
@@ -250,8 +304,10 @@ def main():
         )
     if no_longer_flagged:
         report.append(
-            f"{len(no_longer_flagged)} no longer flagged: the wider "
-            "vocabulary lost recall on those bodies."
+            f"{len(no_longer_flagged)} no longer flagged: each is either a "
+            "recall loss or a false positive the wider vocabulary corrected "
+            "-- this corpus's own `six lines`, quoted out of `thirty-six "
+            "lines`, is the second shape -- which only reading them settles."
         )
     report.append(
         "Re-derive the precision claim in "

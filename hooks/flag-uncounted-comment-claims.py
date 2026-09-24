@@ -388,9 +388,13 @@ ENUM_SEPARATOR = r"\s*/?(?:,|(?<=\s)/|/(?=\s))\s*"
 # and only there. `scripts/measure-cardinality-vocabulary.py` is the
 # instrument: measured 2026-09-23 against origin/main at b96c640f, both
 # vocabularies yield a cardinality claim in the same 54 of this repository's
-# 111 multi-line commit bodies. That SET OF BODIES is what the script asserts,
-# and what it exits 1 on -- neither the 54 nor the 111, both of which move
-# as the history grows.
+# 111 multi-line commit bodies. That SET OF BODIES is the only thing the
+# script asserts -- neither the 54 nor the 111, both of which move as the
+# history grows. A non-zero exit does not by itself mean the set moved: seven
+# refusals share that status, for an unloadable hook, a missing `git`, an
+# unreadable history, a vocabulary the substitution can no longer find, a
+# NARROW baseline identical to the live one, an empty corpus, and an empty
+# detection. Each prints its own message, so read the message.
 #
 # Two things that claim does NOT say, because each is easy to read into it.
 #
@@ -405,19 +409,16 @@ ENUM_SEPARATOR = r"\s*/?(?:,|(?<=\s)/|/(?=\s))\s*"
 # And it is not a claim about CLAIMS, which do differ: 319 to twelve against
 # 325 to hundred, 7 gained and 1 lost, every one inside a body already flagged
 # under both. Reporting only bodies hid that, so read the two directions
-# separately. All 7 gains are positional line references -- `fifty lines`,
-# `thirty-six lines`, `TWENTY LINES` -- which name a location rather than a
-# count anyone could have got wrong, so this corpus carries no instance of the
-# real miscount above and the widening's recall gain is unrepresented in it.
-# The single loss is `six lines`, quoted by the narrow pattern out of
-# `thirty-six lines` -- the same surfaced-figure-the-author-never-wrote
-# failure the compound-word note below describes, so the widening corrected it
-# rather than causing it.
+# separately. What each gained and lost claim actually is, and what it says
+# about the widening, is written once in that script's own module docstring
+# rather than restated here: the two copies of that reading drifted apart
+# inside a single commit, which is the argument for keeping one.
 #
 # Nothing runs that script automatically. It is a re-derivation to run by hand
 # when this comment's figures are in question or the vocabulary changes again,
-# not a check to read as green: after a body set moves, its own failure
-# message asks for a human reading rather than announcing a verdict, so a CI
+# not a check to read as green: when the body set moves, the script's own
+# failure message asks for a human reading rather than announcing a verdict,
+# so a CI
 # step would go red the first time the hook legitimately caught something new.
 #
 # A tens word joined by a hyphen to a ones word is one count, so the compound
@@ -438,11 +439,21 @@ ENUM_SEPARATOR = r"\s*/?(?:,|(?<=\s)/|/(?=\s))\s*"
 # pattern reads the word before the count. It predates the widening rather
 # than following from it -- measured 2026-09-23, the pre-widening vocabulary
 # flags both identically, since `ten` and `three` were always in it -- so
-# narrowing `hundred` back would not recover either. A hyphenated compound
-# escapes only by accident: `Twenty-odd files` matches nothing because `odd`
-# is not a ones word, which is a gap in the compound alternative rather than
-# an exemption for hedges. Tracked as ai-config#3907; leaving the hedge in is
-# the safe direction, since the hook only ever asks for a count.
+# narrowing `hundred` back would not recover either. A hyphenated compound is
+# the one hedge that escapes: `Twenty-odd files` matches nothing, because
+# `odd` is not a ones word and the compound alternative admits only those.
+# `hooks/test-flag-uncounted-comment-claims.py` pins that as an EXEMPTION
+# rather than an accident, on the same reasoning that excludes `no` above --
+# a hedged approximation names a band rather than a figure anyone could have
+# got wrong.
+#
+# So the gap is the hedged LEAD-IN, which is what ai-config#3907 tracks:
+# `Roughly fifty files` still yields a claim, because `CARDINALITY_RE` begins
+# its match at the count itself, leaving the word before it outside the match
+# entirely. Read that cost against the `no` exclusion rather than as a safe
+# default -- both are ordinary hedging, so flagging one carries the same
+# erosion of trust that excluding the other was meant to avoid. #3907's
+# candidate fix is a negative lookbehind over a closed set of lead-ins.
 CARDINALITY_TENS = r"twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety"
 CARDINALITY_ONES = r"one|two|three|four|five|six|seven|eight|nine"
 CARDINALITY_COUNT = (

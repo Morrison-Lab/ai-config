@@ -65,12 +65,24 @@ has actually confirmed the directory is unrelated to the running render.
 
 Matches a `rm`, `trash`, `find ... -delete`, or `git clean` invocation (via
 `scripts/lib/shellcmd.py`'s argv split, including any interpreter `-c`
-piece `shell_c_expansions` can see) whose targets -- non-option arguments
-for `rm`/`trash`, every token after `find`, and non-option pathspecs for
-`git clean` -- name one of the intermediate families above, by filename
-suffix or directory-component match. `git clean` additionally requires no
-`-n`/`--dry-run` flag, and is skipped (not matched) with one, since a dry
-run deletes nothing.
+piece `shell_c_expansions` can see, and past a leading command WRAPPER --
+`sudo`, `timeout`, `nice`, `env`, `command`, ... -- via `_resolve_program`)
+whose targets -- non-option arguments for `rm`/`trash`, every token after
+`find`, and non-option pathspecs for `git clean` -- name one of the
+intermediate families above, by filename suffix or directory-component
+match. `git clean` additionally requires no `-n`/`--dry-run` flag, and is
+skipped (not matched) with one, since a dry run deletes nothing.
+
+The directory-component match is intentionally COARSE, the same
+over-matching trade-off the module docstring's "Why this checks the whole
+MACHINE" section already accepts for the process check: `rm -rf
+collected_data_files/` (an ordinary directory that happens to end in
+`_files`, unrelated to any render) and `find . -newer report.knit.md
+-delete` (where `report.knit.md` is a `-newer` REFERENCE file, not what
+gets deleted) both match, and both deny when a render happens to be live at
+the same moment. Neither is the failure direction this guard exists to
+close -- see "Why this WARNS-as-DENY" above for why a false positive here
+is the cheap outcome.
 
 Text that merely MENTIONS an intermediate -- inside an `echo`, a `grep`
 pattern, a commit message -- never matches, because the match is over
@@ -116,12 +128,15 @@ try:
         "scripts", "lib")
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
-    from shellcmd import shell_c_expansions, simple_commands, git_subcommand
+    from shellcmd import (shell_c_expansions, simple_commands, git_subcommand,
+                          COMMAND_WRAPPERS, SHELL_KEYWORDS, WRAPPER_ARG_WINDOW)
 except Exception as _exc:  # broken install: degrade, do not fail open further
     print(f"no-rm-live-render-intermediate: cannot load "
           f"scripts/lib/shellcmd.py ({_exc}); not evaluating",
           file=sys.stderr)
     shell_c_expansions = simple_commands = git_subcommand = None
+    COMMAND_WRAPPERS = SHELL_KEYWORDS = frozenset()
+    WRAPPER_ARG_WINDOW = 6
 
 import subprocess
 
@@ -151,9 +166,19 @@ INTERMEDIATE_DIR_NAME = ".quarto"
 
 def _matches_intermediate(token: str) -> bool:
     """Whether TOKEN (a literal path, or a simple glob naming one) refers to
-    a Quarto/knitr render intermediate."""
+    a Quarto/knitr render intermediate.
+
+    Deliberately does NOT reject a token starting with `-`: a `_rm_targets`/
+    `_git_clean_targets` caller has already filtered those out UNLESS the
+    token follows a `--` end-of-options marker, in which case a leading `-`
+    is part of a real filename (`rm -- --report.knit.md`) and rejecting it
+    here would silently undo that filtering. `_find_targets` passes every
+    token after `find`, flags included, relying on this function's own
+    suffix/component match to be false for `find`'s own predicate words
+    (`-delete`, `-type`, `f`, ...) rather than on a leading-dash check.
+    """
     token = token.strip()
-    if not token or token.startswith("-"):
+    if not token:
         return False
     parts = [p for p in token.rstrip("/").split("/") if p]
     if not parts:
@@ -165,21 +190,65 @@ def _matches_intermediate(token: str) -> bool:
                for p in parts)
 
 
-def _lead_prefix(argv):
-    """`(index of the first real word, override present)` for ARGV.
+# The program names this guard dispatches on, used by `_resolve_program` to
+# find one past a wrapper. `sh`/`bash` are deliberately absent: a nested
+# shell is reached instead through `shell_c_expansions`, which analyses it
+# as a SEPARATE piece rather than as this argv's own program.
+KNOWN_PROGRAMS = {"rm", "trash", "find", "git"}
 
-    Mirrors `no-clobbering-push.py`'s `_lead_prefix`, narrowed to the one
-    override this guard has: leading `VAR=value` assignments are skipped,
-    and `ALLOW_RM_RENDER_INTERMEDIATE=1` among them is reported so the
-    caller can clear the deny for THIS simple command specifically -- a
-    mention of the string elsewhere (a comment, an unrelated echo) is not a
-    real assignment and does not count.
+
+def _resolve_program(argv):
+    """`(index of the program token, override present)` for ARGV.
+
+    Peels leading `VAR=value` assignments (reporting
+    `ALLOW_RM_RENDER_INTERMEDIATE=1` among them, since a mention of the
+    string elsewhere -- a comment, an unrelated echo -- is not a real
+    assignment and does not count) and command WRAPPERS
+    (`sudo`, `timeout`, `nice`, `env`, `command`, ...), the same
+    `COMMAND_WRAPPERS`/`SHELL_KEYWORDS`/`WRAPPER_ARG_WINDOW` classification
+    `scripts/lib/shellcmd.py`'s `strip_env` already uses for `git`
+    specifically, generalized here to the four programs this guard cares
+    about. Without it, `sudo rm paper.rmarkdown` and
+    `timeout 60 git clean -fd paper.knit.md` reached neither the `rm`/`trash`
+    nor the `git` branch below, because `argv[0]` was `sudo`/`timeout`
+    rather than the program actually invoked -- a silent false negative,
+    the dangerous direction for a guard that exists to deny.
+
+    Looking ahead for a token in `KNOWN_PROGRAMS` (rather than "the next
+    token that is not an option," which a wrapper's own option VALUE can
+    satisfy just as well -- `timeout 60 rm x` would otherwise read `60` as
+    the program) mirrors `command_program`'s own lookahead for a shell,
+    narrowed to the programs this guard recognizes instead of to a shell.
+    `export FOO=1 rm x` is deliberately not specially handled the way
+    `strip_env` handles it for `git`: `export` runs nothing, but the loop
+    below simply fails to find a known program in its window and returns an
+    index past the end of ARGV, which `main`'s `head = argv[lead:]` already
+    reads as "nothing to dispatch on."
     """
-    i, override = 0, False
-    while i < len(argv) and ASSIGNMENT.match(argv[i]):
-        if argv[i] == f"{OVERRIDE}=1":
-            override = True
-        i += 1
+    i, override, after_wrapper = 0, False, False
+    while i < len(argv):
+        tok = argv[i]
+        if ASSIGNMENT.match(tok):
+            if tok == f"{OVERRIDE}=1":
+                override = True
+            i += 1
+            after_wrapper = False
+            continue
+        if tok in COMMAND_WRAPPERS:
+            after_wrapper = True
+            i += 1
+            continue
+        if tok in SHELL_KEYWORDS:
+            after_wrapper = False
+            i += 1
+            continue
+        if after_wrapper:
+            window = argv[i:i + WRAPPER_ARG_WINDOW]
+            hit = next((off for off, cand in enumerate(window)
+                        if os.path.basename(cand) in KNOWN_PROGRAMS), None)
+            i = i + hit if hit is not None else len(argv)
+            break
+        break
     return i, override
 
 
@@ -255,7 +324,7 @@ def _matching_deletion(command):
         if argvs is None:
             continue
         for argv in argvs:
-            lead, override = _lead_prefix(argv)
+            lead, override = _resolve_program(argv)
             head = argv[lead:]
             if not head:
                 continue
@@ -265,7 +334,7 @@ def _matching_deletion(command):
                 targets = _rm_targets(head)
             elif program == "find" and "-delete" in head[1:]:
                 targets = _find_targets(head)
-            elif program == "git" and git_subcommand is not None:
+            elif program == "git":
                 targets = _git_clean_targets(head)
                 if targets is None:
                     continue
@@ -283,18 +352,45 @@ def _matching_deletion(command):
 
 # The programs and argument shapes `live_render_process` looks for. `pgrep`
 # does its own coarse text match first (so the subprocess call costs
-# nothing extra to broaden), and `RENDER_PROCESS_RE` then classifies each
+# nothing extra to broaden), and `_is_render_line` then classifies each
 # matching line precisely -- two passes rather than trusting `pgrep`'s own
 # regex engine to encode the exact shape, which differs across platforms.
 PGREP_FILTER = "quarto|rmarkdown|knitr|rmd_render|deno"
 
-RENDER_PROCESS_RE = re.compile(
-    r"quarto\s+(render|preview)\b"
-    r"|quarto\.js"
-    r"|\bdeno\b.*\brender\b"
-    r"|(?:^|/)(?:R|Rscript)\b.*\b(?:knitr|rmarkdown|rmd_render)\b",
-    re.IGNORECASE,
-)
+# `quarto render`/`quarto preview`, wherever `quarto` sits on PATH: a
+# `pgrep -fl` line is always `"<pid> <full argv>"`, so the program token
+# never sits at the START of the line, and never checking for that would be
+# the bug this pattern must not repeat.
+_QUARTO_RE = re.compile(r"quarto\s+(render|preview)\b", re.IGNORECASE)
+_QUARTO_JS_RE = re.compile(r"quarto\.js", re.IGNORECASE)
+_DENO_RENDER_RE = re.compile(r"\bdeno\b.*\brender\b", re.IGNORECASE)
+
+# `R`/`Rscript` running knitr/rmarkdown, matched as two SEPARATE
+# case-SENSITIVE word-boundary checks against the whole line rather than one
+# combined, order-dependent, case-INSENSITIVE pattern. An earlier version
+# anchored `R`/`Rscript` to start-of-line or right after a `/`
+# (`r"(?:^|/)(?:R|Rscript)\b..."`), which never matches a bare,
+# PATH-resolved `pgrep -fl` line at all -- the PID prefix means an ordinary
+# `Rscript -e 'rmarkdown::render(...)'` from a terminal, exactly the
+# incident this guard exists for, never sits at the line's start or right
+# after a `/`. Measured against `"12345 Rscript -e knitr::knit('report.Rmd')"`:
+# the anchored form does not match; a plain `\bRscript\b` does. Kept
+# case-sensitive (rather than folded into the `re.IGNORECASE` the other
+# three patterns use) because `R` in particular is a real, common word when
+# lowercased, and this pattern's whole job is distinguishing the
+# capital-letter INTERPRETER from prose that happens to mention rendering.
+_R_INVOCATION_RE = re.compile(r"\b(?:R|Rscript)\b")
+_R_RENDER_LIB_RE = re.compile(r"\b(?:knitr|rmarkdown|rmd_render)\b", re.IGNORECASE)
+
+
+def _is_render_line(line: str) -> bool:
+    """Whether LINE (one `pgrep -fl` result) names a live Quarto/knitr
+    render process."""
+    if _QUARTO_RE.search(line) or _QUARTO_JS_RE.search(line):
+        return True
+    if _DENO_RENDER_RE.search(line):
+        return True
+    return bool(_R_INVOCATION_RE.search(line) and _R_RENDER_LIB_RE.search(line))
 
 
 def live_render_process(timeout=5):
@@ -322,7 +418,7 @@ def live_render_process(timeout=5):
         return None
     for line in out.stdout.splitlines():
         line = line.strip()
-        if line and RENDER_PROCESS_RE.search(line):
+        if line and _is_render_line(line):
             return line
     return None
 
@@ -397,14 +493,21 @@ def main() -> int:
     if not payload:
         return 0
 
-    if payload.get("tool_name") != "Bash":
+    # Multiple tool-name spellings and command-field names, the same set
+    # `no-heavy-work-on-head-node.py` and `warn-blanket-worktree-force-
+    # remove.py` accept, so an adapter mapping another harness's event onto
+    # this shared script (`plugins/ai-config/claude-hook-adapter.py`,
+    # per AGENTS.md) is not silently inert here.
+    if payload.get("tool_name") not in ("Bash", "bash", "run_command",
+                                        "execute_command", "terminal", "shell"):
         if is_dry_run:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
     inp = payload.get("tool_input")
     inp = inp if isinstance(inp, dict) else {}
-    command = inp.get("command") or ""
+    command = (inp.get("command") or inp.get("CommandLine")
+               or inp.get("cmd") or inp.get("script") or "")
 
     hit = _matching_deletion(command)
     if not hit:

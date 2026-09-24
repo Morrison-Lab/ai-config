@@ -125,6 +125,39 @@ class TestBlocks(unittest.TestCase):
     def test_git_clean_dry_run_allowed(self):
         self.assert_allowed("git clean -n paper.knit.md")
 
+    def test_git_clean_no_pathspec_allowed(self):
+        """Documented known limitation: a bare `git clean -fdx` names no
+        pathspec this guard's text-only target extraction can see, so it is
+        not matched even though it may delete intermediates incidentally.
+        Pinned here so a future change either fixes this deliberately (and
+        updates the docstring) or is caught reintroducing a regression in
+        the other direction."""
+        self.assert_allowed("git clean -fdx")
+
+    # -- wrapped invocations: sudo/timeout/nice/env/command must still match -
+    def test_sudo_wrapped_rm_denied(self):
+        self.assert_blocked("sudo rm paper.rmarkdown")
+
+    def test_timeout_wrapped_git_clean_denied(self):
+        self.assert_blocked("timeout 60 git clean -fd paper.knit.md")
+
+    def test_env_wrapped_rm_denied(self):
+        self.assert_allowed("env rm notes.txt")  # not an intermediate at all
+        self.assert_blocked("env rm paper.rmarkdown")
+
+    def test_nice_wrapped_rm_denied(self):
+        self.assert_blocked("nice rm paper.rmarkdown")
+
+    # -- `--` end-of-options marker -------------------------------------------
+    def test_rm_end_of_options_marker_denied(self):
+        """A target named after `--` is still a target, not an option,
+        even though its own name starts with `-`."""
+        self.assert_blocked("rm -- --report.knit.md")
+
+    # -- a benign command chained before a real deletion, no override --------
+    def test_benign_chain_then_deletion_denied(self):
+        self.assert_blocked("echo starting cleanup; rm paper.rmarkdown")
+
     # -- mutation check: the process check must be load-bearing --------------
     def test_deny_depends_on_the_process_check(self):
         """If the process check were stubbed to always return `None`, the
@@ -136,6 +169,51 @@ class TestBlocks(unittest.TestCase):
         command = "rm inst/analysis/paper/paper-with-supplement.rmarkdown"
         self.assert_blocked(command, process=RENDERING)
         self.assert_allowed(command, process=None)
+
+
+class TestIsRenderLine(unittest.TestCase):
+    """Exercises `_is_render_line` directly against realistic, UNSTUBBED
+    `pgrep -fl` output -- every case above replaces `live_render_process`
+    wholesale, so none of it would have caught the earlier regression where
+    the R/Rscript branch was anchored to start-of-line and so never matched
+    a real `pgrep -fl` line at all (that output is always
+    `"<pid> <full argv>"`, never the bare argv)."""
+
+    def test_quarto_render_matches(self):
+        self.assertTrue(guard._is_render_line(
+            "12345 quarto render inst/analysis/paper/paper-with-supplement.qmd"
+        ))
+
+    def test_quarto_preview_matches(self):
+        self.assertTrue(guard._is_render_line("6789 quarto preview"))
+
+    def test_bare_rscript_matches(self):
+        """The exact shape that regressed: a PATH-resolved `Rscript`, no
+        directory prefix, with a pid ahead of it."""
+        self.assertTrue(guard._is_render_line(
+            "12345 Rscript -e knitr::knit('report.Rmd')"
+        ))
+
+    def test_bare_r_matches(self):
+        self.assertTrue(guard._is_render_line(
+            "12345 R --no-save -e rmarkdown::render('x.Rmd')"
+        ))
+
+    def test_absolute_path_rscript_still_matches(self):
+        self.assertTrue(guard._is_render_line(
+            "12345 /usr/bin/Rscript -e knitr::knit('x.Rmd')"
+        ))
+
+    def test_unrelated_process_does_not_match(self):
+        self.assertFalse(guard._is_render_line(
+            "999 /usr/bin/python3 scripts/build.py"
+        ))
+
+    def test_r_without_render_library_does_not_match(self):
+        """`R` alone, with no knitr/rmarkdown/rmd_render anywhere on the
+        line, is not evidence of a render (an interactive R console, an
+        unrelated R script)."""
+        self.assertFalse(guard._is_render_line("12345 R --vanilla"))
 
 
 if __name__ == "__main__":

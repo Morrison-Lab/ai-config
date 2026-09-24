@@ -57,9 +57,19 @@ CASES = [
     ([say("I was wrong. That is not mechanizable -- there is no decidable "
           "condition in the transcript for a domain error like this.")],
      False, "an explicit not-mechanizable judgment discharges it"),
+    ([say("My mistake. That isn't mechanizable because it relies on domain knowledge.")],
+     False, "an explicit 'isn't mechanizable' judgment discharges it"),
+    ([say("I was mistaken. This isn't hookable since the state is external.")],
+     False, "an explicit 'isn't hookable' judgment discharges it"),
+    ([say("My mistake. That can't be automated reliably.")],
+     False, "an explicit 'can't be automated' judgment discharges it"),
+    ([say("I was wrong. This can't be caught by a hook.")],
+     False, "an explicit 'can't be caught by a hook' judgment discharges it"),
     ([say("The redundant prose is not mechanizable because there is no decidable "
           "condition in the transcript.")], False,
      "an explicit non-mechanizable redundancy judgment discharges it"),
+    ([say("My mistake -- we should consider if this is mechanizable."), UNRELATED],
+     True, "merely mentioning 'mechanizable' without a negative judgment does not discharge"),
 
     # A UMS/memory write is the SIBLING hook's discharge, not this one's.
     # Recording the learning does not prevent the recurrence.

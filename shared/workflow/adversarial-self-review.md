@@ -920,10 +920,15 @@ The fix is the same one this section already gives: state the required line expl
 
 - **Do:** treat a report with no verdict line at all as the identical failure to a heading-separated one --- both leave the guard holding a stale prior verdict.
 - **Don't:** assume a report that "sounds clean" (ends in "No findings.", carries a clean JSON payload) discharges the guard without the literal verdict line the parser requires.
+- **Do:** leave the verdict's wording to the persona, or quote its phrases (`Ready for merge`, `Needs more work`) exactly when a brief has to mention them.
+- **Do:** dispatch one reviewer per repository, and push each repository before dispatching the next review.
 - **Don't:** ask the reviewer for a verdict in your own vocabulary ("end with clean / not clean") --- the brief overrides the persona's format, the reviewer answers `### Verdict: clean`, and that parses as no verdict.
-- **Don't:** review two repositories in one dispatch --- `parse_report` takes the first `Reviewed-Commit` after the verdict, so one report cannot clear both pushes.
+- **Don't:** review two repositories in one dispatch --- `parse_report` returns one `(verdict, Reviewed-Commit)` pair per report, so one report cannot clear both pushes.
 
-(Measured 2026-09-24 on Morrison-Lab/mlg#41 and Morrison-Lab/mln#92: two clean rounds reporting `### Verdict: clean` were invisible to the guard, which kept an earlier `Needs more work`; both briefs asked for "clean / not clean" and covered both repositories. One dispatch per repository, left to the persona's own format, cleared each once it was the latest verdict.)
+(Measured 2026-09-24 on Morrison-Lab/mlg#41 and Morrison-Lab/mln#92:
+two clean rounds reporting `### Verdict: clean` were invisible to the guard, which kept an earlier `Needs more work`.
+Both briefs asked for "clean / not clean" and covered both repositories.
+One dispatch per repository, left to the persona's own format, cleared each once it was the latest verdict.)
 
 **A separate, real constraint: the guard tracks one global latest verdict, not one per branch.**
 `read_latest_review` scans the whole transcript and keeps overwriting a single `(verdict, reviewed_commit)` pair with whatever it parses next, with no branch scoping at all.

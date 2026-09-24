@@ -3063,6 +3063,270 @@ def codex_cases() -> tuple[int, int]:
     return failures, ran
 
 
+def exempt_repo_cases() -> tuple[int, int]:
+    """Pushes to an EXEMPT_REPOS repository skip the verdict check, and only those.
+
+    Three layers, because each can fail without the others noticing.
+    `_owner_repo` decides which URL spellings name an exempt repository, and
+    its negative rows are the ones to keep: a lookalike host, a lookalike
+    repository, or a separator git reads differently must never match.
+    `_is_plain_command` decides which command shapes may be exempt at all.
+    The end-to-end rows run the real hook against throwaway repositories with
+    no review in the transcript, so an exempt push is allowed and everything
+    else is denied -- including an exempt push that a `-c`, an environment
+    variable, a second push URL or a transport setting could redirect.
+
+    The hook runs with the global and system git config pointed at the null
+    device and the TRANSPORT_ENV variables removed, so an `insteadOf` rule or
+    a `GIT_SSH_COMMAND` on the machine running the suite cannot decide a row.
+    """
+    failures = ran = 0
+
+    def check(label, ok):
+        nonlocal failures, ran
+        ran += 1
+        if ok:
+            print(f"PASS: {label}")
+        else:
+            print(f"FAIL: {label}")
+            failures += 1
+
+    mod = _load_subject()
+
+    for url, want in (
+        ("https://github.com/Morrison-Lab/mln.git", "morrison-lab/mln"),
+        ("https://github.com/Morrison-Lab/mlg", "morrison-lab/mlg"),
+        ("https://GitHub.com/morrison-lab/MLR.git/", "morrison-lab/mlr"),
+        ("https://x-access-token:abc@github.com/Morrison-Lab/mln.git",
+         "morrison-lab/mln"),
+        ("git@github.com:Morrison-Lab/mlg.git", "morrison-lab/mlg"),
+        ("ssh://git@github.com/Morrison-Lab/mlr.git", "morrison-lab/mlr"),
+        ("  https://github.com/Morrison-Lab/mln.git\n", "morrison-lab/mln"),
+        ("https://github.com.evil.example/Morrison-Lab/mln.git", None),
+        ("https://evil.example/github.com/Morrison-Lab/mln.git", None),
+        ("https://evil.example/x/Morrison-Lab/mln.git", None),
+        ("http://github.com/Morrison-Lab/mln.git", None),
+        ("git@github.com/Morrison-Lab/mln.git", None),
+        ("ssh://git@github.com:Morrison-Lab/mln.git", None),
+        ("https://github.com/Morrison-Lab/mln/extra.git", None),
+        ("/tmp/scratch/Morrison-Lab/mln", None),
+        ("file:///tmp/Morrison-Lab/mln.git", None),
+        ("", None),
+    ):
+        try:
+            got = mod._owner_repo(url)
+        except Exception as exc:
+            got = f"raised {type(exc).__name__}"
+        check(f"`_owner_repo({url!r})` is {want!r} (got {got!r})", got == want)
+
+    check("EXEMPT_REPOS is exactly mln, mlg and mlr, lowercase",
+          mod.EXEMPT_REPOS == {"morrison-lab/mln", "morrison-lab/mlg",
+                               "morrison-lab/mlr"})
+    # Pinned by equality, like EXEMPT_REPOS, so trimming either list to the
+    # members the end-to-end rows below happen to exercise still fails here.
+    check("TRANSPORT_ENV is exactly the six transport-redirecting variables",
+          mod.TRANSPORT_ENV == {"GIT_SSH", "GIT_SSH_COMMAND", "GIT_SSH_VARIANT",
+                                "GIT_PROXY_COMMAND", "GIT_EXEC_PATH",
+                                "GIT_SSL_NO_VERIFY"})
+    check("`_owner_repo` of a lookalike repository is not in EXEMPT_REPOS",
+          mod._owner_repo("https://github.com/Morrison-Lab/mln-evil.git")
+          not in mod.EXEMPT_REPOS)
+
+    for command, want in (
+        ("git push origin main", True),
+        ("git -C /tmp/r push origin main", True),
+        ("cd /tmp/r && git push origin main", True),
+        ("cd /tmp/r && cd sub && git push", True),
+        ("git push origin main 2>&1", True),
+        ("git push origin main 2>&1 | tail -5", True),
+        ("git push origin main | head -n 3", True),
+        ("git push origin main; echo done", False),
+        ("export GIT_SSH_COMMAND=x && git push origin main", False),
+        ("env -i git push origin main", False),
+        ("git push $REMOTE main", False),
+        ("git push $(echo origin) main", False),
+        ("git push `echo origin` main", False),
+        ("git push origin main && git push other main", False),
+        ("git push origin main &", False),
+        ("git push origin main > out.txt", False),
+        ("git push origin main < in.txt", False),
+        ("git push origin main | sh", False),
+        ("(git push origin main)", False),
+        ("cd && git push origin main", False),
+        ("git push 'origin main", False),
+        ("git push origin main\ngit push other main", False),
+        # `#` is refused anywhere: shlex reads it as a comment even mid-word,
+        # where bash does not, so a chained command could hide behind it.
+        ("git push origin main # note", False),
+        ("git push origin refs/heads/main#z && touch pwned", False),
+        ("git push origin a#b", False),
+    ):
+        try:
+            got = mod._is_plain_command(command)
+        except Exception as exc:
+            got = f"raised {type(exc).__name__}"
+        check(f"`_is_plain_command({command!r})` is {want} (got {got!r})",
+              got is want)
+
+    # `_is_plain_command` already refuses an environment prefix (its first
+    # token is not `cd` or `git`), so no end-to-end row can reach
+    # `_is_plain_push`'s own `env` check. Call it directly so that backstop
+    # cannot be deleted unnoticed. A non-empty `env` returns before any git
+    # call, so the shared time budget is never consulted.
+    check("`_is_plain_command` refuses an environment prefix",
+          mod._is_plain_command("GIT_TRACE=1 git push origin main") is False)
+    try:
+        got = mod._is_plain_push(None, ["git", "push", "origin", "main"],
+                                 ["GIT_TRACE=1"])
+    except Exception as exc:
+        got = f"raised {type(exc).__name__}"
+    check(f"`_is_plain_push` refuses a push with an environment prefix "
+          f"(got {got!r})", got is False)
+
+    hook_env = {k: v for k, v in os.environ.items()
+                if k not in mod.TRANSPORT_ENV}
+    hook_env.update({"GIT_CONFIG_GLOBAL": os.devnull,
+                     "GIT_CONFIG_SYSTEM": os.devnull})
+    mln = "https://github.com/Morrison-Lab/mln.git"
+    other = "https://github.com/Morrison-Lab/other.git"
+
+    def run_e2e(remotes, configs, args, extra_env=None, shape="{git}"):
+        d = make_repo(("x",))
+        tf = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False)
+        tf.close()
+        try:
+            for name, url in remotes:
+                _git(d, "remote", "add", name, url)
+            for cfg in configs:
+                _git(d, "config", *cfg)
+            git = f"git -C {shlex.quote(d)} {args}"
+            cmd = shape.format(git=git, d=shlex.quote(d),
+                               args=args)
+            payload = {"tool_name": "Bash", "tool_input": {"command": cmd},
+                       "transcript_path": tf.name}
+            res = subprocess.run([sys.executable, HOOK],
+                                 input=json.dumps(payload),
+                                 capture_output=True, text=True,
+                                 env={**hook_env, **(extra_env or {})})
+            out = json.loads(res.stdout) if res.stdout.strip() else {}
+            decision = (out.get("hookSpecificOutput") or {}).get(
+                "permissionDecision")
+            return res.returncode, decision == "deny"
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+            os.remove(tf.name)
+
+    origin_mln = [("origin", mln)]
+    for label, remotes, configs, args, env, shape, want_deny in (
+        ("an exempt https remote is allowed with no review",
+         origin_mln, [], "push origin main", None, "{git}", False),
+        ("an exempt remote matches case-insensitively",
+         [("origin", "https://github.com/morrison-lab/MLG.git")], [],
+         "push origin main", None, "{git}", False),
+        ("an exempt scp-style remote is allowed",
+         [("origin", "git@github.com:Morrison-Lab/mlr.git")], [],
+         "push origin main", None, "{git}", False),
+        ("an exempt remote is allowed for a bare `git push`",
+         origin_mln, [["branch.main.remote", "origin"]], "push", None,
+         "{git}", False),
+        ("an exempt push under `cd DIR &&` with `2>&1 | tail` is allowed",
+         origin_mln, [], "push origin main", None,
+         "cd {d} && git {args} 2>&1 | tail -3", False),
+        ("a non-exempt repository is denied",
+         [("origin", other)], [], "push origin main", None, "{git}", True),
+        ("a lookalike repository name is denied",
+         [("origin", "https://github.com/Morrison-Lab/mln-evil.git")], [],
+         "push origin main", None, "{git}", True),
+        ("an exempt path on another host is denied",
+         [("origin", "https://evil.example/x/Morrison-Lab/mln.git")], [],
+         "push origin main", None, "{git}", True),
+        ("a local path ending in an exempt name is denied",
+         [("origin", "/tmp/scratch/Morrison-Lab/mln")], [],
+         "push origin main", None, "{git}", True),
+        ("a literal exempt URL in the remote position is denied",
+         [], [], f"push {mln} main", None, "{git}", True),
+        ("an unknown remote is denied",
+         origin_mln, [], "push nosuchremote main", None, "{git}", True),
+        ("a remote with one exempt and one non-exempt push URL is denied",
+         origin_mln,
+         [["remote.origin.pushurl", mln],
+          ["--add", "remote.origin.pushurl", other]],
+         "push origin main", None, "{git}", True),
+        ("a pushInsteadOf rewrite away from the exempt repo is denied",
+         origin_mln, [[f"url.{other}.pushInsteadOf", mln]],
+         "push origin main", None, "{git}", True),
+        ("an inline `-c remote.origin.pushurl` is denied",
+         origin_mln, [], f"-c remote.origin.pushurl={other} push origin main",
+         None, "{git}", True),
+        ("an environment prefix on an exempt push is denied",
+         origin_mln, [], "push origin main", None,
+         "GIT_TRACE=1 {git}", True),
+        ("an inherited GIT_SSH_COMMAND disqualifies an exempt push",
+         origin_mln, [], "push origin main",
+         {"GIT_SSH_COMMAND": "ssh -o ProxyCommand=nc"}, "{git}", True),
+        ("an inherited GIT_SSH disqualifies an exempt push",
+         origin_mln, [], "push origin main", {"GIT_SSH": "ssh"}, "{git}",
+         True),
+        ("an inherited GIT_SSH_VARIANT disqualifies an exempt push",
+         origin_mln, [], "push origin main", {"GIT_SSH_VARIANT": "ssh"},
+         "{git}", True),
+        ("an inherited GIT_PROXY_COMMAND disqualifies an exempt push",
+         origin_mln, [], "push origin main",
+         {"GIT_PROXY_COMMAND": "nc"}, "{git}", True),
+        # The real exec path, so the hook's own git calls still work and the
+        # row turns on the variable being set, not on git breaking.
+        ("an inherited GIT_EXEC_PATH disqualifies an exempt push",
+         origin_mln, [], "push origin main",
+         {"GIT_EXEC_PATH": subprocess.run(
+             ["git", "--exec-path"], capture_output=True,
+             text=True).stdout.strip()}, "{git}", True),
+        ("an inherited GIT_SSL_NO_VERIFY disqualifies an exempt push",
+         origin_mln, [], "push origin main", {"GIT_SSL_NO_VERIFY": "1"},
+         "{git}", True),
+        ("`http.sslVerify=false` in config disqualifies an exempt push",
+         origin_mln, [["http.sslVerify", "false"]], "push origin main",
+         None, "{git}", True),
+        ("a URL-scoped `http.<url>.sslVerify` disqualifies an exempt push",
+         origin_mln, [["http.https://github.com/.sslVerify", "false"]],
+         "push origin main", None, "{git}", True),
+        ("`core.sshCommand` in config disqualifies an exempt push",
+         origin_mln, [["core.sshCommand", "ssh -v"]], "push origin main",
+         None, "{git}", True),
+        ("`core.gitProxy` in config disqualifies an exempt push",
+         origin_mln, [["core.gitProxy", "nc"]], "push origin main",
+         None, "{git}", True),
+        ("`remote.origin.vcs` in config disqualifies an exempt push",
+         origin_mln, [["remote.origin.vcs", "custom"]], "push origin main",
+         None, "{git}", True),
+        ("`remote.origin.receivepack` in config disqualifies an exempt push",
+         origin_mln, [["remote.origin.receivepack", "git-receive-pack"]],
+         "push origin main", None, "{git}", True),
+        ("`--receive-pack` on an exempt push is denied",
+         origin_mln, [], "push --receive-pack=git-receive-pack origin main",
+         None, "{git}", True),
+        ("an abbreviated `--exec` on an exempt push is denied",
+         origin_mln, [], "push --ex=git-receive-pack origin main",
+         None, "{git}", True),
+        ("an exempt push chained after another command is denied",
+         origin_mln, [], "push origin main", None, "true && {git}", True),
+        ("an exempt push followed by `;` is denied",
+         origin_mln, [], "push origin main", None, "{git}; true", True),
+        ("an exempt push chained behind a mid-word `#` is denied",
+         origin_mln, [], "push origin refs/heads/main#z", None,
+         "{git} && true", True),
+    ):
+        try:
+            rc, denied = run_e2e(remotes, configs, args, env, shape)
+            ok = rc == 0 and denied is want_deny
+            detail = f"exit {rc}, denied={denied}"
+        except Exception as exc:
+            ok = False
+            detail = f"raised {type(exc).__name__}: {exc}"
+        check(f"exempt e2e: {label} ({detail})", ok)
+
+    return failures, ran
+
+
 def deny_resilience_cases() -> tuple[int, int]:
     """Test that deny() emission failures never collapse into a silent allow (ai-config#3756).
 
@@ -3198,7 +3462,8 @@ def main():
                    cd_tracking_cases, fallback_cases,
                    fingerprint_guidance_cases, fingerprint_resolution_cases,
                    omo_cases, codex_cases, external_reviewer_cases,
-                   symlinked_plugin_root_cases, deny_resilience_cases):
+                   symlinked_plugin_root_cases, exempt_repo_cases,
+                   deny_resilience_cases):
             f, r = fn()
             failed += f
             extra += r

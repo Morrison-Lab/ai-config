@@ -3063,6 +3063,108 @@ def codex_cases() -> tuple[int, int]:
     return failures, ran
 
 
+def deny_resilience_cases() -> tuple[int, int]:
+    """Test that deny() emission failures never collapse into a silent allow (ai-config#3756).
+
+    A PreToolUse guard wraps its analysis in fail-open so crashes do not wedge
+    ordinary commands. But once a denial decision is made, failing open converts
+    a blocked push into an authorized one.
+    """
+    failures = 0
+    ran = 0
+
+    def check(label, ok):
+        nonlocal failures, ran
+        ran += 1
+        print(f"{'PASS' if ok else 'FAIL'}: {label}")
+        failures += not ok
+
+    # 1. When fd 1 was closed before deny() runs, deny() restores stdout and emits
+    #    its permissionDecision: deny payload cleanly with exit code 0.
+    code_closed_fd1 = (
+        f"import importlib.util, os, sys\n"
+        f"spec = importlib.util.spec_from_file_location('hook', {HOOK!r})\n"
+        f"hook = importlib.util.module_from_spec(spec)\n"
+        f"spec.loader.exec_module(hook)\n"
+        f"os.close(1)\n"
+        f"hook.deny('denial reason after fd1 close')\n"
+    )
+    p1 = subprocess.run([sys.executable, "-c", code_closed_fd1],
+                        capture_output=True, text=True)
+    out1 = {}
+    if p1.stdout.strip():
+        try:
+            out1 = json.loads(p1.stdout)
+        except Exception:
+            pass
+    dec1 = (out1.get("hookSpecificOutput") or {}).get("permissionDecision")
+    reason1 = (out1.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
+    check("deny() recovers from closed fd 1 and emits denial on stdout (exit 0)",
+          p1.returncode == 0 and dec1 == "deny" and "denial reason after fd1 close" in reason1)
+
+    # 2. When stdout is completely unwriteable (e.g. both fd 1 and saved dup closed),
+    #    deny() fails closed with exit code 2 and writes to stderr rather than
+    #    returning 0 with empty stdout (which would be a silent allow).
+    code_unwriteable = (
+        f"import importlib.util, os, sys\n"
+        f"spec = importlib.util.spec_from_file_location('hook', {HOOK!r})\n"
+        f"hook = importlib.util.module_from_spec(spec)\n"
+        f"spec.loader.exec_module(hook)\n"
+        f"if hook._ORIGINAL_STDOUT_FD is not None:\n"
+        f"    try: os.close(hook._ORIGINAL_STDOUT_FD)\n"
+        f"    except Exception: pass\n"
+        f"os.close(1)\n"
+        f"hook.deny('unwriteable denial')\n"
+    )
+    p2 = subprocess.run([sys.executable, "-c", code_unwriteable],
+                        capture_output=True, text=True)
+    check("deny() fails closed with exit 2 on unwriteable stdout",
+          p2.returncode == 2 and "no-push-without-self-review: FATAL" in p2.stderr)
+
+    # 3. An exception raised in main() AFTER a denial decision has been made
+    #    fails closed (exit 2) rather than falling back to return 0.
+    code_post_denial_exc = (
+        f"import importlib.util, json, os, sys\n"
+        f"spec = importlib.util.spec_from_file_location('hook', {HOOK!r})\n"
+        f"hook = importlib.util.module_from_spec(spec)\n"
+        f"spec.loader.exec_module(hook)\n"
+        f"def boom(*args, **kwargs):\n"
+        f"    hook._DENIAL_ISSUED[0] = True\n"
+        f"    raise RuntimeError('simulated crash after denial decision')\n"
+        f"hook.verify_review = boom\n"
+        f"payload = {{'tool_name': 'Bash', 'tool_input': {{'command': 'git push origin main'}}}}\n"
+        f"sys.stdin = open(os.devnull, 'r')\n"
+        f"sys.argv = ['hook', '--simulate', json.dumps(payload)]\n"
+        f"sys.exit(hook.main())\n"
+    )
+    p3 = subprocess.run([sys.executable, "-c", code_post_denial_exc],
+                        capture_output=True, text=True)
+    check("main() fails closed (exit 2) when an exception occurs after denial decision",
+          p3.returncode == 2 and "exception raised after denial decision" in p3.stderr)
+
+    # 4. An exception raised in main() BEFORE any denial decision is made continues
+    #    to fail open (return 0), preserving crash-proofing for command parsing.
+    code_pre_denial_exc = (
+        f"import importlib.util, json, os, sys\n"
+        f"spec = importlib.util.spec_from_file_location('hook', {HOOK!r})\n"
+        f"hook = importlib.util.module_from_spec(spec)\n"
+        f"spec.loader.exec_module(hook)\n"
+        f"def boom_parse(*args, **kwargs):\n"
+        f"    raise RuntimeError('simulated crash in command parser')\n"
+        f"hook.iter_pushes = boom_parse\n"
+        f"payload = {{'tool_name': 'Bash', 'tool_input': {{'command': 'git push origin main'}}}}\n"
+        f"sys.stdin = open(os.devnull, 'r')\n"
+        f"sys.argv = ['hook', '--simulate', json.dumps(payload)]\n"
+        f"sys.exit(hook.main())\n"
+    )
+    p4 = subprocess.run([sys.executable, "-c", code_pre_denial_exc],
+                        capture_output=True, text=True)
+    check("main() fails open (exit 0) when an exception occurs before any denial decision",
+          p4.returncode == 0 and not p4.stdout.strip())
+
+    return failures, ran
+
+
 def main():
     failed = 0
     extra = 0
@@ -3096,7 +3198,7 @@ def main():
                    cd_tracking_cases, fallback_cases,
                    fingerprint_guidance_cases, fingerprint_resolution_cases,
                    omo_cases, codex_cases, external_reviewer_cases,
-                   symlinked_plugin_root_cases):
+                   symlinked_plugin_root_cases, deny_resilience_cases):
             f, r = fn()
             failed += f
             extra += r

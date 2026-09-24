@@ -231,4 +231,9 @@ The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-anti
 - **Rerun cancelled concurrency checks to unblock fully-clean rollup:**
   When a prior workflow run is cancelled by a higher-priority check or concurrency group (e.g. `review / preempt-previous`), it registers as `cancelled` in the statusCheckRollup, blocking `check-pr-fully-clean.py` and MWC merge.
   Rerunning the failed/cancelled job via `gh run rerun -R <repo> <run-id> --failed` re-executes the check and clears the cancelled status without requiring a new commit or push.
+- **Verdict heading levels in `enforce-mwc-review-gate.py` (ai-config#3918):**
+  Review bodies commonly format their verdict section as `## Verdict` (H2) or `### Verdict` (H3).
+  `VERDICT_MARKER_RE` must match `#{2,4}\s*Verdict\b` rather than strictly requiring `### Verdict`;
+  otherwise, reviews with `## Verdict` are ignored by the gate and fall back to older comments, resulting in false `stale` merge denials.
+
 

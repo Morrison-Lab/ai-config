@@ -96,8 +96,9 @@ HOOK_WORK = re.compile(
 # An explicit judgment that the mistake is not mechanizable. Discharges the
 # obligation, because forcing a hook here is worse than none.
 NOT_HOOKABLE = re.compile(
-    r"not (mechaniz|hookab|automat)|no (decidable|mechanical) (condition|test)|"
-    r"cannot be (caught|detected) (by|with) a hook|not a hookable",
+    r"\b(?:not|isn't|is not|can't be|cannot be)\s+(?:mechaniz|hookab|automat)|"
+    r"no (?:decidable|mechanical) (?:condition|test)|"
+    r"(?:cannot|can't) be (?:caught|detected) (?:by|with) a hook|not a hookable",
     re.I,
 )
 

@@ -81,9 +81,8 @@ WHERE IT DELIBERATELY DOES NOT FIRE
   ai-config#1929, not a decision that they are safe.
 - A push whose every resolved push URL ends in an `EXEMPT_REPOS` entry
   (Morrison-Lab's mln, mlg and mlr) passes with no verdict and no override.
-  The match is on the trailing `owner/repo` of each URL or path, host
-  unchecked, so a local path ending in one of those names matches too; that
-  admits nothing `ALLOW_UNREVIEWED_PUSH=1` does not already admit.
+  Only a github.com URL (https or ssh) or the loopback git proxy counts, so a
+  push URL on any other host, or a local path, is still gated.
 
 Authorized override: `ALLOW_UNREVIEWED_PUSH=1`, as an environment assignment on
 the pushing command itself.
@@ -513,13 +512,18 @@ EXEMPT_REPOS = frozenset({
     "morrison-lab/mlr",
 })
 
-# The trailing `owner/repo` of a remote URL or path, whatever the transport:
-# `https://host/owner/repo(.git)`, `git@host:owner/repo.git`,
-# `ssh://git@host/owner/repo`, a proxy path ending in `/owner/repo`, or a
-# local path. The host is not checked, deliberately: cloud sessions push
-# through a local git proxy whose URL is not github.com, and the exemption is
-# about which repository is pushed, not where it is hosted.
-_URL_OWNER_REPO = re.compile(r"([^/:\s]+)/([^/:\s]+?)(?:\.git)?/*\Z")
+# `owner/repo` of a push URL, accepted only on a host that cannot be anyone
+# else's: github.com over https or ssh, or the loopback git proxy some cloud
+# sessions push through (`http://<user>@127.0.0.1:<port>/git/owner/repo`).
+# Matching the trailing path alone let one inline
+# `-c remote.origin.pushurl=https://any.host/x/Morrison-Lab/mln` read as
+# exempt while shipping somewhere else entirely, so the host is part of the
+# match. A local path or any other host is never exempt.
+_URL_OWNER_REPO = re.compile(
+    r"(?:https://(?:[^@/\s]+@)?github\.com/"
+    r"|(?:ssh://)?git@github\.com[:/]"
+    r"|http://(?:[^@/\s]+@)?127\.0\.0\.1:\d+/git/)"
+    r"([^/:\s]+)/([^/:\s]+?)(?:\.git)?/*")
 
 # Options after which no single reviewed commit can describe the push.
 # `--branches` is git's own documented alias of `--all` (`git push -h`), so it
@@ -1427,8 +1431,8 @@ def _push_remote(directory: str | None, argv: list[str],
 
 
 def _owner_repo(url: str) -> str | None:
-    """Lowercase `owner/repo` at the end of a remote URL or path, or None."""
-    m = _URL_OWNER_REPO.search(url.strip())
+    """Lowercase `owner/repo` of a github.com or loopback-proxy URL, or None."""
+    m = _URL_OWNER_REPO.fullmatch(url.strip())
     return f"{m.group(1)}/{m.group(2)}".lower() if m else None
 
 

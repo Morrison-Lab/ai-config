@@ -443,7 +443,7 @@ def settings_scope_paths(home: Path) -> List[Path]:
     """Return the `enabledPlugins` settings files to read, highest scope first.
 
     Local, then project, then user, matching the *scope walk* in
-    `skills/ai-config-hooks/run-hook.sh`. The walk is the only part the two
+    `plugins/ai-config-hooks/run-hook.sh`. The walk is the only part the two
     share; each reads a file differently -- see `resolve_plugin_enabled`.
     The project root is `CLAUDE_PROJECT_DIR` when the harness exports it,
     and this checkout otherwise.
@@ -471,7 +471,7 @@ def resolve_plugin_enabled(home: Path) -> tuple[Optional[bool], Optional[Path], 
     final. Within one file any truthy `ai-config@*` entry counts, since a
     second marketplace's copy loads the same plugin.
 
-    Only the scope walk is shared with `skills/ai-config-hooks/run-hook.sh`,
+    Only the scope walk is shared with `plugins/ai-config-hooks/run-hook.sh`,
     which parses nothing: it greps the raw file text and takes the *first*
     match of `"ai-config@...": true|false` wherever it lands. That diverges
     from this function twice. Within `enabledPlugins` the two disagree on

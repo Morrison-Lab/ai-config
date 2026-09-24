@@ -165,7 +165,7 @@ network policy allowlists the Julia download hosts. See
 [`docs/julia-setup.md`](docs/julia-setup.md) for the allowlist and a
 build-time alternative.
 
-### Hooks in this repo's own web sessions (`skills/ai-config-hooks/`)
+### Hooks in this repo's own web sessions (`plugins/ai-config-hooks/`)
 
 The paragraph above covers skills and commands.
 Hooks are different: `hooks/hooks.json` reaches Claude Code only through the
@@ -173,19 +173,22 @@ ai-config **plugin**, and a session that opens this checkout itself never
 installs that plugin, so every enforcement hook was inert in ai-config's own
 web sessions ([#2004](https://github.com/Morrison-Lab/ai-config/issues/2004)).
 
-[`skills/ai-config-hooks/`](skills/ai-config-hooks/README.md) closes that
-gap as a hooks-only **skills-directory plugin**: a folder under
-`.claude/skills/` (a symlink to `skills/`) that carries a
-`.claude-plugin/plugin.json` and loads in place as
-`ai-config-hooks@skills-dir`, with no marketplace and no install step.
-Its `hooks/hooks.json` is generated from the canonical catalog by
+[`plugins/ai-config-hooks/`](plugins/ai-config-hooks/README.md) holds a
+hooks-only plugin meant to close that gap.
+It used to live in `skills/`, where it loaded in place as
+`ai-config-hooks@skills-dir` through the `.claude/skills` symlink.
+It is parked outside `skills/` because a plugin manifest there is the
+suspected cause of the claude.ai marketplace sync failing since 2026-09-02,
+which dropped ai-config from every cloud session;
+`scripts/validate-skills.py` now refuses one.
+So the gap is open again until the plugin has a home that does not ship
+inside `skills/`.
+Its `hooks/hooks.json` is still generated from the canonical catalog by
 `scripts/gen-hooks-plugin.py` (CI fails when the two drift), and each
 command runs through `run-hook.sh`, which stands down when an `ai-config@*`
 plugin is enabled under Claude Code's scope precedence (local, project, then
 user settings) so no hook fires twice on a machine that has the marketplace
 install.
-Verify it in a fresh web session by checking that the first prompt carries
-the `Current time -- local:` line `inject-local-time.sh` injects.
 
 ## Use these skills in another repo's web sessions (plugin marketplace)
 
@@ -832,7 +835,7 @@ never reaches a consumer, and `--fix` only edits the running machine --- so the
 *script* existing is harmless while merging its entry is activation.
 
 **`hooks/hooks.json` has a generated mirror, and registering in one without the other fails CI.**
-`skills/ai-config-hooks/hooks/hooks.json` is generated from it by `scripts/gen-hooks-plugin.py`, and `validate` runs that script with `--check`.
+`plugins/ai-config-hooks/hooks/hooks.json` is generated from it by `scripts/gen-hooks-plugin.py`, and `validate` runs that script with `--check`.
 So the registration step is two files, not one:
 
 ```bash

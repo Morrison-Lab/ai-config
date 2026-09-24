@@ -687,6 +687,40 @@ def check_attribution(table=None, events=None, prefix="attribution"):
     return failures
 
 
+PUSH_ATTRIBUTION = [
+    (PUSH, "(git push -q)", "CLI git push summary in reason"),
+    (MCP_PUSH, "(mcp__github__push_files)", "MCP push tool name in reason"),
+    ({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "run_command", "input": {"command": "git push origin main"}}]}},
+     "(git push origin main)", "CLI chained/argument push in reason"),
+]
+
+
+def check_push_attribution():
+    """Warning must name the push command or tool that triggered the staleness."""
+    failures = 0
+    for push_event, expected, label in PUSH_ATTRIBUTION:
+        td = tempfile.mkdtemp()
+        try:
+            path = os.path.join(td, "transcript.jsonl")
+            with open(path, "w", encoding="utf-8") as fh:
+                for e in (QUERY, push_event, say("All checks green at this head.")):
+                    fh.write(json.dumps(e) + "\n")
+            env = dict(os.environ, TMPDIR=td, TEMP=td, TMP=td)
+            out = subprocess.run(
+                [sys.executable, HOOK],
+                input=json.dumps({"transcript_path": path}),
+                capture_output=True, text=True, env=env,
+            ).stdout.strip()
+            reason = (json.loads(out).get("reason") if out else "") or ""
+            ok = expected in reason
+            failures += 0 if ok else 1
+            print(f"{'ok  ' if ok else 'FAIL'}  push-attribution: {label}")
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+    return failures
+
+
 def main():
     failures = 0
     for events, want_block, label in CASES:
@@ -702,13 +736,14 @@ def main():
         (CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT),
         "attribution (failing-query)",
     )
+    failures += check_push_attribution()
     failures += check_query_forms()
     # `ATTRIBUTION_FAILING_QUERY` runs above and its failures are counted,
     # so leaving it out of the denominator understated the suite by four:
     # it printed `117/117 passed` over 121 executed checks, and a reader
     # comparing runs saw the population unchanged (round 7, finding 7).
-    total = (len(CASES) + len(ATTRIBUTION)
-             + len(ATTRIBUTION_FAILING_QUERY) + len(QUERY_FORMS))
+    total = (len(CASES) + len(ATTRIBUTION) + len(ATTRIBUTION_FAILING_QUERY)
+             + len(PUSH_ATTRIBUTION) + len(QUERY_FORMS))
     print(f"\n{total - failures}/{total} passed")
     return 1 if failures else 0
 

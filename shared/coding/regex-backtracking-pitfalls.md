@@ -92,6 +92,64 @@ past the lookahead's blind spot entirely.)
   fixed once one phrasing of it stops matching; vary the optional pieces of
   the match and re-test.
 
+## Quadratic cost can come from restart positions, not from backtracking
+
+Every section above describes a pattern that is slow **on one match
+attempt**, so every remedy below targets the attempt: make the quantifiers
+disjoint, flatten the nesting, scan line by line.
+A `finditer` sweep has a second cost axis those remedies never touch.
+`finditer` restarts the engine at each position where the pattern can begin,
+and when the tail of the pattern can run to the end of the string, each
+restart scans the whole remainder.
+The total is then quadratic in the number of **start positions**, with no
+backtracking anywhere.
+
+The tell is that rewriting the quantifier changes nothing, which reads as
+"I have not found the pathological construct yet" and is really "the cost is
+not in the construct".
+Confirm it by holding the input length fixed and varying the number of
+positions the pattern can start at.
+If time tracks the starts rather than the length, no rewrite of the pattern
+will help.
+
+Measured 2026-09-24 against a heredoc matcher whose opener is `<<` and whose
+body runs to a terminator that an unterminated heredoc never supplies:
+
+```text
+openers   chars   seconds
+    200    1614     0.020
+    400    3214     0.080
+    800    6414     0.314
+   1600   12814     1.207
+   3200   25614     4.787
+```
+
+Doubling the openers quadruples the time.
+The same matcher over ONE terminated heredoc is untroubled by length:
+240024 characters take 0.003s --- ten times the input of the 3200-opener case
+and a sixteen-hundredth of the time.
+
+Two attempted fixes did not help, and both looked like the remedies below.
+Rewriting the body quantifier as a negated character class, in place of a
+DOTALL `.`, is equivalent to the engine and changed nothing.
+Capping the input **length** did not either: a 25KB command is well under any
+sane cap and still took seconds, because length is not the variable.
+
+**Bound the count of start positions.**
+Refuse outright past a threshold that no legitimate input reaches, and say so
+rather than silently scanning a prefix.
+The shipped bound of 32 heredoc openers returns in 0.0000s on a
+20000-opener command while a 60KB single-heredoc body still matches normally.
+
+- **Do:** vary the start-position count with the length held fixed, before
+  concluding a pattern backtracks.
+- **Do:** bound the number of starts when the pattern's tail can reach the
+  end of the input.
+- **Don't:** read "rewriting the quantifier changed nothing" as evidence you
+  have not found the construct --- it is evidence the cost is elsewhere.
+- **Don't:** cap the input length as a proxy; a short input with many starts
+  is the expensive case.
+
 ## Remedies
 
 1. **Replace nested quantifiers with linear scans.**

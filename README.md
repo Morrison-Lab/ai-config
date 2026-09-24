@@ -724,6 +724,48 @@ paragraph naming three.
 - **Don't:** key it on a bare identifier --- prose about the absence of a gate
   reads as the gate itself.
 
+### A guard's prescribed remedy is a claim about every other guard
+
+A blocking hook usually tells you how to comply: state the pending work,
+re-run the query, name the input.
+That sentence is not advice about the world --- it is an assertion that the
+form it prescribes trips nothing else, and nothing in this repo checks it.
+The hooks are written one at a time, by whoever met the failure that motivated
+one, and several bind the same event.
+So two of them can be individually correct and jointly unsatisfiable.
+
+Measured 2026-09-24, on two `Stop` hooks that both read the reply text.
+`no-incomplete-check-enumeration.py` prescribes its remedy by example:
+
+> `"13 pass, 5 pending"` trips nothing
+
+`no-stale-pr-status.py`'s `RX_ASSERT` matched `13 pass` inside that exact
+string, so writing the form the first hook asks for produced a block from the
+second.
+The trap is that the block reads as a finding about the reply rather than as a
+collision, and conceding it means retracting a claim the evidence supports ---
+see [`challenge-the-assignment`](shared/workflow/challenge-the-assignment.md)'s
+"A guard's own blocking message" shape.
+The fix was on the second hook: a bare count alongside a disclosed pending
+state is now exempt, and its message names the sibling by file, so a reader
+who meets the collision again is pointed at the rule rather than left to
+re-derive it.
+
+Two properties make this hard to notice.
+A guard's prescribed form is **prose**, so no test asserts it --- the suite
+tests what the hook fires on, never what its message recommends.
+And the collision only appears when one hook's remedy is actually written,
+which happens in a live session rather than in a test.
+
+- **Do:** run a new hook's own prescribed form through every other hook bound
+  to the same event, before shipping the message that prescribes it.
+- **Do:** name the sibling by filename in the message when a collision is
+  resolved, so the next reader meets the rule rather than the symptom.
+- **Don't:** treat a guard's remedy sentence as advice --- it asserts
+  satisfiability, and that assertion is untested.
+- **Don't:** concede a block whose premise you have not checked; the guard
+  compared its own inputs, which may not reach your claim.
+
 Every hook must ship a companion `test-<name>.py` beside it in the same change before pushing;
 `scripts/test_hooks.py` runs
 every such suite (pairing each with its subject) and also checks the reverse

@@ -237,6 +237,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-find-root-on-windows.py\"",
+            "timeout": 10,
+            "script": "no-find-root-on-windows.py",
+            "why": "ai-config#3897 -- PreToolUse guard denying `find /` and bare drive roots in Git Bash on Windows, preventing whole-system traversals that crash paging and spawn long-running orphaned processes."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unchained-branch-switch.py\"",
             "timeout": 10,
             "script": "flag-unchained-branch-switch.py",

@@ -149,14 +149,42 @@ no start at all is another.
 
 **Bound both, and bound them over the region the matcher will actually
 scan.**
-The shipped guard refuses past 32 heredoc openers and past a restart-cost
-budget, counting neither over heredoc BODIES, which the matcher never
-rescans.
+The shipped guard refuses past 32 heredoc openers, past a restart-cost budget,
+and past a third term covered below, counting none of the three over heredoc
+BODIES, which the matcher never rescans.
 Skipping bodies is what makes the cost bound safe for the case a plain length
 cap would have broken: a single heredoc carrying a 60KB body still matches, in
 0.0008s, because its body scores nothing.
 A 20000-opener command is refused in 0.036s, essentially all of it the split
 into lines.
+
+**A third factor hides between the first two, and bounding them is what
+exposes it.**
+Both bounds above are proxies: a count of start positions, and a restart cost
+summed per line.
+Neither can see a construct whose single match attempt scans to the END of the
+input instead of to the end of its own line.
+In the shipped guard that construct is an UNTERMINATED heredoc opener, where
+the matcher walks from the opener to the end of the string looking for a
+terminator that never arrives.
+At 3.6 MB of four-character lines, 0 untied openers took 0.33s and 31 took
+33.84s -- against a registered 10-second timeout -- while the restart cost
+moved by 3000 and the opener count stayed well inside its bound.
+Neither instrument registered the input that nearly stopped the hook.
+
+Charging that third term correctly took a second measurement, and the first
+one was wrong in the way this section opens with.
+It held the untied opener's line at four characters and so read the cost as
+untied openers times total length.
+The pattern opens with a `([^\n]*)` that may match empty, so the restarts are
+positions on the LINE rather than occurrences of the opener.
+Varying the line length instead, at 200000 trailing lines, lines of
+400/800/1600/2400 characters took 5.60s/11.26s/22.78s/34.40s -- all four
+carrying a single opener, and all four admitted.
+The charge is the untied LINE's length, once per line, times the total length,
+so two untied openers sharing a line cost what one does.
+A terminated heredoc scores nothing under this term, which is what keeps the
+64 KB body case above admitted.
 
 Say which way the refusal falls, because that is a separate decision from the
 bound.
@@ -171,9 +199,14 @@ whose silence is an approval.
   input's own inert bulk does not vote.
 - **Don't:** read "rewriting the quantifier changed nothing" as evidence you
   have not found the construct --- it is evidence the cost is elsewhere.
+- **Do:** ask whether any construct in the pattern can scan past the region a
+  bound is computed over -- an unterminated opener, an unclosed delimiter, a
+  lookahead with no floor -- and charge it its own term.
 - **Don't:** treat a length cap as a proxy for the start count, or the start
   count as a proxy for length; they are independent, and a measurement that
   varied only one of them cannot say the other is inert.
+- **Don't:** read two bounded factors as a bounded cost -- each bound is a
+  proxy, and the axis that actually times out can sit in the gap between them.
 
 ## Remedies
 

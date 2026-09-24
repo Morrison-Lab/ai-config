@@ -1129,6 +1129,26 @@ Naming the population and the count is what makes either statement
 checkable.
 A later review round caught the original generalization, and the row is now a
 fixture with its verdict spelled out.
+
+**A third round then caught the same shape on an axis the second had held
+fixed without saying so.**
+The eight-form sweep varied the verdict and kept one body: a blank line
+between the verdict and the row.
+That guard's window is a character count, so the separation decides it, and
+at a blank line the row already starts past the 60 characters -- all eight
+forms classify the same with the row and without it.
+Re-measured across three separations, the suppression appears only at one
+newline and at the same line.
+So the corrected claim was itself a population sampled at a single point, and
+it read as settled precisely because the round before it had been the careful
+one.
+The fixture still spells its verdict out, but on the ground the third
+measurement supplied rather than the second's: `Changes requested` is a
+verdict family no other fixture in that file carries, so it is what pins the
+behaviour outside `Needs ... work` at any separation.
+Fixing a generalization does not immunize its replacement.
+Ask what the new measurement held fixed, and name it, or the next round finds
+the next axis.
 The finding itself was real throughout and reproduced on three further
 constructions.)
 

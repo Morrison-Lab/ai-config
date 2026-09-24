@@ -83,14 +83,99 @@ _PENDING_WORD = r"in[- ]progress|still running|pending|queued|in flight"
 _CHECK_NOUN = (
     r"check(?:-runs?|s)?|runs?|jobs?|workflows?|pipelines?|reviews?|CI"
 )
+# Polarity, found by the adversarial review of this branch. The vocabulary
+# was split once already (round 9, just above) so a polysemous word could not
+# exempt itself outside check context. The same reasoning applies to POLARITY
+# and was not applied: a sentence DENYING pending work satisfied this
+# exemption, switching the guard off on exactly the clean assertion it exists
+# to surface. Measured on the pre-fix pattern, against a transcript whose
+# most recent status query reported a failing state:
+#
+#   "14 pass."                    blocks
+#   "14 pass, 0 pending."         exempt, on the count
+#   "14 pass, no checks pending." exempt, on the noun
+#   "14 pass, 0 checks queued."   exempt, on the count
+#   "14 pass, zero jobs pending." exempt, on the noun
+#
+# Two independent leaks. The count slot accepted a zero, and the check-noun
+# branch had no leading-negator guard at all.
+#
+# The count fix is in the pattern. The negator fix is not, because a negator
+# sits at a variable distance from the phrase it governs and Python's `re`
+# takes only a fixed-width lookbehind.
+#
+# `RX_NEGATION` is deliberately NOT reused. It excludes bare "no" on purpose,
+# because in ASSERT context "no" is usually a determiner on some other noun
+# ("No findings remain, so the PR is ready to merge"). Here bare "no"
+# attached to the check noun is the entire polarity signal, so this wants its
+# own set. The bounds are `(?<![-\w])` / `(?![-\w])` rather than `\b`: a
+# hyphen is a non-word character, so `\bno\b` matches inside `no-op` and
+# `\bzero\b` inside `zero-findings`, and in a NEGATOR set a spurious match
+# silences the exemption with nothing red.
+_PENDING_NEGATOR = re.compile(
+    r"(?<![-\w])(?:no|none|zero|nothing|neither|not)(?![-\w])"
+    r"(?!\s+longer(?![-\w]))"
+    r"|(?<![-\w.])0+(?![-\w.])",
+    re.I,
+)
+# Clause-scoped rather than sentence-scoped, and that is the whole
+# difficulty. A negator inverts only the phrase it governs, so a
+# sentence-wide window lets an unrelated earlier negation suppress a genuine
+# disclosure: "No findings remain, 2 checks still pending." discloses two
+# pending checks and must stay exempt. Breaking on commas as well as sentence
+# terminators is what separates the two -- the window there is " 2 " rather
+# than the whole sentence.
+#
+# "no longer" is carved out as an idiom of RESOLUTION rather than of denial:
+# "no longer blocked, 2 checks pending" discloses pending work.
+#
+# A bare zero is a negator too, and it is not redundant with the count slot's
+# own zero-exclusion: "0 checks queued" is matched by the NOUN branch, at
+# `checks`, where the slot never sees the zero at all. Dropping it reopened
+# exactly one of the four leaks this fix is for.
+#
+# Its bounds exclude a dot on BOTH sides so a version is not read as a zero
+# count -- and that is only sound because the clause breaker below refuses to
+# split inside one. With a bare `.` in the break class, "14 pass. v1.0 has 3
+# checks pending." left a window of "0 has ", whose leading 0 is the tail of
+# `v1.0` with its dot already consumed as a boundary, so the negator fired
+# and blocked a genuine disclosure. A version in a recap is common here, so
+# that false alarm would have been the frequent error, not the rare one.
+#
+# Hence `(?<!\d)\.(?!\d)`: a dot flanked by digits is a decimal point rather
+# than a clause terminator. The other terminators need no such guard.
+RX_PENDING_CLAUSE_BREAK = re.compile(r"(?<!\d)\.(?!\d)|[!?;:,\u2014\u2013]|\n")
 RX_DISCLOSES_PENDING = re.compile(
     _DISCLOSES_STATE
-    + r"|\b\d+\s+(?:(?:%s)\s+)?(?:still\s+)?(?:%s)\b"
+    + r"|\b(?!0+(?!\d))\d+\s+(?:(?:%s)\s+)?(?:still\s+)?(?:%s)\b"
     % (_CHECK_NOUN, _PENDING_WORD)
     + r"|\b(?:%s)\s+(?:(?:are|is|remain|remains)\s+)?(?:still\s+)?(?:%s)\b"
     % (_CHECK_NOUN, _PENDING_WORD),
     re.I,
 )
+
+
+def _pending_clause_start(text, start):
+    """Start of the clause containing `start`, for the negator scan."""
+    at = 0
+    for boundary in RX_PENDING_CLAUSE_BREAK.finditer(text, 0, start):
+        at = boundary.end()
+    return at
+
+
+def discloses_pending(text):
+    """True if `text` states its own pending or failing work.
+
+    A match whose own clause carries a negator does not count: it DENIES the
+    pending work rather than disclosing it, and reading that as a disclosure
+    switches this guard off on the claim it exists to surface.
+    """
+    for hit in RX_DISCLOSES_PENDING.finditer(text):
+        window = text[_pending_clause_start(text, hit.start()):hit.start()]
+        if _PENDING_NEGATOR.search(window):
+            continue
+        return True
+    return False
 
 # What makes a count a claim about THIS PR/MR rather than about a local run.
 # Proximity, not presence anywhere in the message: a recap routinely mentions
@@ -200,11 +285,21 @@ def _check_push(tool_name: str, args: any) -> tuple[bool, str]:
 # commit, so counting it as a push invalidates a reading that is still current
 # and fires this guard on a premise that was never true.
 #
-# Anchored at the start of the result, deliberately. Both strings are harness
-# prefixes on a refusal, and this corpus quotes them constantly -- an unanchored
-# match would read a transcript DISCUSSING a blocked push as one. The two shapes
-# are the only unambiguous ones: a runtime `Exit code N` still counts as a push,
-# because `git push && something-else` can fail after the push succeeded.
+# Anchored at the start of each result PART, deliberately. Both strings are
+# harness prefixes on a refusal, and this corpus quotes them constantly -- an
+# unanchored match would read a transcript DISCUSSING a blocked push as one. The
+# two shapes are the only unambiguous ones: a runtime `Exit code N` still counts
+# as a push, because `git push && something-else` can fail after the push
+# succeeded.
+#
+# Per PART rather than per result, because `^` with no `re.M` anchors at string
+# start and a `content` list arrives as several parts. An earlier revision
+# joined them with newlines before searching, which left the anchor reachable
+# only by the first part -- so a refusal delivered as a second part read as a
+# real push, and the guard fired on a premise that was never true. That is the
+# expensive direction: the whole point of this predicate is that a refused push
+# moved no commit, so missing one invalidates a reading that is still current.
+# The three shapes now agree, since a string result is a one-part list.
 RX_NEVER_RAN = re.compile(
     r"^\s*(?:\\n)*\s*PreToolUse:[^\n]*hook error:"
     r"|^\s*(?:\\n)*\s*Permission for this action was denied",
@@ -577,13 +672,20 @@ def find_unnegated_assert(text):
     return None
 
 
-def _result_text(block):
-    """The tool_result's text, whichever of the three shapes it arrived in."""
+def _result_parts(block):
+    """The tool_result's text parts, whichever of the three shapes it arrived in.
+
+    A LIST, not a joined string, because `RX_NEVER_RAN` anchors at `^` with no
+    `re.M`: joining first would move every part after the first away from a
+    string start, so a refusal arriving as a later content part read as a real
+    push and fired this guard on a premise that was never true. Each part is a
+    result in its own right and gets its own anchor.
+    """
     content = block.get("content")
     if content is None:
         content = block.get("text") or ""
     if isinstance(content, str):
-        return content
+        return [content]
     if isinstance(content, list):
         parts = []
         for part in content:
@@ -591,8 +693,8 @@ def _result_text(block):
                 parts.append(part.get("text") or "")
             elif isinstance(part, str):
                 parts.append(part)
-        return "\n".join(parts)
-    return ""
+        return parts
+    return []
 
 
 def _never_ran(block):
@@ -605,7 +707,7 @@ def _never_ran(block):
     """
     if block.get("is_error") is False:
         return False
-    return bool(RX_NEVER_RAN.search(_result_text(block)))
+    return any(RX_NEVER_RAN.search(part) for part in _result_parts(block))
 
 
 def scan(path):
@@ -723,7 +825,7 @@ def main() -> int:
     # If the last status query reported a failing or not-clean state, block clean assertions.
     if last_failing_query > last_query and last_failing_query > last_push:
         fail_hit = hit
-        if RX_DISCLOSES_PENDING.search(text):
+        if discloses_pending(text):
             # Re-aim past every bare count: the message already discloses its
             # own pending work, so a count in it is the prescribed progress
             # form rather than a clean claim. A non-count assert in the same

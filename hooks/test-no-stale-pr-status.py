@@ -82,6 +82,28 @@ PUSH_MARKED_OK = {"type": "user", "message": {"content": [
      "content": "PreToolUse:Bash hook error: git push blocked"}]}}
 PUSH_SECOND_ATTEMPT = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "id": "p2", "input": {"command": "git push -q"}}]}}
+# Round 13, finding 9. A `content` LIST, which is the shape `_result_parts`
+# exists for and which no row previously used. `RX_NEVER_RAN` anchors at `^`
+# with no `re.M`, so joining the parts before searching left the anchor
+# reachable only by the first one and a refusal delivered as a later part read
+# as a real push. Both directions are pinned, because the anchor has to keep
+# doing its job per part: the refusal STARTS the second part here, and merely
+# sits inside the second part below.
+PUSH_BLOCKED_PARTS = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "p1", "is_error": True,
+     "content": [
+         {"type": "text", "text": "Running git push -q"},
+         {"type": "text",
+          "text": "PreToolUse:Bash [python3 hooks/no-push-without-self-review.py]"
+                  " hook error: git push blocked by the pre-push self-review policy"}]}]}}
+PUSH_PARTS_QUOTE_REFUSAL = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "p1",
+     "content": [
+         {"type": "text", "text": "Exit code 0"},
+         {"type": "text",
+          "text": "The docstring says: PreToolUse:Bash hook error: git push"
+                  " blocked by the pre-push self-review policy"}]}]}}
+
 
 # (events, should_block, label)
 CASES = [
@@ -179,6 +201,11 @@ CASES = [
      "a push with no tool_use id at all still makes a query stale"),
     ([QUERY, PUSH_ATTEMPT, PUSH_MARKED_OK, say("All checks pass.")], True,
      "an explicit is_error false overrides the refusal wording"),
+    ([QUERY, PUSH_ATTEMPT, PUSH_BLOCKED_PARTS, say("All checks pass.")], False,
+     "a refusal arriving as a LATER content part is still a refusal"),
+    ([QUERY, PUSH_ATTEMPT, PUSH_PARTS_QUOTE_REFUSAL, say("All checks pass.")],
+     True,
+     "a later content part QUOTING the refusal wording is not a refusal"),
     ([QUERY, PUSH_ATTEMPT, PUSH_BLOCKED, PUSH_SECOND_ATTEMPT,
       say("All checks pass.")], True,
      "a real push after a blocked one still makes a query stale"),
@@ -209,6 +236,56 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("9 pass, but the PR is not fully clean.")], False,
      "the state half needs no check noun to exempt"),
+    # Polarity, from the adversarial review of this branch. The round-9 split
+    # above stopped a polysemous word exempting itself outside check context
+    # and left the mirror case open: a sentence DENYING pending work bought
+    # the exemption by naming the thing it denies, which switches this guard
+    # off on exactly the clean assertion it exists to surface. All four
+    # measured sentences exempted before the fix; none of the 139 rows that
+    # predate these distinguishes them from a real disclosure.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 0 pending.")], True,
+     "a ZERO count denies pending work rather than disclosing it"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 0 checks queued.")], True,
+     "a zero count denies it with a check noun too"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, no checks pending.")], True,
+     "a negator before the check noun denies pending work"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, zero jobs pending.")], True,
+     "`zero` before the check noun denies it as `no` does"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 0 of 14 checks pending.")], True,
+     "a bare zero governs a count the slot itself cannot see"),
+    # ... and the disclosures the polarity guard must NOT reach. A negator
+    # inverts only the phrase it governs, so the window is the CLAUSE; a
+    # sentence-wide one suppresses the first of these, which is this repo's
+    # own commonest recap opening.
+    #
+    # Every row here opens with a clean assertion, and that is load-bearing
+    # rather than scene-setting. Written without one they were VACUOUS: the
+    # hook returns at `find_unnegated_assert` before the exemption is ever
+    # consulted, so each passed with the construct it names deleted, while
+    # reading exactly like coverage. The second row is also comma-free,
+    # because a comma puts the negator outside the window on its own and the
+    # carve-out is then never reached.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. No findings remain, 2 checks still pending.")], False,
+     "a negation in ANOTHER clause leaves the disclosure standing"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. No longer blocked and 2 checks are still pending.")], False,
+     "`no longer` is resolution, not denial"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. v1.0 has 3 checks pending.")], False,
+     "a version's zero is not a zero count"),
+    # A hyphen is a non-word character, so `\bno\b` matches inside `no-op`
+    # and `\bzero\b` inside `zero-findings`. In a NEGATOR set that silences
+    # the exemption with nothing red, so the bounds are `(?<![-\w])` /
+    # `(?![-\w])`. This row is what makes that choice falsifiable.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. The no-op rebase left 2 checks pending.")], False,
+     "a negator inside a hyphenated compound is not a negator"),
 
     ([READ_FILE_QUERY, READ_FILE_RESULT, say("Checked the file contents.")], False,
      "reading script source containing failure text must not trip query block"),

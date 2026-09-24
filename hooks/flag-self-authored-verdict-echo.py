@@ -303,7 +303,7 @@ def authored_text(body):
 # draft allowed the bold run but not the label, and a review fixture using only
 # that form was silently unmatched -- which made a negative case pass for the
 # wrong reason.
-_ARD_LABEL = r"(?:\d+(?:\s*(?:--|-|to)\s*\d+)?\s*[.):]\s*)?"
+_ARD_LABEL = r"(?:\d+(?:[ \t]*(?:--|-|to)[ \t]*\d+)?[ \t]*[.):][ \t]*)?"
 # The list marker and the emphasis run are SEPARATE optional groups, not
 # two branches of one alternation. As a single alternation the prefix
 # could consume `- ` or `**` but never both, so `- **Addressed.**` -- a
@@ -317,17 +317,24 @@ _ARD_LABEL = r"(?:\d+(?:\s*(?:--|-|to)\s*\d+)?\s*[.):]\s*)?"
 # ordinal is why these citations now name the finding rather than count
 # it).
 #
-# The bullet's `\s+` is what keeps the branch to actual list items. CommonMark
-# requires whitespace after the marker, so relaxing it to `\s*` widens the
-# guard onto ordinary prose: `-Addressed.`, `+Addressed.`, `-**Addressed**`
-# and `-**1. Rebutted.**` all begin matching, and none of them is a list item
-# (the unpinned-`\s+` mutation finding; the suite's own `PROSE_*` cases pin
-# it -- the glob is `PROSE_*` and not `PROSE_DASH_*`, since one of the four
-# is `PROSE_PLUS_BARE`). What the `\s+` does NOT decide is `**Addressed**`
+# The bullet's `[ \t]+` is what keeps the branch to actual list items.
+# CommonMark requires whitespace after the marker, so making that gap
+# optional widens the guard onto ordinary prose: `-Addressed.`,
+# `+Addressed.`, `-**Addressed**` and `-**1. Rebutted.**` all begin
+# matching, and none of them is a list item (the unpinned-marker-gap
+# mutation finding; the suite's own `PROSE_*` cases pin it -- the glob is
+# `PROSE_*` and not `PROSE_DASH_*`, since one of the four is
+# `PROSE_PLUS_BARE`). What that gap does NOT decide is `**Addressed**`
 # -- an earlier version of this comment claimed it did. That form matches
-# under `\s*` too, because the first `*` is eaten as a bullet and the
-# second satisfies the emphasis group, so both spellings reach the label
-# by one route or another.
+# with the gap optional too, because the first `*` is eaten as a bullet and
+# the second satisfies the emphasis group, so both spellings reach the
+# label by one route or another.
+#
+# Two earlier revisions of this passage, and its sibling in the suite,
+# spelled the gap `\s+` and the mutation `\s*`. That was the pre-narrowing
+# spelling and it survived the narrowing below, so the comment named a
+# token the pattern no longer contained -- while the commit message's own
+# mutation row had it right. Found by an adversarial review of this branch.
 #
 # The bullet, the checkbox and the number are three independent optional
 # steps rather than one choice, because GitHub renders a disposition as a
@@ -1075,8 +1082,17 @@ def _governs(prose, window_start, match_start, rx):
 # the window loses the sentence's own negator. Measured on the committed
 # hook: three pairs differing ONLY in a dotted citation, where the dotted row
 # warned and the plain row stayed silent. That is the direction this hook's
-# own docstring calls expensive, and the shape is everywhere in this corpus
-# (11017 backticked spans carrying a dot, across 636 of 744 markdown files).
+# own docstring calls expensive, and the shape is everywhere in this corpus:
+# 12739 code spans carrying a dot, across 644 of 745 tracked Markdown files,
+# measured 2026-09-24 with `scripts/lib/fences.py`'s own `CODE_SPAN_RE` over
+# `git ls-files '*.md'` --
+#     sum(1 for f in files for m in CODE_SPAN_RE.finditer(read(f))
+#         if "." in m.group(0))
+# An earlier revision of this comment gave 11017 across 636 of 744 with neither
+# a date nor the expression behind it, and that figure reproduces under no
+# reading tried, this one included. Only the file count reproduced, and it has
+# since moved 744 -> 745 within this branch, which is why the figure now
+# carries its command and its date (`shared/writing/timestamp-volatile-claims.md`).
 #
 # `scripts/lib/fences.py`'s `CODE_SPAN_RE` is the corpus's own span matcher
 # and is what `check-pr-fully-clean.py` already blanks with, so it is imported

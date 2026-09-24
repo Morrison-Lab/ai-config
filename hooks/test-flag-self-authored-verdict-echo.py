@@ -223,11 +223,11 @@ ECHO_BULLET_THEN_NUMBER = (
     "- 1. **Addressed.** The gate was wrong.\n"
 ) % NOT_CLEAN.lower()
 
-# The unpinned-`\s+` mutation finding. The bullet branch's `\s+` is what
-# holds it to actual list items: CommonMark requires whitespace after the
-# marker, and relaxing
-# it to `\s*` makes each of these match while none is a list item. Nothing
-# pinned that, so the mutation left the suite fully green.
+# The unpinned-marker-gap mutation finding. The bullet branch's `[ \t]+` is
+# what holds it to actual list items: CommonMark requires whitespace after
+# the marker, and making that gap optional makes each of these match while
+# none is a list item. Nothing pinned that, so the mutation left the suite
+# fully green.
 #
 # Each body carries a verdict so it still classifies not-clean; the dashed
 # line is the only thing that could supply a disposition phrase, so a fire
@@ -378,16 +378,28 @@ NEGATED_PHRASES = (
 # this fix under each of them. The row suppresses a verdict under one family,
 # `Needs ... work` -- which is this suite's own `NOT_CLEAN` -- because of the
 # 60-CHARACTER suffix window on `classify_verdict()`'s `Needs ... work` guard
-# (`check-pr-fully-clean.py:2347`, `scan[match.end():match.end() + 60]`;
+# (`check-pr-fully-clean.py:2368`, `scan[match.end():match.end() + 60]`;
 # ai-config#3937). An earlier revision of this comment called it a paragraph
 # window, which named the wrong mechanism (review finding 10).
-# Eight forms were measured with the row and without it, and the row changes
-# the answer for `Needs more work` and `Needs work` and no other; `Request
-# changes` and `Do not merge` return `''` with or without it, being no
-# recognized verdict at all. That is why the fixture below spells its verdict
-# out instead of interpolating `NOT_CLEAN`. Measuring one form and generalizing
-# to all of them is the population-vs-recall failure this corpus names
-# repeatedly; the row is adopted below rather than dropped.
+# Eight forms were measured with the row and without it, at three SEPARATIONS,
+# because that window is a character count and so the body shape decides it.
+# At the blank line this fixture actually uses, the row changes no answer at
+# all: it starts past the 60 characters, so every form classifies the same with
+# it and without it. The suppression appears only when the row sits nearer --
+# one newline, or the same line -- and then only for `Needs more work` and
+# `Needs work`; `Request changes` and `Do not merge` return `''` at every
+# separation, being no recognized verdict at all. An earlier revision of this
+# comment reported the eight-form result without naming the separation it held
+# fixed, and offered it as the reason the fixture below spells its verdict out.
+# That reason was false for the fixture as written: interpolating `NOT_CLEAN`
+# here leaves the suite at 124/124, the row being too far away to suppress
+# anything. The real reason is that `Changes requested` is a verdict family no
+# other fixture in this file carries -- every one of the other 67 interpolates
+# `NOT_CLEAN` -- so this row is what pins the fix outside `Needs ... work`,
+# under a verdict the 60-character window never reaches at any separation.
+# Measuring one form, or one body shape, and generalizing to all of them is the
+# population-vs-recall failure this corpus names repeatedly; the row is adopted
+# below rather than dropped.
 # The REGRESSION the fix for the over-correction above shipped, and the four
 # bodies a third-round adversarial review reproduced it on. Reusing
 # `flag-clean-claim-over-findings.py`'s attach test whole imported that hook's

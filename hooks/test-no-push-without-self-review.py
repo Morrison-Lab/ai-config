@@ -3078,7 +3078,7 @@ def exempt_repo_cases() -> tuple[int, int]:
 
     The hook runs with the global and system git config pointed at the null
     device and the TRANSPORT_ENV variables removed, so an `insteadOf` rule or
-    an `GIT_SSH_COMMAND` on the machine running the suite cannot decide a row.
+    a `GIT_SSH_COMMAND` on the machine running the suite cannot decide a row.
     """
     failures = ran = 0
 
@@ -3122,6 +3122,12 @@ def exempt_repo_cases() -> tuple[int, int]:
     check("EXEMPT_REPOS is exactly mln, mlg and mlr, lowercase",
           mod.EXEMPT_REPOS == {"morrison-lab/mln", "morrison-lab/mlg",
                                "morrison-lab/mlr"})
+    # Pinned by equality, like EXEMPT_REPOS, so trimming either list to the
+    # members the end-to-end rows below happen to exercise still fails here.
+    check("TRANSPORT_ENV is exactly the six transport-redirecting variables",
+          mod.TRANSPORT_ENV == {"GIT_SSH", "GIT_SSH_COMMAND", "GIT_SSH_VARIANT",
+                                "GIT_PROXY_COMMAND", "GIT_EXEC_PATH",
+                                "GIT_SSL_NO_VERIFY"})
     check("`_owner_repo` of a lookalike repository is not in EXEMPT_REPOS",
           mod._owner_repo("https://github.com/Morrison-Lab/mln-evil.git")
           not in mod.EXEMPT_REPOS)
@@ -3255,6 +3261,22 @@ def exempt_repo_cases() -> tuple[int, int]:
         ("an inherited GIT_SSH_COMMAND disqualifies an exempt push",
          origin_mln, [], "push origin main",
          {"GIT_SSH_COMMAND": "ssh -o ProxyCommand=nc"}, "{git}", True),
+        ("an inherited GIT_SSH disqualifies an exempt push",
+         origin_mln, [], "push origin main", {"GIT_SSH": "ssh"}, "{git}",
+         True),
+        ("an inherited GIT_SSH_VARIANT disqualifies an exempt push",
+         origin_mln, [], "push origin main", {"GIT_SSH_VARIANT": "ssh"},
+         "{git}", True),
+        ("an inherited GIT_PROXY_COMMAND disqualifies an exempt push",
+         origin_mln, [], "push origin main",
+         {"GIT_PROXY_COMMAND": "nc"}, "{git}", True),
+        # The real exec path, so the hook's own git calls still work and the
+        # row turns on the variable being set, not on git breaking.
+        ("an inherited GIT_EXEC_PATH disqualifies an exempt push",
+         origin_mln, [], "push origin main",
+         {"GIT_EXEC_PATH": subprocess.run(
+             ["git", "--exec-path"], capture_output=True,
+             text=True).stdout.strip()}, "{git}", True),
         ("an inherited GIT_SSL_NO_VERIFY disqualifies an exempt push",
          origin_mln, [], "push origin main", {"GIT_SSL_NO_VERIFY": "1"},
          "{git}", True),
@@ -3266,6 +3288,12 @@ def exempt_repo_cases() -> tuple[int, int]:
          "push origin main", None, "{git}", True),
         ("`core.sshCommand` in config disqualifies an exempt push",
          origin_mln, [["core.sshCommand", "ssh -v"]], "push origin main",
+         None, "{git}", True),
+        ("`core.gitProxy` in config disqualifies an exempt push",
+         origin_mln, [["core.gitProxy", "nc"]], "push origin main",
+         None, "{git}", True),
+        ("`remote.origin.vcs` in config disqualifies an exempt push",
+         origin_mln, [["remote.origin.vcs", "custom"]], "push origin main",
          None, "{git}", True),
         ("`remote.origin.receivepack` in config disqualifies an exempt push",
          origin_mln, [["remote.origin.receivepack", "git-receive-pack"]],

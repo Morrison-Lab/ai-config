@@ -61,15 +61,26 @@ FIRE CONDITION (all of)
      `gh issue comment`, `gh api .../comments`, or an MCP comment tool).
   2. The body is readable.
   3. `classify_verdict(body)` returns "not-clean".
-  4. The body carries no `review-data:` machine payload -- a real review
-     emits one, so a body with one is a review stating its own verdict and is
-     none of this hook's business.
+  4. The body carries no `review-data:` machine payload OF ITS OWN -- a real
+     review emits one, so a body with one is a review stating its own verdict
+     and is none of this hook's business. Tested against the body with fenced
+     and blockquoted lines blanked, because a disposition may quote the
+     reviewer's payload back to say what the review concluded, and a quoted
+     one is not this author's verdict.
   5. The body carries ARD disposition vocabulary (Addressed / Rebutted /
      Deferred, "addressed in", "closed in", "answered below"). This is the
      discriminator that separates a disposition ANSWERING findings from a
      self-review STATING them -- `shared/workflow/self-review-fallback.md`
      requires the second to carry a real verdict, including a not-clean one,
      and warning on those is how a guard gets switched off.
+  6. That vocabulary is not NEGATED or hedged within its own clause. "None of
+     the findings are addressed yet" is the honest sentence a self-review
+     writes when it has found work and not done it, and an earlier draft
+     warned on it -- which is condition 5's own failure reached from the
+     other side. The disqualifiers are the ones `classify_verdict()` applies
+     to its own bare patterns, reused rather than re-derived, and the window
+     errs toward disqualifying: a missed warning costs one unguarded
+     comment, a false one teaches the author to ignore the hook.
 
 It WARNS and never blocks. Whether an echo is the author's own call is a
 judgment the lexical condition only approximates, and refusing to post a
@@ -119,6 +130,8 @@ def _instrument():
 
 _rebuttal = _sibling("flag-uncited-rebuttal.py", "_sib_verdict_echo_rebuttal")
 _disclosure = _sibling("require-agent-disclosure.py", "_sib_verdict_echo_disclosure")
+_clean_claim = _sibling("flag-clean-claim-over-findings.py",
+                        "_sib_verdict_echo_clean_claim")
 _checker = _instrument()
 
 classify_verdict = getattr(_checker, "classify_verdict", None)
@@ -126,19 +139,61 @@ classify_verdict = getattr(_checker, "classify_verdict", None)
 RX_COMMENT_POST = getattr(_rebuttal, "RX_COMMENT_POST", None)
 extract_body_text = getattr(_rebuttal, "extract_body_text", None)
 
-MCP_POST_TOOLS = tuple(getattr(_disclosure, "MCP_POST_TOOLS", (
+_INHERITED_POST_TOOLS = tuple(getattr(_disclosure, "MCP_POST_TOOLS", (
     "mcp__github__add_issue_comment",
     "mcp__github__add_reply_to_pull_request_comment",
-))) + (
+)))
+# EDITING a comment is this hook's case as much as posting one: the incident's
+# first two attempted fixes were edits. The sibling's tuple already carries
+# some of these, so the union is deduplicated in order rather than concatenated
+# -- an adversarial review found `add_comment_to_pending_review` listed twice.
+MCP_POST_TOOLS = tuple(dict.fromkeys(_INHERITED_POST_TOOLS + (
     "mcp__github__update_issue_comment",
     "mcp__github__add_comment_to_pending_review",
-)
+)))
 
 BASH_TOOL_NAMES = ("Bash", "bash", "run_command", "execute_command", "terminal", "shell")
 
-# A real review emits this marker beside its verdict. Matched anywhere, because
-# a body carrying one is a review whatever else it says.
+# A real review emits this marker beside its verdict, so a body carrying its
+# OWN one is a review rather than a disposition. It is matched against the
+# authored view only: a disposition may quote the reviewer's payload back to
+# explain what was said, and an adversarial review found that a quoted payload
+# exempted the comment from this warning while `classify_verdict()` still read
+# that same embedded payload as the comment's own verdict -- the incident's own
+# shape, reached through a quoted payload instead of quoted prose.
 RX_REVIEW_PAYLOAD = re.compile(r"review-data\s*:", re.I)
+
+RX_FENCE = re.compile(r"^\s{0,3}(?P<d>`{3,}|~{3,})\s*(?P<info>.*)$")
+
+
+def authored_text(body):
+    """`body` with fenced-code and blockquote lines blanked.
+
+    Line-oriented and deliberately simple, mirroring the same fence rule
+    `check-review-execution.sh` uses for its own authored-heading scan: a
+    fence closes only on a run of the SAME character, at least as long as
+    the opener, with nothing but whitespace after it. Blanking rather than
+    deleting keeps every line number and every sentence boundary, so a
+    scan over the result cannot join two lines that were never adjacent.
+    """
+    out = []
+    fence = None
+    for line in (body or "").split("\n"):
+        m = RX_FENCE.match(line)
+        if fence is None:
+            if m:
+                fence = m.group("d")
+                out.append("")
+                continue
+        else:
+            if (m and m.group("d")[0] == fence[0]
+                    and len(m.group("d")) >= len(fence)
+                    and not m.group("info").strip()):
+                fence = None
+            out.append("")
+            continue
+        out.append("" if line.lstrip().startswith(">") else line)
+    return "\n".join(out)
 
 # ARD disposition vocabulary. The point is a body that ANSWERS findings.
 # The ARD bullet label is the commonest form by far and the easiest to miss:
@@ -150,7 +205,11 @@ RX_REVIEW_PAYLOAD = re.compile(r"review-data\s*:", re.I)
 _ARD_LABEL = r"(?:\d+(?:\s*(?:--|-|to)\s*\d+)?\s*[.):]\s*)?"
 RX_DISPOSITION = re.compile(
     r"(?:^|\n)\s{0,4}(?:[-*+]\s+|\d+[.)]\s+|\*{1,2}|_{1,2})?\s*" + _ARD_LABEL +
-    r"(?:Addressed|Rebutted|Deferred)\b"
+    # NOT `\b`: an adversarial review found the underscore branch above dead,
+    # because `_` is a word character, so `_Addressed_` has no boundary after
+    # the final `d`. A non-alphanumeric lookahead admits the closing emphasis
+    # while still refusing `Addressedly`.
+    r"(?:Addressed|Rebutted|Deferred)(?=[^A-Za-z0-9]|$)"
     r"|\b(?:are|all|each|both|every one|five|four|three|two)\s+"
     r"(?:\w+\s+){0,3}addressed\b"
     r"|\baddressed\s+in\b|\bclosed\s+in\b|\banswered\s+(?:below|point by point)\b",
@@ -239,6 +298,53 @@ def _post_from_payload(tool_name, tool_input, cwd):
     return None, None, None
 
 
+# A negated or hedged disposition phrase means the OPPOSITE of answering a
+# finding, so it must not fire. An adversarial review reproduced the gap end to
+# end: "None of the findings are addressed yet" is an ordinary honest
+# self-review, and this hook warned on it -- contradicting its own fire
+# condition 5, and warning on a self-review is exactly how a guard gets
+# switched off. `flag-clean-claim-over-findings.py` already carries the
+# disqualifiers `classify_verdict()` applies to its own bare patterns, so they
+# are reused rather than re-derived; the negator set is widened with the
+# determiner forms ("none of the findings", "neither") that a disposition scan
+# meets and a clean-claim scan does not.
+_FALLBACK_PREFIX_DISQUALIFY = re.compile(
+    r"(?i)\b(?:should|would|could|might|may|claims?|says?|said|saying|"
+    r"seems?|apparently|maybe|perhaps|if|unless|hypothetically)\b"
+)
+PREFIX_DISQUALIFY_RX = (getattr(_clean_claim, "PREFIX_DISQUALIFY_RX", None)
+                        or _FALLBACK_PREFIX_DISQUALIFY)
+NEGATION_RX = re.compile(
+    r"(?i)(?:\bnot\b|\bnever\b|\bno\b|\bnone\b|\bneither\b|\bnor\b|"
+    r"\bnothing\b|\bwithout\b|\bun(?:addressed|resolved)\b|n't\b|"
+    r"\byet\s+to\b|\bfail(?:s|ed)?\s+to\b)"
+)
+
+# The clause the phrase sits in, bounded by a sentence end or a PARAGRAPH
+# break. Deliberately not a bare `\n`: this corpus writes semantic line
+# breaks, so a negator and the phrase it governs routinely sit on adjacent
+# lines of one sentence ("... was never\naddressed in the fix"), and a
+# newline boundary cut the negator off -- reproduced against the suite's
+# own `NEGATED_PHRASES` fixture. A blank line is a real block boundary and
+# still bounds the window.
+RX_CLAUSE_START = re.compile(r"[.!?]|\n\s*\n")
+
+
+def _disqualified(prose, match_start):
+    """True when a negator or hedge governs the phrase at `match_start`.
+
+    The window is the phrase's own CLAUSE -- back to the nearest sentence
+    end or line break -- so a negation in a previous sentence does not
+    reach it. Where that window is ambiguous this errs toward
+    disqualifying, which is the cheap direction here: a missed warning
+    costs one un-guarded comment, while a false warning lands on a genuine
+    self-review and teaches the author to ignore the hook.
+    """
+    starts = [m.end() for m in RX_CLAUSE_START.finditer(prose, 0, match_start)]
+    window = prose[(starts[-1] if starts else 0):match_start]
+    return bool(NEGATION_RX.search(window) or PREFIX_DISQUALIFY_RX.search(window))
+
+
 def echoed_verdict(body):
     """The matched disposition phrase when `body` should warn, else None."""
     if not body or classify_verdict is None:
@@ -248,12 +354,19 @@ def echoed_verdict(body):
             return None
     except Exception:
         return None
-    if RX_REVIEW_PAYLOAD.search(body):
+    prose = authored_text(body)
+    if RX_REVIEW_PAYLOAD.search(prose):
         return None
-    hit = RX_DISPOSITION.search(body)
-    if not hit:
-        return None
-    return " ".join(hit.group(0).split())
+    for hit in RX_DISPOSITION.finditer(prose):
+        # The bullet branch starts at the preceding newline, so the clause
+        # window would otherwise be the LINE ABOVE the bullet. Anchor on the
+        # phrase's own first word instead.
+        word = re.search(r"[A-Za-z0-9]", hit.group(0))
+        start = hit.start() + (word.start() if word else 0)
+        if _disqualified(prose, start):
+            continue
+        return " ".join(hit.group(0).split())
+    return None
 
 
 def _read_payload():

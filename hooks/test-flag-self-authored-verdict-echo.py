@@ -77,6 +77,51 @@ SELF_REVIEW = (
     "2. The retry loop has no ceiling.\n"
 ) % NOT_CLEAN
 
+# A genuine self-review that DOES carry disposition vocabulary, negated.
+# The `SELF_REVIEW` fixture above states findings in vocabulary this hook
+# never matches, so it passed under a negation-blind fire condition too --
+# an adversarial review reproduced the gap here, on the honest sentence a
+# self-review writes when it has found work and not yet done it.
+SELF_REVIEW_NEGATED = (
+    "## Self-review at `abc1234`\n\n"
+    "### Verdict\n**%s**\n\n"
+    "None of the findings are addressed yet --- I have not started\n"
+    "implementation.\n\n"
+    "1. `foo()` crashes on empty input.\n"
+    "2. The retry loop has no ceiling.\n"
+) % NOT_CLEAN
+
+# The same blindness reached through the bare phrases rather than the
+# quantifier: each of these is a statement that something was NOT done.
+NEGATED_PHRASES = (
+    "### Verdict\n**%s**\n\n"
+    "This is not closed in the current diff. The concern was not answered\n"
+    "below because it is out of scope, and the root cause was never\n"
+    "addressed in the fix.\n"
+) % NOT_CLEAN
+
+# A closed markdown-italic ARD label. `_` is a word character, so the verb
+# has no word boundary after it and a `\b`-terminated pattern cannot match.
+ITALIC_ARD_LABEL = (
+    "## Disposition at `f120e5a`\n\n"
+    "### Verdict\n**%s**\n\n"
+    "_Addressed_ in the push above.\n"
+) % NOT_CLEAN
+
+# A disposition that quotes the REVIEWER's payload back, to say what the
+# review concluded. The payload is not this comment's own, so it must not
+# exempt the comment -- `classify_verdict()` reads it as this author's
+# verdict all the same, which is the incident's own shape.
+QUOTED_PAYLOAD = (
+    "## Disposition at `f120e5a`\n\n"
+    "Verdict: **%s**, the reviewer said.\n\n"
+    "**1. Addressed.** Fixed in `abc123`.\n\n"
+    "It concluded:\n\n"
+    "> <!-- review-data:\n"
+    '> {"schema_version": "1.1", "verdict": "NOT_CLEAN"}\n'
+    "> -->\n"
+) % NOT_CLEAN
+
 # A real review, carrying the machine payload a review emits.
 REVIEW_WITH_PAYLOAD = (
     "### Verdict\n**%s**\n\n"
@@ -188,6 +233,9 @@ def main():
                         ("code-spanned echo", ECHO_CODE_SPAN)):
         got = mod.classify_verdict(body)
         check(f"classifier still reads {label} as not-clean", got, "not-clean")
+    tools = getattr(mod, "MCP_POST_TOOLS", ())
+    check("the MCP tool list carries no duplicate",
+          len(tools) == len(set(tools)) and len(tools) > 0, True)
     check("classifier reads the described form as no-verdict",
           mod.classify_verdict(DESCRIBED_NOT_ECHOED), "")
 
@@ -197,6 +245,9 @@ def main():
     check("a code span does not exempt it", mcp(ECHO_CODE_SPAN), True)
     check("the ARD bullet form alone is disposition vocabulary",
           mcp(ECHO_BULLET_ONLY), True)
+    check("a closed italic ARD label still matches", mcp(ITALIC_ARD_LABEL), True)
+    check("a QUOTED review payload does not exempt the comment",
+          mcp(QUOTED_PAYLOAD), True)
     check("an edit to an existing comment is covered",
           mcp(ECHO_DISPOSITION, "mcp__github__update_issue_comment"), True)
     check(
@@ -210,6 +261,10 @@ def main():
     print("Negative cases (must stay silent):")
     check("a genuine self-review stating its own verdict",
           mcp(SELF_REVIEW), False)
+    check("a self-review whose disposition vocabulary is NEGATED",
+          mcp(SELF_REVIEW_NEGATED), False)
+    check("negated disposition phrases stay silent",
+          mcp(NEGATED_PHRASES), False)
     check("a real review carrying a review-data payload",
           mcp(REVIEW_WITH_PAYLOAD), False)
     check("the call described rather than reproduced",

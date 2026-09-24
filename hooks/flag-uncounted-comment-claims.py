@@ -68,7 +68,10 @@ Agent briefs):
   * CARDINALITY -- a COUNT (digit run or a number word) followed, within a
     small gap, by a plural noun drawn from LISTABLE_NOUN -- a curated
     vocabulary of countable, listable ARTIFACTS (files, scripts, lines,
-    tests, comments, mentions, sites, findings, PRs, commits, hooks, ...).
+    tests, comments, mentions, sites, hooks, skills, memories, ...).
+    Routine review-housekeeping words (findings, PRs, commits, issues,
+    fixes, bugs) are deliberately excluded to prevent false positives on
+    routine summary prose (see vocabulary comments below).
     The noun carries the precision burden that `remind-brief-premises.py`'s
     PATH clause carries there: an unscoped "any plural noun" would fire on
     "three days" or "two people" just as readily as "18 files".

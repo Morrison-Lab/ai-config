@@ -11,6 +11,7 @@ error).
 """
 import importlib.util
 import json
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -317,55 +318,51 @@ def main() -> int:
             len(errs) == 1 and "over the marketplace" in errs[0],
         )
 
-    # --- skills-directory plugin exemption (ai-config#2004) ---
+    # --- a plugin manifest under skills/ breaks the marketplace sync ---
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)
         plugin = tmp / "skills" / "hooks-only"
         (plugin / ".claude-plugin").mkdir(parents=True)
-        manifest = plugin / ".claude-plugin" / "plugin.json"
-        manifest.write_text(
+        (plugin / ".claude-plugin" / "plugin.json").write_text(
             json.dumps({"name": "hooks-only", "description": "d"}),
             encoding="utf-8",
-        )
-        errors, _ = run_skills_check(tmp)
-        check("skills-dir plugin without SKILL.md is not an error", errors == [])
-
-        manifest.write_text(
-            json.dumps({"name": "other", "description": "d"}), encoding="utf-8"
         )
         errors, _ = run_skills_check(tmp)
         check(
-            "skills-dir plugin whose name != directory is an error",
-            any("!= directory" in e for e in errors),
+            "skills-dir plugin under skills/ is one sync error",
+            len(errors) == 1 and "marketplace sync" in errors[0],
         )
 
-        manifest.write_text(
-            json.dumps({"name": "hooks-only", "description": "d"}),
-            encoding="utf-8",
-        )
         (tmp / "skills" / "bare").mkdir()
         errors, _ = run_skills_check(tmp)
         check(
             "skill dir with neither SKILL.md nor manifest is still an error",
             any("no SKILL.md" in e for e in errors),
         )
-        (tmp / "skills" / "bare").rmdir()
 
-        manifest.write_text(
-            json.dumps({"name": "hooks-only", "description": ""}),
-            encoding="utf-8",
-        )
-        errors, _ = run_skills_check(tmp)
+        # A manifest in any .claude-plugin/ below the root is an error;
+        # the root one and a parked manifest outside such a dir are not.
+        repo = tmp / "nested"
+        repo.mkdir()
+        for rel in (".claude-plugin/plugin.json",
+                    "plugins/hooks/.claude-plugin/plugin.json",
+                    "plugins/parked/plugin.json.parked"):
+            (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+            (repo / rel).write_text("{}", encoding="utf-8")
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+        subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+        original_root = vs.ROOT
+        vs.ROOT = repo
+        vs.errors.clear()
+        try:
+            vs.check_nested_plugin_manifests()
+            errors = list(vs.errors)
+        finally:
+            vs.ROOT = original_root
         check(
-            "skills-dir plugin with an empty description is an error",
-            any("empty description" in e for e in errors),
-        )
-
-        manifest.write_text("{not json", encoding="utf-8")
-        errors, _ = run_skills_check(tmp)
-        check(
-            "skills-dir plugin with invalid manifest JSON is one error",
-            len(errors) == 1 and "invalid JSON" in errors[0],
+            "nested .claude-plugin manifest is exactly one sync error",
+            len(errors) == 1
+            and errors[0].startswith("plugins/hooks/.claude-plugin/"),
         )
 
 

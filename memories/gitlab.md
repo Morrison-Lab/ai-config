@@ -143,15 +143,76 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   - `glab api --method POST "/projects/<TARGET_ID>/job_token_scope/allowlist" -f "target_project_id=<SOURCE_ID>"`
   - `include:` (for CI templates) works independently of the API allowlist
   - Check existing: `glab api "/projects/<ID>/job_token_scope/allowlist"`
-  - A Maintainer cannot always temporarily disable a target project's
-    inbound scope for an access A/B.
+  - For cross-project Git transport, do not interpolate `CI_JOB_TOKEN` into
+    a remote URL.
+    An authentication failure can echo a credential-bearing URL.
+    Use a short-lived, mode-700 `GIT_ASKPASS` helper that reads the inherited
+    job token, keep `GIT_TERMINAL_PROMPT=0`, disable shell tracing during
+    authentication, and remove the helper on exit.
+    Invoke Git with `LC_ALL=C` when the helper recognizes its username/password
+    prompts, because Git localizes those prompt strings.
+    (Measured 2026-09-23 while testing HACR access from `test.hac`.)
+  - A GitLab personal, group, or project access token can authenticate Git over
+    HTTPS as the password with any non-empty username when it has repository
+    read access and authorization for the target.
+    Use `oauth2` as the generic askpass username and preserve
+    `gitlab-ci-token` for `CI_JOB_TOKEN`.
+    (Verified against GitLab documentation on 2026-09-24 during review of
+    HACtions MR !71.)
+  - Unset inherited askpass credential aliases and Git prompt settings, then
+    scope their replacements to each Git command instead of exporting them for
+    a whole CI script block.
+    Test that a later non-Git subprocess cannot inherit those values.
+    (Learned from the 2026-09-24 independent review of HACtions MR !71.)
+  - In shell, assigning an inherited exported variable preserves its export
+    attribute.
+    `unset` secret aliases before assigning them for command-local use, and
+    test with those aliases pre-exported.
+    (Learned from the 2026-09-24 independent review of HACtions MR !71.)
+  - Do not materialize a token-backed HTTP header before the selected transport
+    needs it.
+    Construct it only in the archive-fetch branch so Git transport does not
+    leave an unrelated plaintext credential file in the workspace.
+    (Learned from the 2026-09-24 independent review of HACtions MR !71.)
+  - Disable shell tracing before inspecting or constructing token-backed values.
+    `set +x` after a token-selection conditional is too late:
+    Bash has already logged both the conditional expansion and any assignment.
+    Exercise CI-token and PAT paths under `bash -x` with sentinel values,
+    and assert the transport still authenticates while the trace omits each value.
+    A PAT-fallback test in GitLab CI must explicitly clear `CI_JOB_TOKEN`,
+    because the runner otherwise supplies the preferred credential and masks the fallback path.
+    The archive and API paths need the same protection as Git askpass.
+    (Learned from the 2026-09-24 independent review of HACtions MR !71.)
+  - Build a CI Git remote from `CI_SERVER_URL`, not `CI_SERVER_HOST`.
+    The host drops the configured protocol, port, and any GitLab relative URL
+    root, which breaks self-hosted instances outside default HTTPS.
+    (Learned from the 2026-09-24 review of HACtions MR !71.)
+  - A regression test for a CI-variable default must not set that variable in
+    the test environment.
+    Also assert the rendered YAML value when the default itself is contractual.
+    (Learned from the 2026-09-24 review of HACtions MR !71.)
+  - A shell test double must explicitly exit on an invariant failure unless it
+    enables `set -e`.
+    A bare `test` can be overwritten by a later successful command and leave a
+    regression undetected.
+    (Learned from the 2026-09-24 independent review of HACtions MR !71.)
+  - A test for an environment override must set a contrasting ambient value.
+    Inheriting the runner environment can mask removal of the override when its
+    default already matches the expected value.
+    (Learned from the 2026-09-24 independent review of HACtions MR !71.)
+  - A credential-provider test must assert both the username and password.
+    Include the case where multiple supported credentials are present to keep
+    the intended precedence from silently regressing.
+    (Learned from the 2026-09-24 independent review of HACtions MR !71.)
+  - A Maintainer cannot always temporarily disable a target project's inbound
+    scope for an access A/B.
     If `PATCH /projects/<ID>/job_token_scope` with `enabled=false` returns
     "Job token scope cannot be disabled ... enforced for the instance,"
     the setting is instance-enforced and only an instance administrator can change it.
     Verify the subsequent `GET` still reports
     `inbound_enabled: true`; do not retry the CI job under a claimed bypass.
-    (Measured 2026-09-23 while diagnosing access from `test.hac`
-    to HACR (`health-analytics-core/hacr`).)
+    (Measured 2026-09-23 while diagnosing access from `test.hac` to HACR
+    (`health-analytics-core/hacr`).)
   - Decode `access_level` with GitLab's versioned role mapping.
     In GitLab 19.0.2, `40` means Maintainer (`30` is Developer);
     verify effective access with `GET /projects/<ID>/members/all?query=<username>`

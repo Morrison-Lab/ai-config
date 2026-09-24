@@ -81,9 +81,11 @@ WHERE IT DELIBERATELY DOES NOT FIRE
   ai-config#1929, not a decision that they are safe.
 - A push whose every resolved push URL ends in an `EXEMPT_REPOS` entry
   (Morrison-Lab's mln, mlg and mlr) passes with no verdict and no override.
-  Only a github.com URL (https or ssh) on a configured remote counts, so a
-  push URL on any other host, a local path, or a literal URL in the remote
-  position is still gated.
+  Only a github.com URL (https or ssh) on a configured remote counts, and only
+  for a plain push: no `-c`, no environment prefix, and no ssh command, proxy,
+  exec path or receive-pack program that could deliver the pack elsewhere. A
+  push URL on any other host, a local path, a literal URL in the remote
+  position, or anything else is still gated.
 
 Authorized override: `ALLOW_UNREVIEWED_PUSH=1`, as an environment assignment on
 the pushing command itself.
@@ -1440,14 +1442,53 @@ def _owner_repo(url: str) -> str | None:
     return f"{m.group(1)}/{m.group(2)}".lower() if m else None
 
 
+# What can send a push somewhere its URL does not name. `git remote get-url`
+# reports the URL after `insteadOf`/`pushurl` rewriting, but a command git runs
+# to reach it (an ssh wrapper, a proxy, a replaced remote helper, a
+# `--receive-pack` program) can deliver the pack anywhere while git still
+# prints the github.com URL. So a push that carries or inherits any of these is
+# never exempt.
+TRANSPORT_ENV = frozenset({
+    "GIT_SSH", "GIT_SSH_COMMAND", "GIT_SSH_VARIANT", "GIT_PROXY_COMMAND",
+    "GIT_EXEC_PATH",
+})
+TRANSPORT_CONFIG = (r"^(core\.sshcommand|core\.gitproxy"
+                    r"|remote\..*\.(receivepack|vcs))$")
+
+
+def _is_plain_push(directory: str | None, argv: list[str],
+                   env: list[str]) -> bool:
+    """True when nothing in or around this push can redirect its transport.
+
+    Plain means: no environment prefix at all, no git global option but `-C`,
+    no `--receive-pack`/`--exec`, none of TRANSPORT_ENV in the inherited
+    environment, and none of TRANSPORT_CONFIG in the repository's resolved
+    config. Stricter than it needs to be on purpose: an exempt push that is
+    not plain just goes through the ordinary review check.
+    """
+    if env or any(os.environ.get(k) for k in TRANSPORT_ENV):
+        return False
+    i = 1
+    while i < len(argv) and argv[i] != "push":
+        if argv[i] != "-C" or i + 1 >= len(argv):
+            return False
+        i += 2
+    for tok in argv[i + 1:]:
+        if tok.startswith(("--receive-pack", "--exec")):
+            return False
+    return not _run_git(directory, env, "config", "--get-regexp",
+                        TRANSPORT_CONFIG)
+
+
 def push_is_exempt(directory: str | None, argv: list[str],
                    env: list[str]) -> bool:
     """True when every URL this push would write to is in EXEMPT_REPOS.
 
-    The remote is resolved the way `_push_remote` resolves it, and its URLs are
-    read with `git remote get-url --push --all` under the pushing command's own
-    `-c` overrides and environment prefix, so `pushurl`, `pushInsteadOf` and an
-    inline `-c remote.origin.pushurl=...` are all seen as git will apply them.
+    Only a plain push (`_is_plain_push`) qualifies, so no `-c`, environment
+    prefix or transport command is in play. The remote is resolved the way
+    `_push_remote` resolves it, and its URLs are read with
+    `git remote get-url --push --all`, so `pushurl` and `insteadOf` rewrites
+    in the repository's config are seen as git will apply them.
     A remote with several push URLs is exempt only if all of them are. A
     command naming a URL or path instead of a configured remote is never
     exempt: `git remote get-url` cannot resolve it, and git still applies
@@ -1462,10 +1503,12 @@ def push_is_exempt(directory: str | None, argv: list[str],
     whole command, which is what `push_refspecs` guards against the same way.
     """
     try:
+        if not _is_plain_push(directory, argv, env):
+            return False
         remote = _push_remote(directory, argv, env)
         if not remote:
             return False
-        listed = _run_git(directory, env, *_config_overrides(argv),
+        listed = _run_git(directory, env,
                           "remote", "get-url", "--push", "--all", remote)
     except Exception:  # TimeoutError included; see above.
         return False

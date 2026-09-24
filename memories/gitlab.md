@@ -174,6 +174,15 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
     Construct it only in the archive-fetch branch so Git transport does not
     leave an unrelated plaintext credential file in the workspace.
     (Learned from the 2026-09-24 independent review of HACtions MR !71.)
+  - Disable shell tracing before inspecting or constructing token-backed values.
+    `set +x` after a token-selection conditional is too late:
+    Bash has already logged both the conditional expansion and any assignment.
+    Exercise CI-token and PAT paths under `bash -x` with sentinel values,
+    and assert the transport still authenticates while the trace omits each value.
+    A PAT-fallback test in GitLab CI must explicitly clear `CI_JOB_TOKEN`,
+    because the runner otherwise supplies the preferred credential and masks the fallback path.
+    The archive and API paths need the same protection as Git askpass.
+    (Learned from the 2026-09-24 independent review of HACtions MR !71.)
   - Build a CI Git remote from `CI_SERVER_URL`, not `CI_SERVER_HOST`.
     The host drops the configured protocol, port, and any GitLab relative URL
     root, which breaks self-hosted instances outside default HTTPS.

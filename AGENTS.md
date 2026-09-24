@@ -114,6 +114,18 @@ A verified clean stopping point needs no timer because no work remains to resume
 Do not substitute a promise to return for a mechanism that will actually fire.
 See `shared/workflow/flag-session-boundaries.md`.
 
+## Terminate superseded and abandoned background tasks
+
+When background tasks, asynchronous command executions, monitors, or subagents are dispatched to inspect, search, or diagnose an issue, actively terminate them as soon as their purpose is fulfilled, their findings are superseded, or the session moves on.
+Never leave diagnostic processes or superseded background jobs running indefinitely.
+Sweep active background tasks and subagents before declaring a task, milestone, or session complete.
+See [`shared/workflow/terminate-superseded-tasks.md`](shared/workflow/terminate-superseded-tasks.md).
+
+- **Do:** kill diagnostic searches, greps, and test processes the moment their question has been answered or superseded.
+- **Do:** run an active task and subagent sweep before declaring a milestone or session complete.
+- **Don't:** leave broad searches running in the background after moving on to fixing the code or writing documentation.
+- **Don't:** answer "session done" or conclude a session while transient background tasks are still running.
+
 ## Prefer optionality over removing functionality
 
 Never remove existing functionality entirely when you can add optionality instead.

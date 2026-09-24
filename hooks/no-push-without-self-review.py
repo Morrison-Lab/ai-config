@@ -81,8 +81,9 @@ WHERE IT DELIBERATELY DOES NOT FIRE
   ai-config#1929, not a decision that they are safe.
 - A push whose every resolved push URL ends in an `EXEMPT_REPOS` entry
   (Morrison-Lab's mln, mlg and mlr) passes with no verdict and no override.
-  Only a github.com URL (https or ssh) or the loopback git proxy counts, so a
-  push URL on any other host, or a local path, is still gated.
+  Only a github.com URL (https or ssh) on a configured remote counts, so a
+  push URL on any other host, a local path, or a literal URL in the remote
+  position is still gated.
 
 Authorized override: `ALLOW_UNREVIEWED_PUSH=1`, as an environment assignment on
 the pushing command itself.
@@ -512,17 +513,20 @@ EXEMPT_REPOS = frozenset({
     "morrison-lab/mlr",
 })
 
-# `owner/repo` of a push URL, accepted only on a host that cannot be anyone
-# else's: github.com over https or ssh, or the loopback git proxy some cloud
-# sessions push through (`http://<user>@127.0.0.1:<port>/git/owner/repo`).
-# Matching the trailing path alone let one inline
-# `-c remote.origin.pushurl=https://any.host/x/Morrison-Lab/mln` read as
-# exempt while shipping somewhere else entirely, so the host is part of the
-# match. A local path or any other host is never exempt.
+# `owner/repo` of a push URL, accepted only on github.com: `https://` (with
+# or without credentials), scp-style `git@github.com:owner/repo`, or
+# `ssh://git@github.com/owner/repo`. Each form takes exactly the separator git
+# itself reads it with -- `git@github.com/owner/repo` is a local path to git,
+# and `ssh://git@github.com:owner/repo` drops the owner from the path it
+# requests -- so neither is matched. Matching the trailing path alone let one
+# inline `-c remote.origin.pushurl=https://any.host/x/Morrison-Lab/mln` read
+# as exempt while shipping somewhere else, so the host is part of the match.
+# The host is case-insensitive, as DNS is; any other host or a local path is
+# never exempt.
 _URL_OWNER_REPO = re.compile(
-    r"(?:https://(?:[^@/\s]+@)?github\.com/"
-    r"|(?:ssh://)?git@github\.com[:/]"
-    r"|http://(?:[^@/\s]+@)?127\.0\.0\.1:\d+/git/)"
+    r"(?:(?i:https://(?:[^@/\s]+@)?github\.com/)"
+    r"|(?i:git@github\.com:)"
+    r"|(?i:ssh://git@github\.com/))"
     r"([^/:\s]+)/([^/:\s]+?)(?:\.git)?/*")
 
 # Options after which no single reviewed commit can describe the push.
@@ -1431,7 +1435,7 @@ def _push_remote(directory: str | None, argv: list[str],
 
 
 def _owner_repo(url: str) -> str | None:
-    """Lowercase `owner/repo` of a github.com or loopback-proxy URL, or None."""
+    """Lowercase `owner/repo` of a github.com push URL, or None."""
     m = _URL_OWNER_REPO.fullmatch(url.strip())
     return f"{m.group(1)}/{m.group(2)}".lower() if m else None
 
@@ -1452,9 +1456,10 @@ def push_is_exempt(directory: str | None, argv: list[str],
 
     Anything unresolvable is NOT exempt, which leaves the push to the ordinary
     review check: the exemption can only ever narrow the guard by destination.
-    That includes running out of the shared time budget. `_run_git` raises
-    `TimeoutError` then, and letting it escape here would reach `main`'s
-    fail-open `except` -- a silent allow, which the budget exists to prevent.
+    That includes running out of the shared time budget, and any parse error:
+    `_run_git` raises `TimeoutError` then, and letting any exception escape
+    here would reach `main`'s fail-open `except` -- a silent allow for the
+    whole command, which is what `push_refspecs` guards against the same way.
     """
     try:
         remote = _push_remote(directory, argv, env)
@@ -1462,7 +1467,7 @@ def push_is_exempt(directory: str | None, argv: list[str],
             return False
         listed = _run_git(directory, env, *_config_overrides(argv),
                           "remote", "get-url", "--push", "--all", remote)
-    except TimeoutError:
+    except Exception:  # TimeoutError included; see above.
         return False
     urls = [u.strip() for u in (listed or "").splitlines() if u.strip()]
     return bool(urls) and all(_owner_repo(u) in EXEMPT_REPOS for u in urls)

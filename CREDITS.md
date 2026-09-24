@@ -42,7 +42,7 @@ Keep the in-skill note short enough that the two cannot meaningfully drift: the 
   [jeremylongshore/claude-code-plugins-plus-skills](https://github.com/jeremylongshore/claude-code-plugins-plus-skills)
   (MIT). Reimplemented from scratch.
 
-- **R and Quarto authoring skills** --- `skills/brand-yml/`, `skills/cli/`, `skills/cran-extrachecks/`, `skills/create-release-checklist/`, `skills/lifecycle/`, `skills/quarto-authoring/`, `skills/r-package-development/`, `skills/release-post/`, `skills/testing-r-packages/` --- adapted from [posit-dev/skills](https://github.com/posit-dev/skills) (MIT).
+- **R and Quarto authoring skills** --- `skills/alt-text/`, `skills/brand-yml/`, `skills/cli/`, `skills/cran-extrachecks/`, `skills/create-release-checklist/`, `skills/lifecycle/`, `skills/quarto-authoring/`, `skills/r-package-development/`, `skills/release-post/`, `skills/testing-r-packages/` --- adapted from [posit-dev/skills](https://github.com/posit-dev/skills) (MIT).
   The upstream license text is kept verbatim at `skills/POSIT-DEV-LICENSE.txt`.
   Each already carries its own `author`/`version`/`license` in frontmatter rather than a `## Heritage` section --- MIT permits reuse outright, so there is no reuse constraint for an in-body note to carry beyond what the frontmatter and this entry already state.
 

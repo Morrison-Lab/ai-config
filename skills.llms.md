@@ -104,6 +104,7 @@ Most skills also respond to plain-English triggers listed in their `description`
 | [`quarto-authoring`](skills/quarto-authoring/SKILL.llms.md) |  | Author and convert Quarto documents |
 | [`lifecycle`](skills/lifecycle/SKILL.llms.md) |  | Apply lifecycle badges and deprecation stages to R package functions |
 | [`brand-yml`](skills/brand-yml/SKILL.llms.md) |  | Configure a shared `_brand.yml` for Quarto, Shiny, and R Markdown |
+| [`alt-text`](skills/alt-text/SKILL.llms.md) |  | Write accessible alt text (`fig-alt`) for figures in Quarto documents and pkgdown sites |
 | [`cli`](skills/cli/SKILL.llms.md) |  | Format CLI output with the R `{cli}` package |
 | [`release-post`](skills/release-post/SKILL.llms.md) |  | Draft a release announcement post for an R package |
 | [`reproducibility-audit`](skills/reproducibility-audit/SKILL.llms.md) |  | Audit a project for reproducibility gaps: hidden deps, hardcoded paths, undocumented prerequisites, output traceability |

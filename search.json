@@ -3437,11 +3437,305 @@
     "text": "always (alias for memorize)\nalways, remember, and memorize are synonyms — same behavior regardless of which word the user uses. An “always …” (or “never …”) directive is a standing preference to persist, so it routes to the same canonical skill. Read and follow the canonical skill:\n→ memorize\n\n\n\n\n Back to top"
   },
   {
-    "objectID": "skills/ai-tells/SKILL.html",
-    "href": "skills/ai-tells/SKILL.html",
-    "title": "ai-tells (alias for find-ai-tells)",
+    "objectID": "skills/also/SKILL.html",
+    "href": "skills/also/SKILL.html",
+    "title": "also",
     "section": "",
-    "text": "ai-tells (alias for find-ai-tells)\nThis is a short alias. Read and follow the canonical skill:\n→ find-ai-tells\n\n\n\n\n Back to top"
+    "text": "/also &lt;instructions&gt; means: finish everything that came before this, then also do &lt;instructions&gt;. The /also text is a tail task appended to the queue — it does not interrupt, reprioritize, or replace the work already underway.\nIt is the lowest-priority non-sticky slot in the queue family:\n\n/first — head of queue; may pause in-progress work to run now.\n/next — immediately after the current (in-progress) task.\n/before &lt;target&gt; — immediately before the referenced queued task.\n/also — tail of queue.\n/last — sticky tail; stays last even as new /also tasks arrive.\n\n\n\nThe user types /also followed by one or more instructions, e.g.:\n\n/also run the spellchecker before you wrap up\n/also add a test for the new helper\n/also update the changelog once everything else is done\n\nThe instructions after /also are the deferred task. Everything the user asked for before the /also (earlier in this message, or in earlier messages that you haven’t finished yet) is the preceding work.\n\n\n\n\nIdentify the preceding work. Look back over the current message and any still-unfinished requests from earlier in the conversation. If a task is in flight (mid-refactor, mid-render, waiting on a verification), that is preceding work.\nFinish all of it first. Do not start the /also task while anything that came before it is incomplete. The whole point of /also is “last, not now.”\nThen do the deferred task. Once the preceding work is genuinely done — verified, not just attempted — carry out the /also instructions as a normal request.\nReport both. In your wrap-up, make clear that the preceding work completed and then the /also task was done (or surface anything that blocked it).\n\n\n\n\n\nNothing precedes it. If there is no outstanding work (the /also is the only live request), just do it immediately — there is nothing to wait for.\nMultiple /alsos. Handle them in the order given, all after the preceding non-/also work. They form a FIFO tail queue.\nThe deferred task depends on the preceding work. That is the normal case and exactly why it is deferred — e.g. “spellcheck before wrapping up” needs the edits done first. Run it against the finished state.\nThe preceding work fails or is blocked. Surface that first. Only skip ahead to the /also task if it is genuinely independent and still useful; otherwise tell the user why you stopped before reaching it.\n\n\n\n\n\nNot a priority bump — /also lowers urgency (do it last), it does not raise it.\nNot a reason to drop or shortcut the preceding work to get to the deferred task faster.\nNot a silent hand-off — always confirm the deferred task’s outcome in your recap.\nNot the sticky-tail variant — /last stays last even as new /also tasks arrive; /also tasks can be displaced by a later /also."
+  },
+  {
+    "objectID": "skills/also/SKILL.html#what-fires-this",
+    "href": "skills/also/SKILL.html#what-fires-this",
+    "title": "also",
+    "section": "",
+    "text": "The user types /also followed by one or more instructions, e.g.:\n\n/also run the spellchecker before you wrap up\n/also add a test for the new helper\n/also update the changelog once everything else is done\n\nThe instructions after /also are the deferred task. Everything the user asked for before the /also (earlier in this message, or in earlier messages that you haven’t finished yet) is the preceding work."
+  },
+  {
+    "objectID": "skills/also/SKILL.html#how-to-handle-it",
+    "href": "skills/also/SKILL.html#how-to-handle-it",
+    "title": "also",
+    "section": "",
+    "text": "Identify the preceding work. Look back over the current message and any still-unfinished requests from earlier in the conversation. If a task is in flight (mid-refactor, mid-render, waiting on a verification), that is preceding work.\nFinish all of it first. Do not start the /also task while anything that came before it is incomplete. The whole point of /also is “last, not now.”\nThen do the deferred task. Once the preceding work is genuinely done — verified, not just attempted — carry out the /also instructions as a normal request.\nReport both. In your wrap-up, make clear that the preceding work completed and then the /also task was done (or surface anything that blocked it)."
+  },
+  {
+    "objectID": "skills/also/SKILL.html#edge-cases",
+    "href": "skills/also/SKILL.html#edge-cases",
+    "title": "also",
+    "section": "",
+    "text": "Nothing precedes it. If there is no outstanding work (the /also is the only live request), just do it immediately — there is nothing to wait for.\nMultiple /alsos. Handle them in the order given, all after the preceding non-/also work. They form a FIFO tail queue.\nThe deferred task depends on the preceding work. That is the normal case and exactly why it is deferred — e.g. “spellcheck before wrapping up” needs the edits done first. Run it against the finished state.\nThe preceding work fails or is blocked. Surface that first. Only skip ahead to the /also task if it is genuinely independent and still useful; otherwise tell the user why you stopped before reaching it."
+  },
+  {
+    "objectID": "skills/also/SKILL.html#what-this-is-not",
+    "href": "skills/also/SKILL.html#what-this-is-not",
+    "title": "also",
+    "section": "",
+    "text": "Not a priority bump — /also lowers urgency (do it last), it does not raise it.\nNot a reason to drop or shortcut the preceding work to get to the deferred task faster.\nNot a silent hand-off — always confirm the deferred task’s outcome in your recap.\nNot the sticky-tail variant — /last stays last even as new /also tasks arrive; /also tasks can be displaced by a later /also."
+  },
+  {
+    "objectID": "skills/agy-review-workflow/SKILL.html",
+    "href": "skills/agy-review-workflow/SKILL.html",
+    "title": "agy-review-workflow",
+    "section": "",
+    "text": "[!IMPORTANT] This workflow’s API-dispatch route is still out of service, most recently confirmed 2026-09-01. The original 2026-08-20 run ended request failed (code 429): Your prepayment credits are depleted / Execution failed: model unreachable; a 2026-09-01 retest (workflow_dispatch run 33557587761) failed again with a different error: Spend cap breached (code 403) rather than the original 429. Two different failures a week apart both stop this dispatch path, so keep it disabled rather than re-running it on spec — do not dispatch the workflow. This is a separate claim from the agy CLI, which is confirmed working on Windows as of 2026-09-02 via a direct local install (see memories/delegation.md’s IMPORTANT banner and its “agy on Windows” section, pointed to from memories/preferences.md) — that CLI route does not go through this workflow file at all, so its recovery says nothing about whether the API dispatch here still fails. Prefer delegate-to-codex or a direct agy --print CLI dispatch (per memories/delegation.md) for a cross-vendor second opinion. Copilot stays requestable on the PR where the org’s licensing reaches it. Tracked as ai-config#1776.\n\nSets up or edits the Google Antigravity PR review, security audit, and test generation workflow (antigravity-review.yml), which invokes the reusable antigravity-code-review.yml workflow from Morrison-Lab/gha.\nPath: .github/workflows/antigravity-review.yml\n\n\n\n\njobs:\n  review:\n    uses: Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2\nThe workflow delegates execution to Morrison-Lab/gha’s reusable workflow, which executes Morrison-Lab/gha/antigravity-review@v2. This ensures updates, safety checks, and runner handling in gha are automatically shared across repos.\n\n\n\npermissions:\n  contents: read\n  pull-requests: write\n  issues: write\n  id-token: write\n  actions: read\n\ncontents: read: Allows reading repository code and diffs.\npull-requests: write: Grants permission to post review comments and verdicts on PRs.\nissues: write: Allows writing issue comments where required.\nid-token: write: Enables OIDC authentication where required.\nactions: read: Lets automated review agents inspect CI run status.\n\n\n\n\nconcurrency:\n  group: antigravity-review-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}\n  cancel-in-progress: true\ncancel-in-progress: true cancels superseded runs on rapid sequential pushes, preventing API quota waste and review comment race conditions.\n\n\n\nsecrets:\n  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}\nAntigravity uses the Gemini API. Ensure the target repo has GEMINI_API_KEY defined in repository or organization secrets (gh secret list).\n\n\n\nSupported operational modes passed via inputs.mode: - code-review (default): Performs an automated PR code review. - security-audit: Runs targeted security inspection on modified code. - test-generation: Generates suggested test cases for changed files.\n\n\n\nwith:\n  trigger-policy: ${{ github.event_name == 'pull_request' && 'on-push' || 'on-request' }}\n\non-push: Automatically reviews PR updates on pull_request events (opened, synchronize, ready_for_review, reopened).\non-request: Restricts review to manual execution via workflow_dispatch.\n\n\n\n\nThe underlying action (Morrison-Lab/gha/antigravity-review@v2) enforces guards so draft PRs, cross-repository (fork) PRs, and dependabot[bot] runs do not leak secrets or execute untrusted code.\n\n\n\n\n\nConfirm GEMINI_API_KEY secret exists (gh secret list).\nWrite .github/workflows/antigravity-review.yml using the template below.\nPush to main or open a PR to enable automated reviews.\n\n\n\n# Active caller for Morrison-Lab/gha's reusable Antigravity PR review workflow.\nname: Antigravity Code Review\n\non:\n  pull_request:\n    types: [opened, synchronize, ready_for_review, reopened]\n\n  workflow_dispatch:\n    inputs:\n      pr_number:\n        description: 'Pull request number to review'\n        required: true\n        type: string\n      mode:\n        description: 'Operational mode: code-review, security-audit, or test-generation'\n        required: false\n        default: 'code-review'\n        type: choice\n        options:\n          - code-review\n          - security-audit\n          - test-generation\n\nconcurrency:\n  group: antigravity-review-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}\n  cancel-in-progress: true\n\njobs:\n  review:\n    permissions:\n      contents: read\n      pull-requests: write\n      issues: write\n      id-token: write\n      actions: read\n    uses: Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2\n    with:\n      mode: ${{ inputs.mode || 'code-review' }}\n      pr-number: ${{ github.event.pull_request.number || inputs.pr_number || '' }}\n      model: ''\n      trigger-policy: ${{ github.event_name == 'pull_request' && 'on-push' || 'on-request' }}\n    secrets:\n      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}\n\n\n\n\n\nclaude-review-workflow – sets up the Claude Code PR review workflow (claude-code-review.yml).\nclaude-agent-workflow – sets up the Claude Code agent workflow (claude.yml).\nconfig-ai – routes AI capability and bot workflow requests to the appropriate skill."
+  },
+  {
+    "objectID": "skills/agy-review-workflow/SKILL.html#load-bearing-pieces-dont-simplify-away",
+    "href": "skills/agy-review-workflow/SKILL.html#load-bearing-pieces-dont-simplify-away",
+    "title": "agy-review-workflow",
+    "section": "",
+    "text": "jobs:\n  review:\n    uses: Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2\nThe workflow delegates execution to Morrison-Lab/gha’s reusable workflow, which executes Morrison-Lab/gha/antigravity-review@v2. This ensures updates, safety checks, and runner handling in gha are automatically shared across repos.\n\n\n\npermissions:\n  contents: read\n  pull-requests: write\n  issues: write\n  id-token: write\n  actions: read\n\ncontents: read: Allows reading repository code and diffs.\npull-requests: write: Grants permission to post review comments and verdicts on PRs.\nissues: write: Allows writing issue comments where required.\nid-token: write: Enables OIDC authentication where required.\nactions: read: Lets automated review agents inspect CI run status.\n\n\n\n\nconcurrency:\n  group: antigravity-review-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}\n  cancel-in-progress: true\ncancel-in-progress: true cancels superseded runs on rapid sequential pushes, preventing API quota waste and review comment race conditions.\n\n\n\nsecrets:\n  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}\nAntigravity uses the Gemini API. Ensure the target repo has GEMINI_API_KEY defined in repository or organization secrets (gh secret list).\n\n\n\nSupported operational modes passed via inputs.mode: - code-review (default): Performs an automated PR code review. - security-audit: Runs targeted security inspection on modified code. - test-generation: Generates suggested test cases for changed files.\n\n\n\nwith:\n  trigger-policy: ${{ github.event_name == 'pull_request' && 'on-push' || 'on-request' }}\n\non-push: Automatically reviews PR updates on pull_request events (opened, synchronize, ready_for_review, reopened).\non-request: Restricts review to manual execution via workflow_dispatch.\n\n\n\n\nThe underlying action (Morrison-Lab/gha/antigravity-review@v2) enforces guards so draft PRs, cross-repository (fork) PRs, and dependabot[bot] runs do not leak secrets or execute untrusted code."
+  },
+  {
+    "objectID": "skills/agy-review-workflow/SKILL.html#setting-up-in-a-new-repo",
+    "href": "skills/agy-review-workflow/SKILL.html#setting-up-in-a-new-repo",
+    "title": "agy-review-workflow",
+    "section": "",
+    "text": "Confirm GEMINI_API_KEY secret exists (gh secret list).\nWrite .github/workflows/antigravity-review.yml using the template below.\nPush to main or open a PR to enable automated reviews.\n\n\n\n# Active caller for Morrison-Lab/gha's reusable Antigravity PR review workflow.\nname: Antigravity Code Review\n\non:\n  pull_request:\n    types: [opened, synchronize, ready_for_review, reopened]\n\n  workflow_dispatch:\n    inputs:\n      pr_number:\n        description: 'Pull request number to review'\n        required: true\n        type: string\n      mode:\n        description: 'Operational mode: code-review, security-audit, or test-generation'\n        required: false\n        default: 'code-review'\n        type: choice\n        options:\n          - code-review\n          - security-audit\n          - test-generation\n\nconcurrency:\n  group: antigravity-review-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}\n  cancel-in-progress: true\n\njobs:\n  review:\n    permissions:\n      contents: read\n      pull-requests: write\n      issues: write\n      id-token: write\n      actions: read\n    uses: Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2\n    with:\n      mode: ${{ inputs.mode || 'code-review' }}\n      pr-number: ${{ github.event.pull_request.number || inputs.pr_number || '' }}\n      model: ''\n      trigger-policy: ${{ github.event_name == 'pull_request' && 'on-push' || 'on-request' }}\n    secrets:\n      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}"
+  },
+  {
+    "objectID": "skills/agy-review-workflow/SKILL.html#relationship-to-other-skills",
+    "href": "skills/agy-review-workflow/SKILL.html#relationship-to-other-skills",
+    "title": "agy-review-workflow",
+    "section": "",
+    "text": "claude-review-workflow – sets up the Claude Code PR review workflow (claude-code-review.yml).\nclaude-agent-workflow – sets up the Claude Code agent workflow (claude.yml).\nconfig-ai – routes AI capability and bot workflow requests to the appropriate skill."
+  },
+  {
+    "objectID": "skills/adv/SKILL.html",
+    "href": "skills/adv/SKILL.html",
+    "title": "adv (Adversarial Review)",
+    "section": "",
+    "text": "Runs a detailed and holistic local adversarial AI code review on outgoing branch commits using an alternate model/engine available on this machine (evaluating architecture, conventions, safety, tests, and diff impacts rather than perfunctory surface checks).\n\n\n\n“adv”, “run adv”, “get an adversarial review from another model”\nWhen the user wants a quick adversarial review using a different desktop subscription model (e.g., Codex, Claude, Cursor, OpenCode, Antigravity) without using their primary model’s context or quota.\n\n\n\n\nNote: Until this skill is merged to main, you must set PRE_PUSH_REVIEW_LOCAL_DEV=1 in your environment to use the local branch copy.\nRun the pre-push-review.py script with the --engine alternate flag to rotate through available models, or specify a specific engine.\n# By default, use the trusted installed review script to prevent executing untrusted branch code.\n# To override with a local checkout during development, set PRE_PUSH_REVIEW_LOCAL_DEV=1\nGIT_ROOT=$(git rev-parse --show-toplevel 2&gt;/dev/null)\nif [ -n \"$PRE_PUSH_REVIEW_LOCAL_DEV\" ] && [ -n \"$GIT_ROOT\" ] && [ -f \"$GIT_ROOT/scripts/pre-push-review.py\" ]; then\n  REVIEW_SCRIPT=\"$GIT_ROOT/scripts/pre-push-review.py\"\nelse\n  TRUSTED_DIR=$(python3 -c \"import os, sys; candidates = [os.environ.get('CLAUDE_PLUGIN_ROOT', ''), '~/.claude/skills/pre-push-review', '~/.gemini/skills/pre-push-review', '~/.cursor/skills/pre-push-review', '~/.codex/skills/pre-push-review', '~/.gemini/config/plugins/ai-config/skills/pre-push-review']; p = next((os.path.realpath(os.path.expanduser(f)) for f in candidates if f and os.path.exists(os.path.expanduser(f))), None); sys.exit('Error: Trusted pre-push-review skill not found') if not p else print(os.path.abspath(p if os.path.isdir(os.path.join(p, 'scripts')) else os.path.join(p, '..', '..')))\")\n  TMP_WORKTREE=$(mktemp -d)\n  trap 'rm -rf \"$TMP_WORKTREE\"' EXIT\n  git -C \"$TRUSTED_DIR\" archive origin/main | tar -x -C \"$TMP_WORKTREE\" 2&gt;/dev/null || { echo \"Error: Failed to extract trusted origin/main review script. Set PRE_PUSH_REVIEW_LOCAL_DEV=1 to use local branch.\"; exit 1; }\n  REVIEW_SCRIPT=\"$TMP_WORKTREE/scripts/pre-push-review.py\"\nfi\n\n\nif [ -n \"$AGENT_NAME\" ]; then\n  python3 \"$REVIEW_SCRIPT\" --engine alternate --exclude-engine \"$AGENT_NAME\"\nelse\n  python3 \"$REVIEW_SCRIPT\" --engine alternate\nfi\nOr explicitly choose an alternate engine (e.g., if you are currently using Claude, you might use Codex or OpenCode):\npython3 \"$REVIEW_SCRIPT\" --engine codex\n\n\n\n\nComputes the local outgoing diff against origin/main (or PR base).\nDispatches the review to the selected alternate model/engine using plan/read-only mode to independently conduct both a detailed implementation defect audit and a holistic change assessment.\nParses and validates the structured review findings.\nExits with a nonzero code on blocking findings (unless --allow-findings is specified).\n\n\n\n\n\npre-push-review: The underlying script and skill for pre-push reviews."
+  },
+  {
+    "objectID": "skills/adv/SKILL.html#when-this-fires",
+    "href": "skills/adv/SKILL.html#when-this-fires",
+    "title": "adv (Adversarial Review)",
+    "section": "",
+    "text": "“adv”, “run adv”, “get an adversarial review from another model”\nWhen the user wants a quick adversarial review using a different desktop subscription model (e.g., Codex, Claude, Cursor, OpenCode, Antigravity) without using their primary model’s context or quota."
+  },
+  {
+    "objectID": "skills/adv/SKILL.html#usage",
+    "href": "skills/adv/SKILL.html#usage",
+    "title": "adv (Adversarial Review)",
+    "section": "",
+    "text": "Note: Until this skill is merged to main, you must set PRE_PUSH_REVIEW_LOCAL_DEV=1 in your environment to use the local branch copy.\nRun the pre-push-review.py script with the --engine alternate flag to rotate through available models, or specify a specific engine.\n# By default, use the trusted installed review script to prevent executing untrusted branch code.\n# To override with a local checkout during development, set PRE_PUSH_REVIEW_LOCAL_DEV=1\nGIT_ROOT=$(git rev-parse --show-toplevel 2&gt;/dev/null)\nif [ -n \"$PRE_PUSH_REVIEW_LOCAL_DEV\" ] && [ -n \"$GIT_ROOT\" ] && [ -f \"$GIT_ROOT/scripts/pre-push-review.py\" ]; then\n  REVIEW_SCRIPT=\"$GIT_ROOT/scripts/pre-push-review.py\"\nelse\n  TRUSTED_DIR=$(python3 -c \"import os, sys; candidates = [os.environ.get('CLAUDE_PLUGIN_ROOT', ''), '~/.claude/skills/pre-push-review', '~/.gemini/skills/pre-push-review', '~/.cursor/skills/pre-push-review', '~/.codex/skills/pre-push-review', '~/.gemini/config/plugins/ai-config/skills/pre-push-review']; p = next((os.path.realpath(os.path.expanduser(f)) for f in candidates if f and os.path.exists(os.path.expanduser(f))), None); sys.exit('Error: Trusted pre-push-review skill not found') if not p else print(os.path.abspath(p if os.path.isdir(os.path.join(p, 'scripts')) else os.path.join(p, '..', '..')))\")\n  TMP_WORKTREE=$(mktemp -d)\n  trap 'rm -rf \"$TMP_WORKTREE\"' EXIT\n  git -C \"$TRUSTED_DIR\" archive origin/main | tar -x -C \"$TMP_WORKTREE\" 2&gt;/dev/null || { echo \"Error: Failed to extract trusted origin/main review script. Set PRE_PUSH_REVIEW_LOCAL_DEV=1 to use local branch.\"; exit 1; }\n  REVIEW_SCRIPT=\"$TMP_WORKTREE/scripts/pre-push-review.py\"\nfi\n\n\nif [ -n \"$AGENT_NAME\" ]; then\n  python3 \"$REVIEW_SCRIPT\" --engine alternate --exclude-engine \"$AGENT_NAME\"\nelse\n  python3 \"$REVIEW_SCRIPT\" --engine alternate\nfi\nOr explicitly choose an alternate engine (e.g., if you are currently using Claude, you might use Codex or OpenCode):\npython3 \"$REVIEW_SCRIPT\" --engine codex"
+  },
+  {
+    "objectID": "skills/adv/SKILL.html#how-it-works",
+    "href": "skills/adv/SKILL.html#how-it-works",
+    "title": "adv (Adversarial Review)",
+    "section": "",
+    "text": "Computes the local outgoing diff against origin/main (or PR base).\nDispatches the review to the selected alternate model/engine using plan/read-only mode to independently conduct both a detailed implementation defect audit and a holistic change assessment.\nParses and validates the structured review findings.\nExits with a nonzero code on blocking findings (unless --allow-findings is specified)."
+  },
+  {
+    "objectID": "skills/adv/SKILL.html#related",
+    "href": "skills/adv/SKILL.html#related",
+    "title": "adv (Adversarial Review)",
+    "section": "",
+    "text": "pre-push-review: The underlying script and skill for pre-push reviews."
+  },
+  {
+    "objectID": "skills/adri/SKILL.html",
+    "href": "skills/adri/SKILL.html",
+    "title": "adri (alias for ardi)",
+    "section": "",
+    "text": "adri (alias for ardi)\nThis is a transposition-typo alias for the ardi skill. Read and follow the canonical skill:\n→ ardi\n\n\n\n\n Back to top"
+  },
+  {
+    "objectID": "workflow.html",
+    "href": "workflow.html",
+    "title": "Workflow guide",
+    "section": "",
+    "text": "This page covers the key workflow conventions baked into the skills and CLAUDE.md instructions in this repo."
+  },
+  {
+    "objectID": "workflow.html#issue-first",
+    "href": "workflow.html#issue-first",
+    "title": "Workflow guide",
+    "section": "Issue-first",
+    "text": "Issue-first\nBefore branching, editing, or opening a PR, make sure a tracking issue exists. Search first; if no open issue covers the task, file one:\ngh issue create --title \"...\" --body \"...\"\nThe issue is the durable record of intent and scope. It lets the PR auto-close it via Closes #N and keeps the work discoverable if the PR stalls.\nThe start-task skill (/st) runs this pattern end-to-end: search for an existing issue, file one if needed, branch, implement, open PR, and iterate to clean."
+  },
+  {
+    "objectID": "workflow.html#claim-a-pr-before-working-on-it",
+    "href": "workflow.html#claim-a-pr-before-working-on-it",
+    "title": "Workflow guide",
+    "section": "Claim a PR before working on it",
+    "text": "Claim a PR before working on it\nBefore fetching a branch, editing files, or triggering a review loop, post a brief comment so other people and bots know not to start a conflicting session:\ngh pr comment &lt;N&gt; --body \"Working on this --- please hold off on pushing to this branch until I'm done.\n\n_Posted by Claude Code (AI agent) --- not written by a human._\"\nAfter the session ends (PR merged, paused, or closed), follow up with a closing comment so the PR is unclaimed for the next person.\nSkip the claim step if the most recent comment already claims it and the claim is still live — claims expire 2 hours after the most recent push or comment, and need reasserting past that. Read-only inspection (checking status, explaining a diff) doesn’t need a claim.\nThe claim-pr skill handles the exact wording and tracks when to unclaim."
+  },
+  {
+    "objectID": "workflow.html#the-ardi-loop",
+    "href": "workflow.html#the-ardi-loop",
+    "title": "Workflow guide",
+    "section": "The ARDI loop",
+    "text": "The ARDI loop\nARDI stands for Address, Rebut, Defer, Iterate. It’s the review loop that drives a PR to a clean verdict.\nFor every flagged item in a review, do exactly one of:\n\nAddress — fix it in this PR (the default path; most nits are 1–3 line changes).\nRebut — explain why the finding is wrong or doesn’t apply. Post the rebuttal in the PR and wait for the reviewer’s response. A rebuttal that doesn’t convince the reviewer does not close the item.\nDefer — file a follow-up issue and reference it in the PR. Use only when the fix expands scope (new feature, separate concern) or the requester said the PR shouldn’t grow.\n\nAfter handling every item, push the fixes, post an ARD summary comment, and re-request review. Repeat until the latest review has zero flagged items under any heading.\nThe ardi skill (/ardi) runs this full loop automatically. Aliases: dc, drive, clean, iterate.\n\nWhat “fully clean” means\nA PR is fully clean when:\n\nAll CI workflows and check runs are green and completed – not just the required checks, and not just the review job.\nThe latest review has no flagged items — no nits, no “consider”, no “minor observation”. The reviewer’s “Not a blocker” label is not a pass; fix it or defer it.\nThat review is a genuine posted verdict at the current head commit, from an external reviewer whenever one is reachable. Self-review is only the fallback for when no working external reviewer is available – never a substitute once one is – and availability gets re-checked right before declaring clean, not assumed from an earlier round.\n\nAt fully clean, every inline review thread is resolved. The only open conversation is the final all-clear exchange.\nSee shared/workflow/fully-clean.md for the full definition this page summarizes.\nDeadlock: if you and the reviewer can’t reach consensus after a rebuttal exchange, escalate to a human reviewer via the request-pr-review skill (which resolves that person from the repository’s own configuration, not from a name written here) rather than looping."
+  },
+  {
+    "objectID": "workflow.html#keep-branches-synced-with-main",
+    "href": "workflow.html#keep-branches-synced-with-main",
+    "title": "Workflow guide",
+    "section": "Keep branches synced with main",
+    "text": "Keep branches synced with main\nBefore pushing fixes or triggering a fresh review, merge main into the PR branch:\ngit fetch origin main\ngit log --oneline ..origin/main | head    # any output? main is ahead\ngit merge origin/main\nDon’t rebase or squash-rewrite a published PR branch unless explicitly asked — a merge commit matches GitHub’s “Update branch” button and preserves PR history.\nThe sync-pr-branch skill (/sync) does this automatically."
+  },
+  {
+    "objectID": "workflow.html#tracking-upstream-issues",
+    "href": "workflow.html#tracking-upstream-issues",
+    "title": "Workflow guide",
+    "section": "Tracking upstream issues",
+    "text": "Tracking upstream issues\nWhen you find a bug in a dependency or external repo:\n\nOpen a PR in the upstream repo if you have a fix ready.\nFile an issue in the upstream repo if you have tracker access but no fix.\nFile an issue in your own repo and ask the user to transfer it via GitHub’s Transfer issue feature.\n\nIn all cases, link the upstream issue or PR in your current PR so the root cause is tracked.\nThe send-upstream skill (/sup) handles steps 1–2."
+  },
+  {
+    "objectID": "workflow.html#updating-memories-and-skills",
+    "href": "workflow.html#updating-memories-and-skills",
+    "title": "Workflow guide",
+    "section": "Updating memories and skills",
+    "text": "Updating memories and skills\nAfter a PR merges (or at the end of any significant session), run UMS to capture what you learned:\n/ums\nUMS reviews recent context for recurring review findings, corrections, and guidance, then writes or updates the relevant memory and skill files. A merge is the natural checkpoint to bank lessons before context is lost.\nThe merge-it skill chains merge-it → post-merge → ums automatically when you say “merge it”."
+  },
+  {
+    "objectID": "workflow.html#queue-keywords",
+    "href": "workflow.html#queue-keywords",
+    "title": "Workflow guide",
+    "section": "Queue keywords",
+    "text": "Queue keywords\nSeveral bare keywords (no / prefix) trigger skill semantics:\n\n\n\n\n\n\n\n\nKeyword\nSkill\nWhat it does\n\n\n\n\nalso\n/also\nAppend a task to the current queue\n\n\nfirst\n/first\nPrepend a task (do it before anything else)\n\n\nnext\n/next\nQueue a task for after the current one\n\n\nbefore\n/before\nInsert a task before a named step\n\n\nand\n/and\nAdd a step to the current task\n\n\nremember / always\n/memorize\nSave a fact or preference to memory"
+  },
+  {
+    "objectID": "skills.html",
+    "href": "skills.html",
+    "title": "Skills",
+    "section": "",
+    "text": "Skills are markdown files that teach Claude Code a reusable workflow. Each skills/&lt;name&gt;/SKILL.md file describes when to invoke the skill, what steps to follow, and which tools it may use. Claude Code discovers skills in ~/.claude/skills/ automatically.\nCodex uses generated wrappers in codex-skills/&lt;name&gt;/SKILL.md. Those wrappers keep Codex frontmatter strict and point back to the canonical Claude skill in skills/, so the workflow stays in one place."
+  },
+  {
+    "objectID": "skills.html#how-to-invoke-a-skill",
+    "href": "skills.html#how-to-invoke-a-skill",
+    "title": "Skills",
+    "section": "How to invoke a skill",
+    "text": "How to invoke a skill\n\n\n\nSurface\nSyntax\n\n\n\n\nLocal CLI\n/skill-name or a bare keyword (e.g. ardi)\n\n\nPlugin (other repos)\n/ai-config:skill-name\n\n\n@claude bot on PRs\n@claude skill-name in a PR comment\n\n\nCodex\nskill trigger from ${CODEX_HOME:-$HOME/.codex}/skills\n\n\n\nMost skills also respond to plain-English triggers listed in their description field (e.g. “grab an issue”, “drive to clean”, “update memories and skills”)."
+  },
+  {
+    "objectID": "skills.html#skill-categories",
+    "href": "skills.html#skill-categories",
+    "title": "Skills",
+    "section": "Skill categories",
+    "text": "Skill categories\n\nPR / review workflow\n\n\n\nSkill\nAliases\nWhat it does\n\n\n\n\nardi\ndc, drive, clean, iterate\nRead the latest review, address/rebut/defer every finding, push, re-request review — loop until clean\n\n\nard\nadr\nSingle ARD pass: address, rebut, defer, or acknowledge — without the iterate loop\n\n\nresolve-pr-threads\n\nResolve inline review threads that are already settled, without a full ARD pass\n\n\nclaim-pr\n\nPost a claim comment before a work session; unclaim when done\n\n\nrequest-pr-review\n\nAdd a human reviewer and @-mention them with context\n\n\npr-status\n\nReport the current PR’s CI and review state\n\n\npr-status-all\n\nReport status across all open PRs\n\n\nstack-prs\n\nBranch a new PR off an unmerged base PR, keep it in sync, and re-target it to main once the base merges\n\n\n\n\n\nIssue management\n\n\n\nSkill\nAliases\nWhat it does\n\n\n\n\nbrainstorm\n\nSocratic clarifying-question loop before any code/issue, ending in a plan file\n\n\nstart-task\nst\nFile a tracking issue (if none exists), branch, implement, open PR, ARDI to clean\n\n\ngrab-issue\ngi\nPick the highest-priority open issue and work it end-to-end\n\n\ngrab-issues-in-parallel\ngip\nGrab multiple issues and work them in parallel worktrees\n\n\ndefer-issue\n\nFile a follow-up issue for something out of scope in the current PR\n\n\ncancel-superseded\ncb\nClose issues/PRs that a merged PR made redundant\n\n\ndiscussions\n\nRead and respond to GitHub Discussions topics; mark Q&A answers\n\n\nmigrate-discussion\n\nMove an item between Discussions and Issues when it fits the other tracker better\n\n\n\n\n\nBranch / sync\n\n\n\nSkill\nAliases\nWhat it does\n\n\n\n\nsync-pr-branch\nsync, merge-main, resync-branch\nFetch origin, merge main into the branch, push\n\n\nmerge-it\nmerged\nSquash-merge a ready PR, then run post-merge cleanup\n\n\nmwc\nmerge-when-confident, maw, merge-at-will\nGrant session-scoped permission to merge fully-clean PRs without asking per PR\n\n\npost-merge\n\nAfter a merge: checkout main, pull, delete branch, run UMS\n\n\nclean-branches\ncb, prune\nDelete local branches already merged or closed\n\n\nclean-worktrees\ncw\nRemove dead git worktrees left behind by merged PRs and ended sessions\n\n\nclean-git\n\nSweep dead worktrees then dead branches in one pass, in the order that works\n\n\nresolve-conflicts\nrmc\nResolve merge/rebase/cherry-pick conflicts by consolidating the best of both branches\n\n\n\n\n\nMemory and skills maintenance\n\n\n\nSkill\nAliases\nWhat it does\n\n\n\n\nums\nupdate-memories-and-skills\nCapture learnings from the session into memory files and skill definitions\n\n\nmemorize\nremember, always\nSave a specific fact or preference to memory\n\n\npush-memory\n\nPush a general-purpose memory into ai-config from a session working in another repo — on a branch + PR\n\n\nrecord-learnings\n\nStructured post-mortem: extract lessons from a completed task\n\n\nconsolidate-memory\n\nMerge or deduplicate memory files that have drifted\n\n\nskill-audit\n\nReport which skills actually fire (and how often) vs. dead weight, and recommend pruning candidates\n\n\nlearn\n\nStage a candidate learning without yet deciding if it’s durable enough to commit\n\n\npromote-memory\n\nReview staged learnings and promote the durable ones into committed memory\n\n\n\n\n\nWriting and style\n\n\n\nSkill\nAliases\nWhat it does\n\n\n\n\nuse-preferred-style\nstyle\nApply the plain-prose writing guide to a draft\n\n\nfind-ai-tells\nai-tells\nScan text for AI-sounding patterns and flag them\n\n\nfact-check-prose\nfcp\nCheck prose claims, reasoning, and computed values against sources and rendered output\n\n\nfix-forward-references\nffr\nDetect and rearrange/reword forward-pointing references (“see below”) in prose\n\n\ndetect-informal-definitions\n\nFind concepts defined with definitional precision that never got wrapped in a formal definition div\n\n\ndetect-hypothetical-examples\n\nFind worked examples using invented numbers when a real dataset is already available\n\n\nuse-math-macros\nmacroize\nRewrite manuscript math onto the shared d-morrison/macros submodule\n\n\ntidy\n\nClean up code or prose without changing behavior\n\n\nsimplify\n\nReduce a file or function to its essential parts\n\n\n\n\n\nRepo / CI utilities\n\n\n\nSkill\nAliases\nWhat it does\n\n\n\n\nconvert-repo-format\ncrf\nConvert a repo between the lab’s template formats (R package, Quarto website/book/manuscript)\n\n\nscout-peers\n\nSurvey comparable repos for ideas and conventions\n\n\ncheck-dependency-updates\ncdu\nCheck for outdated dependencies and propose updates\n\n\ndependabot\n\nAdd or update Dependabot config for a repo\n\n\nsend-upstream\nsup\nOpen a PR or issue in an upstream repo for a bug found here\n\n\nreprexes\n\nBuild minimal reproducible examples for a bug\n\n\nr-pkg-spellcheck\n\nSpell-check an R package’s documentation\n\n\nr-pkg-check\n\nRun devtools::check()/R CMD check and triage the results\n\n\nr-pkg-news\n\nDraft a new NEWS.md entry for an R package\n\n\nr-pkg-cran-checklist\n\nWalk through the standard CRAN submission checklist\n\n\ncran-extrachecks\n\nCheck the ad-hoc CRAN requirements devtools::check() doesn’t catch\n\n\ncreate-release-checklist\n\nFile a GitHub issue with a release checklist for an R package\n\n\nr-package-development\n\nDay-to-day R package dev loop: load, test, document, format\n\n\ntesting-r-packages\n\nFull testthat reference: fixtures, mocking, snapshots, BDD-style tests\n\n\nquarto-authoring\n\nAuthor and convert Quarto documents\n\n\nlifecycle\n\nApply lifecycle badges and deprecation stages to R package functions\n\n\nbrand-yml\n\nConfigure a shared _brand.yml for Quarto, Shiny, and R Markdown\n\n\nalt-text\n\nWrite accessible alt text (fig-alt) for figures in Quarto documents and pkgdown sites\n\n\ncli\n\nFormat CLI output with the R {cli} package\n\n\nrelease-post\n\nDraft a release announcement post for an R package\n\n\nreproducibility-audit\n\nAudit a project for reproducibility gaps: hidden deps, hardcoded paths, undocumented prerequisites, output traceability\n\n\nmeasure-performance\nperf, benchmark\nProfile R code to find the real bottleneck, microbenchmark only that, then confirm the win survives end to end\n\n\nrefresh-claude-token\nrct\nRotate CLAUDE_CODE_OAUTH_TOKEN across the repos that carry it, without /install-github-app’s workflow scaffolding, then verify the new token authenticates\n\n\n\n\n\nSession management\n\n\n\nSkill\nAliases\nWhat it does\n\n\n\n\nsession-lock\n\nRegister/deregister this session to prevent parallel clobbering\n\n\nhandoff\n\nSnapshot work state (branch, jobs, open decisions) so the next session can resume cleanly\n\n\nwrap-up\ndone, merged\nVerify true PR/issue/branch state, report a linked summary, then run UMS\n\n\nselect-model\nmodel-fit, assess-model-fit\nChoose the right Claude model for the task at hand\n\n\naway\n\nGrant session-scoped permission to stop asking clarifying questions, pick confident work, and consult a stronger model instead of blocking\n\n\nback\n\nCancel the away grant and surface a decision log of what was resolved unattended\n\n\ndaytb\ndo-as-you-think-best\nDecide the question at hand yourself and report the choice – scoped to that task, unlike away’s whole-session grant\n\n\ndelegate-to-codex\ndtc\nOffload heavy read/draft/verify work to the codex CLI before spending Claude quota, with Claude fallback\n\n\ndelegate-to-opencode\ndto\nOffload work to OpenCode (Go subscription, hosted Zen free, local Ollama) or OpenRouter models\n\n\nrec\nrecommend\nProvide clear, actionable recommendations when presenting choices or questions\n\n\nprompt-me\npm\nSurface the single most pressing open question (or top N) waiting on user input\n\n\nprompt-me-all\npma\nRestate every open question still waiting on user input, uncapped\n\n\npending-decisions\npd\nSweep issues/PRs (not just this conversation) for ones waiting on a decision from you, and ask about them one at a time\n\n\ncheckpoint\n\nSave a deliberate mid-task snapshot without ending the session\n\n\nfinish-wave\nfw\nCap an orchestration run at the wave already in flight: grab nothing new, drive the open wave to a terminal state, then ask before the next wave\n\n\ncompress-session\n\nDistill the session into auto memory before context fills up\n\n\npermission-check\n\nDiagnose why Claude Code is (or isn’t) prompting for permission on an action"
+  },
+  {
+    "objectID": "skills.html#full-skill-list",
+    "href": "skills.html#full-skill-list",
+    "title": "Skills",
+    "section": "Full skill list",
+    "text": "Full skill list\nAll 204+ canonical skills are in skills/ on GitHub. Generated Codex wrappers live in codex-skills/. Each canonical SKILL.md has a description field that lists the trigger phrases and a full procedure."
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "ai-config",
+    "section": "",
+    "text": "Portable AI agent config — skills, memories, and commands synced across machines via git. Works with Claude Code, Codex, Cursor, VS Code Copilot, and any agent that reads markdown instruction files."
+  },
+  {
+    "objectID": "index.html#whats-in-this-repo",
+    "href": "index.html#whats-in-this-repo",
+    "title": "ai-config",
+    "section": "What’s in this repo",
+    "text": "What’s in this repo\n\n\n\nDirectory\nPurpose\n\n\n\n\nskills/\nReusable workflow skills for Claude Code (~/.claude/skills/), Gemini CLI (~/.gemini/skills/), and Cursor\n\n\ncodex-skills/\nGenerated Codex wrappers (~/.codex/skills/)\n\n\ncursor-rules/\nUser-global Cursor rules (plugin or ~/.cursor/rules/)\n\n\n.cursor/rules/\nProject Cursor rules when this repo is the workspace\n\n\n.cursor-plugin/\nCursor Plugin manifest (skills, rules, commands)\n\n\nAGENTS.md\nUniversal vendor-neutral instruction file for all coding agents\n\n\ncommands/\nSlash commands (~/.claude/commands/)\n\n\n.claude/agents/\nRead-only custom subagents (see Agents)\n\n\nmemories/\nPersistent notes and preferences (shared with VS Code Copilot)\n\n\nshared/\nSingle-topic guidance fragments shared with UCD-SERG lab manual"
+  },
+  {
+    "objectID": "index.html#three-ways-to-use-these-skills",
+    "href": "index.html#three-ways-to-use-these-skills",
+    "title": "ai-config",
+    "section": "Three ways to use these skills",
+    "text": "Three ways to use these skills\nLocal CLI — clone the repo and run bootstrap.sh once. It symlinks each directory into ~/.claude/, ~/.gemini/, ~/.codex/, and — when no Cursor plugin is already serving them — ~/.cursor/rules/ (and, when no Cursor plugin or Claude skill catalog is already serving this repo, ~/.cursor/skills/). Skills appear in Claude Code, Gemini CLI, and Cursor as /skill-name.\nCodex & Cursor — the same bootstrap links generated wrappers from codex-skills/ into ${CODEX_HOME:-$HOME/.codex}/skills and, when no Cursor plugin is already serving them, user-global Cursor rules from cursor-rules/ into ${CURSOR_HOME:-$HOME/.cursor}/rules. This repo is also a Cursor plugin (.cursor-plugin/plugin.json). AGENTS.md acts as a universal entrypoint.\nCloud sessions (other repos) — this repo is a plugin marketplace. Add enabledPlugins to your repo’s .claude/settings.json and skills load at session start, namespaced as /ai-config:skill-name.\n@claude bot on this repo’s PRs — the .claude/skills → ../skills symlink is committed to main. Claude Code Action restores it on every PR run, so you can call @claude ardi (or any other skill) in PR comments."
+  },
+  {
+    "objectID": "index.html#quick-links",
+    "href": "index.html#quick-links",
+    "title": "ai-config",
+    "section": "Quick links",
+    "text": "Quick links\n\nSetup guide — clone, bootstrap, verify, web sessions\nSkills reference — what skills exist and how to invoke them\nAgents reference — the read-only subagents skills fan work out to\nWorkflow guide — ARDI loop, issue-first, claim-PR, and more\nGitHub repository — source code"
+  },
+  {
+    "objectID": "setup.html",
+    "href": "setup.html",
+    "title": "Setup",
+    "section": "",
+    "text": "Requirements: git, Claude Code CLI, Codex, and/or Cursor.\ngit clone https://github.com/Morrison-Lab/ai-config.git ~/ai-config\nbash ~/ai-config/bootstrap.sh\nClaude Code and Cursor install this repo’s skills natively as a plugin (see the repo README’s per-harness sections). bootstrap.sh handles what a plugin install can’t: Gemini CLI / Antigravity config and per-machine dotfiles. Codex and Cursor’s user-global rules currently have no install path other than a manual symlink or copy of codex-skills/ / cursor-rules/ respectively (ai-config#2352) — except that the Cursor plugin already ships cursor-rules/ as its user-global rules, so a Cursor plugin install covers that one.\n\n\ncat ~/.gemini/config/skills.json ~/.gemini/config/plugins.json\nscripts/inventory.sh                         # live counts of skills/wrappers/commands/docs\nIn a Claude Code or Cursor session with the plugin installed, type / and confirm skills appear (e.g. /ardi, /scout-peers).\nIn Cursor, open Customize -&gt; Rules and confirm the cursor-rules/ files appear as user rules (from the plugin). Skills appear under Customize -&gt; Skills from the plugin."
+  },
+  {
+    "objectID": "setup.html#local-setup",
+    "href": "setup.html#local-setup",
+    "title": "Setup",
+    "section": "",
+    "text": "Requirements: git, Claude Code CLI, Codex, and/or Cursor.\ngit clone https://github.com/Morrison-Lab/ai-config.git ~/ai-config\nbash ~/ai-config/bootstrap.sh\nClaude Code and Cursor install this repo’s skills natively as a plugin (see the repo README’s per-harness sections). bootstrap.sh handles what a plugin install can’t: Gemini CLI / Antigravity config and per-machine dotfiles. Codex and Cursor’s user-global rules currently have no install path other than a manual symlink or copy of codex-skills/ / cursor-rules/ respectively (ai-config#2352) — except that the Cursor plugin already ships cursor-rules/ as its user-global rules, so a Cursor plugin install covers that one.\n\n\ncat ~/.gemini/config/skills.json ~/.gemini/config/plugins.json\nscripts/inventory.sh                         # live counts of skills/wrappers/commands/docs\nIn a Claude Code or Cursor session with the plugin installed, type / and confirm skills appear (e.g. /ardi, /scout-peers).\nIn Cursor, open Customize -&gt; Rules and confirm the cursor-rules/ files appear as user rules (from the plugin). Skills appear under Customize -&gt; Skills from the plugin."
+  },
+  {
+    "objectID": "setup.html#web-cloud-sessions-this-repo",
+    "href": "setup.html#web-cloud-sessions-this-repo",
+    "title": "Setup",
+    "section": "Web (cloud) sessions — this repo",
+    "text": "Web (cloud) sessions — this repo\nIn cloud sessions (claude.ai or remote environments), bootstrap.sh can’t run at startup because the repo isn’t on disk yet. Skills and commands need no such step, though: this repo is a native Claude Code plugin (.claude-plugin/plugin.json), so a web session working in ai-config itself discovers skills/ and commands/ directly. The committed SessionStart hook (.claude/settings.json -&gt; .claude/hooks/session-start.sh) instead runs bootstrap.sh once the repo is checked out, for its remaining job: Gemini CLI / Antigravity config and per-machine dotfiles. The hook is a no-op outside remote sessions (CLAUDE_CODE_REMOTE) and is idempotent.\nThe hook also installs Julia (via juliaup) on first start, if allowed by the environment’s network policy. See docs/julia-setup.md."
+  },
+  {
+    "objectID": "setup.html#plugin-marketplace-other-repos",
+    "href": "setup.html#plugin-marketplace-other-repos",
+    "title": "Setup",
+    "section": "Plugin marketplace — other repos",
+    "text": "Plugin marketplace — other repos\nTo load these skills when a different repo is open in a cloud session, add this to that repo’s .claude/settings.json:\n{\n  \"extraKnownMarketplaces\": {\n    \"Morrison-Lab\": {\n      \"source\": { \"source\": \"github\", \"repo\": \"Morrison-Lab/ai-config\" }\n    }\n  },\n  \"enabledPlugins\": {\n    \"ai-config@Morrison-Lab\": true\n  }\n}\nClaude Code installs the plugin at session start. Skills are namespaced: /ai-config:ardi, /ai-config:reprexes, etc.\nOr try it interactively in any Claude Code session:\n/plugin marketplace add Morrison-Lab/ai-config\n/plugin install ai-config@Morrison-Lab\n\n\n\n\n\n\nWarningEnable the plugin from at most one marketplace\n\n\n\nMorrison-Lab/ai-config and d-morrison/ai-config publish the same plugin from the same repo, so only one entry can own the ai-config: namespace and the rest are no-op collisions. Enabling both lists every skill twice (bare /ai-config:ardi from each marketplace) and risks the skill-listing context budget (ai-config#1409). Enable at most one, and opt a specific repo’s checked-in enabledPlugins block out of the other in .claude/settings.local.json, not ~/.claude/settings.json. The user scope is the lowest of Claude Code’s five, so a false there loses to the repo’s checked-in true (settings docs)."
+  },
+  {
+    "objectID": "setup.html#claude-bot-on-prs",
+    "href": "setup.html#claude-bot-on-prs",
+    "title": "Setup",
+    "section": "@claude bot on PRs",
+    "text": "@claude bot on PRs\nThe bot that runs claude-code-action on this repo’s PRs reads skills from .claude/skills/. The .claude/skills → ../skills symlink is committed to main, so restoreConfigFromBase always restores it — even on PR branches. Comment @claude ardi (or any skill name) on a PR and the bot can run it."
+  },
+  {
+    "objectID": "setup.html#deconflicting-parallel-local-sessions",
+    "href": "setup.html#deconflicting-parallel-local-sessions",
+    "title": "Setup",
+    "section": "Deconflicting parallel local sessions",
+    "text": "Deconflicting parallel local sessions\nWhen several AI sessions share one local checkout, they can clobber each other. The session-lock skill keeps a machine-local registry of active sessions under .git/ai-sessions/. Sessions can refuse to share a working tree and isolate into a git worktree. See docs/local-session-deconfliction.md."
+  },
+  {
+    "objectID": "agents.html",
+    "href": "agents.html",
+    "title": "Agents",
+    "section": "",
+    "text": "Agents are custom subagents that Claude Code can delegate a task to via its built-in Agent tool. Each .claude/agents/&lt;name&gt;.md file gives a subagent a system prompt, a description (what Claude Code matches invocations against), and a restricted tools list. Claude Code discovers agents in .claude/agents/ automatically — like skills, no separate registration step is needed once this repo is bootstrapped."
+  },
+  {
+    "objectID": "agents.html#why-read-only-fan-out-workers",
+    "href": "agents.html#why-read-only-fan-out-workers",
+    "title": "Agents",
+    "section": "Why read-only fan-out workers",
+    "text": "Why read-only fan-out workers\nSeveral skills fan a task out across many independent targets — one competitor community per research pass, one dependency pin per audit, one claim per fact-check — and want each target checked in parallel without risking a stray worker writing a file, filing an issue, or running a destructive command. Every scout, auditor, and reviewer agent in this repo omits Edit and Write from its Claude Code tools list. Claude Code honors that allowlist (the tools: field, documented at https://code.claude.com/docs/en/sub-agents and in this repo since ai-config#341; still the mechanism Claude Code uses as of 2026-08-26). Some other harnesses still grant Write schemas to the same persona (Cursor Cloud Task, measured 2026-08-25 PDT on ai-config#2265, ai-config#2266, and ai-config#2272), so the restriction is not a universal harness guarantee. All but one of them also keep Bash, which can run write-capable shell commands (git push, rm, a redirect); for those, staying read-only is instruction-level discipline, not a harness guarantee (see the note below the table). Each agent returns a report. Even when a harness still grants the worker Write schemas, the worker stays read-only by instruction, and the calling session is what dispositions findings and applies fixes, on the user’s go-ahead.\nadversarial-reviewer is the one that is not a fan-out worker but a critic — it reviews the calling session’s own diff rather than investigating the repo fresh. The read-only constraint matters for the same reason and one more: a reviewer that could edit would turn a finding into a silent fix, losing the finding and its disposition together.\nThe editor agents (prose-editor and code-editor, in the table below) are bounded implementation workers granted Edit and Write access to revise drafts in-place. Writing agents do not need to enforce all style guidelines on their first draft; they work iteratively, producing substantively-correct but stylistically loose first drafts and then handing off to editor agents for revisions."
+  },
+  {
+    "objectID": "agents.html#agents-in-this-repo",
+    "href": "agents.html#agents-in-this-repo",
+    "title": "Agents",
+    "section": "Agents in this repo",
+    "text": "Agents in this repo\n\n\n\nAgent\nTools\nUsed by\nWhat it does\n\n\n\n\nadversarial-reviewer\nBash, Read, Grep, Glob, WebFetch, WebSearch\nevery self-review — push, ardi, self-review-fallback\nScrutinizes a diff for defects, unhandled edge cases, false factual and tool-behaviour claims, and convention violations — judging it by what it says rather than by the author’s account of it — and emits a structured review ending in a verdict (Ready for merge vs Needs more work)\n\n\ncode-editor\nBash, Read, Edit, Write, Grep, Glob, WebFetch\ntidy, coding workflows\nImproves code style and enforces compliance with a style guide (SERG Lab Manual by default), taking working implementations and revising them directly to decompose functions, avoid nesting, and pass linters\n\n\ncommunity-demand-scout\nWebSearch, WebFetch, Read, Grep, Glob\nopposition-research (oppo)\nMines one competitor community surface — an issue tracker, feature-request board, subreddit, Q&A site, forum, or review site — for user-demanded features, and reports each with demand evidence and a source link\n\n\ndependency-auditor\nBash, Read, Grep, Glob, WebFetch\ncheck-dependency-updates (cdu)\nSurveys pinned GitHub Actions tags/SHAs, renv.lock versions, pre-commit revs, Quarto/tool versions in CI, and submodules for available upgrades, reads changelogs, and reports what each bump would buy\n\n\nhallucination-detector\nBash, Read, Grep, Glob, WebFetch\npurge-hallucinations (ph)\nVerifies concrete, checkable references — files, functions, action refs, URLs, citations, config keys — against ground truth and sorts each into Resolves / Fabricated / Unverifiable\n\n\nprose-editor\nBash, Read, Edit, Write, Grep, Glob, WebFetch\nuse-preferred-style, drafting workflows\nImproves prose style and enforces compliance with a style guide (Principles of Scientific Writing (PSW) by default), taking substantively-correct drafts and revising them directly while preserving facts and technical precision\n\n\nprose-fact-checker\nBash, Read, Grep, Glob, WebFetch\nfact-check-prose (fcp)\nChecks one factual claim, reasoning step, or computed value/figure against domain knowledge, an external source, or a rendered artifact, and returns a verdict naming the exact source it checked\n\n\noverlap-detector\nBash, Read, Grep, Glob\nfind-overlap\nClusters comparable units (skills, memories, docs, code, prose) by similarity, classifies each cluster as intentional-alias / adjacent-but-distinct / genuine-duplicate, and reports each with evidence and a recommended disposition\n\n\nreproducibility-auditor\nBash, Read, Grep, Glob, WebFetch\nreproducibility-audit\nSurveys a project for hidden dependencies, hardcoded absolute paths, undocumented prerequisites, environment assumptions, and output traceability, scoped per project type\n\n\nskill-usage-auditor\nBash, Read, Grep, Glob\nskill-audit\nEnumerates skills, greps local session transcripts for their invocations, rolls alias counts into their canonical skill, and buckets every skill into actively-used / dormant / dead\n\n\n\nEvery scout, auditor, and reviewer agent except community-demand-scout keeps Bash for read-only checks (grep, gh api, git submodule status, test -e) — avoiding a write-capable shell command (renv::update() without check = TRUE, pre-commit autoupdate) is instruction-level discipline for those. The editor agents (prose-editor and code-editor) use Bash to run linters, formatters, and test suites alongside their direct Edit and Write tools. Each read-only agent’s file under .claude/agents/ says so in as many words, so the Bash discipline is instructed where it is relied on rather than only asserted here. The Claude Code versus other-harness split for Edit/Write is in Why read-only fan-out workers above. adversarial-reviewer is the persona that currently carries the Write-schema hedge. The .opencode/ mirrors are not all the same: opencode’s own permission block can deny bash outright, in which case the Bash restriction is harness-enforced there. A harness that still grants Write schemas is not bound by that block. Which copy Cursor Cloud reads was not isolated (measured 2026-08-25 PDT)."
+  },
+  {
+    "objectID": "agents.html#how-theyre-invoked",
+    "href": "agents.html#how-theyre-invoked",
+    "title": "Agents",
+    "section": "How they’re invoked",
+    "text": "How they’re invoked\nThe calling skill fans work out to one of these agents through Claude Code’s Agent tool, passing a scope line — what to check, against what — rather than letting the agent pick its own scope. To use one standalone rather than through its usual skill, invoke the Agent tool with subagent_type set to the agent’s name and describe the single target to check."
+  },
+  {
+    "objectID": "skills/adr/SKILL.html",
+    "href": "skills/adr/SKILL.html",
+    "title": "adr (alias for ard)",
+    "section": "",
+    "text": "adr (alias for ard)\nThis is a transposition-typo alias for the ard skill. Read and follow the canonical skill:\n→ ard\n\n\n\n\n Back to top"
+  },
+  {
+    "objectID": "skills/adria/SKILL.html",
+    "href": "skills/adria/SKILL.html",
+    "title": "adria (alias for ardia)",
+    "section": "",
+    "text": "adria (alias for ardia)\nThis is a transposition-typo alias for the ardia skill. Read and follow the canonical skill:\n→ ardia\n\n\n\n\n Back to top"
   },
   {
     "objectID": "skills/agent-builder/SKILL.html",
@@ -3528,305 +3822,81 @@
     "text": "❌ Creating a new agent when an existing persona, parameterized differently, would do.\n❌ Not checking open PRs → building a second draft of an agent someone already pushed and opened a PR for, instead of redirecting to it.\n❌ Giving a read-only fan-out worker Edit/Write “just in case.”\n❌ Writing the agent’s system prompt assuming it inherits the calling skill’s text — restate every needed discipline explicitly.\n❌ tools: written as a YAML list — agent frontmatter uses a plain comma-separated string, unlike skills’ allowed-tools:.\n❌ Delegating the authoring itself to a spawned agent instead of doing it in the main session — naming, tool-scoping, and the reuse-check need a human-in-the-loop.\n❌ Leaving the new agent unreferenced by any skill — an orphaned .claude/agents/*.md file with nothing to spawn it.\n❌ Leaving the change local-only, or pushing straight to main."
   },
   {
-    "objectID": "skills/adria/SKILL.html",
-    "href": "skills/adria/SKILL.html",
-    "title": "adria (alias for ardia)",
+    "objectID": "skills/ai-tells/SKILL.html",
+    "href": "skills/ai-tells/SKILL.html",
+    "title": "ai-tells (alias for find-ai-tells)",
     "section": "",
-    "text": "adria (alias for ardia)\nThis is a transposition-typo alias for the ardia skill. Read and follow the canonical skill:\n→ ardia\n\n\n\n\n Back to top"
+    "text": "ai-tells (alias for find-ai-tells)\nThis is a short alias. Read and follow the canonical skill:\n→ find-ai-tells\n\n\n\n\n Back to top"
   },
   {
-    "objectID": "skills/adr/SKILL.html",
-    "href": "skills/adr/SKILL.html",
-    "title": "adr (alias for ard)",
+    "objectID": "skills/alt-text/SKILL.html",
+    "href": "skills/alt-text/SKILL.html",
+    "title": "Write Accessible Alt Text",
     "section": "",
-    "text": "adr (alias for ard)\nThis is a transposition-typo alias for the ard skill. Read and follow the canonical skill:\n→ ard\n\n\n\n\n Back to top"
+    "text": "Generate accessible alt text for data visualizations and images in this project.\nARGUMENTS - label: (optional) specific figure label or chunk to target - file: (optional) specific file to process\n\n\nBefore proceeding, identify the project context and read the relevant reference. Check for a _pkgdown.yml file in the project root to detect a pkgdown site:\nls _pkgdown.yml 2&gt;/dev/null && echo \"pkgdown\" || echo \"not pkgdown\"\n\npkgdown site (_pkgdown.yml present) -&gt; read references/pkgdown.md\nQuarto documents (no _pkgdown.yml, .qmd files present) -&gt; read references/quarto.md\n\nIf the context is still ambiguous, ask the user which format they are working in.\n\n\n\nUnlike typical alt text scenarios where you only see an image, we have access to the code that generates each chart. Use this to extract precise details:\nFrom plotting code: - Variable mappings -&gt; exact variable names for axes - Color/fill mappings -&gt; what color encodes - Plot type functions -&gt; scatter, histogram, line chart, etc. - Trend lines or fitted curves -&gt; overlaid statistical fits - Faceting/subplots -&gt; number of panels and what varies - Color scales -&gt; encoding scheme (sequential, diverging, categorical) - Axis labels and titles -&gt; customized labels\nFrom data generation code: - Random distributions -&gt; expected distribution shape - Transformations -&gt; what was done to data - Feature engineering -&gt; preprocessing applied - Filtering/subsetting -&gt; what subset is shown\nFrom surrounding prose: - Text before/after the chunk explains the purpose and key insight - Chapter context tells you what the figure is meant to teach - This is often the best source for the “key insight” part of alt text\n\n\n\n\nChart type — first words identify the format\nData description — axes, variables, what is shown\nKey insight — the pattern or takeaway (often found in surrounding text)\n\n\n\n\nRead the caption (fig-cap, fig.cap) first. Alt text should complement, not duplicate it: - If the caption states the insight, alt text can focus on describing the visual structure - If the caption is generic, alt text should include the key insight - Together they should give a complete understanding\n\n\n\nInclude: - Chart type as first words - Axis labels and what they represent - Specific values/ranges when code reveals them (e.g., “peaks between 25–50”) - Number of panels/facets - What color/size encodes if used - The key pattern that supports the surrounding point\nExclude: - Openers like “Image of” or “Chart showing” (screen readers announce this) - Decorative color descriptions (unless color encodes data) - Information already in the caption - Implementation details (package names, function internals)\n\n\n\n\n\n\n\n\n\n\n\nComplexity\nSentences\nWhen to use\n\n\n\n\nSimple\n2–3\nSingle geom, no facets, obvious pattern\n\n\nStandard\n3–4\nMultiple geoms or color encoding\n\n\nComplex\n4–5\nFaceted, multiple overlays, nuanced insight\n\n\n\n\n\n\n\nStarts with chart type (Scatter chart, Histogram, Faceted bar chart, etc.)\nNames the axis variables\nIncludes specific values/ranges from code when informative\nStates the key insight from surrounding prose\nComplements (not duplicates) the caption\nWould make sense to someone who cannot see the image\nUses plain language (avoid jargon like “geom” or “aesthetic”)\n\n\n\n\nScatter chart:\nScatter chart. [X var] along the x-axis, [Y var] along the y-axis.\n[Shape: linear/curved/clustered]. [Specific pattern, e.g., \"peaks when X is 25--50\"].\n[Any overlaid fits or annotations].\nHistogram:\nHistogram of [variable]. [Shape: right-skewed/bimodal/normal/uniform].\n[If transformed: \"after [transformation], the distribution [result]\"].\n[Notable features: outliers, gaps, multiple modes].\nBar chart:\nBar chart. [Categories] along the x-axis, [measure] along the y-axis.\n[Key comparison: which is highest/lowest, relative differences].\n[Pattern: increasing/decreasing/grouped].\nTile/raster chart:\nTile chart [or heatmap]. [Row variable] along the y-axis, [column variable] along the x-axis.\nColor encodes [what value]. [Pattern: where values are high/low].\n[If faceted: \"N panels showing [what varies]\"].\nFaceted chart:\nFaceted [chart type] with [N] panels, one per [faceting variable].\n[What's constant across panels]. [What changes/varies].\n[Key comparison or insight across panels].\nCorrelation heatmap:\nCorrelation [matrix/heatmap] of [what variables]. [Arrangement].\n[Overall pattern: mostly positive/negative/mixed].\n[Notable clusters or strong/weak pairs].\n[If relevant: contrast with expected behavior].\nBefore/after comparison:\n[N] [chart type]s arranged [vertically/in grid]. [Top/Left] shows [original].\n[Bottom/Right] shows [transformed]. [Key difference/similarity].\n[If overlay: \"[color] curve shows [reference]\"].\nLine chart with overlays:\n[Line/Scatter] chart with overlaid [fits/curves]. [Axes].\n[Number] of [lines/fits] shown: [list what each represents].\n[Which fits well vs. poorly and why].\n\n\n\nCode context:\nplotting_data |&gt;\n  ggplot(aes(value)) +\n  geom_histogram(binwidth = 0.2) +\n  facet_grid(name~., scales = \"free_y\") +\n  geom_line(aes(x, y), data = norm_curve, color = \"green4\")\nSurrounding prose says: “Normalization doesn’t make data more normal”\nCaption: “Normalization doesn’t make data more normal. The green curve indicates the density of the unit normal distribution.”\nGood alt text:\nFaceted histogram with two panels stacked vertically. Top panel shows\noriginal data with a bimodal distribution. Bottom panel shows the same\ndata after z-score normalization, retaining the bimodal shape. A green\nnormal distribution curve overlaid on the bottom panel clearly does not\nmatch the data, demonstrating that normalization preserves distribution\nshape rather than creating normality."
   },
   {
-    "objectID": "agents.html",
-    "href": "agents.html",
-    "title": "Agents",
+    "objectID": "skills/alt-text/SKILL.html#detect-project-type",
+    "href": "skills/alt-text/SKILL.html#detect-project-type",
+    "title": "Write Accessible Alt Text",
     "section": "",
-    "text": "Agents are custom subagents that Claude Code can delegate a task to via its built-in Agent tool. Each .claude/agents/&lt;name&gt;.md file gives a subagent a system prompt, a description (what Claude Code matches invocations against), and a restricted tools list. Claude Code discovers agents in .claude/agents/ automatically — like skills, no separate registration step is needed once this repo is bootstrapped."
+    "text": "Before proceeding, identify the project context and read the relevant reference. Check for a _pkgdown.yml file in the project root to detect a pkgdown site:\nls _pkgdown.yml 2&gt;/dev/null && echo \"pkgdown\" || echo \"not pkgdown\"\n\npkgdown site (_pkgdown.yml present) -&gt; read references/pkgdown.md\nQuarto documents (no _pkgdown.yml, .qmd files present) -&gt; read references/quarto.md\n\nIf the context is still ambiguous, ask the user which format they are working in."
   },
   {
-    "objectID": "agents.html#why-read-only-fan-out-workers",
-    "href": "agents.html#why-read-only-fan-out-workers",
-    "title": "Agents",
-    "section": "Why read-only fan-out workers",
-    "text": "Why read-only fan-out workers\nSeveral skills fan a task out across many independent targets — one competitor community per research pass, one dependency pin per audit, one claim per fact-check — and want each target checked in parallel without risking a stray worker writing a file, filing an issue, or running a destructive command. Every scout, auditor, and reviewer agent in this repo omits Edit and Write from its Claude Code tools list. Claude Code honors that allowlist (the tools: field, documented at https://code.claude.com/docs/en/sub-agents and in this repo since ai-config#341; still the mechanism Claude Code uses as of 2026-08-26). Some other harnesses still grant Write schemas to the same persona (Cursor Cloud Task, measured 2026-08-25 PDT on ai-config#2265, ai-config#2266, and ai-config#2272), so the restriction is not a universal harness guarantee. All but one of them also keep Bash, which can run write-capable shell commands (git push, rm, a redirect); for those, staying read-only is instruction-level discipline, not a harness guarantee (see the note below the table). Each agent returns a report. Even when a harness still grants the worker Write schemas, the worker stays read-only by instruction, and the calling session is what dispositions findings and applies fixes, on the user’s go-ahead.\nadversarial-reviewer is the one that is not a fan-out worker but a critic — it reviews the calling session’s own diff rather than investigating the repo fresh. The read-only constraint matters for the same reason and one more: a reviewer that could edit would turn a finding into a silent fix, losing the finding and its disposition together.\nThe editor agents (prose-editor and code-editor, in the table below) are bounded implementation workers granted Edit and Write access to revise drafts in-place. Writing agents do not need to enforce all style guidelines on their first draft; they work iteratively, producing substantively-correct but stylistically loose first drafts and then handing off to editor agents for revisions."
-  },
-  {
-    "objectID": "agents.html#agents-in-this-repo",
-    "href": "agents.html#agents-in-this-repo",
-    "title": "Agents",
-    "section": "Agents in this repo",
-    "text": "Agents in this repo\n\n\n\nAgent\nTools\nUsed by\nWhat it does\n\n\n\n\nadversarial-reviewer\nBash, Read, Grep, Glob, WebFetch, WebSearch\nevery self-review — push, ardi, self-review-fallback\nScrutinizes a diff for defects, unhandled edge cases, false factual and tool-behaviour claims, and convention violations — judging it by what it says rather than by the author’s account of it — and emits a structured review ending in a verdict (Ready for merge vs Needs more work)\n\n\ncode-editor\nBash, Read, Edit, Write, Grep, Glob, WebFetch\ntidy, coding workflows\nImproves code style and enforces compliance with a style guide (SERG Lab Manual by default), taking working implementations and revising them directly to decompose functions, avoid nesting, and pass linters\n\n\ncommunity-demand-scout\nWebSearch, WebFetch, Read, Grep, Glob\nopposition-research (oppo)\nMines one competitor community surface — an issue tracker, feature-request board, subreddit, Q&A site, forum, or review site — for user-demanded features, and reports each with demand evidence and a source link\n\n\ndependency-auditor\nBash, Read, Grep, Glob, WebFetch\ncheck-dependency-updates (cdu)\nSurveys pinned GitHub Actions tags/SHAs, renv.lock versions, pre-commit revs, Quarto/tool versions in CI, and submodules for available upgrades, reads changelogs, and reports what each bump would buy\n\n\nhallucination-detector\nBash, Read, Grep, Glob, WebFetch\npurge-hallucinations (ph)\nVerifies concrete, checkable references — files, functions, action refs, URLs, citations, config keys — against ground truth and sorts each into Resolves / Fabricated / Unverifiable\n\n\nprose-editor\nBash, Read, Edit, Write, Grep, Glob, WebFetch\nuse-preferred-style, drafting workflows\nImproves prose style and enforces compliance with a style guide (Principles of Scientific Writing (PSW) by default), taking substantively-correct drafts and revising them directly while preserving facts and technical precision\n\n\nprose-fact-checker\nBash, Read, Grep, Glob, WebFetch\nfact-check-prose (fcp)\nChecks one factual claim, reasoning step, or computed value/figure against domain knowledge, an external source, or a rendered artifact, and returns a verdict naming the exact source it checked\n\n\noverlap-detector\nBash, Read, Grep, Glob\nfind-overlap\nClusters comparable units (skills, memories, docs, code, prose) by similarity, classifies each cluster as intentional-alias / adjacent-but-distinct / genuine-duplicate, and reports each with evidence and a recommended disposition\n\n\nreproducibility-auditor\nBash, Read, Grep, Glob, WebFetch\nreproducibility-audit\nSurveys a project for hidden dependencies, hardcoded absolute paths, undocumented prerequisites, environment assumptions, and output traceability, scoped per project type\n\n\nskill-usage-auditor\nBash, Read, Grep, Glob\nskill-audit\nEnumerates skills, greps local session transcripts for their invocations, rolls alias counts into their canonical skill, and buckets every skill into actively-used / dormant / dead\n\n\n\nEvery scout, auditor, and reviewer agent except community-demand-scout keeps Bash for read-only checks (grep, gh api, git submodule status, test -e) — avoiding a write-capable shell command (renv::update() without check = TRUE, pre-commit autoupdate) is instruction-level discipline for those. The editor agents (prose-editor and code-editor) use Bash to run linters, formatters, and test suites alongside their direct Edit and Write tools. Each read-only agent’s file under .claude/agents/ says so in as many words, so the Bash discipline is instructed where it is relied on rather than only asserted here. The Claude Code versus other-harness split for Edit/Write is in Why read-only fan-out workers above. adversarial-reviewer is the persona that currently carries the Write-schema hedge. The .opencode/ mirrors are not all the same: opencode’s own permission block can deny bash outright, in which case the Bash restriction is harness-enforced there. A harness that still grants Write schemas is not bound by that block. Which copy Cursor Cloud reads was not isolated (measured 2026-08-25 PDT)."
-  },
-  {
-    "objectID": "agents.html#how-theyre-invoked",
-    "href": "agents.html#how-theyre-invoked",
-    "title": "Agents",
-    "section": "How they’re invoked",
-    "text": "How they’re invoked\nThe calling skill fans work out to one of these agents through Claude Code’s Agent tool, passing a scope line — what to check, against what — rather than letting the agent pick its own scope. To use one standalone rather than through its usual skill, invoke the Agent tool with subagent_type set to the agent’s name and describe the single target to check."
-  },
-  {
-    "objectID": "setup.html",
-    "href": "setup.html",
-    "title": "Setup",
+    "objectID": "skills/alt-text/SKILL.html#key-advantage-source-code-access",
+    "href": "skills/alt-text/SKILL.html#key-advantage-source-code-access",
+    "title": "Write Accessible Alt Text",
     "section": "",
-    "text": "Requirements: git, Claude Code CLI, Codex, and/or Cursor.\ngit clone https://github.com/Morrison-Lab/ai-config.git ~/ai-config\nbash ~/ai-config/bootstrap.sh\nClaude Code and Cursor install this repo’s skills natively as a plugin (see the repo README’s per-harness sections). bootstrap.sh handles what a plugin install can’t: Gemini CLI / Antigravity config and per-machine dotfiles. Codex and Cursor’s user-global rules currently have no install path other than a manual symlink or copy of codex-skills/ / cursor-rules/ respectively (ai-config#2352) — except that the Cursor plugin already ships cursor-rules/ as its user-global rules, so a Cursor plugin install covers that one.\n\n\ncat ~/.gemini/config/skills.json ~/.gemini/config/plugins.json\nscripts/inventory.sh                         # live counts of skills/wrappers/commands/docs\nIn a Claude Code or Cursor session with the plugin installed, type / and confirm skills appear (e.g. /ardi, /scout-peers).\nIn Cursor, open Customize -&gt; Rules and confirm the cursor-rules/ files appear as user rules (from the plugin). Skills appear under Customize -&gt; Skills from the plugin."
+    "text": "Unlike typical alt text scenarios where you only see an image, we have access to the code that generates each chart. Use this to extract precise details:\nFrom plotting code: - Variable mappings -&gt; exact variable names for axes - Color/fill mappings -&gt; what color encodes - Plot type functions -&gt; scatter, histogram, line chart, etc. - Trend lines or fitted curves -&gt; overlaid statistical fits - Faceting/subplots -&gt; number of panels and what varies - Color scales -&gt; encoding scheme (sequential, diverging, categorical) - Axis labels and titles -&gt; customized labels\nFrom data generation code: - Random distributions -&gt; expected distribution shape - Transformations -&gt; what was done to data - Feature engineering -&gt; preprocessing applied - Filtering/subsetting -&gt; what subset is shown\nFrom surrounding prose: - Text before/after the chunk explains the purpose and key insight - Chapter context tells you what the figure is meant to teach - This is often the best source for the “key insight” part of alt text"
   },
   {
-    "objectID": "setup.html#local-setup",
-    "href": "setup.html#local-setup",
-    "title": "Setup",
+    "objectID": "skills/alt-text/SKILL.html#three-part-structure-amy-cesals-formula",
+    "href": "skills/alt-text/SKILL.html#three-part-structure-amy-cesals-formula",
+    "title": "Write Accessible Alt Text",
     "section": "",
-    "text": "Requirements: git, Claude Code CLI, Codex, and/or Cursor.\ngit clone https://github.com/Morrison-Lab/ai-config.git ~/ai-config\nbash ~/ai-config/bootstrap.sh\nClaude Code and Cursor install this repo’s skills natively as a plugin (see the repo README’s per-harness sections). bootstrap.sh handles what a plugin install can’t: Gemini CLI / Antigravity config and per-machine dotfiles. Codex and Cursor’s user-global rules currently have no install path other than a manual symlink or copy of codex-skills/ / cursor-rules/ respectively (ai-config#2352) — except that the Cursor plugin already ships cursor-rules/ as its user-global rules, so a Cursor plugin install covers that one.\n\n\ncat ~/.gemini/config/skills.json ~/.gemini/config/plugins.json\nscripts/inventory.sh                         # live counts of skills/wrappers/commands/docs\nIn a Claude Code or Cursor session with the plugin installed, type / and confirm skills appear (e.g. /ardi, /scout-peers).\nIn Cursor, open Customize -&gt; Rules and confirm the cursor-rules/ files appear as user rules (from the plugin). Skills appear under Customize -&gt; Skills from the plugin."
+    "text": "Chart type — first words identify the format\nData description — axes, variables, what is shown\nKey insight — the pattern or takeaway (often found in surrounding text)"
   },
   {
-    "objectID": "setup.html#web-cloud-sessions-this-repo",
-    "href": "setup.html#web-cloud-sessions-this-repo",
-    "title": "Setup",
-    "section": "Web (cloud) sessions — this repo",
-    "text": "Web (cloud) sessions — this repo\nIn cloud sessions (claude.ai or remote environments), bootstrap.sh can’t run at startup because the repo isn’t on disk yet. Skills and commands need no such step, though: this repo is a native Claude Code plugin (.claude-plugin/plugin.json), so a web session working in ai-config itself discovers skills/ and commands/ directly. The committed SessionStart hook (.claude/settings.json -&gt; .claude/hooks/session-start.sh) instead runs bootstrap.sh once the repo is checked out, for its remaining job: Gemini CLI / Antigravity config and per-machine dotfiles. The hook is a no-op outside remote sessions (CLAUDE_CODE_REMOTE) and is idempotent.\nThe hook also installs Julia (via juliaup) on first start, if allowed by the environment’s network policy. See docs/julia-setup.md."
-  },
-  {
-    "objectID": "setup.html#plugin-marketplace-other-repos",
-    "href": "setup.html#plugin-marketplace-other-repos",
-    "title": "Setup",
-    "section": "Plugin marketplace — other repos",
-    "text": "Plugin marketplace — other repos\nTo load these skills when a different repo is open in a cloud session, add this to that repo’s .claude/settings.json:\n{\n  \"extraKnownMarketplaces\": {\n    \"Morrison-Lab\": {\n      \"source\": { \"source\": \"github\", \"repo\": \"Morrison-Lab/ai-config\" }\n    }\n  },\n  \"enabledPlugins\": {\n    \"ai-config@Morrison-Lab\": true\n  }\n}\nClaude Code installs the plugin at session start. Skills are namespaced: /ai-config:ardi, /ai-config:reprexes, etc.\nOr try it interactively in any Claude Code session:\n/plugin marketplace add Morrison-Lab/ai-config\n/plugin install ai-config@Morrison-Lab\n\n\n\n\n\n\nWarningEnable the plugin from at most one marketplace\n\n\n\nMorrison-Lab/ai-config and d-morrison/ai-config publish the same plugin from the same repo, so only one entry can own the ai-config: namespace and the rest are no-op collisions. Enabling both lists every skill twice (bare /ai-config:ardi from each marketplace) and risks the skill-listing context budget (ai-config#1409). Enable at most one, and opt a specific repo’s checked-in enabledPlugins block out of the other in .claude/settings.local.json, not ~/.claude/settings.json. The user scope is the lowest of Claude Code’s five, so a false there loses to the repo’s checked-in true (settings docs)."
-  },
-  {
-    "objectID": "setup.html#claude-bot-on-prs",
-    "href": "setup.html#claude-bot-on-prs",
-    "title": "Setup",
-    "section": "@claude bot on PRs",
-    "text": "@claude bot on PRs\nThe bot that runs claude-code-action on this repo’s PRs reads skills from .claude/skills/. The .claude/skills → ../skills symlink is committed to main, so restoreConfigFromBase always restores it — even on PR branches. Comment @claude ardi (or any skill name) on a PR and the bot can run it."
-  },
-  {
-    "objectID": "setup.html#deconflicting-parallel-local-sessions",
-    "href": "setup.html#deconflicting-parallel-local-sessions",
-    "title": "Setup",
-    "section": "Deconflicting parallel local sessions",
-    "text": "Deconflicting parallel local sessions\nWhen several AI sessions share one local checkout, they can clobber each other. The session-lock skill keeps a machine-local registry of active sessions under .git/ai-sessions/. Sessions can refuse to share a working tree and isolate into a git worktree. See docs/local-session-deconfliction.md."
-  },
-  {
-    "objectID": "index.html",
-    "href": "index.html",
-    "title": "ai-config",
+    "objectID": "skills/alt-text/SKILL.html#relationship-to-captions",
+    "href": "skills/alt-text/SKILL.html#relationship-to-captions",
+    "title": "Write Accessible Alt Text",
     "section": "",
-    "text": "Portable AI agent config — skills, memories, and commands synced across machines via git. Works with Claude Code, Codex, Cursor, VS Code Copilot, and any agent that reads markdown instruction files."
+    "text": "Read the caption (fig-cap, fig.cap) first. Alt text should complement, not duplicate it: - If the caption states the insight, alt text can focus on describing the visual structure - If the caption is generic, alt text should include the key insight - Together they should give a complete understanding"
   },
   {
-    "objectID": "index.html#whats-in-this-repo",
-    "href": "index.html#whats-in-this-repo",
-    "title": "ai-config",
-    "section": "What’s in this repo",
-    "text": "What’s in this repo\n\n\n\nDirectory\nPurpose\n\n\n\n\nskills/\nReusable workflow skills for Claude Code (~/.claude/skills/), Gemini CLI (~/.gemini/skills/), and Cursor\n\n\ncodex-skills/\nGenerated Codex wrappers (~/.codex/skills/)\n\n\ncursor-rules/\nUser-global Cursor rules (plugin or ~/.cursor/rules/)\n\n\n.cursor/rules/\nProject Cursor rules when this repo is the workspace\n\n\n.cursor-plugin/\nCursor Plugin manifest (skills, rules, commands)\n\n\nAGENTS.md\nUniversal vendor-neutral instruction file for all coding agents\n\n\ncommands/\nSlash commands (~/.claude/commands/)\n\n\n.claude/agents/\nRead-only custom subagents (see Agents)\n\n\nmemories/\nPersistent notes and preferences (shared with VS Code Copilot)\n\n\nshared/\nSingle-topic guidance fragments shared with UCD-SERG lab manual"
-  },
-  {
-    "objectID": "index.html#three-ways-to-use-these-skills",
-    "href": "index.html#three-ways-to-use-these-skills",
-    "title": "ai-config",
-    "section": "Three ways to use these skills",
-    "text": "Three ways to use these skills\nLocal CLI — clone the repo and run bootstrap.sh once. It symlinks each directory into ~/.claude/, ~/.gemini/, ~/.codex/, and — when no Cursor plugin is already serving them — ~/.cursor/rules/ (and, when no Cursor plugin or Claude skill catalog is already serving this repo, ~/.cursor/skills/). Skills appear in Claude Code, Gemini CLI, and Cursor as /skill-name.\nCodex & Cursor — the same bootstrap links generated wrappers from codex-skills/ into ${CODEX_HOME:-$HOME/.codex}/skills and, when no Cursor plugin is already serving them, user-global Cursor rules from cursor-rules/ into ${CURSOR_HOME:-$HOME/.cursor}/rules. This repo is also a Cursor plugin (.cursor-plugin/plugin.json). AGENTS.md acts as a universal entrypoint.\nCloud sessions (other repos) — this repo is a plugin marketplace. Add enabledPlugins to your repo’s .claude/settings.json and skills load at session start, namespaced as /ai-config:skill-name.\n@claude bot on this repo’s PRs — the .claude/skills → ../skills symlink is committed to main. Claude Code Action restores it on every PR run, so you can call @claude ardi (or any other skill) in PR comments."
-  },
-  {
-    "objectID": "index.html#quick-links",
-    "href": "index.html#quick-links",
-    "title": "ai-config",
-    "section": "Quick links",
-    "text": "Quick links\n\nSetup guide — clone, bootstrap, verify, web sessions\nSkills reference — what skills exist and how to invoke them\nAgents reference — the read-only subagents skills fan work out to\nWorkflow guide — ARDI loop, issue-first, claim-PR, and more\nGitHub repository — source code"
-  },
-  {
-    "objectID": "skills.html",
-    "href": "skills.html",
-    "title": "Skills",
+    "objectID": "skills/alt-text/SKILL.html#content-rules",
+    "href": "skills/alt-text/SKILL.html#content-rules",
+    "title": "Write Accessible Alt Text",
     "section": "",
-    "text": "Skills are markdown files that teach Claude Code a reusable workflow. Each skills/&lt;name&gt;/SKILL.md file describes when to invoke the skill, what steps to follow, and which tools it may use. Claude Code discovers skills in ~/.claude/skills/ automatically.\nCodex uses generated wrappers in codex-skills/&lt;name&gt;/SKILL.md. Those wrappers keep Codex frontmatter strict and point back to the canonical Claude skill in skills/, so the workflow stays in one place."
+    "text": "Include: - Chart type as first words - Axis labels and what they represent - Specific values/ranges when code reveals them (e.g., “peaks between 25–50”) - Number of panels/facets - What color/size encodes if used - The key pattern that supports the surrounding point\nExclude: - Openers like “Image of” or “Chart showing” (screen readers announce this) - Decorative color descriptions (unless color encodes data) - Information already in the caption - Implementation details (package names, function internals)"
   },
   {
-    "objectID": "skills.html#how-to-invoke-a-skill",
-    "href": "skills.html#how-to-invoke-a-skill",
-    "title": "Skills",
-    "section": "How to invoke a skill",
-    "text": "How to invoke a skill\n\n\n\nSurface\nSyntax\n\n\n\n\nLocal CLI\n/skill-name or a bare keyword (e.g. ardi)\n\n\nPlugin (other repos)\n/ai-config:skill-name\n\n\n@claude bot on PRs\n@claude skill-name in a PR comment\n\n\nCodex\nskill trigger from ${CODEX_HOME:-$HOME/.codex}/skills\n\n\n\nMost skills also respond to plain-English triggers listed in their description field (e.g. “grab an issue”, “drive to clean”, “update memories and skills”)."
-  },
-  {
-    "objectID": "skills.html#skill-categories",
-    "href": "skills.html#skill-categories",
-    "title": "Skills",
-    "section": "Skill categories",
-    "text": "Skill categories\n\nPR / review workflow\n\n\n\nSkill\nAliases\nWhat it does\n\n\n\n\nardi\ndc, drive, clean, iterate\nRead the latest review, address/rebut/defer every finding, push, re-request review — loop until clean\n\n\nard\nadr\nSingle ARD pass: address, rebut, defer, or acknowledge — without the iterate loop\n\n\nresolve-pr-threads\n\nResolve inline review threads that are already settled, without a full ARD pass\n\n\nclaim-pr\n\nPost a claim comment before a work session; unclaim when done\n\n\nrequest-pr-review\n\nAdd a human reviewer and @-mention them with context\n\n\npr-status\n\nReport the current PR’s CI and review state\n\n\npr-status-all\n\nReport status across all open PRs\n\n\nstack-prs\n\nBranch a new PR off an unmerged base PR, keep it in sync, and re-target it to main once the base merges\n\n\n\n\n\nIssue management\n\n\n\nSkill\nAliases\nWhat it does\n\n\n\n\nbrainstorm\n\nSocratic clarifying-question loop before any code/issue, ending in a plan file\n\n\nstart-task\nst\nFile a tracking issue (if none exists), branch, implement, open PR, ARDI to clean\n\n\ngrab-issue\ngi\nPick the highest-priority open issue and work it end-to-end\n\n\ngrab-issues-in-parallel\ngip\nGrab multiple issues and work them in parallel worktrees\n\n\ndefer-issue\n\nFile a follow-up issue for something out of scope in the current PR\n\n\ncancel-superseded\ncb\nClose issues/PRs that a merged PR made redundant\n\n\ndiscussions\n\nRead and respond to GitHub Discussions topics; mark Q&A answers\n\n\nmigrate-discussion\n\nMove an item between Discussions and Issues when it fits the other tracker better\n\n\n\n\n\nBranch / sync\n\n\n\nSkill\nAliases\nWhat it does\n\n\n\n\nsync-pr-branch\nsync, merge-main, resync-branch\nFetch origin, merge main into the branch, push\n\n\nmerge-it\nmerged\nSquash-merge a ready PR, then run post-merge cleanup\n\n\nmwc\nmerge-when-confident, maw, merge-at-will\nGrant session-scoped permission to merge fully-clean PRs without asking per PR\n\n\npost-merge\n\nAfter a merge: checkout main, pull, delete branch, run UMS\n\n\nclean-branches\ncb, prune\nDelete local branches already merged or closed\n\n\nclean-worktrees\ncw\nRemove dead git worktrees left behind by merged PRs and ended sessions\n\n\nclean-git\n\nSweep dead worktrees then dead branches in one pass, in the order that works\n\n\nresolve-conflicts\nrmc\nResolve merge/rebase/cherry-pick conflicts by consolidating the best of both branches\n\n\n\n\n\nMemory and skills maintenance\n\n\n\nSkill\nAliases\nWhat it does\n\n\n\n\nums\nupdate-memories-and-skills\nCapture learnings from the session into memory files and skill definitions\n\n\nmemorize\nremember, always\nSave a specific fact or preference to memory\n\n\npush-memory\n\nPush a general-purpose memory into ai-config from a session working in another repo — on a branch + PR\n\n\nrecord-learnings\n\nStructured post-mortem: extract lessons from a completed task\n\n\nconsolidate-memory\n\nMerge or deduplicate memory files that have drifted\n\n\nskill-audit\n\nReport which skills actually fire (and how often) vs. dead weight, and recommend pruning candidates\n\n\nlearn\n\nStage a candidate learning without yet deciding if it’s durable enough to commit\n\n\npromote-memory\n\nReview staged learnings and promote the durable ones into committed memory\n\n\n\n\n\nWriting and style\n\n\n\nSkill\nAliases\nWhat it does\n\n\n\n\nuse-preferred-style\nstyle\nApply the plain-prose writing guide to a draft\n\n\nfind-ai-tells\nai-tells\nScan text for AI-sounding patterns and flag them\n\n\nfact-check-prose\nfcp\nCheck prose claims, reasoning, and computed values against sources and rendered output\n\n\nfix-forward-references\nffr\nDetect and rearrange/reword forward-pointing references (“see below”) in prose\n\n\ndetect-informal-definitions\n\nFind concepts defined with definitional precision that never got wrapped in a formal definition div\n\n\ndetect-hypothetical-examples\n\nFind worked examples using invented numbers when a real dataset is already available\n\n\nuse-math-macros\nmacroize\nRewrite manuscript math onto the shared d-morrison/macros submodule\n\n\ntidy\n\nClean up code or prose without changing behavior\n\n\nsimplify\n\nReduce a file or function to its essential parts\n\n\n\n\n\nRepo / CI utilities\n\n\n\nSkill\nAliases\nWhat it does\n\n\n\n\nconvert-repo-format\ncrf\nConvert a repo between the lab’s template formats (R package, Quarto website/book/manuscript)\n\n\nscout-peers\n\nSurvey comparable repos for ideas and conventions\n\n\ncheck-dependency-updates\ncdu\nCheck for outdated dependencies and propose updates\n\n\ndependabot\n\nAdd or update Dependabot config for a repo\n\n\nsend-upstream\nsup\nOpen a PR or issue in an upstream repo for a bug found here\n\n\nreprexes\n\nBuild minimal reproducible examples for a bug\n\n\nr-pkg-spellcheck\n\nSpell-check an R package’s documentation\n\n\nr-pkg-check\n\nRun devtools::check()/R CMD check and triage the results\n\n\nr-pkg-news\n\nDraft a new NEWS.md entry for an R package\n\n\nr-pkg-cran-checklist\n\nWalk through the standard CRAN submission checklist\n\n\ncran-extrachecks\n\nCheck the ad-hoc CRAN requirements devtools::check() doesn’t catch\n\n\ncreate-release-checklist\n\nFile a GitHub issue with a release checklist for an R package\n\n\nr-package-development\n\nDay-to-day R package dev loop: load, test, document, format\n\n\ntesting-r-packages\n\nFull testthat reference: fixtures, mocking, snapshots, BDD-style tests\n\n\nquarto-authoring\n\nAuthor and convert Quarto documents\n\n\nlifecycle\n\nApply lifecycle badges and deprecation stages to R package functions\n\n\nbrand-yml\n\nConfigure a shared _brand.yml for Quarto, Shiny, and R Markdown\n\n\ncli\n\nFormat CLI output with the R {cli} package\n\n\nrelease-post\n\nDraft a release announcement post for an R package\n\n\nreproducibility-audit\n\nAudit a project for reproducibility gaps: hidden deps, hardcoded paths, undocumented prerequisites, output traceability\n\n\nmeasure-performance\nperf, benchmark\nProfile R code to find the real bottleneck, microbenchmark only that, then confirm the win survives end to end\n\n\nrefresh-claude-token\nrct\nRotate CLAUDE_CODE_OAUTH_TOKEN across the repos that carry it, without /install-github-app’s workflow scaffolding, then verify the new token authenticates\n\n\n\n\n\nSession management\n\n\n\nSkill\nAliases\nWhat it does\n\n\n\n\nsession-lock\n\nRegister/deregister this session to prevent parallel clobbering\n\n\nhandoff\n\nSnapshot work state (branch, jobs, open decisions) so the next session can resume cleanly\n\n\nwrap-up\ndone, merged\nVerify true PR/issue/branch state, report a linked summary, then run UMS\n\n\nselect-model\nmodel-fit, assess-model-fit\nChoose the right Claude model for the task at hand\n\n\naway\n\nGrant session-scoped permission to stop asking clarifying questions, pick confident work, and consult a stronger model instead of blocking\n\n\nback\n\nCancel the away grant and surface a decision log of what was resolved unattended\n\n\ndaytb\ndo-as-you-think-best\nDecide the question at hand yourself and report the choice – scoped to that task, unlike away’s whole-session grant\n\n\ndelegate-to-codex\ndtc\nOffload heavy read/draft/verify work to the codex CLI before spending Claude quota, with Claude fallback\n\n\ndelegate-to-opencode\ndto\nOffload work to OpenCode (Go subscription, hosted Zen free, local Ollama) or OpenRouter models\n\n\nrec\nrecommend\nProvide clear, actionable recommendations when presenting choices or questions\n\n\nprompt-me\npm\nSurface the single most pressing open question (or top N) waiting on user input\n\n\nprompt-me-all\npma\nRestate every open question still waiting on user input, uncapped\n\n\npending-decisions\npd\nSweep issues/PRs (not just this conversation) for ones waiting on a decision from you, and ask about them one at a time\n\n\ncheckpoint\n\nSave a deliberate mid-task snapshot without ending the session\n\n\nfinish-wave\nfw\nCap an orchestration run at the wave already in flight: grab nothing new, drive the open wave to a terminal state, then ask before the next wave\n\n\ncompress-session\n\nDistill the session into auto memory before context fills up\n\n\npermission-check\n\nDiagnose why Claude Code is (or isn’t) prompting for permission on an action"
-  },
-  {
-    "objectID": "skills.html#full-skill-list",
-    "href": "skills.html#full-skill-list",
-    "title": "Skills",
-    "section": "Full skill list",
-    "text": "Full skill list\nAll 204+ canonical skills are in skills/ on GitHub. Generated Codex wrappers live in codex-skills/. Each canonical SKILL.md has a description field that lists the trigger phrases and a full procedure."
-  },
-  {
-    "objectID": "workflow.html",
-    "href": "workflow.html",
-    "title": "Workflow guide",
+    "objectID": "skills/alt-text/SKILL.html#length-guidelines",
+    "href": "skills/alt-text/SKILL.html#length-guidelines",
+    "title": "Write Accessible Alt Text",
     "section": "",
-    "text": "This page covers the key workflow conventions baked into the skills and CLAUDE.md instructions in this repo."
+    "text": "Complexity\nSentences\nWhen to use\n\n\n\n\nSimple\n2–3\nSingle geom, no facets, obvious pattern\n\n\nStandard\n3–4\nMultiple geoms or color encoding\n\n\nComplex\n4–5\nFaceted, multiple overlays, nuanced insight"
   },
   {
-    "objectID": "workflow.html#issue-first",
-    "href": "workflow.html#issue-first",
-    "title": "Workflow guide",
-    "section": "Issue-first",
-    "text": "Issue-first\nBefore branching, editing, or opening a PR, make sure a tracking issue exists. Search first; if no open issue covers the task, file one:\ngh issue create --title \"...\" --body \"...\"\nThe issue is the durable record of intent and scope. It lets the PR auto-close it via Closes #N and keeps the work discoverable if the PR stalls.\nThe start-task skill (/st) runs this pattern end-to-end: search for an existing issue, file one if needed, branch, implement, open PR, and iterate to clean."
-  },
-  {
-    "objectID": "workflow.html#claim-a-pr-before-working-on-it",
-    "href": "workflow.html#claim-a-pr-before-working-on-it",
-    "title": "Workflow guide",
-    "section": "Claim a PR before working on it",
-    "text": "Claim a PR before working on it\nBefore fetching a branch, editing files, or triggering a review loop, post a brief comment so other people and bots know not to start a conflicting session:\ngh pr comment &lt;N&gt; --body \"Working on this --- please hold off on pushing to this branch until I'm done.\n\n_Posted by Claude Code (AI agent) --- not written by a human._\"\nAfter the session ends (PR merged, paused, or closed), follow up with a closing comment so the PR is unclaimed for the next person.\nSkip the claim step if the most recent comment already claims it and the claim is still live — claims expire 2 hours after the most recent push or comment, and need reasserting past that. Read-only inspection (checking status, explaining a diff) doesn’t need a claim.\nThe claim-pr skill handles the exact wording and tracks when to unclaim."
-  },
-  {
-    "objectID": "workflow.html#the-ardi-loop",
-    "href": "workflow.html#the-ardi-loop",
-    "title": "Workflow guide",
-    "section": "The ARDI loop",
-    "text": "The ARDI loop\nARDI stands for Address, Rebut, Defer, Iterate. It’s the review loop that drives a PR to a clean verdict.\nFor every flagged item in a review, do exactly one of:\n\nAddress — fix it in this PR (the default path; most nits are 1–3 line changes).\nRebut — explain why the finding is wrong or doesn’t apply. Post the rebuttal in the PR and wait for the reviewer’s response. A rebuttal that doesn’t convince the reviewer does not close the item.\nDefer — file a follow-up issue and reference it in the PR. Use only when the fix expands scope (new feature, separate concern) or the requester said the PR shouldn’t grow.\n\nAfter handling every item, push the fixes, post an ARD summary comment, and re-request review. Repeat until the latest review has zero flagged items under any heading.\nThe ardi skill (/ardi) runs this full loop automatically. Aliases: dc, drive, clean, iterate.\n\nWhat “fully clean” means\nA PR is fully clean when:\n\nAll CI workflows and check runs are green and completed – not just the required checks, and not just the review job.\nThe latest review has no flagged items — no nits, no “consider”, no “minor observation”. The reviewer’s “Not a blocker” label is not a pass; fix it or defer it.\nThat review is a genuine posted verdict at the current head commit, from an external reviewer whenever one is reachable. Self-review is only the fallback for when no working external reviewer is available – never a substitute once one is – and availability gets re-checked right before declaring clean, not assumed from an earlier round.\n\nAt fully clean, every inline review thread is resolved. The only open conversation is the final all-clear exchange.\nSee shared/workflow/fully-clean.md for the full definition this page summarizes.\nDeadlock: if you and the reviewer can’t reach consensus after a rebuttal exchange, escalate to a human reviewer via the request-pr-review skill (which resolves that person from the repository’s own configuration, not from a name written here) rather than looping."
-  },
-  {
-    "objectID": "workflow.html#keep-branches-synced-with-main",
-    "href": "workflow.html#keep-branches-synced-with-main",
-    "title": "Workflow guide",
-    "section": "Keep branches synced with main",
-    "text": "Keep branches synced with main\nBefore pushing fixes or triggering a fresh review, merge main into the PR branch:\ngit fetch origin main\ngit log --oneline ..origin/main | head    # any output? main is ahead\ngit merge origin/main\nDon’t rebase or squash-rewrite a published PR branch unless explicitly asked — a merge commit matches GitHub’s “Update branch” button and preserves PR history.\nThe sync-pr-branch skill (/sync) does this automatically."
-  },
-  {
-    "objectID": "workflow.html#tracking-upstream-issues",
-    "href": "workflow.html#tracking-upstream-issues",
-    "title": "Workflow guide",
-    "section": "Tracking upstream issues",
-    "text": "Tracking upstream issues\nWhen you find a bug in a dependency or external repo:\n\nOpen a PR in the upstream repo if you have a fix ready.\nFile an issue in the upstream repo if you have tracker access but no fix.\nFile an issue in your own repo and ask the user to transfer it via GitHub’s Transfer issue feature.\n\nIn all cases, link the upstream issue or PR in your current PR so the root cause is tracked.\nThe send-upstream skill (/sup) handles steps 1–2."
-  },
-  {
-    "objectID": "workflow.html#updating-memories-and-skills",
-    "href": "workflow.html#updating-memories-and-skills",
-    "title": "Workflow guide",
-    "section": "Updating memories and skills",
-    "text": "Updating memories and skills\nAfter a PR merges (or at the end of any significant session), run UMS to capture what you learned:\n/ums\nUMS reviews recent context for recurring review findings, corrections, and guidance, then writes or updates the relevant memory and skill files. A merge is the natural checkpoint to bank lessons before context is lost.\nThe merge-it skill chains merge-it → post-merge → ums automatically when you say “merge it”."
-  },
-  {
-    "objectID": "workflow.html#queue-keywords",
-    "href": "workflow.html#queue-keywords",
-    "title": "Workflow guide",
-    "section": "Queue keywords",
-    "text": "Queue keywords\nSeveral bare keywords (no / prefix) trigger skill semantics:\n\n\n\n\n\n\n\n\nKeyword\nSkill\nWhat it does\n\n\n\n\nalso\n/also\nAppend a task to the current queue\n\n\nfirst\n/first\nPrepend a task (do it before anything else)\n\n\nnext\n/next\nQueue a task for after the current one\n\n\nbefore\n/before\nInsert a task before a named step\n\n\nand\n/and\nAdd a step to the current task\n\n\nremember / always\n/memorize\nSave a fact or preference to memory"
-  },
-  {
-    "objectID": "skills/adri/SKILL.html",
-    "href": "skills/adri/SKILL.html",
-    "title": "adri (alias for ardi)",
+    "objectID": "skills/alt-text/SKILL.html#quality-checklist",
+    "href": "skills/alt-text/SKILL.html#quality-checklist",
+    "title": "Write Accessible Alt Text",
     "section": "",
-    "text": "adri (alias for ardi)\nThis is a transposition-typo alias for the ardi skill. Read and follow the canonical skill:\n→ ardi\n\n\n\n\n Back to top"
+    "text": "Starts with chart type (Scatter chart, Histogram, Faceted bar chart, etc.)\nNames the axis variables\nIncludes specific values/ranges from code when informative\nStates the key insight from surrounding prose\nComplements (not duplicates) the caption\nWould make sense to someone who cannot see the image\nUses plain language (avoid jargon like “geom” or “aesthetic”)"
   },
   {
-    "objectID": "skills/adv/SKILL.html",
-    "href": "skills/adv/SKILL.html",
-    "title": "adv (Adversarial Review)",
+    "objectID": "skills/alt-text/SKILL.html#template-patterns",
+    "href": "skills/alt-text/SKILL.html#template-patterns",
+    "title": "Write Accessible Alt Text",
     "section": "",
-    "text": "Runs a detailed and holistic local adversarial AI code review on outgoing branch commits using an alternate model/engine available on this machine (evaluating architecture, conventions, safety, tests, and diff impacts rather than perfunctory surface checks).\n\n\n\n“adv”, “run adv”, “get an adversarial review from another model”\nWhen the user wants a quick adversarial review using a different desktop subscription model (e.g., Codex, Claude, Cursor, OpenCode, Antigravity) without using their primary model’s context or quota.\n\n\n\n\nNote: Until this skill is merged to main, you must set PRE_PUSH_REVIEW_LOCAL_DEV=1 in your environment to use the local branch copy.\nRun the pre-push-review.py script with the --engine alternate flag to rotate through available models, or specify a specific engine.\n# By default, use the trusted installed review script to prevent executing untrusted branch code.\n# To override with a local checkout during development, set PRE_PUSH_REVIEW_LOCAL_DEV=1\nGIT_ROOT=$(git rev-parse --show-toplevel 2&gt;/dev/null)\nif [ -n \"$PRE_PUSH_REVIEW_LOCAL_DEV\" ] && [ -n \"$GIT_ROOT\" ] && [ -f \"$GIT_ROOT/scripts/pre-push-review.py\" ]; then\n  REVIEW_SCRIPT=\"$GIT_ROOT/scripts/pre-push-review.py\"\nelse\n  TRUSTED_DIR=$(python3 -c \"import os, sys; candidates = [os.environ.get('CLAUDE_PLUGIN_ROOT', ''), '~/.claude/skills/pre-push-review', '~/.gemini/skills/pre-push-review', '~/.cursor/skills/pre-push-review', '~/.codex/skills/pre-push-review', '~/.gemini/config/plugins/ai-config/skills/pre-push-review']; p = next((os.path.realpath(os.path.expanduser(f)) for f in candidates if f and os.path.exists(os.path.expanduser(f))), None); sys.exit('Error: Trusted pre-push-review skill not found') if not p else print(os.path.abspath(p if os.path.isdir(os.path.join(p, 'scripts')) else os.path.join(p, '..', '..')))\")\n  TMP_WORKTREE=$(mktemp -d)\n  trap 'rm -rf \"$TMP_WORKTREE\"' EXIT\n  git -C \"$TRUSTED_DIR\" archive origin/main | tar -x -C \"$TMP_WORKTREE\" 2&gt;/dev/null || { echo \"Error: Failed to extract trusted origin/main review script. Set PRE_PUSH_REVIEW_LOCAL_DEV=1 to use local branch.\"; exit 1; }\n  REVIEW_SCRIPT=\"$TMP_WORKTREE/scripts/pre-push-review.py\"\nfi\n\n\nif [ -n \"$AGENT_NAME\" ]; then\n  python3 \"$REVIEW_SCRIPT\" --engine alternate --exclude-engine \"$AGENT_NAME\"\nelse\n  python3 \"$REVIEW_SCRIPT\" --engine alternate\nfi\nOr explicitly choose an alternate engine (e.g., if you are currently using Claude, you might use Codex or OpenCode):\npython3 \"$REVIEW_SCRIPT\" --engine codex\n\n\n\n\nComputes the local outgoing diff against origin/main (or PR base).\nDispatches the review to the selected alternate model/engine using plan/read-only mode to independently conduct both a detailed implementation defect audit and a holistic change assessment.\nParses and validates the structured review findings.\nExits with a nonzero code on blocking findings (unless --allow-findings is specified).\n\n\n\n\n\npre-push-review: The underlying script and skill for pre-push reviews."
+    "text": "Scatter chart:\nScatter chart. [X var] along the x-axis, [Y var] along the y-axis.\n[Shape: linear/curved/clustered]. [Specific pattern, e.g., \"peaks when X is 25--50\"].\n[Any overlaid fits or annotations].\nHistogram:\nHistogram of [variable]. [Shape: right-skewed/bimodal/normal/uniform].\n[If transformed: \"after [transformation], the distribution [result]\"].\n[Notable features: outliers, gaps, multiple modes].\nBar chart:\nBar chart. [Categories] along the x-axis, [measure] along the y-axis.\n[Key comparison: which is highest/lowest, relative differences].\n[Pattern: increasing/decreasing/grouped].\nTile/raster chart:\nTile chart [or heatmap]. [Row variable] along the y-axis, [column variable] along the x-axis.\nColor encodes [what value]. [Pattern: where values are high/low].\n[If faceted: \"N panels showing [what varies]\"].\nFaceted chart:\nFaceted [chart type] with [N] panels, one per [faceting variable].\n[What's constant across panels]. [What changes/varies].\n[Key comparison or insight across panels].\nCorrelation heatmap:\nCorrelation [matrix/heatmap] of [what variables]. [Arrangement].\n[Overall pattern: mostly positive/negative/mixed].\n[Notable clusters or strong/weak pairs].\n[If relevant: contrast with expected behavior].\nBefore/after comparison:\n[N] [chart type]s arranged [vertically/in grid]. [Top/Left] shows [original].\n[Bottom/Right] shows [transformed]. [Key difference/similarity].\n[If overlay: \"[color] curve shows [reference]\"].\nLine chart with overlays:\n[Line/Scatter] chart with overlaid [fits/curves]. [Axes].\n[Number] of [lines/fits] shown: [list what each represents].\n[Which fits well vs. poorly and why]."
   },
   {
-    "objectID": "skills/adv/SKILL.html#when-this-fires",
-    "href": "skills/adv/SKILL.html#when-this-fires",
-    "title": "adv (Adversarial Review)",
+    "objectID": "skills/alt-text/SKILL.html#example",
+    "href": "skills/alt-text/SKILL.html#example",
+    "title": "Write Accessible Alt Text",
     "section": "",
-    "text": "“adv”, “run adv”, “get an adversarial review from another model”\nWhen the user wants a quick adversarial review using a different desktop subscription model (e.g., Codex, Claude, Cursor, OpenCode, Antigravity) without using their primary model’s context or quota."
-  },
-  {
-    "objectID": "skills/adv/SKILL.html#usage",
-    "href": "skills/adv/SKILL.html#usage",
-    "title": "adv (Adversarial Review)",
-    "section": "",
-    "text": "Note: Until this skill is merged to main, you must set PRE_PUSH_REVIEW_LOCAL_DEV=1 in your environment to use the local branch copy.\nRun the pre-push-review.py script with the --engine alternate flag to rotate through available models, or specify a specific engine.\n# By default, use the trusted installed review script to prevent executing untrusted branch code.\n# To override with a local checkout during development, set PRE_PUSH_REVIEW_LOCAL_DEV=1\nGIT_ROOT=$(git rev-parse --show-toplevel 2&gt;/dev/null)\nif [ -n \"$PRE_PUSH_REVIEW_LOCAL_DEV\" ] && [ -n \"$GIT_ROOT\" ] && [ -f \"$GIT_ROOT/scripts/pre-push-review.py\" ]; then\n  REVIEW_SCRIPT=\"$GIT_ROOT/scripts/pre-push-review.py\"\nelse\n  TRUSTED_DIR=$(python3 -c \"import os, sys; candidates = [os.environ.get('CLAUDE_PLUGIN_ROOT', ''), '~/.claude/skills/pre-push-review', '~/.gemini/skills/pre-push-review', '~/.cursor/skills/pre-push-review', '~/.codex/skills/pre-push-review', '~/.gemini/config/plugins/ai-config/skills/pre-push-review']; p = next((os.path.realpath(os.path.expanduser(f)) for f in candidates if f and os.path.exists(os.path.expanduser(f))), None); sys.exit('Error: Trusted pre-push-review skill not found') if not p else print(os.path.abspath(p if os.path.isdir(os.path.join(p, 'scripts')) else os.path.join(p, '..', '..')))\")\n  TMP_WORKTREE=$(mktemp -d)\n  trap 'rm -rf \"$TMP_WORKTREE\"' EXIT\n  git -C \"$TRUSTED_DIR\" archive origin/main | tar -x -C \"$TMP_WORKTREE\" 2&gt;/dev/null || { echo \"Error: Failed to extract trusted origin/main review script. Set PRE_PUSH_REVIEW_LOCAL_DEV=1 to use local branch.\"; exit 1; }\n  REVIEW_SCRIPT=\"$TMP_WORKTREE/scripts/pre-push-review.py\"\nfi\n\n\nif [ -n \"$AGENT_NAME\" ]; then\n  python3 \"$REVIEW_SCRIPT\" --engine alternate --exclude-engine \"$AGENT_NAME\"\nelse\n  python3 \"$REVIEW_SCRIPT\" --engine alternate\nfi\nOr explicitly choose an alternate engine (e.g., if you are currently using Claude, you might use Codex or OpenCode):\npython3 \"$REVIEW_SCRIPT\" --engine codex"
-  },
-  {
-    "objectID": "skills/adv/SKILL.html#how-it-works",
-    "href": "skills/adv/SKILL.html#how-it-works",
-    "title": "adv (Adversarial Review)",
-    "section": "",
-    "text": "Computes the local outgoing diff against origin/main (or PR base).\nDispatches the review to the selected alternate model/engine using plan/read-only mode to independently conduct both a detailed implementation defect audit and a holistic change assessment.\nParses and validates the structured review findings.\nExits with a nonzero code on blocking findings (unless --allow-findings is specified)."
-  },
-  {
-    "objectID": "skills/adv/SKILL.html#related",
-    "href": "skills/adv/SKILL.html#related",
-    "title": "adv (Adversarial Review)",
-    "section": "",
-    "text": "pre-push-review: The underlying script and skill for pre-push reviews."
-  },
-  {
-    "objectID": "skills/agy-review-workflow/SKILL.html",
-    "href": "skills/agy-review-workflow/SKILL.html",
-    "title": "agy-review-workflow",
-    "section": "",
-    "text": "[!IMPORTANT] This workflow’s API-dispatch route is still out of service, most recently confirmed 2026-09-01. The original 2026-08-20 run ended request failed (code 429): Your prepayment credits are depleted / Execution failed: model unreachable; a 2026-09-01 retest (workflow_dispatch run 33557587761) failed again with a different error: Spend cap breached (code 403) rather than the original 429. Two different failures a week apart both stop this dispatch path, so keep it disabled rather than re-running it on spec — do not dispatch the workflow. This is a separate claim from the agy CLI, which is confirmed working on Windows as of 2026-09-02 via a direct local install (see memories/delegation.md’s IMPORTANT banner and its “agy on Windows” section, pointed to from memories/preferences.md) — that CLI route does not go through this workflow file at all, so its recovery says nothing about whether the API dispatch here still fails. Prefer delegate-to-codex or a direct agy --print CLI dispatch (per memories/delegation.md) for a cross-vendor second opinion. Copilot stays requestable on the PR where the org’s licensing reaches it. Tracked as ai-config#1776.\n\nSets up or edits the Google Antigravity PR review, security audit, and test generation workflow (antigravity-review.yml), which invokes the reusable antigravity-code-review.yml workflow from Morrison-Lab/gha.\nPath: .github/workflows/antigravity-review.yml\n\n\n\n\njobs:\n  review:\n    uses: Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2\nThe workflow delegates execution to Morrison-Lab/gha’s reusable workflow, which executes Morrison-Lab/gha/antigravity-review@v2. This ensures updates, safety checks, and runner handling in gha are automatically shared across repos.\n\n\n\npermissions:\n  contents: read\n  pull-requests: write\n  issues: write\n  id-token: write\n  actions: read\n\ncontents: read: Allows reading repository code and diffs.\npull-requests: write: Grants permission to post review comments and verdicts on PRs.\nissues: write: Allows writing issue comments where required.\nid-token: write: Enables OIDC authentication where required.\nactions: read: Lets automated review agents inspect CI run status.\n\n\n\n\nconcurrency:\n  group: antigravity-review-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}\n  cancel-in-progress: true\ncancel-in-progress: true cancels superseded runs on rapid sequential pushes, preventing API quota waste and review comment race conditions.\n\n\n\nsecrets:\n  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}\nAntigravity uses the Gemini API. Ensure the target repo has GEMINI_API_KEY defined in repository or organization secrets (gh secret list).\n\n\n\nSupported operational modes passed via inputs.mode: - code-review (default): Performs an automated PR code review. - security-audit: Runs targeted security inspection on modified code. - test-generation: Generates suggested test cases for changed files.\n\n\n\nwith:\n  trigger-policy: ${{ github.event_name == 'pull_request' && 'on-push' || 'on-request' }}\n\non-push: Automatically reviews PR updates on pull_request events (opened, synchronize, ready_for_review, reopened).\non-request: Restricts review to manual execution via workflow_dispatch.\n\n\n\n\nThe underlying action (Morrison-Lab/gha/antigravity-review@v2) enforces guards so draft PRs, cross-repository (fork) PRs, and dependabot[bot] runs do not leak secrets or execute untrusted code.\n\n\n\n\n\nConfirm GEMINI_API_KEY secret exists (gh secret list).\nWrite .github/workflows/antigravity-review.yml using the template below.\nPush to main or open a PR to enable automated reviews.\n\n\n\n# Active caller for Morrison-Lab/gha's reusable Antigravity PR review workflow.\nname: Antigravity Code Review\n\non:\n  pull_request:\n    types: [opened, synchronize, ready_for_review, reopened]\n\n  workflow_dispatch:\n    inputs:\n      pr_number:\n        description: 'Pull request number to review'\n        required: true\n        type: string\n      mode:\n        description: 'Operational mode: code-review, security-audit, or test-generation'\n        required: false\n        default: 'code-review'\n        type: choice\n        options:\n          - code-review\n          - security-audit\n          - test-generation\n\nconcurrency:\n  group: antigravity-review-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}\n  cancel-in-progress: true\n\njobs:\n  review:\n    permissions:\n      contents: read\n      pull-requests: write\n      issues: write\n      id-token: write\n      actions: read\n    uses: Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2\n    with:\n      mode: ${{ inputs.mode || 'code-review' }}\n      pr-number: ${{ github.event.pull_request.number || inputs.pr_number || '' }}\n      model: ''\n      trigger-policy: ${{ github.event_name == 'pull_request' && 'on-push' || 'on-request' }}\n    secrets:\n      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}\n\n\n\n\n\nclaude-review-workflow – sets up the Claude Code PR review workflow (claude-code-review.yml).\nclaude-agent-workflow – sets up the Claude Code agent workflow (claude.yml).\nconfig-ai – routes AI capability and bot workflow requests to the appropriate skill."
-  },
-  {
-    "objectID": "skills/agy-review-workflow/SKILL.html#load-bearing-pieces-dont-simplify-away",
-    "href": "skills/agy-review-workflow/SKILL.html#load-bearing-pieces-dont-simplify-away",
-    "title": "agy-review-workflow",
-    "section": "",
-    "text": "jobs:\n  review:\n    uses: Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2\nThe workflow delegates execution to Morrison-Lab/gha’s reusable workflow, which executes Morrison-Lab/gha/antigravity-review@v2. This ensures updates, safety checks, and runner handling in gha are automatically shared across repos.\n\n\n\npermissions:\n  contents: read\n  pull-requests: write\n  issues: write\n  id-token: write\n  actions: read\n\ncontents: read: Allows reading repository code and diffs.\npull-requests: write: Grants permission to post review comments and verdicts on PRs.\nissues: write: Allows writing issue comments where required.\nid-token: write: Enables OIDC authentication where required.\nactions: read: Lets automated review agents inspect CI run status.\n\n\n\n\nconcurrency:\n  group: antigravity-review-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}\n  cancel-in-progress: true\ncancel-in-progress: true cancels superseded runs on rapid sequential pushes, preventing API quota waste and review comment race conditions.\n\n\n\nsecrets:\n  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}\nAntigravity uses the Gemini API. Ensure the target repo has GEMINI_API_KEY defined in repository or organization secrets (gh secret list).\n\n\n\nSupported operational modes passed via inputs.mode: - code-review (default): Performs an automated PR code review. - security-audit: Runs targeted security inspection on modified code. - test-generation: Generates suggested test cases for changed files.\n\n\n\nwith:\n  trigger-policy: ${{ github.event_name == 'pull_request' && 'on-push' || 'on-request' }}\n\non-push: Automatically reviews PR updates on pull_request events (opened, synchronize, ready_for_review, reopened).\non-request: Restricts review to manual execution via workflow_dispatch.\n\n\n\n\nThe underlying action (Morrison-Lab/gha/antigravity-review@v2) enforces guards so draft PRs, cross-repository (fork) PRs, and dependabot[bot] runs do not leak secrets or execute untrusted code."
-  },
-  {
-    "objectID": "skills/agy-review-workflow/SKILL.html#setting-up-in-a-new-repo",
-    "href": "skills/agy-review-workflow/SKILL.html#setting-up-in-a-new-repo",
-    "title": "agy-review-workflow",
-    "section": "",
-    "text": "Confirm GEMINI_API_KEY secret exists (gh secret list).\nWrite .github/workflows/antigravity-review.yml using the template below.\nPush to main or open a PR to enable automated reviews.\n\n\n\n# Active caller for Morrison-Lab/gha's reusable Antigravity PR review workflow.\nname: Antigravity Code Review\n\non:\n  pull_request:\n    types: [opened, synchronize, ready_for_review, reopened]\n\n  workflow_dispatch:\n    inputs:\n      pr_number:\n        description: 'Pull request number to review'\n        required: true\n        type: string\n      mode:\n        description: 'Operational mode: code-review, security-audit, or test-generation'\n        required: false\n        default: 'code-review'\n        type: choice\n        options:\n          - code-review\n          - security-audit\n          - test-generation\n\nconcurrency:\n  group: antigravity-review-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}\n  cancel-in-progress: true\n\njobs:\n  review:\n    permissions:\n      contents: read\n      pull-requests: write\n      issues: write\n      id-token: write\n      actions: read\n    uses: Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2\n    with:\n      mode: ${{ inputs.mode || 'code-review' }}\n      pr-number: ${{ github.event.pull_request.number || inputs.pr_number || '' }}\n      model: ''\n      trigger-policy: ${{ github.event_name == 'pull_request' && 'on-push' || 'on-request' }}\n    secrets:\n      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}"
-  },
-  {
-    "objectID": "skills/agy-review-workflow/SKILL.html#relationship-to-other-skills",
-    "href": "skills/agy-review-workflow/SKILL.html#relationship-to-other-skills",
-    "title": "agy-review-workflow",
-    "section": "",
-    "text": "claude-review-workflow – sets up the Claude Code PR review workflow (claude-code-review.yml).\nclaude-agent-workflow – sets up the Claude Code agent workflow (claude.yml).\nconfig-ai – routes AI capability and bot workflow requests to the appropriate skill."
-  },
-  {
-    "objectID": "skills/also/SKILL.html",
-    "href": "skills/also/SKILL.html",
-    "title": "also",
-    "section": "",
-    "text": "/also &lt;instructions&gt; means: finish everything that came before this, then also do &lt;instructions&gt;. The /also text is a tail task appended to the queue — it does not interrupt, reprioritize, or replace the work already underway.\nIt is the lowest-priority non-sticky slot in the queue family:\n\n/first — head of queue; may pause in-progress work to run now.\n/next — immediately after the current (in-progress) task.\n/before &lt;target&gt; — immediately before the referenced queued task.\n/also — tail of queue.\n/last — sticky tail; stays last even as new /also tasks arrive.\n\n\n\nThe user types /also followed by one or more instructions, e.g.:\n\n/also run the spellchecker before you wrap up\n/also add a test for the new helper\n/also update the changelog once everything else is done\n\nThe instructions after /also are the deferred task. Everything the user asked for before the /also (earlier in this message, or in earlier messages that you haven’t finished yet) is the preceding work.\n\n\n\n\nIdentify the preceding work. Look back over the current message and any still-unfinished requests from earlier in the conversation. If a task is in flight (mid-refactor, mid-render, waiting on a verification), that is preceding work.\nFinish all of it first. Do not start the /also task while anything that came before it is incomplete. The whole point of /also is “last, not now.”\nThen do the deferred task. Once the preceding work is genuinely done — verified, not just attempted — carry out the /also instructions as a normal request.\nReport both. In your wrap-up, make clear that the preceding work completed and then the /also task was done (or surface anything that blocked it).\n\n\n\n\n\nNothing precedes it. If there is no outstanding work (the /also is the only live request), just do it immediately — there is nothing to wait for.\nMultiple /alsos. Handle them in the order given, all after the preceding non-/also work. They form a FIFO tail queue.\nThe deferred task depends on the preceding work. That is the normal case and exactly why it is deferred — e.g. “spellcheck before wrapping up” needs the edits done first. Run it against the finished state.\nThe preceding work fails or is blocked. Surface that first. Only skip ahead to the /also task if it is genuinely independent and still useful; otherwise tell the user why you stopped before reaching it.\n\n\n\n\n\nNot a priority bump — /also lowers urgency (do it last), it does not raise it.\nNot a reason to drop or shortcut the preceding work to get to the deferred task faster.\nNot a silent hand-off — always confirm the deferred task’s outcome in your recap.\nNot the sticky-tail variant — /last stays last even as new /also tasks arrive; /also tasks can be displaced by a later /also."
-  },
-  {
-    "objectID": "skills/also/SKILL.html#what-fires-this",
-    "href": "skills/also/SKILL.html#what-fires-this",
-    "title": "also",
-    "section": "",
-    "text": "The user types /also followed by one or more instructions, e.g.:\n\n/also run the spellchecker before you wrap up\n/also add a test for the new helper\n/also update the changelog once everything else is done\n\nThe instructions after /also are the deferred task. Everything the user asked for before the /also (earlier in this message, or in earlier messages that you haven’t finished yet) is the preceding work."
-  },
-  {
-    "objectID": "skills/also/SKILL.html#how-to-handle-it",
-    "href": "skills/also/SKILL.html#how-to-handle-it",
-    "title": "also",
-    "section": "",
-    "text": "Identify the preceding work. Look back over the current message and any still-unfinished requests from earlier in the conversation. If a task is in flight (mid-refactor, mid-render, waiting on a verification), that is preceding work.\nFinish all of it first. Do not start the /also task while anything that came before it is incomplete. The whole point of /also is “last, not now.”\nThen do the deferred task. Once the preceding work is genuinely done — verified, not just attempted — carry out the /also instructions as a normal request.\nReport both. In your wrap-up, make clear that the preceding work completed and then the /also task was done (or surface anything that blocked it)."
-  },
-  {
-    "objectID": "skills/also/SKILL.html#edge-cases",
-    "href": "skills/also/SKILL.html#edge-cases",
-    "title": "also",
-    "section": "",
-    "text": "Nothing precedes it. If there is no outstanding work (the /also is the only live request), just do it immediately — there is nothing to wait for.\nMultiple /alsos. Handle them in the order given, all after the preceding non-/also work. They form a FIFO tail queue.\nThe deferred task depends on the preceding work. That is the normal case and exactly why it is deferred — e.g. “spellcheck before wrapping up” needs the edits done first. Run it against the finished state.\nThe preceding work fails or is blocked. Surface that first. Only skip ahead to the /also task if it is genuinely independent and still useful; otherwise tell the user why you stopped before reaching it."
-  },
-  {
-    "objectID": "skills/also/SKILL.html#what-this-is-not",
-    "href": "skills/also/SKILL.html#what-this-is-not",
-    "title": "also",
-    "section": "",
-    "text": "Not a priority bump — /also lowers urgency (do it last), it does not raise it.\nNot a reason to drop or shortcut the preceding work to get to the deferred task faster.\nNot a silent hand-off — always confirm the deferred task’s outcome in your recap.\nNot the sticky-tail variant — /last stays last even as new /also tasks arrive; /also tasks can be displaced by a later /also."
+    "text": "Code context:\nplotting_data |&gt;\n  ggplot(aes(value)) +\n  geom_histogram(binwidth = 0.2) +\n  facet_grid(name~., scales = \"free_y\") +\n  geom_line(aes(x, y), data = norm_curve, color = \"green4\")\nSurrounding prose says: “Normalization doesn’t make data more normal”\nCaption: “Normalization doesn’t make data more normal. The green curve indicates the density of the unit normal distribution.”\nGood alt text:\nFaceted histogram with two panels stacked vertically. Top panel shows\noriginal data with a bimodal distribution. Bottom panel shows the same\ndata after z-score normalization, retaining the bimodal shape. A green\nnormal distribution curve overlaid on the bottom panel clearly does not\nmatch the data, demonstrating that normalization preserves distribution\nshape rather than creating normality."
   },
   {
     "objectID": "skills/and/SKILL.html",

@@ -868,10 +868,14 @@ def vocabulary_checks(mod):
     where the true figure was 23. It matched nothing, because the vocabulary
     stopped at `twelve`.
 
-    The widening costs nothing in precision on this corpus:
-    `scripts/measure-cardinality-vocabulary.py` is the instrument, and it
-    reports the same flagged count under either vocabulary rather than a
-    figure this docstring would have to keep in step with the history.
+    The widening costs nothing in precision on this corpus AT THE BODY LEVEL.
+    `scripts/measure-cardinality-vocabulary.py` is the instrument, and what it
+    holds fixed is the SET of commit bodies yielding a cardinality claim,
+    which is the same under either vocabulary -- not a count this docstring
+    would then have to keep in step with the history. The CLAIM counts do
+    differ inside those bodies, and the script reports both directions. The
+    hook's own comment beside `CARDINALITY_COUNT` carries the figures and the
+    two things that claim does not say.
 
     Every case here was confirmed by mutation to go red, and the note on each
     names the mutation that kills it. Two earlier drafts of this block --

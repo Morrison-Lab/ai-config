@@ -384,22 +384,41 @@ ENUM_SEPARATOR = r"\s*/?(?:,|(?<=\s)/|/(?=\s))\s*"
 # stronger signal than a digit run, because prose spells out a count someone
 # holds in mind and writes digits for one they just read off a command.
 #
-# The widening costs nothing in precision on this corpus, and the precision
-# claim is a BODY count rather than a claim count, because a body is what
-# this hook acts on: `scripts/measure-cardinality-vocabulary.py` flags 54 of
-# this repository's 111 multi-line commit bodies under EITHER vocabulary
-# (measured 2026-09-23 against origin/main at b96c640f). The script exits 1
-# if that ever stops holding.
+# The widening costs nothing in precision on this corpus AT THE BODY LEVEL,
+# and only there. `scripts/measure-cardinality-vocabulary.py` is the
+# instrument: measured 2026-09-23 against origin/main at b96c640f, both
+# vocabularies yield a cardinality claim in the same 54 of this repository's
+# 111 multi-line commit bodies. That SET OF BODIES is what the script asserts,
+# and what it exits 1 on -- neither the 54 nor the 111, both of which move
+# as the history grows.
 #
-# The CLAIM counts do differ, and reporting only bodies hid that: 319 to
-# twelve against 325 to hundred, 7 gained and 1 lost, every one of them
-# inside a body already flagged under both. Each gain is a count the narrow
-# vocabulary could not spell. The single loss is `six lines`, which the
-# narrow pattern quoted out of `thirty-six lines` -- the same
-# surfaced-figure-the-author-never-wrote failure the compound-word note
-# below describes, so the widening corrected it rather than causing it.
-# Every figure here moves as the history grows, so re-run the script rather
-# than trusting any of them.
+# Two things that claim does NOT say, because each is easy to read into it.
+#
+# It is not a claim about what the hook WARNS. The script calls `find_claims`,
+# never `evaluate()`, so it stops one step short of the discharge pass: 7 of
+# those 54 bodies discharge under `_derived_in_body(body, need_count=True)`
+# and would produce no warning at all. Reaching `evaluate()` would mean
+# reconstructing each body's originating command, which the git history does
+# not carry, so the proxy is deliberate and its gap is stated rather than
+# papered over.
+#
+# And it is not a claim about CLAIMS, which do differ: 319 to twelve against
+# 325 to hundred, 7 gained and 1 lost, every one inside a body already flagged
+# under both. Reporting only bodies hid that, so read the two directions
+# separately. All 7 gains are positional line references -- `fifty lines`,
+# `thirty-six lines`, `TWENTY LINES` -- which name a location rather than a
+# count anyone could have got wrong, so this corpus carries no instance of the
+# real miscount above and the widening's recall gain is unrepresented in it.
+# The single loss is `six lines`, quoted by the narrow pattern out of
+# `thirty-six lines` -- the same surfaced-figure-the-author-never-wrote
+# failure the compound-word note below describes, so the widening corrected it
+# rather than causing it.
+#
+# Nothing runs that script automatically. It is a re-derivation to run by hand
+# when this comment's figures are in question or the vocabulary changes again,
+# not a check to read as green: after a body set moves, its own failure
+# message asks for a human reading rather than announcing a verdict, so a CI
+# step would go red the first time the hook legitimately caught something new.
 #
 # A tens word joined by a hyphen to a ones word is one count, so the compound
 # needs its own alternative: without it the pattern fails on "Twenty-", which
@@ -412,6 +431,18 @@ ENUM_SEPARATOR = r"\s*/?(?:,|(?<=\s)/|/(?=\s))\s*"
 # keeps both compound cases green, because Python backtracks within the group
 # at one start position rather than committing to the first alternative that
 # begins to match.
+#
+# A HEDGED count is still flagged, and that is a known cost rather than a
+# decision this vocabulary made. "Roughly ten files were touched" and "About
+# three scripts remain" each yield a cardinality claim, because nothing in the
+# pattern reads the word before the count. It predates the widening rather
+# than following from it -- measured 2026-09-23, the pre-widening vocabulary
+# flags both identically, since `ten` and `three` were always in it -- so
+# narrowing `hundred` back would not recover either. A hyphenated compound
+# escapes only by accident: `Twenty-odd files` matches nothing because `odd`
+# is not a ones word, which is a gap in the compound alternative rather than
+# an exemption for hedges. Tracked as ai-config#3907; leaving the hedge in is
+# the safe direction, since the hook only ever asks for a count.
 CARDINALITY_TENS = r"twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety"
 CARDINALITY_ONES = r"one|two|three|four|five|six|seven|eight|nine"
 CARDINALITY_COUNT = (

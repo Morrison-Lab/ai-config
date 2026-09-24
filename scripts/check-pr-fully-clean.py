@@ -2221,7 +2221,7 @@ COPILOT_SUPPRESSED_BLOCK = re.compile(r"\bSuppressed\s+comments\b", re.IGNORECAS
 # ValueError uncaught, crashing the merge-gate classifier instead of
 # failing closed. `COPILOT_COMMENT_GENERATED` matches just the phrase
 # prefix; `COPILOT_COMMENT_COUNT` is then `.match()`-anchored at that
-# phrase's end, bounded to 1-6 digits, with `(?<![0-9])`/`(?![0-9])`
+# phrase's end, bounded to 1-6 ASCII digits, with `(?<!\d)`/`(?!\d)`
 # guarding both ends so a run LONGER than 6 digits cannot match a
 # truncated head or tail of itself -- it fails to match at all, and the
 # caller treats that as a present-but-unparseable source (fail closed)
@@ -2229,10 +2229,24 @@ COPILOT_SUPPRESSED_BLOCK = re.compile(r"\bSuppressed\s+comments\b", re.IGNORECAS
 # check is a single bounded match (at most 6 backtrack attempts, O(1)) at
 # one fixed anchor position, so this stays O(1) per occurrence regardless
 # of how long the adversarial digit run is.
+#
+# The boundary lookarounds use `\d` (Unicode-aware in Python's `re` by
+# default, matching every Unicode `Nd`-category digit) rather than
+# `[0-9]`, even though the CAPTURE stays ASCII-only `[0-9]{1,6}`
+# (ai-config#3899 review finding, PR ai-config#3906 Copilot review): an
+# `[0-9]`-only boundary lets a non-ASCII digit sit right where the
+# boundary is checked without tripping it, since `[0-9]` doesn't
+# recognise it as a digit at all. `Comments generated: 0５` (a
+# full-width "5" after an ASCII "0") matched `0` as a complete count under
+# `(?![0-9])`, because the following character genuinely isn't in the
+# `[0-9]` class -- but it plainly IS more digit, just not an ASCII one,
+# and a real Copilot count is never followed by another digit of any
+# script. `(?!\d)` correctly rejects it: `\d` sees the full-width digit as
+# a digit even though `[0-9]` in the capture does not.
 COPILOT_COMMENT_GENERATED = re.compile(
     r"\bComments\s+generated:\**[ \t]*", re.IGNORECASE
 )
-COPILOT_COMMENT_COUNT = re.compile(r"(?<![0-9])([0-9]{1,6})(?![0-9])")
+COPILOT_COMMENT_COUNT = re.compile(r"(?<!\d)([0-9]{1,6})(?!\d)")
 
 
 def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str:

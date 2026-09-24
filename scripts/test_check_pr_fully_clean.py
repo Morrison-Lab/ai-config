@@ -6395,6 +6395,41 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) is None,
     )
 
+    # ai-config#3899 review finding, fifteenth round (PR ai-config#3906
+    # Copilot review): the legacy COPILOT_COMMENT_COUNT regex's boundary
+    # lookarounds were `[0-9]`-only, not `\d`, so a non-ASCII digit sitting
+    # right after an ASCII digit never tripped the "not immediately
+    # followed by another digit" check -- `[0-9]` genuinely does not
+    # recognise it as a digit, even though it plainly is one, just not an
+    # ASCII one. "Comments generated: 0" + a full-width "5" (U+FF15)
+    # matched `0` as a complete legacy count and classified clean. Fixed
+    # by switching the boundary lookarounds to `\d` (Unicode-aware),
+    # keeping the capture group itself ASCII-only `[0-9]{1,6}`. The v2
+    # count regexes (`_COPILOT_FIRST_COUNT`/`_COPILOT_SEP_COUNT`) do NOT
+    # have the same shape and need no equivalent change: they are anchored
+    # with `^...$` against the whole token rather than floating boundary
+    # lookarounds at one position, so a trailing full-width digit already
+    # broke their `$` anchor and failed the match outright (see the
+    # "fails closed on a full-width Unicode digit" check just above,
+    # which already covered this and passed before this round's fix).
+    check(
+        "copilot_verdict: a legacy 'Comments generated: 0' immediately "
+        "followed by a full-width digit is not read as a complete zero "
+        "count",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "<details>\n- **Comments generated:** 0５\n</details>"
+        ) != "clean",
+    )
+    check(
+        "copilot_verdict: a v2 'Findings:' count immediately followed by "
+        "a full-width digit is not read as a complete zero count",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            f"**Review effort:** Lite  \n**Findings:** 0５ {_v2_picture}"
+        ) != "clean",
+    )
+
     # ai-config#3899 review finding, ninth round: the tokenizer ended a tag
     # at the first '>' even inside a quoted attribute value, so
     # `<img alt="a>5">` truncated mid-attribute and a `>` hidden inside a

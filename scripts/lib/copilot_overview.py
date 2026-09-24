@@ -10,8 +10,8 @@ genuinely finding-free. The legacy body format states that count as
 word ``None``, or one or more ``<n> <severity-badge>`` pairs (an inline
 ``<picture>`` or ``<img>`` element per severity) that need summing when
 several severities appear on the same line, e.g. ``2 <picture ...>
-...</picture>`` alone, or ``2 <picture ...></picture> . 1 <picture
-...></picture>`` (a middle dot between them) for a mixed body.
+...</picture>`` alone, or ``2 <picture ...></picture> · 1 <picture
+...></picture>`` (a middle dot, U+00B7, between them) for a mixed body.
 
 ``**Findings:**`` line's per-severity counts are validated against a
 small grammar rather than by pattern-matching one bad shape at a time.

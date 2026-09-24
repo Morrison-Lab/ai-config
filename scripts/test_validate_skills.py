@@ -349,7 +349,7 @@ def main() -> int:
                     "plugins/parked/plugin.json.parked"):
             (repo / rel).parent.mkdir(parents=True, exist_ok=True)
             (repo / rel).write_text("{}", encoding="utf-8")
-        subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
         subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
         original_root = vs.ROOT
         vs.ROOT = repo

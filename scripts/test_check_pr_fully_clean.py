@@ -7353,6 +7353,20 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
         ) == "clean",
     )
+    # A malformed `<details/evil>` opener must NOT open a details region
+    # (PR #3906 Copilot review, eleventh round): accepting any trailing slash
+    # in `_COPILOT_DETAILS_OPEN` let `<details/evil>` hide later nonzero
+    # findings down to a false clean.
+    check(
+        "copilot_verdict: a malformed '<details/evil>' opener does not "
+        "hide a later live nonzero finding inside a fake details region",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n\n"
+            f"<details/evil>\n\n**Findings:** 5 {_v2_picture}\n\n"
+            "</details>\n"
+        ) == "not-clean",
+    )
     # A genuine `<details open>`/`<details/>` opener must still match
     # (the delimiter set admits whitespace and `/`, not just `>`).
     check(
@@ -7620,6 +7634,21 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "'<picture:evil>' rather than reading it as a real <picture> badge",
         checker._copilot_v2_line_findings_count(
             "0 <picture:evil></picture>"
+        ) is None,
+    )
+    # PR #3906 Copilot review, eleventh round: `_copilot_tag_name` accepted
+    # any slash after the tag name, so `<img/evil>` and `<picture/evil>`
+    # scanned as valid tags. Requiring `/` to be followed by `>` fails them closed.
+    check(
+        "_copilot_v2_line_findings_count fails closed on '<img/evil>' "
+        "rather than reading it as a real <img> badge",
+        checker._copilot_v2_line_findings_count("0 <img/evil>") is None,
+    )
+    check(
+        "_copilot_v2_line_findings_count fails closed on "
+        "'<picture/evil>' rather than reading it as a real <picture> badge",
+        checker._copilot_v2_line_findings_count(
+            "0 <picture/evil></picture>"
         ) is None,
     )
 

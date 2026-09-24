@@ -293,8 +293,12 @@ _COPILOT_OVERVIEW_START = re.compile(
 # or `>`); this mirrors that same delimiter set here, for consistency, so
 # `<details:evil>`/`<details-evil>` are rejected outright while
 # `<details>`, `<details open>`, and `<details/>` still match.
+# A bare `/` lookahead accepted any slash (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot
+# review, eleventh round), so `<details/evil>` opened a fake details
+# region that hid later nonzero findings down to a false clean; require
+# `/` to be followed by `>` (`(?=[ \t>]|/>)`).
 _COPILOT_DETAILS_OPEN = re.compile(
-    r"(?:^|\n)[ ]{0,3}<details(?=[ \t/>])", re.IGNORECASE
+    r"(?:^|\n)[ ]{0,3}<details(?=[ \t>]|/>)", re.IGNORECASE
 )
 _COPILOT_NEXT_HEADING = re.compile(r"(?:^|\n)[ ]{0,3}##[ \t]")
 # `[0-9]`, not `\d`: Python's `\d` matches every Unicode `Nd`-category
@@ -897,9 +901,13 @@ def _copilot_tag_name(tag: str) -> Optional[str]:
     j = 1
     while j < len(low) and low[j].isalnum():
         j += 1
-    if low[j] not in (" ", "\t", "/", ">"):
-        return None
-    return low[1:j]
+    # A real opening tag's name is followed by whitespace, `>`, or `/>`
+    # (a void-element self-close). Accepting any slash allowed `<img/evil>`
+    # and `<picture/evil>` to scan as valid badges (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
+    # Copilot review, eleventh round).
+    if low[j] in (" ", "\t", ">") or (low[j] == "/" and low[j:].startswith("/>")):
+        return low[1:j]
+    return None
 
 
 def _consume_copilot_badge(tokens: List[Tuple[str, str]], i: int) -> Optional[int]:

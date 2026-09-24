@@ -99,7 +99,7 @@ RX_PUSH = re.compile(r"git\s+push|create_or_update_file|push_files", re.I)
 LOCAL_FILE_TOOLS = {
     "view_file", "read_file", "grep_search", "list_dir", "find_by_name",
     "write_to_file", "replace_file_content", "edit", "write", "str_replace_editor",
-    "multiedit",
+    "multiedit", "view", "read",
 }
 
 
@@ -543,6 +543,8 @@ def scan(path):
                 for tc in m.get("tool_calls") or []:
                     if isinstance(tc, dict):
                         tool_name = (tc.get("name") or (tc.get("function") or {}).get("name") or "").lower()
+                        if tool_name in LOCAL_FILE_TOOLS:
+                            continue
                         args = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
                         blob = tool_name + " " + json.dumps(args)
                         tool_id = tc.get("id") or str(id(tc))
@@ -567,6 +569,8 @@ def scan(path):
                         continue
                     if b.get("type") == "tool_use":
                         tool_name = (b.get("name") or "").lower()
+                        if tool_name in LOCAL_FILE_TOOLS:
+                            continue
                         args = b.get("input") or {}
                         blob = tool_name + " " + json.dumps(args)
                         tool_id = b.get("id") or b.get("tool_use_id") or ""

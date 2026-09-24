@@ -469,6 +469,23 @@ CASES = [
           }}]}},
       say("All checks green at this head.")], True,
      "CommandLine parameter with git push is recognized as a push"),
+
+    # Local file tools mentioning query vocabulary must not register as a fresh status query.
+    ([QUERY, PUSH,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "view_file", "input": {
+              "AbsolutePath": "/path/to/scripts/check-pr-fully-clean.py"
+          }}]}},
+      say("All checks green at this head.")], True,
+     "view_file mentioning query vocabulary must not count as fresh status query"),
+    ([QUERY, PUSH,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "edit", "input": {
+              "file_path": "scripts/ci.sh",
+              "text": "gh pr checks 123\n"
+          }}]}},
+      say("All checks green at this head.")], True,
+     "edit tool mentioning query vocabulary must not count as fresh status query"),
 ]
 
 

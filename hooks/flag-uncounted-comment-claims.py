@@ -377,8 +377,128 @@ ENUM_SEPARATOR = r"\s*/?(?:,|(?<=\s)/|/(?=\s))\s*"
 # constant -- `remind-brief-premises.py`'s own Agent-brief use of "no" is a
 # different population (a brief instructing an agent, not review-comment
 # prose) and is out of scope for this hook's fix.
+# The number words run to `hundred`, not to `twelve`, but the two halves of
+# that range are included on different grounds, and only the first half has
+# the obvious argument behind it. For the teens and the tens, a spelled-out
+# number is if anything a stronger signal than a digit run: prose spells out
+# a count someone holds in mind and writes digits for one they just read off
+# a command. `hundred` is the exception to that, and it is the weaker
+# addition: it is the one vocabulary word that is overwhelmingly approximate
+# in ordinary prose (`a few hundred lines up`), so it buys recall at a real
+# cost in precision, and one of the three bodies this widening newly flags in
+# this repository is exactly that phrasing. What settles `hundred` is the
+# corpus measurement below, never the spelled-out-means-counted argument,
+# which does not reach it.
+#
+# The widening's founding anecdote does NOT support it, and saying so is the
+# point of writing it down. "Fourteen such references remain in text at this
+# head" -- a real miscount, whose true figure was 23 -- did match nothing
+# while the vocabulary stopped at twelve. But it was posted as a PULL-REQUEST
+# BODY, and this hook watches comment bodies only: measured 2026-09-23,
+# `gh pr create --body` and `gh issue create --body` carrying that sentence
+# each yield `[]` from `evaluate()`, where the `gh pr comment` and
+# `gh issue comment` forms yield a cardinality claim. It also carried its own
+# deriving command, which `_derived_in_body(body, need_count=True)`
+# discharges. So the widening would not have caught it twice over, and the
+# case for the widening rests on the corpus measurement below rather than on
+# that sentence. (The PR/issue-body surface was built and reverted
+# separately; ai-config#3900 carries it.)
+#
+# `scripts/measure-cardinality-vocabulary.py` is the instrument, and its own
+# module docstring owns the reading: what the refusals are, what the script
+# measures instead of what the hook warns, and what each gained and lost
+# claim actually is. Restating any of that here is what let two copies drift
+# apart inside a single commit, which is the argument for keeping one.
+#
+# The one fact the widening rests on, which the script derives and reports:
+# the flagged body set MOVED rather than merely growing in claim count, and
+# the claims gained include counts of things rather than only positional line
+# references. Run the script for the figures; it prints them, and this comment
+# deliberately does not, because the copy that used to sit here is what drifted.
+#
+# An earlier revision of this comment read "the same 54 of 111 bodies",
+# measured at that same ref from a SHALLOW clone carrying a small fraction of
+# the multi-line bodies the complete history holds -- a fragment whose own
+# depth is unrecoverable. `git log`
+# reports a grafted fragment with no warning and exits 0, so the figures were
+# true statements about a history nobody chose, and they inverted the
+# conclusion. The script now refuses a shallow clone.
+#
+# Nothing runs that script automatically. It is a re-derivation to run by hand
+# when this comment's figures are in question or the vocabulary changes again,
+# not a check to read as green: when the body set moves, the script's own
+# failure message asks for a human reading rather than announcing a verdict,
+# so a CI step would go red the first time the hook legitimately caught
+# something new.
+#
+# A tens word joined by a hyphen to a ones word is one count, so the compound
+# needs its own alternative: without it the pattern fails on "Twenty-", which
+# requires whitespace after the count, restarts at the next word boundary, and
+# quotes "three files" out of "Twenty-three files" -- a surfaced figure the
+# author never wrote.
+#
+# Its POSITION in the alternation is readability rather than correctness, which
+# a mutation measured rather than reasoned: moving it after the bare ones words
+# keeps both compound cases green, because Python backtracks within the group
+# at one start position rather than committing to the first alternative that
+# begins to match.
+#
+# A HEDGED count is still flagged, and that is a known cost rather than a
+# decision this vocabulary made. "Roughly ten files were touched" and "About
+# three scripts remain" each yield a cardinality claim, because
+# `CARDINALITY_RE` begins its match at the count itself and never reads the
+# word before it. It predates the widening rather than following from it --
+# measured 2026-09-23, the pre-widening vocabulary flags both identically,
+# since `ten` and `three` were always in it -- so narrowing `hundred` back
+# would not recover either.
+#
+# `Twenty-odd files` matches nothing, and the HYPHEN is why. The compound
+# alternative admits only a tens word joined to a ones word, and `odd` is not
+# one, so the pattern rejects that string for the same reason it would reject
+# `Twenty-purple files`. Nothing in the pattern recognises an approximation.
+# `hooks/test-flag-uncounted-comment-claims.py` pins the OUTCOME, which is
+# worth pinning, and its own comment now says so in those terms: an earlier
+# revision of it read a designed hedge exemption into the outcome, and the
+# comment refutes that reading rather than carrying it. ai-config#3907
+# measures both halves of the refutation.
+#
+# The cost also runs the OPPOSITE way from the `no` exclusion above, which is
+# what makes the analogy wrong rather than merely loose. Quoting #3907:
+# "Over-exempting is the expensive direction here for the opposite reason it
+# usually is: the hook's whole purpose is catching a figure nobody counted,
+# and 'roughly' is exactly what an author writes when they did not count."
+# So flagging a hedged count is the safe direction, and exempting one is what
+# would cost the recall this hook exists for.
+#
+# The widening raises those stakes, for the reason already given above:
+# `hundred` is the vocabulary's one overwhelmingly approximate word.
+# #3907 adds that this repository's history carries no such phrasing, and
+# that aside is wrong.
+# Measured 2026-09-23 over the 2753 commit bodies at `origin/main`,
+# five carry `a hundred`, `several hundred` or `a few hundred`, and two of
+# those yield a `hundred` claim. One is `documented a few hundred lines up`,
+# which is one of the THREE bodies the widening newly flags -- so the corpus
+# carries the false positive #3907 expected to be absent, and it is a third
+# of the measured set change. The other (`a hundred and fifty lines`) sits in
+# a body the narrow vocabulary already flagged, so the body-set instrument is
+# silent about it, which is what #3907's second clause describes. The aside
+# is consistent with a shallow-clone measurement: the `a few hundred` body
+# sits 1889 commits deep, far outside the fragment this checkout carried
+# before `git fetch --unshallow`, which held 111 of the 2539 multi-line
+# bodies and is reproduced by a 119-commit log-order prefix.
+#
+# #3907's candidate fix is a negative lookbehind over a closed set of lead-ins
+# (`about`, `roughly`, `around`, `nearly`, `some`, `several`, `a few`). Its
+# own stated trap is that the lead-in is not always adjacent, and
+# `Roughly a hundred files` still flags today (measured), so a fixed-width
+# lookbehind misses the article case.
+CARDINALITY_TENS = r"twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety"
+CARDINALITY_ONES = r"one|two|three|four|five|six|seven|eight|nine"
 CARDINALITY_COUNT = (
-    r"\d[\d,]*|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve"
+    rf"\d[\d,]*|(?:{CARDINALITY_TENS})-(?:{CARDINALITY_ONES})"
+    rf"|{CARDINALITY_ONES}|ten|eleven|twelve"
+    r"|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen"
+    rf"|{CARDINALITY_TENS}|hundred"
     r"|zero"
 )
 CARDINALITY_RE = re.compile(

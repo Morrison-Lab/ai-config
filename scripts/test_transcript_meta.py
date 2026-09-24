@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Tests for scripts/lib/transcript_meta.py (ai-config#3860).
+"""Tests for scripts/lib/transcript_meta.py (ai-config#3860, ai-config#3914).
 
 Three real transcript-entry shapes, all carrying `isMeta: true`, pinned from
 a survey of 1,072 such entries across 896 local transcripts under
 `~/.claude/projects` (measured 2026-09-22) -- see the module docstring for
-the full derivation. Only the first is a loaded skill's body, and only that
-one should match `is_skill_load_meta()`.
+the full derivation. Distinguishes loaded skill bodies, scheduled
+continuations, and harness/hook feedback.
 """
 from __future__ import annotations
 

@@ -1,41 +1,40 @@
 #!/usr/bin/env python3
-"""Predicate: is this transcript entry a loaded skill's body?
+"""Predicates for classifying harness-generated transcript metadata.
 
 Claude Code injects several different kinds of harness-generated content as
-a `type: "user"` transcript entry with `isMeta: true` -- and only ONE of
-them is a loaded skill's body. Morrison-Lab/ai-config#3860's first fix
-treated every `isMeta` entry as "not a real user turn", which is too broad:
-a coordinator review of that fix found a SCHEDULED CHECK-IN CONTINUATION
-(from a `ScheduleWakeup`/cron fire, delivered through a queue
-enqueue/dequeue pair) also arrives as `isMeta: true`, and it IS a genuine
-new turn carrying real elapsed time -- collapsing it into the skill-load
-carve-out silently expired a clock reading (or any other turn-scoped state)
-across a real gap, reintroducing the exact class of bug the guard exists to
-catch.
+a `type: "user"` transcript entry with `isMeta: true`: loaded skill bodies,
+scheduled continuations, and harness/hook feedback. Morrison-Lab/ai-config#3860
+identified that treating every `isMeta` entry as "not a real user turn" is too
+broad: a SCHEDULED CHECK-IN CONTINUATION (from a `ScheduleWakeup`/cron fire,
+delivered through a queue enqueue/dequeue pair) also arrives as `isMeta: true`,
+and it IS a genuine new turn carrying real elapsed time -- collapsing it into
+the skill-load carve-out silently expired a clock reading (or any other
+turn-scoped state) across a real gap.
 
-THE DISCRIMINATOR
-------------------
-`sourceToolUseID` is present on a skill-load entry and absent on every
-other observed `isMeta` shape. Verified against 1,072 real `isMeta: true`
-entries across 896 local transcripts under `~/.claude/projects` (measured
-2026-09-22):
+Conversely, Morrison-Lab/ai-config#3914 identified that harness-injected hook
+feedback and system notifications (which also arrive as `type: "user"`) were
+being read by issue-freshness guards as genuine user prose, retargeting guards
+to incident examples cited inside hook messages.
+
+THE THREE SHAPES
+----------------
+Verified against 1,072 real `isMeta: true` entries across 896 local transcripts
+under `~/.claude/projects` (measured 2026-09-22):
 
   * `sourceToolUseID` present (108 entries): 103 begin
     "Base directory for this skill: ..."; the other 5 are a skill
     re-invocation notice ("(Re-invocation of /post-merge -- the skill
     instructions were previously loaded...") or a skill's own rendered body
-    ("# Update Config Skill\n..."). All 108 are skill-load content.
+    ("# Update Config Skill\n..."). All 108 are skill-load content
+    (classified by `is_skill_load_meta`).
   * `sourceToolUseID` absent, `promptSource: "sdk"` (270 entries): a
     dispatched/scheduled task continuation ("Check CI/review status on
     Morrison-Lab/ai-config PR #2070...", "Quota-sprint orchestrator
-    tick..."). A genuine new turn with real elapsed time -- this is the
-    scheduled-continuation shape the coordinator's review named.
+    tick..."). A genuine new turn with real elapsed time.
   * `sourceToolUseID` absent, no `promptSource` (694 entries): harness
     "Stop hook feedback" and "[SYSTEM NOTIFICATION - NOT USER INPUT]"
-    injections. Not a skill load either, and out of scope for this
-    predicate -- narrowing the #3860 carve-out to the skill-load shape
-    specifically is the whole point of this module, not broadening it to
-    cover every harness-injected shape.
+    injections. Machine output, classified by `is_harness_meta` and
+    `is_hook_feedback`.
 
 No `(sourceToolUseID present, promptSource: "sdk")` combination occurred in
 the sample, so the two are mutually exclusive in practice.

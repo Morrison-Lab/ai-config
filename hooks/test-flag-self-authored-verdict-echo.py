@@ -152,6 +152,24 @@ HONEST_BREAK_IN_PARENTHETICAL = (
 # interpolated from `NOT_CLEAN`, per the comment above: under "Needs more
 # work" this body is stopped at gate 3 by ai-config#3937 and would pin
 # nothing.
+# The other half of the window bound, and the half no case reached until a
+# mutation sweep asked for it. `SCOPE_BREAK_RX` carries no sentence-ending
+# period, so the attach test alone cannot tell a negator in the CURRENT
+# clause from one a sentence or a paragraph back -- only the scan back to the
+# last clause start does. Each of these is a genuine echo whose only negator
+# belongs to an earlier sentence, and each goes silent if that bound is
+# widened to the whole body.
+NEGATOR_A_SENTENCE_BACK = (
+    "### Verdict\n**%s**\n\n"
+    "Nothing here is a blocker. The retry ceiling is addressed in `f120e5a`.\n"
+) % NOT_CLEAN
+
+NEGATOR_A_PARAGRAPH_BACK = (
+    "### Verdict\n**%s**\n\n"
+    "None of this is deferred.\n\n"
+    "The retry ceiling is addressed in `f120e5a`.\n"
+) % NOT_CLEAN
+
 REVIEWER_ROW = (
     "### Verdict\n**Changes requested**\n\n"
     "None are deferred; all five are addressed in `f120e5a`.\n"
@@ -350,6 +368,10 @@ def main():
           mcp(NEGATOR_IN_PRIOR_BULLET), True)
     check("the reviewer's own semicolon row still warns",
           mcp(REVIEWER_ROW), True)
+    check("a negator a sentence back does not reach the disposition",
+          mcp(NEGATOR_A_SENTENCE_BACK), True)
+    check("a negator a paragraph back does not reach the disposition",
+          mcp(NEGATOR_A_PARAGRAPH_BACK), True)
     check("a heredoc-written body is read, not called unreadable",
           fired("Bash", {"command":
                          "cat > /tmp/vb.md <<'EOF'\n%s\nEOF\n"

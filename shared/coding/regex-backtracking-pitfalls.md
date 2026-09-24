@@ -129,26 +129,51 @@ The same matcher over ONE terminated heredoc is untroubled by length:
 240024 characters take 0.003s --- ten times the input of the 3200-opener case
 and a sixteen-hundredth of the time.
 
-Two attempted fixes did not help, and both looked like the remedies below.
 Rewriting the body quantifier as a negated character class, in place of a
 DOTALL `.`, is equivalent to the engine and changed nothing.
-Capping the input **length** did not either: a 25KB command is well under any
-sane cap and still took seconds, because length is not the variable.
 
-**Bound the count of start positions.**
-Refuse outright past a threshold that no legitimate input reaches, and say so
-rather than silently scanning a prefix.
-The shipped bound of 32 heredoc openers returns in 0.0000s on a
-20000-opener command while a 60KB single-heredoc body still matches normally.
+**The cost is the number of start positions multiplied by the work each start
+does, and both factors need bounding.**
+An earlier revision of this section stated the first factor alone and wrote
+"length is not the variable", on the strength of a measurement that had held
+openers-per-line fixed at one and never varied the other factor.
+That is false for the very matcher it cites.
+The pattern opens with a capturing `([^\n]*)` that may match empty, so the
+engine also restarts at every character of every line and each restart walks
+that line to its end, which makes the second factor the sum of the SQUARES of
+the line lengths.
+At an identical 25600 bytes, one long line took 1.65s and the same bytes
+broken into 80-character lines took 0.007s, with no opener in either.
+So a short input with many starts is one expensive case and a long LINE with
+no start at all is another.
 
-- **Do:** vary the start-position count with the length held fixed, before
-  concluding a pattern backtracks.
-- **Do:** bound the number of starts when the pattern's tail can reach the
-  end of the input.
+**Bound both, and bound them over the region the matcher will actually
+scan.**
+The shipped guard refuses past 32 heredoc openers and past a restart-cost
+budget, counting neither over heredoc BODIES, which the matcher never
+rescans.
+Skipping bodies is what makes the cost bound safe for the case a plain length
+cap would have broken: a single heredoc carrying a 60KB body still matches, in
+0.0008s, because its body scores nothing.
+A 20000-opener command is refused in 0.036s, essentially all of it the split
+into lines.
+
+Say which way the refusal falls, because that is a separate decision from the
+bound.
+This one is an EXEMPTION -- past the bound the body is unreadable and the hook
+stays silent -- which is right for a warn-only guard and wrong for a guard
+whose silence is an approval.
+
+- **Do:** vary each factor with the other held fixed, before concluding a
+  pattern backtracks.
+- **Do:** bound the start count AND the span each start scans.
+- **Do:** compute either bound over the region the matcher rescans, so the
+  input's own inert bulk does not vote.
 - **Don't:** read "rewriting the quantifier changed nothing" as evidence you
   have not found the construct --- it is evidence the cost is elsewhere.
-- **Don't:** cap the input length as a proxy; a short input with many starts
-  is the expensive case.
+- **Don't:** treat a length cap as a proxy for the start count, or the start
+  count as a proxy for length; they are independent, and a measurement that
+  varied only one of them cannot say the other is inert.
 
 ## Remedies
 

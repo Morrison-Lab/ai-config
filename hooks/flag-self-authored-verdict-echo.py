@@ -457,8 +457,69 @@ RX_HEREDOC = re.compile(
 # ran its quadratic scan unchecked: 13.35 s on a 6463-byte command here,
 # paid as a stall of the Bash call this hook gates. Counting the token alone
 # keeps the counter and the scanner agreeing about what an opener is.
+#
+# The opener count is one of TWO cost variables, and an earlier revision of
+# this comment asserted it was the only one. `RX_HEREDOC` opens with a
+# capturing `([^\n]*)` that may match empty, so the engine also restarts at
+# every character of every line it scans and each restart walks that line to
+# its end looking for `<<`. The second axis is therefore the sum of the
+# SQUARES of the line lengths, and it is reachable with no opener at all: a
+# 25600-character single line containing no `<<` took 1.65s here, where the
+# same bytes broken into 80-character lines took 0.007s, and 40 KB on one
+# line took 4.2s (round 7, finding 1). A command writing a long blob to a
+# file and then posting through the prescribed heredoc form has exactly that
+# shape.
+#
+# `MAX_SCAN_COST` bounds that second axis. It is a cost model rather than a
+# length cap, which is what makes it safe for the case a length cap would
+# have broken: a single heredoc carrying a 64 KiB body on ONE line scores
+# 1810, because a heredoc BODY is not scanned at all.
 MAX_HEREDOC_OPENERS = 32
-RX_HEREDOC_OPENER = re.compile(r"<<-?[ \t]*['\"]?[A-Za-z_][A-Za-z0-9_]*")
+MAX_SCAN_COST = 20_000_000
+RX_HEREDOC_OPENER = re.compile(r"<<(-)?[ \t]*['\"]?([A-Za-z_][A-Za-z0-9_]*)")
+
+
+def _scan_budget(command):
+    """`(opener count, restart cost)` over `command`, skipping heredoc bodies.
+
+    Skipping bodies is what stops the BODY's own prose voting on either
+    bound. Counting raw `<<WORD` tokens meant a disposition whose prose
+    discussed heredoc parsing wrote 40 of them and exempted itself, which is
+    round 5's finding 3 through a second token (round 7, finding 6).
+
+    A body is skipped only when its terminator is actually found. An
+    UNTERMINATED heredoc has no body to skip -- and is the pathological case
+    itself, since its scan runs to the end of the string -- so its lines are
+    counted like any other.
+
+    The opener bound is tested as the scan proceeds and returns early, which
+    is what keeps the terminator searches bounded: at most one per admitted
+    opener, never one per opener in a 3200-opener command.
+    """
+    lines = command.split("\n")
+    total = len(lines)
+    openers = 0
+    cost = 0
+    i = 0
+    while i < total:
+        line = lines[i]
+        cost += len(line) * len(line)
+        found = RX_HEREDOC_OPENER.findall(line)
+        openers += len(found)
+        if openers > MAX_HEREDOC_OPENERS:
+            return openers, cost
+        i += 1
+        for dash, word in found:
+            k = i
+            while k < total:
+                probe = lines[k].rstrip("\r")
+                if (probe.lstrip("\t") if dash else probe) == word:
+                    break
+                k += 1
+            if k >= total:
+                break
+            i = k + 1
+    return openers, cost
 
 
 def _heredoc_body_for(command, segment):
@@ -468,15 +529,26 @@ def _heredoc_body_for(command, segment):
     must. Without one, a single
     heredoc in the command is unambiguous and is taken; several are not.
     """
-    if len(RX_HEREDOC_OPENER.findall(command)) > MAX_HEREDOC_OPENERS:
+    openers, cost = _scan_budget(command)
+    if openers > MAX_HEREDOC_OPENERS or cost > MAX_SCAN_COST:
         return None
     docs = [(m.group(1), m.group(4)) for m in RX_HEREDOC.finditer(command)]
     if not docs:
         return None
     target = RX_BODY_FILE.search(segment) or RX_BODY_FILE.search(command)
+    raw = next((g for g in target.groups() if g), "").strip("'\"") if target else ""
+    # `-` and `/dev/stdin` name STDIN rather than a file, so `-F body=@-` and
+    # `--body-file -` are the single-heredoc case wearing a target's clothes.
+    # Adding the `-F/--field body=@` branch made the first of those capture
+    # `-`, whose basename is `-`, which no heredoc prefix can match: the
+    # idiom went from readable to silent, a regression inside the feature
+    # that commit added (round 7, finding 5). `--body-file -` escaped it only
+    # because its `-` is space-delimited, which is accident rather than
+    # design.
+    if raw in ("-", "/dev/stdin"):
+        target = None
     if target:
-        raw = next(g for g in target.groups() if g)
-        name = os.path.basename(raw.strip("'\"")).strip("'\"")
+        name = os.path.basename(raw).strip("'\"")
         if not name:
             return None
         # A path boundary on BOTH edges, not substring containment:
@@ -631,8 +703,6 @@ _CLAUSE_OPENERS = _COORDINATORS + r"|" + _SUBORDINATORS
 # goes from silent to warning, correctly -- and leaves every honest control
 # silent (round 6, finding 8). The counter-intuitive half is that eliding
 # MORE warns MORE, so this is not a relaxation.
-_ASIDE_COORDINATORS = _COORDINATORS
-
 SCOPE_BREAK_RX = re.compile(
     r"--|[;:|]"
     r"|[\u2013\u2014\u2192\u2026]|\s[-/]\s"
@@ -654,29 +724,30 @@ SCOPE_BREAK_RX = re.compile(
 # the clause after it (review finding 2). Skipping that pair makes the NEXT
 # pair, the real aside, the match.
 #
-# The disqualifying test differs by class, and collapsing the two is how
-# rounds 4 and 5 each broke the other's case.
+# A connector disqualifies the span only when it IS the span. Round 6 widened
+# the COORDINATOR half to "whenever it OPENS the span", on the argument that a
+# coordinator cannot open an appositive so nothing would be lost. Measured
+# against the same module with only this pattern swapped -- the two revisions
+# differ in an import, so comparing whole files compares nothing -- the
+# widening bought three warnings and cost SIX false alarms on honest negated
+# self-reviews, among them "No finding, so far, is addressed in `f120e5a`."
+# and "None of these, and this is the key point, are addressed in `f120e5a`."
+# (round 7, finding 2). A coordinator opens an adverbial interruption often
+# enough, and `so` is an adverb more often than a conjunction.
 #
-# A COORDINATOR disqualifies the span whenever it OPENS it. It cannot open an
-# appositive, so nothing is lost, and the opening form is what catches an
-# adverbial following it: `, and as noted,` is the same clause boundary as
-# `, and,`. Round 5 narrowed this to "the span IS the connector" and thereby
-# silenced three natural comma splices that round 4 warned on -- whether a
-# comma happens to follow `and` is punctuation taste, not grammar (round 6,
-# finding 2).
+# The asymmetry decides it rather than the grammar: this hook only ever warns,
+# so a missed warning costs a line of prose and a false one is how a warn-only
+# guard gets switched off. The three sentences the widening caught are an
+# accepted miss, tracked as ai-config#3953.
 #
-# A SUBORDINATOR disqualifies only when it IS the span. `, though small and
-# fiddly,` is a genuine appositive whose `though` belongs to it, and refusing
-# to elide it leaves `SCOPE_BREAK_RX` finding that `though` and warning on an
-# honest self-review. That harm is reachable only over a vocabulary that
-# CONTAINS subordinators, which round 4's six-word list did not -- an earlier
-# comment here blamed round 4's opening form for it, and round 4 is in fact
-# silent on the cited sentence (round 6, finding 6).
+# `yet` and `nor` stay OUT of the vocabulary, which round 6 measured and this
+# revision keeps: eliding the `, yet,` span spends the leftmost-first elision
+# on the NEXT comma pair, and that pair is the genuine aside carrying a real
+# scope break, so eliding more warns more (round 6, finding 8).
 _BRACKETED = r"\([^()]*\)|\[[^\[\]]*\]"
 RX_ASIDE = re.compile(
     _BRACKETED
-    + r"|,(?!\s*(?:" + _ASIDE_COORDINATORS + r")\b"
-      r"|\s*(?:" + _SUBORDINATORS + r")\s*,)[^,.;:!?]*,",
+    + r"|,(?!\s*(?:" + _CLAUSE_OPENERS + r")\s*,)[^,.;:!?]*,",
     re.I,
 )
 # Parentheses and brackets alone. Their extent is unambiguous, so they may be

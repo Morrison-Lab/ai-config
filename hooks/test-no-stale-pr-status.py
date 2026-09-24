@@ -611,7 +611,12 @@ def main():
         "attribution (failing-query)",
     )
     failures += check_query_forms()
-    total = len(CASES) + len(ATTRIBUTION) + len(QUERY_FORMS)
+    # `ATTRIBUTION_FAILING_QUERY` runs above and its failures are counted,
+    # so leaving it out of the denominator understated the suite by four:
+    # it printed `117/117 passed` over 121 executed checks, and a reader
+    # comparing runs saw the population unchanged (round 7, finding 7).
+    total = (len(CASES) + len(ATTRIBUTION)
+             + len(ATTRIBUTION_FAILING_QUERY) + len(QUERY_FORMS))
     print(f"\n{total - failures}/{total} passed")
     return 1 if failures else 0
 

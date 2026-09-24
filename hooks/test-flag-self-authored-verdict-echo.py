@@ -197,6 +197,32 @@ ECHO_COORD_ADVERBIAL_SO = (
     "Nothing is blocking, so after review, all five are addressed in `f120e5a`.\n"
 ) % NOT_CLEAN
 
+# Round 7, finding 2: the six honest self-reviews round 6's widening cost.
+# Each negator governs its clause ACROSS an interrupting comma aside that
+# happens to open with a coordinator, which is a shape ordinary prose writes
+# constantly -- the reviewer counted 2383 such spans in `shared/*.md` against
+# five of the bare `, and,` form the widening was aimed at.
+HONEST_COORD_ASIDES = (
+    ("a bare adverbial (so far)",
+     "No finding, so far, is addressed in `f120e5a`."),
+    ("a hedging clause (so far as I can tell)",
+     "Nothing, so far as I can tell, is addressed in `f120e5a`."),
+    ("a parenthetical clause (and I checked each one)",
+     "None of the findings, and I checked each one, are addressed in `f120e5a`."),
+    ("an emphatic aside (and this is the key point)",
+     "None of these, and this is the key point, are addressed in `f120e5a`."),
+    ("an alternative aside (or nit for that matter)",
+     "No blocker, or nit for that matter, is addressed in `f120e5a`."),
+    ("an exception aside (but the docs)",
+     "Nothing, but the docs, is addressed in `f120e5a`."),
+)
+
+
+def honest_aside_body(sentence):
+    """A not-clean self-review whose one sentence is `sentence`."""
+    return "### Verdict\n**%s**\n\n%s\n" % (NOT_CLEAN, sentence)
+
+
 # Round 6, finding 8: a `yet` boundary followed by a genuine comma aside.
 ECHO_YET_BEFORE_ASIDE = (
     "### Verdict\n**%s**\n\n"
@@ -522,19 +548,25 @@ def main():
           mcp(ECHO_BARE_HOWEVER_COMMA_PAIR), True)
     check("a `, and,` pair is a clause boundary, not an aside",
           mcp(ECHO_CONJUNCTION_COMMA_PAIR_AND), True)
-    # Round 6, finding 2. Round 5 narrowed the aside lookahead from "the span
-    # OPENS with a connector" to "the span IS the connector", which made a
-    # comma after `and` decide the verdict: `, and,` warned while `, and as
-    # noted,` went silent. That is punctuation taste, not grammar, and all
-    # three of these warned before the narrowing. A coordinator cannot open
-    # an appositive, so it takes the opening form; only a subordinator needs
-    # the IS form, which is what keeps `, though small and fiddly,` elidable.
-    check("a coordinator plus an adverbial is still a clause boundary (and)",
-          mcp(ECHO_COORD_ADVERBIAL_AND), True)
-    check("a coordinator plus an adverbial is still a clause boundary (but)",
-          mcp(ECHO_COORD_ADVERBIAL_BUT), True)
-    check("a coordinator plus an adverbial is still a clause boundary (so)",
-          mcp(ECHO_COORD_ADVERBIAL_SO), True)
+    # Round 6 made these three warn by disqualifying any comma span that
+    # OPENS with a coordinator. Round 7 reverted that: measured with only the
+    # pattern swapped, the widening bought these three and cost six false
+    # alarms on honest negated self-reviews (finding 2). For a warn-only
+    # guard that trade is the wrong way round, so they are accepted misses,
+    # tracked as ai-config#3953, and pinned here so the widening cannot
+    # return without this expectation changing with it.
+    check("a coordinator plus an adverbial is an accepted miss (and)",
+          mcp(ECHO_COORD_ADVERBIAL_AND), False)
+    check("a coordinator plus an adverbial is an accepted miss (but)",
+          mcp(ECHO_COORD_ADVERBIAL_BUT), False)
+    check("a coordinator plus an adverbial is an accepted miss (so)",
+          mcp(ECHO_COORD_ADVERBIAL_SO), False)
+    # The six sentences that widening cost. Each is an honest self-review
+    # whose negator governs the clause across an interrupting aside, and
+    # each is the population fire condition 6 exists to protect.
+    for _label, _sentence in HONEST_COORD_ASIDES:
+        check("an honest negated self-review survives %s" % _label,
+              mcp(honest_aside_body(_sentence)), False)
     # Round 6, finding 8. `_ASIDE_COORDINATORS` carried `|yet|nor`, which no
     # case pinned: dropping it left the whole suite green. It was also the
     # wrong answer, because eliding is leftmost-first -- refusing the
@@ -600,6 +632,52 @@ def main():
                   "gh pr comment 1 --body-file /tmp/v.md\n" % ECHO_DISPOSITION)
     check("a one-line command past the opener bound is refused too",
           mod._heredoc_body_for(_oneline, _oneline) is None, True)
+    # Round 7, finding 1. The opener count is one of TWO cost variables.
+    # `RX_HEREDOC`'s capturing `([^\n]*)` prefix may match empty, so the
+    # engine restarts at every character of every line and each restart walks
+    # that line -- cost is the sum of the SQUARES of the line lengths, and a
+    # command with NO opener at all reaches it. The pair below is the point,
+    # both arms carrying the same 25600 bytes and a real tie-able heredoc:
+    # the one-line arm is refused and the line-broken arm still ties.
+    _post = ("cat > /tmp/v.md <<'A'\n%s\nA\n"
+             "gh pr comment 1 --body-file /tmp/v.md\n" % ECHO_DISPOSITION)
+    _longline = "echo '" + "q" * 25600 + "' > /tmp/blob.txt\n" + _post
+    check("a long single line is refused however few openers it carries",
+          mod._heredoc_body_for(_longline, _longline) is None, True)
+    _broken = ("echo '" + "q" * 79 + "' >> /tmp/blob.txt\n") * 320 + _post
+    check("the same bytes broken into lines are still read",
+          mod._heredoc_body_for(_broken, _broken) is not None, True)
+    # ... and the case a plain LENGTH cap would have broken instead: a
+    # heredoc BODY is not scanned, so a full-size body on one line is cheap.
+    _fatbody = ("cat > /tmp/v.md <<'A'\n%s\n%s\nA\n"
+                "gh pr comment 1 --body-file /tmp/v.md\n"
+                % (ECHO_DISPOSITION, "y" * 65536))
+    check("a 64 KiB body on one line is still read",
+          fired("Bash", {"command": _fatbody}), True)
+    # Round 7, finding 6. Counting openers over the RAW command let the
+    # body's own prose vote: a disposition discussing heredoc parsing wrote
+    # `<<EOF` forty times and exempted itself, which is round 5's finding 3
+    # through a second token. Bodies are skipped now, so this one is read.
+    _proseopeners = ("cat > /tmp/v.md <<'A'\n%s\n" % ECHO_DISPOSITION
+                     + "The opener is written `<<EOF` on this line.\n"
+                     * (mod.MAX_HEREDOC_OPENERS + 8)
+                     + "A\ngh pr comment 1 --body-file /tmp/v.md\n")
+    check("opener-shaped prose in the body does not reach the bound",
+          fired("Bash", {"command": _proseopeners}), True)
+    # An UNTERMINATED heredoc has no body to skip, and is the pathological
+    # case itself, so its lines must still be counted.
+    check("an unterminated heredoc's lines still count toward the bound",
+          mod._scan_budget("x <<EOF\n" * 200)[0] > mod.MAX_HEREDOC_OPENERS,
+          True)
+    # Round 7, finding 5. `-F body=@-` and `--body-file -` name STDIN, not a
+    # file, so the heredoc feeding them is the single-heredoc case. Adding
+    # the `-F/--field` branch captured `-` as a filename and silenced the
+    # idiom; the `--body-file` spelling escaped only by accident of spacing.
+    for _flag in ("-F body=@-", "--field body=@-", "--body-file -"):
+        _stdin = ("gh api repos/o/r/issues/1/comments %s <<'EOF'\n%s\nEOF\n"
+                  % (_flag, ECHO_DISPOSITION))
+        check("a heredoc piped to stdin via `%s` is read" % _flag,
+              mod._heredoc_body_for(_stdin, _stdin) is not None, True)
     # Round 5, finding 3. The bound counted every `<<` in the raw command,
     # including the ones the BODY writes, so a verdict echo whose prose
     # quoted a shift operator 33 times exempted itself -- silently, because

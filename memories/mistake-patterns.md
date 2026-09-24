@@ -851,24 +851,7 @@ A clean automated review from every available provider evaluating the current HE
   classifier can start denying a plainly innocuous, unrelated command too
   (e.g. `gh run list -R ... --json ...`), which is a widened blast radius
   the earlier occurrences in [`mistake-patterns.cases.md`](mistake-patterns.cases.md) did not record.
-- **Example**: 2026-09-01, `Lacaedemon/sparta` [PR #1459](https://github.com/Lacaedemon/sparta/pull/1459) (GIA sweep), tracked as [ai-config#2899](https://github.com/Morrison-Lab/ai-config/issues/2899);
-  previously `ucdavis/bcs` 2026-08-28 ([ai-config#2544](https://github.com/Morrison-Lab/ai-config/issues/2544), closed by [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820)).
-  In an auto-permission-mode plugin-consumer session where no `adversarial-reviewer` agent is registered (`Agent type not found`),
-  the session treated `hooks/no-push-without-self-review.py`'s refusal as solvable in-session by repeatedly rephrasing the sanctioned `ALLOW_UNREVIEWED_PUSH=1` override or by patching the running hook file ---
-  when the auto-mode permission classifier pattern-matches every such attempt as a guard bypass and denies it,
-  and repeated varied attempts make the classifier (correctly) more suspicious,
-  until it denies even legitimately-shaped review dispatches.
-  The hook's sanctioned escape valve is exactly what the classifier reads as a bypass, so the two mechanisms compose into a lockout neither intends.
-  Both discharge paths were unreachable at once:
-  the plugin's shipped agents were absent from the session's Agent registry
-  (writing `.claude/agents/adversarial-reviewer.md` into the repo mid-session does not register it immediately or reliably --- definitions load at session start, and the one measured mid-session appearance came about fifty minutes after the write, by a mechanism not yet identified),
-  and the classifier denied the override in all three phrasings tried (Bash chained, Bash standalone, PowerShell `$env:`) --- consistent denials, not stochastic ones.
-  A fourth phrasing, `env VAR=1 command`, was not tried here and later succeeded on its first attempt in a separate 2026-09-06 incident where the inline `VAR=1 command` form had just been denied --- see [`claude-code-transcripts.md`](claude-code-transcripts.md)'s "A shared session's transcript can carry a genuinely later, genuinely unrelated verdict" for that record, which draws no conclusion from the single data point about why the `env` form passed.
-  The [#2820](https://github.com/Morrison-Lab/ai-config/pull/2820) fallback, merged earlier that same day, was ALSO unreachable, for a distinct reason:
-  the harness runs the hook from the plugin CACHE snapshot (`~/.claude/plugins/cache/Morrison-Lab/ai-config/<rev>/hooks/`, via `${CLAUDE_PLUGIN_ROOT}`),
-  which predated the fix (rev `a3e0fdb`, no `FALLBACK_AGENT_NAME`);
-  pulling the marketplace clone (`git -C ~/.claude/plugins/marketplaces/Morrison-Lab pull --ff-only origin main`, to `79def2e`) succeeded but changed nothing the harness executes,
-  and copying the updated hook onto the cache copy was itself classifier-denied (reasonably --- an agent rewriting its own active guard).
+- **Example**: see [`mistake-patterns.cases.md`](mistake-patterns.cases.md) Pattern 43 for the 2026-09-01 `Lacaedemon/sparta` [PR #1459](https://github.com/Lacaedemon/sparta/pull/1459) case (tracked as [ai-config#2899](https://github.com/Morrison-Lab/ai-config/issues/2899)).
 - **Canonical Rule**: [`adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md) (the override's sanctioned scope),
   [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py) (the fallback contract),
   and [`keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md) (the plugin hook path is the cache snapshot, not the marketplace clone).
@@ -1238,3 +1221,22 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
   Inline code spans cannot cross block boundaries.
 - **Fix**: in inline code span regexes, ensure line continuation lookaheads forbid crossing any paragraph-interrupting construct:
   `(?![ \t]*(?:\r?\n|$|[#>`]|Verdict\b|<!--))`.
+
+## Pattern 59: Abandoning Diagnostic or Superseded Background Tasks
+
+- **Mistake**: launching background tasks, asynchronous command executions, monitors, or subagents to inspect, search, or diagnose an issue, and leaving them running indefinitely after their question has been answered or superseded.
+- **Direction of failure**: asynchronous commands that exceed synchronous execution limits
+  (such as recursive `grep`, `find`, or test suites) continue consuming CPU, disk I/O, and writing large log files in the background.
+  Leaving them active pollutes session state and results in ambiguous task status when concluding a session.
+- **Example**: 2026-09-24 session: exploratory recursive `grep` commands across SQLite databases
+  and large directories ran in the background for over an hour, accumulating >110MB log files each.
+  When asked "session done?", the tasks were still running unmonitored.
+- **Canonical Rule**: `AGENTS.md` ("Terminate superseded and abandoned background tasks"), [`shared/workflow/terminate-superseded-tasks.md`](../shared/workflow/terminate-superseded-tasks.md).
+- **Fix**: actively terminate diagnostic tasks and subagents (`manage_task(Action='kill')`)
+  the moment their finding arrives or is superseded;
+  sweep running tasks before declaring milestone or session completion.
+
+- **Do:** kill diagnostic searches, greps, and test processes the moment their question has been answered or superseded.
+- **Do:** run an active task and subagent sweep (`manage_task(Action='list')`, `manage_subagents(Action='list')`) before declaring a milestone or session complete.
+- **Don't:** leave broad searches running in the background after moving on to fixing the code or writing documentation.
+- **Don't:** answer "session done" or conclude a session while transient background tasks are still running.

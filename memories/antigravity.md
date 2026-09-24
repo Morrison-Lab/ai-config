@@ -236,4 +236,16 @@ The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-anti
   `VERDICT_MARKER_RE` must match `#{2,4}\s*Verdict\b` rather than strictly requiring `### Verdict`;
   otherwise, reviews with `## Verdict` are ignored by the gate and fall back to older comments, resulting in false `stale` merge denials.
 
+## Antigravity native task and subagent management APIs
 
+Antigravity provides built-in system tools for managing asynchronous background tasks and subagents:
+
+- **`manage_task`**: Manage background tasks.
+  - `Action='list'`: List all currently running background tasks.
+  - `Action='kill'`: Cancel the task's execution (`TaskId` required).
+  - `Action='status'`: Check the task's current status and log file location (`TaskId` required).
+  - `Action='send_input'`: Send input to a running task (`TaskId` and `Input` required).
+- **`manage_subagents`**: Manage existing subagents.
+  - `Action='list'`: List active direct subagents with their conversation IDs and live state.
+  - `Action='kill'`: Terminate specific subagents and all their descendants (`ConversationIds` required).
+  - `Action='kill_all'`: Terminate all subagents and all their descendants.

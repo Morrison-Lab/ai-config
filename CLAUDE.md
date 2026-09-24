@@ -1285,6 +1285,7 @@ The corpus's other gha triggers each wait for an event (a bug to patch, a port t
 Candidates are duplication, drift, a named missing fix, or a directory that already calls gha for some workflows and not others.
 Not candidates are repo-specific logic gha does not model, a repo deliberately pinned off gha, and a repo we cannot merge a PR to.
 The fragment carries the rest: taking the inventory from gha's README table rather than its directory listing, pinning per capability, filing the migration as its own issue and PR, the private-consumer access precondition, the `permissions:` and `concurrency:` traps, and how to confirm the self-edit guard when a migration PR gets no review.
+Its "new repo" counterpart: a brand-new repository gets gha-backed CI (the baseline set, plus whatever fits the repo type) in the same first PR that creates it, never deferred to later.
 
 ## Don't incur technical debt
 

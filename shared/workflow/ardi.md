@@ -1235,6 +1235,15 @@ leaves the other's mutation alive.
 - **Don't:** assume one case covers a finding fixed by two mechanisms --- run
   a mutation per mechanism and count the kills.
 
+Both steps above are mechanical and both are currently hand-run, which is how
+a mutation that missed its anchor, changed nothing, or landed on a branch no
+case reaches ends up reported as a surviving mutant.
+Confirm each mutation actually changed the file before reading its verdict,
+and report mutations attempted beside mutations killed --- "all killed" over
+zero attempts is the same sentence as a clean sweep.
+An instrument for it is filed as
+[ai-config#3941](https://github.com/Morrison-Lab/ai-config/issues/3941).
+
 **A systematic audit done by skimming is worse than the one-at-a-time
 version it replaces.**
 

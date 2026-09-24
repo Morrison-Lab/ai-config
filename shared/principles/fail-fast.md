@@ -885,6 +885,54 @@ Three sibling files kept their fixes, so `git status` still listed
 modifications and looked plausible; only re-counting the specific file caught
 it.)
 
+### An eighth cause: the download or derived count is silently wrong, not absent
+
+Every cause above assumes the check ran against the right subject and
+misjudged it.
+A download and a derived page count fail one step earlier: the artifact
+itself is wrong, and nothing about fetching or reading it raises an error.
+
+**`curl -o <file>` exits 0 on an HTTP 404 and writes the error page's body
+into `<file>` anyway.**
+Without `-f`/`--fail`, curl treats a 404 response as a successfully
+transferred document --- it has bytes, a status line was received, the
+transfer completed --- so `curl -sSL -o report.pdf https://.../missing` exits
+0 having written an HTML error page into `report.pdf`.
+Nothing downstream complains until something tries to parse the file as a
+PDF, and by then the exit code and the file's existence have both already
+read as success.
+Measured twice in one session: two separate 404s each produced a file whose
+extension and exit status both said "downloaded", while its content was an
+HTML page.
+
+- **Do:** pass `-f`/`--fail` so curl itself turns a 4xx/5xx response into a
+  non-zero exit.
+- **Do:** verify the downloaded file's actual type (`file <path>`, or a
+  format-specific magic-byte check) before treating a download as having
+  succeeded, independent of the exit code.
+- **Don't:** read a zero exit status plus a file that now exists as evidence
+  the URL served the thing you asked for.
+
+**A PDF's page count read off `/Count` names one page-tree node, not the
+document.**
+The `file` command (and several other quick page-count tools) report a
+PDF's page count by reading the `/Count` entry of the first `/Pages` node it
+finds, which is correct only when the document's page tree is a single flat
+node.
+A page tree with intermediate nodes --- common in PDFs assembled or edited by
+tools that append rather than rebuild the tree --- has a `/Count` on each
+subtree, and the first one found can be far smaller than the true total.
+"3 pages" reported this way on a 26 MB file is not by itself evidence of a
+truncated download; it can equally be a correctly-sized file with a nested
+page tree.
+
+- **Do:** derive the real page count by walking the page tree (or by using a
+  tool that does, such as `pdfinfo`/`qpdf --show-npages`) rather than
+  reading a single `/Count` value.
+- **Don't:** treat a small `/Count` as proof of truncation, or a large one as
+  proof of completeness, without checking whether the tree has more than one
+  `/Pages` node.
+
 ## In a guard you ship: partial is worse than absent
 
 Everything above concerns a check whose failure is invisible **at runtime**,

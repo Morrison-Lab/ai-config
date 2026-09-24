@@ -6,17 +6,17 @@ This reference covers how to find images and add alt text across a pkgdown site.
 
 | Location | Image type | Can have alt text? |
 |----------|------------|-------------------|
-| `vignettes/*.Rmd` or `vignettes/*.qmd` | code-generated plots | Yes — `fig.alt` chunk option |
-| `vignettes/*.Rmd` | static images via `knitr::include_graphics()` | Yes — `fig.alt` chunk option |
-| `README.Rmd` / `README.md` | code-generated plots | Yes — `fig.alt` chunk option |
-| `README.Rmd` / `README.md` | markdown images `![](path)` | Yes — fill in the bracket |
-| `README.Rmd` / `README.md` | HTML `<img src=...>` tags | Yes — add `alt="..."` attribute |
-| `R/*.R` `@examples` | code-generated plots | **No — pkgdown limitation** |
+| `vignettes/*.Rmd` or `vignettes/*.qmd` | code-generated plots | Yes --- `fig.alt` chunk option |
+| `vignettes/*.Rmd` | static images via `knitr::include_graphics()` | Yes --- `fig.alt` chunk option |
+| `README.Rmd` / `README.md` | code-generated plots | Yes --- `fig.alt` chunk option |
+| `README.Rmd` / `README.md` | markdown images `![](path)` | Yes --- fill in the bracket |
+| `README.Rmd` / `README.md` | HTML `<img src=...>` tags | Yes --- add `alt="..."` attribute |
+| `R/*.R` `@examples` | code-generated plots | **No --- pkgdown limitation** |
 
 There is currently no way to add alt text to plots generated in `@examples` blocks.
 Focus effort on vignettes and README.
 
-## Step 1 — Find missing alt text
+## Step 1 --- Find missing alt text
 
 ### Find chunks missing fig.alt in vignettes
 
@@ -24,7 +24,7 @@ Focus effort on vignettes and README.
 # Find chunks that already have fig.alt (to see what's covered)
 grep -rn "fig\.alt\|fig-alt" vignettes/
 
-# Find all plot-producing chunks — each one needs a fig.alt
+# Find all plot-producing chunks --- each one needs a fig.alt
 grep -rn "ggplot\|geom_\|autoplot\|include_graphics" vignettes/
 ```
 
@@ -36,10 +36,10 @@ Compare the two lists to identify chunks with plots but no `fig.alt`.
 # Markdown images with empty alt: ![](path)
 grep -rn "!\[\](" vignettes/ README.md README.Rmd
 
-# All markdown images — review each for descriptive alt text
+# All markdown images --- review each for descriptive alt text
 grep -rn "!\[" vignettes/ README.md README.Rmd
 
-# HTML <img> tags — check each for a non-empty alt attribute
+# HTML <img> tags --- check each for a non-empty alt attribute
 grep -rn "<img" vignettes/ README.md README.Rmd
 ```
 
@@ -55,21 +55,21 @@ Check that the `alt` attribute is present and descriptive:
   alt="Package hex logo: a blue hexagon with the package name." />
 ```
 
-## Step 2 — Audit quality of existing alt text
+## Step 2 --- Audit quality of existing alt text
 
 When alt text already exists, leave it alone unless it has a concrete problem.
 Only rewrite alt text that fails one of these checks:
 
-**Relative references** — alt text must be self-contained.
+**Relative references** --- alt text must be self-contained.
 Fix phrases like:
-- "A plot identical to the one above…" → describe the plot fully
-- "The same data as shown above…" → name the data explicitly
+- "A plot identical to the one above..." -> describe the plot fully
+- "The same data as shown above..." -> name the data explicitly
 
-**Missing key information** — fix if alt text omits chart type, axis labels, or the key pattern.
+**Missing key information** --- fix if alt text omits chart type, axis labels, or the key pattern.
 
-**Grammar and spelling errors** — alt text is read aloud by screen readers.
+**Grammar and spelling errors** --- alt text is read aloud by screen readers.
 
-## Step 3 — Add fig.alt to Rmd chunks
+## Step 3 --- Add fig.alt to Rmd chunks
 
 The `fig.alt` chunk option works for both code-generated plots and static images loaded with `knitr::include_graphics()`.
 
@@ -94,15 +94,15 @@ plot_code_here()
 
 ### Multiple plots in one chunk
 
-When a chunk produces multiple plots, `fig.alt` accepts a vector — one string per plot, in order:
+When a chunk produces multiple plots, `fig.alt` accepts a vector --- one string per plot, in order:
 
 ```r
 #| fig.alt:
-#|   - "Histogram of bill length. Right-skewed distribution with a peak at 45–50mm."
+#|   - "Histogram of bill length. Right-skewed distribution with a peak at 45--50mm."
 #|   - "Histogram of bill depth. Bimodal distribution with peaks at 15mm and 18mm."
 ```
 
-## Step 4 — Add alt text to static markdown images
+## Step 4 --- Add alt text to static markdown images
 
 For `![](path)` images, fill in the bracket:
 
@@ -121,7 +121,7 @@ For purely decorative images, leave the bracket empty intentionally and add a co
 ![](man/figures/decorative-banner.png)
 ```
 
-## Step 5 — Verify
+## Step 5 --- Verify
 
 Because pkgdown does not warn about missing alt text in vignettes, verify by re-running the same grep from Step 1 and confirming every plot-producing chunk now has a `fig.alt`:
 

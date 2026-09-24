@@ -14,7 +14,7 @@ import os
 import subprocess
 import sys
 
-HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+HOOK = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                     "flag-partial-put-to-resource-root.py")
 FAILURES = []
 

@@ -120,7 +120,7 @@ def is_windows_env() -> bool:
     return False
 
 
-def is_prohibited_root(path: str, has_gnu_predicates: bool = False) -> bool:
+def is_prohibited_root(path: str) -> bool:
     """True if path specifies the whole filesystem root or a bare drive root."""
     p = path.strip()
     if not p:
@@ -134,9 +134,6 @@ def is_prohibited_root(path: str, has_gnu_predicates: bool = False) -> bool:
     if WIN_DRIVE_ROOT_RE.match(p):
         return True
     if MSYS_DRIVE_ROOT_RE.match(p):
-        # Disambiguate /c in Windows find (find /c "needle") vs GNU find (find /c -type f or find /c)
-        if p.lower() in ("/c", "\\c") and not p.endswith(("/", "\\")) and not has_gnu_predicates:
-            return False
         return True
     return False
 
@@ -227,12 +224,9 @@ def evaluate_command(command: str, is_windows: bool | None = None) -> tuple[str,
         if not is_find_executable(cmd[0]):
             continue
 
-        # Check if the command contains GNU find predicates starting with '-'
-        has_gnu_predicates = any(tok.startswith("-") for tok in cmd[1:])
-
         paths = extract_find_paths(cmd[1:])
         for p in paths:
-            if is_prohibited_root(p, has_gnu_predicates=has_gnu_predicates):
+            if is_prohibited_root(p):
                 return p, " ".join(argv)
 
     return None

@@ -60,6 +60,16 @@ dispatch returns an agent id rather than a report, so no verdict ever becomes
 that call's result. This is also the Agent tool's own criterion -- the push is
 waiting on the answer.
 
+Re-dispatch FRESH for each re-review round, rather than resuming the finished
+reviewer with `SendMessage` to its agent id. A resumed reviewer's verdict
+arrives later as a task notification, not as that `SendMessage` call's result,
+so this guard still sees only the earlier verdict it already cached from the
+original foreground call and blocks the push -- even though the session that
+sent the message may believe the re-review already happened and came back
+clean. See `shared/workflow/adversarial-self-review.md`'s "Freshly dispatched,
+not resumed" section for why a resumed reviewer also converges on its own
+prior verdict, independent of this guard's visibility gap.
+
 Review AFTER committing, which is where `shared/workflow/ardi.md` already puts
 the pause point. A review of uncommitted work names a commit that does not
 exist yet.

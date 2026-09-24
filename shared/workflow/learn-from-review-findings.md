@@ -459,3 +459,74 @@ whether this claim was ever explained anywhere outside this repository.
 Distinct from `algorithmatize-checks.cases.md`'s "a retraction can land the
 OPPOSITE overclaim", which is about a retraction being *wrong*;
 this is about one that is right and incomplete.)
+
+## The fix for an accepted finding is the likeliest place for the next one
+
+Everything above treats an accepted finding as a miss to record.
+It says nothing about the **fix**, which is where the next defect lands, and
+which gets the least scrutiny of anything in the change: it is written under
+the belief that its region is now the best-understood part of the diff, and it
+arrives late, after the reviewer has already approved everything around it.
+
+Closing a finding on a detector almost always means **widening** something ---
+a regex, an elision scope, an anchor, a bound.
+The finding names one input the detector got wrong.
+Nothing in it names the inputs the widening will now get wrong, so those go
+unmeasured by construction, and the suite stays green because a suite holds
+only the cases somebody thought to write.
+
+Measured 2026-09-24 on `hooks/flag-self-authored-verdict-echo.py`.
+Round 4 closed four findings; round 5 found three of the four net-negative
+against the pre-fix file:
+
+- Blanking asides across the whole window rather than the connector closed a
+  negator-inside-a-parenthetical case and made **five honest self-reviews
+  warn**, because a comma span's extent is a guess and the leftmost guess
+  pairs the comma closing an introductory phrase with the comma opening the
+  real appositive, deleting the sentence's own negator.
+- End-anchoring a heredoc terminator closed a truncation case and made
+  **every CRLF command unreadable**, because `$` under `re.MULTILINE` matches
+  before `\n` and at end of string, never before `\r`.
+- Bounding a quadratic scan by counting `<<` closed the cost and **silently
+  exempted** any body whose own prose wrote `<<` more than the bound.
+
+Each fix was correct about the case it named.
+
+**What decides the trade is the guard's own asymmetry, and it has to be stated
+rather than felt.**
+For a warn-only guard a missed warning costs nothing and a false warning is
+how the guard gets switched off, so the whole-window elision was reverted for
+comma spans even though that reopens a real miss.
+A reopened miss is then pinned as a fixture asserting the new behaviour, with
+the reason in the check's own name, and filed
+([ai-config#3947](https://github.com/Morrison-Lab/ai-config/issues/3947)) ---
+an accepted regression that is neither pinned nor filed is indistinguishable
+from an ordinary one.
+
+**A finding's own reproduction can be stopped at an earlier gate than the
+finding names**, which is the second way a fix goes wrong here.
+Round 5's finding 2 was right that the aside vocabulary was too narrow, and
+its sample body never reached the aside test at all: the body's first sentence
+made `classify_verdict` return empty, so the function returned at its first
+gate, silent before and after the fix for a reason unrelated to the finding.
+Copying that body into the regression fixture would have produced a case that
+passes under its own mutation.
+This is not the wrong-figure failure the sections above describe --- every
+figure in the finding was right, and re-deriving it confirms it and still
+tells you nothing.
+The check is whether the input reaches the code, not whether the arithmetic
+holds.
+
+- **Do:** construct three inputs the widening newly captures, and measure them
+  against the pre-fix file, before shipping a fix that widens a mechanism.
+  Not being able to construct one means the widening is not yet understood.
+- **Do:** name the guard's asymmetry out loud and let it decide the trade,
+  rather than the finding's urgency.
+- **Do:** run a finding's sample input through the function the finding names,
+  and treat "silent before and after my fix" as a sign the input is
+  short-circuited rather than as evidence the finding was wrong.
+- **Do:** re-run the whole mutation sweep after a fix, not only the case the
+  finding named.
+- **Don't:** read a green suite after a fix as evidence the fix is safe.
+- **Don't:** score a fix against the finding; score it against the population
+  the detector actually runs on.

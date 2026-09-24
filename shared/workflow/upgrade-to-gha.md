@@ -136,3 +136,57 @@ Filed as [ai-config#2126](https://github.com/Morrison-Lab/ai-config/issues/2126)
 Measured 2026-08-24: `git show origin/main:AGENTS.md | grep -ci gha` returned 0, so the cross-agent contract carried no gha guidance before this rule.
 The ai-config repo is itself a consumer --- `grep -rho 'gha/\.github/[a-z]*/[a-z-]*' .github/workflows/ | sort -u` returned nine reusable workflows and one composite action on the same date.
 `ucdavis/win#75`, merged 2026-07-17, is the worked migration: the PR converting that repo's hand-rolled review workflow to a gha caller could never itself be bot-reviewed, and win#69 then ran the migrated workflow live.)
+
+## A new repo's counterpart: CI ships in the first PR, not later
+
+Everything above is about a repo that already exists and already has some CI, hand-rolled or otherwise.
+It says nothing about a repo that has neither yet, and that gap is exactly what let `Morrison-Lab/mlr` get created with no `.github/workflows/` at all (2026-09-24).
+No hand-maintained workflow existed to migrate, so `dont-reinvent-wheel`'s own detection tell --- a local copy of something gha already ships --- never fired, and the repo shipped with nothing catching a leaked secret, a malformed workflow, or a typo until someone thought to add it later.
+"Later" is the failure mode this section names: a repo with real content and no CI accumulates exactly the defects CI exists to catch, for however long "later" takes.
+
+So when creating a new repository, add CI in the same first PR that creates the repo's initial content, not as a follow-up once something is already there to break.
+An empty repo with no workflows is not a clean slate;
+it is a repo whose CI has not been written yet.
+
+### The baseline set
+
+Every new repo gets these gha-backed callers, whatever the repo's purpose, because none of them depends on the repo having any particular language or build system:
+
+- `claude-review.yml` + `claude-bot.yml` --- the AI review and agent-dispatch pair, pinned per `claude-code-review.yml`'s and `claude.yml`'s own reference pages (`@v2` as of this writing;
+  read gha's README Versioning section rather than copying that number).
+- `check-secrets.yml` --- the gitleaks history scan.
+- `check-junk-files.yml` --- tracked OS/editor detritus.
+- `check-typos.yml` --- misspellings on the lines a PR adds.
+- `lint-workflows.yml` --- actionlint plus zizmor over `.github/`, together with a `.github/zizmor.yml` accepting tag pins and a `.github/dependabot.yml` keeping those tags current (`Morrison-Lab/mln`'s copies of both are the pattern to start from).
+
+### Add whatever fits the repo type on top of that
+
+The baseline is deliberately generic.
+A repo's actual content decides the rest: an R package wants `r-cmd-check.yml` and friends, a Quarto site wants `preview.yml`/`preview-deploy.yml`/`quarto-publish.yml`, and so on.
+Take the inventory and the pin from gha's README table, exactly as the migration case above does --- this is not a separate lookup, only an earlier one.
+
+"Any other appropriate sources" (the user's own phrase) means: where gha has no matching capability, reach for a well-maintained third-party action or `r-lib/actions` rather than hand-rolling one, pinned per the gha README's "Pinning third-party actions" subsection.
+That subsection's SHA-pinning guidance applies to a third-party action exactly as it would if you were adding it to gha itself;
+it does not relax because the action lives in a consumer repo instead.
+
+### The fastest route is copying a sibling repo's callers
+
+A sibling repo of the same shape almost certainly already has this worked out.
+`Morrison-Lab/mln`'s `.github/` is a private-repo Quarto-site example carrying the whole baseline set plus `check-equation-renders.yml`, `check-new-line-breaks.yml`, `check-ai-tells.yml`, and the Quarto preview/publish chain;
+a private R-package repo would instead start from `Morrison-Lab/gha`'s own `examples/` stubs or from `Morrison-Lab/qwt`/`rpt` template repos (see `Morrison-Lab/gha`'s own CLAUDE.md, "Test changes against a template repo").
+Copy the caller stubs wholesale and then adapt only what is genuinely repo-specific --- the `claude-bot.yml` header comment naming the repo's own visibility posture, a `review-workflow-file:` value, any `install-quarto`/`setup-r` flags the new repo's content actually needs.
+Do not copy blind: a caller file carries prose that describes the repo it came from, and leaving that prose unedited in the new repo is a smaller version of the same problem [`check-the-renders`](check-the-renders.md) names for a stale claim about a different artifact.
+
+- **Do:** add `.github/workflows/` in the repo's first PR, alongside its first real content, not in a later PR.
+- **Do:** start from the baseline set (`claude-review` + `claude-bot`, `check-secrets`, `check-junk-files`, `check-typos`, `lint-workflows` with `zizmor.yml` and `dependabot.yml`), then add what the repo's type needs.
+- **Do:** copy a sibling repo's callers as the fast path, and actually re-read the copied prose rather than leaving it describing the wrong repo.
+- **Do:** reach for a well-maintained third-party action or `r-lib/actions`, SHA-pinned per gha's own third-party-pinning guidance, wherever gha itself has no capability.
+- **Don't:** create a repo with no `.github/workflows/` at all and plan to add CI "later" --- that is the exact failure this section exists to name.
+- **Don't:** treat the baseline set as optional scaffolding to skip for a small or private repo;
+  `Morrison-Lab/mlr` was both, and shipped with no CI anyway.
+- **Don't:** invent a bespoke workflow for something gha or a well-maintained third-party action already covers, even in a repo too new to have accumulated the migration-condition history the section above looks for.
+- **Don't:** copy a sibling's caller stub and leave its repo-specific prose (visibility notes, `review-workflow-file:`, feature flags) pointed at the sibling instead of the new repo.
+
+(Directive from the user, Ezra, 2026-09-24: "cai: let's set up CI workflows, using gha and any other appropriate sources, by default when starting new repos".
+Filed as [ai-config#3978](https://github.com/Morrison-Lab/ai-config/issues/3978).
+Originating case: `Morrison-Lab/mlr` was created with no CI at all.)

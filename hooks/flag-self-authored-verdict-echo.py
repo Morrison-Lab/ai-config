@@ -977,15 +977,31 @@ PREFIX_DISQUALIFY_RX = (getattr(_clean_claim, "PREFIX_DISQUALIFY_RX", None)
 # two mechanisms are complementary by construction rather than by
 # coincidence: one covers the separators, the other the joiner.
 #
-# Measured over 1217 tracked files on 2026-09-24 (`git ls-files`, decoded
-# as UTF-8), U+2013 (32 occurrences) and U+2014 (2866) are the ONLY
-# Unicode dashes present, and `SCOPE_BREAK_RX` carries both. U+2010,
-# U+2011, U+2012, U+2015 and U+2212 occur zero times and are covered by
-# neither pattern -- a disclosed residual rather than a closed one. An
-# earlier revision reported those figures doubled, having walked
+# Measured at commit f6e6d242 (this comment's parent) over the 1218
+# readable files of the 1220 `git ls-files` reports, decoded as UTF-8:
+# U+2013 (32 occurrences) and U+2014 (2866) are the ONLY Unicode dashes
+# present, and `SCOPE_BREAK_RX` carries both. U+2010, U+2011, U+2012,
+# U+2015 and U+2212 occur zero times and are covered by neither pattern
+# -- a disclosed residual rather than a closed one.
+#
+# Two of the 1220 are not regular files and are skipped rather than read:
+# `.claude/skills` is a symlink to a directory (mode 120000) and
+# `shared/sembr-skills` is a submodule gitlink (mode 160000). Both
+# denominators are stated because neither alone is the whole answer, and
+# a reader re-running the command gets 1220 while the count behind the
+# figures is 1218.
+#
+# Two earlier revisions of the denominator were wrong (round 20, finding
+# 5). The first reported every figure doubled, having walked
 # `/home/user/ai-config` with `rglob` and counted a nested agent worktree
 # as a second copy of the repository; the qualitative claim survived, the
-# numbers did not.
+# numbers did not. The second replaced it with 1217, which reproduces
+# under NO reading of `git ls-files`: the branch tip gives 1220 entries
+# and 1218 readable ones, and the merge base 7b9fb345 gives 1218 and 1216,
+# the branch having added two files and deleted none. The substantive
+# figures were right in that revision and only the population they were
+# taken over was invented, which is the shape that survives a re-read:
+# nothing in the sentence looks unmeasured.
 #
 # What decides the residual is the ABUTTING shape rather than the dash's
 # overall frequency. A negator immediately AFTER an en or em dash occurs
@@ -1135,16 +1151,32 @@ def _governs(prose, window_start, match_start, rx, bracketed=None, hits=None):
 # hook: three pairs differing ONLY in a dotted citation, where the dotted row
 # warned and the plain row stayed silent. That is the direction this hook's
 # own docstring calls expensive, and the shape is everywhere in this corpus:
-# 12739 code spans carrying a dot, across 644 of 745 tracked Markdown files,
-# measured 2026-09-24 with `scripts/lib/fences.py`'s own `CODE_SPAN_RE` over
-# `git ls-files '*.md'` --
+# 12805 code spans carrying a dot, across 644 of 746 tracked Markdown files,
+# measured AT COMMIT f6e6d242 (this comment's parent) with
+# `scripts/lib/fences.py`'s own `CODE_SPAN_RE` over `git ls-files '*.md'` --
 #     sum(1 for f in files for m in CODE_SPAN_RE.finditer(read(f))
 #         if "." in m.group(0))
-# An earlier revision of this comment gave 11017 across 636 of 744 with neither
-# a date nor the expression behind it, and that figure reproduces under no
-# reading tried, this one included. Only the file count reproduced, and it has
-# since moved 744 -> 745 within this branch, which is why the figure now
-# carries its command and its date (`shared/writing/timestamp-volatile-claims.md`).
+# A COMMIT rather than a date, because the total moves with every prose commit
+# on this branch and a date cannot say which one was read: 12783 at the merge
+# base 7b9fb345, 12798 at 171efa1a, 12805 here. Those three commits span about
+# six hours and two calendar days in UTC (2026-09-24 23:04, 2026-09-25 02:15
+# and 05:20), so a date does not even separate the last two.
+#
+# Two earlier revisions were wrong, and the second in the same way as the
+# first (round 20, finding 4). The first gave 11017 across 636 of 744 with
+# neither a date nor the expression behind it. The second gave 12739 across
+# 644 of 745, adding the command and the date but not re-measuring: 12739
+# reproduces at no commit on this branch, and neither does 745:
+# `git log --diff-filter=AD --name-status 7b9fb345..HEAD -- '*.md'` returns
+# nothing, so no Markdown file was added or deleted anywhere on the branch and
+# the denominator was 746 at every commit. "It has since moved 744 -> 745
+# within this branch" was therefore false as well. Of that revision's three
+# figures only 644 reproduces, and it holds at all three commits above -- so
+# the figure a re-measurement would NOT have changed is the one it carried
+# forward unexamined, and the two it did change were both wrong. That is the
+# argument for re-running the command in the same edit that attaches it,
+# rather than for trusting whichever figure looks settled
+# (`shared/writing/timestamp-volatile-claims.md`).
 #
 # `scripts/lib/fences.py`'s `CODE_SPAN_RE` is the corpus's own span matcher
 # and is what `check-pr-fully-clean.py` already blanks with, so it is imported

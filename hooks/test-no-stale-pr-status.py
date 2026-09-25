@@ -1274,8 +1274,42 @@ def check_cost():
     # proportional to the assert count passed 207/207 with both rows
     # unmoved. A row needs many asserts AND a disclosed pending state
     # together, which is an ordinary multi-PR status recap: one line
-    # disclosing the pending work, then one bullet per PR. Measured against
-    # the pre-fix code at this size, 14.05s; it is 0.08s now.
+    # disclosing the pending work, then one bullet per PR.
+    #
+    # Round 20, finding 2. What this row ACTUALLY kills is narrower than the
+    # revision above claimed, and the difference matters because round 18
+    # finding 2 was fixed by TWO mechanisms -- the precomputed sentence
+    # starts read by bisect in `_sentence_start`, and the generator form of
+    # `all_unnegated_asserts` -- and this row was cited as pinning the pair.
+    # Each reverted ALONE against this suite at f6e6d242, before the LAZY
+    # row below existed (so out of 245):
+    #
+    #   `_sentence_start` rescan, `if starts is None:` -> `if True:`
+    #       244/245. The row that reddens is the STALE one below, at
+    #       16.02s. THIS row stays green, at 0.08s.
+    #   `all_unnegated_asserts` eager, `return iter([...])`
+    #       245/245. Every cost row green, this one at 0.17s -- the whole
+    #       suite passed with half the fix reverted.
+    #   both together
+    #       243/245. This row reddens, at 29.86s.
+    #
+    # So it fires only on the CONJUNCTION, and on the conjunction the STALE
+    # row fires too -- its kill set is a subset of that row's. It is kept
+    # as the only shape covering the `discloses_pending` re-aim path, not
+    # as the pin for either mechanism; the LAZY row below is what pins the
+    # generator half, which had no killing row at all. With that row added
+    # the same three states read 245/246, 245/246 and 243/246, and each
+    # mechanism has a row of its own.
+    #
+    # The times are samples under load rather than constants: the round-20
+    # review's own sweep of these same three states read 14.91s, 0.18s and
+    # 14.38s where this one reads 16.02s, 0.17s and 29.86s. The VERDICTS
+    # agreed exactly, which is what the sweep is for -- the 5s ceiling
+    # rests on the two to three orders of magnitude between a reverted and
+    # a shipped reading, not on any one number.
+    #
+    # Recording the kills per mechanism rather than asserting coverage is
+    # the rule this branch adds to `shared/workflow/ardi.md`.
     RECAP = (CLEAN + "3 checks still running.\n" + "".join(
         "- PR #%d: all checks green, 12 pass, ready to merge; "
         "rebased on main and fully clean.\n" % i for i in range(1500)))
@@ -1288,6 +1322,37 @@ def check_cost():
     # reference anywhere near them -- one `#N` and it breaks on the first
     # hit. Measured with the bisect reverted, 14.84s; it is 0.60s here.
     STALE = "".join("Suite %d: 12 pass.\n" % i for i in range(6000))
+    # ...and the GENERATOR half of that same fix, which no shape above can
+    # see. Two conditions have to hold together for the eager form to cost
+    # anything: a caller must stop early, AND the candidates it skipped must
+    # be expensive to evaluate. Each shape above misses one. The two single-
+    # assert bodies have nothing to skip. STALE's asserts are all bare counts
+    # with no PR reference, so the `soft` loop runs to completion and reads
+    # every one of them under either form. RECAP stops at candidate 0, but
+    # `RX_SENTENCE_BREAK` treats a bare newline as a break, so each of its
+    # asserts sits in a one-line sentence and evaluating all 7501 is cheap
+    # once `_sentence_start` bisects -- which is why it reddens only when the
+    # bisect is reverted too. (Counted directly: 7501 asserts, the `soft`
+    # loop and the re-aim each reading 1; STALE 6000 asserts and 6000 read;
+    # LAZY 2500 and 1.)
+    #
+    # One unbroken LINE satisfies both conditions at once. Every assert then
+    # shares the same whole-line prefix, so evaluating one is O(offset) and
+    # evaluating all of them is quadratic whatever `_sentence_start` costs;
+    # and candidate 0 is a non-bare-count phrase, so `find_unnegated_assert`
+    # returns there and the `soft` loop below breaks on it -- 2499 of the
+    # 2500 are never evaluated. That is exactly the shape the helper's
+    # docstring describes and nothing pinned.
+    #
+    # Measured against the hook at f6e6d242, in the suite: 0.05s to 0.28s
+    # as shipped across runs, and 17.78s with `all_unnegated_asserts`
+    # reverted to `return iter([...])`, against the same 5s ceiling. It
+    # stays green under the `_sentence_start` revert alone, at 0.05s, so the
+    # two rows separate the two mechanisms rather than both answering to
+    # the conjunction. Outside the suite the reverted reading is 17.26s at
+    # k=2500, 11.89s at k=2000 and 6.13s at k=1500, so the size is chosen
+    # for headroom over the ceiling rather than to be just past it.
+    LAZY = "Status on the stack: " + "PR ready to merge, " * 2500 + "done"
     # Round 19, finding 3. `RX_NEVER_RAN` opened with three adjacent
     # unbounded runs, so a FAILING match over a long whitespace prefix tried
     # every split of it between them. It runs once per PART of every push
@@ -1318,6 +1383,8 @@ def check_cost():
          "many asserts beside a disclosed pending state"),
         ([PUSH, PUSH_OK, say(STALE)],
          "many bare counts on the staleness branch"),
+        ([PUSH, PUSH_OK, say(LAZY)],
+         "many asserts in one sentence, all but the first unread"),
         (NEVER_RAN_COST, "long whitespace runs in a push result"),
     ]
     for events, label in shapes:
@@ -1331,7 +1398,7 @@ def check_cost():
     return failures
 
 
-COST_CHECKS = 5
+COST_CHECKS = 6
 
 
 def run(events):

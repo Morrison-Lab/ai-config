@@ -1083,8 +1083,8 @@ for the finding, whatever the finding's own merits.
   it stops.
 - **Don't:** read one non-reproducing row as refuting a finding whose other
   rows reproduce.
-- **Don't:** adopt a reviewer's row as a fixture without the mutation control
-  the section above's own remedy does not ask for.
+- **Don't:** adopt a reviewer's row as a fixture without a mutation control,
+  which the section above's own remedy does not ask for.
 
 **The mirror is the likelier error, and it wears the same clothes.**
 Rejecting a row also rests on a measurement, and that measurement is taken

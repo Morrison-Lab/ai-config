@@ -931,8 +931,35 @@ def main():
     spec.loader.exec_module(mod)
 
     if mod.classify_verdict is None:
-        print("SKIP: check-pr-fully-clean.py's classify_verdict is unavailable")
-        return 0
+        # Round 20, finding 3. This branch used to print one SKIP line and
+        # return 0 -- the same exit code a full pass gives, and before the
+        # suite had examined anything, so a deployment in which the hook is
+        # permanently inert read as green to any runner reading the code.
+        #
+        # The condition is not hypothetical. `echoed_verdict` opens
+        # `if not body or classify_verdict is None: return None`, so a plugin
+        # root shipping `hooks/` without `scripts/`, a renamed instrument, or
+        # an import-time error inside it silences the guard on every body
+        # forever -- and `_instrument()` swallows every exception, so nothing
+        # anywhere says so. Reproduced by loading the hook from a directory
+        # whose parent has no `scripts/`: `classify_verdict` is None and the
+        # real incident body produces no output at all.
+        #
+        # Non-zero rather than running the rows that need no instrument,
+        # because what a partial deployment needs told is "this guard warns
+        # on nothing here", and a subset of rows passing under an exit 0
+        # reports the opposite. The examined total prints either way, so the
+        # run is distinguishable from a pass by its OUTPUT as well as by its
+        # exit code -- a reader who greps for the `N/N passed` line sees
+        # `0/0` rather than nothing.
+        print("FAIL: check-pr-fully-clean.py's classify_verdict is "
+              "unavailable, so this hook is INERT in this deployment --"
+              " echoed_verdict() returns None for every body. Resolve"
+              " scripts/check-pr-fully-clean.py beside hooks/, or fix the"
+              " import error inside it, and re-run.")
+        print(f"\n{EXAMINED}/{EXAMINED} passed (0 examined -- the suite "
+              "did not run)")
+        return 1
 
     print("Negative control on the classifier itself:")
     # Guards against a vacuous suite: if the classifier stopped reading these as
@@ -1503,6 +1530,28 @@ def main():
     # enclosing every hit reads 5.30s at 2000 hits, unchanged from before
     # this round. Tracked rather than fixed here, since it is the behaviour
     # that already shipped.
+    #
+    # Round 20, finding 1, re-measured independently on another machine and
+    # reported per reverted state rather than as one "before" number, since
+    # a single figure cannot say which part of the fix the row answers to.
+    # Each state run against this suite at f6e6d242:
+    #
+    #   the round-19 pre-fix shape -- per-hit clause rescan AND `_governs`
+    #       draining `rx.finditer(window)` per hit: 36.64s.
+    #   the caller's hoist alone -- `_disqualified(prose, start)`, so all
+    #       three precomputes rerun per hit: 82.81s. Heavier than the
+    #       pre-fix shape rather than lighter, because `_disqualifier_spans`
+    #       did not exist before this round and reruns three whole-body
+    #       `finditer`s per hit here.
+    #   the clause split alone -- `if ends is None:` -> `if True:`: 12.93s.
+    #
+    # All three also redden `a body with many hits precomputes exactly once
+    # each` below, so each is killed twice; 130/132 in every case. The
+    # spread is load and machine, not behaviour -- the 16.24s above was a
+    # sample too. What the ceiling needs is that every reverted state clears
+    # it by a margin no sample can close, and the four readings run from
+    # 2.6x (the clause split alone) to 17x (the full hoist) against a
+    # shipped 0.17s, which is 0.03x.
     hits = "Needs more work\n\n" + "no findings\nAddressed\n" * 3000
     env = dict(os.environ)
     env["TMPDIR"] = tempfile.mkdtemp(prefix="verdict-echo-hits-")

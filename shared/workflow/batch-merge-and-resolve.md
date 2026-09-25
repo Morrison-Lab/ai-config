@@ -645,6 +645,57 @@ predicate runs on both sides.
 - **Don't:** read two green PRs as evidence their merge is green, or reach for a
   merge order to fix a breach that both orders reach.
 
+## A merge can delete the detector, and the suite then passes for that reason
+
+The five modes above are defects a merge introduces into the *content*.
+This one is a defect a merge introduces into the *instrument*, and it inverts
+what a green suite means: the cases that would have failed are the cases the
+merge removed, so the run is green **because** of the damage rather than
+despite it.
+
+Measured on this repo, 2026-09-24: merge `57f44a05` dropped 77 lines from
+`hooks/test-no-stale-pr-status.py`, ten of them check rows, while every line of
+`hooks/no-stale-pr-status.py` those rows covered still shipped.
+Both sides of the merge were green, the PR was clean, and nothing reported that
+ten assertions had stopped running.
+The loss surfaced only when the merge's own diff was read, rounds later.
+
+It is not the deleted-line blind spot stated above, and the remedy there does
+not reach it.
+That one is about a *check* scoped to added lines missing a defect a deletion
+caused.
+The defect was still in the tree there, and a wider scope would have found it.
+Here there is nothing in the tree to find.
+The evidence that anything is wrong is an absence, and the only artifact
+carrying it is the merge itself.
+
+The count-delta instrument above transfers unchanged, with the assertion count
+as the quantity: **a merge must not run fewer cases than either parent did.**
+Check out each of the three commits into a throwaway worktree and run the suite
+there, so the suite and the hook it drives always come from the same commit:
+
+```bash
+for ref in "$MERGE^1" "$MERGE^2" "$MERGE"; do
+  d="$(mktemp -d)"; git worktree add -q --detach "$d" "$ref"
+  printf '%s  ' "$ref"; (cd "$d" && python3 "$SUITE" "$HOOK" | tail -1)
+  git worktree remove -q --force "$d"
+done
+```
+
+Take the total from the suite's own report rather than by grepping the file for
+`check(`, since a row can sit in the file and never be reached.
+The bound is necessary and not sufficient: it catches a merge that loses cases
+outright, and says nothing about one that keeps the count while gutting what a
+case asserts.
+
+- **Do:** compare a suite's own reported total across a merge and both its
+  parents, whenever the merge touches a test file.
+- **Do:** state a deliberate deletion in the merge's message, so a real drop is
+  distinguishable from this one.
+- **Don't:** read a green suite after a merge as evidence the merge was safe ---
+  a merge that deletes cases is green for the wrong reason.
+- **Don't:** count cases by grepping the source; count what the run reports.
+
 ## The recovery has a silent failure mode of its own, and no merge produces it
 
 The modes above arrive *through* a merge nothing flags, and the batch pass

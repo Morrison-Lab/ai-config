@@ -30,10 +30,11 @@ When PSW and this guidance disagree, PSW wins.
   "The fit improves when n grows", not "When n grows, the fit improves".
   A leading clause makes the reader hold a condition before knowing what it
   conditions.
-- **Don't write "thing".** Name the object, quantity, step, or idea meant;
+- **Don't write "thing".**
+  Name the object, quantity, step, or idea meant;
   "thing" almost never survives that test.
-- **Don't let a demonstrative stand in for its referent.** "This", "that",
-  and phrases like "getting there" point at something the reader must
+- **Don't let a demonstrative stand in for its referent.**
+  "This", "that", and phrases like "getting there" point at something the reader must
   reconstruct; name it instead
   (PSW, [Demonstrative pronouns](https://morrison-lab.github.io/psw/chapters/grammar.html#demonstrative-pronouns);
   see also [`ambiguous-reference`](ambiguous-reference.md)).

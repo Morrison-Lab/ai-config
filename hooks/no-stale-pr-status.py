@@ -354,8 +354,8 @@ _FAILING_COUNT_HIT = re.compile(
 # this PR's failures and exempted the clean claim beside it (round 17,
 # finding 3). The two orders now agree.
 #
-# The gap between the lead word and the count admits spaces, tabs, commas
-# and brackets, and NOT a sentence terminator: without that bound,
+# The gap between the lead word and the count admits spaces, tabs and
+# commas, and NOT a sentence terminator: without that bound,
 # "...still in progress. 3 checks failed." matched across the full stop and
 # the second sentence stopped disclosing anything. A self-referential
 # object ("on this PR", "in the current branch") is refused, since that is

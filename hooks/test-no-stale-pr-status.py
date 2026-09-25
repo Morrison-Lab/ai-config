@@ -383,6 +383,14 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("14 pass, 3 checks pending with zero drama.")], False,
      "...including the bare-zero arm, which reads no differently"),
+    # The same sentence with no count in it. Round 17's count rule exempts
+    # every row above before the tail is consulted, so both the anchoring
+    # and the mandatory copula went unexercised by them -- measured, with
+    # the negator unanchored or the copula made optional beside the word
+    # slot, the whole suite stayed green. This row is what moves.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending with zero drama.")], False,
+     "an UNCOUNTED disclosure is what still exercises the anchor"),
     # Round 16, finding 2. Round 15 closed the finding-2 leak by refusing a
     # preposition after the count, which caught that sentence and not its
     # class: the tense sits IN FRONT of the count, so every past-tense
@@ -402,6 +410,16 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("14 pass. I fixed the CI and 3 errors remain.")], False,
      "...but three words is out of reach, so this still discloses"),
+    # ...and the same bound with no conjunction in it. The row above stopped
+    # pinning the window once round 17 added the conjunction exclusion:
+    # "and" is refused independently, so it passes under a two-word bound
+    # and a three-word one alike and says nothing about which is shipped.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. I fixed the very last 3 errors.")], False,
+     "...on the two-word bound alone, with no conjunction doing the work"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. I fixed the last 3 errors.")], True,
+     "...and its control, one word shorter and so within reach"),
     # Round 16, finding 3. Anchoring the trailing negator admitted only an
     # empty connector, a colon and a copula, so every other way of joining
     # a label to its value read as a disclosure and exempted the clean
@@ -471,8 +489,13 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("14 pass. On this PR, 3 checks failed.")], False,
      "...but a self-referential object is a disclosure, not a re-target"),
+    # The first sentence must disclose NOTHING, or it returns True on its
+    # own hit and the lead in front of the second is never consulted. The
+    # round-17 draft of this row opened "2 runs still in progress", which
+    # made it vacuous: widening the gap to any non-word character killed
+    # nothing.
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
-      say("14 pass. 2 runs still in progress. 3 checks failed.")], False,
+      say("14 pass. The rebase landed in main. 3 checks failed.")], False,
      "...and the lead cannot reach across a sentence boundary"),
     # Round 17, findings 4 and 5. A past-tense verb in front of a count is
     # an exemption only for a count of things that FAILED: a review can be
@@ -486,6 +509,12 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("14 pass. Fixed lint and 3 checks pending.")], False,
      "...for the pending alternative in its own right"),
+    # ...and the same shape with no conjunction, which is what isolates the
+    # failing-count gate: both rows above also fail on the conjunction
+    # exclusion, so either fix alone keeps them green.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Addressed the 3 reviews still in progress.")], False,
+     "...with the verb reaching the count, and the count still queued"),
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("14 pass. Two fixes and 3 errors remain.")], False,
      "a conjunction is not filler, so the verb does not reach the count"),
@@ -944,6 +973,12 @@ def check_cost():
     only linear in how many runs there are, so a padded markdown table does
     not trigger it and nothing short of one long run will.
 
+    Its disclosure is UNCOUNTED, which round 17 made load-bearing: a
+    counted hit never reaches the trailing negator now, so the round-16
+    wording of this shape stopped timing the pattern it names. The sweep
+    caught it -- reinstating the two adjacent runs killed nothing -- which
+    is finding 2's vacuity arriving by way of this round's own fix.
+
     The ceiling is 5s against a whole-process baseline of about 0.04s,
     which the larger shape takes to 0.107s -- ample headroom on a slow
     runner, and still red on every regression above by two to three orders
@@ -966,7 +1001,7 @@ def check_cost():
     shapes = [
         (CLEAN + "fixed 3 errors left " * 8000,
          "many skipped hits, loop run to completion"),
-        (CLEAN + "3 checks pending" + " " * 16000 + "x",
+        (CLEAN + "Checks pending" + " " * 16000 + "x",
          "one long run of spaces"),
     ]
     for text, label in shapes:

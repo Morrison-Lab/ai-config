@@ -816,3 +816,18 @@ so the acknowledgement stays out of the slides.
   or put the acknowledgement in slide-visible text.
 
 (Directive from the user, 2026-09-25, stated as a global rule.)
+
+## Quote the primary source, not someone quoting it
+
+When a secondary source quotes a primary one,
+quote and cite the primary source directly,
+after checking the wording and locator against it.
+Do not write "X, as quoted in Y".
+
+- **Do:** find the original (Mitchell 1997, not Goodfellow et al. quoting Mitchell),
+  verify the quotation there, and cite it with its own page.
+- **Don't:** cite the secondary source for a quotation it only relays,
+  or copy a relayed quotation without checking the original.
+
+(Directive from the user, 2026-09-25: "why quote Goodfellow quoting Mitchell,
+when we can quote Mitchell directly? ... (apply this principle generally too)".)

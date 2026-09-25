@@ -725,6 +725,17 @@ def _check_push(tool_name: str, args: any) -> tuple[bool, str]:
 # run of spaces and is not a refusal takes 2.19s at 16000 spaces against
 # 0.0027s for the union. The alternation stays deterministic -- `\s` never
 # matches a backslash -- so at most one branch applies at any position.
+#
+# Round 20, finding 8. That rewrite also WIDENED the accepted language, and
+# the widening is deliberate rather than incidental: the three-run form
+# required the escaped newlines to be contiguous, and the union admits any
+# interleaving of them with real whitespace, which is what a serialized
+# transcript actually produces. Over-matching is the expensive direction
+# here, so the widening is stated rather than assumed harmless: the only
+# strings it newly admits are ones carrying a real refusal marker at the
+# anchor, since everything before the marker is whitespace of one spelling
+# or the other. `PUSH_BLOCKED_INTERLEAVED` pins the boundary, which neither
+# form had a row for.
 RX_NEVER_RAN = re.compile(
     r"^(?:\s|\\n)*PreToolUse:[^\n]*hook error:"
     r"|^(?:\s|\\n)*Permission for this action was denied",

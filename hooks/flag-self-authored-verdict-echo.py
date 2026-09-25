@@ -1200,9 +1200,17 @@ def _clause_start_ends(text):
     to fit whatever `endpos` allows -- so the old call's last end moved with
     `match_start` in a way no rule about clauses would predict. Every extra
     position lies inside a whitespace run, and a negator match starts on a
-    word character, so the window's negator set is unchanged; the
-    differential test over the suite's own bodies plus 40000 random ones
-    asserts that directly on `echoed_verdict`.
+    word character, so the window's negator set is unchanged.
+
+    Round 20, finding 7. That last claim used to cite "the differential test"
+    for its evidence, and no such test existed -- the measurement had been a
+    one-off during development, so a definite article was telling the reader
+    that a committed artifact guarded the argument when nothing did. The
+    companion suite's `differential()` is that artifact now: it reimplements
+    the pre-bisect path as `reference_disqualified` and compares the two over
+    the suite's own bodies plus 20000 generated ones, 21762 hits, 0
+    disagreements. Dropping the blank-line end here takes that to 1568 and
+    dropping the terminator end to 60.
     """
     ends = []
     seen_newline = False
@@ -1229,7 +1237,7 @@ def _straddles(spans, window_start, match_start):
 
 
 def _disqualifier_spans(scanned):
-    """`(bracketed, negator spans, prefix-disqualifier spans)` for one body.
+    """`(bracketed, negator spans, prefix spans, bracket spans)` for a body.
 
     Computed once and bisected per hit, per `_governs`.
 
@@ -1238,9 +1246,13 @@ def _disqualifier_spans(scanned):
     it is elided here and was two unmatched delimiters there. `RX_ASIDE_BRACKETED`
     admits no nesting, so that STRADDLE is the only way the two can disagree,
     and the bracket spans are returned so `_disqualified` can detect it and
-    take the exact per-window path for that hit. A first draft without the
-    fallback differed on 9 of 40000 random bodies, every one of them carrying
-    an unclosed delimiter across a blank line; with it, 0.
+    take the exact per-window path for that hit. Disabling the fallback makes
+    the companion suite's `differential()` report 14 disagreements of 21762,
+    every one of them an aside opening before a clause boundary and closing
+    after it around a negator; with it, 0. A body that straddles that way is
+    rare enough that a corpus has to be built to contain one rather than
+    waiting for volume to produce it, which is why `DIFF_FRAGMENTS` carries a
+    bare opener and a negator-bearing closer as separate pieces.
     """
     bracketed = _elide_bracketed(scanned)
     return (bracketed,
@@ -1325,11 +1337,21 @@ def echoed_verdict(body):
             # it is that only this one call sits inside the try, and its
             # only effect is to skip an exemption (review finding 16).
             pass
-    # Blanked once and enumerated once for the whole body, not per hit.
-    scanned = _elide_code_spans(prose)
-    ends = _clause_start_ends(scanned)
-    spans = _disqualifier_spans(scanned)
+    # Blanked once and enumerated once for the whole body, not per hit --
+    # but only once a FIRST hit exists. Round 20, finding 9: hoisting these
+    # three out of `_disqualified` made them run on bodies with no
+    # disposition phrase at all, where before they ran not at all. That is
+    # O(n) rather than the O(n*k) the hoist removed, so it cannot hang the
+    # guard, but it is strictly new work on the commonest shape there is --
+    # 0.46s to 0.90s on a 900 KB body carrying zero hits. Binding them on
+    # first use keeps the once-per-body property for the k-hit case and
+    # restores the zero-hit case to doing nothing.
+    scanned = ends = spans = None
     for hit in RX_DISPOSITION.finditer(prose):
+        if scanned is None:
+            scanned = _elide_code_spans(prose)
+            ends = _clause_start_ends(scanned)
+            spans = _disqualifier_spans(scanned)
         # The bullet branch starts at the preceding newline, so the clause
         # window would otherwise be the LINE ABOVE the bullet. Anchor on the
         # phrase's own first word instead.

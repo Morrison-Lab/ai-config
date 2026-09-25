@@ -18,8 +18,11 @@ silently does nothing.
 Run: python3 hooks/test-flag-self-authored-verdict-echo.py \\
          hooks/flag-self-authored-verdict-echo.py
 """
+import itertools
 import json
 import os
+import random
+import re
 import shutil
 import subprocess
 import sys
@@ -469,7 +472,12 @@ ECHO_NEGATOR_IN_COMMA_ASIDE = (
 # phrase, leaves the opening delimiter unmatched, and keeps the semicolon. The
 # straddle fallback is what routes this hit back to the exact per-window path;
 # without it this body is a MISSED disclosure, which is the expensive
-# direction. Measured over 200000 random bodies, 85 of them differ this way.
+# direction. Round 20, finding 7: this used to cite 200000 random bodies of
+# which 85 differed, from a one-off run with no generator committed, so
+# nobody could check it. `differential()` below is the committed corpus,
+# and disabling the straddle fallback makes it report 14 disagreements of
+# 21762 -- a smaller absolute count over a smaller corpus deliberately
+# built to contain the shape, rather than a larger one that stumbled on it.
 ECHO_BREAK_IN_STRADDLING_PARENTHETICAL = (
     "### Verdict\n**%s**\n\n"
     "No findings are outstanding "
@@ -813,6 +821,105 @@ def check(name, got, want):
     if got != want:
         FAILURES.append(f"{name}: expected fired={want}, got fired={got}")
     print(f"  {'ok  ' if got == want else 'FAIL'}  {name}")
+
+
+# The differential harness behind `_clause_start_ends`'s superset argument and
+# `_disqualifier_spans`'s straddle fallback. Round 19 replaced a per-hit
+# truncated clause scan with a once-per-body enumeration plus a bisect, and a
+# once-per-body bracket elision with the same. Both are meant to be
+# behaviour-preserving, and neither is pinned by any single row: a defect in
+# either shows up as a verdict that differs from the old path on some body
+# nobody wrote down. Round 20, finding 7: the hook cited "the differential
+# test" for exactly this, and no such test existed -- the measurement had been
+# a one-off during development, so nothing guarded the claim against a later
+# edit to `RX_CLAUSE_START` or to the negator sets. This is that test.
+def reference_disqualified(mod, prose, match_start):
+    """`_disqualified` by the PRE-BISECT path, as the reference implementation.
+
+    The clause window is the last `RX_CLAUSE_START` end in a scan truncated at
+    `match_start`, and `_governs` is called with no precomputed spans, which is
+    the exact per-window elision branch it still carries.
+    """
+    scanned = mod._elide_code_spans(prose)
+    found = None
+    for found in mod.RX_CLAUSE_START.finditer(scanned, 0, match_start):
+        pass
+    window_start = found.end() if found else 0
+    return bool(
+        mod._governs(scanned, window_start, match_start, mod.NEGATION_RX)
+        or mod._governs(scanned, window_start, match_start,
+                        mod.PREFIX_DISQUALIFY_RX))
+
+
+# Fragments chosen so the generator can BUILD the two shapes the differential
+# exists to catch, rather than waiting for volume to stumble on them. A bracket
+# opener and a negator-bearing closer are separate fragments, so a separator can
+# fall between them and produce an aside that straddles a clause boundary --
+# whole-body elision blanks such an aside entirely, per-window elision sees only
+# an unmatched closer, and the negator inside it then governs under one path and
+# not the other. Blank lines are over-weighted for the same reason: they are the
+# boundary the enumeration and the truncated scan can disagree about.
+DIFF_FRAGMENTS = [
+    "No findings remain", "none of the three", "nothing further",
+    "not yet", "without a rewrite", "zero open items",
+    "the root cause", "all five items", "a second reviewer",
+    "`f120e5a`", "(none of which matter)", "(unclosed aside",
+    "[unclosed bracket", "(an aside opens", "none of these matter)",
+    "nothing here]", "(a second opener", "code `a` span", "the review said",
+]
+DIFF_DISPOSITIONS = [
+    "Addressed.", "Rebutted.", "Deferred.", "- **Addressed.**",
+    "1. Rebutted.", "*Deferred.*",
+]
+DIFF_SEPARATORS = [
+    ". ", "; ", " -- ", "\n\n", "\n\n",
+    "\n\n", "\n", ", ", " and ", ": ",
+]
+# Fixed, so a disagreement is reproducible from the failure message alone.
+DIFF_SEED = 20260925
+DIFF_BODIES = 20000
+
+
+def generated_bodies(count=DIFF_BODIES, seed=DIFF_SEED):
+    rng = random.Random(seed)
+    for _ in range(count):
+        parts = [rng.choice(DIFF_FRAGMENTS) if rng.random() < 0.55
+                 else rng.choice(DIFF_DISPOSITIONS)
+                 for _ in range(rng.randint(1, 8))]
+        body = ""
+        for i, part in enumerate(parts):
+            body += part
+            if i < len(parts) - 1:
+                body += rng.choice(DIFF_SEPARATORS)
+        yield body
+
+
+def suite_bodies():
+    """Every module-level string constant in this file, as a corpus."""
+    for name, value in sorted(globals().items()):
+        if name.isupper() and isinstance(value, str) and value:
+            yield value
+
+
+def differential(mod):
+    """(bodies, hits, disagreements) between the shipped path and the reference."""
+    bodies = hits = disagreements = 0
+    first = None
+    for body in itertools.chain(suite_bodies(), generated_bodies()):
+        prose = mod.authored_text(body)
+        bodies += 1
+        for hit in mod.RX_DISPOSITION.finditer(prose):
+            word = re.search(r"[A-Za-z0-9]", hit.group(0))
+            start = hit.start() + (word.start() if word else 0)
+            hits += 1
+            if mod._disqualified(prose, start) != reference_disqualified(
+                    mod, prose, start):
+                disagreements += 1
+                if first is None:
+                    first = (prose, start)
+    if first is not None:
+        print("    first disagreement at %d in %r" % (first[1], first[0]))
+    return bodies, hits, disagreements
 
 
 def main():
@@ -1412,6 +1519,53 @@ def main():
         shutil.rmtree(env["TMPDIR"], ignore_errors=True)
     check(f"3000 disqualified disposition hits finish under 5s "
           f"(took {elapsed:.2f}s)", elapsed < 5.0, True)
+
+    print("Precompute is once per body, and not at all without a hit:")
+    # Round 20, finding 9. Hoisting the three precomputes out of the per-hit
+    # loop made them run on every body, including the ones carrying no
+    # disposition phrase at all -- where before they ran not at all. A cost
+    # ceiling cannot see that: it is O(n) rather than the O(n*k) the hoist
+    # removed, so it roughly doubles a figure that is well under any ceiling
+    # worth setting. Counting the calls pins it exactly, and pins the other
+    # half of the same property in the same breath: for a body that DOES carry
+    # hits, each helper must still run exactly once however many hits there
+    # are, which is what the hoist was for.
+    counts = {}
+    originals = {}
+    for name in ("_elide_code_spans", "_clause_start_ends", "_disqualifier_spans"):
+        originals[name] = getattr(mod, name)
+
+        def counted(*args, _n=name, **kwargs):
+            counts[_n] = counts.get(_n, 0) + 1
+            return originals[_n](*args, **kwargs)
+
+        setattr(mod, name, counted)
+    try:
+        no_hits = "### Verdict\n**%s**\n\n%s" % (NOT_CLEAN, "filler prose\n" * 40)
+        mod.echoed_verdict(no_hits)
+        check("a body with no disposition hit precomputes nothing",
+              sum(counts.values()), 0)
+        counts.clear()
+        many_hits = "### Verdict\n**%s**\n\n%s" % (
+            NOT_CLEAN, "no findings\nAddressed\n" * 200)
+        mod.echoed_verdict(many_hits)
+        check("a body with many hits precomputes exactly once each",
+              sorted(counts.items()),
+              [("_clause_start_ends", 1), ("_disqualifier_spans", 1),
+               ("_elide_code_spans", 1)])
+    finally:
+        for name, fn in originals.items():
+            setattr(mod, name, fn)
+
+    print("Differential against the pre-bisect path:")
+    bodies, dhits, disagreements = differential(mod)
+    # The hit count is asserted too, because a generator that stopped producing
+    # dispositions would report zero disagreements over nothing at all -- the
+    # positive control `algorithmatize-checks.md` asks every sweep to carry.
+    check(f"the generated corpus still reaches the scan ({dhits} hits over "
+          f"{bodies} bodies)", dhits > 5000, True)
+    check("no window disagrees with the pre-bisect path "
+          f"({disagreements} of {dhits})", disagreements == 0, True)
 
     if FAILURES:
         print(f"\n{EXAMINED - len(FAILURES)}/{EXAMINED} passed")

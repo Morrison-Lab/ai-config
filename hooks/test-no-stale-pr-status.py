@@ -86,6 +86,19 @@ PUSH_QUOTES_REFUSAL = {"type": "user", "message": {"content": [
 PUSH_MARKED_OK = {"type": "user", "message": {"content": [
     {"type": "tool_result", "tool_use_id": "p1", "is_error": False,
      "content": "PreToolUse:Bash hook error: git push blocked"}]}}
+# Round 20, finding 8. Round 19 rewrote the leading run from
+# three adjacent quantifiers to ONE over a union, to kill a quadratic. That
+# also WIDENED the accepted language: the old form required the escaped
+# newlines to be contiguous, and the union admits any interleaving of them
+# with real whitespace. The widening is kept, because that interleaving is
+# exactly what a serialized transcript produces, and the only strings it
+# newly admits are ones carrying a real refusal marker at the anchor. It is
+# pinned here rather than left to be rediscovered, since over-matching is
+# the expensive direction for this predicate and nothing else tests the
+# boundary in either form.
+PUSH_BLOCKED_INTERLEAVED = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "p1", "is_error": True,
+     "content": "\\n  \\n PreToolUse:Bash hook error: git push blocked"}]}}
 PUSH_SECOND_ATTEMPT = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "id": "p2", "input": {"command": "git push -q"}}]}}
 # Round 13, finding 9. A `content` LIST, which is the shape `_result_parts`
@@ -209,6 +222,9 @@ CASES = [
      "an explicit is_error false overrides the refusal wording"),
     ([QUERY, PUSH_ATTEMPT, PUSH_BLOCKED_PARTS, say("All checks pass.")], False,
      "a refusal arriving as a LATER content part is still a refusal"),
+    ([QUERY, PUSH_ATTEMPT, PUSH_BLOCKED_INTERLEAVED, say("All checks pass.")],
+     False,
+     "escaped newlines interleaved with whitespace still open a refusal"),
     ([QUERY, PUSH_ATTEMPT, PUSH_PARTS_QUOTE_REFUSAL, say("All checks pass.")],
      True,
      "a later content part QUOTING the refusal wording is not a refusal"),
@@ -1127,22 +1143,42 @@ CASES = [
           }}]}},
       say("All checks green at this head.")], True,
      "chained git push after git add is recognized as a push"),
+    # Round 20, finding 5. This row used to carry a bare
+    # `git push --force-with-lease origin main`, and stayed green with
+    # `args.get("CommandLine")` deleted from `_check_push`: `cmd_str` became
+    # None, control fell through to the step-3 blob fallback, and `RX_PUSH`
+    # matched `git push` inside the serialized JSON whatever key had held it.
+    # So it pinned the fallback rather than the extraction its label names.
+    # `git -C <dir> push` is recognised by the shell parse and invisible to
+    # `RX_PUSH`, whose `git\s+push` cannot span the `-C` and its argument, so
+    # only the parsed path can see it. (`--git-dir=...git push` does NOT work
+    # here: the blob then literally contains `git push`.)
     ([QUERY,
       {"type": "assistant", "message": {"content": [
           {"type": "tool_use", "name": "run_command", "input": {
-              "CommandLine": "git push --force-with-lease origin main"
+              "CommandLine": "git -C /home/user/ai-config push origin HEAD"
           }}]}},
       say("All checks green at this head.")], True,
      "CommandLine parameter with git push is recognized as a push"),
 
     # Local file tools mentioning query vocabulary must not register as a fresh status query.
+    # Round 20, finding 4. This row used to read `view_file` on
+    # `/path/to/scripts/check-pr-fully-clean.py`, and stayed green with BOTH
+    # `LOCAL_FILE_TOOLS` guards deleted -- `RX_QUERY` never matched that blob
+    # at all, because the path alone carries none of its vocabulary (the
+    # `check-pr-fully-clean.py` alternative requires a leading `python3`), so
+    # the row asserted nothing about the set its label names. A `grep_search`
+    # for `statusCheckRollup` is both the realistic shape of the false
+    # positive -- an agent searching the corpus for the vocabulary while
+    # writing about it -- and one `RX_QUERY` really does match.
     ([QUERY, PUSH,
       {"type": "assistant", "message": {"content": [
-          {"type": "tool_use", "name": "view_file", "input": {
-              "AbsolutePath": "/path/to/scripts/check-pr-fully-clean.py"
+          {"type": "tool_use", "name": "grep_search", "input": {
+              "SearchDirectory": "/home/user/ai-config",
+              "Query": "statusCheckRollup"
           }}]}},
       say("All checks green at this head.")], True,
-     "view_file mentioning query vocabulary must not count as fresh status query"),
+     "grep_search for query vocabulary must not count as fresh status query"),
     ([QUERY, PUSH,
       {"type": "assistant", "message": {"content": [
           {"type": "tool_use", "name": "edit", "input": {

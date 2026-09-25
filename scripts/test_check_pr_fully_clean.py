@@ -6911,6 +6911,39 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) == "",
     )
 
+    # PR #3906 Copilot review, fourteenth round: `COPILOT_FINDINGS_LINE` consumed
+    # trailing whitespace at the end of the line inside `rest` and the match,
+    # so when `**Findings:** None` was cited inside double backticks with
+    # trailing spaces (` ``**Findings:** None``  \n`), `m.end()` included
+    # those uncited trailing spaces, causing `match_is_cited` to return False
+    # and treating the cited zero as live clean evidence.
+    check(
+        "copilot_verdict: trailing spaces on a line with a double-backtick-wrapped "
+        "'**Findings:** None' line do not cause the match to include uncited offsets",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "  " + B + B + "**Findings:** None" + B + B + "  \n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: uncited '**Findings:** None' with trailing spaces "
+        "still classifies as clean",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Findings:** None  \n"
+        ) == "clean",
+    )
+    check(
+        "copilot_verdict: a bare '**Findings:**  ' line with no count fails closed (states no verdict)",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Findings:**  \n"
+        ) == "",
+    )
+
     # Site 3: `_find_details_regions`'s CLOSER scan checked comment spans
     # but never the `cited` mask at all -- a double-backtick-quoted
     # `` </details> `` sitting inside a genuinely open `<details>` region,
@@ -7415,6 +7448,20 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "heading and an uncited 'Findings: None' line following it",
         checker.copilot_verdict(
             "<!-- ccr-overview-v2 -->\n\n``## Copilot review overview``\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) != "clean",
+    )
+    # PR #3906 Copilot review, fourteenth round: `_COPILOT_OVERVIEW_START`
+    # capture group 2 included trailing spaces `[ \t]*`, so when the heading
+    # was cited in double backticks with trailing spaces on the line
+    # (` ``## Copilot review overview``  \n`), group 2's span included those
+    # uncited trailing spaces, causing `match_is_cited` to return False and
+    # opening a trusted block.
+    check(
+        "copilot_verdict: a heading cited as a single-line code span with trailing spaces "
+        "does not open a real block",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n``## Copilot review overview``  \n\n"
             "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
         ) != "clean",
     )

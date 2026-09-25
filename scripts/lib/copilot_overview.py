@@ -150,7 +150,8 @@ import re
 from typing import Callable, List, Optional, Tuple
 
 COPILOT_FINDINGS_LINE = re.compile(
-    r"(?:^|\n)[ ]{0,3}\*\*Findings:\*\*[ \t]*(?P<rest>[^\n\r]*)", re.IGNORECASE
+    r"(?:^|\n)[ ]{0,3}\*\*Findings:\*\*(?:[ \t]*(?P<rest>\S(?:[^\r\n]*?\S)?))?(?=[ \t]*(?:\r?\n|$))",
+    re.IGNORECASE,
 )
 
 
@@ -273,7 +274,7 @@ def match_content_start(m: "re.Match[str]") -> int:
 _COPILOT_OVERVIEW_START = re.compile(
     r"(?:^|\n)[ ]{0,3}(<!--[ \t]*ccr-overview-v2[ \t]*-->)"
     r"(?:[ \t]*\r?\n)+"
-    r"[ ]{0,3}(##[ \t]+Copilot review overview[ \t]*)(?=\r?\n|$)",
+    r"[ ]{0,3}(##[ \t]+Copilot review overview)[ \t]*(?=\r?\n|$)",
     re.IGNORECASE,
 )
 # A lookahead for a real tag-name delimiter, not a trailing `\b` (PR
@@ -1083,7 +1084,7 @@ def _copilot_v2_findings_count(
             if _position_in_spans(m.start(), comment_span_starts, comment_spans):
                 continue
             saw_line = True
-            rest = m.group("rest")
+            rest = m.group("rest") or ""
             if _COPILOT_NONE_LINE.match(rest):
                 continue
             count = _copilot_v2_line_findings_count(rest)
@@ -1126,7 +1127,7 @@ def _copilot_v2_findings_count(
             continue
         if _position_in_spans(m.start(), orphan_details_starts, orphan_details):
             continue
-        rest = m.group("rest")
+        rest = m.group("rest") or ""
         if _COPILOT_NONE_LINE.match(rest):
             continue
         count = _copilot_v2_line_findings_count(rest)

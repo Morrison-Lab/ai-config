@@ -325,20 +325,36 @@ def _short_cluster(cluster: str):
     regardless of what follows (`-nef` == `-n -e f`, confirmed against real
     git to be a dry run); an `n` AFTER `e` is part of `-e`'s bundled
     pattern value, not a flag (`-fen` == `-f -e n`, confirmed to delete).
-    `e` with nothing after it in the cluster (`-fe`) takes its value from
-    the FOLLOWING token instead, the same as an unbundled `-e` -- the
-    caller consumes that next token as the value and never re-classifies
-    it. Every other character (`d`, `f`, `i`, `q`, `x`, `X`, or anything
-    else) is an ordinary boolean flag this scan does not need to
-    individually recognize -- only `e` (stops the scan) and `n` (dry-run)
-    change the result.
+    `e` with nothing after it in the cluster (`-fe`, or `-ne` where `n`
+    ALSO set dry-run first) takes its value from the FOLLOWING token
+    instead, the same as an unbundled `-e` -- the caller consumes that next
+    token as the value and never re-classifies it.
+
+    The scan does NOT return as soon as it sees `n`: an earlier version did,
+    which meant a cluster like `ne` correctly set `dry_run=True` for the `n`
+    but never noticed the trailing `e` right after it, so `expects_value`
+    came back `False` when it should have been `True` -- the token
+    following `-ne` was then read as an ordinary token rather than
+    consumed as `-e`'s value, which (confirmed against real git, caught by
+    adversarial review before merge) let `--no-dry-run` sitting right after
+    `-ne` slip through unconsumed and be read as a real negation when it
+    was actually `-e`'s literal pattern value, or vice versa depending on
+    what followed. `e` is checked on every character, `n` only sets
+    `dry_run` and keeps scanning, so the trailing-`e` case is caught
+    whichever side of it `n` fell on.
+
+    Every other character (`d`, `f`, `i`, `q`, `x`, `X`, or anything else)
+    is an ordinary boolean flag this scan does not need to individually
+    recognize -- only `e` (stops the scan) and `n` (dry-run) change the
+    result.
     """
+    dry_run = False
     for i, ch in enumerate(cluster):
         if ch == "e":
-            return False, i == len(cluster) - 1
+            return dry_run, i == len(cluster) - 1
         if ch == "n":
-            return True, False
-    return False, False
+            dry_run = True
+    return dry_run, False
 
 
 def _git_clean_targets(argv):

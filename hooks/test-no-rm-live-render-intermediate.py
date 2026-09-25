@@ -210,6 +210,20 @@ class TestBlocks(unittest.TestCase):
         restores the dry run, confirmed against real git."""
         self.assert_allowed("git clean --no-dry-run -n -f paper.knit.md")
 
+    def test_git_clean_trailing_e_after_n_still_expects_value(self):
+        """A fourth regression, caught by a further adversarial review
+        round: `_short_cluster` used to return as soon as it saw `n`, so a
+        cluster like `ne` correctly set `dry_run=True` but never noticed
+        the trailing `e` right after it, and `expects_value` came back
+        False when it should have been True. Both lines below are pinned
+        exactly as confirmed against real git (not re-derived from
+        reasoning about the parser): with a second, literal `-e` token
+        present, the command still deletes; with none, `--no-dry-run` is
+        consumed as the trailing `-e`'s value and the command is a dry
+        run."""
+        self.assert_blocked("git clean -nfe -e --no-dry-run paper.knit.md")
+        self.assert_allowed("git clean -ne --no-dry-run paper.knit.md")
+
     def test_git_clean_no_pathspec_allowed(self):
         """Documented known limitation: a bare `git clean -fdx` names no
         pathspec this guard's text-only target extraction can see, so it is

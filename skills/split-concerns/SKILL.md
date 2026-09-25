@@ -90,6 +90,8 @@ most visibly faster review and independent timelines.
 
 - **Do:** pick the finer split when both are defensible,
   and accept a temporary gap that a later PR closes.
+  A gap makes the pieces dependent rather than independent in the sense above,
+  so open them as stacked PRs (`stack-prs`) and state the merge order.
 - **Don't:** settle on the coarser split just because it means fewer PRs to manage.
 - **Don't:** stretch the judgment items in "When NOT to split" above into tiebreakers.
   The small-diff item applies to a diff that really is under 50 lines,

@@ -176,6 +176,8 @@ need to *compute* or *cite*, not just how *persuaded* they would be.
 PSW's [Guidelines for defining terms](https://morrison-lab.github.io/psw/chapters/defining-terms.html#guidelines-for-defining-terms)
 is the canonical statement: one `#def-` div per term, commentary after the div,
 and a bolded term in running prose treated as an inline definition to convert.
+The same guidelines ask a definition to name the term's synonyms and near-synonyms
+(*learning*, *training*, *fitting*), in the div or a callout beside it.
 This skill is how that rule is checked.
 
 ## Relationship to other checks

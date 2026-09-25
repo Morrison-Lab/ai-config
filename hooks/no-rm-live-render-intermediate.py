@@ -296,49 +296,56 @@ def _rm_targets(argv):
     return targets
 
 
-# `git clean`'s only VALUE-TAKING short option. Once `-e`/`--exclude` appears
-# in a bundled cluster, every character after it in that SAME token is its
-# pattern argument, not a further boolean flag -- so a whole-cluster "does
-# this contain the letter n" test is unsound: `-fen` is `-f -e n` (force,
-# plus an ignore-pattern of literally "n"), confirmed against real git to
-# actually DELETE its target, not skip it. An earlier version of this
-# function used exactly that whole-cluster regex and read `-fen` as carrying
-# `-n` (dry-run), which made the guard skip a real deletion entirely --
-# caught by adversarial review before merge. `_short_cluster_is_dry_run`
-# scans left to right and stops at `-e` instead, the same character-by-
-# character approach `no-clobbering-push.py`'s `SHORT_BOOL`/`_parse_push`
-# already uses to decode a bundled `git push` cluster: a value-taking option
-# ends the scan for THAT cluster, it does not merely get skipped over.
-_DRY_RUN_VALUE_OPT = "e"
+# `git clean`'s only VALUE-TAKING option, short (`-e`) or long
+# (`--exclude`). Its value can arrive three ways, each confirmed against
+# real git in a scratch repo: INLINE in a bundled cluster (`-fen` ==
+# `-f -e n`, deletes -- the value is "n", not a further `-n` flag);
+# INLINE after `=` on the long form (`--exclude=n`, deletes -- consumes no
+# further token); or as the NEXT token, when `-e`/`--exclude` has nothing
+# following it in its own token (`-fe report.knit.md` == `-f -e
+# report.knit.md`, which EXCLUDES report.knit.md rather than deleting it --
+# confirmed only `other.txt` was removed). A version of this function that
+# recognized only the bundled-inline case still read `-n` immediately AFTER
+# a bare `-e`/`--exclude` as a real dry-run flag (`git clean -fe -n <file>`
+# actually deletes the file, confirmed against real git; this function
+# previously read it as a dry run and skipped the deletion undetected --
+# caught by adversarial review before merge) and read that same following
+# token as a deletion TARGET when it wasn't a dry-run spelling (`git clean
+# -f -e report.knit.md` was read as targeting `report.knit.md`, when real
+# git uses that invocation to EXCLUDE, not delete, it).
+_EXCLUDE_OPT_TOKENS = ("-e", "--exclude")
 
 
-def _short_cluster_is_dry_run(cluster: str) -> bool:
-    """Whether short-option CLUSTER (the token with its leading `-` stripped)
-    carries `git clean`'s `-n` (dry-run).
+def _short_cluster(cluster: str):
+    """`(dry_run, expects_next_token_as_value)` for short-option CLUSTER
+    (the token with its leading `-` stripped).
 
-    Order matters and is read left to right, matching getopt-style bundling:
-    a `n` BEFORE `-e` in the cluster is a real `-n` flag regardless of what
-    follows (`-nef` == `-n -e f`, confirmed against real git to be a dry
-    run); a `n` AFTER `-e` is part of `-e`'s pattern value, not a flag
-    (`-fen` == `-f -e n`, confirmed to delete). Every other character
-    (`d`, `f`, `i`, `q`, `x`, `X`, or anything else) is an ordinary boolean
-    flag this scan does not need to individually recognize -- only `e`
-    (stops the scan) and `n` (dry-run) change what the result is.
+    Order matters and is read left to right, matching getopt-style
+    bundling: an `n` BEFORE `e` in the cluster is a real `-n` flag
+    regardless of what follows (`-nef` == `-n -e f`, confirmed against real
+    git to be a dry run); an `n` AFTER `e` is part of `-e`'s bundled
+    pattern value, not a flag (`-fen` == `-f -e n`, confirmed to delete).
+    `e` with nothing after it in the cluster (`-fe`) takes its value from
+    the FOLLOWING token instead, the same as an unbundled `-e` -- the
+    caller consumes that next token as the value and never re-classifies
+    it. Every other character (`d`, `f`, `i`, `q`, `x`, `X`, or anything
+    else) is an ordinary boolean flag this scan does not need to
+    individually recognize -- only `e` (stops the scan) and `n` (dry-run)
+    change the result.
     """
-    for ch in cluster:
-        if ch == _DRY_RUN_VALUE_OPT:
-            return False  # everything after this is -e's bundled value
+    for i, ch in enumerate(cluster):
+        if ch == "e":
+            return False, i == len(cluster) - 1
         if ch == "n":
-            return True
-    return False
+            return True, False
+    return False, False
 
 
 def _git_clean_targets(argv):
     """Non-option pathspecs of a `git clean` invocation, or `None` when the
     invocation is a dry run (`-n`/`--dry-run`, including `-n` BUNDLED into a
     short-option cluster like `-fdn`, correctly distinguished from `-e`'s
-    bundled pattern value by `_short_cluster_is_dry_run`) and therefore
-    deletes nothing.
+    pattern value by `_short_cluster`) and therefore deletes nothing.
 
     An earlier version checked only the exact tokens `"-n"`/`"--dry-run"`,
     which missed `git clean`'s standard bundled short-flag spelling: `git
@@ -354,8 +361,13 @@ def _git_clean_targets(argv):
     subcommand, rest, _env = sub
     if subcommand != "clean":
         return None
-    targets, end_of_opts, dry_run = [], False, False
+    targets, end_of_opts, dry_run, expect_value = [], False, False, False
     for tok in rest:
+        if expect_value:
+            # -e's/--exclude's value, from wherever it came: never a flag,
+            # never a target, whatever it happens to look like.
+            expect_value = False
+            continue
         if end_of_opts:
             targets.append(tok)
             continue
@@ -365,11 +377,30 @@ def _git_clean_targets(argv):
         if tok in ("-n", "--dry-run"):
             dry_run = True
             continue
+        if tok == "--no-dry-run":
+            # Every git option has a `--[no-]` form, and it is not merely
+            # accepted syntax: confirmed against real git that `git clean
+            # -n --no-dry-run -f <file>` actually deletes the file, the
+            # later flag winning over the earlier one -- the identical
+            # order-sensitivity `no-clobbering-push.py`'s own docstring
+            # warns about for `git push --dry-run --no-dry-run --force`. A
+            # sticky "set once, never cleared" dry_run flag read that
+            # command as a dry run and skipped a real, protected deletion
+            # undetected -- the same under-deny class as the `-e` findings
+            # above, via a different route.
+            dry_run = False
+            continue
+        if tok in _EXCLUDE_OPT_TOKENS:
+            expect_value = True
+            continue
+        if tok.startswith("--exclude="):
+            continue  # inline value; nothing further to consume
         if tok.startswith("--"):
             continue
         if tok.startswith("-") and tok != "-":
-            if _short_cluster_is_dry_run(tok[1:]):
-                dry_run = True
+            cluster_dry_run, cluster_expects = _short_cluster(tok[1:])
+            dry_run = dry_run or cluster_dry_run
+            expect_value = cluster_expects
             continue
         targets.append(tok)
     if dry_run:

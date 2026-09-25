@@ -161,6 +161,55 @@ class TestBlocks(unittest.TestCase):
             with self.subTest(command=command):
                 self.assert_allowed(command)
 
+    def test_git_clean_n_after_unbundled_exclude_is_still_deletion(self):
+        """A second regression caught by adversarial review, in the SAME
+        commit that fixed the first: `-n`/`--dry-run` appearing as the
+        literal token immediately after a bare `-e`/`--exclude` (bundled or
+        not) is that option's VALUE, not a real dry-run flag -- confirmed
+        against real git that each of these actually deletes
+        `paper.knit.md` ("Removing paper.knit.md"). Must DENY, not skip."""
+        for command in [
+            "git clean -f -e -n paper.knit.md",
+            "git clean -f --exclude -n paper.knit.md",
+            "git clean -f -e --dry-run paper.knit.md",
+            "git clean -fe -n paper.knit.md",
+        ]:
+            with self.subTest(command=command):
+                self.assert_blocked(command)
+
+    def test_git_clean_trailing_e_excludes_not_targets(self):
+        """`-fe paper.knit.md` == `-f -e paper.knit.md`: real git EXCLUDES
+        `paper.knit.md` (protects it), it does not target it for deletion
+        -- confirmed only an unrelated file was removed. Must not deny."""
+        self.assert_allowed("git clean -fe paper.knit.md")
+
+    def test_git_clean_exclude_inline_long_form_deletes(self):
+        """`--exclude=n` is an INLINE value on the long form and consumes
+        no further token, so the pathspec after it is a real target --
+        confirmed against real git that `paper.knit.md` (not matching the
+        exclude pattern "n") is actually removed."""
+        self.assert_blocked("git clean --exclude=n -f paper.knit.md")
+
+    # -- --no-dry-run negates a preceding -n/--dry-run, last-flag-wins ------
+    def test_git_clean_no_dry_run_negates_earlier_dry_run(self):
+        """Every git option has a `--[no-]` form, and it is not merely
+        accepted syntax -- confirmed against real git that `-n --no-dry-run`
+        and `--dry-run --no-dry-run` both actually delete the target, the
+        later flag winning over the earlier one. A sticky "set once, never
+        cleared" dry_run flag read these as dry runs and skipped a real,
+        protected deletion undetected."""
+        for command in [
+            "git clean -n --no-dry-run -f paper.knit.md",
+            "git clean --dry-run --no-dry-run -f paper.knit.md",
+        ]:
+            with self.subTest(command=command):
+                self.assert_blocked(command)
+
+    def test_git_clean_dry_run_after_negation_still_dry_run(self):
+        """Last-flag-wins in both directions: a `-n` AFTER `--no-dry-run`
+        restores the dry run, confirmed against real git."""
+        self.assert_allowed("git clean --no-dry-run -n -f paper.knit.md")
+
     def test_git_clean_no_pathspec_allowed(self):
         """Documented known limitation: a bare `git clean -fdx` names no
         pathspec this guard's text-only target extraction can see, so it is

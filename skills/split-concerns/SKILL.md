@@ -79,13 +79,14 @@ and sometimes a temporary gap between the PRs,
 such as links to content that lands in a later PR,
 which that later PR then makes resolve.
 A split that is too coarse gives up the "Benefits to communicate" above,
-and those costs land on the reviewer rather than on you.
+most visibly faster review and independent timelines.
 
 - **Do:** pick the finer split when both are defensible,
   and accept a temporary gap that a later PR closes.
 - **Don't:** settle on the coarser split just because it means fewer PRs to manage.
-- **Don't:** stretch the small-diff item under "When NOT to split" into a tiebreaker.
-  It applies to a diff that really is under 50 lines,
+- **Don't:** stretch the judgment items under "When NOT to split" into tiebreakers.
+  The small-diff item applies to a diff that really is under 50 lines,
+  and the shared-context item to context that splitting would actually lose,
   not to every close call about granularity.
 
 (Directive from the user, 2026-09-25:

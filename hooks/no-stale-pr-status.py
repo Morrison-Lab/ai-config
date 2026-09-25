@@ -219,11 +219,15 @@ RX_PENDING_CLAUSE_BREAK = re.compile(
 # The trailing negator is ANCHORED to the match rather than scanned over the
 # rest of the clause, and that difference is the whole of round 15, finding
 # 3. Round 14 read a trailing denial by slicing to the next value break,
-# which let any negator anywhere in the tail vote: "3 checks pending with no
-# failures" discloses three pending checks AND reports nothing failing, and
-# the `no` in that second, independent phrase cancelled the disclosure --
-# turning an honest progress report into a block. "with nothing else
-# outstanding", "on none of the jobs" and "with zero drama" did the same.
+# which let any negator anywhere in the tail vote: "3 checks pending with
+# nothing else outstanding" discloses three pending checks AND reports
+# nothing about the rest, and the `nothing` in that second, independent
+# phrase cancelled the disclosure -- turning an honest progress report into
+# a block. "on none of the release jobs" and "with zero drama" did the
+# same. Round 15 and round 16 both cited "with no failures" here instead,
+# which is a sentence the guard blocks either way: "no failures" is itself
+# a clean claim, so the assert scan finds it whatever the exemption does,
+# and it demonstrates nothing about the tail (round 17, finding 9).
 #
 # A denial that really governs the phrase follows it IMMEDIATELY: as the
 # value of a label ("Checks pending: 0"), as a bare value ("checks pending
@@ -261,12 +265,17 @@ RX_PENDING_CLAUSE_BREAK = re.compile(
 #
 # The connector set is closed ON PURPOSE. Round 15 replaced a free-text
 # scan of the clause tail with this anchored match, because scanning let
-# "3 checks pending with no failures" read as a denial. So the set is the
+# "3 checks pending with zero drama" read as a denial. So the set is the
 # connectors that ATTACH a value to a label and carry no meaning of their
-# own -- a colon, a dash of any spelling, an equals sign, an opening paren.
-# `--` is in it because it is this corpus's own house substitute for an em
-# dash (`shared/coding/ascii-punctuation-in-source.md`), so it is what an
-# author writing in house style actually types (round 16, finding 3).
+# own -- a colon, an equals sign, an opening paren, and a dash.
+# The dash is a RUN of any length rather than an enumeration of spellings:
+# round 16 spelled it as exactly two hyphens, which is this corpus's house
+# substitute for an em dash
+# (`shared/coding/ascii-punctuation-in-source.md`) but not its commonest
+# one. Over the 746 tracked `*.md` files, `grep -hoE ' --- '` returns
+# 9618 against `grep -hoE ' -- '`'s 1214 (measured 2026-09-25), so the
+# form an author writing in house style actually types was the form that
+# read as a disclosure (round 17, finding 1).
 #
 # The optional word before the copula is why that copula is MANDATORY
 # rather than optional beside it. An unconditional word slot re-opens
@@ -278,7 +287,7 @@ RX_PENDING_CLAUSE_BREAK = re.compile(
 # copula admits "Checks pending today are none" and refuses all three,
 # because none of them carries one.
 _PENDING_TRAILING_NEGATOR = re.compile(
-    r"[ \t]*(?:(?:--|[-:=(\u2014\u2013])[ \t]*)?"
+    r"[ \t]*(?:(?:-+|[:=(\u2014\u2013])[ \t]*)?"
     r"(?:(?:\w+[ \t]+)?(?:are|is|was|were|remain|remains)[ \t]+)?"
     r"(?:" + _NEGATOR_ALT + r")",
     re.I,
@@ -291,6 +300,13 @@ RX_DISCLOSES_PENDING = re.compile(
     % (_CHECK_NOUN, _PENDING_WORD),
     re.I,
 )
+
+
+# A coordinating conjunction opens a new coordinate clause, so it can never
+# be filler INSIDE one. Round 16 let it fill the gap between a resolution
+# verb and a count, which is how "Two fixes and 3 errors remain" came to
+# read as a denial (round 17, finding 5).
+_CONJUNCTION_ALT = r"and|but|or|then|yet|plus|while|whereas|though|although"
 
 
 # A count the author says they RESOLVED is not a disclosure, and the tail
@@ -311,10 +327,47 @@ _RESOLVED_LEAD = re.compile(
     r"(?<![-\w])(?:fix(?:ed|es)|resolv(?:ed|es)|clos(?:ed|es)|remov(?:ed|es)|"
     r"correct(?:ed|s)|address(?:ed|es)|clear(?:ed|s)|eliminat(?:ed|es)|"
     r"repair(?:ed|s)|squash(?:ed|es)|drop(?:ped|s)|undid|reverted)"
-    r"[ \t]+(?:\w+[ \t]+){0,2}\Z",
+    r"[ \t]+(?:(?!(?:%s)(?![-\w]))\w+[ \t]+){0,2}\Z" % _CONJUNCTION_ALT,
     re.I,
 )
 _RESOLVED_LEAD_WINDOW = 48
+
+# Only a count of things that FAILED can have been fixed. Round 16 keyed the
+# exemption on the hit merely starting with a digit, which let a past-tense
+# verb retract a count of work still QUEUED: "Addressed review and 3 runs
+# still in progress" and "Fixed lint and 3 checks pending" both read as
+# denials, so an honest progress report was refused (round 17, findings 4
+# and 5). Addressing a review cannot finish a run that has not started, so
+# the tense says nothing about the queue -- and the first of those two
+# sentences is close to the remedy this very guard prints, which is the
+# jointly-unsatisfiable pair ai-config#2274 records.
+_FAILING_COUNT_HIT = re.compile(
+    r"\d+\s+(?:(?:%s)\s+)?(?:fail|error)" % _CHECK_NOUN,
+    re.I,
+)
+
+# A count the author attributes to ANOTHER target is not a disclosure about
+# this PR, and round 16 left that judgment depending on word order.
+# "3 checks failed on main" is refused, because `_FAILING_TAIL` admits only
+# a terminator or a word of continuation after the count -- but front-load
+# the same re-target and "On main, 3 checks failed" read as a disclosure of
+# this PR's failures and exempted the clean claim beside it (round 17,
+# finding 3). The two orders now agree.
+#
+# The gap between the lead word and the count admits spaces, tabs, commas
+# and brackets, and NOT a sentence terminator: without that bound,
+# "...still in progress. 3 checks failed." matched across the full stop and
+# the second sentence stopped disclosing anything. A self-referential
+# object ("on this PR", "in the current branch") is refused, since that is
+# a disclosure about the PR in hand rather than a re-target.
+_RETARGET_LEAD = re.compile(
+    r"(?<![-\w])(?:"
+    r"(?:on|in|for|at|from|across|over)(?![ \t]+(?:this|our|the current))"
+    r"|last[ \t]+(?:week|month|night|time|round)|yesterday|earlier"
+    r"|previously|before"
+    r")(?:[ \t,]+(?!(?:%s)(?![-\w]))\w+){0,3}[ \t,]+\Z" % _CONJUNCTION_ALT,
+    re.I,
+)
 
 
 def _clause_starts(text, breaker):
@@ -375,10 +428,23 @@ def discloses_pending(text):
         k = bisect.bisect_left(neg_starts, clause)
         if k < len(negs) and negs[k][1] <= hit.start():
             continue
-        if hit.group()[:1].isdigit() and _RESOLVED_LEAD.search(
-                text[max(0, hit.start() - _RESOLVED_LEAD_WINDOW):hit.start()]):
-            continue
-        if _PENDING_TRAILING_NEGATOR.match(text, hit.end()):
+        if hit.group()[:1].isdigit():
+            lead = text[max(0, hit.start() - _RESOLVED_LEAD_WINDOW):hit.start()]
+            if _FAILING_COUNT_HIT.match(hit.group()) and _RESOLVED_LEAD.search(
+                    lead):
+                continue
+            if _RETARGET_LEAD.search(lead):
+                continue
+        # A COUNT is its own disclosure, and nothing trailing it retracts one.
+        # The tail exists for a bare phrase -- "Checks pending: none" names no
+        # quantity, so the `none` supplies it -- and round 16 applied it to
+        # counted hits as well, which refused four honest reports at once:
+        # "3 checks pending with zero drama", "-- zero drama", "(zero drama)"
+        # and "-- nothing else outstanding" each disclose three pending checks
+        # and then say something independent about the rest (round 17, finding
+        # 6). The known miss this buys is the self-contradicting
+        # "3 checks pending -- none", which now reads as a disclosure of three.
+        elif _PENDING_TRAILING_NEGATOR.match(text, hit.end()):
             continue
         return True
     return False

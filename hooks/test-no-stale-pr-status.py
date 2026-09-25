@@ -420,14 +420,91 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("14 pass. Checks pending (none).")], True,
      "...and by a paren, which closes after the negator"),
+    # Round 17, finding 1. The connector was spelled as EXACTLY two hyphens,
+    # and this corpus's dominant spaced dash is three: 9618 occurrences of
+    # `---` against 1214 of `--` over the 746 tracked `*.md` files,
+    # measured 2026-09-25 with `grep -hoE`. So the form an
+    # author writing in house style actually types read as a disclosure and
+    # exempted the clean claim beside it. The run is unbounded now rather
+    # than enumerated, which is one closed set fewer to keep current.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending --- none.")], True,
+     "a denial joined by the corpus's dominant dash is still a denial"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending ---- none.")], True,
+     "...and by any longer run, which the unbounded form covers"),
+    # Round 17, finding 6. A COUNT is its own disclosure. Round 16 let the
+    # trailing negator retract one, which refused four honest reports whose
+    # second phrase is independent of the first. The three sibling rows
+    # above ("with zero drama" and friends) pass at both commits because a
+    # WORD connector was already refused; these three carry a connector the
+    # tail admits, so they are the ones that isolate the count rule.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 3 checks pending -- zero drama.")], False,
+     "a counted disclosure is not retracted by a dash and a negator"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 3 checks pending (zero drama).")], False,
+     "...nor by a parenthesis"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 3 checks pending -- nothing else outstanding.")], False,
+     "...for another word in the negator set"),
+    # ...and the miss that rule buys, stated rather than left to be found:
+    # a sentence that discloses a count and then denies it outright now
+    # reads as the disclosure. It is self-contradicting either way, and the
+    # four rows above are ordinary prose.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. 3 checks pending -- none.")], False,
+     "a counted disclosure denied outright is a known miss, not a block"),
+    # Round 17, finding 3. A count re-targeted off this PR was refused by
+    # the tail and admitted by the lead, so one word order disclosed and
+    # the other did not. The first row is the tail form, already pinned
+    # above; these three are the front-loaded forms it disagreed with.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. On main, 3 checks failed.")], True,
+     "a re-target in front of the count buys no more exemption than behind"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. In the sibling repo 3 checks failed.")], True,
+     "...with three words between the preposition and the count"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Last week 3 checks failed.")], True,
+     "...and for a temporal re-target, which names no place at all"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. On this PR, 3 checks failed.")], False,
+     "...but a self-referential object is a disclosure, not a re-target"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. 2 runs still in progress. 3 checks failed.")], False,
+     "...and the lead cannot reach across a sentence boundary"),
+    # Round 17, findings 4 and 5. A past-tense verb in front of a count is
+    # an exemption only for a count of things that FAILED: a review can be
+    # addressed while the runs it triggered are still queued. And a
+    # coordinating conjunction opens a new clause, so it can never be
+    # filler inside one. The first of these is close to the remedy this
+    # guard itself prints, which is the jointly-unsatisfiable pair.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Addressed review and 3 runs still in progress.")], False,
+     "a resolution verb does not retract a count of work still queued"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Fixed lint and 3 checks pending.")], False,
+     "...for the pending alternative in its own right"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Two fixes and 3 errors remain.")], False,
+     "a conjunction is not filler, so the verb does not reach the count"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Fixed CI and 3 errors remain.")], False,
+     "...with no article to pad the window past its two-word bound"),
     # Round 16, finding 3, the other side. The connector set is closed on
     # purpose: admitting an arbitrary word would let "with" fill the slot
     # and "no" satisfy the negator, which is round 15 finding 3 reopened.
-    # So an intervening adverb is a deliberate miss, and this row pins that
-    # the miss is a MISS rather than a silent exemption.
+    # An adverb is admitted anyway, by the optional word in front of the
+    # MANDATORY copula -- so this row pins a recognized denial rather than
+    # a miss, and it is the copula that separates it from "with zero
+    # drama". Round 16 described it as a deliberate miss, which inverts the
+    # mechanism: a genuine miss here reads as a disclosure and exempts the
+    # clean claim silently, which is the opposite of what this row sees
+    # (round 17, finding 7).
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("14 pass. Checks pending today are none.")], True,
-     "an intervening adverb is a known miss, and blocks rather than exempts"),
+     "an adverb before the copula is admitted, so the denial is recognized"),
     # Round 16, finding 4. The count alternative required the digit to be
     # adjacent to the verb, so the commonest honest disclosure there is was
     # a false alarm -- and the comment above it told the author to write
@@ -848,11 +925,15 @@ def check_cost():
 
     A LONG CLAUSE WITH MANY HITS. Round 15, finding 1: the prefix scan
     re-sliced and re-searched a growing window once per hit, so k hits over
-    n characters cost O(n*k). One long line with no clause break, no prefix
-    negator and a single negator at the very end is what makes the loop run
-    to completion; both obvious inputs return early and look linear.
-    Measured at 136002 characters: 63.6s before the bisect rewrite, 0.015s
-    after.
+    n characters cost O(n*k). What makes the loop run to completion is that
+    every hit is SKIPPED -- the first hit it does not skip returns True and
+    the rest are never read, which is how round 16's own shape came to time
+    a body of 8000 disclosures after looking at one of them (round 17,
+    finding 2). A resolution verb in front of each count skips all 8000.
+    Measured at 160017 characters: 0.107s as shipped, against 40.99s with
+    the per-hit prefix rescan reinstated and 41.50s with the window
+    unbounded -- the two regressions this shape exists to catch, each
+    confirmed to turn it red and each invisible to round 16's version.
 
     ONE LONG RUN OF SPACES. Round 16, finding 1: the rewrite spelled the
     trailing negator with two adjacent unbounded `[ \t]*` runs, so a
@@ -863,9 +944,10 @@ def check_cost():
     only linear in how many runs there are, so a padded markdown table does
     not trigger it and nothing short of one long run will.
 
-    The ceiling is 5s against measured costs of about 0.2s for the whole
-    hook process, which is ample headroom on a slow runner and still red on
-    both regressions above by three orders of magnitude.
+    The ceiling is 5s against a whole-process baseline of about 0.04s,
+    which the larger shape takes to 0.107s -- ample headroom on a slow
+    runner, and still red on every regression above by two to three orders
+    of magnitude.
     """
     failures = 0
     # Both shapes must OPEN with a clean claim. `main()` returns at
@@ -874,9 +956,16 @@ def check_cost():
     # the first draft of this check omitted the opener and passed against
     # the very commit whose regression it was written to catch, in 0.04s.
     CLEAN = "All checks pass. "
+    # Every hit in the first shape is SKIPPED, which is what makes the loop
+    # run to completion. Round 16 wrote it as a repeated bare disclosure,
+    # so the very first hit returned True and the other 7999 were never
+    # reached: the check passed in 0.07s against a body it had not read,
+    # and it would have passed identically with the per-hit prefix rescan
+    # reinstated (round 17, finding 2). A resolved lead in front of each
+    # count skips every one of them, so the per-hit work is what is timed.
     shapes = [
-        (CLEAN + "3 checks pending " * 8000 + "no",
-         "many hits in one clause"),
+        (CLEAN + "fixed 3 errors left " * 8000,
+         "many skipped hits, loop run to completion"),
         (CLEAN + "3 checks pending" + " " * 16000 + "x",
          "one long run of spaces"),
     ]

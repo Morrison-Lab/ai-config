@@ -779,10 +779,23 @@ The trailing side has to be ANCHORED to the phrase, though: scanning the rest
 of the clause let "3 checks pending with zero drama" read as a denial, so a
 progress report that disclosed pending work was silenced by the second half of
 its own sentence (round 15, finding 3).
-The anchor admits a closed set of connectors --- a colon, a dash, an equals
-sign, an opening paren, and one word before a copula --- because an arbitrary
-intervening word re-opens exactly that case: "with" fills the slot and "zero"
-satisfies the negator (round 16, finding 3).
+What keeps that case out is not the connector list but the COPULA: a word may
+sit in front of the negator only when a copula follows it, so "pending today
+are none" is a denial and "pending with zero drama" is not.
+Round 16 attributed it to the list instead, which reads as a reason to keep
+enumerating (round 17, finding 6).
+The list itself is a colon, an equals sign, an opening paren, a run of hyphens
+of any length, and the two Unicode dashes.
+The run is unbounded because spelling it as exactly two missed this corpus's
+own dominant spaced dash by a factor of eight: over the 746 tracked
+`*.md` files, `grep -hoE ' --- '` returns 9618 and `grep -hoE ' -- '` 1214
+(measured 2026-09-25, round 17, finding 1).
+And an explicit COUNT is never retracted by any of them.
+The trailing negator supplies a quantity the phrase left open, which a count
+does not leave open, so applying it to "3 checks pending -- zero drama"
+refused four honest progress reports at once (round 17, finding 6).
+The miss that buys is the self-contradicting "3 checks pending -- none", which
+now reads as the disclosure of three.
 When the pending count has genuinely drained to zero, a disclosed failing
 count ("14 pass, 1 fail, 0 pending") is what carries the exemption instead;
 when nothing is pending and nothing is failing, there is no progress to

@@ -33,6 +33,10 @@ jobs:
         run: python3 scripts/check-md056-table-columns.py
       - name: Run check-md056-table-columns tests
         run: python3 scripts/test_check_md056_table_columns.py
+      - name: Run split-qmd tests
+        # The splitter rewrites a Quarto chapter into a spine plus subfiles,
+        # so these pin that expanding the includes restores every line.
+        run: python3 scripts/test_split_qmd.py
       - name: Run resolve-equation-anchors tests
         # The page-side script numbers unlabeled display equations by
         # position, so a cited `#eq-anchor-N` silently renames when an

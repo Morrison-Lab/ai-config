@@ -208,6 +208,10 @@ Three instances he named the same day:
   ("Decomposing content into subfiles") asks for one subtopic per subfile.
   `Morrison-Lab/mln`'s `AUTHORING.md` ("Subfiles") adapts it for the
   course notes.
+  The [SERG lab manual](https://ucd-serg.github.io/lab-manual/)'s
+  "Using Includes for Modular Content" (`quarto/advanced-features.qmd`)
+  gives the same reasons: a reorder touches only the spine,
+  and review sees organization and content changes separately.
 - **Theorem-type divs do not nest.**
   A definition, theorem, lemma, corollary, proposition, example or remark
   never sits inside another; a special case gets its own div after the

@@ -787,9 +787,12 @@ enumerating (round 17, finding 6).
 The list itself is a colon, an equals sign, an opening paren, a run of hyphens
 of any length, and the two Unicode dashes.
 The run is unbounded because spelling it as exactly two missed this corpus's
-own dominant spaced dash by a factor of eight: over the 746 tracked
-`*.md` files, `grep -hoE ' --- '` returns 9618 and `grep -hoE ' -- '` 1214
-(measured 2026-09-25, round 17, finding 1).
+own dominant spaced dash by a factor of eight: counted at `7b9fb345`, the
+merge base for this change, over its 746 tracked `*.md` files,
+`grep -hoE ' --- '` returns 9604 and `grep -hoE ' -- '` 1200.
+The count is taken at a commit rather than in a working tree because
+documenting the ratio adds dashes and moves it
+(round 17, finding 1).
 And an explicit COUNT is never retracted by any of them.
 The trailing negator supplies a quantity the phrase left open, which a count
 does not leave open, so applying it to "3 checks pending -- zero drama"

@@ -272,10 +272,12 @@ RX_PENDING_CLAUSE_BREAK = re.compile(
 # round 16 spelled it as exactly two hyphens, which is this corpus's house
 # substitute for an em dash
 # (`shared/coding/ascii-punctuation-in-source.md`) but not its commonest
-# one. Over the 746 tracked `*.md` files, `grep -hoE ' --- '` returns
-# 9618 against `grep -hoE ' -- '`'s 1214 (measured 2026-09-25), so the
-# form an author writing in house style actually types was the form that
-# read as a disclosure (round 17, finding 1).
+# one. Counted at `7b9fb345`, the merge base for this change, over its 746
+# tracked `*.md` files: `grep -hoE ' --- '` returns 9604 against
+# `grep -hoE ' -- '`'s 1200. The count is taken at a commit rather than in
+# a working tree because documenting the ratio adds dashes and moves it.
+# So the form an author writing in house style actually types was the form
+# that read as a disclosure (round 17, finding 1).
 #
 # The optional word before the copula is why that copula is MANDATORY
 # rather than optional beside it. An unconditional word slot re-opens

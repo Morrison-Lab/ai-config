@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 HOOK = sys.argv[1]
 
@@ -382,6 +383,69 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("14 pass, 3 checks pending with zero drama.")], False,
      "...including the bare-zero arm, which reads no differently"),
+    # Round 16, finding 2. Round 15 closed the finding-2 leak by refusing a
+    # preposition after the count, which caught that sentence and not its
+    # class: the tense sits IN FRONT of the count, so every past-tense
+    # sentence about a count already resolved still ended on a terminator
+    # the tail admits. Each of these blocks at HEAD~1 only by accident of
+    # phrasing and not at all as shipped; measured at the parent, all four
+    # went unblocked over a failing status query.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. I fixed 3 errors.")], True,
+     "a resolved count ending on a terminator buys no exemption"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. That resolved 2 failures.")], True,
+     "...for the verb in its own right, not just the first-person form"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. The last round closed 3 failures.")], True,
+     "...with two words between the verb and the count"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. I fixed the CI and 3 errors remain.")], False,
+     "...but three words is out of reach, so this still discloses"),
+    # Round 16, finding 3. Anchoring the trailing negator admitted only an
+    # empty connector, a colon and a copula, so every other way of joining
+    # a label to its value read as a disclosure and exempted the clean
+    # claim. The first row is the one that matters: `--` is this corpus's
+    # own house substitute for an em dash, so it is what an author writing
+    # in house style types. All four block at HEAD~2 and not at HEAD~1.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending -- none.")], True,
+     "a denial joined by the house em-dash substitute is still a denial"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending - none.")], True,
+     "...and by a single hyphen"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending = 0.")], True,
+     "...and by an equals sign, with the bare-zero arm"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending (none).")], True,
+     "...and by a paren, which closes after the negator"),
+    # Round 16, finding 3, the other side. The connector set is closed on
+    # purpose: admitting an arbitrary word would let "with" fill the slot
+    # and "no" satisfy the negator, which is round 15 finding 3 reopened.
+    # So an intervening adverb is a deliberate miss, and this row pins that
+    # the miss is a MISS rather than a silent exemption.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending today are none.")], True,
+     "an intervening adverb is a known miss, and blocks rather than exempts"),
+    # Round 16, finding 4. The count alternative required the digit to be
+    # adjacent to the verb, so the commonest honest disclosure there is was
+    # a false alarm -- and the comment above it told the author to write
+    # exactly the form that did not work. The noun slot is `_CHECK_NOUN`,
+    # shared with the pending alternatives. The last row pins that the tail
+    # still refuses a count re-targeted somewhere other than this PR.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. 3 checks failed.")], False,
+     "a count with its noun between it and the verb still discloses"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. 1 check failed.")], False,
+     "...in the singular"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. 2 jobs failing.")], False,
+     "...for another noun in the shared vocabulary"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. 3 checks failed on main.")], True,
+     "...but the tail still refuses one re-targeted off this PR"),
     # Round 15, finding 2: a failing count says nothing about what it counts,
     # so an unattached one bought the whole exemption and let the clean claim
     # in front of it through. The count now has to land on a clause end or on
@@ -770,6 +834,66 @@ CASES = [
 ]
 
 
+def check_cost():
+    r"""Bounded cost on the two shapes that have each gone quadratic here.
+
+    This suite had no timing assertion of any kind until round 16, which is
+    why it could not see either. The verdict is identical under a quadratic
+    and a linear pattern, so every other row in this file passes in both
+    states -- a cost ceiling is the only instrument that can tell them
+    apart, exactly as in the sibling suite for the verdict-echo hook.
+
+    The two shapes are independent and a fix for one does not bound the
+    other, so both are asserted:
+
+    A LONG CLAUSE WITH MANY HITS. Round 15, finding 1: the prefix scan
+    re-sliced and re-searched a growing window once per hit, so k hits over
+    n characters cost O(n*k). One long line with no clause break, no prefix
+    negator and a single negator at the very end is what makes the loop run
+    to completion; both obvious inputs return early and look linear.
+    Measured at 136002 characters: 63.6s before the bisect rewrite, 0.015s
+    after.
+
+    ONE LONG RUN OF SPACES. Round 16, finding 1: the rewrite spelled the
+    trailing negator with two adjacent unbounded `[ \t]*` runs, so a
+    FAILING match tried every split of one run between them. Measured at
+    8000 spaces: 5.63s as that commit shipped, 0.003s once written as one
+    run plus an optional connector. Note the asymmetry that makes this the
+    easier one to miss: cost is quadratic in the length of a single run and
+    only linear in how many runs there are, so a padded markdown table does
+    not trigger it and nothing short of one long run will.
+
+    The ceiling is 5s against measured costs of about 0.2s for the whole
+    hook process, which is ample headroom on a slow runner and still red on
+    both regressions above by three orders of magnitude.
+    """
+    failures = 0
+    # Both shapes must OPEN with a clean claim. `main()` returns at
+    # `find_unnegated_assert` when there is none, so a pathological body
+    # with no assertion in it never reaches `discloses_pending` at all --
+    # the first draft of this check omitted the opener and passed against
+    # the very commit whose regression it was written to catch, in 0.04s.
+    CLEAN = "All checks pass. "
+    shapes = [
+        (CLEAN + "3 checks pending " * 8000 + "no",
+         "many hits in one clause"),
+        (CLEAN + "3 checks pending" + " " * 16000 + "x",
+         "one long run of spaces"),
+    ]
+    for text, label in shapes:
+        started = time.time()
+        run([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT, say(text)])
+        elapsed = time.time() - started
+        ok = elapsed < 5.0
+        failures += 0 if ok else 1
+        print(f"{'ok  ' if ok else 'FAIL'}  cost: {label} "
+              f"under 5s (took {elapsed:.2f}s)")
+    return failures
+
+
+COST_CHECKS = 2
+
+
 def run(events):
     td = tempfile.mkdtemp()
     try:
@@ -979,12 +1103,13 @@ def main():
     )
     failures += check_push_attribution()
     failures += check_query_forms()
+    failures += check_cost()
     # `ATTRIBUTION_FAILING_QUERY` runs above and its failures are counted,
     # so leaving it out of the denominator understated the suite by four:
     # it printed `117/117 passed` over 121 executed checks, and a reader
     # comparing runs saw the population unchanged (round 7, finding 7).
     total = (len(CASES) + len(ATTRIBUTION) + len(ATTRIBUTION_FAILING_QUERY)
-             + len(PUSH_ATTRIBUTION) + len(QUERY_FORMS))
+             + len(PUSH_ATTRIBUTION) + len(QUERY_FORMS) + COST_CHECKS)
     print(f"\n{total - failures}/{total} passed")
     return 1 if failures else 0
 

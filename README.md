@@ -776,9 +776,13 @@ The negator is looked for on both sides of the phrase and never inside it,
 which is what keeps "not yet clean" working while "checks pending 0" does
 not.
 The trailing side has to be ANCHORED to the phrase, though: scanning the rest
-of the clause let "3 checks pending with no failures" read as a denial, so a
-progress report that disclosed pending work and reported nothing failing was
-blocked on the second half of its own sentence (round 15, finding 3).
+of the clause let "3 checks pending with zero drama" read as a denial, so a
+progress report that disclosed pending work was silenced by the second half of
+its own sentence (round 15, finding 3).
+The anchor admits a closed set of connectors --- a colon, a dash, an equals
+sign, an opening paren, and one word before a copula --- because an arbitrary
+intervening word re-opens exactly that case: "with" fills the slot and "zero"
+satisfies the negator (round 16, finding 3).
 When the pending count has genuinely drained to zero, a disclosed failing
 count ("14 pass, 1 fail, 0 pending") is what carries the exemption instead;
 when nothing is pending and nothing is failing, there is no progress to

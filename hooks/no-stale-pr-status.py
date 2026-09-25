@@ -95,6 +95,10 @@ RX_BARE_COUNT = re.compile(r"^\d+\s+pass$", re.I)
 # NOTHING matched, so dropping the exclusion left the suite at 159/159. Only
 # the mutation sweep could see it, since a row that is right at both commits
 # has no prior-commit baseline to fail against.
+_PENDING_WORD = r"in[- ]progress|still running|pending|queued|in flight"
+_CHECK_NOUN = (
+    r"check(?:-runs?|s)?|runs?|jobs?|workflows?|pipelines?|reviews?|CI"
+)
 # The failing count has to LAND on a clause end or on a word that keeps it
 # current, because the count alone says nothing about what it counts. Round
 # 15, finding 2: "All 14 checks pass. I fixed 3 errors in the docs." bought
@@ -108,9 +112,20 @@ RX_BARE_COUNT = re.compile(r"^\d+\s+pass$", re.I)
 # closed set of words that leave the count describing present state
 # ("3 errors remain", "2 failures outstanding"). A preposition or a second
 # verb re-targets the count at something that is not this PR's check state,
-# and is refused. The known cost is a real disclosure phrased as
-# "3 checks failed on main", which no branch of this pattern now matches;
-# writing it as "3 checks failed." works, and the block message says so.
+# and is refused.
+#
+# An earlier draft of this comment claimed "3 checks failed." worked and
+# that the block message said so. Both were false, and the second was
+# checkable by grep: the count alternative required the digit to be
+# ADJACENT to the verb, so every natural spelling with the noun in between
+# -- "3 checks failed", "1 check failed", "3 jobs failed", "2 runs failing"
+# -- was refused, and the block message never mentioned the form. That is a
+# false alarm on the commonest honest disclosure there is, and the comment
+# sent its reader to a remedy that did not work (round 16, finding 4). The
+# noun slot below is `_CHECK_NOUN`, the same vocabulary the pending
+# alternatives use, so the two stay one set rather than drifting into two.
+# "3 checks failed on main" is still refused, by the tail, which is the
+# intended direction: it names a count somewhere other than this PR.
 _FAILING_TAIL = (
     r"(?=[ \t]*(?:[.,;:!?)\]\u2014\u2013]|\n|\Z"
     r"|(?:remain(?:s|ing)?|outstanding|left|still)(?![-\w])))"
@@ -118,12 +133,9 @@ _FAILING_TAIL = (
 _DISCLOSES_STATE = (
     r"\bnot (?:yet )?(?:fully )?clean\b|\bstill failing\b|"
     r"\bnot a clean stopping point\b|"
-    r"\b(?!0+(?!\d))\d+\s+(?:fail(?:ures?|ing|ed|s)?|error(?:s|ed)?)\b"
+    r"\b(?!0+(?!\d))\d+\s+(?:(?:%s)\s+)?"
+    r"(?:fail(?:ures?|ing|ed|s)?|error(?:s|ed)?)\b" % _CHECK_NOUN
     + _FAILING_TAIL
-)
-_PENDING_WORD = r"in[- ]progress|still running|pending|queued|in flight"
-_CHECK_NOUN = (
-    r"check(?:-runs?|s)?|runs?|jobs?|workflows?|pipelines?|reviews?|CI"
 )
 # Polarity, found by the adversarial review of this branch. The vocabulary
 # was split once already (round 9, just above) so a polysemous word could not
@@ -228,11 +240,46 @@ RX_PENDING_CLAUSE_BREAK = re.compile(
 # computed, and the `j < len(ends)` guard that could never be false (round
 # 15, finding 6) are all gone with it.
 #
-# The two `[ \t]*` runs are unbounded and still O(n) in total: matches are
-# non-overlapping and ordered, so a given run of spaces is scanned by at
-# most one hit's tail. A count would have been an unexplained magic number.
+# TWO adjacent unbounded runs is the shape to avoid here, and the first
+# draft had it: `[ \t]*:?[ \t]*` lets the engine try every split of one run
+# of spaces between the two, which is quadratic in that run's length on a
+# FAILING match. Measured on the shipped draft, `discloses_pending` over a
+# disclosure phrase followed by n spaces and an `x`: 0.02s at 500, 0.14s at
+# 1000, 0.43s at 2000, 1.42s at 4000 and 5.63s at 8000, against this hook's
+# registered 10-second timeout, where the round-14 code cost 0.0017s. That
+# is round 15 finding 1's own defect, reintroduced by the fix for it (round
+# 16, finding 1).
+#
+# The comment this replaces argued the pair was linear because matches are
+# non-overlapping, so a run is scanned by at most one hit's tail. That
+# bounds how many times `match` is CALLED and says nothing about what one
+# call costs, which is where the quadratic was.
+#
+# Written as one run plus an optional connector carrying its own run, a
+# failing match backtracks the single run one position at a time: O(n), not
+# O(n^2). Same series: 0.0004s at 1000, 0.0029s at 8000.
+#
+# The connector set is closed ON PURPOSE. Round 15 replaced a free-text
+# scan of the clause tail with this anchored match, because scanning let
+# "3 checks pending with no failures" read as a denial. So the set is the
+# connectors that ATTACH a value to a label and carry no meaning of their
+# own -- a colon, a dash of any spelling, an equals sign, an opening paren.
+# `--` is in it because it is this corpus's own house substitute for an em
+# dash (`shared/coding/ascii-punctuation-in-source.md`), so it is what an
+# author writing in house style actually types (round 16, finding 3).
+#
+# The optional word before the copula is why that copula is MANDATORY
+# rather than optional beside it. An unconditional word slot re-opens
+# round 15 finding 3 exactly: "with" fills it and "zero" satisfies the
+# negator, so "3 checks pending with zero drama" reads as a denial.
+# Measured directly -- with the slot unconditional, that sentence and the
+# two beside it in the suite ("with nothing else outstanding", "on none of
+# the release jobs") all flip from disclosure to denial. Requiring the
+# copula admits "Checks pending today are none" and refuses all three,
+# because none of them carries one.
 _PENDING_TRAILING_NEGATOR = re.compile(
-    r"[ \t]*:?[ \t]*(?:(?:are|is|was|were|remain|remains)[ \t]+)?"
+    r"[ \t]*(?:(?:--|[-:=(\u2014\u2013])[ \t]*)?"
+    r"(?:(?:\w+[ \t]+)?(?:are|is|was|were|remain|remains)[ \t]+)?"
     r"(?:" + _NEGATOR_ALT + r")",
     re.I,
 )
@@ -244,6 +291,30 @@ RX_DISCLOSES_PENDING = re.compile(
     % (_CHECK_NOUN, _PENDING_WORD),
     re.I,
 )
+
+
+# A count the author says they RESOLVED is not a disclosure, and the tail
+# above cannot see that: the tense lives in front of the count, not behind
+# it. Round 15 closed "I fixed 3 errors in the docs" by refusing the
+# preposition, which caught that sentence and not its class -- "I fixed 3
+# errors.", "That resolved 2 failures.", "The last round closed 3
+# failures." all end on a terminator the tail admits, and each bought the
+# whole exemption for a clean claim standing over a failing status query
+# (round 16, finding 2).
+#
+# The window is bounded at 48 characters and anchored at its own end, so
+# this is O(1) per hit rather than another prefix scan. At most two words
+# may sit between the verb and the count ("fixed the last 3 errors"),
+# which is what keeps "I fixed the CI and 3 errors remain" a disclosure:
+# three words intervene, so the verb does not reach the count.
+_RESOLVED_LEAD = re.compile(
+    r"(?<![-\w])(?:fix(?:ed|es)|resolv(?:ed|es)|clos(?:ed|es)|remov(?:ed|es)|"
+    r"correct(?:ed|s)|address(?:ed|es)|clear(?:ed|s)|eliminat(?:ed|es)|"
+    r"repair(?:ed|s)|squash(?:ed|es)|drop(?:ped|s)|undid|reverted)"
+    r"[ \t]+(?:\w+[ \t]+){0,2}\Z",
+    re.I,
+)
+_RESOLVED_LEAD_WINDOW = 48
 
 
 def _clause_starts(text, breaker):
@@ -303,6 +374,9 @@ def discloses_pending(text):
         # the hit, every later one does too.
         k = bisect.bisect_left(neg_starts, clause)
         if k < len(negs) and negs[k][1] <= hit.start():
+            continue
+        if hit.group()[:1].isdigit() and _RESOLVED_LEAD.search(
+                text[max(0, hit.start() - _RESOLVED_LEAD_WINDOW):hit.start()]):
             continue
         if _PENDING_TRAILING_NEGATOR.match(text, hit.end()):
             continue

@@ -296,19 +296,36 @@ def _rm_targets(argv):
     return targets
 
 
+# A short-option CLUSTER (leading `-`, letters only) containing `n`, so `-fdn`,
+# `-ndf`, and `-nf` are all recognized as carrying `git clean`'s `-n` alongside
+# `-f`/`-d`/etc. A long option (`--dry-run` and any other `--...`) is excluded
+# by `_git_clean_targets`'s own `startswith("--")` check before this is tried,
+# so this pattern only ever sees a genuine short-flag cluster.
+_DRY_RUN_SHORT = re.compile(r"^-[a-zA-Z]*n[a-zA-Z]*$")
+
+
 def _git_clean_targets(argv):
     """Non-option pathspecs of a `git clean` invocation, or `None` when the
-    invocation is a dry run (`-n`/`--dry-run`) and therefore deletes
-    nothing."""
+    invocation is a dry run (`-n`/`--dry-run`, including `-n` BUNDLED into a
+    short-option cluster like `-fdn`) and therefore deletes nothing.
+
+    An earlier version checked only the exact tokens `"-n"`/`"--dry-run"`,
+    which missed `git clean`'s standard bundled short-flag spelling: `git
+    clean -fdn` is exactly `git clean -f -d -n`, confirmed against real git
+    ("Would remove ..." and nothing actually removed), and denying that
+    invocation as though it deletes its target contradicts this file's own
+    stated design -- a dry run deletes nothing, so it should never need the
+    override. `_DRY_RUN_SHORT` catches any short-option cluster containing
+    `n` (`-fdn`, `-ndf`, `-nf`, ...), the same bundled-flag decoding
+    `no-clobbering-push.py`'s `SHORT_BOOL` map already does for `git push`.
+    """
     sub = git_subcommand(argv)
     if sub is None:
         return None
     subcommand, rest, _env = sub
     if subcommand != "clean":
         return None
-    if "-n" in rest or "--dry-run" in rest:
-        return None
-    targets, end_of_opts = [], False
+    targets, end_of_opts, dry_run = [], False, False
     for tok in rest:
         if end_of_opts:
             targets.append(tok)
@@ -316,9 +333,18 @@ def _git_clean_targets(argv):
         if tok == "--":
             end_of_opts = True
             continue
+        if tok in ("-n", "--dry-run"):
+            dry_run = True
+            continue
+        if tok.startswith("--"):
+            continue
         if tok.startswith("-") and tok != "-":
+            if _DRY_RUN_SHORT.match(tok):
+                dry_run = True
             continue
         targets.append(tok)
+    if dry_run:
+        return None
     return targets
 
 

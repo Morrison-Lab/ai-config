@@ -125,6 +125,20 @@ class TestBlocks(unittest.TestCase):
     def test_git_clean_dry_run_allowed(self):
         self.assert_allowed("git clean -n paper.knit.md")
 
+    def test_git_clean_bundled_dry_run_flags_allowed(self):
+        """`git clean -fdn` is exactly `git clean -f -d -n` -- confirmed
+        against real git (`git clean -fdn report.knit.md` prints "Would
+        remove report.knit.md" and deletes nothing). The `-n` bundled into
+        a short-option cluster must be recognized the same way the
+        standalone `-n` is, in any position within the cluster."""
+        for command in [
+            "git clean -fdn paper.knit.md",
+            "git clean -ndf paper.knit.md",
+            "git clean -nf paper.knit.md",
+        ]:
+            with self.subTest(command=command):
+                self.assert_allowed(command)
+
     def test_git_clean_no_pathspec_allowed(self):
         """Documented known limitation: a bare `git clean -fdx` names no
         pathspec this guard's text-only target extraction can see, so it is

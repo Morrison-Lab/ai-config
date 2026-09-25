@@ -977,8 +977,8 @@ PREFIX_DISQUALIFY_RX = (getattr(_clean_claim, "PREFIX_DISQUALIFY_RX", None)
 # two mechanisms are complementary by construction rather than by
 # coincidence: one covers the separators, the other the joiner.
 #
-# Measured at commit f6e6d242 (this comment's parent) over the 1218
-# readable files of the 1220 `git ls-files` reports, decoded as UTF-8:
+# Measured at commit f6e6d242 over the 1218 readable files of the 1220
+# `git ls-files` reports, decoded as UTF-8:
 # U+2013 (32 occurrences) and U+2014 (2866) are the ONLY Unicode dashes
 # present, and `SCOPE_BREAK_RX` carries both. U+2010, U+2011, U+2012,
 # U+2015 and U+2212 occur zero times and are covered by neither pattern
@@ -1152,15 +1152,19 @@ def _governs(prose, window_start, match_start, rx, bracketed=None, hits=None):
 # warned and the plain row stayed silent. That is the direction this hook's
 # own docstring calls expensive, and the shape is everywhere in this corpus:
 # 12805 code spans carrying a dot, across 644 of 746 tracked Markdown files,
-# measured AT COMMIT f6e6d242 (this comment's parent) with
-# `scripts/lib/fences.py`'s own `CODE_SPAN_RE` over `git ls-files '*.md'` --
+# measured AT COMMIT f6e6d242 with `scripts/lib/fences.py`'s own
+# `CODE_SPAN_RE` over `git ls-files '*.md'` --
 #     sum(1 for f in files for m in CODE_SPAN_RE.finditer(read(f))
 #         if "." in m.group(0))
 # A COMMIT rather than a date, because the total moves with every prose commit
-# on this branch and a date cannot say which one was read: 12783 at the merge
-# base 7b9fb345, 12798 at 171efa1a, 12805 here. Those three commits span about
-# six hours and two calendar days in UTC (2026-09-24 23:04, 2026-09-25 02:15
-# and 05:20), so a date does not even separate the last two.
+# on this branch and a date cannot say which one was read. A bare SHA rather
+# than a phrase like "this comment's parent", because that phrase is re-read
+# against wherever the comment has since moved: it was true when written and
+# false one commit later, which is this paragraph's own subject one level up.
+# The readings: 12783 at the merge base 7b9fb345, 12798 at 171efa1a, 12805
+# at f6e6d242. Those three commits span about six hours and two calendar
+# days in UTC (2026-09-24 23:04, 2026-09-25 02:15 and 05:20), so a date
+# does not even separate the last two.
 #
 # Two earlier revisions were wrong, and the second in the same way as the
 # first (round 20, finding 4). The first gave 11017 across 636 of 744 with

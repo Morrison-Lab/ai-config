@@ -768,7 +768,7 @@ _CASE = [0]
 _TMP = tempfile.mkdtemp(prefix="verdict-echo-tests-")
 
 
-def run(tool_name, tool_input, cwd=None, tmpdir=None):
+def run(tool_name, tool_input, cwd=None, tmpdir=None, env_extra=None):
     # A distinct transcript_path per case as well, because two cases sharing a
     # body would otherwise see the second suppressed by the first's sentinel,
     # which reads the same way.
@@ -778,6 +778,14 @@ def run(tool_name, tool_input, cwd=None, tmpdir=None):
                "transcript_path": "/nonexistent/case-%d.jsonl" % _CASE[0]}
     env = dict(os.environ)
     env["TMPDIR"] = tmpdir or _TMP
+    # `ANTIGRAVITY_AGENT` is cleared rather than inherited, so the delivery
+    # check below is reading the branch it sets rather than whatever the
+    # session that runs the suite happens to export. Inheriting it would make
+    # the suppressed-case assertion pass for the wrong reason under
+    # Antigravity and the unsuppressed one fail there, which reads as the
+    # guard being broken rather than as the harness leaking its environment.
+    env.pop("ANTIGRAVITY_AGENT", None)
+    env.update(env_extra or {})
     proc = subprocess.run(
         [sys.executable, HOOK], input=json.dumps(payload),
         capture_output=True, text=True, env=env)
@@ -1605,6 +1613,51 @@ def main():
     finally:
         for name, fn in originals.items():
             setattr(mod, name, fn)
+
+    # Delivery under Antigravity. The emit path ends in a two-surface payload
+    # -- `additionalContext` to the model, `systemMessage` to the user -- and
+    # suppresses the second when `ANTIGRAVITY_AGENT` is set, because that
+    # harness renders a system message as a second visible warning and the
+    # guard would double-warn. No other row reaches the branch: `fired()`
+    # reads `additionalContext` alone, so every case above scores the same
+    # whichever way the branch goes, and the suppression could be inverted or
+    # deleted with the whole suite green.
+    #
+    # Both directions are asserted, because either alone passes under a
+    # mutation it is meant to catch: with the condition forced true the
+    # suppressed case still carries `systemMessage`, and with it forced false
+    # the ordinary case loses the surface the user actually reads.
+    #
+    # Round 20's dispatched bot review raised this branch as its one
+    # observation and declined to file it, on the figures "2 of the 9 sibling
+    # hooks using the same pattern" and "most sibling hooks using this pattern
+    # also lack such a test". Measured at commit f6e6d242 over `hooks/*.py`
+    # excluding `test-*`, the population is 40 hooks, not 9, and 18 of them
+    # are pinned by their sibling suite rather than 2. The conclusion survives
+    # on the corrected figures -- 22 of 40 are unpinned, so "most" holds as a
+    # bare majority -- but the evidence offered for it reproduces under no
+    # reading, so the branch is pinned here rather than excused by a count.
+    print("Delivery surfaces:")
+    plain = run("mcp__github__add_issue_comment",
+                {"owner": "o", "repo": "r", "issue_number": 1,
+                 "body": ECHO_DISPOSITION})
+    check("without ANTIGRAVITY_AGENT the warning reaches both surfaces",
+          bool((plain or {}).get("hookSpecificOutput", {})
+               .get("additionalContext")) and bool((plain or {})
+               .get("systemMessage")),
+          True)
+    anti = run("mcp__github__add_issue_comment",
+               {"owner": "o", "repo": "r", "issue_number": 1,
+                "body": ECHO_DISPOSITION},
+               env_extra={"ANTIGRAVITY_AGENT": "1"})
+    check("under ANTIGRAVITY_AGENT the context still reaches the model",
+          bool((anti or {}).get("hookSpecificOutput", {})
+               .get("additionalContext")),
+          True)
+    check("under ANTIGRAVITY_AGENT no systemMessage is emitted, so the "
+          "harness cannot double-warn",
+          "systemMessage" in (anti or {}),
+          False)
 
     print("Differential against the pre-bisect path:")
     bodies, dhits, disagreements = differential(mod)

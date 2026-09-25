@@ -194,6 +194,29 @@ as a parameter, not buried as a literal), and the
 flag duplicated logic, functions that do too much, and steps that
 should be extracted and named).
 
+The principle reaches past code, into prose documents and their structure
+(Ezra Morrison, 2026-09-25: "this falls under the general principle of
+favoring modularity and decomposition").
+Three instances he named the same day:
+
+- **Documents decompose into subfiles.**
+  A Quarto chapter is a spine of `{{< include >}}` calls over one subfile
+  per unit of content, roughly one div per file, so a reorder moves an
+  include line instead of a block of prose.
+  `Morrison-Lab/mln`'s `AUTHORING.md` ("Subfiles") states it for the
+  course notes.
+- **Theorem-type divs do not nest.**
+  A definition, theorem, lemma, corollary, proposition, example or remark
+  never sits inside another; a special case gets its own div after the
+  general one, and links to it.
+  `mln`'s `AUTHORING.md` states it for the course notes.
+- **Functions do not nest** without a specific efficiency or simplicity
+  reason, stated beside the nested definition
+  ([`avoid-nesting`](../coding/avoid-nesting.md)).
+
+Whenever one unit sits inside another only because it was written there
+first, split it out.
+
 ## Least astonishment (POLA)
 
 Prefer the construction a knowledgeable reader expects: idiomatic R

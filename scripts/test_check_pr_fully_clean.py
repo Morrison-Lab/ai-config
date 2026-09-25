@@ -7689,6 +7689,40 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
         ) == "clean",
     )
+
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, thirteenth round: in `copilot_verdict()`,
+    # double-backtick code spans remain in `scan` while only the citation mask
+    # marks them. `_find_html_comment_spans` without citation awareness treated
+    # a cited literal `<!--` (e.g. inside ``<!--``) as a real comment opener,
+    # swallowing a later live `**Findings:** 5 <img>` line up to a plain `-->`
+    # as being inside an HTML comment. With an earlier live `**Findings:** None`,
+    # the body was incorrectly classified clean (FAIL-OPEN). Delimiters wholly
+    # inside cited text are now ignored for both openers and closers.
+    check(
+        "copilot_verdict: a cited literal '<!--' inside double backticks does "
+        "not open an HTML comment and hide later live nonzero findings",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Findings:** None\n\n"
+            "Here is an example: ``<!--``\n\n"
+            f"**Findings:** 5 {_v2_picture}\n\n"
+            "-->\n"
+        ) == "not-clean",
+    )
+    check(
+        "copilot_verdict: a cited literal '-->' inside double backticks does "
+        "not close an HTML comment prematurely",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Findings:** None\n\n"
+            "<!--\n"
+            "A commented block with ``-->`` inside\n"
+            f"**Findings:** 5 {_v2_picture}\n"
+            "-->\n"
+        ) == "clean",
+    )
     # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, eleventh round: `_copilot_tag_name` accepted
     # any slash after the tag name, so `<img/evil>` and `<picture/evil>`
     # scanned as valid tags. Requiring `/` to be followed by `>` fails them closed.

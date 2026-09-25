@@ -320,7 +320,7 @@ interpolation), same as `--body-file` on the porcelain command.
 - **Don't:** read the error as a permissions or repo problem --- the failing
   field is one the edit never needed.
 
-(Measured 2026-08-23 on Morrison-Lab/ai-config#1976, 2026-09-23 on Morrison-Lab/gha#913, and 2026-09-24 on Morrison-Lab/wai#245, gh in local Windows sessions;
+(Measured 2026-08-23 on [ai-config#1976](https://github.com/Morrison-Lab/ai-config/issues/1976), 2026-09-23 on [gha#913](https://github.com/Morrison-Lab/gha/issues/913), and 2026-09-24 on [wai#245](https://github.com/Morrison-Lab/wai/pull/245), gh in local Windows sessions;
 the REST endpoints succeeded immediately.)
 
 ## `gh pr merge` "not up to date with the base branch" does not fire consistently on an equally-stale PR
@@ -366,5 +366,5 @@ When scanning review bodies for verdict markers, headings, or section boundaries
 - **Don't:** use unanchored substring searches (`str.find("</details>")`) for HTML block tags --- blockquoted occurrences (e.g. ` > </details>`) or mid-line text occurrences will prematurely close the region, leaking nested overview blocks or findings out as top-level clean verdicts.
 - **Don't:** cite issues or PRs in markdown comments or code as bare `#123` or `PR #123` --- always format them as clickable forge links per `AGENTS.md` (e.g. `[ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)`).
 
-(Measured 2026-09-24 on Morrison-Lab/ai-config#3906 Copilot review round 12.)
+(Measured 2026-09-24 on [Morrison-Lab/ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review round 12.)
 

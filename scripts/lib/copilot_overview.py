@@ -149,12 +149,6 @@ import bisect
 import re
 from typing import Callable, List, Optional, Tuple
 
-# A-Z -> a-z only. Length-preserving by construction, unlike `str.lower()`
-# (see `_find_details_regions`).
-_ASCII_LOWER = str.maketrans(
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"
-)
-
 COPILOT_FINDINGS_LINE = re.compile(
     r"(?:^|\n)[ ]{0,3}\*\*Findings:\*\*[ \t]*(?P<rest>[^\n\r]*)", re.IGNORECASE
 )
@@ -431,7 +425,7 @@ def _copilot_overview_block_spans(
     cited by `_citation_mask` today, so a marker quoted that way still
     opens a block ([ai-config#3956](https://github.com/Morrison-Lab/ai-config/issues/3956)).
     """
-    comment_spans = _find_html_comment_spans(scan)
+    comment_spans = _find_html_comment_spans(scan, cited, match_is_cited)
     comment_span_starts = [s for s, _ in comment_spans]
     details_regions = _find_details_regions(
         scan, comment_spans, comment_span_starts, cited, match_is_cited
@@ -478,7 +472,11 @@ def _copilot_overview_block_spans(
     return spans
 
 
-def _find_html_comment_spans(text: str) -> List[Tuple[int, int]]:
+def _find_html_comment_spans(
+    text: str,
+    cited: Optional[bytearray] = None,
+    match_is_cited: Optional[Callable[[bytearray, int, int], bool]] = None,
+) -> List[Tuple[int, int]]:
     """Find every `<!--...-->` span in `text`, or one that opens but never
     closes (treated as extending to the end of the string -- the
     fail-closed direction: content after an unterminated comment should
@@ -490,6 +488,12 @@ def _find_html_comment_spans(text: str) -> List[Tuple[int, int]]:
     `<!--`, the same quadratic trap `_tokenize_copilot_line` already
     avoids for tag matching. `pos` only ever advances past a span already
     found, so no character is examined by more than one comment's scan.
+
+    When `cited` and `match_is_cited` are provided, delimiters that fall
+    wholly inside cited text (e.g. within double-backtick code spans) are
+    ignored rather than treated as real comment delimiters (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
+    Copilot review, thirteenth round): a cited `<!--` cannot open a comment
+    and hide later live findings, and a cited `-->` cannot close a comment early.
     """
     spans: List[Tuple[int, int]] = []
     pos = 0
@@ -498,9 +502,26 @@ def _find_html_comment_spans(text: str) -> List[Tuple[int, int]]:
         open_pos = text.find("<!--", pos)
         if open_pos == -1:
             break
-        close_pos = text.find("-->", open_pos + 4)
-        if close_pos == -1:
-            spans.append((open_pos, n))
+        if (
+            cited is not None
+            and match_is_cited is not None
+            and match_is_cited(cited, open_pos, open_pos + 4)
+        ):
+            pos = open_pos + 4
+            continue
+        close_search = open_pos + 4
+        while True:
+            close_pos = text.find("-->", close_search)
+            if close_pos == -1:
+                spans.append((open_pos, n))
+                return spans
+            if (
+                cited is not None
+                and match_is_cited is not None
+                and match_is_cited(cited, close_pos, close_pos + 3)
+            ):
+                close_search = close_pos + 3
+                continue
             break
         spans.append((open_pos, close_pos + 3))
         pos = close_pos + 3
@@ -1051,7 +1072,7 @@ def _copilot_v2_findings_count(
     # stayed within the block, before this bound was added; the max-end
     # form preserves that fix across multiple blocks).
     max_end = max(end for _, end in blocks)
-    comment_spans = _find_html_comment_spans(scan[:max_end])
+    comment_spans = _find_html_comment_spans(scan[:max_end], cited, match_is_cited)
     comment_span_starts = [s for s, _ in comment_spans]
     saw_line = False
     saw_unparseable = False
@@ -1093,7 +1114,9 @@ def _copilot_v2_findings_count(
         if match_is_cited(cited, match_content_start(m), m.end()):
             continue
         if orphan_comment_spans is None:
-            orphan_comment_spans = _find_html_comment_spans(scan)
+            orphan_comment_spans = _find_html_comment_spans(
+                scan, cited, match_is_cited
+            )
             orphan_comment_starts = [a for a, _ in orphan_comment_spans]
             orphan_details = _find_details_regions(
                 scan, orphan_comment_spans, orphan_comment_starts, cited, match_is_cited

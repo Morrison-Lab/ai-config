@@ -2376,7 +2376,7 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
     # via `_find_html_comment_spans`/`_position_in_spans` from
     # copilot_overview (the same linear, bisect-backed helpers the v2 path
     # already uses), rather than inventing a second HTML-comment detector.
-    comment_spans = _find_html_comment_spans(scan)
+    comment_spans = _find_html_comment_spans(scan, cited, match_is_cited)
     comment_span_starts = [s for s, _ in comment_spans]
     details_spans = _find_details_regions(
         scan, comment_spans, comment_span_starts, cited, match_is_cited

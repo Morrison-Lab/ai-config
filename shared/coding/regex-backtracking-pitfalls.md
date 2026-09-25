@@ -208,6 +208,58 @@ whose silence is an approval.
 - **Don't:** read two bounded factors as a bounded cost -- each bound is a
   proxy, and the axis that actually times out can sit in the gap between them.
 
+## The same quadratic has a caller-side twin that no regex review can see
+
+Everything above is a property of a pattern, so every tell above is
+something you can find by reading one.
+The commonest shape of this defect is not in a pattern at all.
+It is a loop that calls a per-item helper, where the helper rescans the
+prefix from index 0 to answer a question about its item.
+Each call is linear, every regex in it is linear, and the loop is
+quadratic.
+
+Reading the helper finds nothing, because the helper is correct.
+Reading the loop finds nothing, because the loop is one line.
+The cost lives in the composition, and the composition is the one thing
+neither reading covers.
+
+The tell is a helper whose first statement resets an accumulator to the
+start of the input.
+`for m in RX.finditer(text, 0, item.start())` inside a function called once
+per item is the canonical spelling, and it looks like careful scoping
+rather than like a scan.
+The remedy is the one the section above already describes on its other
+axis: compute the boundaries once, and have each item ask by bisection
+which one precedes it.
+
+Two things make it survive review.
+It is invisible to a cost test whose input has many items but only ONE
+call into the helper, and equally invisible to one with many calls over a
+short input, so a suite can carry a cost ceiling that the defect passes.
+And a second fix landing in the same change can hide it: a caller that
+stops at the first item never runs the loop to completion, so the
+quadratic is unreachable by that route even with the helper unchanged.
+Both halves then look pinned by one test and neither is.
+
+- **Do:** ask of every per-item helper whether it starts from index 0.
+- **Do:** build the cost test so the loop runs to COMPLETION, and check
+  how many times the helper was entered rather than how long the input is.
+- **Do:** mutate each fix separately when two land together -- a survivor
+  there means one test was covering both.
+- **Don't:** read "every regex here is linear" as "this loop is linear".
+
+(Measured on Morrison-Lab/ai-config PR
+[#3928](https://github.com/Morrison-Lab/ai-config/pull/3928), which added the
+section above and shipped this defect in the same diff.
+`hooks/no-stale-pr-status.py` resolved each assertion's sentence start by
+rescanning from index 0, so an ordinary multi-PR status recap cost 3.97s at
+70 KB and 9.31s at 105 KB against a registered 10-second timeout, in a
+blocking hook that fails open -- a timeout there is a silent approval.
+Computing the starts once and bisecting took the same recap to 0.04s and
+526 KB to 0.23s.
+Having the rule in the diff was not enough: it was written about patterns,
+and the defect was in a loop.)
+
 ## Remedies
 
 1. **Replace nested quantifiers with linear scans.**

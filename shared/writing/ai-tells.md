@@ -23,6 +23,39 @@ Watch for:
   restates the point as a verdict ("... has not yet stated a problem").
   Replace them with the literal claim.
   (Directive from the user, 2026-09-25, flagging those in a lecture slide.)
+- **More clichéd sentence shapes** (user directive, 2026-09-25: add every
+  known one).
+  A rhetorical question answered at once ("The result? ...",
+  "Why does this matter? Because ...").
+  A throat-clearing lead-in ("Here's the thing:", "Here's why:",
+  "The key is", "The short answer:", "Put simply,").
+  An "X isn't about Y; it's about Z" or "The question isn't X, it's Y" reframe.
+  "Not because X, but because Y".
+  Fragment emphasis ("Simple. Fast. Reliable.").
+  A trailing participial clause that editorializes
+  (", highlighting the importance of ...", ", ensuring that ...",
+  ", making it ideal for ...").
+  "Serves as", "stands as", or "acts as" in place of "is".
+  "When it comes to", "In the world of", "In the realm of".
+  "From X to Y" range framing that lists extremes instead of the scope.
+  "Whether you're X or Y" audience framing.
+  An "In other words" restatement of what was just said.
+  A one-line verdict closing a paragraph ("And that's the point.",
+  "That's the whole trick.", "Simple as that.").
+  Intensifiers used as sincerity markers ("genuinely", "truly", "actually",
+  "really", "crucially").
+  Conversational or assistant chatter ("Let's dive in", "Let's unpack this",
+  "Great question", "I hope this helps").
+  Metaphor clusters: "journey", "landscape", "navigate", "unlock", "harness",
+  "pave the way", "shed light on", "at the heart of", "sits at the
+  intersection of", "beacon", "cornerstone", "deep dive".
+  More overused words: underscore, highlight, foster, bolster, intricate,
+  meticulous, comprehensive, groundbreaking, game-changer, empower, elevate,
+  streamline, paradigm, synergy, ever-evolving, dynamic, myriad, plethora,
+  noteworthy, "at its core", "in essence", "boils down to", "key takeaway".
+  Chained additive connectors ("Furthermore", "Moreover", "Additionally")
+  opening consecutive sentences.
+  Fix: state the literal claim; name the actor, the object, and the number.
 - **Formulaic openers:** a declarative sentence fronted by one of four shapes.
   An underspecified reference: a bare demonstrative ("This is", "That is",
   "These are", "Those are") or "The one that".

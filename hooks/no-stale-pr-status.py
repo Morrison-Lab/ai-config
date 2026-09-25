@@ -468,19 +468,29 @@ def _retargeted(lead):
     pass drops at least one waiting phrase from a 48-character window, so
     the loop is bounded by how many fit in it.
 
-    No mutation kills the CONTAINMENT half of that test, and it is kept
-    rather than relaxed back. The re-anchor rescues the same sentences on
-    its own: reverting to the round-19 trailing-half test makes
-    "Earlier, waiting on infra" take the supplier branch, truncate at the
-    waiting verb, and re-match on the bare "Earlier, " -- the same verdict
-    by a longer route. Every arrangement that separates the two has that
-    shape, because a waiting verb can only sit inside a re-target span as
-    one of the three words the lead reaches back over, and truncating there
-    always leaves the opening word and its separator behind. So the two
-    agree today, and they agree for a reason that widening
-    `_RETARGET_LEAD`'s reach, or `_WAITING_ON`'s verb set, would quietly
-    remove. Containment is also the rule the comment above `_WAITING_ON`
-    states, and the cheaper of the two, since it answers without looping.
+    The containment half needs its own row, and finding the one that
+    supplies it corrected this docstring. A first version claimed no
+    mutation could kill containment, on the argument that the re-anchor
+    rescues the same verdict by a longer route: reverting to the
+    trailing-half test makes "Earlier, waiting on infra" take the supplier
+    branch, truncate at the waiting verb, and re-match on the bare
+    "Earlier, ". That much is true, and it is why the row written for
+    round 20's finding 1 kills nothing. The claim that every arrangement
+    has that shape was not. A differential over the two predicates reports
+    374 disagreements of 37914 leads built from well-formed fragments, each
+    one carrying a SECOND waiting phrase BEFORE the re-target: it cancels
+    the re-anchored lead too, so there is nothing left for the re-anchor to
+    rescue and the two verdicts part.
+
+    "Waiting on CI, earlier, blocked on review, " is that shape, and the
+    suite now carries it. `earlier` supplies its own re-target and takes no
+    preposition, so containment is also the answer round 19's rule asks
+    for, while the trailing half attributes `blocked on`'s `on` to it and
+    then loses `on CI, earlier, ` to `Waiting on` on the next pass -- a
+    live failing count read as re-targeted, which is a missed block rather
+    than a false one. Containment is also the rule the comment above
+    `_WAITING_ON` states, and the cheaper of the two, since it answers
+    without looping.
     """
     while True:
         retarget = _RETARGET_LEAD.search(lead)

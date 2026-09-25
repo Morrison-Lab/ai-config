@@ -607,11 +607,29 @@ CASES = [
     # waiting phrase later in the lead cancelled an earlier re-target. The
     # row above could not see it: its waiting phrase sits BEFORE the
     # re-target, so the half test and containment agree there. Here the
-    # waiting phrase sits INSIDE the re-target's own match, which is the
-    # only arrangement that separates them.
+    # waiting phrase sits INSIDE the re-target's own match.
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("14 pass. Earlier, waiting on infra, 2 checks failed.")], True,
      "a waiting phrase inside the re-target's own span does not cancel it"),
+    # ...and that row does NOT separate the two tests, though its comment
+    # claimed it was the only arrangement that did. Reverting the span test
+    # to the trailing half kills zero rows, because the re-anchor below
+    # rescues the same verdict by a longer route: the half test takes
+    # `waiting on` for the supplier, truncates to `Earlier, `, and matches
+    # the re-target again on what is left. A differential over the two
+    # predicates found 374 leads of 37914 where they do disagree, all of
+    # one shape -- a SECOND waiting phrase before the re-target, which
+    # cancels the re-anchored lead as well and so has nothing left to
+    # rescue. This is that shape, and it is the row that kills the
+    # mutation. `earlier` carries no preposition for a waiting verb to have
+    # supplied, so the containment answer is also the one the round-19 rule
+    # asks for; the half test mis-attributes `blocked on`'s `on` to it and
+    # then loses `on CI, earlier, ` to `Waiting on` on the next pass.
+    # A semicolon in place of the first comma does not discriminate.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Waiting on CI, earlier, blocked on review, "
+          "2 checks failed.")], True,
+     "a second waiting phrase before the re-target does not cancel it either"),
     # ...and when the containment DOES hold, the lead before the waiting
     # phrase may still carry a re-target of its own. `_RETARGET_LEAD` is
     # anchored at the end of the lead, so it only ever sees the re-target

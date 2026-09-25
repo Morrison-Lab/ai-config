@@ -630,7 +630,7 @@ Those two own the internal case; this section owns the external one.
   correctly; the anchor and the number decay independently.
 
 (UCD-SERG/serocalculator, 2026-08-09: `vignettes/methodology.qmd` cited
-`[Theorem 15](https://morrison-lab.github.io/rme/chapters/math-prereqs.html#thm-log-prod)`,
+`[Theorem 15](https://d-morrison.github.io/rme/chapters/math-prereqs.html#thm-log-prod)`,
 in *Regression Models for Epidemiology*.
 That number is literally an ordinal position.
 In `Morrison-Lab/rme`, `thm-log-prod` is the 15th theorem div in

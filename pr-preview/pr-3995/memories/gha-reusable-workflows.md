@@ -1,0 +1,422 @@
+# Morrison-Lab/gha reusable workflows
+
+Check `Morrison-Lab/gha` before writing bespoke CI --- it has reusable workflows for common patterns.
+The check is not only for CI you are about to write: a repo already carrying a hand-maintained workflow gha provides is one to migrate, per [`upgrade-to-gha`](../shared/workflow/upgrade-to-gha.md).
+
+Split out of [`github-actions.md`](github-actions.md) (ai-config#1680) at the 1200-line memory-file gate.
+Generic Actions-authoring material stays there.
+
+- **`cursor-code-review.yml`** --- queues Cursor Bugbot via the
+  Enterprise `POST /bugbot/review` API (`CURSOR_API_KEY` with `admin:*`).
+  It is not a mention bot (no `cursor.yml`).
+  A Team-plan key fails the queue step with
+  `HTTP 401: Invalid Team API Key` (measured Morrison-Lab/gha
+  run 32694255358, 2026-08-24); that is the wrong key class, not missing
+  `secrets:` wiring.
+  Team/individual: enable Bugbot in the Cursor dashboard instead.
+  Lab operating notes (author-mismatch on `bugbot run`, dashboard vs GHA)
+  live in [`cursor-bugbot.md`](cursor-bugbot.md).
+- **`quarto-publish.yml`** --- sets up Quarto, renders, and deploys the site.
+  Caller stub is ~12 lines.
+  See `examples/quarto-publish.yml` in the gha repo.
+  **`@v1` vs `@v2` differ in HOW they deploy, and the two are mutually exclusive at the repo-Pages-source level:**
+  - **`@v1`** deploys via the Pages **artifact** (`actions/upload-pages-artifact`
+    + `actions/deploy-pages`).
+      Repo setup: Settings → Pages → Source = **"GitHub
+    Actions"**.
+    No `gh-pages` branch served.
+  - **`@v2`** (gha#118) deploys to the **`gh-pages` branch** (`JamesIves/github-pages-deploy-action`, `clean-exclude: pr-preview/`, plus a `.nojekyll`).
+    Repo setup: Settings → Pages → Source = **"Deploy from a branch", `gh-pages` / `(root)`**.
+    Caller grants `contents: write` (not `pages:write` + `id-token:write`), **even with `deploy: false`** (see the reusable-workflow permission rule in [`github-actions.md`](github-actions.md)).
+  - **WHY the switch:** the gha PR-preview family (`preview-deploy`, `cleanup-pr-previews`) pushes previews to the `gh-pages` branch.
+    A repo serves Pages from **one** source, so Actions-artifact publish + branch-based previews can't coexist --- under Actions-source Pages, every `…/pr-preview/pr-N/` link 404s.
+    `rossjrw/pr-preview-action` REQUIRES branch-based Pages.
+    So a repo that wants both a main site AND PR previews must use `@v2` + branch Pages.
+  - **Branch-served Quarto needs `.nojekyll`** at the gh-pages root, or Jekyll strips Quarto's `_`-prefixed asset dirs.
+    `quarto publish gh-pages` adds it automatically; `JamesIves` does not, so `@v2` touches one in before deploy.
+  - **Private Pages repositories can receive an opaque `*.pages.github.io` hostname instead of `<owner>.github.io/<repo>`.**
+    Read the authoritative URL from `gh api repos/<owner>/<repo>/pages --jq .html_url`.
+    Strip the `https://` prefix and any trailing slash before passing it as `rossjrw/pr-preview-action`'s `pages-base-url`.
+    The action builds its links as `https://$pages_base_url/$preview_url_path/` (`lib/main.sh`), so a full URL produces `https://https://...` preview links.
+    Stripping the scheme is the whole transformation --- **don't also drop the path**.
+    It leaves a bare hostname only for a private site;
+    for an ordinary one it leaves `<owner>.github.io/<repo>`, which is exactly what the action computes for itself by default (`lib/calculate-pages-base-url.sh`), and dropping that `/<repo>` 404s every preview.
+    Quarto's `website.site-url` still takes the complete `https://.../` URL.
+  - **The repo's Pages *source* is a manual setting** --- not changeable via the MCP tools or (in scoped sessions) the API.
+    Hand the flip to the user,
+    and order it safely: deploy to `gh-pages` FIRST (populates root;
+    live site keeps serving the old artifact), THEN flip the source, or the root 404s in between.
+- **`lint-changed-lines.yml@v2`** (gha#276) --- runs `lintr` on changed R files but filters the reported lints down to only the lines a PR **adds or modifies**, so a repo can adopt or tighten a lint rule *incrementally*: new and edited code must comply while untouched legacy code is left alone.
+  This is the answer to "a linter version bump (e.g. lintr 3.4.0's `indentation_linter` now matching the current tidyverse single-indent style) flags the whole repo" --- don't disable the linter or reformat everything at once;
+  adopt via this workflow and let the rule migrate file-by-file as code is touched.
+  Caller stub is ~8 lines (`uses: Morrison-Lab/gha/.github/workflows/lint-changed-lines.yml@v2`).
+  Implementation detail worth knowing when debugging false negatives: the reusable workflow checks out `github.event.pull_request.head.sha` (NOT the default `refs/pull/N/merge` ref) so on-disk line numbers match the head-relative line numbers in the GitHub "list PR files" `patch` field.
+  serocalculator#564 is the first consumer.
+- **Convention:** consumer repos call `Morrison-Lab/gha` reusable workflows with a moving major tag, not a SHA-pinned ref.
+  SHA-pinning is the pattern for third-party actions only.
+  **Which** major tag is per-capability, not a repo-wide default --- read the README's Versioning section.
+  Corrected 2026-08-24 (ai-config#2126): this bullet previously read `@v1` repo-wide, which the `@v1` freeze made stale.
+  Measured the same day, ai-config's own callers are eight `@v2`, one `@v1` (`sync-shared-fragments`, one of the three capabilities still current there), and two deliberately SHA-pinned to a gha commit.
+- **gha's major tag slides ONLY on a manual `workflow_dispatch`, NOT on every merge to main**
+  (`slide-major-tag.yml`; `on: workflow_dispatch:` only, gated `if: github.ref == 'refs/heads/main'`).
+  It re-points the major derived from the latest `vX.Y.Z` tag to HEAD when dispatched.
+  So merging a fix or a new capability to `main` does **not** roll it out to `@v1`/`@v2` consumers on its own --- the tag stays put until someone runs the workflow.
+  This is deliberate (the workflow's own header comment: "the slide is a deliberate manual step, not an automatic reaction to every push" --- merge, optionally canary a consumer at `@main`, then dispatch once confident).
+  Practical consequence: after merging a PR that adds/fixes a capability, a consumer PR that calls it at `@v2` keeps running the **pre-merge** tagged version until the human dispatches the slide --- the same "can't self-verify before merge" bootstrapping gap gha's own `CLAUDE.md` describes, but persisting *after* merge too until the dispatch.
+  (serocalculator#564 called gha's new `lint-changed-lines.yml@v2` right after gha#276 merged;
+  it only picked up the real capability once the user manually dispatched `slide-major-tag`.)
+  Because the slide is manual, a **breaking** change merging to main does NOT silently slide `v1` onto it --- but when you DO dispatch after a breaking change, guard it with TWO tag moves so the slide doesn't break `v1`: (1) force `v1` back to the last non-breaking commit (`git tag -f v1 <sha>; git push --force origin refs/tags/v1`), and (2) create `v2.0.0` + `v2` at HEAD.
+  Once `v2.0.0` exists it's the latest semver, so the slide moves `v2` thereafter and `v1` stays frozen.
+  There is NO MCP tool to create tags/releases --- use `git` (but see the 403 caveat below).
+  Notify registered consumers in `REVDEPS.md` (e.g. `Lacaedemon/sparta`).
+- **`@v1` can trail `main` in practice --- verify against the TAGGED file, not `main` or `examples/`.**
+  Observed: `main`'s `claude.yml` / `claude-code-review.yml` both declare an `ANTHROPIC_API_KEY` secret in their `workflow_call: secrets:` block, and `examples/claude.yml` / `examples/claude-code-review.yml` (also on `main`) show passing it --- but the `@v1` tag's copy of both reusable workflows only declares `CLAUDE_CODE_OAUTH_TOKEN`, `SUBMODULES_TOKEN`, and (for `claude.yml`) `WORKFLOW_TOKEN`.
+  A caller that copies the example verbatim and pins `@v1` gets a `startup_failure`: `Invalid secret, ANTHROPIC_API_KEY is not defined in the referenced workflow.` Before trusting an `examples/` template (or `main`'s workflow file) for a `secrets:`/`with:` block passed to an `@v1` call, fetch the actual `@v1`-tagged file (`mcp__github__get_file_contents` with `ref: refs/tags/v1`, or `git show v1:.github/workflows/<file>`) and diff its `workflow_call:` section against what you're about to pass.
+  Filed as gha#179; worked around in `d-morrison/altdoc`#14 by omitting `ANTHROPIC_API_KEY` until `@v1` catches up.
+- **A `workflow_call` reusable-workflow ref (`@v1`/`@v2`) resolves ONCE, at the run's original creation time, and stays pinned to that SHA across every re-run of that same run --- even after the tag has since moved to a fix.**
+  So if a consumer PR's `claude-code-review.yml` run first ran while `@v2` still pointed at a broken gha commit, re-running that same run (whether via the Actions UI "Re-run failed jobs" or a bot re-dispatch that happens to target the existing run rather than creating a new one) reproduces the identical pre-fix failure forever, no matter how many times you retry or how long ago the tag was fixed.
+  **Diagnose by checking `run_attempt`** (> 1 means this is a re-run, not a fresh dispatch) **and `created_at`** (`mcp__github__actions_get`, `method: get_workflow_run` --- compare against when the fix landed), then read `referenced_workflows[].sha` in the same response --- it shows the ACTUAL resolved commit for that run, which you can diff against the tag's current `get_tag` SHA to confirm staleness.
+  **Only a genuinely NEW run (a new `run_id`) re-resolves the tag fresh** --- a new commit (`pull_request: synchronize`) is the reliable trigger;
+  an `@claude review` comment sometimes causes the bot to re-run the existing stale run instead of dispatching a new one (observed on UCD-SERG/serodynamics#193 --- a direct `workflow_dispatch` via `actions_run_trigger` would have sidestepped this, but that call 403s in these sessions too, per the note above).
+- **Testing a reusable workflow that calls `anthropics/claude-code-action` (a review or agent workflow) before merge is DOUBLY constrained -- a branch-pinned caller cannot exercise the change even when it runs.**
+  Two independent mechanisms both defeat the obvious "point a caller at the test branch and dispatch it" approach:
+  1. **The action's own workflow-validation guard refuses to run unless the CALLER's workflow file is byte-identical to that repo's DEFAULT branch** (`Workflow validation failed ... must exist and have identical content to the version on the repository's default branch`).
+     A caller placed on a throwaway BRANCH therefore always fails validation and skips the review BEFORE it starts -- producing no execution output at all.
+     This is the same guard `claude-review-dispatch.md` documents for the review-workflow repo itself, but it fires in **consumer** repos too, not just where the reusable workflow lives.
+     To actually run it, the caller has to be on the default branch: add a throwaway dispatch-only caller workflow to `main`, `workflow_dispatch` it, then delete it.
+     **Same guard, consumer PR, 2026-08-18 (2nd occurrence, gha#386):** Morrison-Lab/ai-config#1642 edited `.github/workflows/validate.yml` (not the review workflow).
+     A `workflow_dispatch` of `claude-review.yml` skipped with a PR warning that token exchange refuses until that file matches the default branch.
+     Re-dispatching does not lift it.
+     - **Do:** self-review immediately, then start the *agent* workflow with a dedicated mention comment if an external verdict is still owed.
+     - **Don't:** re-dispatch `claude-review.yml` hoping the skip comment was a one-off.
+  2. **A nested `uses: <owner>/<repo>/.github/actions/<x>@v2` composite ref inside the reusable workflow resolves at its OWN literal `@v2`, independent of the ref the reusable workflow was called at.**
+     GitHub resolves each full-path `uses:@ref` independently, so SHA/branch-pinning a consumer's caller to a test branch runs the workflow FILE at that branch but still pulls the composite actions at `@v2` (the old code).
+     This is a different fact from the "resolves ONCE at run creation" bullet above (that one is about re-runs of one run;
+     this is about which ref each nested reference picks up on a fresh run).
+     To exercise a change that lives in a nested composite action, you must ALSO temporarily bump the reusable workflow's own internal `@v2` refs to the test branch -- scaffolding you revert before merge. (gha#400 test, 2026-08-03.)
+- **`check-non-standard-chars` (the `chars` selftest job) scans only `.qmd` and `.R` files.**
+  Em dashes / smart quotes in workflow YAML comments, README, or example stubs pass;
+  the SAME character in a `.qmd` fails CI (`U+2014` etc.).
+  When editing gha docs, keep `.qmd` ASCII (`-`/`;`, not an em-dash).
+- **`check-non-standard-chars` has NO diff-scoping capability at all --- unlike `check-new-line-breaks`, it always scans the whole tree.**
+  Its composite action (`check-non-standard-chars/action.yml` -> `check-non-standard-chars.py`) takes only `python-version` and `extensions` as inputs;
+  no base-ref, no path-filter, no way to check just the lines a PR added.
+  It globs every file under the given extensions (default `.qmd, .R, .md`), respects only a small hardcoded `ignored_dirs` set, and fails on any match anywhere in the tree.
+  Consequence: wiring it into a consumer's CI as a blocking check is safe ONLY once that repo's existing backlog of the banned glyphs is at zero --- there is no "diff-scoped, blocking, land before the sweep" middle state the way `check-new-line-breaks` offers.
+  A consumer with a nonzero backlog (measured on `Morrison-Lab/ai-config` at commit f8d9c24, 2026-08-29, by replicating the action's own glob-plus-`ignored_dirs` logic: 2878 em-dashes across 160 of 657 tracked `.md` files) would see every PR fail immediately on files it never touched.
+  Confirmed the same absence in the reusable-workflow wrapper (`check-non-standard-chars.yml`) too --- it forwards only the same two inputs, no scoping added at that layer either.
+- **403 caveat --- scoped sessions can push ONLY the assigned branch.**
+  Tag pushes are denied.
+  In remote/web sessions the proxy rejects any ref that isn't the harness-assigned branch with `HTTP 403` --- including `refs/tags/*`.
+  **`git push --dry-run` gives a FALSE POSITIVE here** (it prints `* [new tag] …` because the negotiation succeeds, but the real push 403s on the ref update).
+  So you cannot cut tags from such a session --- hand the exact `git tag` + `git push` commands to the user instead.
+  Don't retry the 403 (policy denial, not transient).
+- **A session can be fully READ-ONLY on a repo --- even the harness-assigned branch can be unwritable.**
+  Beyond the tag-push case above, some sessions 403 on every write path to a given repo: `git push` to the assigned branch itself (not just other branches --- and `git ls-remote` may show the assigned branch doesn't even exist on the remote yet, so the push 403s trying to create it), plus every GitHub MCP write tool --- `push_files`/branch creation, `create_or_update_file` (contents API), and `add_issue_comment` --- all returning `403 Resource not accessible by integration`.
+  Confirm this conclusively by testing 2-3 *distinct* write endpoints (not just retrying the same one) before concluding read-only, since a single 403 could be a branch-scope issue (the case above) rather than a repo-wide one.
+  Once confirmed: don't keep retrying --- package the diff as a patch (`git format-patch`) and hand it to the user via `SendUserFile` instead of a pasted diff, so it's directly `git am`-able.
+  Because you can't push, watch for the user (or another session) to land an independently-derived fix rather than your literal patch ---
+  re-verify the actual merged diff before reporting status rather than assuming your patch was applied as-is.
+  (Hit on ucdavis/fxtas#156: diagnosed a CI-breaking dependency issue, delivered the fix as two patch files since every write 403'd;
+  the user filed their own issue/PR with a different fix for the same root cause and merged that instead.)
+- **Input-forwarding checklist when adding an input to a gha composite action.**
+  Adding a new `inputs:` entry to `<name>/action.yml` requires four coordinated updates:
+  1. Expose it in the wrapping reusable workflow (`.github/workflows/<name>.yml`) under `on: workflow_call: inputs:`.
+  2. Forward it in the reusable workflow's `uses: Morrison-Lab/gha/<name>@v1` step's `with:` block.
+  3. Update `examples/<name>.yml` (the caller stub) if the input is consumer-visible.
+  4. Update the README table row for `<name>.yml` to list the new input under "Key inputs".
+  Missing any of these leaves the input wired only partway --- consumers can't pass it through the reusable workflow even though it exists in the composite.
+  (Caught by Copilot on gha#92: `fail-if-empty` was in the composite but not in README or examples;
+  a separate pre-existing gap --- the `fail` input --- was filed as gha#93.)
+- **Reusable workflow input descriptions say "workflow run", not "action."**
+  A `workflow_call` wrapper is not a composite action --- `inputs:` descriptions should say "Fail the workflow run …" not "Fail the action …".
+  When copying an input description from `action.yml` into the wrapping `workflow_call` file, update "action" → "workflow run". (Fixed in gha#92: `fail-if-empty` description in `check-links.yml`.)
+- **GitHub Actions job conclusions: no "skipped" from a running job.**
+  A job that has started can only conclude `success` or `failure` --- never `skipped`.
+  The only way to get the gray skip icon on a check is a false `if:` on an *unstarted* job.
+  Pattern for infrastructure conditions (quota exhaustion, pre-flight failures): have the main job succeed (exit 0) and set an output flag, then add a second gate job whose `if:` is false when the flag is set.
+  The gate job is what consumers watch in branch protection;
+  it shows skipped (gray) on infra conditions and success on clean reviews.
+  See gha#104 for the `require-review` job implementation.
+- **`mcp__github__get_job_logs` usage.**
+  Two calling modes --- use the right one:
+  - Single job: pass `job_id` (number) + `return_content: true`.
+    Do NOT pass `run_id` alongside.
+    Without `return_content: true` the tool returns only a `logs_url` download link and `"Job logs are available for download"` --- no actual log text.
+  - All failed jobs in a run: pass `run_id` (number) + `failed_only: true` + `return_content: true`.
+    Do NOT pass `job_id`.
+  The tool's error message ("job_id is required when failed_only is false") is misleading when you pass `failed_only: true` with `run_id`;
+  the issue is actually conflicting parameters.
+- **A small `tail_lines` on `get_job_logs` can silently miss the real failure** when the log contains a few enormous single-line entries (e.g. a base64-encoded spinner GIF/PNG being curled and embedded in a PR comment) --- the tool's "line" budget gets consumed by those giant lines before reaching earlier real steps, so `tail_lines: 60`/`120`/`300` can return only post-failure cleanup/reviewer-restore steps with no trace of the actual error.
+  Escalate `tail_lines` (e.g. to 2000) and, once the result exceeds the token cap and gets saved to a file, grep/slice that file with `python3` (byte-offset search, not line-based) rather than trusting a small default tail.
+  Cross-check with `mcp__github__actions_get` (`method: "get_workflow_job"` --- confirmed in the live schema alongside `get_workflow_run`) for the per-step `conclusion` breakdown to know which step actually failed and roughly where in the log to look. (ai-config#403.)
+- **`get_job_logs` hard-caps the returned content at 5,000 lines regardless of `tail_lines`** --- a `tail_lines: 100000` request on a 14,503-line job log still returns only the last 5,000 lines.
+  The result's `original_length` field reports the full line count, so compute the offset: returned line `i` (0-based) is full-log line `original_length - 5000 + i + 1`.
+  There's no way to fetch the head through this tool, and the REST fallback (`/actions/jobs/{id}/logs`) needs `api.github.com`, which the agent proxy blocks in these sessions.
+  A GitHub UI deep link `#step:N:L` means line `L` counted *within step N* (step N's first log line is 1), so locating it in the tail needs the step's start line --- estimable from the earlier steps' typical output volume when the head is unfetchable, and worth cross-checking against whether a plausible warning/error actually sits at the computed spot. (rme#1047: located a docx TeX-math warning this way at `#step:10:8366` of a truncated publish log.)
+- **`claude-review` failing with "Skipping action due to workflow validation… must have identical content to the default branch" is NOT always the documented self-mod-skip or stale-`@v1`-tag drift.**
+  Before assuming either, verify: diff the PR branch's own workflow files against current `origin/main` (`git diff origin/<branch> origin/main -- .github/workflows/`) --- if that's empty, the branch has zero drift and neither known cause applies.
+  The actual failure can be a one-off transient GitHub API error unrelated to workflow content at all, e.g. a `502` "Unicorn" error page from `GET /repos/.../collaborators/<actor>/permission` during the action's actor-permission check --- visible only by reading the full job log (see the `tail_lines` note above), not from the top-level check-run message.
+  Re-running (push a commit, since `actions:write` is usually unavailable --- see above) clears a transient 502 with no code change needed. (ai-config#403.)
+- **`update-snapshots.yml@v1`** --- regenerates testthat snapshots, commits, and pushes.
+  Supports `workflow_dispatch`, `/update-snapshots` PR comment (`pr-mode: true`), and auto-update before R-CMD-check (`ref: github.head_ref`).
+  Pass system deps via `apt-packages`.
+  Added in gha#103; bcs#226 is the reference caller.
+- **The gha family has THREE different R-dependency mechanisms, with opposite defaults, and picking the wrong one fails only at render time.**
+  A consumer migrating a whole repo touches several of these workflows in one PR, which is exactly when the differences are invisible --- they read as one coherent family, and each caller stub is short enough to look obviously correct.
+  - **`claude.yml`** --- `setup-r` defaults **true**, and with `use-renv` false it runs `setup-r-dependencies` with `extra-packages`, whose default spec includes `local::.`.
+    That resolves against a `DESCRIPTION`.
+    A Quarto site with no `DESCRIPTION` therefore fails on every agent run unless the caller sets `setup-r: false` explicitly.
+  - **`quarto-publish.yml`** --- `setup-r` defaults **false**, and its `r-packages` input reaches `setup-r-dependencies` as `packages:` rather than `extra-packages:`.
+    That *replaces* the default `deps::.` spec instead of adding to it, which is what makes `setup-r: true` work with no `DESCRIPTION` at all.
+  - **`preview.yml`** --- offers neither.
+    It installs R unconditionally and supports only `use-renv` (needs `renv.lock`) or `install-package` (needs the repo to be an R package).
+    A site that is neither has no path, so the preview half of the preview/publish family cannot serve a repo shape the publish half serves fine.
+    Filed as [gha#607](https://github.com/Morrison-Lab/gha/issues/607).
+
+  Read the *composite action*, not the reusable workflow, when the question is which `setup-r-dependencies` argument an input lands in --- the workflow forwards the input by name and the composite decides `packages:` versus `extra-packages:`, so the wrapping file cannot answer it.
+
+  - **Do:** set `setup-r: false` on `claude.yml` for any consumer without a `DESCRIPTION`, and `setup-r: true` plus an explicit `r-packages` on `quarto-publish.yml`.
+  - **Do:** check each workflow's default separately when migrating several at once.
+  - **Don't:** carry a setting across from one gha workflow's caller to another's --- `setup-r` alone defaults opposite ways in two of them.
+  - **Don't:** infer the dependency mechanism from the reusable workflow's `inputs:` block --- the composite decides it.
+
+  (Measured 2026-08-24 migrating [d-morrison/macros#83](https://github.com/d-morrison/macros/pull/83), a Quarto site with no `renv.lock` and no `DESCRIPTION` whose `macros-table.qmd` needs `knitr`, `rmarkdown`, and `DT`.)
+
+- **`lint-markdown.yml`'s `fail: false` does NOT make the job advisory --- two of its three companion checks default to failing.**
+
+  `lint-markdown` runs four things, and `fail` gates only the first.
+  Measured against the `@v2` tag consumers pin, 2026-08-27:
+
+  | check | input | default |
+  |---|---|---|
+  | markdownlint | `fail` | `true` |
+  | list-item merge splices | `fail-on-item-splices` | `true` |
+  | GFM table splits | `fail-on-table-splits` | `true` |
+  | fenced-code-block length | `fail-on-long-code-blocks` | `false` |
+
+  So adopting the workflow warn-only, to work down a pre-existing backlog, does not buy a green check.
+  Set `fail-on-item-splices` and `fail-on-table-splits` explicitly when that is the intent.
+
+  This reads as a contradiction from the PR page, which is what makes it cost a round.
+  The caller says `fail: false`, the check goes red, and the two hypotheses that present themselves --- a wrong pin, an ignored input --- are both wrong.
+  A different check inside the same job failed, and the job's conclusion comes from whichever step failed rather than from the one whose name is on the caller.
+  [`fully-clean`](../shared/workflow/fully-clean.md) already describes that shape for a green guard step beside a red job.
+
+  **`lint-yaml.yml` splits the same way and does not bite**, which is the comparison that makes the rule checkable rather than merely memorable.
+  Its `fail` gates yamllint while `fail-on-long-scripts` gates the long-`run:`-block companion --- and that one defaults to `false`, so `fail: false` there really is warn-only.
+  The split existing tells you nothing; only the defaults do.
+
+  - **Do:** read each companion input's own default before calling a multi-check workflow advisory.
+  - **Do:** set `fail-on-item-splices` and `fail-on-table-splits` explicitly when adopting `lint-markdown` warn-only.
+  - **Don't:** read `fail: false` plus a red check as evidence the input was ignored or the tag is wrong.
+  - **Don't:** generalize from `lint-yaml` to `lint-markdown`, or from one companion to the next --- the defaults differ within a single workflow.
+
+  (Measured 2026-08-27 on [UCD-SERG/shigella#37](https://github.com/UCD-SERG/shigella/pull/37), whose `lint-markdown` caller was added at `fail: false` in [#33](https://github.com/UCD-SERG/shigella/pull/33) and still went red on six list-item splices.
+  The first draft of this entry claimed all three companions default to `true`;
+  the review caught it, and the table above is read off `@v2` directly.)
+
+- **An input a caller does not pass is not "off" --- it carries the callee's default, and several of gha's default to `true`.**
+
+  A caller stub is mostly commented-out inputs, so reading one and finding no `use-ai-config:` line invites the conclusion that the feature is not in effect.
+  It is the opposite conclusion the file supports: an omitted input means *the default applies*, and `use-ai-config` defaults to `true` in both `claude.yml` and `claude-code-review.yml` at `@v2`.
+
+  Measured 2026-08-28.
+  A session filed [UCD-SERG/shigella#36](https://github.com/UCD-SERG/shigella/issues/36) claiming the reviewer there "works from whatever prose the repo happens to carry" because neither caller passed the input.
+  The shared `ai-config` corpus had been loading on every run all along.
+  [#38](https://github.com/UCD-SERG/shigella/pull/38) then shipped against that premise, and the change it makes is a behavioural no-op --- worth having, since it records intent and survives a default moving, but not the fix the issue described.
+
+  **The recurrence is the part to notice.**
+  This is the second entry in this memory file from one session, both from assuming a default instead of reading one in the same `@v2` workflow file --- the other being `lint-markdown`'s companion toggles directly above.
+  That session had opened `@v2`'s `claude-code-review.yml` three times that evening, for the `ANTHROPIC_API_KEY` secret and for the companion defaults, and never scrolled to this input.
+  So the failure is not "I lacked the file";
+  it is asking the file only the question already in mind.
+
+  One command answers it for a whole caller, and costs less than the round trip of being wrong:
+
+  ```bash
+  git show v2:.github/workflows/<name>.yml | grep -B1 -A6 '^      [a-z-]*:$' | grep -E '^      [a-z-]+:|default:'
+  ```
+
+  - **Do:** read the callee's defaults at the pinned tag before claiming an unpassed input is inactive.
+  - **Do:** dump every input's default at once when a caller is under review, rather than looking up the one input you came for.
+  - **Don't:** read an absent or commented-out input as a disabled feature.
+  - **Don't:** describe a caller-side pin of an already-defaulted input as enabling something --- it records intent, which is a different and smaller claim.
+
+- **Scoping negative formatting constraints in review prompt templates ([gha#794](https://github.com/Morrison-Lab/gha/pull/794)).**
+  When designing or updating AI reviewer prompt templates that embed machine-readable payloads
+  (e.g. hidden `<!-- review-data: ... -->` HTML comments wrapped inside a collapsible `<details><summary>...</summary>...</details>` block alongside visible syntax-highlighted code fences),
+  negative formatting instructions must be scoped precisely to the marker lines rather than the entire trailing context.
+  A blanket negative constraint like *"Do NOT add text inside or after `<!-- review-data:` or `-->`"*
+  directly contradicts subsequent required elements in the template
+  (such as the visible companion code fence and closing `</details>` tag).
+  Instead, scope the rule to the delimiter lines themselves:
+  *"Keep the `<!-- review-data:` and `-->` marker lines alone with no extra text on those exact lines, and keep the JSON in the hidden comment and visible code fence identical."*
+  Additionally, when prompts instruct reviewers to provide dual representations
+  (e.g. a hidden machine-readable comment and a visible rendered code block),
+  explicitly mandate that both payloads remain synchronized
+  so automated consumers and human readers inspect identical data.
+  - **Do:** scope negative line-formatting rules ("no extra text") strictly to the marker lines themselves rather than forbidding subsequent block elements.
+  - **Do:** require that companion hidden and visible payloads (e.g., HTML comment and markdown code block) remain synchronized.
+  - **Don't:** use broad "no text after `-->`" phrasing when subsequent block elements (code fences, closing tags) are required by the template.
+  (Measured 2026-08-31 on [Morrison-Lab/gha#794](https://github.com/Morrison-Lab/gha/pull/794).)
+
+- **`one-function-per-file` scans changed files only, so a pre-existing multi-function script goes red the first time a PR touches it.**
+  The check has no baseline exemption for a script that predates the rule:
+it counts top-level `def`s in every file the diff touches,
+not only in files the diff adds.
+  `check-new-line-breaks/check-new-line-breaks.py` in gha carried 18 top-level `def`s on `main` (`grep -c '^def '`) before [gha#826](https://github.com/Morrison-Lab/gha/pull/826) touched it for an unrelated working-tree-scope fix, and the touch alone was enough to fail the check.
+  The remedy is the opt-out marker the check itself names, `# check-one-function-per-file: allow-multiple`,
+  placed "near the top" in the check's own words:
+  gha#826 put it on the line after the shebang,
+  and gha's `check-one-function-per-file.py` carries it on line 19, after its module docstring,
+  and the check accepts both placements.
+  `check-one-function-per-file/check-one-function-per-file.py` in gha carries that same marker on itself,
+so the pattern is load-bearing rather than a workaround invented for this PR.
+  - **Do:** when a gha PR touches a pre-existing multi-function script, add the marker in the same PR and say so in the PR body.
+  - **Don't:** split a mature script into one-function files to satisfy a check that postdates it.
+  (Measured 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826).)
+
+- **A `changelog.d/<slug>.<category>.md` fragment is scanned by gha's own `new-line-breaks` and `diff-scoped-guard` jobs, the same as any other `.md`/`.qmd` file.**
+  There is no changelog-fragment exemption in either job's globs or paths-ignore.
+  `check-new-line-breaks` in `Morrison-Lab/gha` is configured via the `NLB_BASE_REF` environment variable (e.g. `NLB_BASE_REF=origin/main`).
+  It flags markdown lines containing more than one sentence or clause, strictly enforcing Semantic Line Breaks (SemBr) across all `.md` files, including changelog fragments (`changelog.d/*.md`).
+  A fragment written as one long bullet line fails `new-line-breaks` and triggers an avoidable review round, exactly as a long line anywhere else would.
+  Every sibling fragment in the directory is already clause-broken, which is the tell that the convention is enforced rather than merely stylistic.
+  - **Do:** write the fragment at clause boundaries like its siblings, placing each sentence on its own line, and run gha's own checker from the worktree before pushing: `NLB_GLOBS='*.md *.qmd' NLB_BASE_REF=origin/main python3 check-new-line-breaks/check-new-line-breaks.py`.
+  - **Don't:** write a changelog bullet as one unbroken line on the reasoning that it is "just a changelog" and outside the line-break convention's scope.
+  (2nd occurrence, 2026-09-24 on [Morrison-Lab/gha#931](https://github.com/Morrison-Lab/gha/issues/931) ([PR #933](https://github.com/Morrison-Lab/gha/pull/933));
+  prior: 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826).)
+
+- **Historically, `check-new-line-breaks` did not see a sentence that opens with a digit or an opening parenthesis, so a two-sentence line passed silently.**
+  Its `_SENT_BREAK_RE` lookahead class was `` [A-Z"'`*\[] ``, which admitted an uppercase letter or a markup character --- and neither a digit nor `(`.
+  This corpus opens sentences with derived counts constantly, because `CLAUDE.md` asks for numbers derived rather than recalled --- "19 sites across ...", "308 cases passed ..." --- so the blind spot sat exactly where the prose most often lands.
+  It was a false negative, so nothing reported it: the check went green and the author read that as the line being fine.
+  - **Do:** break before sentences opening with digits, parens, or underscore emphasis;
+    the widened lookahead now actively enforces these boundaries.
+  - **Don't:** assume a sentence opening with a digit or paren is invisible to `new-line-breaks`.
+  (Measured 2026-09-13 on a `Morrison-Lab/ai-config` branch: two added lines each carrying two sentences passed green, and a matcher differing only by `0-9` in the lookahead flagged both.
+  A later line on the same branch opened its second sentence with `(` and passed green too --- and the `0-9` widening does NOT catch it, so the fix is the wider class rather than the digit alone.
+  Measured against the shipped regex: digit `False`, paren `False`, uppercase `True`.
+  Filed as [gha#878](https://github.com/Morrison-Lab/gha/issues/878).
+  Resolved 2026-09-19: [Morrison-Lab/gha#884](https://github.com/Morrison-Lab/gha/pull/884) widened `_SENT_BREAK_RE` to `(?=[A-Z0-9\"'`*\[(_])`,
+  and [Morrison-Lab/ai-config#3789](https://github.com/Morrison-Lab/ai-config/issues/3789) vendored the update.)
+
+- **A `changelog.d/<slug>.<category>.md` fragment is also linted by markdownlint-cli2 and fails on multiple trailing blanks (MD012).**
+  In Morrison-Lab/gha, `selftest` runs `lint-markdown` over all tracked markdown files using `.markdownlint.default.jsonc`.
+  Leaving extra blank lines at the end of a changelog fragment triggers `MD012/no-multiple-blanks Multiple consecutive blank lines [Expected: 1; Actual: 2]`.
+  Verify new or modified changelog fragments before pushing with:
+  `npx markdownlint-cli2 --config lint-markdown/.markdownlint.default.jsonc 'changelog.d/*.md'`.
+  - **Do:** ensure changelog fragments end with exactly one terminal newline and no trailing blank lines.
+  - **Don't:** assume changelog fragments are exempt from repo-wide markdownlint passes.
+  (Measured 2026-09-12 on [Morrison-Lab/gha#873](https://github.com/Morrison-Lab/gha/pull/873).)
+
+- **Qualify safety and trade-off claims in verdict classifiers to their precise conditions.**
+  When documenting "Accepted trade-offs" in regex- or string-blanking routines (e.g. `strip_code_spans` in `classify-review-verdict.sh`),
+  never assert blanket fail-closed guarantees (`clean=false verdict=no-verdict`)
+  without checking whether earlier surviving text or headings could be exposed by swallowing a subsequent retraction.
+  In last-match-wins scanners, if an earlier clean verdict exists,
+  swallowing a later rejection's heading and polarity keyword leaves that earlier verdict active as the last match,
+  reverting to `clean=true`.
+  Safety claims must be strictly qualified with the exact preconditions required for fail-closed behavior
+  (e.g. when no other verdict-bearing text survives elsewhere in the body).
+  - **Do:** state the exact structural condition required for fail-closed behavior rather than claiming universal safety.
+  - **Do:** test multi-heading interactions in the same block when blanking rules operate per paragraph.
+  - **Don't:** assert that losing a rejection heading always defaults to fail-closed when preceding blocks in the same body can state an approving verdict.
+  (Measured 2026-09-12 on [Morrison-Lab/gha#873](https://github.com/Morrison-Lab/gha/pull/873).)
+
+## `formats` means the OPPOSITE thing in `preview.yml` and `quarto-publish.yml`
+
+Two consumer-facing traps in the Quarto pair, both measured 2026-09-15 on
+`Morrison-Lab/machine_learning_lecture_materials` against `@v2`.
+
+**The `formats` input.**
+An empty `formats` is the bare, all-formats-at-once `quarto render` in
+`quarto-publish.yml`, and is **not** that in `preview.yml`:
+
+- `quarto-publish/action.yml`: empty `formats` → `FORMAT_LIST` empty → a single
+  `quarto render`.
+- `preview/action.yml`: empty `formats` → a legacy branch that renders `pdf`
+  (when `tinytex: true`) and then `html` as **separate invocations**, and renders
+  `revealjs` only when the PR carries a `preview:revealjs` label.
+The bare render there is spelled `formats: default`.
+
+`preview/action.yml`'s own input description says so ("Set to 'default' to run a
+single bare `quarto render` letting `_quarto.yml` decide formats (note: unlike
+`quarto-publish` where empty string defaults to bare render)") --- which is easy
+to miss precisely because a consumer copying a working `quarto-publish.yml` call
+into a `preview.yml` call reads "empty" as meaning the same thing.
+
+Getting it wrong **does not fail the build**.
+It deploys a preview whose pages have no CSS, because per-format renders prune
+each other's `site_libs` (see [`quarto-sites.md`](quarto-sites.md)).
+
+**`tinytex: true` on `preview.yml` needs the R `tinytex` package.**
+The composite installs its extra TeX packages by shelling out to
+`Rscript -e "tinytex::tlmgr_install(c('luacolor', 'lua-ul'))"`.
+With `use-renv: false` and an empty `r-packages`, nothing puts that package on
+the runner and the build dies at that step with
+`Error in loadNamespace(x) : there is no package called 'tinytex'`.
+Pass `r-packages: any::tinytex`.
+`quarto-publish.yml` has no such step and needs no R at all --- which leaves a
+latent asymmetry worth knowing: `preview` prefetches `luacolor` and `lua-ul` and
+`publish` cannot, so a handout needing either goes green on the PR and red on
+the push to `main`.
+
+- **Do:** write `formats: default` on a `preview.yml` call that wants all formats.
+- **Do:** pair `tinytex: true` with `r-packages: any::tinytex` on `preview.yml`.
+- **Don't:** copy an empty `formats` across from a working `quarto-publish.yml` call.
+- **Don't:** read a green preview build as evidence the PDF path works on `main`.
+
+## `claude-code-review.yml` caller permissions: omit `id-token: write`
+
+A consumer workflow calling `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2` should declare:
+`contents: read`, `pull-requests: write`, `issues: write`, `actions: read`, `checks: read`.
+
+- **Do NOT grant `id-token: write` on the review job:**
+  The review callee processes an untrusted PR diff and specifically omits `id-token: write` in its own jobs.
+  Granting `id-token: write` on the caller ceiling bypasses this isolation and creates an unnecessary privilege escalation risk (e.g. if `claude-code-action` falls back to its default write token minting).
+- **Template propagation hazard:**
+  Permissions copied from a reference caller workflow often escape scrutiny in reviews because copying an existing template reads as standard consistency.
+  Keep caller templates strictly minimized so copy-pasted implementations do not propagate over-privileged permissions.
+  (Measured 2026-09-21, tracked in [#3842](https://github.com/Morrison-Lab/ai-config/issues/3842); surfaced during `@claude` review on `Morrison-Lab/mln#23`.)
+- **The permission was one of three defects from one copy, and the other two travel the same way.**
+  `Morrison-Lab/mln#23` and `Morrison-Lab/mlg#5` copied ai-config's own `claude-review.yml` and `claude-bot.yml` and condensed their comments.
+  Besides `id-token: write`, the agent caller had no caller-side `if:` trusted-author gate, which gha's `examples/claude.yml` carries,
+  and the condensed header said assigning an issue summons the agent, dropping the qualifier that the body or title must also mention it (or `dispatch-on-assignee` must be set).
+  Reviewers caught all three.
+  ai-config's own `claude-bot.yml` still lacks the `if:` gate and carries a stale header rationale for dropping `issues: opened` ([#3862](https://github.com/Morrison-Lab/ai-config/issues/3862));
+  its `id-token: write` is correct, since the agent writes.
+  A consumer caller is a *copy* of the blessed stub, with that repo's drift, so copying it inherits every grant, every missing gate, and every claim in its comments without their sources.
+  [`upgrade-to-gha`](../shared/workflow/upgrade-to-gha.md) already says to copy `permissions:` from `examples/<name>.yml`;
+  the `if:` gate and the header comments belong to the same diff.
+  A condensed comment is a fresh claim, per [`fact-check-prose`](../shared/writing/fact-check-prose.md)'s condensation section.
+  - **Do:** start from gha's `examples/<name>.yml` at the tag you pin, and diff the finished caller against it clause by clause: `permissions:`, job `if:`, `on:` types, and each header claim.
+  - **Do:** re-check every qualifier a condensed comment dropped against the callee at the pinned tag.
+  - **Don't:** copy a sibling consumer's caller, ai-config's own included, as the reference.
+  - **Don't:** treat a copied comment's rationale as true because the file it came from is blessed.
+
+## Bundled repository suites (`check-*.yml`) and callee input verification
+
+Added in Morrison-Lab/gha#903 (closes #865, 2026-09-21):
+six bundled composite actions and reusable workflows consolidate standard check suites by repository type:
+`check-repo-hygiene.yml` (general repos / base suite),
+`check-quarto-website.yml` (websites),
+`check-quarto-book.yml` (books),
+`check-quarto-manuscript.yml` (manuscripts),
+`check-r-package.yml` (R packages), and
+`check-python-package.yml` (Python packages).
+
+- **Read-only permission boundary vs PR label inspection:**
+  All six bundled workflows declare and require only `contents: read`.
+  Governance checks inspecting live PR labels (`check-news.yml`, `version-check.yml`)
+  must remain dedicated standalone workflows
+  because querying live labels from the GitHub API requires `pull-requests: read`.
+  Inlining them into a read-only bundle breaks label bypasses (`no-changelog`, `no version increment`).
+- **Callee input parity:**
+  When composing higher-level composite actions from existing single-purpose composites (`Morrison-Lab/gha/<action>@v2`),
+  always verify each step's `with:` keys against the callee's declared `action.yml` inputs.
+  For example, `check-non-standard-chars` takes only `python-version` and `extensions`;
+  passing `paths` or `fail` causes silent parameter drops.
+  Contract tests (`run-bundle-repo-actions-tests.py`) should parse callee `action.yml` files
+  and statically assert zero undeclared inputs.

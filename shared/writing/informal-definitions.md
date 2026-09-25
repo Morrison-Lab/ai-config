@@ -171,6 +171,23 @@ need to *compute* or *cite*, not just how *persuaded* they would be.
    convention already uses `::: notes` throughout for exactly this kind
    of "why this matters" content, so the fix is relocation, not loss.
 
+## A bolded keyword is the signal; every such term gets its own div
+
+A **bolded keyword** in running prose is usually an inline definition.
+Replace every inline definition with a formal definition div
+(`::: {#def-<term>}`), one div per term, with the commentary moved outside it.
+A term the surrounding text is defining in passing (for example,
+"generalization" introduced mid-paragraph) still gets its own div.
+
+- **Do:** convert each bolded or inline definition to its own `#def-` div, and
+  keep motivation or commentary in the prose after the div.
+- **Don't:** leave a definition inline because it is short, or define two
+  terms in one div.
+
+(Directive from the user, 2026-09-25: "we want to replace all inline
+definitions (often detectable by bolded keyword) with formal def divs",
+stated as a global principle.)
+
 ## Relationship to other checks
 
 - **[`definition-crossrefs.md`](definition-crossrefs.md)** --- assumes the

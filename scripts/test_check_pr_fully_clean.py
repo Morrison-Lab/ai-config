@@ -6143,6 +6143,23 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "copilot_verdict: quoted heading is not affirmative",
         checker.copilot_verdict("## \"Approval recommended\"? No.\n\n- **Comments generated:** 0") == "",
     )
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, fifteenth round: `COPILOT_AFFIRMATIVE_HEADER`
+    # was word-bounded, accepting suffixed text on the same heading line
+    # ("### Approval recommended was the previous verdict").
+    check(
+        "copilot_verdict: a suffixed affirmative heading ('### Approval recommended was the previous verdict') "
+        "is not an affirmative heading (states no verdict)",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended was the previous verdict\n\n- **Comments generated:** 0"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: a suffixed affirmative heading with v2 findings line states no verdict",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended was the previous verdict\n\n**Findings:** None\n"
+        ) == "",
+    )
 
     # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899): Copilot's `ccr-overview-v2` body format drops the
     # `Comments generated:` field the checks above rely on in favor of a
@@ -6759,6 +6776,31 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             "### \U0001f7e2 Approval recommended\n\nComments generated: 0\n"
         ) == "not-clean",
     )
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, fifteenth round: `COPILOT_COMMENT_GENERATED`
+    # was unanchored, treating prose ending with the phrase as a real count field
+    # ("The documentation correctly describes Comments generated: 0").
+    check(
+        "copilot_verdict: unanchored prose ending with 'Comments generated: 0' "
+        "is not a count field (states no verdict)",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "The documentation correctly describes Comments generated: 0\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: real bare 'Comments generated: 0' line still classifies as clean",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "Comments generated: 0\n"
+        ) == "clean",
+    )
+    check(
+        "copilot_verdict: real bulleted '- **Comments generated:** 0' line still classifies as clean",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "- **Comments generated:** 0\n"
+        ) == "clean",
+    )
     #
     # (b) `_find_details_regions`'s CLOSER search (scripts/lib/
     # copilot_overview.py) was `scan.find("</details>", ...)` -- plain,
@@ -6911,7 +6953,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) == "",
     )
 
-    # PR #3906 Copilot review, fourteenth round: `COPILOT_FINDINGS_LINE` consumed
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, fourteenth round: `COPILOT_FINDINGS_LINE` consumed
     # trailing whitespace at the end of the line inside `rest` and the match,
     # so when `**Findings:** None` was cited inside double backticks with
     # trailing spaces (` ``**Findings:** None``  \n`), `m.end()` included
@@ -7451,7 +7493,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
         ) != "clean",
     )
-    # PR #3906 Copilot review, fourteenth round: `_COPILOT_OVERVIEW_START`
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, fourteenth round: `_COPILOT_OVERVIEW_START`
     # capture group 2 included trailing spaces `[ \t]*`, so when the heading
     # was cited in double backticks with trailing spaces on the line
     # (` ``## Copilot review overview``  \n`), group 2's span included those

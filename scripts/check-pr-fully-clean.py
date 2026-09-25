@@ -2225,7 +2225,8 @@ def _is_marked_or_in_verdict_section(scan: str, match_start: int) -> bool:
 # matching a fourth.
 _COPILOT_HEADING_PREFIX = r"(?:^|\n)[ \t]*#{1,6}[ \t]*(?:[^\w\n\"\']+[ \t]*)?"
 COPILOT_AFFIRMATIVE_HEADER = re.compile(
-    _COPILOT_HEADING_PREFIX + r"\bApproval\s+recommended\b", re.IGNORECASE
+    _COPILOT_HEADING_PREFIX + r"\bApproval\s+recommended(?=[ \t]*(?:\r?\n|$))",
+    re.IGNORECASE,
 )
 COPILOT_NEGATIVE_HEADER = re.compile(
     _COPILOT_HEADING_PREFIX
@@ -2288,7 +2289,8 @@ COPILOT_SUPPRESSED_BLOCK = re.compile(r"\bSuppressed\s+comments\b", re.IGNORECAS
 # the occurrence as present but unparseable rather than as a clean 0 --
 # see `copilot_verdict`'s combine rule.
 COPILOT_COMMENT_GENERATED = re.compile(
-    r"\bComments[ \t]+generated:\**[ \t]*", re.IGNORECASE
+    r"(?:^|\n)[ ]{0,3}(?:[-*+][ \t]+)?(?:\*\*)?(?P<label>Comments[ \t]+generated:\**)[ \t]*",
+    re.IGNORECASE,
 )
 COPILOT_COMMENT_COUNT = re.compile(
     r"(?<!\d)([0-9]{1,6})(?=(?:[ \t]+new\b)?[ \t]*(?:\r?\n|$))"
@@ -2451,10 +2453,10 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
     legacy_comment_spans = comment_spans
     legacy_comment_span_starts = comment_span_starts
     for gm in COPILOT_COMMENT_GENERATED.finditer(scan):
-        if match_is_cited(cited, gm.start(), gm.end()):
+        if match_is_cited(cited, gm.start("label"), gm.end("label")):
             continue
         if _position_in_spans(
-            gm.start(), legacy_comment_span_starts, legacy_comment_spans
+            gm.start("label"), legacy_comment_span_starts, legacy_comment_spans
         ):
             continue
         dm = COPILOT_COMMENT_COUNT.match(scan, gm.end())

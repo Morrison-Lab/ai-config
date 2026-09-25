@@ -439,12 +439,14 @@ CASES = [
       say("14 pass. Checks pending (none).")], True,
      "...and by a paren, which closes after the negator"),
     # Round 17, finding 1. The connector was spelled as EXACTLY two hyphens,
-    # and this corpus's dominant spaced dash is three: 9618 occurrences of
-    # `---` against 1214 of `--` over the 746 tracked `*.md` files,
-    # measured 2026-09-25 with `grep -hoE`. So the form an
-    # author writing in house style actually types read as a disclosure and
-    # exempted the clean claim beside it. The run is unbounded now rather
-    # than enumerated, which is one closed set fewer to keep current.
+    # and this corpus's dominant spaced dash is three: 9604 occurrences of
+    # `---` against 1200 of `--` over the 746 tracked `*.md` files, counted
+    # at `7b9fb345` with `grep -hoE`. The figure is anchored to a commit
+    # because prose citing the ratio adds dashes and moves it. So the form
+    # an author writing in house style actually types read as a disclosure
+    # and exempted the clean claim beside it. Round 18 finding 1 replaced
+    # the whole connector enumeration with its complement, which is one
+    # closed set fewer to keep current.
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("14 pass. Checks pending --- none.")], True,
      "a denial joined by the corpus's dominant dash is still a denial"),
@@ -497,6 +499,79 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("14 pass. The rebase landed in main. 3 checks failed.")], False,
      "...and the lead cannot reach across a sentence boundary"),
+    # Round 18, finding 1. The connector between a label and the value that
+    # denies it was a CLOSED set, so the two spellings a status recap
+    # actually uses went unrecognised while the enumerated ones blocked.
+    # It is the complement now: any run of punctuation that is not a
+    # sentence terminator or a comma.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending -> 0.")], True,
+     "an arrow attaches the value that denies the phrase"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending => 0.")], True,
+     "...in its fat-arrow spelling too"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("| 14 pass | checks pending | 0 |")], True,
+     "...and a markdown table cell, which is this corpus's recap format"),
+    # The counterweight, and the reason the complement excludes `,` and the
+    # terminators: a comma SEPARATES rather than attaches, so the zero
+    # belongs to its own clause and the phrase in front still discloses.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending, 0 of them are mine.")], False,
+     "a comma separates rather than attaches, so the phrase still discloses"),
+    # Round 18, finding 8. The absence vocabulary missed the spellings a
+    # table uses.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending: nil.")], True,
+     "nil denies the phrase it trails"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending: n/a.")], True,
+     "...and so does the n/a a status table writes"),
+    # ...and the regression that widening nearly shipped. Folding the new
+    # words into the guarded alternative put `no` in front of a `no longer`
+    # lookahead the new alternative did not carry, so a phrase saying the
+    # blockage is GONE read as a denial of the pending work.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending -- no longer blocked.")], False,
+     "`no longer` is still exempt from the widened negator set"),
+    # Round 18, finding 4. `patched` is a resolution in the same force as
+    # `fixed`, and its absence let the count it governs read as live work.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. I patched 3 errors.")], True,
+     "a resolved count buys no exemption for the synonyms of `fixed` either"),
+    # Round 18, finding 6. The re-target guard sat inside the digit branch,
+    # so only the COUNTED spelling of a re-target was ever tested against
+    # it. Both spellings name work on `main`, not on this PR.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. On main, checks are still running.")], True,
+     "a re-target is refused for a disclosure that names no number"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. On this PR, checks are still running.")], False,
+     "...and the self-referential object is still a disclosure, not a re-target"),
+    # Round 18, finding 5. A CI noun the set omitted turned an honest
+    # progress report into a block. Widening the noun list constrains the
+    # polysemous pending word to check context rather than loosening it.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 3 tests still running.")], False,
+     "a count of running tests discloses as a count of running checks does"),
+    # Round 18, finding 9. The subordinators were half present, so one
+    # conjunction broke the resolved lead and its synonym did not.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. I fixed it so 3 checks failed.")], False,
+     "a subordinating conjunction breaks the resolved lead as `and` does"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. I fixed it and 3 checks failed.")], False,
+     "...which is the behaviour the listed conjunction already had"),
+    # Round 18, finding 2, the correctness half. Precomputing the sentence
+    # starts and bisecting is not identical to the per-hit rescan: that
+    # rescan bounded `finditer` at the hit, where `$` matches AT the endpos,
+    # so a terminator sitting flush against the hit was a boundary for it
+    # and is not one for a whole-text scan. Without the O(1) abutment test
+    # beside the bisect, the sentence here runs back to index 0 and the
+    # `not` in the previous sentence negates a claim it does not govern.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("I have not rebased.All checks pass.")], True,
+     "a terminator flush against the hit still ends the previous sentence"),
     # Round 17, findings 4 and 5. A past-tense verb in front of a count is
     # an exemption only for a count of things that FAILED: a review can be
     # addressed while the runs it triggered are still queued. And a
@@ -998,11 +1073,25 @@ def check_cost():
     # and it would have passed identically with the per-hit prefix rescan
     # reinstated (round 17, finding 2). A resolved lead in front of each
     # count skips every one of them, so the per-hit work is what is timed.
+    # Round 18, finding 3. Neither shape above reaches
+    # `all_unnegated_asserts` with work to do: the first never calls it at
+    # all, because its `discloses_pending` is False, and the second calls it
+    # over a body holding ONE assert. So the per-assert quadratic in
+    # `_sentence_start` was invisible to both -- a mutant whose cost is
+    # proportional to the assert count passed 207/207 with both rows
+    # unmoved. A row needs many asserts AND a disclosed pending state
+    # together, which is an ordinary multi-PR status recap: one line
+    # disclosing the pending work, then one bullet per PR. Measured against
+    # the pre-fix code at this size, 14.05s; it is 0.08s now.
+    RECAP = (CLEAN + "3 checks still running.\n" + "".join(
+        "- PR #%d: all checks green, 12 pass, ready to merge; "
+        "rebased on main and fully clean.\n" % i for i in range(1500)))
     shapes = [
         (CLEAN + "fixed 3 errors left " * 8000,
          "many skipped hits, loop run to completion"),
         (CLEAN + "Checks pending" + " " * 16000 + "x",
          "one long run of spaces"),
+        (RECAP, "many asserts beside a disclosed pending state"),
     ]
     for text, label in shapes:
         started = time.time()
@@ -1015,7 +1104,7 @@ def check_cost():
     return failures
 
 
-COST_CHECKS = 2
+COST_CHECKS = 3
 
 
 def run(events):

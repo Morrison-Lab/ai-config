@@ -96,8 +96,18 @@ RX_BARE_COUNT = re.compile(r"^\d+\s+pass$", re.I)
 # the mutation sweep could see it, since a row that is right at both commits
 # has no prior-commit baseline to fail against.
 _PENDING_WORD = r"in[- ]progress|still running|pending|queued|in flight"
+# Round 18, finding 5. `tests`, `builds`, `suites` and `stages` were absent,
+# so "14 pass, 3 tests still running" blocked while the synonymous
+# "3 checks still running" was exempt. Widening the NOUN set is the cheap
+# direction even though widening the exemption generally is not, and the two
+# pull opposite ways for a reason worth stating: the polysemy the comment
+# above guards against lives in `_PENDING_WORD`, not here, so adding a CI
+# noun CONSTRAINS a polysemous pending word to check context rather than
+# loosening it. "The write-up is still in progress" gains no exemption from
+# any noun in this list.
 _CHECK_NOUN = (
     r"check(?:-runs?|s)?|runs?|jobs?|workflows?|pipelines?|reviews?|CI"
+    r"|tests?|builds?|suites?|stages?"
 )
 # The failing count has to LAND on a clause end or on a word that keeps it
 # current, because the count alone says nothing about what it counts. Round
@@ -166,9 +176,21 @@ _DISCLOSES_STATE = (
 # hyphen is a non-word character, so `\bno\b` matches inside `no-op` and
 # `\bzero\b` inside `zero-findings`, and in a NEGATOR set a spurious match
 # silences the exemption with nothing red.
+# Round 18, finding 8. The set held six spellings of absence and missed the
+# ones a status TABLE uses: "checks pending: nil" and "checks pending: n/a"
+# each bought the exemption they deny. The whole group is adopted rather than
+# the two that were typed, because seventeen rounds of adding the spelling
+# the last reviewer happened to write is what the round-18 review named as
+# the structural problem with these closed sets.
 _NEGATOR_ALT = (
     r"(?<![-\w])(?:no|none|zero|nothing|neither|not)(?![-\w])"
     r"(?!\s+longer(?![-\w]))"
+    # The new spellings go in their OWN alternative, after the guarded one.
+    # Folding them into it put `no` in front of its own `no longer` lookahead
+    # in an alternative that no longer carried it, so "no longer blocked"
+    # became a negator -- a widening that silently undoes round 12.
+    r"|(?<![-\w])(?:nil|empty|nada|zilch)(?![-\w])"
+    r"|(?<![-\w])n/a(?![-\w])"
     r"|(?<![-\w.])0+(?![-\w])(?!\.\d)"
 )
 _PENDING_NEGATOR = re.compile(_NEGATOR_ALT, re.I)
@@ -288,8 +310,18 @@ RX_PENDING_CLAUSE_BREAK = re.compile(
 # the release jobs") all flip from disclosure to denial. Requiring the
 # copula admits "Checks pending today are none" and refuses all three,
 # because none of them carries one.
+# Round 18, finding 1. The connector was a CLOSED set and missed the arrow
+# and the markdown table pipe, so "checks pending -> 0" and a table row's
+# "| checks pending | 0 |" each bought the exemption while the enumerated
+# "checks pending: 0" blocked. Round 17 finding 1 had already closed this
+# class once for ` -- ` against ` --- `, which is the argument for inverting
+# it rather than adding two more members: a connector is now ANY run of
+# punctuation that is not a clause or sentence separator. The excluded
+# characters are the ones that BREAK the attachment -- `.!?;` end the
+# sentence and `,` separates -- so "checks pending, 0 of them" still reads
+# as two clauses rather than as a denial.
 _PENDING_TRAILING_NEGATOR = re.compile(
-    r"[ \t]*(?:(?:-+|[:=(\u2014\u2013])[ \t]*)?"
+    r"[ \t]*(?:[^\w\s.,!?;]+[ \t]*)?"
     r"(?:(?:\w+[ \t]+)?(?:are|is|was|were|remain|remains)[ \t]+)?"
     r"(?:" + _NEGATOR_ALT + r")",
     re.I,
@@ -308,7 +340,15 @@ RX_DISCLOSES_PENDING = re.compile(
 # be filler INSIDE one. Round 16 let it fill the gap between a resolution
 # verb and a count, which is how "Two fixes and 3 errors remain" came to
 # read as a denial (round 17, finding 5).
-_CONJUNCTION_ALT = r"and|but|or|then|yet|plus|while|whereas|though|although"
+# Round 18, finding 9. The subordinators were half present: `while`,
+# `whereas`, `though` and `although` were listed and `so`, `because`,
+# `since`, `when`, `once`, `after`, `before`, `unless` and `until` were not,
+# so "I fixed it and 3 checks failed" stayed a disclosure while "I fixed it
+# so 3 checks failed" blocked. Same class, same closed-set omission.
+_CONJUNCTION_ALT = (
+    r"and|but|or|then|yet|plus|while|whereas|though|although"
+    r"|so|because|since|when|once|after|before|unless|until"
+)
 
 
 # A count the author says they RESOLVED is not a disclosure, and the tail
@@ -328,7 +368,14 @@ _CONJUNCTION_ALT = r"and|but|or|then|yet|plus|while|whereas|though|although"
 _RESOLVED_LEAD = re.compile(
     r"(?<![-\w])(?:fix(?:ed|es)|resolv(?:ed|es)|clos(?:ed|es)|remov(?:ed|es)|"
     r"correct(?:ed|s)|address(?:ed|es)|clear(?:ed|s)|eliminat(?:ed|es)|"
-    r"repair(?:ed|s)|squash(?:ed|es)|drop(?:ped|s)|undid|reverted)"
+    r"repair(?:ed|s)|squash(?:ed|es)|drop(?:ped|s)|undid|reverted|"
+    # Round 18, finding 4: `patched`, `handled`, `deleted`, `silenced` and
+    # `suppressed` are resolutions in the same force as `fixed`, and their
+    # absence let "I patched 3 errors" buy the exemption "I fixed 3 errors"
+    # is refused. An omission here is the EXPENSIVE direction, since it is
+    # what lets a resolved count read as live pending work.
+    r"patch(?:ed|es)|handl(?:ed|es)|delet(?:ed|es)|silenc(?:ed|es)|"
+    r"suppress(?:ed|es))"
     r"[ \t]+(?:(?!(?:%s)(?![-\w]))\w+[ \t]+){0,2}\Z" % _CONJUNCTION_ALT,
     re.I,
 )
@@ -430,13 +477,19 @@ def discloses_pending(text):
         k = bisect.bisect_left(neg_starts, clause)
         if k < len(negs) and negs[k][1] <= hit.start():
             continue
-        if hit.group()[:1].isdigit():
-            lead = text[max(0, hit.start() - _RESOLVED_LEAD_WINDOW):hit.start()]
-            if _FAILING_COUNT_HIT.match(hit.group()) and _RESOLVED_LEAD.search(
-                    lead):
-                continue
-            if _RETARGET_LEAD.search(lead):
-                continue
+        lead = text[max(0, hit.start() - _RESOLVED_LEAD_WINDOW):hit.start()]
+        counted = hit.group()[:1].isdigit()
+        if counted and _FAILING_COUNT_HIT.match(
+                hit.group()) and _RESOLVED_LEAD.search(lead):
+            continue
+        # Round 18, finding 6. This sat INSIDE the digit branch, so a
+        # re-targeted disclosure that names no number was never tested
+        # against it: "On main, 3 checks failed" was recognised as a
+        # re-target and "On main, checks are still running" was not, though
+        # `_RETARGET_LEAD` matches the same lead in both. Only the RESOLVED
+        # lead needs a digit, because only a count can have been fixed.
+        if _RETARGET_LEAD.search(lead):
+            continue
         # A COUNT is its own disclosure, and nothing trailing it retracts one.
         # The tail exists for a bare phrase -- "Checks pending: none" names no
         # quantity, so the `none` supplies it -- and round 16 applied it to
@@ -446,7 +499,13 @@ def discloses_pending(text):
         # and then say something independent about the rest (round 17, finding
         # 6). The known miss this buys is the self-contradicting
         # "3 checks pending -- none", which now reads as a disclosure of three.
-        elif _PENDING_TRAILING_NEGATOR.match(text, hit.end()):
+        # Gated on `counted` EXPLICITLY rather than on an `elif` chained to
+        # the branch above it. Hoisting the re-target guard out of the digit
+        # branch (finding 6) moved that `elif` onto the re-target test, so
+        # every counted hit started falling through to this tail and the
+        # four round-17 finding-6 rows went red at once. The flag says what
+        # the gate is about, and cannot be re-aimed by an edit above it.
+        if not counted and _PENDING_TRAILING_NEGATOR.match(text, hit.end()):
             continue
         return True
     return False
@@ -571,9 +630,16 @@ def _check_push(tool_name: str, args: any) -> tuple[bool, str]:
 # start and a `content` list arrives as several parts. An earlier revision
 # joined them with newlines before searching, which left the anchor reachable
 # only by the first part -- so a refusal delivered as a second part read as a
-# real push, and the guard fired on a premise that was never true. That is the
-# expensive direction: the whole point of this predicate is that a refused push
-# moved no commit, so missing one invalidates a reading that is still current.
+# real push, and the guard fired on a premise that was never true.
+#
+# Round 18, finding 7 corrected this comment's polarity. It used to call that
+# the expensive direction, which contradicts the governing asymmetry stated
+# above: a missed refusal makes the guard FIRE over a reading that was still
+# current, and a false block costs the author a rewording. Measured both ways
+# -- a detected refusal allows, a missed one blocks -- so missing a refusal is
+# the CHEAP direction. For this predicate the expensive direction is
+# over-matching: reading a real push as a refusal drops it from the
+# comparison, and the guard then goes silent over a genuinely stale claim.
 # The three shapes now agree, since a string result is a one-part list.
 RX_NEVER_RAN = re.compile(
     r"^\s*(?:\\n)*\s*PreToolUse:[^\n]*hook error:"
@@ -869,12 +935,42 @@ RX_METALINGUISTIC_HEAD = re.compile(
 RX_TRAILING_BREAK = re.compile(r"[.!?;]|\n[ \t]*\n")
 
 
-def _sentence_start(text, hit):
-    """Start of the sentence containing `hit`, coarsely."""
-    start = 0
-    for boundary in RX_SENTENCE_BREAK.finditer(text, 0, hit.start()):
-        start = boundary.end()
-    return start
+# A terminator and its closers sitting flush against the hit, with no
+# whitespace after them. `RX_SENTENCE_BREAK` needs `\s|$` after the closers,
+# and under `finditer(text, 0, hit.start())` the `$` matches AT the endpos --
+# so the per-hit scan sees a boundary there that a whole-text scan does not.
+# Precomputing the starts therefore needs this one O(1) test beside the
+# bisect, or the two forms disagree on "...clean.All checks pass".
+RX_SENTENCE_BREAK_ABUT = re.compile(r"[.!?;][\"\'\)\]*_`]*\Z")
+
+
+def sentence_starts(text):
+    """Every sentence start in `text`, in ONE pass, for `_sentence_start`."""
+    return _clause_starts(text, RX_SENTENCE_BREAK)
+
+
+def _sentence_start(text, hit, starts=None):
+    """Start of the sentence containing `hit`, coarsely.
+
+    Round 18, finding 2. Without `starts` this rescans from index 0 for
+    every hit, so a caller looping over N asserts pays O(N x length): an
+    ordinary multi-PR recap cost 3.97s at 70 KB and 9.31s at 105 KB against
+    this hook's registered 10-second timeout, and a timed-out Stop hook
+    fails open, which in a blocking guard is a silent approval. This is the
+    same defect round 14 fixed in `discloses_pending` and the same one this
+    branch documents in `shared/coding/regex-backtracking-pitfalls.md`; it
+    survived because neither cost row reached this path (finding 3).
+    Pass `starts` from `sentence_starts` to get O(n + k log n).
+    """
+    pos = hit.start()
+    if starts is None:
+        start = 0
+        for boundary in RX_SENTENCE_BREAK.finditer(text, 0, pos):
+            start = boundary.end()
+        return start
+    if RX_SENTENCE_BREAK_ABUT.search(text, max(0, pos - 64), pos):
+        return pos
+    return starts[bisect.bisect_right(starts, pos) - 1]
 
 
 def _trailing_end(text, hit):
@@ -888,7 +984,7 @@ def _attaches(connector, separators=RX_CLAUSE_SEPARATOR):
     return not separators.search(connector)
 
 
-def _is_retracted(text, hit):
+def _is_retracted(text, hit, starts=None):
     """True if a retraction attaches to the ASSERT match, either side of it.
 
     The trailing scan falls THROUGH when its match does not attach, rather than
@@ -905,7 +1001,7 @@ def _is_retracted(text, hit):
         if _attaches(connector):
             return True
         break
-    start = _sentence_start(text, hit)
+    start = _sentence_start(text, hit, starts)
     before = None
     for before in RX_RETRACTION.finditer(text, start, hit.start()):
         pass
@@ -914,7 +1010,7 @@ def _is_retracted(text, hit):
         RX_LEADING_SEPARATOR)
 
 
-def _is_negated(text, hit):
+def _is_negated(text, hit, starts=None):
     """True if the ASSERT match is negated or retracted within its sentence.
 
     Plain negation stays scoped to the text BEFORE the phrase, which is the
@@ -923,9 +1019,9 @@ def _is_negated(text, hit):
     trailing negation is about something else entirely. Only the retraction
     vocabulary reads in both directions, and only when it attaches.
     """
-    if RX_NEGATION.search(text[_sentence_start(text, hit):hit.start()]):
+    if RX_NEGATION.search(text[_sentence_start(text, hit, starts):hit.start()]):
         return True
-    return _is_retracted(text, hit)
+    return _is_retracted(text, hit, starts)
 
 
 def all_unnegated_asserts(text):
@@ -935,16 +1031,22 @@ def all_unnegated_asserts(text):
     "should this fire". It is the wrong answer for "how should this be
     worded", because the strongest claim in a message is not always the
     earliest one.
+
+    A GENERATOR rather than a list, which is the second half of round 18
+    finding 2: both call sites stop early -- one at the first non-bare-count
+    candidate, the other at the first hit that settles the wording -- and a
+    materialised list denied them that. On a 105 KB recap the answer was
+    candidate 0 at offset 60 and the eager form still computed 5999 more.
     """
-    return [hit for hit in RX_ASSERT.finditer(text) if not _is_negated(text, hit)]
+    starts = sentence_starts(text)
+    for hit in RX_ASSERT.finditer(text):
+        if not _is_negated(text, hit, starts):
+            yield hit
 
 
 def find_unnegated_assert(text):
     """Return the first ASSERT match not negated or retracted in its sentence."""
-    for hit in RX_ASSERT.finditer(text):
-        if not _is_negated(text, hit):
-            return hit
-    return None
+    return next(all_unnegated_asserts(text), None)
 
 
 def _result_parts(block):

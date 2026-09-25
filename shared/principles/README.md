@@ -380,7 +380,17 @@ Items become a list, steps become a numbered list, a term's definition becomes i
 Structure lets a reader scan, cite, and check each part, and lets a tool find it.
 Keep inline prose for a short series of single words, where a list would add scaffolding without clarity.
 
+Structure has to match a shape the content actually has, so it can be overdone.
+A header over a single figure or item, or one that repeats the topic of the header just before it, adds a level the content does not have.
+Before adding a header, check that it opens a part the reader would want to find on its own.
+
+- **Do:** put a list, a numbered list, a div or a table where the content has that shape.
+- **Do:** fold a header into its neighbour when it covers one item or names the same topic.
+- **Don't:** leave items, steps, definitions or examples buried in a sentence.
+- **Don't:** add a header, list or div to content that has no such shape just because structure is preferred.
+
 Stated by Ezra Morrison, 2026-09-25, with the bullet-list and example-div rules as its first recorded instances.
+He added the limit the same day, about a course-overview header that came one figure after the previous one: "we like structure, but it's possible to overdo it".
 Operationalized by:
 [`plain-prose`](../writing/plain-prose.md) (inline lists become bullet lists, per PSW's "Put lists in bullet points"),
 [`informal-definitions`](../writing/informal-definitions.md) (definitions become formal divs),

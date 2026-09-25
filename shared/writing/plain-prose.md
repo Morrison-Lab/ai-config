@@ -26,31 +26,16 @@ When PSW and this guidance disagree, PSW wins.
   present an idealization or a prior approach afterward,
   as an extension rather than a correction to something just asserted.
   See [`no-rug-pulls`](no-rug-pulls.md).
-- **Open a sentence with its subject, not a dependent clause.**
-  "The fit improves when n grows", not "When n grows, the fit improves".
-  A leading clause makes the reader hold a condition before knowing what it
-  conditions.
-- **Don't write "thing".**
-  Name the object, quantity, step, or idea meant;
-  "thing" almost never survives that test.
-- **Don't let a demonstrative stand in for its referent.**
-  "This", "that", and phrases like "getting there" point at something the reader must
-  reconstruct; name it instead
-  (PSW, [Demonstrative pronouns](https://morrison-lab.github.io/psw/chapters/grammar.html#demonstrative-pronouns);
-  see also [`ambiguous-reference`](ambiguous-reference.md)).
-- **Avoid unnecessarily informal or idiomatic phrasing** ("getting there",
-  "the whole point", "kicks in") in technical and teaching prose; state the
-  literal claim.
-
-  - **Do:** start with the subject, name the referent, and state the literal
-    claim.
-  - **Don't:** open with "When ...", "If ...", or "Since ..." clauses by
-    default, write "thing", or use a demonstrative or idiom where a noun
-    would do.
-
-  (Directive from the user, 2026-09-25, reviewing a lecture slide:
-  "getting there" as a demonstrative, informal idiom, sentence-initial
-  dependent clauses, and "thing" are general principles to apply globally.)
+- **Lead with the subject, name the referent, and state the literal claim.**
+  The canonical rules and examples are in PSW:
+  [Lead with the subject](https://morrison-lab.github.io/psw/chapters/conciseness.html#lead-with-the-subject),
+  [Say which thing](https://morrison-lab.github.io/psw/chapters/word-choice.html#say-which-thing),
+  [Demonstrative pronouns](https://morrison-lab.github.io/psw/chapters/grammar.html#demonstrative-pronouns),
+  and [Avoid vague and metaphorical language](https://morrison-lab.github.io/psw/chapters/word-choice.html#avoid-vague-and-metaphorical-language)
+  (idioms).
+  - **Do:** apply those PSW sections when writing or reviewing prose.
+  - **Don't:** copy their text here; link the section instead
+    (see [`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md)).
 
 This is a default, not an absolute rule. Keep a clause or a technical term when
 removing it would lose meaning or precision. Never trade an honest hedge for

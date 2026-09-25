@@ -801,47 +801,15 @@ The same commit fixed two locators the branch had never touched --- `(p. 22-23)`
 Re-deriving one range from the source puts its neighbours within reach of the same check for the first time, and a page citation nobody has ever opened the PDF for is likelier to be wrong than one that survived a reading.
 Sweep the locators around a split, not only the ones the split created.)
 
-## Adapt another course's material; don't summarize it inline
+## Quote the original; put the content first; adapt, don't summarize
 
-When course notes draw on another course's material,
-write our own version of the content.
-Do not narrate what the other course does
-("Andrew Ng opens Stanford's CS229 with ...").
-Credit the source in a `::: notes` div at the start or end of the adapted section,
-so the acknowledgement stays out of the slides.
+Three citation rules live canonically in PSW's Citations and evidence chapter:
 
-- **Do:** teach the content in our own words,
-  and put "Adapted from ..." in a `::: notes` div.
-- **Don't:** summarize the other course's presentation in the body,
-  or put the acknowledgement in slide-visible text.
+- [Quote the original](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#quote-the-original),
+  not a secondary source quoting it;
+- [Put the content first](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#put-the-content-first):
+  headings name the topic, and a quotation is followed by a bare citation;
+- [Adapting another course's material](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#adapting-another-courses-material):
+  write our own version and credit it in a `::: notes` div.
 
-(Directive from the user, 2026-09-25, stated as a global rule.)
-
-## Quote the primary source, not someone quoting it
-
-When a secondary source quotes a primary one,
-quote and cite the primary source directly,
-after checking the wording and locator against it.
-Do not write "X, as quoted in Y".
-
-- **Do:** find the original (Mitchell 1997, not Goodfellow et al. quoting Mitchell),
-  verify the quotation there, and cite it with its own page.
-- **Don't:** cite the secondary source for a quotation it only relays,
-  or copy a relayed quotation without checking the original.
-
-(Directive from the user, 2026-09-25: "why quote Goodfellow quoting Mitchell,
-when we can quote Mitchell directly? ... (apply this principle generally too)".)
-
-## Emphasize the content, not its creators
-
-Headers and prose name the topic, not the person who said it:
-"A formal definition of machine learning", not "Mitchell's definition".
-Put the citation after a quotation as a bare Quarto citation (`[@key]`),
-with no commentary about the author or where the quotation appeared.
-
-- **Do:** title a section by its content, and follow a quotation with its citation alone.
-- **Don't:** build headers or sentences around the author,
-  or add narration such as "as he puts it" or "a definition usually credited to".
-
-(Directive from the user, 2026-09-25: "the emphasis should be on the content,
-not on the creators".)
+Link those sections rather than restating them here.

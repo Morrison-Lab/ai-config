@@ -173,20 +173,10 @@ need to *compute* or *cite*, not just how *persuaded* they would be.
 
 ## A bolded keyword is the signal; every such term gets its own div
 
-A **bolded keyword** in running prose is usually an inline definition.
-Replace every inline definition with a formal definition div
-(`::: {#def-<term>}`), one div per term, with the commentary moved outside it.
-A term the surrounding text is defining in passing (for example,
-"generalization" introduced mid-paragraph) still gets its own div.
-
-- **Do:** convert each bolded or inline definition to its own `#def-` div, and
-  keep motivation or commentary in the prose after the div.
-- **Don't:** leave a definition inline because it is short, or define two
-  terms in one div.
-
-(Directive from the user, 2026-09-25: "we want to replace all inline
-definitions (often detectable by bolded keyword) with formal def divs",
-stated as a global principle.)
+PSW's [Guidelines for defining terms](https://morrison-lab.github.io/psw/chapters/defining-terms.html#guidelines-for-defining-terms)
+is the canonical statement: one `#def-` div per term, commentary after the div,
+and a bolded term in running prose treated as an inline definition to convert.
+This skill is how that rule is checked.
 
 ## Relationship to other checks
 

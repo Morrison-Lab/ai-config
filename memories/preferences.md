@@ -646,8 +646,13 @@
   Example: [ucdavis/bcs#191 review comment r3437005734](https://github.com/ucdavis/bcs/pull/191/changes#r3437005734).
 - When adding or changing math (LaTeX/Quarto equations --- `$...$`, `$$...$$`, `\begin{equation}`, `\(...\)`), always verify it actually RENDERS --- open the rendered HTML page and confirm the equation displays, not just that the build succeeded.
   A typo in a macro can silently break MathJax while the build still passes.
-  For rme, open your PR's preview page --- e.g. `https://morrison-lab.github.io/rme/pr-preview/pr-<N>/chapters/proportional-hazards-models.html` (the `pr-<N>` previews are per-PR and get deleted when the PR closes, so `<N>` is a placeholder for your PR number). (An instance of never assume; always verify, applied to math.)
-  - **In a remote/web sandbox the github.io preview may be unreachable** --- if the environment's network policy blocks `morrison-lab.github.io` the proxy answers `403` to CONNECT (curl: `CONNECT tunnel failed, response 403`; Chromium: `ERR_TUNNEL_CONNECTION_FAILED`), so you can't load the preview to eyeball the math.
+  For rme, open your PR's preview page --- e.g. `https://morrison-lab.github.io/rme/pr-preview/pr-<N>/chapters/proportional-hazards-models.html`
+  (the `pr-<N>` previews are per-PR and get deleted when the PR closes, so `<N>` is a placeholder for your PR number).
+  (An instance of never assume; always verify, applied to math.)
+  - **In a remote/web sandbox the github.io preview may be unreachable** --- if the environment's network policy blocks `morrison-lab.github.io`,
+    the proxy answers `403` to CONNECT
+    (curl: `CONNECT tunnel failed, response 403`; Chromium: `ERR_TUNNEL_CONNECTION_FAILED`),
+    so you can't load the preview to eyeball the math.
     Verify locally instead: `npm i mathjax` (npmjs is allowed through the proxy), then init MathJax **with the `[tex]/noundefined` extension loaded** (`init({tex:{packages:{'[+]':['noundefined']}}}).then(MJ => MJ.tex2mml(defs + expr))`) and check the output.
     With `noundefined` an undefined macro shows as `<mtext mathcolor="red">\cmd</mtext>` (NOT an `<merror>` or a thrown exception), so grep for `mathcolor="red"`.
   - **MathJax ignores `\providecommand`** --- only `\newcommand` / `\def` / `\renewcommand` define a macro.

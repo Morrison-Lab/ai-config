@@ -43,120 +43,131 @@ def div_name(attrs, section):
     return f"{section}-{m.group(1) if m else 'div'}"
 
 
+def line_at(body, j, path, opened):
+    # a scan that runs off the end means the block opened at line `opened` never closed
+    if j >= len(body):
+        sys.exit(f"{path}:{opened}: unclosed div, code fence or HTML comment")
+    return body[j]
+
+
+def split_blank_edges(chunk):
+    """Return (leading blank lines, content, trailing blank lines)."""
+    start = 0
+    while start < len(chunk) and not chunk[start].strip():
+        start += 1
+    stop = len(chunk)
+    while stop > start and not chunk[stop - 1].strip():
+        stop -= 1
+    return chunk[:start], chunk[start:stop], chunk[stop:]
+
+
+def add_subfile(out, name, chunk):
+    """Record chunk as a subfile named after name and include it from the spine."""
+    _, chunk, _ = split_blank_edges(chunk)
+    if not chunk:
+        return
+    n = out["used"].get(name, 0) + 1
+    out["used"][name] = n
+    fname = f"_{name}.qmd" if n == 1 else f"_{name}-{n}.qmd"
+    assert fname not in out["files"], fname
+    out["files"][fname] = "\n".join(chunk) + "\n"
+    out["spine"].append(f"{{{{< include {out['rel']}/{fname} >}}}}")
+
+
+def flush_prose(out, pending, section):
+    """Move a run of top-level prose into a subfile, keeping its edge blanks in the spine."""
+    lead, prose, trail = split_blank_edges(pending)
+    out["spine"].extend(lead)
+    if prose:
+        add_subfile(out, f"sec-{section}", prose)
+    out["spine"].extend(trail)
+
+
+def div_end(body, i, path, opened):
+    """Return the index of the line closing the div that opens at body[i]."""
+    depth, j, fence = 0, i, None
+    while True:
+        l = line_at(body, j, path, opened)
+        if fence:
+            if l.startswith(fence) and l.strip() == fence[0] * len(l.strip()) and len(l.strip()) >= len(fence):
+                fence = None
+        elif FENCE.match(l):
+            fence = FENCE.match(l).group(1)
+        elif DIV_OPEN.match(l):
+            depth += 1
+        elif DIV_CLOSE.match(l):
+            depth -= 1
+            if depth == 0:
+                return j
+        j += 1
+
+
 def split(path):
     path = Path(path)
     lines = path.read_text().split("\n")
     # front matter
     assert lines[0] == "---", "expected front matter"
     end = lines.index("---", 1)
-    spine = lines[: end + 1]
     body = lines[end + 1 :]
 
     subdir = path.parent / "_subfiles" / path.stem
-    rel = f"_subfiles/{path.stem}"
-    files = {}
-    used = {}
+    out = {"spine": lines[: end + 1], "files": {}, "used": {}, "rel": f"_subfiles/{path.stem}"}
+    spine = out["spine"]
     section = "intro"
-
-    def emit(name, chunk):
-        # strip leading/trailing blank lines
-        while chunk and not chunk[0].strip():
-            chunk = chunk[1:]
-        while chunk and not chunk[-1].strip():
-            chunk = chunk[:-1]
-        if not chunk:
-            return
-        n = used.get(name, 0) + 1
-        used[name] = n
-        fname = f"_{name}.qmd" if n == 1 else f"_{name}-{n}.qmd"
-        assert fname not in files, fname
-        files[fname] = "\n".join(chunk) + "\n"
-        spine.append(f"{{{{< include {rel}/{fname} >}}}}")
-
-    i = 0
-
-    def at(j):
-        # a scan that runs off the end means the block opened at line i never closed
-        if j >= len(body):
-            sys.exit(f"{path}:{i + end + 2}: unclosed div, code fence or HTML comment")
-        return body[j]
     pending = []  # a run of top-level prose
 
-    def flush():
-        nonlocal pending
-        # keep leading/trailing blank lines in the spine, prose in a subfile
-        lead = []
-        while pending and not pending[0].strip():
-            lead.append(pending.pop(0))
-        trail = []
-        while pending and not pending[-1].strip():
-            trail.insert(0, pending.pop())
-        spine.extend(lead)
-        if pending:
-            emit(f"sec-{section}", pending)
-        spine.extend(trail)
-        pending = []
-
+    i = 0
     while i < len(body):
         line = body[i]
+        opened = i + end + 2
         if line.strip() == "" and not pending:
             spine.append(line)
             i += 1
             continue
         hm = HEADING.match(line)
         if hm or line.strip() in ("{{< slidebreak >}}",) or INCLUDE.match(line):
-            flush()
+            flush_prose(out, pending, section)
+            pending = []
             spine.append(line)
             if hm:
                 section = slug(hm.group(2))
             i += 1
             continue
         if line.startswith("<!--"):
-            flush()
+            flush_prose(out, pending, section)
+            pending = []
             j = i
-            while "-->" not in at(j):
+            while "-->" not in line_at(body, j, path, opened):
                 j += 1
             spine.extend(body[i : j + 1])
             i = j + 1
             continue
         dm = DIV_OPEN.match(line)
         if dm:
-            flush()
-            depth, j, fence = 0, i, None
-            while True:
-                l = at(j)
-                if fence:
-                    if l.startswith(fence) and l.strip() == fence[0] * len(l.strip()) and len(l.strip()) >= len(fence):
-                        fence = None
-                elif FENCE.match(l):
-                    fence = FENCE.match(l).group(1)
-                elif DIV_OPEN.match(l):
-                    depth += 1
-                elif DIV_CLOSE.match(l):
-                    depth -= 1
-                    if depth == 0:
-                        break
-                j += 1
+            flush_prose(out, pending, section)
+            pending = []
+            j = div_end(body, i, path, opened)
             if j - i < 2:  # an empty placeholder such as ::: {#refs}
                 spine.extend(body[i : j + 1])
             else:
                 attrs = dm.group(2) if dm.group(2) is not None else "." + dm.group(4)
-                emit(div_name(attrs, section), body[i : j + 1])
+                add_subfile(out, div_name(attrs, section), body[i : j + 1])
             i = j + 1
             continue
         fm = FENCE.match(line)
         if fm:
             fence = fm.group(1)
             j = i + 1
-            while not (at(j).startswith(fence) and at(j).strip() == fence[0] * len(at(j).strip())):
+            while not (line_at(body, j, path, opened).startswith(fence) and body[j].strip() == fence[0] * len(body[j].strip())):
                 j += 1
             pending.extend(body[i : j + 1])
             i = j + 1
             continue
         pending.append(line)
         i += 1
-    flush()
+    flush_prose(out, pending, section)
 
+    files = out["files"]
     subdir.mkdir(parents=True, exist_ok=True)
     for fname, text in files.items():
         target = subdir / fname

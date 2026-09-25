@@ -178,6 +178,9 @@ is the canonical statement: one `#def-` div per term, commentary after the div,
 and a bolded term in running prose treated as an inline definition to convert.
 The same guidelines ask a definition to name the term's synonyms and near-synonyms
 (*learning*, *training*, *fitting*), in the div or a callout beside it.
+In lecture material, a definition or theorem div also goes in the solution to an exercise that asks for it;
+Morrison-Lab/mln's [`AUTHORING.md`](https://github.com/Morrison-Lab/mln/blob/main/AUTHORING.md#lectures-are-built-from-exercise-and-solution-pairs)
+is the canonical statement.
 This skill is how that rule is checked.
 
 ## Relationship to other checks

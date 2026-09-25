@@ -955,12 +955,17 @@ PREFIX_DISQUALIFY_RX = (getattr(_clean_claim, "PREFIX_DISQUALIFY_RX", None)
 # compound: `\bno\b` matched the `no` of `no-op` and of every
 # `no-*.py` hook filename this corpus writes, `\bnothing\b` the
 # `Nothing-burger`, and `\bzero\b` the `zero-findings`, `zero-cost` and
-# `zero-width` compounds -- 108 of them across 55 tracked files on
-# 2026-09-24, counted with `git ls-files` and `(?i)(?<![-\w])zero-[a-z]`,
-# the command being given because the figure moves. Each made the guard
-# go silent on a sentence whose only negator was a hyphenated adjective
-# modifying something else: "The zero-findings run aside, all three are
-# addressed in `abc1234`." The `no|not|none|nothing` half of that was
+# `zero-width` compounds -- 115 of them across 57 tracked files, measured
+# at commit 8d4abef2 with `git ls-files` and `(?i)(?<![-\w])zero-[a-z]`.
+# A COMMIT rather than a date, for the reason the two figures below give:
+# the total moves with every prose commit on this branch, and this branch
+# landed several on the date the earlier figure named. That figure read
+# 108 across 55 files on 2026-09-24 and reproduces at no commit -- 114
+# across 57 at 1ea1f960, so it was already stale on the day it cites.
+# Each made the guard go silent on a sentence whose only negator was a
+# hyphenated adjective modifying something else: "The zero-findings run
+# aside, all three are addressed in `abc1234`." The
+# `no|not|none|nothing` half of that was
 # pre-existing; `zero` added one more instance of it, which is why the
 # whole set is bounded rather than that one token. `n't` keeps a bare
 # trailing `\b` and no leading boundary at all, because in every real

@@ -800,3 +800,19 @@ The Wendland applications list is the enumeration half, and it survived into the
 The same commit fixed two locators the branch had never touched --- `(p. 22-23)` for four items that run pp. 23-24, and `(pp. 307-309)` for content that opens on p. 306 --- which is the follow-on worth keeping.
 Re-deriving one range from the source puts its neighbours within reach of the same check for the first time, and a page citation nobody has ever opened the PDF for is likelier to be wrong than one that survived a reading.
 Sweep the locators around a split, not only the ones the split created.)
+
+## Adapt another course's material; don't summarize it inline
+
+When course notes draw on another course's material,
+write our own version of the content.
+Do not narrate what the other course does
+("Andrew Ng opens Stanford's CS229 with ...").
+Credit the source in a `::: notes` div at the start or end of the adapted section,
+so the acknowledgement stays out of the slides.
+
+- **Do:** teach the content in our own words,
+  and put "Adapted from ..." in a `::: notes` div.
+- **Don't:** summarize the other course's presentation in the body,
+  or put the acknowledgement in slide-visible text.
+
+(Directive from the user, 2026-09-25, stated as a global rule.)

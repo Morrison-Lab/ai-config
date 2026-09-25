@@ -19,6 +19,11 @@ HOOK = sys.argv[1]
 
 PUSH = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {"command": "git push -q"}}]}}
+# A push RESULT that really ran, for the staleness-branch cost shape
+# below: `PUSH` alone is an ATTEMPT, and this hook deliberately reads a
+# refused attempt as no push at all, so the result part is load-bearing.
+PUSH_OK = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "content": "Exit code 0\nEverything up-to-date"}]}}
 QUERY = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {"command": "gh pr checks 493 -R o/r"}}]}}
 MCP_QUERY = {"type": "assistant", "message": {"content": [
@@ -1086,16 +1091,30 @@ def check_cost():
     RECAP = (CLEAN + "3 checks still running.\n" + "".join(
         "- PR #%d: all checks green, 12 pass, ready to merge; "
         "rebased on main and fully clean.\n" % i for i in range(1500)))
+    # ...and the STALENESS branch reaches the same helper by the other
+    # route, which is why this shape carries its own events. The mutation
+    # sweep is what separated them: reverting the bisect alone killed
+    # nothing, because on the failing-query branch the lazy generator stops
+    # at candidate 0 and the quadratic never runs. The `soft` loop below
+    # runs to completion instead, so it needs many BARE counts with no PR
+    # reference anywhere near them -- one `#N` and it breaks on the first
+    # hit. Measured with the bisect reverted, 14.84s; it is 0.60s here.
+    STALE = "".join("Suite %d: 12 pass.\n" % i for i in range(6000))
     shapes = [
-        (CLEAN + "fixed 3 errors left " * 8000,
+        ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+          say(CLEAN + "fixed 3 errors left " * 8000)],
          "many skipped hits, loop run to completion"),
-        (CLEAN + "Checks pending" + " " * 16000 + "x",
+        ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+          say(CLEAN + "Checks pending" + " " * 16000 + "x")],
          "one long run of spaces"),
-        (RECAP, "many asserts beside a disclosed pending state"),
+        ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT, say(RECAP)],
+         "many asserts beside a disclosed pending state"),
+        ([PUSH, PUSH_OK, say(STALE)],
+         "many bare counts on the staleness branch"),
     ]
-    for text, label in shapes:
+    for events, label in shapes:
         started = time.time()
-        run([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT, say(text)])
+        run(events)
         elapsed = time.time() - started
         ok = elapsed < 5.0
         failures += 0 if ok else 1
@@ -1104,7 +1123,7 @@ def check_cost():
     return failures
 
 
-COST_CHECKS = 3
+COST_CHECKS = 4
 
 
 def run(events):

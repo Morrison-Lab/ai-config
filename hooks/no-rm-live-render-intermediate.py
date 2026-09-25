@@ -296,18 +296,49 @@ def _rm_targets(argv):
     return targets
 
 
-# A short-option CLUSTER (leading `-`, letters only) containing `n`, so `-fdn`,
-# `-ndf`, and `-nf` are all recognized as carrying `git clean`'s `-n` alongside
-# `-f`/`-d`/etc. A long option (`--dry-run` and any other `--...`) is excluded
-# by `_git_clean_targets`'s own `startswith("--")` check before this is tried,
-# so this pattern only ever sees a genuine short-flag cluster.
-_DRY_RUN_SHORT = re.compile(r"^-[a-zA-Z]*n[a-zA-Z]*$")
+# `git clean`'s only VALUE-TAKING short option. Once `-e`/`--exclude` appears
+# in a bundled cluster, every character after it in that SAME token is its
+# pattern argument, not a further boolean flag -- so a whole-cluster "does
+# this contain the letter n" test is unsound: `-fen` is `-f -e n` (force,
+# plus an ignore-pattern of literally "n"), confirmed against real git to
+# actually DELETE its target, not skip it. An earlier version of this
+# function used exactly that whole-cluster regex and read `-fen` as carrying
+# `-n` (dry-run), which made the guard skip a real deletion entirely --
+# caught by adversarial review before merge. `_short_cluster_is_dry_run`
+# scans left to right and stops at `-e` instead, the same character-by-
+# character approach `no-clobbering-push.py`'s `SHORT_BOOL`/`_parse_push`
+# already uses to decode a bundled `git push` cluster: a value-taking option
+# ends the scan for THAT cluster, it does not merely get skipped over.
+_DRY_RUN_VALUE_OPT = "e"
+
+
+def _short_cluster_is_dry_run(cluster: str) -> bool:
+    """Whether short-option CLUSTER (the token with its leading `-` stripped)
+    carries `git clean`'s `-n` (dry-run).
+
+    Order matters and is read left to right, matching getopt-style bundling:
+    a `n` BEFORE `-e` in the cluster is a real `-n` flag regardless of what
+    follows (`-nef` == `-n -e f`, confirmed against real git to be a dry
+    run); a `n` AFTER `-e` is part of `-e`'s pattern value, not a flag
+    (`-fen` == `-f -e n`, confirmed to delete). Every other character
+    (`d`, `f`, `i`, `q`, `x`, `X`, or anything else) is an ordinary boolean
+    flag this scan does not need to individually recognize -- only `e`
+    (stops the scan) and `n` (dry-run) change what the result is.
+    """
+    for ch in cluster:
+        if ch == _DRY_RUN_VALUE_OPT:
+            return False  # everything after this is -e's bundled value
+        if ch == "n":
+            return True
+    return False
 
 
 def _git_clean_targets(argv):
     """Non-option pathspecs of a `git clean` invocation, or `None` when the
     invocation is a dry run (`-n`/`--dry-run`, including `-n` BUNDLED into a
-    short-option cluster like `-fdn`) and therefore deletes nothing.
+    short-option cluster like `-fdn`, correctly distinguished from `-e`'s
+    bundled pattern value by `_short_cluster_is_dry_run`) and therefore
+    deletes nothing.
 
     An earlier version checked only the exact tokens `"-n"`/`"--dry-run"`,
     which missed `git clean`'s standard bundled short-flag spelling: `git
@@ -315,9 +346,7 @@ def _git_clean_targets(argv):
     ("Would remove ..." and nothing actually removed), and denying that
     invocation as though it deletes its target contradicts this file's own
     stated design -- a dry run deletes nothing, so it should never need the
-    override. `_DRY_RUN_SHORT` catches any short-option cluster containing
-    `n` (`-fdn`, `-ndf`, `-nf`, ...), the same bundled-flag decoding
-    `no-clobbering-push.py`'s `SHORT_BOOL` map already does for `git push`.
+    override.
     """
     sub = git_subcommand(argv)
     if sub is None:
@@ -339,7 +368,7 @@ def _git_clean_targets(argv):
         if tok.startswith("--"):
             continue
         if tok.startswith("-") and tok != "-":
-            if _DRY_RUN_SHORT.match(tok):
+            if _short_cluster_is_dry_run(tok[1:]):
                 dry_run = True
             continue
         targets.append(tok)

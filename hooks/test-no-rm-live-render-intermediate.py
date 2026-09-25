@@ -139,6 +139,28 @@ class TestBlocks(unittest.TestCase):
             with self.subTest(command=command):
                 self.assert_allowed(command)
 
+    def test_git_clean_dash_e_pattern_not_misread_as_dry_run(self):
+        """`git clean -e`/`--exclude` takes a bundled value, and a
+        regression caught by adversarial review before merge treated ANY
+        cluster containing the letter `n` as dry-run -- so `-fen`
+        (`-f -e n`: force, plus an ignore-pattern of literally "n") was
+        misread as a dry run and let a real deletion through undetected.
+        Confirmed against real git: `git clean -fen report.knit.md` prints
+        "Removing report.knit.md" and the file is actually gone. Must DENY
+        like any other real `git clean` deletion, not skip it."""
+        self.assert_blocked("git clean -fen paper.knit.md")
+
+    def test_git_clean_n_before_e_is_still_dry_run(self):
+        """Order matters: `n` BEFORE `-e` in the cluster is a real `-n`
+        flag regardless of what follows -- `-nef` == `-n -e f`, confirmed
+        against real git to print "Would remove ..." and delete nothing."""
+        for command in [
+            "git clean -nef paper.knit.md",
+            "git clean -ne paper.knit.md",
+        ]:
+            with self.subTest(command=command):
+                self.assert_allowed(command)
+
     def test_git_clean_no_pathspec_allowed(self):
         """Documented known limitation: a bare `git clean -fdx` names no
         pathspec this guard's text-only target extraction can see, so it is

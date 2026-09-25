@@ -376,11 +376,11 @@ and the `clean` / `simplify` review passes.
 ## Prefer more structure
 
 When content has a shape, show the shape in the markup rather than leaving the reader to recover it from a sentence.
-Items become a list, steps become a numbered list, a term's definition becomes its own definition div, and a comparison becomes a table.
+Items become a list, steps become a numbered list, a term's definition becomes its own definition div, a worked or named example becomes its own example div (`#exm-` in Quarto), and a comparison becomes a table.
 Structure lets a reader scan, cite, and check each part, and lets a tool find it.
 Keep inline prose for a short series of single words, where a list would add scaffolding without clarity.
 
-Stated by Ezra Morrison, 2026-09-25, with the bullet-list rule as its first recorded instance.
+Stated by Ezra Morrison, 2026-09-25, with the bullet-list and example-div rules as its first recorded instances.
 Operationalized by:
 [`plain-prose`](../writing/plain-prose.md) (inline lists become bullet lists, per PSW's "Put lists in bullet points"),
 [`informal-definitions`](../writing/informal-definitions.md) (definitions become formal divs),

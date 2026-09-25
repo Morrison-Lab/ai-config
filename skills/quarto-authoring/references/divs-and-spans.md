@@ -41,6 +41,13 @@ Content with attributes.
 
 ## Nested Divs
 
+Do not nest one theorem-type div (`#def-`, `#thm-`, `#lem-`, `#cor-`,
+`#prp-`, `#exm-`, `#rem-`) inside another: give each its own div, placing a
+special case after the general one, with a link back to it.
+See the Modularity entry in
+[`shared/principles/README.md`](../../../shared/principles/README.md).
+Nesting is for layout and callout wrappers.
+
 Nest divs inside each other:
 
 ````markdown

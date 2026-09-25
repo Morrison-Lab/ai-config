@@ -86,8 +86,9 @@ most visibly faster review and independent timelines.
 - **Don't:** settle on the coarser split just because it means fewer PRs to manage.
 - **Don't:** stretch the judgment items under "When NOT to split" into tiebreakers.
   The small-diff item applies to a diff that really is under 50 lines,
-  and the shared-context item to context that splitting would actually lose,
-  not to every close call about granularity.
+  and the shared-context item only when a reviewer of one PR
+  could not follow it without reading the other's diff.
+  Context that a cross-reference ("Related: #N") carries is not lost.
 
 (Directive from the user, 2026-09-25:
 "when uncertain, err on the side of more decomposition",

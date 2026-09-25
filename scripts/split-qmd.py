@@ -138,7 +138,8 @@ def split(path):
             if j - i < 2:  # an empty placeholder such as ::: {#refs}
                 spine.extend(body[i : j + 1])
             else:
-                emit(div_name(dm.group(2) or dm.group(4) or "", section), body[i : j + 1])
+                attrs = dm.group(2) if dm.group(2) is not None else "." + dm.group(4)
+                emit(div_name(attrs, section), body[i : j + 1])
             i = j + 1
             continue
         fm = FENCE.match(line)

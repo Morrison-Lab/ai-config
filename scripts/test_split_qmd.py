@@ -61,6 +61,10 @@ x = 1
 A definition.
 :::
 
+::: center
+A bare-class div.
+:::
+
 ::: {#refs}
 :::
 """
@@ -82,10 +86,6 @@ def expand(spine: Path) -> str:
     return "\n".join(out)
 
 
-def nonblank(text: str) -> list[str]:
-    return [line for line in text.split("\n") if line.strip()]
-
-
 def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         chapter = Path(tmp) / "fixture.qmd"
@@ -93,7 +93,8 @@ def main() -> int:
         files = split_qmd.split(chapter)
         check("writes subfiles", len(files) >= 4, str(sorted(files)))
         check("names divs by id", {"_exr-first.qmd", "_sol-first.qmd", "_def-thing.qmd"} <= set(files))
-        check("round-trips every line", nonblank(expand(chapter)) == nonblank(CHAPTER))
+        check("names a bare-class div by its class", any(f.endswith("-center.qmd") for f in files), str(sorted(files)))
+        check("round-trips every line, blank lines included", expand(chapter) == CHAPTER)
         spine = chapter.read_text()
         check("keeps headings in the spine", "# First section" in spine and "# Second section" in spine)
         check("keeps {#refs} in the spine", "::: {#refs}" in spine)

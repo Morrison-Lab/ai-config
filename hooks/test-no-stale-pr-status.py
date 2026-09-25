@@ -586,6 +586,30 @@ CASES = [
       say("14 pass. Waiting on a slow flaky build, "
           "on main, 2 checks pending.")], True,
      "a waiting verb elsewhere in the lead does not cancel a re-target"),
+    # Round 20, finding 1. That span test was written as
+    # `w.end() > retarget.start()`, which is only its trailing half, so ANY
+    # waiting phrase later in the lead cancelled an earlier re-target. The
+    # row above could not see it: its waiting phrase sits BEFORE the
+    # re-target, so the half test and containment agree there. Here the
+    # waiting phrase sits INSIDE the re-target's own match, which is the
+    # only arrangement that separates them.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Earlier, waiting on infra, 2 checks failed.")], True,
+     "a waiting phrase inside the re-target's own span does not cancel it"),
+    # ...and when the containment DOES hold, the lead before the waiting
+    # phrase may still carry a re-target of its own. `_RETARGET_LEAD` is
+    # anchored at the end of the lead, so it only ever sees the re-target
+    # adjacent to the count: here that is `on infra`, whose preposition the
+    # waiting verb supplied. Re-anchoring at the waiting phrase finds the
+    # `On main` the anchor could not. The parent exempted this sentence by
+    # reading `on infra` as a re-target to something called infra, so
+    # dropping the re-anchor keeps the verdict and loses the reason.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. On main, blocked on infra, 3 checks failed.")], True,
+     "a cancelled re-target re-anchors on the lead before the waiting phrase"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. On main, waiting for review, 3 checks failed.")], True,
+     "...for a waiting phrase whose preposition is `for` rather than `on`"),
     # Round 18, finding 5. A CI noun the set omitted turned an honest
     # progress report into a block. Widening the noun list constrains the
     # polysemous pending word to check context rather than loosening it.

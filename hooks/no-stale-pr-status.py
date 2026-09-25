@@ -427,10 +427,13 @@ _RETARGET_LEAD = re.compile(
 # punctuation the author never meant to signal with.
 #
 # It cannot be a lookbehind inside `_RETARGET_LEAD`: Python requires a
-# fixed-width one and these phrases differ in length. Instead the call site
+# fixed-width one and these phrases differ in length. Instead `_retargeted`
 # asks whether a waiting phrase's own preposition IS the word that opened the
-# re-target lead, by comparing spans -- so "On main, and we are waiting" keeps
-# its re-target reading, which a bare `search` over the lead would not.
+# re-target lead, by CONTAINMENT of spans -- so "Earlier, waiting on infra, 2
+# checks failed" keeps its re-target reading, which neither a bare `search`
+# over the lead nor the half-span test round 19 shipped would allow. Read
+# `_retargeted` for what happens when the containment does hold, which is not
+# simply to give up on the lead.
 _WAITING_ON = re.compile(
     r"(?<![-\w])(?:wait(?:ing|s|ed)?|block(?:ed|ing)?|hold(?:ing)?|held|"
     r"depend(?:s|ing|ed)?|hinge(?:s|d)?|stuck|gated|contingent|"
@@ -438,6 +441,59 @@ _WAITING_ON = re.compile(
     r"(?:[ \t]+up)?[ \t]+(?:on|for)(?![-\w])",
     re.I,
 )
+
+
+def _retargeted(lead):
+    r"""True when `lead` re-targets the count away from this PR.
+
+    Round 19, finding 4 cancelled a re-target whose preposition a waiting
+    verb had supplied, and tested that with `w.end() > retarget.start()`
+    over every waiting phrase in the lead. That is only half a span test, so
+    ANY waiting phrase later in the lead cancelled an earlier, genuine
+    re-target: "Earlier, waiting on infra, 2 checks failed" lost its
+    exemption to a `waiting on` sitting INSIDE the `Earlier, ...` match it
+    was cancelling (round 20, finding 1). The test is containment now,
+    which is what the comment above `_WAITING_ON` always said it was.
+
+    Containment alone still narrows the parent, because `_RETARGET_LEAD` is
+    `\Z`-anchored and so only ever sees the re-target ADJACENT to the
+    count. In "On main, blocked on infra, 3 checks failed" the anchored
+    match is `on infra`, the waiting verb supplied that `on`, and the
+    genuine `On main` earlier in the lead is invisible to the anchor. The
+    parent exempted that sentence by reading `on infra` as a re-target to
+    something called infra, which is the right answer for the wrong reason.
+    So cancelling re-anchors rather than giving up: the lead is truncated at
+    the waiting phrase that supplied the preposition and searched again, and
+    a re-target standing on its own before that phrase still counts. Each
+    pass drops at least one waiting phrase from a 48-character window, so
+    the loop is bounded by how many fit in it.
+
+    No mutation kills the CONTAINMENT half of that test, and it is kept
+    rather than relaxed back. The re-anchor rescues the same sentences on
+    its own: reverting to the round-19 trailing-half test makes
+    "Earlier, waiting on infra" take the supplier branch, truncate at the
+    waiting verb, and re-match on the bare "Earlier, " -- the same verdict
+    by a longer route. Every arrangement that separates the two has that
+    shape, because a waiting verb can only sit inside a re-target span as
+    one of the three words the lead reaches back over, and truncating there
+    always leaves the opening word and its separator behind. So the two
+    agree today, and they agree for a reason that widening
+    `_RETARGET_LEAD`'s reach, or `_WAITING_ON`'s verb set, would quietly
+    remove. Containment is also the rule the comment above `_WAITING_ON`
+    states, and the cheaper of the two, since it answers without looping.
+    """
+    while True:
+        retarget = _RETARGET_LEAD.search(lead)
+        if retarget is None:
+            return False
+        supplier = None
+        for w in _WAITING_ON.finditer(lead, 0, retarget.end()):
+            if w.start() <= retarget.start() < w.end():
+                supplier = w
+                break
+        if supplier is None:
+            return True
+        lead = lead[:supplier.start()]
 
 
 def _clause_starts(text, breaker):
@@ -509,9 +565,7 @@ def discloses_pending(text):
         # re-target and "On main, checks are still running" was not, though
         # `_RETARGET_LEAD` matches the same lead in both. Only the RESOLVED
         # lead needs a digit, because only a count can have been fixed.
-        retarget = _RETARGET_LEAD.search(lead)
-        if retarget and not any(
-                w.end() > retarget.start() for w in _WAITING_ON.finditer(lead)):
+        if _retargeted(lead):
             continue
         # A COUNT is its own disclosure, and nothing trailing it retracts one.
         # The tail exists for a bare phrase -- "Checks pending: none" names no

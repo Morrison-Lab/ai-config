@@ -123,6 +123,7 @@ Fails open on every unexpected shape, per the file-wide contract.
 
 from __future__ import annotations
 
+import bisect
 import hashlib
 import importlib.util
 import json
@@ -1037,7 +1038,7 @@ NEGATION_RX = re.compile(
 RX_CLAUSE_START = re.compile(r"[.!?]|\n\s*\n")
 
 
-def _governs(prose, window_start, match_start, rx):
+def _governs(prose, window_start, match_start, rx, bracketed=None, hits=None):
     """True when the LAST `rx` hit in the window reaches `match_start`.
 
     The same shape as `flag-clean-claim-over-findings.py`'s
@@ -1083,13 +1084,45 @@ def _governs(prose, window_start, match_start, rx):
     # addressed", now reads as governed and goes silent. Silence is the cheap
     # direction, and no regex separates that sentence from the five above
     # without knowing which noun the verb agrees with.
-    window = _elide_bracketed(prose[window_start:match_start])
-    last = None
-    for last in rx.finditer(window):
-        pass
-    if last is None:
-        return False
-    connector = _elide_asides(window[last.end():])
+    #
+    # Round 19, finding 2. Draining `rx.finditer(window)` to reach the last
+    # hit costs O(window) per disposition hit, and a body with no clause
+    # break in it gives every hit the whole prefix as its window -- so k
+    # hits over n characters cost O(n*k). A profile of the 1500-hit shape
+    # put 2.712s of 2.919s inside this function's own body, which is why
+    # hoisting the clause split alone moved it barely at all. The caller
+    # elides and scans ONCE for the whole body and hands the spans down;
+    # `bracketed` is length-preserving, so every offset here still indexes
+    # the same characters it did.
+    if bracketed is None:
+        window = _elide_bracketed(prose[window_start:match_start])
+        found = None
+        for found in rx.finditer(window):
+            pass
+        if found is None:
+            return False
+        connector = _elide_asides(window[found.end():])
+    else:
+        # Non-overlapping and ordered, so at most the final candidate can
+        # straddle `match_start`, and one step back is enough.
+        #
+        # No mutation kills this step-back today, and it is kept as boundary
+        # defence rather than deleted. Straddling `match_start` means the
+        # disqualifier starts before the phrase and ends after it, and the
+        # phrase always opens a disposition. Every multi-word alternative in
+        # `NEGATION_RX` (`hardly any`, `zero of`, `zero findings`,
+        # `0 findings`, `yet to`, `fails to`) ends on a word no disposition
+        # opens with, and every `PREFIX_DISQUALIFY_RX` alternative is a single
+        # `\b`-bounded word, so no straddle is constructible from either set as
+        # they stand. Removing the step-back would make `bisect` hand back a
+        # REVERSED slice for the first pattern that can straddle -- an empty
+        # connector, which attaches unconditionally and silences the phrase.
+        k = bisect.bisect_left(hits, (match_start,)) - 1
+        if k >= 0 and hits[k][1] > match_start:
+            k -= 1
+        if k < 0 or hits[k][0] < window_start:
+            return False
+        connector = _elide_asides(bracketed[hits[k][1]:match_start])
     if _ATTACHES is None:
         return not SCOPE_BREAK_RX.search(connector)
     return bool(_ATTACHES(connector, SCOPE_BREAK_RX))
@@ -1147,7 +1180,76 @@ def _elide_code_spans(text):
     return _blank(RX_CODE_SPAN, text)
 
 
-def _disqualified(prose, match_start):
+def _clause_start_ends(text):
+    r"""Every position a `RX_CLAUSE_START` breaker can end at, in ONE pass.
+
+    Round 19, finding 2. `_disqualified` used to run
+    `RX_CLAUSE_START.finditer(scanned, 0, match_start)` once per disposition
+    hit, so k hits over n characters cost O(n*k) -- the caller-side twin of
+    the per-hit rescan this same branch removed from the sibling hook, and
+    invisible to a review of either the regex or the loop alone. Measured on
+    a body of k identical hits: 0.06s at k=250, 0.92s at k=1000 and 3.53s at
+    k=2000, on a hook registered at a 10-second timeout.
+
+    The ends are computed once and bisected per hit. The enumeration is the
+    RULE the regex expresses rather than a transcription of it: a sentence
+    terminator ends a clause after itself, and a blank line ends one after
+    its second newline, whatever whitespace sits between. That is
+    deliberately a SUPERSET of the truncated scan's answer inside a run of
+    whitespace, because `\n\s*\n` is variable-length and `\s*` backtracks
+    to fit whatever `endpos` allows -- so the old call's last end moved with
+    `match_start` in a way no rule about clauses would predict. Every extra
+    position lies inside a whitespace run, and a negator match starts on a
+    word character, so the window's negator set is unchanged; the
+    differential test over the suite's own bodies plus 40000 random ones
+    asserts that directly on `echoed_verdict`.
+    """
+    ends = []
+    seen_newline = False
+    for i, ch in enumerate(text):
+        if ch in ".!?":
+            ends.append(i + 1)
+            seen_newline = False
+        elif ch == "\n":
+            if seen_newline:
+                ends.append(i + 1)
+            seen_newline = True
+        elif not ch.isspace():
+            seen_newline = False
+    return ends
+
+
+def _straddles(spans, window_start, match_start):
+    """True when a bracketed span crosses either end of this hit's window."""
+    for bound in (window_start, match_start):
+        k = bisect.bisect_left(spans, (bound,)) - 1
+        if k >= 0 and spans[k][1] > bound:
+            return True
+    return False
+
+
+def _disqualifier_spans(scanned):
+    """`(bracketed, negator spans, prefix-disqualifier spans)` for one body.
+
+    Computed once and bisected per hit, per `_governs`.
+
+    Eliding brackets over the WHOLE body is not identical to eliding each
+    window: a bracket that opens before a window boundary and closes after
+    it is elided here and was two unmatched delimiters there. `RX_ASIDE_BRACKETED`
+    admits no nesting, so that STRADDLE is the only way the two can disagree,
+    and the bracket spans are returned so `_disqualified` can detect it and
+    take the exact per-window path for that hit. A first draft without the
+    fallback differed on 9 of 40000 random bodies, every one of them carrying
+    an unclosed delimiter across a blank line; with it, 0.
+    """
+    bracketed = _elide_bracketed(scanned)
+    return (bracketed,
+            [(m.start(), m.end()) for m in NEGATION_RX.finditer(bracketed)],
+            [(m.start(), m.end()) for m in PREFIX_DISQUALIFY_RX.finditer(bracketed)],
+            [(m.start(), m.end()) for m in RX_ASIDE_BRACKETED.finditer(scanned)])
+
+
+def _disqualified(prose, match_start, scanned=None, ends=None, spans=None):
     """True when a negator or hedge GOVERNS the phrase at `match_start`.
 
     Two bounds, and both are needed. The window start is the last sentence
@@ -1178,12 +1280,22 @@ def _disqualified(prose, match_start):
     # feeds both the clause split and `_governs`. Blanking for the split
     # alone would still let a negator inside a span claim a scope it
     # never had, which is the mirror of the round-4 bracketed-aside bug.
-    scanned = _elide_code_spans(prose)
-    starts = [m.end() for m in RX_CLAUSE_START.finditer(scanned, 0, match_start)]
-    window_start = starts[-1] if starts else 0
-    return bool(_governs(scanned, window_start, match_start, NEGATION_RX)
+    if scanned is None:
+        scanned = _elide_code_spans(prose)
+    if ends is None:
+        ends = _clause_start_ends(scanned)
+    if spans is None:
+        spans = _disqualifier_spans(scanned)
+    bracketed, neg_hits, prefix_hits, bracket_spans = spans
+    k = bisect.bisect_right(ends, match_start)
+    window_start = ends[k - 1] if k else 0
+    if _straddles(bracket_spans, window_start, match_start):
+        # Exact per-window elision for this hit, per `_disqualifier_spans`.
+        bracketed = neg_hits = prefix_hits = None
+    return bool(_governs(scanned, window_start, match_start, NEGATION_RX,
+                         bracketed, neg_hits)
                 or _governs(scanned, window_start, match_start,
-                            PREFIX_DISQUALIFY_RX))
+                            PREFIX_DISQUALIFY_RX, bracketed, prefix_hits))
 
 
 def echoed_verdict(body):
@@ -1213,13 +1325,17 @@ def echoed_verdict(body):
             # it is that only this one call sits inside the try, and its
             # only effect is to skip an exemption (review finding 16).
             pass
+    # Blanked once and enumerated once for the whole body, not per hit.
+    scanned = _elide_code_spans(prose)
+    ends = _clause_start_ends(scanned)
+    spans = _disqualifier_spans(scanned)
     for hit in RX_DISPOSITION.finditer(prose):
         # The bullet branch starts at the preceding newline, so the clause
         # window would otherwise be the LINE ABOVE the bullet. Anchor on the
         # phrase's own first word instead.
         word = re.search(r"[A-Za-z0-9]", hit.group(0))
         start = hit.start() + (word.start() if word else 0)
-        if _disqualified(prose, start):
+        if _disqualified(prose, start, scanned, ends, spans):
             continue
         return " ".join(hit.group(0).split())
     return None

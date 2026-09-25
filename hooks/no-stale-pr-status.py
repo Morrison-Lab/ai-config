@@ -418,6 +418,27 @@ _RETARGET_LEAD = re.compile(
     re.I,
 )
 
+# ...but a preposition is not a re-target when a WAITING verb governs it.
+# Round 19, finding 4: "Waiting on CI, 2 checks pending." read as a count
+# attributed to something called CI, so the honest disclosure was dropped and
+# the clean claim beside it lost its exemption. `Blocked on`, `held up on`,
+# `depends on` and `stuck on` are the same shape. The bare count discloses,
+# and a colon rather than a comma already did, so the guard's answer turned on
+# punctuation the author never meant to signal with.
+#
+# It cannot be a lookbehind inside `_RETARGET_LEAD`: Python requires a
+# fixed-width one and these phrases differ in length. Instead the call site
+# asks whether a waiting phrase's own preposition IS the word that opened the
+# re-target lead, by comparing spans -- so "On main, and we are waiting" keeps
+# its re-target reading, which a bare `search` over the lead would not.
+_WAITING_ON = re.compile(
+    r"(?<![-\w])(?:wait(?:ing|s|ed)?|block(?:ed|ing)?|hold(?:ing)?|held|"
+    r"depend(?:s|ing|ed)?|hinge(?:s|d)?|stuck|gated|contingent|"
+    r"conditional|predicated)"
+    r"(?:[ \t]+up)?[ \t]+(?:on|for)(?![-\w])",
+    re.I,
+)
+
 
 def _clause_starts(text, breaker):
     """Every clause start under `breaker`, in ONE pass over `text`.
@@ -488,7 +509,9 @@ def discloses_pending(text):
         # re-target and "On main, checks are still running" was not, though
         # `_RETARGET_LEAD` matches the same lead in both. Only the RESOLVED
         # lead needs a digit, because only a count can have been fixed.
-        if _RETARGET_LEAD.search(lead):
+        retarget = _RETARGET_LEAD.search(lead)
+        if retarget and not any(
+                w.end() > retarget.start() for w in _WAITING_ON.finditer(lead)):
             continue
         # A COUNT is its own disclosure, and nothing trailing it retracts one.
         # The tail exists for a bare phrase -- "Checks pending: none" names no
@@ -641,9 +664,16 @@ def _check_push(tool_name: str, args: any) -> tuple[bool, str]:
 # over-matching: reading a real push as a refusal drops it from the
 # comparison, and the guard then goes silent over a genuinely stale claim.
 # The three shapes now agree, since a string result is a one-part list.
+# The leading run is ONE unbounded quantifier over a union, not three
+# adjacent ones. `\s*(?:\\n)*\s*` is quadratic on a FAILING
+# match: every split of a long whitespace prefix between the two `\s*` runs is
+# a distinct backtracking state, and a result part that opens with a long
+# run of spaces and is not a refusal takes 2.19s at 16000 spaces against
+# 0.0027s for the union. The alternation stays deterministic -- `\s` never
+# matches a backslash -- so at most one branch applies at any position.
 RX_NEVER_RAN = re.compile(
-    r"^\s*(?:\\n)*\s*PreToolUse:[^\n]*hook error:"
-    r"|^\s*(?:\\n)*\s*Permission for this action was denied",
+    r"^(?:\s|\\n)*PreToolUse:[^\n]*hook error:"
+    r"|^(?:\s|\\n)*Permission for this action was denied",
     re.I,
 )
 
@@ -1178,10 +1208,15 @@ def scan(path):
     survivors = [
         (idx, cmd) for idx, tid, cmd in push_attempts if tid not in blocked_push_ids
     ]
-    if survivors:
-        last_push, last_push_cmd = max(survivors, key=lambda pair: pair[0])
-    else:
-        last_push, last_push_cmd = -1, ""
+    # Last-wins on a tie, deliberately. `idx` is the MESSAGE index, so two
+    # pushes in one assistant message carry the same one, and `max` returns the
+    # FIRST maximal element -- which attributes the staleness to the earlier
+    # command while the later one is the push that actually moved the head.
+    # `>=` keeps the last, which is what the attribution line claims to name.
+    last_push, last_push_cmd = -1, ""
+    for idx, cmd in survivors:
+        if idx >= last_push:
+            last_push, last_push_cmd = idx, cmd
     return last_push, last_query, last_failing_query, text, last_push_cmd
 
 

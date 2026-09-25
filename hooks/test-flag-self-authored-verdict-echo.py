@@ -461,6 +461,21 @@ ECHO_NEGATOR_IN_COMMA_ASIDE = (
     "Five items, none trivial, are addressed in `f120e5a`.\n"
 ) % NOT_CLEAN
 
+# A bracketed span that OPENS before the phrase and CLOSES after it is the one
+# shape on which eliding brackets over the whole body and eliding them per
+# window disagree (`_disqualifier_spans`): the whole-body pass blanks the span
+# and with it the semicolon that severs the negator from the phrase, so the
+# negator attaches and the hook goes silent. The per-window pass slices at the
+# phrase, leaves the opening delimiter unmatched, and keeps the semicolon. The
+# straddle fallback is what routes this hit back to the exact per-window path;
+# without it this body is a MISSED disclosure, which is the expensive
+# direction. Measured over 200000 random bodies, 85 of them differ this way.
+ECHO_BREAK_IN_STRADDLING_PARENTHETICAL = (
+    "### Verdict\n**%s**\n\n"
+    "No findings are outstanding "
+    "(one was a duplicate; the other two are addressed in `f120e5a`).\n"
+) % NOT_CLEAN
+
 # `, and,` and `, but,` are clause boundaries wearing an aside's punctuation.
 # RX_ASIDE is leftmost-first, so it ate the conjunction SCOPE_BREAK_RX retains
 # as a break and left the negator governing the clause after it.
@@ -604,6 +619,19 @@ NEGATOR_A_PARAGRAPH_BACK = (
     "### Verdict\n**%s**\n\n"
     "None of this is deferred.\n\n"
     "The retry ceiling is addressed in `f120e5a`.\n"
+) % NOT_CLEAN
+
+# ...and the paragraph-back row above cannot pin the blank line ITSELF,
+# because its first paragraph also ends in a full stop, so `_clause_start_ends`
+# reaches the same window start through the terminator. Dropping the
+# blank-line branch from that scan therefore killed nothing. This row carries
+# no terminator at all, so the blank line is the only boundary between the
+# negator and the phrase: with the branch the phrase discloses, and without it
+# the negator governs from the paragraph above and the hook goes silent.
+ECHO_NEGATOR_ACROSS_BLANK_LINE = (
+    "### Verdict\n**%s**\n\n"
+    "No findings remain outstanding\n\n"
+    "All five are addressed in `f120e5a`\n"
 ) % NOT_CLEAN
 
 REVIEWER_ROW = (
@@ -862,6 +890,10 @@ def main():
           mcp(NEGATOR_A_SENTENCE_BACK), True)
     check("a negator a paragraph back does not reach the disposition",
           mcp(NEGATOR_A_PARAGRAPH_BACK), True)
+    check("a blank line alone ends the negator's clause",
+          mcp(ECHO_NEGATOR_ACROSS_BLANK_LINE), True)
+    check("a break inside a parenthetical straddling the phrase still warns",
+          mcp(ECHO_BREAK_IN_STRADDLING_PARENTHETICAL), True)
     check("a heredoc-written body is read, not called unreadable",
           fired("Bash", {"command":
                          "cat > /tmp/vb.md <<'EOF'\n%s\nEOF\n"
@@ -1343,6 +1375,43 @@ def main():
         shutil.rmtree(env["TMPDIR"], ignore_errors=True)
     check(f"20000 blank lines finish under 5s (took {elapsed:.2f}s)",
           elapsed < 5.0, True)
+
+    # Round 19, finding 2: the CALLER-side twin of that quadratic, which the
+    # flood above cannot see because its body carries exactly one disposition
+    # hit. `_disqualified` ran a clause scan per hit and `_governs` drained a
+    # `finditer` over a growing window per hit, so k hits over n characters
+    # cost O(n*k). A profile of a 1500-hit body put 2.712s of 2.919s inside
+    # `_governs` alone, which is why hoisting the clause split by itself
+    # moved the number hardly at all.
+    #
+    # Every hit must be DISQUALIFIED for the loop to run to completion: the
+    # first hit that is not returns, and a body of plain dispositions times
+    # one iteration. A negator on the line above each label disqualifies all
+    # of them, and the body carries no sentence terminator, so every hit's
+    # window is the whole prefix -- the worst case rather than a typical one.
+    #
+    # Measured at 3000 hits: 16.24s before, 0.19s after, against the same 5s
+    # ceiling. The residual is the straddle fallback, which keeps the old
+    # per-window path exactly and so keeps its cost: a bracketed span
+    # enclosing every hit reads 5.30s at 2000 hits, unchanged from before
+    # this round. Tracked rather than fixed here, since it is the behaviour
+    # that already shipped.
+    hits = "Needs more work\n\n" + "no findings\nAddressed\n" * 3000
+    env = dict(os.environ)
+    env["TMPDIR"] = tempfile.mkdtemp(prefix="verdict-echo-hits-")
+    try:
+        payload = {"tool_name": "mcp__github__add_issue_comment",
+                   "tool_input": {"owner": "o", "repo": "r",
+                                  "issue_number": 1, "body": hits},
+                   "cwd": ROOT, "transcript_path": "/nonexistent/hits.jsonl"}
+        started = time.time()
+        subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
+                       capture_output=True, text=True, env=env)
+        elapsed = time.time() - started
+    finally:
+        shutil.rmtree(env["TMPDIR"], ignore_errors=True)
+    check(f"3000 disqualified disposition hits finish under 5s "
+          f"(took {elapsed:.2f}s)", elapsed < 5.0, True)
 
     if FAILURES:
         print(f"\n{EXAMINED - len(FAILURES)}/{EXAMINED} passed")

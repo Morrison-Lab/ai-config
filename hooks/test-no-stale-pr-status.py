@@ -553,6 +553,39 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("14 pass. On this PR, checks are still running.")], False,
      "...and the self-referential object is still a disclosure, not a re-target"),
+    # Round 19, finding 4. A waiting verb's own preposition is not a
+    # re-target lead. Each of these discloses pending work and was blocked,
+    # while the same sentence punctuated with a colon was exempt -- so the
+    # guard's answer turned on punctuation carrying no meaning here.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Waiting on CI, 2 checks pending.")], False,
+     "`waiting on` is a disclosure of pending work, not a re-target"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Blocked on CI, 3 checks pending.")], False,
+     "...and so is `blocked on`"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Held up on the runner, 2 checks pending.")], False,
+     "...and `held up on`, whose verb phrase no fixed-width lookbehind fits"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Depends on CI, 2 checks pending.")], False,
+     "...and `depends on`"),
+    # The exemption is tied to the SPAN, not to the lead as a whole: the
+    # waiting phrase must supply the very preposition the re-target lead
+    # opened with. A waiting verb elsewhere in the lead leaves the re-target
+    # reading intact, which a bare search over the lead would destroy.
+    #
+    # That has to happen inside `_RESOLVED_LEAD_WINDOW`, which is 48
+    # characters, AND with more than three words between the two
+    # prepositions, since `_RETARGET_LEAD` reaches back only three. Two
+    # earlier drafts of this row satisfied neither -- the first was too long
+    # for the re-target lead to match at all, the second pushed the waiting
+    # verb out of the window -- and each passed while pinning nothing. Only
+    # the mutation sweep reported it: relaxing the span test to a bare
+    # search killed zero rows.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Waiting on a slow flaky build, "
+          "on main, 2 checks pending.")], True,
+     "a waiting verb elsewhere in the lead does not cancel a re-target"),
     # Round 18, finding 5. A CI noun the set omitted turned an honest
     # progress report into a block. Widening the noun list constrains the
     # polysemous pending word to check context rather than loosening it.
@@ -1017,6 +1050,83 @@ CASES = [
                        "address.")], True,
      "nor must a trailing 'did not' -- this is the phrasing the RX_NEGATION "
      "comment says the guard must keep catching"),
+
+    # ai-config#3958: quoted push vocabulary in tool inputs must not be treated as a push.
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "edit", "input": {
+              "file_path": "hooks/no-stale-pr-status.py",
+              "text": "RX_PUSH = re.compile(r'git push|push_files')\n"
+          }}]}},
+      say("All checks green at this head.")], False,
+     "edit tool modifying code containing push vocabulary is not a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "replace_file_content", "input": {
+              "TargetFile": "/path/to/script.py",
+              "ReplacementContent": "def push_files():\n    pass\n"
+          }}]}},
+      say("All checks green at this head.")], False,
+     "replace_file_content writing push_files is not a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "run_command", "input": {
+              "command": "cat << 'EOF' > hooks/no-stale-pr-status.py\nRX_PUSH = re.compile(r'git push')\nEOF"
+          }}]}},
+      say("All checks green at this head.")], False,
+     "bash heredoc rewriting file with git push vocabulary is not a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "bash", "input": {
+              "command": 'git commit -m "fix(guard): ignore quoted git push in messages"'
+          }}]}},
+      say("All checks green at this head.")], False,
+     "git commit message mentioning git push is not a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "bash", "input": {
+              "command": "sed -i 's/git push/git push --dry-run/' script.sh"
+          }}]}},
+      say("All checks green at this head.")], False,
+     "sed substitution mentioning git push is not a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "run_command", "input": {
+              "command": "python -c \"print('git push')\""
+          }}]}},
+      say("All checks green at this head.")], False,
+     "python command mentioning git push in arguments is not a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "run_command", "input": {
+              "command": "git add -A && git push origin fix-branch"
+          }}]}},
+      say("All checks green at this head.")], True,
+     "chained git push after git add is recognized as a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "run_command", "input": {
+              "CommandLine": "git push --force-with-lease origin main"
+          }}]}},
+      say("All checks green at this head.")], True,
+     "CommandLine parameter with git push is recognized as a push"),
+
+    # Local file tools mentioning query vocabulary must not register as a fresh status query.
+    ([QUERY, PUSH,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "view_file", "input": {
+              "AbsolutePath": "/path/to/scripts/check-pr-fully-clean.py"
+          }}]}},
+      say("All checks green at this head.")], True,
+     "view_file mentioning query vocabulary must not count as fresh status query"),
+    ([QUERY, PUSH,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "edit", "input": {
+              "file_path": "scripts/ci.sh",
+              "text": "gh pr checks 123\n"
+          }}]}},
+      say("All checks green at this head.")], True,
+     "edit tool mentioning query vocabulary must not count as fresh status query"),
 ]
 
 
@@ -1100,6 +1210,25 @@ def check_cost():
     # reference anywhere near them -- one `#N` and it breaks on the first
     # hit. Measured with the bisect reverted, 14.84s; it is 0.60s here.
     STALE = "".join("Suite %d: 12 pass.\n" % i for i in range(6000))
+    # Round 19, finding 3. `RX_NEVER_RAN` opened with three adjacent
+    # unbounded runs, so a FAILING match over a long whitespace prefix tried
+    # every split of it between them. It runs once per PART of every push
+    # tool_result, and a push result is exactly where a padded harness
+    # banner lands, so the shape is eight parts each opening with a long run
+    # and going on to say the call succeeded. Measured at 8 x 16000:
+    # 18.47s with the three runs reinstated, 0.05s as written. The other
+    # three shapes above cannot see it -- none of them carries a push
+    # tool_result at all, so the helper is never called.
+    NEVER_RAN_COST = [
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "pz", "name": "bash",
+             "input": {"command": "git push origin main"}}]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": "pz", "content": [
+                {"type": "text", "text": " " * 16000 + "Exit code 0"}
+                for _ in range(8)]}]}},
+        say(CLEAN),
+    ]
     shapes = [
         ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
           say(CLEAN + "fixed 3 errors left " * 8000)],
@@ -1111,6 +1240,7 @@ def check_cost():
          "many asserts beside a disclosed pending state"),
         ([PUSH, PUSH_OK, say(STALE)],
          "many bare counts on the staleness branch"),
+        (NEVER_RAN_COST, "long whitespace runs in a push result"),
     ]
     for events, label in shapes:
         started = time.time()
@@ -1123,7 +1253,7 @@ def check_cost():
     return failures
 
 
-COST_CHECKS = 4
+COST_CHECKS = 5
 
 
 def run(events):
@@ -1290,6 +1420,17 @@ PUSH_ATTRIBUTION = [
     ({"type": "assistant", "message": {"content": [
         {"type": "tool_use", "name": "run_command", "input": {"command": "git push origin main"}}]}},
      "(git push origin main)", "CLI chained/argument push in reason"),
+
+    # Two pushes in ONE assistant message share a message index, so the
+    # tie-break decides which one the warning names. `max` returns the first
+    # maximal element and would name `first`; the head was moved by `second`.
+    ({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": "t1", "name": "run_command",
+         "input": {"command": "git push origin first"}},
+        {"type": "tool_use", "id": "t2", "name": "run_command",
+         "input": {"command": "git push origin second"}}]}},
+     "(git push origin second)",
+     "two pushes in one message: the LAST is named, not the first"),
 ]
 
 

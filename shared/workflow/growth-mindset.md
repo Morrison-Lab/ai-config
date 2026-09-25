@@ -352,3 +352,38 @@ eventually harming what it's part of. Apply the same test here:
   fills --- the same "worth it?" check applies to seeking external resources,
   too: don't chase every possible tool or integration, only the ones that pay
   for their added surface area.
+
+## A source you cannot reach goes to the user, named
+
+A paper, book, dataset or web page that the network allowlist will not serve
+is a resource gap, and the "Ask the user directly" bullet above applies to it.
+It is worth its own section because it arrives quietly: the fetch fails,
+the model still remembers the source, and citing it from memory produces a
+sentence that reads as checked.
+
+So when you or a subagent cannot reach a source, tell the user, naming the
+source (title, author, DOI or URL) and the host that refused, so they can
+supply it or widen the allowlist.
+Say which failure it was.
+A proxy refusal (`curl: (56) CONNECT tunnel failed, response 403`) is an
+allowlist question.
+An HTTP status from the origin is the publisher refusing, which a wider
+allowlist does not change, so there the user needs to supply the file.
+A subagent cannot reach the user, so it reports the gap in its hand-back and
+the dispatching session passes it on.
+
+- **Do:** name the source and the failing host to the user, whether the gap
+  was yours or a subagent's.
+- **Do:** keep working on whatever does not depend on the missing source, and
+  mark the dependent claim as unverified until the user supplies the source.
+- **Don't:** quote, paraphrase or cite a source you could not open, from memory
+  or from a secondary source that quotes it.
+- **Don't:** work around the gap silently, for example by substituting a
+  different source without saying so.
+
+(Directive from Ezra, 2026-09-25: "if you or a subagent ever needs access to a
+paper, book, etc that can't be found in the allowlist, always let me know and
+I'll find it myself or expand the allowlist".
+The Do/Don't pairs are inferred from that directive and from the coordinator
+note relaying it, which named the source-and-host requirement and the
+no-citing-from-memory half.)

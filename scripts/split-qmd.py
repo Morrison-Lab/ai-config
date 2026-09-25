@@ -62,10 +62,10 @@ def split_blank_edges(chunk):
 
 
 def add_subfile(out, name, chunk):
-    """Record chunk as a subfile named after name and include it from the spine."""
-    _, chunk, _ = split_blank_edges(chunk)
-    if not chunk:
-        return
+    """Record chunk as a subfile named after name and include it from the spine.
+
+    Both callers pass a chunk with no blank first or last line.
+    """
     n = out["used"].get(name, 0) + 1
     out["used"][name] = n
     fname = f"_{name}.qmd" if n == 1 else f"_{name}-{n}.qmd"
@@ -106,7 +106,8 @@ def split(path):
     path = Path(path)
     lines = path.read_text().split("\n")
     # front matter
-    assert lines[0] == "---", "expected front matter"
+    if lines[0] != "---" or "---" not in lines[1:]:
+        sys.exit(f"{path}:1: expected YAML front matter between two --- lines")
     end = lines.index("---", 1)
     body = lines[end + 1 :]
 

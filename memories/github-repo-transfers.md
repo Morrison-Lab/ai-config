@@ -322,3 +322,26 @@ Worth recording that the draft violated the rule its own companion entry states
 in [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)
 --- state the claim at the confidence the reachable evidence supports --- which
 is how hard that rule is to apply to a claim you have just been handed.)
+
+## A transfer redirects the repository but not its Pages site
+
+GitHub redirects `github.com/<old>/<repo>` and git URLs after a transfer,
+but `<old>.github.io/<repo>/` simply 404s: the project site now lives at
+`<new>.github.io/<repo>/`, and nothing forwards the old address.
+Measured 2026-09-25 when `d-morrison/rme` moved to `Morrison-Lab/rme`:
+`morrison-lab.github.io/rme/` served 200 within minutes, and
+`d-morrison.github.io/rme/` returned 404.
+
+A request for a path under the old address falls through to the old
+owner's **user site** (`<old>/<old>.github.io`), so that repo is where
+the fix goes: a root `404.html` whose script rewrites any path under the
+moved prefix to the same path, query and fragment on the new host, plus
+a `<prefix>/index.html` meta-refresh for the bare URL (a 404 response
+with a JS redirect is weaker for crawlers than a 200 page).
+If the old owner has no user-site repo, creating one is the only route.
+
+- **Do:** check the Pages URL, not just the repository URL, after any
+  transfer, and put deep-path redirects in the old owner's user site.
+- **Do:** update the site's own `site-url`, and any Analytics stream keyed
+  to the old host.
+- **Don't:** read GitHub's repository redirect as covering the Pages site.

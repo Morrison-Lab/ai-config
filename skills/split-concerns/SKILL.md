@@ -73,20 +73,20 @@ Examples:
 
 When the split could reasonably go either way,
 take the finer one.
-The cost of a split that turns out too fine is bookkeeping:
-one more PR to open, and sometimes a temporary gap between them,
-such as links to content that lands in a later PR
-plus a closing PR that restores them.
-The cost of a split that is too coarse lands on the reviewer,
-who has to review one large diff as a whole
-and cannot merge the easy part while the hard part is still being discussed.
+A split that turns out too fine costs bookkeeping:
+one more PR to open,
+and sometimes a temporary gap between the PRs,
+such as links to content that lands in a later PR,
+which that later PR then makes resolve.
+A split that is too coarse gives up the "Benefits to communicate" above,
+and those costs land on the reviewer rather than on you.
 
 - **Do:** pick the finer split when both are defensible,
-  and accept a temporary gap plus a final PR that closes it.
+  and accept a temporary gap that a later PR closes.
 - **Don't:** settle on the coarser split just because it means fewer PRs to manage.
-- **Don't:** use the list below to settle a close call.
-  It is for changes that clearly shouldn't be split,
-  not for granularity you're unsure about.
+- **Don't:** stretch the small-diff item under "When NOT to split" into a tiebreaker.
+  It applies to a diff that really is under 50 lines,
+  not to every close call about granularity.
 
 (Directive from the user, 2026-09-25:
 "when uncertain, err on the side of more decomposition",

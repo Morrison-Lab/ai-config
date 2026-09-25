@@ -831,3 +831,17 @@ Do not write "X, as quoted in Y".
 
 (Directive from the user, 2026-09-25: "why quote Goodfellow quoting Mitchell,
 when we can quote Mitchell directly? ... (apply this principle generally too)".)
+
+## Emphasize the content, not its creators
+
+Headers and prose name the topic, not the person who said it:
+"A formal definition of machine learning", not "Mitchell's definition".
+Put the citation after a quotation as a bare Quarto citation (`[@key]`),
+with no commentary about the author or where the quotation appeared.
+
+- **Do:** title a section by its content, and follow a quotation with its citation alone.
+- **Don't:** build headers or sentences around the author,
+  or add narration such as "as he puts it" or "a definition usually credited to".
+
+(Directive from the user, 2026-09-25: "the emphasis should be on the content,
+not on the creators".)

@@ -14,6 +14,15 @@ Watch for:
 - **Rhetorical reflexes:** the "it's not just X, it's Y" antithesis (the biggest
   tell), mechanical rule-of-three lists, signposting filler ("it's worth noting
   that", "importantly"), hedging stacks, hollow "in conclusion" restatements.
+- **Setup-then-payoff clichés:** a straw objection raised only to be answered
+  ("It can read like a definition that says nothing.
+  Its use is in ..."), which is the antithesis above spread over two sentences;
+  a personified abstraction that "forces", "invites", or "demands" something of
+  the reader; a colon reveal that withholds the point until after the colon;
+  a second-person "you" in expository prose; and a closing aphorism that
+  restates the point as a verdict ("... has not yet stated a problem").
+  Replace them with the literal claim.
+  (Directive from the user, 2026-09-25, flagging those in a lecture slide.)
 - **Formulaic openers:** a declarative sentence fronted by one of four shapes.
   An underspecified reference: a bare demonstrative ("This is", "That is",
   "These are", "Those are") or "The one that".

@@ -69,6 +69,13 @@ Examples:
 - **Lower risk** — if one change causes a regression, the revert is surgical
 - **Better CI signal** — failures are attributable to a specific change
 
+## When NOT to split
+
+- Changes are tightly coupled (splitting would break one or both)
+- The total diff is small (<50 lines) and splitting adds more overhead than value
+- User explicitly says "keep it in one MR"
+- The concerns share significant context that would be lost if separated
+
 ## When unsure how finely to split, split finer
 
 When the split could reasonably go either way,
@@ -76,15 +83,15 @@ take the finer one.
 A split that turns out too fine costs bookkeeping:
 one more PR to open,
 and sometimes a temporary gap between the PRs,
-such as links to content that lands in a later PR,
-which that later PR then makes resolve.
+such as a link to content that the later PR has not yet added,
+which stays broken until that PR lands.
 A split that is too coarse gives up the "Benefits to communicate" above,
 most visibly faster review and independent timelines.
 
 - **Do:** pick the finer split when both are defensible,
   and accept a temporary gap that a later PR closes.
 - **Don't:** settle on the coarser split just because it means fewer PRs to manage.
-- **Don't:** stretch the judgment items under "When NOT to split" into tiebreakers.
+- **Don't:** stretch the judgment items in "When NOT to split" above into tiebreakers.
   The small-diff item applies to a diff that really is under 50 lines,
   and the shared-context item only when a reviewer of one PR
   could not follow it without reading the other's diff.
@@ -93,10 +100,3 @@ most visibly faster review and independent timelines.
 (Directive from the user, 2026-09-25:
 "when uncertain, err on the side of more decomposition",
 said about splitting a large lecture-notes consolidation into PRs.)
-
-## When NOT to split
-
-- Changes are tightly coupled (splitting would break one or both)
-- The total diff is small (<50 lines) and splitting adds more overhead than value
-- User explicitly says "keep it in one MR"
-- The concerns share significant context that would be lost if separated

@@ -12,7 +12,8 @@ The spine keeps the front matter, headings, slide breaks, HTML comments and
 blank lines. Every non-empty top-level fenced div becomes one subfile,
 named after its id, or <section>-<class> when it has only a class
 (::: {.note} or the bare ::: note), or <section>-div when it has neither.
-An empty placeholder such as ::: {#refs} stays in the spine. Every other run of top-level content becomes a _sec-<heading>.qmd.
+An empty placeholder such as ::: {#refs} stays in the spine. Every other
+run of top-level content becomes a _sec-<heading>.qmd.
 An unclosed div, code fence or HTML comment stops the split with its line
 number before anything is written.
 Re-running on an already-split spine is a no-op (it only holds spine items

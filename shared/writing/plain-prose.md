@@ -26,6 +26,12 @@ When PSW and this guidance disagree, PSW wins.
   present an idealization or a prior approach afterward,
   as an extension rather than a correction to something just asserted.
   See [`no-rug-pulls`](no-rug-pulls.md).
+- **Put an inline list of three or more phrases in a bullet list**,
+  introduced by a sentence ending in a colon, and number sequential steps.
+  A short series of single words may stay inline.
+  PSW's rule and examples are proposed in `Morrison-Lab/psw#60` ---
+  once merged, they live at `chapters/conciseness.qmd`,
+  "Put lists in bullet points".
 
 This is a default, not an absolute rule. Keep a clause or a technical term when
 removing it would lose meaning or precision. Never trade an honest hedge for

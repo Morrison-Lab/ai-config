@@ -7222,6 +7222,26 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
         ) == "not-clean",
     )
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, sixteenth round:
+    # `_copilot_v2_findings_count` previously returned `None` early when `blocks` was empty,
+    # skipping the orphan scan entirely. A cited marker followed by a live nonzero Findings line
+    # with NO later block returned no verdict ("") instead of "not-clean".
+    check(
+        "copilot_verdict: a real block orphaned by a code-span-cited marker "
+        "with no subsequent blocks still counts its nonzero Findings line as not-clean",
+        checker.copilot_verdict(
+            "``<!-- ccr-overview-v2 -->``\n\n## Copilot review overview\n\n"
+            "### Approval recommended\n\n**Findings:** 5 <picture><img></picture>\n"
+        ) == "not-clean",
+    )
+    check(
+        "copilot_verdict: a cited marker with an uncited Findings: None line "
+        "and no subsequent block yields no verdict (absent overview, cannot manufacture clean)",
+        checker.copilot_verdict(
+            "``<!-- ccr-overview-v2 -->``\n\n## Copilot review overview\n\n"
+            "### Approval recommended\n\n**Findings:** None\n"
+        ) == "",
+    )
     check(
         "copilot_verdict: an uncited top-level nonzero Findings line in a "
         "LATER section is decisive, not ignored",

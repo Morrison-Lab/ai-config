@@ -451,10 +451,16 @@ _COPILOT_TEMPLATE_HEADING_PREFIX = r"(?:[^\w\n'\"]+[ \t]*)?"
 # A prose line may not begin with any character that starts a Markdown
 # structural construct this template does not otherwise account for: `#`
 # (a heading), `*` (bold/italic emphasis, covering `**Review effort:**`-
-# shaped text so a stray field-looking line cannot hide as prose), `<` (an
-# HTML tag -- a `<details>` section or any other element), a backtick (an
-# inline code span or the start of a ``` fence), or `~` (a ~~~ fence).
-_COPILOT_TEMPLATE_PROSE_LINE = r"(?![#*<`~])[^\n]+"
+# shaped text so a stray field-looking line cannot hide as prose), a
+# backtick (an inline code span or the start of a ``` fence), or `~` (a
+# ~~~ fence). `<` (an HTML tag) is excluded from the whole line, not just
+# its first character ([ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004) review finding): a real empty-Balanced
+# review's summary prose never contains an HTML tag, and `[^\n]+` alone let
+# a MID-SENTENCE `<strong>Open (1)</strong>` (or any other tag) hide inside
+# an otherwise-ordinary-looking prose line, which is exactly how
+# `COPILOT_OPEN_COUNT` below can be defeated from inside the fullmatch
+# rather than only from outside it.
+_COPILOT_TEMPLATE_PROSE_LINE = r"(?![#*`~])[^\n<]+"
 COPILOT_EMPTY_BALANCED_TEMPLATE = re.compile(
     r"\n*"
     r"<!--[ \t]*ccr-overview-v2[ \t]*-->\n+"
@@ -466,6 +472,24 @@ COPILOT_EMPTY_BALANCED_TEMPLATE = re.compile(
     r"\n*",
     re.IGNORECASE,
 )
+# Two raw-body guards checked ALONGSIDE the fullmatch, not inside it
+# ([ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004) review finding): the fullmatch alone only rejects a STRUCTURAL
+# deviation from the template's own line shapes, so plain prose that
+# happens to read "Previously missed items were checked and none remain
+# outstanding." or "See the Open (1) section" -- no heading, no tag, no
+# fence, nothing the prose-line pattern above forbids -- matched the
+# template outright before this pair existed. Both mirror
+# `scripts/check-pr-fully-clean.py`'s own `COPILOT_PREVIOUSLY_MISSED` /
+# `COPILOT_OPEN_ITEMS_HEADING` guards, but broader: that file's Open-items
+# check requires `<strong>...Open (N)...</strong>` markup specifically,
+# while this one matches the bare phrase with no tag required at all, since
+# the prose-line fix above already forbids a `<` from reaching the fullmatch
+# and a reviewer could still write the same words in the summary sentence
+# with no markup whatsoever. Checked against `raw_body`, not the normalized
+# text: a real finding stated this way is a real finding regardless of
+# what line endings or trailing whitespace the review happened to use.
+COPILOT_PREVIOUSLY_MISSED = re.compile(r"previously\s+missed", re.IGNORECASE)
+COPILOT_OPEN_COUNT = re.compile(r"Open[ \t]*\([0-9]+\)", re.IGNORECASE)
 
 
 def copilot_is_empty_balanced_closer_look(raw_body):
@@ -512,29 +536,46 @@ def copilot_is_empty_balanced_closer_look(raw_body):
       non-letter prefix before the words is allowed, nothing else on the
       line), one or more blank lines;
     - EXACTLY ONE prose paragraph -- one or more lines with no blank line
-      between them, none starting with `#`, `*`, `<`, a backtick, or `~`
-      (so a heading, a bold-looking field, an HTML tag, or a fence can
-      never masquerade as prose) -- then one or more blank lines;
+      between them, none starting with `#`, `*`, a backtick, or `~` (so a
+      heading, a bold-looking field, or a fence can never masquerade as
+      prose), and none containing a `<` ANYWHERE in the line, not merely
+      as its first character (so an HTML tag cannot hide mid-sentence
+      either) -- then one or more blank lines;
     - the exact line `**Review effort:** Balanced`, immediately (no blank
       line permitted) followed by the exact line `**Findings:** None`;
     - optional trailing blank lines, and NOTHING else.
 
-    Any deviation returns False: a details block anywhere (INCLUDING a
-    harmless "Resolved since last review" list with no live finding in
-    it), a code fence or inline code span anywhere, a second marker, extra
-    prose paragraphs, a missing or reworded heading, a different effort or
-    findings value, or any trailing content after the findings line. This
-    is STRICTER than `scripts/check-pr-fully-clean.py`'s own carve-out,
-    which is the safe direction for a coarser, second, independent
-    classifier to err in: a real empty-Balanced review that ALSO lists
-    resolved items (a legitimate, common shape once a PR has had a prior
-    round) stays NOT_CLEAN in this gate even though the more sophisticated
-    checker would correctly read it as no verdict. That gap is accepted
-    deliberately -- see `scripts/test_enforce_mwc_review_gate.py`'s test
-    against the real, verbatim body of Lacaedemon/sparta#1638's review
-    5316721676, which this template matches, alongside a test confirming
-    the identical body PLUS a trailing details block does not.
+    Any structural deviation returns False: a details block anywhere
+    (INCLUDING a harmless "Resolved since last review" list with no live
+    finding in it), a code fence or inline code span anywhere, a second
+    marker, extra prose paragraphs, a missing or reworded heading, a
+    different effort or findings value, or any trailing content after the
+    findings line. This is STRICTER than `scripts/check-pr-fully-clean.py`'s
+    own carve-out, which is the safe direction for a coarser, second,
+    independent classifier to err in: a real empty-Balanced review that
+    ALSO lists resolved items (a legitimate, common shape once a PR has
+    had a prior round) stays NOT_CLEAN in this gate even though the more
+    sophisticated checker would correctly read it as no verdict. That gap
+    is accepted deliberately -- see `scripts/test_enforce_mwc_review_gate.py`'s
+    test against the real, verbatim body of Lacaedemon/sparta#1638's
+    review 5316721676, which this template matches, alongside a test
+    confirming the identical body PLUS a trailing details block does not.
+
+    Two further checks apply ALONGSIDE the structural template, on
+    `raw_body` rather than the normalized text, and either one alone
+    fails this closed regardless of an otherwise-perfect structural match
+    ([ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004) review finding -- see `COPILOT_PREVIOUSLY_MISSED` /
+    `COPILOT_OPEN_COUNT`'s own definitions for why a purely structural
+    template cannot catch these on its own): a case-insensitive
+    "previously missed" appearing anywhere, or "Open (" plus digits plus
+    ")" appearing anywhere. Both are real findings the overview's own
+    Findings count does not capture, whether stated as plain prose inside
+    the one paragraph the template otherwise allows, or as
+    `<strong>`-wrapped markup the `<`-exclusion above already rejects on
+    its own.
     """
+    if COPILOT_PREVIOUSLY_MISSED.search(raw_body) or COPILOT_OPEN_COUNT.search(raw_body):
+        return False
     normalized = "\n".join(
         line.rstrip()
         for line in raw_body.replace("\r\n", "\n").replace("\r", "\n").split("\n")

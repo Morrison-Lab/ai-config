@@ -331,10 +331,17 @@ class TestEvaluate(unittest.TestCase):
         self.assertEqual(decision["decision"], "deny")
         self.assertIn("not clean", decision["reason"])
 
-    def test_copilot_balanced_previously_missed_still_denies(self):
+    def test_copilot_balanced_previously_missed_in_trailing_details_denies(self):
         """A Balanced 'Needs a closer look' review carrying a 'Previously
-        missed' item is a real finding the overview's own Findings count
-        does not capture, and still blocks (ai-config#4004)."""
+        missed' item in a TRAILING <details> block is a real finding the
+        overview's own Findings count does not capture, and still blocks.
+        This covers trailing content specifically -- it denies for that
+        reason alone (the template permits nothing after the Findings
+        line) even before the dedicated `COPILOT_PREVIOUSLY_MISSED` guard
+        is consulted; see `test_copilot_previously_missed_in_prose_denies`
+        below for the guard actually being exercised, with the phrase
+        placed INSIDE the one permitted prose paragraph instead
+        (ai-config#4004)."""
         body = (
             self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY
             + "\n\n<details>\n<summary>Review details</summary>\n\n"
@@ -647,16 +654,113 @@ class TestEvaluate(unittest.TestCase):
         self.assertEqual(decision["decision"], "deny")
         self.assertIn("not clean", decision["reason"])
 
-    def test_copilot_balanced_open_items_still_denies(self):
+    def test_copilot_balanced_open_items_in_trailing_details_denies(self):
         """A Balanced 'Needs a closer look' review carrying a genuine
-        'Open (N)' listing -- an unresolved item from a re-review -- still
-        blocks, the same way a 'Previously missed' item does
+        'Open (N)' listing in a TRAILING <details> block -- an unresolved
+        item from a re-review -- still blocks, the same way a 'Previously
+        missed' item does. This covers trailing content specifically -- it
+        denies for that reason alone (the template permits nothing after
+        the Findings line) even before the dedicated `COPILOT_OPEN_COUNT`
+        guard is consulted; see `test_copilot_open_count_in_prose_denies`
+        below for the guard actually being exercised, with the phrase
+        placed INSIDE the one permitted prose paragraph instead
         (ai-config#4004)."""
         body = (
             self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY
             + "\n\n<details open>\n<summary><strong>Open (1)</strong>"
             "</summary>\n\n"
             "- [Some open finding](#discussion_r1) · New\n</details>"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    # ai-config#4004, round 6: f7faca5b's whole-body template only rejected
+    # a prose line whose FIRST character was #/*/</backtick/~, so a real
+    # finding stated in ordinary prose -- with none of those characters
+    # anywhere near it -- matched the template outright. Each test below
+    # is a genuine regression test against f7faca5b specifically: confirmed
+    # by running it against that commit's own code (not merely asserted)
+    # before writing the fix, and each one denied under the fix and was
+    # WRONGLY allowed (matched True) under f7faca5b.
+
+    def test_copilot_previously_missed_in_prose_denies(self):
+        """'Previously missed' stated in plain prose, inside the one
+        paragraph the template otherwise permits -- no heading, no tag, no
+        fence, nothing the prose-line pattern forbade on its own.
+        f7faca5b's fullmatch alone read this as the empty-Balanced shape
+        (WRONGLY allowed); `COPILOT_PREVIOUSLY_MISSED` now catches it
+        regardless of where in the body the phrase sits (ai-config#4004)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY.replace(
+            "The broad routing, formation-geometry, and link-lifecycle "
+            "changes warrant final human review despite strong regression "
+            "coverage.",
+            "Previously missed items were checked and none remain "
+            "outstanding.",
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_open_count_in_prose_denies(self):
+        """'Open (1)' stated in plain prose, no markup at all. f7faca5b's
+        fullmatch alone read this as the empty-Balanced shape (WRONGLY
+        allowed); `COPILOT_OPEN_COUNT` now catches the bare phrase with no
+        `<strong>` wrapping required (ai-config#4004)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY.replace(
+            "The broad routing, formation-geometry, and link-lifecycle "
+            "changes warrant final human review despite strong regression "
+            "coverage.",
+            "See the Open (1) section for details.",
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_strong_open_mid_sentence_denies(self):
+        """'<strong>Open (1)</strong>' sitting mid-sentence, inside the
+        prose paragraph -- not as the line's own first character, which
+        f7faca5b's prose-line pattern already forbade, but partway through
+        an otherwise ordinary-looking line. f7faca5b's fullmatch read this
+        as the empty-Balanced shape (WRONGLY allowed, since only the
+        FIRST character of the line was checked); the prose-line pattern
+        now forbids a `<` anywhere in the line, and `COPILOT_OPEN_COUNT`
+        catches the phrase itself too (ai-config#4004)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY.replace(
+            "The broad routing, formation-geometry, and link-lifecycle "
+            "changes warrant final human review despite strong regression "
+            "coverage.",
+            "See the <strong>Open (1)</strong> section for details.",
         )
         self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
         state = pr(

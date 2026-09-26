@@ -611,3 +611,51 @@ needed conflict resolution more than once and each attempt claimed success
 but the PR still shows `CONFLICTING`, check every "resolved conflicts" commit
 in its history this way before trying yet another resolution attempt on top
 of a foundation that was never actually re-merged.
+
+## Fix a conflict on a PR you're driving the moment you notice it
+
+Holding a `CONFLICTING` PR for a check-in wastes a round trip on work that's
+usually mechanical (merge the base into the head, resolve, push) and always
+reversible short of a force-push --- so resolve it right away rather than
+waiting to be told to.
+This is the specific case of `CLAUDE.md`'s "Watch and ARDI every PR you
+touch" standing yes: "touch" there already means driving the branch (you
+opened it, were asked to iterate it, or are pushing fixes to it), and
+conflict resolution is one of the things driving covers.
+It does **not** cover a PR you were asked only to review --- that section's own
+Review-only mode already says not to push fixes there, and a merge is a
+push.
+Nor does it cover a PR outside your scope: `memories/reviewing-prs.md`'s scope
+test still gates whose branch you touch, per
+`memories/preferences.md`'s "proactively re-sync EVERY trailing open PR branch
+that passes [that] scope test... an out-of-scope branch is reported to the
+user and left untouched".
+This section adds nothing to that scope; it only says that within it, a
+conflict is resolved on sight rather than parked for approval ---
+this fragment's opening already states the same
+"don't wait for a conflict to surface or for someone to ask" for the plain
+sync-before-push case, and this generalizes it to the moment a conflict is
+*noticed*, from any source (a notification, a status check, a review-bot
+comment), not only a push you were about to make yourself.
+When several of your PRs are conflicting at once, "on sight" means one
+batched pass over all of them, per [`batch-merge-and-resolve`](batch-merge-and-resolve.md),
+not a serial chase of each flag as it appears; what this section rules out is
+waiting for approval, not batching.
+
+- **Do:** the moment a conflict is noticed on a PR you're driving, merge the
+  base branch into the head, resolve it, and push --- no approval needed
+  first.
+- **Do:** when several PRs you're driving conflict at once, resolve them
+  together in one batched pass rather than one at a time as each flag appears.
+- **Don't:** leave such a PR `CONFLICTING` pending a check-in, or treat "this
+  still needs a human's review or approval before merge" as a reason to also
+  hold off on fixing its conflicts --- resolving is not approving.
+- **Don't:** push a conflict fix to a PR that fails the scope test, or to one
+  you were asked only to review --- resolve those by asking, or by reporting
+  the conflict, per the sections above.
+- **Don't:** force-push or push to `main` while resolving --- the standing
+  scope limits on those still apply; resolve by merging the base into the PR
+  branch, never by rewriting its history.
+
+(Directive from the user, 2026-09-26: "cai: always fix conflicts; don't wait
+for my approval".)

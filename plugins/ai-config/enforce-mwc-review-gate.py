@@ -164,36 +164,6 @@ _COPILOT_HEADING_PREFIX = r"(?:^|\n)[ \t]*#{1,6}[ \t]*(?:[^\w\n\'\"]+[ \t]*)?"
 COPILOT_AFFIRMATIVE_HEADER = re.compile(
     _COPILOT_HEADING_PREFIX + r"\bApproval\s+recommended\b", re.IGNORECASE
 )
-# Split into two patterns rather than kept as one alternation ([ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004),
-# mirroring `scripts/check-pr-fully-clean.py`'s identical split): `Changes
-# recommended` is always a genuine recommendation and stays unconditionally
-# blocking, but `Needs a closer look` can be an empty BALANCED review with
-# no finding of its own -- see `copilot_is_empty_balanced_closer_look`
-# below, at this pair's one call site in `latest_bot_review_states`.
-#
-# This gate duplicates rather than imports `scripts/check-pr-fully-clean.py`'s
-# (and `scripts/lib/copilot_overview.py`'s) equivalent logic throughout this
-# file, including the comment/`<details>`-stripping machinery
-# `copilot_is_empty_balanced_closer_look` needs below: this file is staged
-# into `~/.gemini/config/plugins/ai-config/` as a symlinked FILE alongside a
-# SIBLING `scripts` symlink (see `scripts/test_agy_hook_adapter.py`'s
-# `test_bootstrap_establishes_staging_runtime_layout...`), so the relative
-# path from this file to `scripts/lib` in that staged layout (`./scripts/lib`)
-# differs from the repo's own `plugins/ai-config/` -> `scripts/lib/` layout
-# (`../../scripts/lib`) -- one relative import cannot resolve in both, and
-# this file's own `extract_request_names` docstring already states the
-# design intent (no external module dependency, for portability across
-# standalone or minimal plugin environments).
-COPILOT_CHANGES_RECOMMENDED_HEADER = re.compile(
-    _COPILOT_HEADING_PREFIX + r"\bChanges\s+recommended\b", re.IGNORECASE
-)
-COPILOT_NEEDS_A_CLOSER_LOOK_HEADER = re.compile(
-    _COPILOT_HEADING_PREFIX + r"\bNeeds\s+a\s+closer\s+look\b", re.IGNORECASE
-)
-# Kept as the union of the two split patterns above so every existing use
-# below (a general "is this a Copilot negative heading at all" test) reads
-# the same as it always has; only `latest_bot_review_states` needs to tell
-# the two spellings apart.
 COPILOT_NEGATIVE_HEADER = re.compile(
     _COPILOT_HEADING_PREFIX
     + r"\b(?:Changes\s+recommended|Needs\s+a\s+closer\s+look)\b",
@@ -203,51 +173,31 @@ COPILOT_SUPPRESSED_BLOCK = re.compile(
     r"\b(?:Suppressed\s+comments|Comments\s+suppressed\s+due\s+to\s+low\s+confidence)\b",
     re.IGNORECASE,
 )
-# The `ccr-overview-v2` body's own per-round fields, read at the same coarse
-# level of rigor as every other Copilot pattern in this file for the raw-
-# body checks (no citation masking) -- but see `copilot_is_empty_balanced_
-# closer_look` and `_strip_non_live_regions` below for the one place this
-# gate DOES need to tell live text apart from an HTML comment or a
-# collapsed `<details>` section, and why. `**Review effort:**` and
-# `**Findings:**` mirror `scripts/lib/copilot_overview.py`'s
-# `COPILOT_REVIEW_EFFORT_LINE` / `COPILOT_FINDINGS_LINE` shape (a 0-3-space
-# indent, value stops at the line's own trailing whitespace). `Previously
-# missed` and an `Open (N)` listing are each a real finding the overview's
-# own Findings count does not capture (module docstring in
-# copilot_overview.py; [ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004)).
-COPILOT_REVIEW_EFFORT_LINE = re.compile(
-    r"(?:^|\n)[ ]{0,3}\*\*Review effort:\*\*(?:[ \t]*(?P<rest>\S(?:[^\r\n]*?\S)?))?(?=[ \t]*(?:\r?\n|$))",
-    re.IGNORECASE,
-)
-COPILOT_FINDINGS_LINE = re.compile(
-    r"(?:^|\n)[ ]{0,3}\*\*Findings:\*\*(?:[ \t]*(?P<rest>\S(?:[^\r\n]*?\S)?))?(?=[ \t]*(?:\r?\n|$))",
-    re.IGNORECASE,
-)
-COPILOT_PREVIOUSLY_MISSED = re.compile(r"\bPreviously\s+missed\b", re.IGNORECASE)
-COPILOT_OPEN_ITEMS_HEADING = re.compile(
-    r"<strong>[ \t]*Open[ \t]*\([0-9]+\)[ \t]*</strong>", re.IGNORECASE
-)
-# The `ccr-overview-v2` block's own start marker -- see
-# `copilot_is_empty_balanced_closer_look`'s docstring for why the carve-out
-# is scoped to exactly one marker's own block rather than reading the
-# heading/effort/findings patterns anywhere in the body: a heading before
-# the marker and an unrelated Balanced/None pair after it must not combine
-# into a false carve-out just because both happen to appear somewhere in
-# the same comment. Mirrors `scripts/lib/copilot_overview.py`'s
-# `_COPILOT_OVERVIEW_START` at this file's own coarser level of rigor (a
-# literal marker match, not that pattern's marker-immediately-followed-by-
-# heading requirement).
-COPILOT_OVERVIEW_MARKER = re.compile(
-    r"<!--[ \t]*ccr-overview-v2[ \t]*-->", re.IGNORECASE
-)
-# `_strip_non_live_regions`'s two building blocks: an HTML comment cannot
-# nest in real markup (`_find_comment_spans` below needs no depth
-# tracking), but a `<details>` region can (a re-review's own "Resolved
-# since last review" listing quoting a PRIOR round's overview, itself
-# containing a `<details>`), so `_find_details_spans` tracks depth the same
-# way `scripts/lib/copilot_overview.py`'s `_find_details_regions` does.
-_DETAILS_OPEN_RE = re.compile(r"<details\b[^>]*>", re.IGNORECASE)
-_DETAILS_CLOSE_RE = re.compile(r"</details\s*>", re.IGNORECASE)
+# `copilot_is_empty_balanced_closer_look`'s carve-out, at its own call site
+# in `latest_bot_review_states`, went through three heuristic designs in a
+# row ([ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004)) -- reading the heading/effort/findings patterns anywhere
+# in the body; then requiring them live (comment/`<details>`-stripped);
+# then scoping them to one v2 overview block -- and a review found a fresh
+# way to defeat each one in turn (a shape hidden in a `<details>`; a
+# heading before the marker combined with an unrelated block after it; a
+# bare marker with no overview heading; a marker or a field wrapped in a
+# code fence or an inline code span). See that function's own docstring
+# for the WHOLE-BODY TEMPLATE this settled on instead, and why a template
+# closes the class of gap a heuristic reopens on every fix.
+#
+# This gate duplicates rather than imports `scripts/check-pr-fully-clean.py`'s
+# (and `scripts/lib/copilot_overview.py`'s) equivalent logic throughout this
+# file: this file is staged into `~/.gemini/config/plugins/ai-config/` as a
+# symlinked FILE alongside a SIBLING `scripts` symlink (see
+# `scripts/test_agy_hook_adapter.py`'s
+# `test_bootstrap_establishes_staging_runtime_layout...`), so the relative
+# path from this file to `scripts/lib` in that staged layout (`./scripts/lib`)
+# differs from the repo's own `plugins/ai-config/` -> `scripts/lib/` layout
+# (`../../scripts/lib`) -- one relative import cannot resolve in both, and
+# this file's own `extract_request_names` docstring already states the
+# design intent (no external module dependency, for portability across
+# standalone or minimal plugin environments).
+#
 # Shortest sha abbreviation a head-binding prefix test will accept.
 ABBREV_SHA_LEN = 7
 # Markdown emphasis and terminal punctuation around an approval headline,
@@ -482,338 +432,114 @@ def extract_request_names(review_requests):
     return names
 
 
-def _copilot_v2_line_values(pattern, text):
-    """Every `rest` group `pattern` finds in `text`, stripped and
-    lower-cased -- the same block-agnostic, citation-agnostic level of
-    rigor as every other Copilot check in this file. Used for both
-    `COPILOT_REVIEW_EFFORT_LINE` and `COPILOT_FINDINGS_LINE`, against
-    either the raw body or `_strip_non_live_regions`' output depending on
-    which of `copilot_is_empty_balanced_closer_look`'s two questions is
-    being asked (see that function): a body carrying more than one round's
-    overview is read conservatively either way, never by committing to the
-    first match.
-    """
-    return [
-        (m.group("rest") or "").strip().lower() for m in pattern.finditer(text)
-    ]
-
-
-def _remove_spans(text, spans):
-    """`text` with every (start, end) span in `spans` removed.
-
-    `spans` must already be sorted and non-overlapping -- both
-    `_find_comment_spans` and `_find_details_spans` produce spans in that
-    shape (a single forward-only scan for the former; a two-pointer merge
-    over two already-ordered event lists for the latter), so this stays
-    linear in `len(text)` with no sort of its own.
-    """
-    if not spans:
-        return text
-    out = []
-    prev = 0
-    for start, end in spans:
-        out.append(text[prev:start])
-        prev = end
-    out.append(text[prev:])
-    return "".join(out)
-
-
-def _find_comment_spans(text):
-    """Every `<!--...-->` span in `text`, one linear `str.find`-based pass.
-
-    An unterminated `<!--` (no closing `-->` anywhere after it) is treated
-    as extending to the end of the string -- the fail-closed direction:
-    content after a comment that never closes should not be trusted as
-    live, mirroring `scripts/lib/copilot_overview.py`'s
-    `_find_html_comment_spans`. This gate stays stdlib-only (see
-    `copilot_is_empty_balanced_closer_look`'s docstring for why that file's
-    helper cannot simply be imported here), so the logic is duplicated
-    rather than shared.
-
-    HTML comments cannot nest, so `pos` only ever advances past a span
-    already found and this needs no depth tracking, unlike
-    `_find_details_spans` below.
-    """
-    spans = []
-    pos = 0
-    n = len(text)
-    while True:
-        open_pos = text.find("<!--", pos)
-        if open_pos == -1:
-            break
-        close_pos = text.find("-->", open_pos + 4)
-        if close_pos == -1:
-            spans.append((open_pos, n))
-            return spans
-        spans.append((open_pos, close_pos + 3))
-        pos = close_pos + 3
-    return spans
-
-
-def _position_in_spans(pos, spans, *, strict=False):
-    """True when `pos` falls inside any (start, end) span in `spans`.
-
-    `spans` must be sorted by start (every producer in this file already
-    returns spans in that order), so this stops at the first span whose
-    own start is past `pos` rather than scanning the rest.
-
-    `strict=True` requires `pos` to fall strictly AFTER a span's own start
-    (`start < pos`, not `start <= pos`) -- needed for exactly one caller
-    (`_copilot_marker_is_live`, checking whether the v2 overview marker's
-    OWN position sits inside some OTHER HTML comment): the marker text
-    `<!-- ccr-overview-v2 -->` is ITSELF a complete, self-contained
-    comment, so the default (non-strict) containment test trivially
-    matches every genuine, standalone marker against its OWN comment span
-    and would read it as hidden. Mirrors `scripts/lib/
-    copilot_overview.py`'s `_position_in_spans`, which documents the
-    identical trap for the identical reason.
-    """
-    for start, end in spans:
-        if start > pos:
-            break
-        if strict:
-            if start < pos < end:
-                return True
-        elif start <= pos < end:
-            return True
-    return False
-
-
-def _find_details_spans(text, comment_spans=()):
-    """Every `<details>...</details>` region in `text`, nested regions
-    collapsed into their outermost enclosing one -- a nested `<details>` is
-    real Copilot re-review markup (a "Resolved since last review" listing
-    quoting a PRIOR round's own overview, itself carrying a `<details>`),
-    not two independent regions. An opening with no matching closer
-    anywhere after it is treated as extending to the end of the string,
-    the same fail-closed convention `_find_comment_spans` uses.
-
-    An opening or closing tag whose own start falls inside one of
-    `comment_spans` is skipped entirely, so a fake `<details>`/`</details>`
-    hidden inside an HTML comment cannot open or close a region.
-    `comment_spans` defaults to empty for `_strip_non_live_regions`'s own
-    use below, where comments have ALREADY been physically removed from
-    `text` by the time this runs (so nothing further needs skipping there);
-    `_copilot_marker_is_live` passes the real spans when it needs
-    `<details>` positions in the SAME, unstripped coordinate space the v2
-    overview marker's own raw position lives in.
-
-    Every opening and every closing tag is collected first (each list
-    already in left-to-right order from a single `finditer` pass), then
-    merged by a two-pointer walk tracking a depth counter: an opening at
-    depth 0 starts a new region and increments depth; a closing at depth 0
-    has no opener in effect and is ignored; any other closing decrements
-    depth and closes the region only when depth returns to 0. Mirrors
-    `scripts/lib/copilot_overview.py`'s `_find_details_regions` at this
-    file's own, simpler level of rigor.
-    """
-    opens = [
-        m.start() for m in _DETAILS_OPEN_RE.finditer(text)
-        if not _position_in_spans(m.start(), comment_spans)
-    ]
-    closes = [
-        m.end() for m in _DETAILS_CLOSE_RE.finditer(text)
-        if not _position_in_spans(m.start(), comment_spans)
-    ]
-    spans = []
-    depth = 0
-    region_start = -1
-    i = j = 0
-    n_opens, n_closes = len(opens), len(closes)
-    while i < n_opens or j < n_closes:
-        if j >= n_closes or (i < n_opens and opens[i] < closes[j]):
-            if depth == 0:
-                region_start = opens[i]
-            depth += 1
-            i += 1
-        else:
-            close_end = closes[j]
-            j += 1
-            if depth == 0:
-                continue  # a closing tag with no opener currently in effect
-            depth -= 1
-            if depth == 0:
-                spans.append((region_start, close_end))
-    if depth > 0:
-        spans.append((region_start, len(text)))
-    return spans
-
-
-def _strip_non_live_regions(raw_body):
-    """`raw_body` with every HTML comment and every `<details>...</details>`
-    region removed, so a pattern search against the result only matches
-    text that would actually RENDER on the PR page.
-
-    Comments are stripped FIRST, over the whole body, and `<details>`
-    regions are found in that already-comment-stripped result -- so a fake
-    `<details>`/`</details>` hidden inside a comment can never open or
-    close a region here, the same ordering
-    `scripts/lib/copilot_overview.py`'s own block-boundary scan achieves
-    with explicit comment-span exclusion. The order also composes
-    correctly for the unterminated case either direction: an unterminated
-    comment strips everything after its own `<!--` in the first pass, so a
-    `<details>` opener that PRECEDED it but whose closer sat AFTER it
-    correctly reads as unterminated too once the second pass runs on the
-    already-shortened text; an unterminated `<details>` whose interior
-    happens to contain a well-formed comment is unaffected, since that
-    comment is stripped from inside a region the second pass discards in
-    full regardless.
-    """
-    after_comments = _remove_spans(raw_body, _find_comment_spans(raw_body))
-    return _remove_spans(after_comments, _find_details_spans(after_comments))
-
-
-def _copilot_marker_is_live(raw_body, marker):
-    """True unless `marker` (a match of `COPILOT_OVERVIEW_MARKER` found in
-    `raw_body`) sits inside some OTHER HTML comment, or inside a
-    `<details>...</details>` region, anywhere in `raw_body`.
-
-    Computed over the WHOLE, unsplit `raw_body` rather than by first
-    splitting `raw_body` at the marker into a "before" half and a "block"
-    half and stripping each independently (as
-    `copilot_is_empty_balanced_closer_look` does immediately after calling
-    this): a `<details>` (or comment) that OPENS before the marker and
-    CLOSES after it spans ACROSS any such split point, so it is invisible
-    to either half stripped on its own -- checking liveness on the unsplit
-    body first is the only way to see it (a review finding: the first cut
-    at this function split-then-stripped without this check and read the
-    empty-Balanced shape as live even when the marker sat inside a
-    `<details>` wrapping the whole thing).
-
-    The comment-span check uses `strict=True` for the reason
-    `_position_in_spans` documents: the marker is itself a complete
-    comment, so a non-strict check would always match it against its own
-    span. The `<details>` check does not need strict, since a details
-    OPENING tag is never at the exact same offset as the marker itself.
-    """
-    comment_spans = _find_comment_spans(raw_body)
-    if _position_in_spans(marker.start(), comment_spans, strict=True):
-        return False
-    details_spans = _find_details_spans(raw_body, comment_spans)
-    return not _position_in_spans(marker.start(), details_spans)
+# The empty-Balanced 'Needs a closer look' carve-out ([ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004)) as a
+# WHOLE-BODY TEMPLATE, matched with `re.fullmatch` after normalizing line
+# endings and trailing whitespace -- see `copilot_is_empty_balanced_closer_
+# look`'s own docstring for why three narrower heuristic designs in a row
+# each lost to a fresh adversarial probe, and for the exact shape this
+# requires. Built as named line-fragments rather than one opaque pattern,
+# so each requirement in the docstring below has one line of regex to
+# check it against.
+#
+# `_COPILOT_TEMPLATE_HEADING_PREFIX` allows a leading emoji or other
+# non-letter decoration before the heading's own words, matching the
+# `[^\w\n'"]+[ \t]*` shape `_COPILOT_HEADING_PREFIX` already uses elsewhere
+# in this file for the identical purpose -- but inline, since this
+# fragment sits INSIDE the larger template rather than being its own
+# `(?:^|\n)`-anchored standalone pattern.
+_COPILOT_TEMPLATE_HEADING_PREFIX = r"(?:[^\w\n'\"]+[ \t]*)?"
+# A prose line may not begin with any character that starts a Markdown
+# structural construct this template does not otherwise account for: `#`
+# (a heading), `*` (bold/italic emphasis, covering `**Review effort:**`-
+# shaped text so a stray field-looking line cannot hide as prose), `<` (an
+# HTML tag -- a `<details>` section or any other element), a backtick (an
+# inline code span or the start of a ``` fence), or `~` (a ~~~ fence).
+_COPILOT_TEMPLATE_PROSE_LINE = r"(?![#*<`~])[^\n]+"
+COPILOT_EMPTY_BALANCED_TEMPLATE = re.compile(
+    r"\n*"
+    r"<!--[ \t]*ccr-overview-v2[ \t]*-->\n+"
+    r"##[ \t]+Copilot review overview\n+"
+    r"###[ \t]+" + _COPILOT_TEMPLATE_HEADING_PREFIX + r"Needs a closer look\n+"
+    r"(?:" + _COPILOT_TEMPLATE_PROSE_LINE + r"\n)*" + _COPILOT_TEMPLATE_PROSE_LINE + r"\n+"
+    r"\*\*Review effort:\*\*[ \t]*Balanced\n"
+    r"\*\*Findings:\*\*[ \t]*None"
+    r"\n*",
+    re.IGNORECASE,
+)
 
 
 def copilot_is_empty_balanced_closer_look(raw_body):
-    """True when `raw_body` is the empty-Balanced 'Needs a closer look'
-    shape [ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004) asks this gate to read as no verdict rather than
+    """True when `raw_body` is EXACTLY the empty-Balanced 'Needs a closer
+    look' shape [ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004) asks this gate to read as no verdict rather than
     not-clean: Copilot flagging a large or ambiguous diff for a human's own
     judgment, with no finding of its own behind it.
 
-    Mirrors `scripts/check-pr-fully-clean.py`'s
-    `_copilot_is_empty_balanced_closer_look` at this file's own, coarser
-    level of rigor for HOW a block's contents are parsed (no citation
-    masking, consistent with every other Copilot check in this file), but
-    NOT at that file's coarser level for comment/`<details>` awareness or
-    for BLOCK SCOPING: a fail-closed gap in either is dangerous in the same
-    way an ambiguous fail-closed default is safe.
+    THIRD DESIGN, not a refinement of the second. Three heuristic
+    approaches were each defeated by a fresh adversarial probe in turn:
 
-    BLOCK SCOPING (added after a review finding on this function's second
-    version, which read the heading/effort/findings patterns anywhere in
-    the body with no requirement that they belong to the SAME round's
-    overview): this gate requires EXACTLY ONE `COPILOT_OVERVIEW_MARKER` in
-    `raw_body` -- zero or more than one both fail this closed, since either
-    means there is no single unambiguous "this round's own overview" to
-    scope to (a body with two markers is exactly the re-review shape where
-    an earlier round's overview is quoted alongside the current one, and a
-    body with none is not a `ccr-overview-v2` body at all as far as this
-    function is concerned). That one marker must also be LIVE
-    (`_copilot_marker_is_live`): a marker itself sitting inside some OTHER
-    HTML comment, or inside a `<details>...</details>` region wrapping the
-    whole overview (a re-review echoing a prior round's overview, marker
-    and all, in a collapsed section), is not this round's own live marker
-    at all, and this returns False before ever looking at what follows it
-    -- checked over the WHOLE, unsplit body, because a `<details>` or
-    comment spanning ACROSS the marker is invisible to the before/block
-    split described next if checked only after that split. The block is
-    everything in `raw_body` AFTER that one (now confirmed live) marker;
-    the text BEFORE it must contain NO live 'Needs a closer look' heading
-    and NO live `**Review effort:**` or `**Findings:**` line at all --
-    otherwise a heading (or a field) sitting before the marker, entirely
-    unconnected to the block that follows it, could combine with the
-    block's own genuine Balanced/None pair to satisfy every check below
-    without any of them actually co-occurring in one round's overview,
-    which is exactly the shape the review's own reproduction constructed
-    (a live closer-look heading before the marker, plain prose under it,
-    then a genuine but heading-less Balanced/None block after the marker).
+    1. read the heading, `**Review effort:**`, and `**Findings:**` patterns
+       anywhere in the raw body -- defeated by a shape stated only inside
+       an HTML comment or a collapsed `<details>` section (not live text
+       at all);
+    2. require those three to be LIVE (comment/`<details>`-stripped) --
+       defeated by a live heading BEFORE the v2 overview marker combining
+       with an unrelated, heading-less Balanced/None block AFTER it, since
+       nothing required them to belong to the same round's overview;
+    3. scope the check to the one block after a single live marker --
+       defeated by a bare marker with no `## Copilot review overview`
+       heading at all, by the marker (or the effort/findings lines) sitting
+       inside a fenced code block or an inline code span, and by CRLF line
+       endings.
 
-    `_strip_non_live_regions` supplies the live version of both the
-    before-marker text and the block, this file's stand-in for
-    `scripts/lib/copilot_overview.py`'s comment/`<details>`-exclusion
-    machinery (kept stdlib-only per this pair's own module docstring on
-    portability, rather than importing that module -- see the comment
-    above `COPILOT_CHANGES_RECOMMENDED_HEADER` for the staged-layout
-    reason a cross-module import cannot work reliably here).
+    Each fix closed exactly the probe that found it and left the next one
+    open, because a heuristic enumerates ways a shape can be EXCLUDED and
+    a reviewer only has to find one it missed. A WHOLE-BODY TEMPLATE
+    inverts that: it enumerates the single shape the carve-out APPLIES to,
+    and `re.fullmatch` fails closed on any character this function does
+    not explicitly expect, rather than only on the specific deviations
+    tried so far.
 
-    Every one of the four conditions the issue states must hold, split
-    into an EXISTENCE half (checked against the live BLOCK -- the text
-    after the one marker, comment/`<details>`-stripped -- so a shape that
-    exists only inside an HTML comment or a collapsed `<details>` section,
-    or that exists only outside the block entirely, is never read as the
-    CURRENT round's own live state) and a UNIFORMITY half (checked against
-    the RAW, unstripped WHOLE body, so a real finding hidden in a
-    `<details>` anywhere -- inside or outside the block -- still blocks):
+    The template, applied to the body after normalizing line endings
+    (`\\r\\n` and bare `\\r` both become `\\n`) and stripping trailing
+    whitespace from every line (so a real Copilot body's two-space
+    Markdown line breaks do not need their own accommodation):
 
-    - a live 'Needs a closer look' heading exists in the live block, and
-      'Changes recommended' does not exist ANYWHERE in `raw_body` --
-      checked against the raw body because that spelling is always
-      blocking regardless of effort, findings, or block membership, live
-      or hidden (see this pair's one call site), so a stale copy of it
-      quoted anywhere is still grounds for caution;
-    - at least one live `**Review effort:**` line in the live block reads
-      `Balanced`, AND every `**Review effort:**` line found anywhere in
-      `raw_body` (live or hidden, in the block or out of it) reads
-      `Balanced` too -- a hidden `Lite` line (an earlier round's overview
-      quoted in a `<details>`) fails this closed even though the live
-      block alone would pass;
-    - at least one live `**Findings:**` line in the live block reads
-      `None`, AND every `**Findings:**` line found anywhere in `raw_body`
-      reads `None` too -- the same shape, for the same reason: a hidden
-      nonzero count still blocks;
-    - neither `COPILOT_PREVIOUSLY_MISSED` nor `COPILOT_OPEN_ITEMS_HEADING`
-      appears anywhere in `raw_body`, hidden or not, in the block or out of
-      it. Either is a real finding the overview's own Findings count does
-      not capture, checked with no citedness or liveness or block-
-      membership test at all -- a false positive here only makes a
-      genuinely clean review read as not-clean, while a false negative
-      would let a real, unresolved finding disappear as no verdict at all.
+    - optional leading blank lines;
+    - the exact `ccr-overview-v2` marker line, one or more blank lines;
+    - the exact `## Copilot review overview` line, one or more blank
+      lines;
+    - a `###` heading line for 'Needs a closer look' (an emoji or other
+      non-letter prefix before the words is allowed, nothing else on the
+      line), one or more blank lines;
+    - EXACTLY ONE prose paragraph -- one or more lines with no blank line
+      between them, none starting with `#`, `*`, `<`, a backtick, or `~`
+      (so a heading, a bold-looking field, an HTML tag, or a fence can
+      never masquerade as prose) -- then one or more blank lines;
+    - the exact line `**Review effort:** Balanced`, immediately (no blank
+      line permitted) followed by the exact line `**Findings:** None`;
+    - optional trailing blank lines, and NOTHING else.
 
-    Deliberately conservative in every direction: any ambiguity here falls
-    through to the caller's pre-existing NOT_CLEAN for a 'Needs a closer
-    look' heading, never to a wrong CLEAN or a wrong no-verdict.
+    Any deviation returns False: a details block anywhere (INCLUDING a
+    harmless "Resolved since last review" list with no live finding in
+    it), a code fence or inline code span anywhere, a second marker, extra
+    prose paragraphs, a missing or reworded heading, a different effort or
+    findings value, or any trailing content after the findings line. This
+    is STRICTER than `scripts/check-pr-fully-clean.py`'s own carve-out,
+    which is the safe direction for a coarser, second, independent
+    classifier to err in: a real empty-Balanced review that ALSO lists
+    resolved items (a legitimate, common shape once a PR has had a prior
+    round) stays NOT_CLEAN in this gate even though the more sophisticated
+    checker would correctly read it as no verdict. That gap is accepted
+    deliberately -- see `scripts/test_enforce_mwc_review_gate.py`'s test
+    against the real, verbatim body of Lacaedemon/sparta#1638's review
+    5316721676, which this template matches, alongside a test confirming
+    the identical body PLUS a trailing details block does not.
     """
-    markers = list(COPILOT_OVERVIEW_MARKER.finditer(raw_body))
-    if len(markers) != 1:
-        return False
-    marker = markers[0]
-    if not _copilot_marker_is_live(raw_body, marker):
-        return False
-    live_before_marker = _strip_non_live_regions(raw_body[:marker.start()])
-    if (
-        COPILOT_NEEDS_A_CLOSER_LOOK_HEADER.search(live_before_marker)
-        or COPILOT_REVIEW_EFFORT_LINE.search(live_before_marker)
-        or COPILOT_FINDINGS_LINE.search(live_before_marker)
-    ):
-        return False
-    live_block = _strip_non_live_regions(raw_body[marker.end():])
-    if not COPILOT_NEEDS_A_CLOSER_LOOK_HEADER.search(live_block):
-        return False
-    if COPILOT_CHANGES_RECOMMENDED_HEADER.search(raw_body):
-        return False
-    live_efforts = _copilot_v2_line_values(COPILOT_REVIEW_EFFORT_LINE, live_block)
-    if "balanced" not in live_efforts:
-        return False
-    raw_efforts = _copilot_v2_line_values(COPILOT_REVIEW_EFFORT_LINE, raw_body)
-    if any(e != "balanced" for e in raw_efforts):
-        return False
-    live_findings = _copilot_v2_line_values(COPILOT_FINDINGS_LINE, live_block)
-    if "none" not in live_findings:
-        return False
-    raw_findings = _copilot_v2_line_values(COPILOT_FINDINGS_LINE, raw_body)
-    if any(f != "none" for f in raw_findings):
-        return False
-    if COPILOT_PREVIOUSLY_MISSED.search(raw_body) or COPILOT_OPEN_ITEMS_HEADING.search(raw_body):
-        return False
-    return True
+    normalized = "\n".join(
+        line.rstrip()
+        for line in raw_body.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    )
+    return COPILOT_EMPTY_BALANCED_TEMPLATE.fullmatch(normalized) is not None
 
 
 def latest_bot_review_states(reviews, head_oid=""):

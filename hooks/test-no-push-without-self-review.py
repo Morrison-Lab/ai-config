@@ -263,6 +263,82 @@ def subagent_transcript(text=None, agent_name="adversarial-reviewer",
     return events
 
 
+def handback_pointer(agent_id: str) -> str:
+    """The `Agent` tool's entire result when a subagent's report was
+    delivered as a `SubagentHandback` message instead (ai-config#3945) --
+    the parent transcript never carries the report itself, only this."""
+    return (f'This agent\'s report was delivered to you as a message from '
+            f'"{agent_id}" (its SubagentHandback call). Read it there; it is '
+            f"not repeated here.\nagentId: {agent_id}")
+
+
+def subagenthandback_use(message_text: str, call_id=None):
+    return {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": call_id or _fresh_id(), "name": "SubagentHandback",
+         "input": {"message": message_text}}]}}
+
+
+def run_hook_handback(cmd: str, agent_id: str, subagent_events: list,
+                      agent_type: str = "adversarial-reviewer",
+                      main_events_before=None, tool_use_id: str | None = None,
+                      meta_overrides: dict | None = None) -> tuple[int, dict]:
+    """Run the hook against a main transcript whose reviewer dispatch result
+    is hand-back-only, plus the sibling `subagents/agent-<id>.jsonl` and
+    `.meta.json` files Claude Code actually writes the report to
+    (ai-config#3945) -- reproducing the on-disk layout rather than only the
+    in-memory shapes `run_hook` builds.
+
+    `tool_use_id` defaults to the dispatch's own call id, matching the
+    measured layout where the `.meta.json` names the dispatching call. Pass a
+    different value to test the id-mismatch (agentId-text-fallback) path.
+    """
+    call_id = _fresh_id()
+    main_events = list(main_events_before or []) + [
+        agent_call(call_id=call_id),
+        agent_result(call_id, handback_pointer(agent_id)),
+    ]
+
+    tmpdir = tempfile.mkdtemp(prefix="npwsr-handback-")
+    try:
+        session_id = "sess"
+        tpath = os.path.join(tmpdir, f"{session_id}.jsonl")
+        with open(tpath, "w", encoding="utf-8") as f:
+            for ev in main_events:
+                f.write(json.dumps(ev) + "\n")
+
+        subagents_dir = os.path.join(tmpdir, session_id, "subagents")
+        os.makedirs(subagents_dir, exist_ok=True)
+
+        with open(os.path.join(subagents_dir, f"agent-{agent_id}.jsonl"),
+                  "w", encoding="utf-8") as f:
+            for ev in subagent_events:
+                f.write(json.dumps(ev) + "\n")
+
+        meta = {"agentType": agent_type,
+                "toolUseId": tool_use_id if tool_use_id is not None else call_id,
+                "requestShape": "foreground"}
+        if meta_overrides:
+            meta.update(meta_overrides)
+        with open(os.path.join(subagents_dir, f"agent-{agent_id}.meta.json"),
+                  "w", encoding="utf-8") as f:
+            json.dump(meta, f)
+
+        payload = {"tool_name": "Bash", "tool_input": {"command": cmd},
+                   "transcript_path": tpath}
+        res = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
+                             capture_output=True, text=True, cwd=REPO,
+                             env=os.environ)
+        data = {}
+        if res.stdout.strip():
+            try:
+                data = json.loads(res.stdout)
+            except Exception:
+                pass
+        return res.returncode, data
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
 PUSH = f"git -C {REPO} push origin main"
 
 CASES = [
@@ -1637,9 +1713,13 @@ def transcript_scoping_cases() -> tuple[int, int]:
         tf.write(json.dumps(rec1) + "\n" + json.dumps(rec2) + "\n")
 
     try:
+        # `read_latest_review`'s second element is a LIST of every
+        # `Reviewed-Commit:` line the winning report named (ai-config#3945),
+        # not a single string -- a single-fingerprint report still names
+        # exactly one, as a one-element list.
         v, s, saw = mod.read_latest_review(tf_path)
         check("transcript_scoping: unattributed main-session prose cannot overwrite reviewer blocking verdict",
-              (v, s, saw) == ("needs_work", HEAD.lower(), True))
+              (v, s, saw) == ("needs_work", [HEAD.lower()], True))
     finally:
         if os.path.exists(tf_path):
             os.remove(tf_path)
@@ -2392,6 +2472,115 @@ def omo_cases() -> tuple[int, int]:
         shutil.rmtree(d, ignore_errors=True)
 
     return failures, ran
+
+
+def handback_cases() -> tuple[int, int]:
+    """Claude Code's hand-back delivery (ai-config#3945).
+
+    Sometimes the dispatched reviewer's report never reaches the parent's own
+    `Agent` tool_result at all: the result carries only a pointer sentence
+    and an `agentId`, and the report lives in a sibling
+    `subagents/agent-<agentId>.jsonl` file, as the `message` input of that
+    subagent's own LAST `SubagentHandback` tool_use, with a `.meta.json`
+    naming the dispatching call's `toolUseId` and the subagent's `agentType`.
+    `run_hook_handback` reproduces that on-disk layout.
+    """
+    failures = 0
+    ran = 0
+
+    def check(label, ok, detail=""):
+        nonlocal failures, ran
+        ran += 1
+        if ok:
+            print(f"PASS: {label}")
+        else:
+            print(f"FAIL: {label}{' - ' + detail if detail else ''}")
+            failures += 1
+
+    def blocked_of(out):
+        return (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+
+    def reason_of(out):
+        return (out.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
+
+    # 1. A clean verdict delivered only through SubagentHandback allows the push.
+    rc, out = run_hook_handback(PUSH, "hb0001agent", [subagenthandback_use(body())])
+    check("a hand-back-only clean verdict allows the push",
+          rc == 0 and not blocked_of(out), reason_of(out)[:200])
+
+    # 2. A blocking verdict delivered the same way still refuses.
+    rc, out = run_hook_handback(
+        PUSH, "hb0002agent", [subagenthandback_use(body("Needs more work"))])
+    check("a hand-back-only blocking verdict refuses the push",
+          rc == 0 and blocked_of(out), reason_of(out)[:200])
+    check("that refusal names the blocking verdict",
+          "returned a blocking verdict" in reason_of(out), reason_of(out)[:200])
+
+    # 3. A verdict string that appears only OUTSIDE the SubagentHandback
+    #    message -- in the subagent's own prose, or in a tool result it
+    #    read while exploring -- is not consulted. Only the
+    #    `SubagentHandback` call's own `message` counts.
+    stray_call_id = _fresh_id()
+    subagent_events = [
+        {"type": "assistant", "message": {"content": [
+            {"type": "text", "text": body()}]}},
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": stray_call_id, "name": "Bash",
+             "input": {"command": "echo report"}}]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": stray_call_id, "content": body()}]}},
+    ]
+    rc, out = run_hook_handback(PUSH, "hb0003agent", subagent_events)
+    check("a verdict appearing only outside the SubagentHandback message is ignored",
+          rc == 0 and blocked_of(out), reason_of(out)[:200])
+
+    # 4. A `.meta.json` naming a non-reviewer agentType is ignored, even
+    #    though the SubagentHandback message itself is a clean report --
+    #    the harness's own record of who ran has to agree independently.
+    rc, out = run_hook_handback(PUSH, "hb0004agent", [subagenthandback_use(body())],
+                                agent_type="doc-writer")
+    check("a hand-back whose meta.json names a non-reviewer agentType is ignored",
+          rc == 0 and blocked_of(out), reason_of(out)[:200])
+
+    # 5. A `.meta.json` located by the fallback `agentId` text (no toolUseId
+    #    match) is still admitted, once its agentType confirms the reviewer.
+    rc, out = run_hook_handback(PUSH, "hb0005agent", [subagenthandback_use(body())],
+                                tool_use_id="toolu_unrelated_0000")
+    check("a hand-back located by the agentId text fallback still authorizes",
+          rc == 0 and not blocked_of(out), reason_of(out)[:200])
+
+    # 6. A report naming several `Reviewed-Commit:` lines under one verdict
+    #    authorizes a push shipping ANY one of them (ai-config#3945).
+    multi_text = ("### Verdict: Ready for merge\n\n"
+                  f"Reviewed-Commit: {HEAD}\n"
+                  f"Reviewed-Commit: {PREV}\n"
+                  f"Reviewed-Commit: {FEATURE}\n")
+
+    rc, out = run_hook_handback(PUSH, "hb0006agenta", [subagenthandback_use(multi_text)])
+    check("a multi-Reviewed-Commit hand-back report allows the first listed sha",
+          rc == 0 and not blocked_of(out), reason_of(out)[:200])
+
+    rc, out = run_hook_handback(
+        f"git -C {REPO} push origin main~1:refs/heads/npwsr-prev-check",
+        "hb0006agentb", [subagenthandback_use(multi_text)])
+    check("a multi-Reviewed-Commit hand-back report allows the second listed sha",
+          rc == 0 and not blocked_of(out), reason_of(out)[:200])
+
+    rc, out = run_hook_handback(
+        f"git -C {REPO} push origin feature",
+        "hb0006agentc", [subagenthandback_use(multi_text)])
+    check("a multi-Reviewed-Commit hand-back report allows the third listed sha",
+          rc == 0 and not blocked_of(out), reason_of(out)[:200])
+
+    # 7. The inline shape -- the report already embedded in the tool_result
+    #    text, prefixed and indented -- must keep working alongside the
+    #    hand-back-only shape.
+    rc, out = run_hook(PUSH, subagent_transcript())
+    check("the inline subagent-report shape still authorizes the push",
+          rc == 0 and not blocked_of(out), reason_of(out)[:200])
+
+    return failures, ran
+
 
 def codex_cases() -> tuple[int, int]:
     """Codex's native `spawn_agent` subagent dispatch (ai-config#3707).
@@ -3496,7 +3685,7 @@ def main():
                    structured_payload_cases, transcript_scoping_cases,
                    cd_tracking_cases, fallback_cases,
                    fingerprint_guidance_cases, fingerprint_resolution_cases,
-                   omo_cases, codex_cases, external_reviewer_cases,
+                   omo_cases, handback_cases, codex_cases, external_reviewer_cases,
                    symlinked_plugin_root_cases, exempt_repo_cases,
                    deny_resilience_cases):
             f, r = fn()

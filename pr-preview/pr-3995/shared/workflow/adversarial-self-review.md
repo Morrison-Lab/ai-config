@@ -860,6 +860,12 @@ So an inline pass, a verdict quoted out of a file, the guard's own denial messag
 There is a **second** admitted provenance, which this paragraph read as the only one until the round-repetition section above was written: a `Bash` call matching the guard's own external-reviewer pattern, which today recognizes `agy --print` and not the other delegation CLIs.
 Both statements have to live in one file, so read the paragraph above as the rule for a Claude-side review and this as the rule for the external lane, rather than as two populations of what the guard accepts.
 
+**"A verdict quoted out of a file" has one narrow exception, added rather than relaxed.**
+Claude Code sometimes delivers a dispatched subagent's report as a message from the subagent's own `SubagentHandback` call instead of inside the `Agent` tool's own result (ai-config#3945): the tool_result then carries only a pointer sentence and an `agentId`, and the report lives in a sibling `subagents/agent-<agentId>.jsonl` file the guard cannot see by reading the parent transcript alone.
+The guard reads that ONE file, located by the `toolUseId` the original dispatch's own call id names (falling back to the `agentId` printed in the pointer sentence), and only after a `.meta.json` beside it independently confirms the subagent's `agentType` is an admitted reviewer -- the same persona check the dispatch itself already had to pass.
+See `_handback_report_text` in [`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py).
+Nothing else about "who said it" changes: a phrase search over any OTHER file, or over this same file located any other way, still fails.
+
 *What it said*: restricting provenance does not make a phrase search sound **inside** the admitted body, which is the same failure one layer in --- a review whose closing note quotes the clean verdict it is withholding would read as clean.
 So the verdict is the last line that **is** a verdict line, anchored at line start, and a quotation mid-sentence is not one.
 

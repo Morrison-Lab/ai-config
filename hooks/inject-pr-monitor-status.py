@@ -20,6 +20,17 @@ polls several sources and keeps the ones that answered beside the error
 from the ones that did not, so `data` can be present (even empty) while
 `error` is set; fingerprinting `data` alone there would read every later
 error text as "no change" and never surface it again.
+
+What is *emitted* is a digest, not the raw state (ai-config#3999).  Raw
+states carry every check run's timestamps and URLs and, for the multi-source
+monitor, every open PR in scope with its `updatedAt`; injected verbatim they
+reached ~100 KB per prompt while telling the session nothing it could act on.
+A per-PR state is reduced to a summary (state, mergeability, review
+decision, check counts, failing and pending check names) and is emitted only
+when that summary changes.  A list-shaped state is reduced to the entries
+that appeared or disappeared since the last report, so `updatedAt` churn on
+an unchanged set is silent.  An error is emitted whenever the state carries
+one, exactly as before.
 """
 import hashlib
 import json
@@ -28,6 +39,12 @@ import tempfile
 
 STATE_DIR = os.path.join(tempfile.gettempdir(), "claude-pr-monitors")
 PERSISTENT_ERROR_POLLS = 3
+MAX_LISTED = 20
+VOLATILE_KEYS = {"updatedAt", "createdAt", "checked_at"}
+FAILING = {"FAILURE", "TIMED_OUT", "CANCELLED", "ERROR", "ACTION_REQUIRED",
+           "STARTUP_FAILURE"}
+PENDING = {"IN_PROGRESS", "QUEUED", "PENDING", "WAITING", "REQUESTED",
+           "EXPECTED"}
 
 
 def fingerprint(state):
@@ -46,6 +63,111 @@ def fingerprint(state):
     else:
         observed = {"data": state.get("data"), "error": state["error"]}
     return hashlib.sha256(json.dumps(observed, sort_keys=True).encode()).hexdigest()
+
+
+def is_pr_view(data):
+    return isinstance(data, dict) and (
+        "state" in data or "statusCheckRollup" in data
+    )
+
+
+def summarize_pr(data):
+    """One PR's `gh pr view --json` payload, reduced to what a session acts on."""
+    counts = {}
+    failing = []
+    pending = []
+    for check in data.get("statusCheckRollup") or []:
+        status = str(check.get("status") or check.get("state") or "").upper()
+        conclusion = str(check.get("conclusion") or "").upper()
+        name = check.get("name") or check.get("context") or "?"
+        if conclusion and status in ("", "COMPLETED"):
+            key = conclusion
+        else:
+            key = status or "UNKNOWN"
+        counts[key] = counts.get(key, 0) + 1
+        if key in FAILING:
+            failing.append(name)
+        elif key in PENDING:
+            pending.append(name)
+    summary = {
+        key: data[key]
+        for key in ("state", "mergeStateStatus", "mergeable", "reviewDecision")
+        if data.get(key) not in (None, "")
+    }
+    summary["checks"] = dict(sorted(counts.items()))
+    if failing:
+        summary["failing"] = sorted(failing)[:5]
+    if pending:
+        summary["pending"] = sorted(pending)[:5]
+    if isinstance(data.get("reviews"), list):
+        summary["reviews"] = len(data["reviews"])
+    return summary
+
+
+def item_identity(item):
+    if isinstance(item, dict):
+        if item.get("url"):
+            return item["url"]
+        return {key: value for key, value in item.items()
+                if key not in VOLATILE_KEYS}
+    return item
+
+
+def list_sources(data):
+    if isinstance(data, list):
+        return {"items": data}
+    if isinstance(data, dict):
+        return {key: value for key, value in data.items()
+                if isinstance(value, list)}
+    return {}
+
+
+def cap(values):
+    if len(values) <= MAX_LISTED:
+        return values
+    return values[:MAX_LISTED] + [f"... and {len(values) - MAX_LISTED} more"]
+
+
+def data_digest(state):
+    """What changed in a state's data since its last report, or None.
+
+    Updates the state's `reported_summary` / `reported_items` bookkeeping in
+    place, so the next call compares against what was just reported.
+    """
+    data = state.get("data")
+    if is_pr_view(data):
+        summary = summarize_pr(data)
+        if summary == state.get("reported_summary"):
+            return None
+        state["reported_summary"] = summary
+        return {"summary": summary}
+    if data is None:
+        return None
+    previous = state.get("reported_items") or {}
+    current = {}
+    changes = {}
+    for source, items in list_sources(data).items():
+        keyed = {}
+        for item in items:
+            identity = item_identity(item)
+            keyed[json.dumps(identity, sort_keys=True)] = identity
+        current[source] = sorted(keyed)
+        before = set(previous.get(source, []))
+        added = [keyed[key] for key in sorted(set(keyed) - before)]
+        removed = [json.loads(key) for key in sorted(before - set(keyed))]
+        if added or removed:
+            changes[source] = {"open": len(keyed)}
+            if added:
+                changes[source]["added"] = cap(added)
+            if removed:
+                changes[source]["removed"] = cap(removed)
+    for source in sorted(set(previous) - set(current)):
+        changes[source] = {
+            "open": 0,
+            "removed": cap([json.loads(key) for key in previous[source]]),
+        }
+    state["reported_items"] = current
+    return {"changes": changes} if changes else None
 
 
 def main():
@@ -80,14 +202,22 @@ def main():
             # recovery and a new error text each get their own shot at the
             # threshold (the monitor restarts the streak on a text change).
             state.pop("persistent_error_reported", None)
+        entry = data_digest(state) or {}
+        if has_error:
+            entry["error"] = state["error"]
         temporary = f"{path}.{os.getpid()}.tmp"
         with open(temporary, "w", encoding="utf-8") as stream:
             json.dump(state, stream, sort_keys=True)
         os.replace(temporary, path)
-        updates.append({key: state.get(key)
-                        for key in ("url", "data", "error", "checked_at", "error_streak")})
+        if not entry:
+            continue
+        entry["url"] = state.get("url") or name
+        if state.get("error_streak"):
+            entry["error_streak"] = state["error_streak"]
+        updates.append(entry)
     if updates:
-        print("Detached PR-monitor update (inspect and act if needed): " + json.dumps(updates, sort_keys=True))
+        print("Detached PR-monitor update (inspect and act if needed): "
+              + json.dumps(updates, sort_keys=True))
 
 
 if __name__ == "__main__":

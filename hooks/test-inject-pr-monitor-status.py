@@ -135,6 +135,70 @@ with tempfile.TemporaryDirectory() as d:
     finally:
         subject.STATE_DIR = orig_dir
 
+# ai-config#3999: a per-PR state is emitted as a summary, not raw check runs,
+# and a re-poll that changes only timestamps is silent.
+with tempfile.TemporaryDirectory() as d:
+    orig_dir = subject.STATE_DIR
+    try:
+        subject.STATE_DIR = d
+        path = os.path.join(d, "pr.json")
+
+        def pr_view(conclusion, stamp):
+            checks = [{"__typename": "CheckRun", "name": f"check-{i}",
+                       "status": "COMPLETED", "conclusion": "SUCCESS",
+                       "startedAt": stamp, "completedAt": stamp,
+                       "detailsUrl": f"https://example.invalid/run/{i}"}
+                      for i in range(40)]
+            checks[0]["conclusion"] = conclusion
+            return {"state": "OPEN", "reviewDecision": "",
+                    "statusCheckRollup": checks, "reviews": []}
+
+        write_state(path, {"url": "https://github.com/o/r/pull/1",
+                           "data": pr_view("SUCCESS", "t1"), "checked_at": 1})
+        first = run_main()
+        assert '"SUCCESS": 40' in first
+        assert "detailsUrl" not in first and "example.invalid" not in first
+        assert len(first) < 400
+
+        # Same outcome, new timestamps: the fingerprint changes, the summary does not.
+        write_state(path, {**read_state(path), "data": pr_view("SUCCESS", "t2"), "checked_at": 2})
+        assert run_main() == ""
+
+        # A check turning red is a summary change, and names the check.
+        write_state(path, {**read_state(path), "data": pr_view("FAILURE", "t3"), "checked_at": 3})
+        red = run_main()
+        assert '"FAILURE": 1' in red and "check-0" in red
+    finally:
+        subject.STATE_DIR = orig_dir
+
+# ai-config#3999: a list-shaped state reports only the entries that appeared
+# or disappeared; updatedAt churn on an unchanged set is silent.
+with tempfile.TemporaryDirectory() as d:
+    orig_dir = subject.STATE_DIR
+    try:
+        subject.STATE_DIR = d
+        path = os.path.join(d, "all-open-prs.json")
+
+        def pr(n, stamp):
+            return {"number": n, "title": f"PR {n}", "updatedAt": stamp,
+                    "url": f"https://github.com/o/r/pull/{n}"}
+
+        write_state(path, {"data": {"github_prs/authored": [pr(1, "a"), pr(2, "a")]},
+                           "error_streak": 0, "checked_at": 1})
+        first = run_main()
+        assert "pull/1" in first and "pull/2" in first
+
+        write_state(path, {**read_state(path), "data": {"github_prs/authored": [pr(1, "b"), pr(2, "b")]}, "checked_at": 2})
+        assert run_main() == ""
+
+        write_state(path, {**read_state(path), "data": {"github_prs/authored": [pr(2, "c"), pr(3, "c")]}, "checked_at": 3})
+        delta = run_main()
+        assert '"added": ["https://github.com/o/r/pull/3"]' in delta
+        assert '"removed": ["https://github.com/o/r/pull/1"]' in delta
+        assert "pull/2" not in delta
+    finally:
+        subject.STATE_DIR = orig_dir
+
 print("PASS: only changed PR observations are injected; a persistent error is "
       "surfaced once at the streak threshold and re-armed on recovery or a "
       "text change")

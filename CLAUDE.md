@@ -1085,10 +1085,16 @@ conflict is resolved on sight rather than parked for approval ---
 sync-before-push case, and this generalizes it to the moment a conflict is
 *noticed*, from any source (a notification, a status check, a review-bot
 comment), not only a push you were about to make yourself.
+When several of your PRs are conflicting at once, "on sight" means one
+batched pass over all of them, per "Batch merge and resolve, always" above,
+not a serial chase of each flag as it appears; what this section rules out is
+waiting for approval, not batching.
 
 - **Do:** the moment a conflict is noticed on a PR you're driving, merge the
   base branch into the head, resolve it, and push --- no approval needed
   first.
+- **Do:** when several PRs you're driving conflict at once, resolve them
+  together in one batched pass rather than one at a time as each flag appears.
 - **Don't:** leave such a PR `CONFLICTING` pending a check-in, or treat "this
   still needs a human's review or approval before merge" as a reason to also
   hold off on fixing its conflicts --- resolving is not approving.

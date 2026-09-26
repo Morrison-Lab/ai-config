@@ -461,7 +461,28 @@ _COPILOT_TEMPLATE_HEADING_PREFIX = r"(?:[^\w\n'\"]+[ \t]*)?"
 # an otherwise-ordinary-looking prose line, which is exactly how
 # `COPILOT_OPEN_COUNT` below can be defeated from inside the fullmatch
 # rather than only from outside it.
-_COPILOT_TEMPLATE_PROSE_LINE = r"(?![#`~])[^\n<*]+"
+#
+# The lookahead also rejects any run of leading spaces/tabs immediately
+# before one of those four characters, not just the character in the
+# line's own first position ([ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding): `(?![#`~])`
+# alone only inspected `m.start()` itself, so an indented line -- `   ```
+# ` or `   ### Blocking concern`, whose first character is a literal space
+# -- passed the lookahead there and then matched `[^\n<*]+` in full,
+# backticks/hash and all, since nothing in that character class excludes
+# them mid-line. Markdown itself does not require zero indentation for a
+# fence or heading to render (GitHub tolerates a few leading spaces before
+# treating either as real), so an indented fence or heading swallowed this
+# way as the template's one permitted prose paragraph, letting an entire
+# extra fenced block or heading ride through the fullmatch. No amount of
+# leading whitespace is exempted here (unlike the 0-3-space tolerance
+# `COPILOT_FINDINGS_LINE`/`COPILOT_REVIEW_EFFORT_LINE` grant elsewhere in
+# this codebase for a genuine field line): a 4+-space indent starts an
+# indented code block instead of a fence, but that is exactly as much a
+# structural construct out of scope for "one prose paragraph" as a fence
+# is, so rejecting on ANY leading run of spaces/tabs before the four
+# characters is the safe, fail-closed direction for a single-paragraph
+# template to take.
+_COPILOT_TEMPLATE_PROSE_LINE = r"(?![ \t]*[#`~])[^\n<*]+"
 COPILOT_EMPTY_BALANCED_TEMPLATE = re.compile(
     r"\n*"
     r"<!--[ \t]*ccr-overview-v2[ \t]*-->\n+"
@@ -499,7 +520,10 @@ def copilot_is_empty_balanced_closer_look(raw_body):
     not-clean: Copilot flagging a large or ambiguous diff for a human's own
     judgment, with no finding of its own behind it.
 
-    THIRD DESIGN, not a refinement of the second. Three heuristic
+    FOURTH DESIGN, not a refinement of the third ([ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding:
+    this label previously read "THIRD DESIGN" while the paragraph below it
+    already enumerated three prior, defeated designs before this one --
+    making the whole-body template the fourth). Three heuristic
     approaches were each defeated by a fresh adversarial probe in turn:
 
     1. read the heading, `**Review effort:**`, and `**Findings:**` patterns
@@ -584,7 +608,39 @@ def copilot_is_empty_balanced_closer_look(raw_body):
     return COPILOT_EMPTY_BALANCED_TEMPLATE.fullmatch(normalized) is not None
 
 
-def latest_bot_review_states(reviews, head_oid=""):
+def _has_live_inline_bot_item(review_comments, login, head_oid):
+    """True when `review_comments` (the PR's inline review comments, in the
+    REST `pulls/{n}/comments` shape) has one authored by `login` and tied to
+    the current head commit.
+
+    Ties to the current head via EITHER `commit_id` (the commit the comment
+    is displayed against today) or `original_commit_id` (the commit it was
+    originally posted against) matching `head_oid` -- a comment can outlive
+    the commit it was made on without becoming stale to the reviewer's own
+    standing verdict, and either field is how GitHub's REST API records
+    that lineage. `head_oid` missing or empty fails this closed to True (an
+    item MIGHT exist that this function cannot rule out), rather than to
+    False (treating the absence of a comparison as proof of absence) --
+    the same asymmetry `_copilot_is_empty_balanced_closer_look`'s own
+    docstring already applies to its two body-wide guard phrases: a false
+    positive here costs a round of asking a human to look again, a false
+    negative would let a real, unaddressed inline finding disappear behind
+    the empty-Balanced carve-out.
+    """
+    if not head_oid:
+        return True
+    for c in review_comments or ():
+        c_login = (c.get("author") or {}).get("login", "")
+        if c_login != login:
+            continue
+        commit_id = c.get("commit_id") or ""
+        original_commit_id = c.get("original_commit_id") or ""
+        if commit_id == head_oid or original_commit_id == head_oid:
+            return True
+    return False
+
+
+def latest_bot_review_states(reviews, head_oid="", review_comments=None):
     """Latest standing per bot author.
 
     Tracks whether any bot review (e.g. Copilot, Coderabbit) submitted a formal
@@ -603,7 +659,21 @@ def latest_bot_review_states(reviews, head_oid=""):
     when `NOT_CLEAN_VERDICT_RE` or the suppressed-block-over-affirmative
     check also independently matched), so a genuinely blocking phrase
     elsewhere in the same body is never carved out.
+
+    The carve-out is ALSO gated on `_has_live_inline_bot_item` finding no
+    current-head inline review comment from the same bot login
+    ([ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding): the overview body's own `**Findings:**
+    None` line is Copilot's summary of its OWN overview, not proof that no
+    inline comment/thread from that same review round is still live on the
+    current head -- `review_comments` (the PR's inline comments, supplied by
+    the caller from `fetch_pr_data`) is the only surface that can confirm
+    that, since `reviews`/`comments` (formal reviews and top-level issue
+    comments) never carry review-thread comments at all. `review_comments`
+    defaults to `None` (treated as empty) for callers -- tests included --
+    that have no inline-comment data to supply; production always passes
+    the real fetched list.
     """
+    review_comments = review_comments or []
     states = {}
     for r in reviews:
         login = (r.get("author") or {}).get("login", "")
@@ -632,6 +702,7 @@ def latest_bot_review_states(reviews, head_oid=""):
             and not is_not_clean_verdict
             and not is_suppressed_over_affirmative
             and copilot_is_empty_balanced_closer_look(raw_body)
+            and not _has_live_inline_bot_item(review_comments, login, head_oid)
         ):
             continue
         if is_negative:
@@ -1174,7 +1245,8 @@ def evaluate(cmd, pr_data):
             "it and get an approving review on the current head."
         )
 
-    bot_states = latest_bot_review_states(reviews, head_oid)
+    review_comments = pr_data.get("reviewComments", []) or []
+    bot_states = latest_bot_review_states(reviews, head_oid, review_comments)
     bot_blockers = [k for k, v in bot_states.items() if v in ("CHANGES_REQUESTED", "REJECTED", "NOT_CLEAN")]
     if bot_blockers:
         return deny(
@@ -1360,6 +1432,33 @@ def fetch_pr_data(cmd, cwd):
         )
     decoder = json.JSONDecoder()
     pr_data["comments"] = _merge_paginated_json(comments_result.stdout.strip(), decoder)
+
+    # Inline PR review comments (the `pulls/{n}/comments` REST endpoint) are
+    # a DIFFERENT surface from the issue comments fetched just above and from
+    # the formal `reviews` this PR's own `gh pr view` call already returned
+    # ([ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding): a bot's empty-Balanced overview body can
+    # read as no-finding while a still-live inline comment or thread from
+    # that same review round sits on the current head -- `latest_bot_review_
+    # states`'s carve-out needs this list to confirm no such item exists
+    # before skipping a negative-header round entirely. `commit_id` and
+    # `original_commit_id` are the two fields that let the caller tie a
+    # comment to the current head (see `_has_live_inline_bot_item`).
+    review_comments_result = run_gh(
+        ["api", f"repos/{url_match.group(1)}/pulls/{url_match.group(2)}/comments",
+         "--paginate", "--jq",
+         "[.[] | {author: {login: (.user.login // \"\")}, "
+         "commit_id: (.commit_id // \"\"), "
+         "original_commit_id: (.original_commit_id // \"\")}]"],
+        cwd,
+    )
+    if review_comments_result.returncode != 0:
+        return None, (
+            "Hook failed to fetch the PR's inline review comments (gh api "
+            "returned non-zero). Output: " + review_comments_result.stderr
+        )
+    pr_data["reviewComments"] = _merge_paginated_json(
+        review_comments_result.stdout.strip(), decoder
+    )
 
     # GraphQL statusCheckRollup drops copilot-pull-request-reviewer
     # (ai-config#3570, fully-clean.cases.md:79). Query commit check-runs via REST

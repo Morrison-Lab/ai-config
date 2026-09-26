@@ -51,15 +51,33 @@ def review(login, state, body="", commit=HEAD, assoc="MEMBER"):
     return r
 
 
+def inline_comment(login, commit_id=HEAD, original_commit_id=None):
+    """An inline review comment record in the REST `pulls/{n}/comments`
+    shape `fetch_pr_data` reduces each entry to.
+
+    `original_commit_id` defaults to `commit_id` (GitHub's own REST API does
+    the same for a comment that has never gone stale relative to a later
+    push); pass it explicitly to model a comment whose displayed commit has
+    moved on from the one it was originally posted against.
+    """
+    return {
+        "author": {"login": login},
+        "commit_id": commit_id or "",
+        "original_commit_id": (original_commit_id if original_commit_id is not None
+                                else commit_id) or "",
+    }
+
+
 def pr(reviews=(), comments=(), checks=(), head=HEAD,
        url="https://github.com/Lacaedemon/sparta/pull/1427",
-       author="pr-opener", review_requests=()):
+       author="pr-opener", review_requests=(), review_comments=()):
     return {
         "reviews": list(reviews),
         "comments": list(comments),
         "statusCheckRollup": list(checks),
         "headRefOid": head,
         "url": url,
+        "reviewComments": list(review_comments),
         "author": {"login": author},
         "reviewRequests": list(review_requests),
     }
@@ -288,6 +306,61 @@ class TestEvaluate(unittest.TestCase):
         )
         bot_states = gate.latest_bot_review_states(
             state["reviews"], state["headRefOid"]
+        )
+        self.assertNotIn("copilot-pull-request-reviewer", bot_states)
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
+
+    def test_copilot_empty_balanced_with_live_inline_comment_still_denies(self):
+        """The overview body's own 'Findings: None' is Copilot's summary of
+        its OWN overview, not proof that no inline comment/thread from that
+        same round is still live on the current head -- a live inline
+        comment from the SAME bot login, tied to the current head via
+        `commit_id`, must block the carve-out even though the body itself
+        is the identical empty-Balanced shape ([ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding:
+        `fetch_pr_data()` used to retrieve formal reviews and issue comments
+        only, never review comments/threads, so this branch could discard
+        Copilot's formal negative state while a real inline finding was
+        still live)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+            review_comments=[inline_comment("copilot-pull-request-reviewer", commit_id=HEAD)],
+        )
+        bot_states = gate.latest_bot_review_states(
+            state["reviews"], state["headRefOid"], state["reviewComments"]
+        )
+        self.assertEqual(bot_states.get("copilot-pull-request-reviewer"), "NOT_CLEAN")
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_empty_balanced_with_stale_inline_comment_still_allows(self):
+        """A stale inline comment from an EARLIER commit (neither its
+        `commit_id` nor `original_commit_id` matches the current head) must
+        not block the carve-out -- only a CURRENT-head item counts
+        ([ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+            review_comments=[inline_comment(
+                "copilot-pull-request-reviewer", commit_id="priorsha0",
+                original_commit_id="priorsha0",
+            )],
+        )
+        bot_states = gate.latest_bot_review_states(
+            state["reviews"], state["headRefOid"], state["reviewComments"]
         )
         self.assertNotIn("copilot-pull-request-reviewer", bot_states)
         self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
@@ -607,6 +680,65 @@ class TestEvaluate(unittest.TestCase):
             "### Needs a closer look\n\n"
             "Some prose paragraph here.\n\n"
             "```\n**Review effort:** Balanced\n**Findings:** None\n```"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_indented_fence_in_prose_denies(self):
+        """[ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding: `_COPILOT_TEMPLATE_PROSE_LINE`'s
+        lookahead only inspected the line's own FIRST character, so a line
+        indented by leading spaces -- `   ``` ` -- passed the lookahead at
+        that leading space and then matched the rest of the line (backticks
+        included) as ordinary prose, letting an indented fenced block ride
+        through the fullmatch as part of the one permitted paragraph. Real
+        Markdown renders a 0-3-space-indented fence as a real fence, so this
+        must deny exactly like the un-indented fence in
+        `test_copilot_effort_and_findings_inside_code_fence_denies` above."""
+        body = (
+            "<!-- ccr-overview-v2 -->\n\n"
+            "## Copilot review overview\n\n"
+            "### Needs a closer look\n\n"
+            "Some ordinary prose about the diff.\n"
+            "   ```\n"
+            "a fenced line hiding inside the 'prose' paragraph\n"
+            "   ```\n\n"
+            "**Review effort:** Balanced  \n**Findings:** None"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_indented_heading_in_prose_denies(self):
+        """The identical leading-indentation bypass, with an indented `###`
+        heading line instead of a fence ([ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding)."""
+        body = (
+            "<!-- ccr-overview-v2 -->\n\n"
+            "## Copilot review overview\n\n"
+            "### Needs a closer look\n\n"
+            "Some ordinary prose about the diff.\n"
+            "   ### Blocking concern\n\n"
+            "**Review effort:** Balanced  \n**Findings:** None"
         )
         self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
         state = pr(
@@ -1676,7 +1808,8 @@ def gh_result(rc=0, stdout="", stderr=""):
 class TestMain(unittest.TestCase):
     def run_main(self, payload, view=None, comments=None, side_effect=None):
         """Run main() with `gh` mocked: first call is `gh pr view`, second is
-        the paginated comments fetch."""
+        the paginated comments fetch, third is the paginated inline review
+        comments fetch, fourth is the paginated check-runs fetch."""
         stdout = io.StringIO()
         if side_effect is None:
             state = view if view is not None else pr()
@@ -1687,6 +1820,7 @@ class TestMain(unittest.TestCase):
                 gh_result(stdout=json.dumps(view_payload)),
                 gh_result(stdout=json.dumps(comments if comments is not None
                                             else state["comments"])),
+                gh_result(stdout=json.dumps(state.get("reviewComments", []))),
                 gh_result(stdout=json.dumps([])),
             ]
         with patch.object(sys, "stdin", io.StringIO(json.dumps(payload))), \
@@ -1874,14 +2008,42 @@ class TestMain(unittest.TestCase):
             self.payload(MERGE_CMD),
             side_effect=[gh_result(stdout=json.dumps(view_payload)),
                          gh_result(stdout=pages),
+                         gh_result(stdout=json.dumps([])),
                          gh_result(stdout=json.dumps([]))],
         )
         self.assertEqual(decision["decision"], "allow")
 
-    def test_check_runs_fetched_via_rest(self):
+    def test_review_comments_fetched_via_paginated_rest(self):
+        """`fetch_pr_data` must fetch the PR's INLINE review comments (a
+        different REST endpoint from the issue-comments fetch above) so
+        `latest_bot_review_states`'s carve-out can confirm no current-head
+        inline item exists before skipping a negative-header round
+        ([ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008))."""
         _, run_mock = self.run_main(
             self.payload(MERGE_CMD), view=pr(comments=[CLEAN_VERDICT]))
         api_cmd = run_mock.call_args_list[2][0][0]
+        self.assertIn("api", api_cmd)
+        self.assertIn("--paginate", api_cmd)
+        self.assertIn("repos/Lacaedemon/sparta/pulls/1427/comments", api_cmd)
+
+    def test_review_comments_fetch_failure_denies(self):
+        state = pr(comments=[CLEAN_VERDICT])
+        view_payload = {k: state[k] for k in
+                        ("url", "author", "reviews", "statusCheckRollup",
+                         "headRefOid", "reviewRequests") if k in state}
+        decision, _ = self.run_main(
+            self.payload(MERGE_CMD),
+            side_effect=[gh_result(stdout=json.dumps(view_payload)),
+                         gh_result(stdout=json.dumps(state["comments"])),
+                         gh_result(rc=1, stderr="rate limited")],
+        )
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("inline review comments", decision["reason"])
+
+    def test_check_runs_fetched_via_rest(self):
+        _, run_mock = self.run_main(
+            self.payload(MERGE_CMD), view=pr(comments=[CLEAN_VERDICT]))
+        api_cmd = run_mock.call_args_list[3][0][0]
         self.assertIn("api", api_cmd)
         self.assertIn("--paginate", api_cmd)
         self.assertIn(f"repos/Lacaedemon/sparta/commits/{HEAD}/check-runs", api_cmd)
@@ -1895,6 +2057,7 @@ class TestMain(unittest.TestCase):
             self.payload(MERGE_CMD),
             side_effect=[gh_result(stdout=json.dumps(view_payload)),
                          gh_result(stdout=json.dumps(state["comments"])),
+                         gh_result(stdout=json.dumps([])),
                          gh_result(rc=1, stderr="check-runs fetch failed")],
         )
         self.assertEqual(decision["decision"], "deny")
@@ -1910,6 +2073,7 @@ class TestMain(unittest.TestCase):
             self.payload(MERGE_CMD),
             side_effect=[gh_result(stdout=json.dumps(view_payload)),
                          gh_result(stdout=json.dumps(state["comments"])),
+                         gh_result(stdout=json.dumps([])),
                          gh_result(stdout=json.dumps(check_runs))],
         )
         self.assertEqual(decision["decision"], "deny")

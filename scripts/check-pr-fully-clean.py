@@ -2352,11 +2352,16 @@ def _copilot_is_empty_balanced_closer_look(
     - `_copilot_v2_findings_count` -- the SAME whole-body, multi-block v2
       parser `copilot_verdict`'s affirmative path already uses -- reads
       exactly 0, not None (unparseable) and not nonzero;
-    - neither `COPILOT_PREVIOUSLY_MISSED` nor `COPILOT_OPEN_ITEMS_HEADING`
-      appears anywhere in the body. Either is a real finding the overview's
-      own Findings count does not capture (see their definitions above),
-      the same way `COPILOT_SUPPRESSED_BLOCK` already is for the
-      affirmative-heading path.
+    - none of `COPILOT_PREVIOUSLY_MISSED`, `COPILOT_OPEN_ITEMS_HEADING`, or
+      `COPILOT_SUPPRESSED_BLOCK` appears anywhere in the body. Each is a
+      real finding the overview's own Findings count does not capture (see
+      their definitions above); `COPILOT_SUPPRESSED_BLOCK` is the same
+      veto the affirmative-heading path already applies at its own call
+      site below ([ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding -- this function used to
+      return early, at the findings-count check, before ever reaching a
+      suppressed-comments veto of its own, so a Balanced closer-look body
+      with `Findings: None` and a suppressed-comments block carrying a real
+      finding was read as no verdict instead of not-clean).
 
     Deliberately conservative in every direction: any ambiguity here falls
     through to the caller's pre-existing, unconditional not-clean for a
@@ -2393,7 +2398,11 @@ def _copilot_is_empty_balanced_closer_look(
         return False
     if _copilot_v2_findings_count(scan, cited, match_is_cited) != 0:
         return False
-    if COPILOT_PREVIOUSLY_MISSED.search(scan) or COPILOT_OPEN_ITEMS_HEADING.search(scan):
+    if (
+        COPILOT_PREVIOUSLY_MISSED.search(scan)
+        or COPILOT_OPEN_ITEMS_HEADING.search(scan)
+        or COPILOT_SUPPRESSED_BLOCK.search(scan)
+    ):
         return False
     return True
 

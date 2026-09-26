@@ -347,6 +347,7 @@ cookieconsent.run({
   <li><a href="#process" id="toc-process" class="nav-link" data-scroll-target="#process">Process</a></li>
   <li><a href="#benefits-to-communicate" id="toc-benefits-to-communicate" class="nav-link" data-scroll-target="#benefits-to-communicate">Benefits to communicate</a></li>
   <li><a href="#when-not-to-split" id="toc-when-not-to-split" class="nav-link" data-scroll-target="#when-not-to-split">When NOT to split</a></li>
+  <li><a href="#when-unsure-how-finely-to-split-split-finer" id="toc-when-unsure-how-finely-to-split-split-finer" class="nav-link" data-scroll-target="#when-unsure-how-finely-to-split-split-finer">When unsure how finely to split, split finer</a></li>
   </ul></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/split-concerns/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/split-concerns/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
@@ -416,6 +417,16 @@ and won't block each other during review.</code></pre></li>
 <li>User explicitly says “keep it in one MR”</li>
 <li>The concerns share significant context that would be lost if separated</li>
 </ul>
+</section>
+<section id="when-unsure-how-finely-to-split-split-finer" class="level2">
+<h2 class="anchored" data-anchor-id="when-unsure-how-finely-to-split-split-finer">When unsure how finely to split, split finer</h2>
+<p>When the split could reasonably go either way, take the finer one. A split that turns out too fine costs bookkeeping: one more PR to open, and sometimes a temporary gap between the PRs, such as a link to content that the later PR has not yet added, which stays broken until that PR lands. A split that is too coarse gives up the “Benefits to communicate” above, most visibly faster review and independent timelines.</p>
+<ul>
+<li><strong>Do:</strong> pick the finer split when both are defensible, and accept a temporary gap that a later PR closes. A gap makes the pieces dependent rather than independent in the sense above, so open them as stacked PRs (<code>stack-prs</code>) and state the merge order.</li>
+<li><strong>Don’t:</strong> settle on the coarser split just because it means fewer PRs to manage.</li>
+<li><strong>Don’t:</strong> stretch the judgment items in “When NOT to split” above into tiebreakers. The small-diff item applies to a diff that really is under 50 lines, and the shared-context item only when a reviewer of one PR could not follow it without reading the other’s diff. Context that a cross-reference (“Related: #N”) carries is not lost.</li>
+</ul>
+<p>(Directive from the user, 2026-09-25: “when uncertain, err on the side of more decomposition”, said about splitting a large lecture-notes consolidation into PRs.)</p>
 
 
 </section>

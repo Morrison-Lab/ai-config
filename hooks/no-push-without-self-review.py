@@ -551,6 +551,19 @@ DEGRADED_OVERRIDE = re.compile(r"(?:^|[;&|`(\s])ALLOW_UNREVIEWED_PUSH=1\s")
 # `git diff` on this constant was, itself, the pending change that a
 # foreground reviewer dispatch could never return a verdict on before the
 # push it was gating.
+#
+# Exempting this repo's OWN name here is a larger step than exempting the
+# three course repos, because this file -- and every sibling guard --
+# lives in it: a push under this entry could weaken a guard with no LOCAL
+# self-review at all. What still stands between such a push and `main` is
+# the ordinary GitHub-side gate: a feature-branch push is a pull request,
+# and this repo's own CLAUDE.md scopes its standing `mwc` merge grant to a
+# PR that is fully clean -- CI green and every review finding addressed --
+# so the automated reviewer (or a human) still reads the diff before it
+# merges. This entry removes the PRE-push check on ai-config pushes, not
+# the PRE-merge one; widening it further, or relying on it as the only
+# safeguard for a change to a guard, is exactly the "reviewed change to
+# this file" the paragraph above already calls for.
 EXEMPT_REPOS = frozenset({
     "morrison-lab/ai-config",
     "morrison-lab/mln",

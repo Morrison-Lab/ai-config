@@ -264,7 +264,8 @@ def poll(url, path):
         state.update({"url": url, "pid": os.getpid(), "checked_at": time.time()})
         try:
             result = subprocess.run(["gh", "pr", "view", url, "--json",
-                                     "url,state,updatedAt,reviewDecision,statusCheckRollup,reviews"],
+                                     "url,state,updatedAt,reviewDecision,statusCheckRollup,reviews,"
+                                     "mergeable,mergeStateStatus"],
                                     capture_output=True, text=True, timeout=30, check=True,
                                     **NO_WINDOW)
             state["data"] = json.loads(result.stdout)

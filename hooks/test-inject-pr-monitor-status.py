@@ -135,6 +135,168 @@ with tempfile.TemporaryDirectory() as d:
     finally:
         subject.STATE_DIR = orig_dir
 
+# ai-config#3999: a per-PR state is emitted as a summary, not raw check runs,
+# and a re-poll that changes only timestamps is silent.
+with tempfile.TemporaryDirectory() as d:
+    orig_dir = subject.STATE_DIR
+    try:
+        subject.STATE_DIR = d
+        path = os.path.join(d, "pr.json")
+
+        def pr_view(conclusion, stamp):
+            checks = [{"__typename": "CheckRun", "name": f"check-{i}",
+                       "status": "COMPLETED", "conclusion": "SUCCESS",
+                       "startedAt": stamp, "completedAt": stamp,
+                       "detailsUrl": f"https://example.invalid/run/{i}"}
+                      for i in range(40)]
+            checks[0]["conclusion"] = conclusion
+            return {"state": "OPEN", "reviewDecision": "",
+                    "statusCheckRollup": checks, "reviews": []}
+
+        write_state(path, {"url": "https://github.com/o/r/pull/1",
+                           "data": pr_view("SUCCESS", "t1"), "checked_at": 1})
+        first = run_main()
+        assert '"SUCCESS": 40' in first
+        assert "detailsUrl" not in first and "example.invalid" not in first
+        assert len(first) < 400
+
+        # Same outcome, new timestamps: the fingerprint changes, the summary does not.
+        write_state(path, {**read_state(path), "data": pr_view("SUCCESS", "t2"), "checked_at": 2})
+        assert run_main() == ""
+
+        # A check turning red is a summary change, and names the check.
+        write_state(path, {**read_state(path), "data": pr_view("FAILURE", "t3"), "checked_at": 3})
+        red = run_main()
+        assert '"FAILURE": 1' in red and "check-0" in red
+    finally:
+        subject.STATE_DIR = orig_dir
+
+# ai-config#3999: a list-shaped state reports only the entries that appeared
+# or disappeared; updatedAt churn on an unchanged set is silent.
+with tempfile.TemporaryDirectory() as d:
+    orig_dir = subject.STATE_DIR
+    try:
+        subject.STATE_DIR = d
+        path = os.path.join(d, "all-open-prs.json")
+
+        def pr(n, stamp):
+            return {"number": n, "title": f"PR {n}", "updatedAt": stamp,
+                    "url": f"https://github.com/o/r/pull/{n}"}
+
+        write_state(path, {"data": {"github_prs/authored": [pr(1, "a"), pr(2, "a")]},
+                           "error_streak": 0, "checked_at": 1})
+        first = run_main()
+        assert "pull/1" in first and "pull/2" in first
+
+        write_state(path, {**read_state(path), "data": {"github_prs/authored": [pr(1, "b"), pr(2, "b")]}, "checked_at": 2})
+        assert run_main() == ""
+
+        write_state(path, {**read_state(path), "data": {"github_prs/authored": [pr(2, "c"), pr(3, "c")]}, "checked_at": 3})
+        delta = run_main()
+        assert '"added": ["https://github.com/o/r/pull/3"]' in delta
+        assert '"removed": ["https://github.com/o/r/pull/1"]' in delta
+        assert "pull/2" not in delta
+    finally:
+        subject.STATE_DIR = orig_dir
+
+# ai-config#3999 review: GitLab merge requests (web_url, updated_at), a
+# source left out of a poll because it errored, recovery with unchanged data,
+# items without a URL, the listing cap, and review verdicts.
+with tempfile.TemporaryDirectory() as d:
+    orig_dir = subject.STATE_DIR
+    try:
+        subject.STATE_DIR = d
+        path = os.path.join(d, "all-open-prs.json")
+
+        def mr(iid, stamp):
+            return {"iid": iid, "title": f"MR {iid}", "updated_at": stamp,
+                    "references": {"full": f"g/p!{iid}"},
+                    "web_url": f"https://gitlab.com/g/p/-/merge_requests/{iid}"}
+
+        def gh(n, stamp):
+            return {"number": n, "updatedAt": stamp,
+                    "url": f"https://github.com/o/r/pull/{n}"}
+
+        write_state(path, {"data": {"gitlab_merge_requests/gitlab.com": [mr(5, "a")],
+                                    "github_prs/authored": [gh(1, "a")]},
+                           "error_streak": 0, "checked_at": 1})
+        first = run_main()
+        assert "merge_requests/5" in first and "pull/1" in first
+
+        # GitLab updated_at churn is silent, like GitHub updatedAt.
+        write_state(path, {**read_state(path),
+                           "data": {"gitlab_merge_requests/gitlab.com": [mr(5, "b")],
+                                    "github_prs/authored": [gh(1, "b")]},
+                           "checked_at": 2})
+        assert run_main() == ""
+
+        # One source errors and is left out: no removal is reported, only the error.
+        write_state(path, {**read_state(path),
+                           "data": {"github_prs/authored": [gh(1, "c")]},
+                           "error": "glab timed out", "error_streak": 1, "checked_at": 3})
+        errored = run_main()
+        assert "glab timed out" in errored
+        assert "merge_requests/5" not in errored and "removed" not in errored
+
+        # The source recovers with the same MR: no re-add, but the recovery is news.
+        recovered = read_state(path)
+        recovered.pop("error")
+        write_state(path, {**recovered,
+                           "data": {"gitlab_merge_requests/gitlab.com": [mr(5, "d")],
+                                    "github_prs/authored": [gh(1, "d")]},
+                           "error_streak": 0, "checked_at": 4})
+        back = run_main()
+        assert "recovered_from" in back and "glab timed out" in back
+        assert "added" not in back
+
+        # Items without a URL are identified without their timestamps.
+        write_state(path, {**read_state(path),
+                           "data": {"items": [{"number": 9, "updatedAt": "x"}]},
+                           "checked_at": 5})
+        assert '"number": 9' in run_main()
+        write_state(path, {**read_state(path),
+                           "data": {"items": [{"number": 9, "updatedAt": "y"}]},
+                           "checked_at": 6})
+        assert run_main() == ""
+
+        # A long list is capped rather than dumped.
+        write_state(path, {**read_state(path),
+                           "data": {"items": [gh(n, "z") for n in range(100, 150)]},
+                           "checked_at": 7})
+        many = run_main()
+        assert "and 30 more" in many
+    finally:
+        subject.STATE_DIR = orig_dir
+
+with tempfile.TemporaryDirectory() as d:
+    orig_dir = subject.STATE_DIR
+    try:
+        subject.STATE_DIR = d
+        path = os.path.join(d, "pr.json")
+        base = {"state": "OPEN", "reviewDecision": "", "statusCheckRollup": []}
+        write_state(path, {"url": "u", "data": {**base, "reviews": []}, "checked_at": 1})
+        run_main()
+        # A changes-requested review is named by its verdict, not just counted.
+        write_state(path, {**read_state(path),
+                           "data": {**base, "reviews": [{"state": "CHANGES_REQUESTED"}]},
+                           "checked_at": 2})
+        assert "CHANGES_REQUESTED" in run_main()
+        # Recovery of a per-PR watcher with unchanged data is reported.
+        write_state(path, {**read_state(path), "error": "gh down", "checked_at": 3})
+        assert "gh down" in run_main()
+        cleared = read_state(path)
+        cleared.pop("error")
+        write_state(path, {**cleared, "checked_at": 4})
+        assert "recovered_from" in run_main()
+        # A mergeability change surfaces.
+        write_state(path, {**read_state(path),
+                           "data": {**base, "reviews": [{"state": "CHANGES_REQUESTED"}],
+                                    "mergeable": "CONFLICTING"},
+                           "checked_at": 5})
+        assert "CONFLICTING" in run_main()
+    finally:
+        subject.STATE_DIR = orig_dir
+
 print("PASS: only changed PR observations are injected; a persistent error is "
       "surfaced once at the streak threshold and re-armed on recovery or a "
       "text change")

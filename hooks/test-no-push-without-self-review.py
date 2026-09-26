@@ -3481,6 +3481,19 @@ def exempt_repo_cases() -> tuple[int, int]:
         ("an exempt remote is denied for a bare `git push` on a feature "
          "branch when `remote.origin.mirror` is configured",
          ["remote.origin.mirror", "true"]),
+        # A fourth override, `push.default=upstream` (and its deprecated
+        # synonym `tracking`), is the one where the destination can differ in
+        # NAME from HEAD's own: it pushes to `@{upstream}`, so a `feature`
+        # branch whose `branch.feature.merge` names `refs/heads/main` ships
+        # straight to `main` on a bare push regardless of what HEAD is
+        # called. Checking only `push.default == "matching"` misses this
+        # (adversarial review finding, PR #4013).
+        ("an exempt remote is denied for a bare `git push` on a feature "
+         "branch when `push.default` is `upstream`",
+         ["push.default", "upstream"]),
+        ("an exempt remote is denied for a bare `git push` on a feature "
+         "branch when `push.default` is `tracking`",
+         ["push.default", "tracking"]),
     ):
         try:
             rc, denied = run_e2e(

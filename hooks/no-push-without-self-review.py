@@ -1372,13 +1372,18 @@ def _push_targets_default_branch(directory: str | None, argv: list[str],
     `remote.<name>.push` overrides the question entirely, and a configured
     `remote.<name>.mirror` makes a bare push behave as `--mirror` (every ref
     under `refs/`, `main` included) with no `--mirror` on the command line to
-    catch. Checking only HEAD's own name here would grant the exemption to a
-    bare push that also ships `main` under any of the three -- exactly the gap
-    this function exists to close, reopened on its own bare-push path.
-    `push_is_exempt`'s own caller already refuses the exemption on anything
-    else this function returns other than `False`, so an unresolved HEAD, an
-    unresolvable override, or an unrecognized refspec shape denies the
-    exemption rather than granting it.
+    catch. `push.default=upstream` (and its deprecated synonym `tracking`) is
+    a fourth override, and the one where the destination can differ in NAME
+    from HEAD's own: per `man git-config`, it pushes the current branch to
+    `@{upstream}`, so a branch named `feature` whose `branch.feature.merge`
+    is `refs/heads/main` ships straight to `main` on a bare push regardless
+    of what HEAD is called. Checking only HEAD's own name here would grant
+    the exemption to a bare push that also ships `main` under any of the
+    four -- exactly the gap this function exists to close, reopened on its
+    own bare-push path. `push_is_exempt`'s own caller already refuses the
+    exemption on anything else this function returns other than `False`, so
+    an unresolved HEAD, an unresolvable override, or an unrecognized refspec
+    shape denies the exemption rather than granting it.
     """
     parsed = _parse_push(argv)
     if parsed is None:
@@ -1387,7 +1392,7 @@ def _push_targets_default_branch(directory: str | None, argv: list[str],
     refspecs = positionals[1:]
     if not refspecs:
         default = _git_config(directory, "--get", "push.default", argv, env)
-        if default and default.lower() == "matching":
+        if default and default.lower() in ("matching", "upstream", "tracking"):
             return None
         remote = _push_remote(directory, argv, env)
         if remote and _git_config(directory, "--get-all",

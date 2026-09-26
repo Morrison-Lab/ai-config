@@ -4,6 +4,7 @@ Branch and remote-branch lifecycle (push, rename, delete, retarget,
 recover, prune): [`git-branches.md`](git-branches.md).
 Diff-range selection, diff-scoped check pitfalls, and pathspec/glob/ref
 pattern matching: [`git-diffing.md`](git-diffing.md).
+Fetch-specific behavior: [`git-fetch.md`](git-fetch.md).
 Stash-specific behavior: [`git-stash.md`](git-stash.md).
 Tag management: [`git-tags.md`](git-tags.md).
 Worktree-specific behavior: [`git-worktrees.md`](git-worktrees.md).

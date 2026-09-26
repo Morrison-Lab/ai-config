@@ -531,98 +531,81 @@ Only one of them was about the decision.)
 
 ## A ref that resolves to a different commit than it did a moment ago
 
-Every shape above substitutes one artifact for another, and a **moving ref** is
-the special case where the operand you typed never changes and the commit it
-names does.
-There is nothing to point at afterwards: the command line reads identically
-before and after, so the diff of what you ran shows no error.
+Most shapes above substitute one artifact for another.
+A **moving ref** is the case where the operand you typed never changes and the commit it names does, so there is nothing to point at afterwards: the command line reads identically before and after, and the record of what you ran shows no error.
 
 `FETCH_HEAD` is the everyday instance.
-It is not a ref but a file that `git fetch` **replaces**, so a fetch run for an
-unrelated reason silently re-points an operand you set up earlier.
+It is not a ref but a file that `git fetch` **replaces**, so a fetch run for an unrelated reason silently re-points an operand you set up earlier.
 
-Three mechanics decide whether this bites, and two of them run opposite to the
-obvious guess.
+Four mechanics decide whether this bites, and three of them run opposite to the obvious guess.
 Measured on git 2.43.0, in a throwaway clone:
 
-- **A multi-ref fetch writes every ref, one per line, and `rev-parse` takes the
-  FIRST.**
+- **A multi-ref fetch writes every ref, one per line, and `rev-parse` takes the FIRST.**
   ```console
-  $ git fetch origin feat main && cat .git/FETCH_HEAD
-  08bec512...    branch 'feat' of /tmp/.../up
-  fae0bc12...    branch 'main' of /tmp/.../up
+  $ git fetch origin feat main && cat -A .git/FETCH_HEAD
+  08bec512...^I^Ibranch 'feat' of /tmp/.../up$
+  fae0bc12...^I^Ibranch 'main' of /tmp/.../up$
   $ git rev-parse FETCH_HEAD
   08bec512...        # feat, the first ref named
   ```
-  (The real separator between SHA and description is a tab, shown as spaces
-  here.)
   Reversing the arguments reverses the answer.
-  So a multi-ref fetch is *not* the hazard --- naming the ref you want first
-  gets you that ref.
+  So a multi-ref fetch is *not* the hazard --- naming the ref you want first gets you that ref.
+  Note the format from `cat -A`: each line is `<sha>` TAB `[not-for-merge]` TAB `<description>`, so there is a middle field between the SHA and the description, empty for a ref marked for merge.
+  A `cut -f2` reaches that middle field, not the description.
 - **A later fetch is the hazard**, because it replaces the file outright.
-- **A fetch that FAILS truncates `.git/FETCH_HEAD` to zero bytes**, and
-  `git rev-parse --verify FETCH_HEAD` then fails loudly rather than returning a
-  stale value.
-  That is the safe direction, and it is worth knowing because the deleted-branch
-  case (`couldn't find remote ref`, routine after a squash-merge with
-  auto-delete) lands here rather than in the silent one.
-  `--dry-run` and `--no-write-fetch-head` leave the prior value intact.
+- **A fetch that FAILS truncates `.git/FETCH_HEAD` to zero bytes**, and `git rev-parse --verify FETCH_HEAD` then fails loudly rather than returning a stale value.
+  That direction is safe, and worth knowing because the deleted-branch case (`couldn't find remote ref`, routine after a squash-merge with auto-delete) lands here rather than in the silent one.
+- **`--dry-run` ANNOUNCES a write it does not make, which is this section's own failure arriving through a flag that looks like protection.**
+  `--no-write-fetch-head` leaves the prior value intact too, but says nothing, so only `--dry-run` actively misleads:
+  ```console
+  $ git rev-parse FETCH_HEAD        # main
+  fae0bc12...
+  $ git fetch --dry-run origin feat
+   * branch            feat       -> FETCH_HEAD
+  $ git rev-parse FETCH_HEAD        # still main, not feat
+  fae0bc12...
+  ```
+  Git reports that `feat` landed in `FETCH_HEAD`, and the next read answers the *previous* fetch.
 
-Measured 2026-09-15 on
-[ai-config#3687](https://github.com/Morrison-Lab/ai-config/pull/3687), checking
-whether it collided with a peer PR.
-The sequence matters, because the first half was correct and only the second
-half went wrong:
+Measured 2026-09-15 on [ai-config#3687](https://github.com/Morrison-Lab/ai-config/pull/3687), checking whether it collided with a peer PR.
+The sequence matters, because the first comparison was correct and only the reads after the second fetch went wrong:
 
 ```bash
 git fetch -q origin ums/qbt-session-2026-09-14 main
-git merge-tree --write-tree HEAD FETCH_HEAD   # HEAD vs the PEER branch -- correct
+git merge-tree --write-tree HEAD FETCH_HEAD    # HEAD vs the PEER branch -- correct
 
-git fetch -q origin main                      # FETCH_HEAD replaced
-git show FETCH_HEAD:shared/workflow/...       # reads main -- wrong, silently
+git fetch -q origin main                       # FETCH_HEAD replaced
+
+# the comparison that broke: two reads, one per ref, counted and compared
+git show origin/main:path | grep -c '^- '      # main
+git show FETCH_HEAD:path  | grep -c '^- '      # ALSO main, silently
 ```
 
-Three successive reads after that second fetch compared `main` against `main`
-and each reported no difference, which is indistinguishable from the genuine
-no-conflict answer the first comparison had correctly produced.
-Nothing exposed it until a bullet-count query returned identical numbers for two
-supposedly different revisions.
+Both operands of that count comparison resolved to `main`, so it returned equal numbers --- and equality is what agreement looks like.
+Nothing exposed it until the two supposedly different revisions reported an identical count, which was implausible enough to force a re-read of what had actually been passed.
 
-Note what the first draft of this very entry got wrong, since it is the same
-error one level up: it blamed the multi-ref fetch, on the guess that
-`FETCH_HEAD` keeps the last ref named.
+Note what the first draft of this very entry got wrong, since it is the same error one level up: it blamed the multi-ref fetch, on the guess that `FETCH_HEAD` keeps the last ref named.
 It keeps the first.
 The guess was never measured, and an adversarial review measured it.
 
-This fragment's own test settles the class in one reading: ask what would have
-to be true for the claim to be **false**, and whether the artifact in hand could
-show it.
-A comparison of a commit against itself cannot show a conflict, so a clean
-result from one is arithmetic rather than evidence --- the same emptiness the
-preceding section names for a baseline that classifies the whole family one way
-by default.
+This fragment's own test settles the class in one reading: ask what would have to be true for the claim to be **false**, and whether the artifact in hand could show it.
+Two reads of one commit cannot show a difference, so equality between them is arithmetic rather than evidence --- the same emptiness [`A comparison's base is an artifact too`](#a-comparisons-base-is-an-artifact-too-and-it-moves-the-scope-in-both-directions) names for a base that classifies the whole family one way by default.
 
-[`fully-clean`](fully-clean.md) already carries the remedy as working code (its
-pre-merge gate captures `tip=$(git rev-parse --verify FETCH_HEAD)` immediately
-after each fetch and re-reads it after the next), and notes at the same site
-that a shell variable does not survive into a later tool call --- which is
-exactly the multi-call shape this incident spanned, so the pin has to be
-**written down**, not held in `$sha`.
-[`ums`](../../skills/ums/SKILL.md)'s worktree block chains its fetch with `&&`
-for the same reason.
+[`fully-clean`](fully-clean.md) already carries the remedy as working code: its pre-merge gate captures `tip=$(git rev-parse --verify FETCH_HEAD)` after the first fetch and a **separate** `head=$(...)` after the second, rather than trusting one capture across both.
+The same site notes that a shell variable does not survive into a later tool call, which is exactly the multi-call shape this incident spanned --- so the pin has to be **printed and written down**, not left in `$tip`.
+[`ums`](../../skills/ums/SKILL.md)'s worktree block chains its fetch with `&&` for a related but distinct reason it states itself: a failed fetch must stop the block rather than let it proceed on an older `FETCH_HEAD`.
 
-- **Do:** resolve a fetched ref to a SHA immediately, print it, and use the
-  printed SHA thereafter --- a pin you cannot quote is not a pin.
+- **Do:** resolve a fetched ref to a SHA immediately, print it, and use the printed SHA thereafter --- a pin you cannot quote is not a pin.
 - **Do:** name the ref you actually want **first** when fetching several.
-- **Do:** treat two refs producing *identical* results as a prompt to confirm
-  which commits were compared, rather than as agreement.
+- **Do:** treat two refs producing *identical* results as a prompt to confirm which commits were compared, rather than as agreement.
 - **Don't:** reuse `FETCH_HEAD` across any later fetch.
-- **Don't:** read "no conflict" or "no difference" as being about the pair you
-  meant without confirming both operands resolved where you thought.
+- **Don't:** read `* branch <ref> -> FETCH_HEAD` from a `--dry-run` as meaning a later read will return that ref;
+  it will return whatever the last real fetch wrote.
+- **Don't:** read "no conflict" or "no difference" as being about the pair you meant without confirming both operands resolved where you thought.
 
 ## A reviewer's counter-measurement needs the same check the claim it rebuts would have needed
 
-The section above is about the same artifact measured at a narrower scope than the claim names.
+[`A measurement of the right artifact can still be scoped narrower than the claim made from it`](#a-measurement-of-the-right-artifact-can-still-be-scoped-narrower-than-the-claim-made-from-it) is about the same artifact measured at a narrower scope than the claim names.
 This one is a plain substitution, the kind the four shapes above describe --- a different document standing in for the one the claim is about --- and it is worth its own entry only because of *who* commits it: a **reviewer** refuting someone else's claim rather than an author supporting their own.
 That is easy to miss, because a rebuttal reads as skepticism rather than as an assertion --- "I tested this and it isn't true" sounds like diligence applied, not like a new claim that itself owes [`dont-take-my-word-for-it`](../principles/dont-take-my-word-for-it.md).
 A finding backed by a real command is not thereby a finding backed by the *right* command, and nothing about the reviewer's own confidence distinguishes the two.

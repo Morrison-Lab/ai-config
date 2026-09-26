@@ -45,6 +45,61 @@ When resolving an issue or defect:
 | An unreviewed push reaches the remote | Tell authors to remember self-review | Install a pre-push review enforcement hook (`no-push-without-self-review.py`) |
 | An out-of-sync generated file | Hand-edit the generated copy | Run the generation script in CI with a `--check` drift flag |
 
+## Porting a sibling function's logic: enumerate its whole table up front
+
+A specific case of "identical instances in siblings" below, worth naming on
+its own because it recurred three review rounds in a row on one PR before
+being generalized here.
+When a new function's job partially overlaps an existing sibling's --- it
+handles the same kind of decision (here, "does this push target the default
+branch?"), but for a narrower purpose than the sibling's own --- and the fix
+is to port some of the sibling's config-override handling into it, port the
+sibling's **whole** override table in one pass, not whichever member of it
+the current review round happens to name.
+
+The one-off-patch instinct shows up here as: read the sibling function,
+notice it handles override X, port X, ship it, and consider the sibling's
+scope "covered".
+That reads as done, because the ported code runs and the one override
+inspected is now handled correctly.
+What it misses is that the sibling was never read as a **checklist** --- only
+as a source for the one thing already suspected of being missing --- so the
+sibling's other overrides stay invisible until a reviewer happens to think of
+each one in turn.
+
+Measured on `Morrison-Lab/ai-config#4013` (2026-09-26): `hooks/no-push-without-self-review.py`'s
+`_push_targets_default_branch` needed to port `shipped_commits`'s bare-push
+git-config handling.
+Three review rounds each found exactly one more override `shipped_commits`
+already checked that the port had missed: `push.default`/`remote.<name>.push`
+first, then a `*`-glob wildcard refspec inside the shared
+`_refspec_dest_branch` helper, then `remote.<name>.mirror`.
+Each fix was correct and each round's suite went green, and the shape was
+identical to the allowlist-regex pattern in
+[`algorithmatize-checks.md`](../workflow/algorithmatize-checks.md)'s "When an
+allowlist regex keeps leaking" section: a fix that closes the case just found
+and opens a different one, because the population being drawn from (the
+sibling's own set of config knobs) was never enumerated, only sampled.
+
+The remedy is mechanical rather than a plea for more care: before porting,
+list every config key, branch, and special case the sibling function reads
+(grep its own body for `git config`/`env.get`/equivalent reads, or just read
+it start to end and write down each conditional), and check the new
+function's scope against that list item by item, in the same pass that ports
+the first item.
+A partial port is then a decision recorded as such ("X does not apply here
+because ...") rather than an omission nobody checked.
+
+- **Do:** when porting one function's handling into a sibling with
+  overlapping scope, enumerate the source function's whole set of special
+  cases before porting any of them, and check each one off against the new
+  function's scope in the same pass.
+- **Do:** treat "the sibling also checks Y" as a question to answer for every
+  Y the sibling checks, not only for the Y a reviewer already named.
+- **Don't:** port the one override a review round flagged and consider the
+  sibling's scope covered --- that is sampling the population, not
+  enumerating it, and the next round will find the next member.
+
 ## Boundary with KISS and YAGNI
 
 Preferring systemic solutions does not license speculative architecture or over-engineering:

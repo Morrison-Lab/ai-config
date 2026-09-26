@@ -747,6 +747,32 @@ class TestEvaluate(unittest.TestCase):
         self.assertEqual(decision["decision"], "deny")
         self.assertIn("not clean", decision["reason"])
 
+    def test_copilot_open_count_with_inner_spaces_denies(self):
+        """'Open ( 1 )' with spaces inside the parentheses is still an Open
+        count; COPILOT_OPEN_COUNT tolerates whitespace inside the parens, not
+        only between 'Open' and '(' (ai-config#4004 review finding)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY.replace(
+            "The broad routing, formation-geometry, and link-lifecycle "
+            "changes warrant final human review despite strong regression "
+            "coverage.",
+            "See the Open ( 1 ) section for details.",
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+
+    def test_copilot_emphasis_mid_prose_denies(self):
+        """Bold emphasis partway through the prose paragraph falls outside the
+        template: `*` is excluded from the whole prose line, the same way `<`
+        is, so emphasis cannot hide a field-shaped fragment mid-sentence
+        (ai-config#4004 review finding)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY.replace(
+            "The broad routing, formation-geometry, and link-lifecycle "
+            "changes warrant final human review despite strong regression "
+            "coverage.",
+            "The broad routing has **critical** issues despite strong "
+            "regression coverage.",
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+
     def test_copilot_strong_open_mid_sentence_denies(self):
         """'<strong>Open (1)</strong>' sitting mid-sentence, inside the
         prose paragraph -- not as the line's own first character, which

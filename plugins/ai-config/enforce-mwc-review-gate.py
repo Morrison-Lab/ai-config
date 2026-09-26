@@ -453,14 +453,15 @@ _COPILOT_TEMPLATE_HEADING_PREFIX = r"(?:[^\w\n'\"]+[ \t]*)?"
 # (a heading), `*` (bold/italic emphasis, covering `**Review effort:**`-
 # shaped text so a stray field-looking line cannot hide as prose), a
 # backtick (an inline code span or the start of a ``` fence), or `~` (a
-# ~~~ fence). `<` (an HTML tag) is excluded from the whole line, not just
-# its first character ([ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004) review finding): a real empty-Balanced
+# ~~~ fence). `<` (an HTML tag) and `*` (emphasis) are excluded from the
+# whole line, not just its first character; a backtick stays allowed mid-line
+# because a real summary quotes identifiers in inline code ([ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004) review finding): a real empty-Balanced
 # review's summary prose never contains an HTML tag, and `[^\n]+` alone let
 # a MID-SENTENCE `<strong>Open (1)</strong>` (or any other tag) hide inside
 # an otherwise-ordinary-looking prose line, which is exactly how
 # `COPILOT_OPEN_COUNT` below can be defeated from inside the fullmatch
 # rather than only from outside it.
-_COPILOT_TEMPLATE_PROSE_LINE = r"(?![#*`~])[^\n<]+"
+_COPILOT_TEMPLATE_PROSE_LINE = r"(?![#`~])[^\n<*]+"
 COPILOT_EMPTY_BALANCED_TEMPLATE = re.compile(
     r"\n*"
     r"<!--[ \t]*ccr-overview-v2[ \t]*-->\n+"
@@ -489,7 +490,7 @@ COPILOT_EMPTY_BALANCED_TEMPLATE = re.compile(
 # text: a real finding stated this way is a real finding regardless of
 # what line endings or trailing whitespace the review happened to use.
 COPILOT_PREVIOUSLY_MISSED = re.compile(r"previously\s+missed", re.IGNORECASE)
-COPILOT_OPEN_COUNT = re.compile(r"Open[ \t]*\([0-9]+\)", re.IGNORECASE)
+COPILOT_OPEN_COUNT = re.compile(r"Open[ \t]*\([ \t]*[0-9]+[ \t]*\)", re.IGNORECASE)
 
 
 def copilot_is_empty_balanced_closer_look(raw_body):

@@ -1060,6 +1060,39 @@ It lapsed.
 
 Standing grant, recorded universally in `AGENTS.md` ("Default to action without asking"): proceed with non-destructive steps without asking, and ask only for destructive, ambiguous, high-impact, or genuinely blocking choices.
 
+## Always fix merge conflicts immediately; never wait for approval
+
+A `CONFLICTING` PR is a standing invitation to defer: resolving it is mechanical
+and fully reversible (merge the base into the head, resolve, push), so there is
+no reason to hold it for a check-in.
+The moment a merge-conflict notice arrives on any open PR --- content or
+infra --- merge the base branch in and resolve it right away, with no
+approval needed first.
+[`sync-with-main`](shared/workflow/sync-with-main.md) covers the mechanics
+(fetch, merge, re-check version parity, verify a claimed resolution is a real
+merge commit); this section covers the authorization, which that fragment does
+not state.
+
+This narrows, rather than replaces, any standing rule that a human reviews and
+merges content themselves: that rule is about who **approves the content**,
+and this one is about who **resolves a conflict on the way there** --- two
+separate questions.
+A PR needing human review for its substance still needs its conflicts fixed
+without waiting for that review to start.
+
+- **Do:** merge base-into-head and resolve conflicts on any open PR the
+  moment a conflict is noticed, whether or not that PR's content still needs
+  a human's review or approval.
+- **Don't:** leave a `CONFLICTING` PR untouched pending a check-in, or treat
+  "this needs human review anyway" as a reason to also hold off on fixing its
+  conflicts.
+- **Don't:** force-push or push to `main` while resolving --- the standing
+  scope limits on those still apply; resolve by merging the base into the PR
+  branch, never by rewriting its history.
+
+(Directive from the user, 2026-09-26: "cai: always fix conflicts; don't wait
+for my approval".)
+
 ## Auto-orchestration: always look for Workflow opportunities
 
 The heavy, parallelizable skills (`ardia`, `ardiaei`, `gia`, `gip`, `grade-work`, `opposition-research`, `find-overlap`) decide on their own whether a task warrants multi-agent orchestration via the `Workflow` tool --- so I don't have to type `ultracode` every time.

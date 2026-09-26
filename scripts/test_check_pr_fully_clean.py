@@ -6674,14 +6674,19 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     # `_find_html_comment_spans` already treats as extending to the end of
     # the string, matching every other unterminated-comment handling in
     # this module) was still trusted as a real block start.
+    # The swallowed marker still opens no block. Since the orphan scan now
+    # runs when no block is found (sixteenth round, r4101514487), the live
+    # nonzero Findings line after the comment's close is read as an orphan,
+    # and a nonzero orphan is decisive: not-clean, the fail-closed direction.
     check(
         "copilot_verdict: a marker swallowed by an earlier unclosed HTML "
-        "comment is not trusted as a real block start",
+        "comment is not trusted as a real block start, and its live nonzero "
+        "Findings line still reads as not-clean",
         checker.copilot_verdict(
             "<!-- unterminated comment with no close\n\n"
             "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
             f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n"
-        ) == "",
+        ) == "not-clean",
     )
     # (b) The block-END search (`<details`/`##`, via `.search()`) also
     # never checked its own candidate against comment spans. A fake,

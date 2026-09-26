@@ -90,7 +90,7 @@ WHERE IT DELIBERATELY DOES NOT FIRE
   fingerprint, so nothing here can check them. They are an open gap, tracked as
   ai-config#1929, not a decision that they are safe.
 - A push whose every resolved push URL ends in an `EXEMPT_REPOS` entry
-  (Morrison-Lab's mln, mlg and mlr) passes with no verdict and no override.
+  (Morrison-Lab's ai-config, mln, mlg and mlr) passes with no verdict and no override.
   Only a github.com URL (https or ssh) on a configured remote counts, and only
   for a plain push in a plain command (`[cd DIR &&] git ... [| tail N]`): no
   `-c`, no environment setting of any kind, and no ssh command, proxy, exec
@@ -542,7 +542,17 @@ DEGRADED_OVERRIDE = re.compile(r"(?:^|[;&|`(\s])ALLOW_UNREVIEWED_PUSH=1\s")
 # override. A constant rather than an environment variable or a file in the
 # pushed repository, because both of those are writable by the session the
 # guard is checking; widening this list is a reviewed change to this file.
+#
+# `morrison-lab/ai-config` joined the same list on 2026-09-26, at the same
+# owner's request: the DATA 571 project's cloud sessions push infra/config
+# fixes to this repository itself (not only to the three course repos above),
+# under the same background-every-dispatch harness, so the same #3045
+# starvation blocked those pushes too -- confirmed live: this repo's own
+# `git diff` on this constant was, itself, the pending change that a
+# foreground reviewer dispatch could never return a verdict on before the
+# push it was gating.
 EXEMPT_REPOS = frozenset({
+    "morrison-lab/ai-config",
     "morrison-lab/mln",
     "morrison-lab/mlg",
     "morrison-lab/mlr",

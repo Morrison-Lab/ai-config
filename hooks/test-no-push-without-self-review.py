@@ -3129,6 +3129,7 @@ def exempt_repo_cases() -> tuple[int, int]:
     mod = _load_subject()
 
     for url, want in (
+        ("https://github.com/Morrison-Lab/ai-config.git", "morrison-lab/ai-config"),
         ("https://github.com/Morrison-Lab/mln.git", "morrison-lab/mln"),
         ("https://github.com/Morrison-Lab/mlg", "morrison-lab/mlg"),
         ("https://GitHub.com/morrison-lab/MLR.git/", "morrison-lab/mlr"),
@@ -3154,9 +3155,9 @@ def exempt_repo_cases() -> tuple[int, int]:
             got = f"raised {type(exc).__name__}"
         check(f"`_owner_repo({url!r})` is {want!r} (got {got!r})", got == want)
 
-    check("EXEMPT_REPOS is exactly mln, mlg and mlr, lowercase",
-          mod.EXEMPT_REPOS == {"morrison-lab/mln", "morrison-lab/mlg",
-                               "morrison-lab/mlr"})
+    check("EXEMPT_REPOS is exactly ai-config, mln, mlg and mlr, lowercase",
+          mod.EXEMPT_REPOS == {"morrison-lab/ai-config", "morrison-lab/mln",
+                               "morrison-lab/mlg", "morrison-lab/mlr"})
     # Pinned by equality, like EXEMPT_REPOS, so trimming either list to the
     # members the end-to-end rows below happen to exercise still fails here.
     check("TRANSPORT_ENV is exactly the six transport-redirecting variables",

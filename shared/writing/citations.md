@@ -800,3 +800,16 @@ The Wendland applications list is the enumeration half, and it survived into the
 The same commit fixed two locators the branch had never touched --- `(p. 22-23)` for four items that run pp. 23-24, and `(pp. 307-309)` for content that opens on p. 306 --- which is the follow-on worth keeping.
 Re-deriving one range from the source puts its neighbours within reach of the same check for the first time, and a page citation nobody has ever opened the PDF for is likelier to be wrong than one that survived a reading.
 Sweep the locators around a split, not only the ones the split created.)
+
+## Quote the original; put the content first; adapt, don't summarize
+
+Three citation rules live canonically in PSW's Citations and evidence chapter:
+
+- [Quote the original](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#quote-the-original),
+  not a secondary source quoting it;
+- [Put the content first](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#put-the-content-first):
+  headings name the topic, and a quotation is followed by a bare citation;
+- [Adapting another course's material](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#adapting-another-courses-material):
+  write our own version and credit it in a `::: notes` div.
+
+Link those sections rather than restating them here.

@@ -1512,6 +1512,10 @@ and a read-through inspects each sentence rather than the sequence.
 
 [`shared/writing/quarto-figure-captions.md`](shared/writing/quarto-figure-captions.md)
 
+## Quarto: style div boxes in revealjs as well as HTML
+
+[`shared/writing/quarto-revealjs-div-styling.md`](shared/writing/quarto-revealjs-div-styling.md)
+
 ## Challenge ambiguous phrasing and terminology in review
 
 [shared/workflow/challenge-ambiguous-terminology.md](shared/workflow/challenge-ambiguous-terminology.md)

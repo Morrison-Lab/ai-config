@@ -7,6 +7,14 @@ definitions where feasible**:
 - Prefer standalone, top-level function definitions over functions defined
   inside other functions. Nested definitions hide reusable logic, complicate
   unit testing, and obscure scope.
+  Define a function inside another only for a specific efficiency or
+  simplicity reason, and say which in a comment beside it
+  (Ezra Morrison, 2026-09-25: "I don't like function definitions inside
+  other functions unless there's a specific efficiency or simplicity reason").
+  - **Do:** define helpers at top level, one per file, and pass them what
+    they need as arguments.
+  - **Don't:** define a helper inside its caller merely because only that
+    caller uses it today.
 
 This is a readability/maintainability default, not an absolute rule --- keep the
 nesting when flattening it would be more convoluted (a trivial one-argument

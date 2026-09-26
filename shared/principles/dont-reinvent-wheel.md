@@ -527,3 +527,24 @@ propose depending on, forking, or contributing to it instead.
 Accept the custom version when one of the escape hatches above
 genuinely applies --- and ask for the "checked, nothing fit" note when
 it's missing.
+
+## One canonical copy across our own repositories
+
+DRW applies to our own content as much as to external packages.
+When two of our repositories need the same guidance or list,
+keep one canonical copy and have the others link to it or depend on it.
+Pick the home by audience:
+prose guidance lives in [PSW](https://morrison-lab.github.io/psw/),
+agent workflow rules in ai-config,
+and deterministic checks in gha.
+A consumer's own file (a course's `AUTHORING.md`, a skill) keeps only what is
+specific to it, plus the link.
+
+- **Do:** add new general guidance to its canonical home first,
+  then link it from every repository that needs it.
+- **Don't:** paste the same rule or list into several repositories,
+  where the copies drift apart.
+
+(Directive from the user, 2026-09-25: "DRW; if those repos can refer to and/or
+depend on content from each other, do so, rather than duplicating similar
+content in multiple repos".)

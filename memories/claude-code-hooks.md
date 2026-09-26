@@ -999,6 +999,17 @@ that was wrong for one of the halves, and the correction is the reason the split
 ai-config#3739 carries the remaining guard side, ai-config#3754 the Stop-hook side.
 Measured against a scratch copy of `hooks/` rather than the live directory, so a mutant could not leak into the session's own guard.)
 
+**Path 3's own gap closed differently than the `peer`-origin consumer half above, and the two are not the same fix.**
+Measured 2026-09-25 (Claude Code desktop, Windows, ai-config#3945): the pointer sentence bullet 3 describes has a concrete home on disk, not only in the transcript.
+The report lives in a sibling `<transcript-dir>/<session-id>/subagents/agent-<agentId>.jsonl`, as the `message` input of that subagent's own last `SubagentHandback` tool_use, with a `.meta.json` beside it naming the dispatching call's `toolUseId` and the subagent's `agentType`.
+The guard now reads that file when path 3's own `tool_result` carries no report --- located by `toolUseId` first, falling back to the `agentId` printed in the pointer sentence, and admitted only once the `.meta.json`'s `agentType` independently confirms an admitted reviewer.
+See `_handback_report_text` in `hooks/no-push-without-self-review.py`.
+This closes path 3's pointer-sentence case specifically.
+It does **not** touch path 4 or the `peer`-origin attachment this section describes above --- that consumer half is a different transport (an in-transcript record) and is still the separate, human-gated change #3739 tracks.
+
+- **Do:** read path 3's own on-disk report via the fix above when its `tool_result` is a bare pointer sentence.
+- **Don't:** read this as having shipped the `peer`-origin consumer half --- that is still #3739's open item.
+
 ## A project-thread session can reach a push deadlock whose layers are each behaving as designed
 
 Measured live 2026-09-17 on `Morrison-Lab/ai-config`, with 23 unpushed commits and a clean fast-forward available.

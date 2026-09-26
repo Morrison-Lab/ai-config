@@ -54,37 +54,26 @@ The one-off-patch instinct shows up here as: read the sibling function, notice i
 That reads as done, because the ported code runs and the one override inspected is now handled correctly.
 What it misses is that the sibling was never read as a **checklist** --- only as a source for the one thing already suspected of being missing --- so the sibling's other overrides stay invisible until a reviewer happens to think of each one in turn.
 
-Measured on `Morrison-Lab/ai-config#4013` (2026-09-26, still open as of this writing --- see below): `hooks/no-push-without-self-review.py`'s `_push_targets_default_branch` needed to port `shipped_commits`'s bare-push git-config handling.
+Measured on `Morrison-Lab/ai-config#4013` (2026-09-26, merged --- see below): `hooks/no-push-without-self-review.py`'s `_push_targets_default_branch` needed to port `shipped_commits`'s bare-push git-config handling.
 
-Across three automated review rounds plus one dispatched adversarial-reviewer subagent pass, four distinct overrides `shipped_commits` already checked turned up missing from the port, one at a time.
+Across five automated review rounds plus one dispatched adversarial-reviewer subagent pass, five distinct overrides `shipped_commits` already checked (or a related refspec-parsing case) turned up missing from the port, one at a time.
 Round 1 found `push.default=matching`/`remote.<name>.push`.
 Round 2 found a `*`-glob wildcard refspec inside the shared `_refspec_dest_branch` helper.
 The same fix commit for round 2 also closed a `remote.<name>.mirror` gap, but that one was caught by a separately dispatched adversarial-reviewer subagent reviewing that commit, not by a distinct numbered review round --- so it was ported proactively alongside a requested fix rather than named by the automated reviewer itself.
-Round 3 then found a fourth gap, `push.default=upstream` and its deprecated synonym `tracking`;
-a fix for it was pushed but had not yet been re-reviewed as of this writing.
-So read the count as four misses surfacing one at a time, not a closed three-round arc.
+Round 3 found a fourth gap, `push.default=upstream` and its deprecated synonym `tracking`.
+By the time that fix was re-reviewed (round 4, confirming it clean), the same round had already found a fifth gap: a colon-less `HEAD`/`@` refspec source (the common `git push origin HEAD` idiom) resolves to the literal string `"HEAD"` instead of the checked-out branch name.
+At that point the PR's author was explicitly instructed to stop chasing further edge cases inline, file the fifth gap as a tracking issue instead of fixing it (`ai-config#4017`), and merge on the current head --- which happened.
+So the PR shipped with four of five known gaps fixed and the fifth tracked rather than fixed, not a closed five-round arc that caught everything.
 
-Each fix made so far was correct and each round's suite went green, and the shape was identical to the allowlist-regex pattern in [`algorithmatize-checks.md`](../workflow/algorithmatize-checks.md)'s "When an allowlist regex keeps leaking" section: a fix that closes the case just found and opens a different one, because the population being drawn from (the sibling's own set of config knobs) was never enumerated, only sampled.
-That a fourth instance surfaced after this entry's first draft was written is itself evidence for the entry's point, not a reason to soften it: enumerating up front would have caught all four in one pass instead of four.
+Each fix made was correct and each round's suite went green, and the shape was identical to the allowlist-regex pattern in [`algorithmatize-checks.md`](../workflow/algorithmatize-checks.md)'s "When an allowlist regex keeps leaking" section: a fix that closes the case just found and opens a different one, because the population being drawn from (the sibling's own set of config knobs, plus the refspec grammar's own special cases) was never enumerated, only sampled.
+That a fifth instance surfaced after a fourth had just been confirmed clean is itself evidence for the entry's point, not a reason to soften it: enumerating up front would have caught all five in one pass instead of five, and the eventual stopping point was a deliberate scope decision, not the population running out.
 
-The remedy is mechanical rather than a plea for more care: before porting,
-list every config key, branch, and special case the sibling function reads
-(grep its own body for `git config`/`env.get`/equivalent reads, or just read
-it start to end and write down each conditional), and check the new
-function's scope against that list item by item, in the same pass that ports
-the first item.
-A partial port is then a decision recorded as such ("X does not apply here
-because ...") rather than an omission nobody checked.
+The remedy is mechanical rather than a plea for more care: before porting, list every config key, branch, and special case the sibling function reads (grep its own body for `git config`/`env.get`/equivalent reads, or just read it start to end and write down each conditional), and check the new function's scope against that list item by item, in the same pass that ports the first item.
+A partial port is then a decision recorded as such ("X does not apply here because ...") rather than an omission nobody checked.
 
-- **Do:** when porting one function's handling into a sibling with
-  overlapping scope, enumerate the source function's whole set of special
-  cases before porting any of them, and check each one off against the new
-  function's scope in the same pass.
-- **Do:** treat "the sibling also checks Y" as a question to answer for every
-  Y the sibling checks, not only for the Y a reviewer already named.
-- **Don't:** port the one override a review round flagged and consider the
-  sibling's scope covered --- that is sampling the population, not
-  enumerating it, and the next round will find the next member.
+- **Do:** when porting one function's handling into a sibling with overlapping scope, enumerate the source function's whole set of special cases before porting any of them, and check each one off against the new function's scope in the same pass.
+- **Do:** treat "the sibling also checks Y" as a question to answer for every Y the sibling checks, not only for the Y a reviewer already named.
+- **Don't:** port the one override a review round flagged and consider the sibling's scope covered --- that is sampling the population, not enumerating it, and the next round will find the next member.
 
 ## Boundary with KISS and YAGNI
 

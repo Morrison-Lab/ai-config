@@ -155,6 +155,53 @@ COPILOT_FINDINGS_LINE = re.compile(
 )
 
 
+# Copilot's ccr-overview-v2 body also states each review's own cost/
+# thoroughness level as a `**Review effort:**` line, immediately preceding
+# the `**Findings:**` line this module already parses ([ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004)) --
+# `Lite` or `Balanced` in every fixture seen so far. Anchored and bounded
+# identically to `COPILOT_FINDINGS_LINE`, for the same reasons documented
+# on that pattern: a 0-3-space indent (never a tab), and the captured value
+# stops at the line's own trailing whitespace rather than running on.
+COPILOT_REVIEW_EFFORT_LINE = re.compile(
+    r"(?:^|\n)[ ]{0,3}\*\*Review effort:\*\*(?:[ \t]*(?P<rest>\S(?:[^\r\n]*?\S)?))?(?=[ \t]*(?:\r?\n|$))",
+    re.IGNORECASE,
+)
+
+
+def copilot_v2_block_review_efforts(
+    scan: str,
+    blocks: List[Tuple[int, int]],
+    cited: bytearray,
+    match_is_cited: Callable[[bytearray, int, int], bool],
+) -> List[str]:
+    """Return the lower-cased value of every live, uncited
+    ``**Review effort:**`` line found within any of `blocks`.
+
+    Mirrors ``_copilot_v2_findings_count``'s own block-scoped scan: the same
+    citedness check, and `match_content_start` for the same reason used
+    everywhere else in this module -- the leading `(?:^|\\n)` anchor
+    consumes a preceding newline the citation mask never marks cited, so
+    checking from the raw match start would report a whole-line, code-span-
+    cited value as live.
+
+    Returns every value found rather than collapsing to the first, so a
+    caller combining results across several blocks (a quoted earlier round
+    ahead of the current one, say) can tell a body that consistently states
+    one effort level apart from one that states two different ones -- the
+    same "don't commit to the first match" reasoning
+    ``_copilot_v2_findings_count`` already applies to `**Findings:**`.
+    """
+    efforts: List[str] = []
+    for block_start, block_end in blocks:
+        for m in COPILOT_REVIEW_EFFORT_LINE.finditer(scan, block_start, block_end):
+            if match_is_cited(cited, match_content_start(m), m.end()):
+                continue
+            rest = (m.group("rest") or "").strip().lower()
+            if rest:
+                efforts.append(rest)
+    return efforts
+
+
 def match_content_start(m: "re.Match[str]") -> int:
     """The position to check citedness FROM, for a match of a LINE-ANCHORED
     pattern -- the line's own first CONTENT character, past any consumed

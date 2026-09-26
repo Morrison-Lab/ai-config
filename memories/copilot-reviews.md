@@ -186,6 +186,18 @@ ai-config#2969 (ai-config#694 pattern) to keep both files well under the
   4. Guarding against short commit abbreviations (`len(oid) >= 7`) before matching head OIDs.
   - **Do:** ensure bot review gates require a later clean review from the same bot or formal dismissal before clearing standing negative reviews across pushes.
   - **Don't:** drop standing bot findings simply because a new commit moved `HEAD`.
+- **An empty BALANCED "Needs a closer look" review is non-blocking; the identical review at LITE effort still blocks.**
+  The `ccr-overview-v2` heading `Needs a closer look` is Copilot flagging a large or ambiguous diff for a human's own judgment, not stating a finding.
+  When it carries `**Review effort:** Balanced`, `**Findings:** None`, no "Open (N)" details block, and no "Previously missed" item, there is no finding behind it at all --- `scripts/check-pr-fully-clean.py`'s `copilot_verdict()` used to treat ANY `Needs a closer look` occurrence as `not-clean` unconditionally, so this exact shape blocked a merge with nothing to address ([Lacaedemon/sparta#1638](https://github.com/Lacaedemon/sparta/pull/1638), review 5316721676, `b36fe3bb`, 2026-09-25T10:42:37Z).
+  Fixed in ai-config#4004: the carve-out reads the body as NO VERDICT (`""`), never as `clean` --- it must not count toward a clean-review quorum, and it must not supersede an earlier not-clean Copilot verdict from an earlier round.
+  `Changes recommended` stays unconditionally blocking regardless of effort or Findings count; only `Needs a closer look` gets the carve-out.
+  A `Lite` review carrying the identical `Findings: None` still blocks: `Needs a closer look` at Lite effort is Copilot declining to do a Balanced pass on a diff it judged too large, and it still needs a Balanced re-request before it says anything about the diff's actual content.
+  A live re-check on the same merged PR after the fix landed: with an EARLIER `Needs a closer look` review (2026-09-25T09:44:20Z, same PR) that DOES carry a genuine `Previously missed (1)` item, `check-pr-fully-clean.py` correctly reports THAT round as the latest not-clean Copilot verdict, and the later empty-Balanced round at 10:42:37Z is silently skipped rather than reported at all --- confirming the carve-out discriminates a real finding from an empty flag-for-review even between two rounds of the same reviewer on the same PR.
+  - **Do:** read an empty `Needs a closer look` review at Balanced effort (no Open/Previously-missed block, Findings: None) as no verdict, and keep waiting on or re-requesting review rather than treating it as a blocker to ARD.
+  - **Do:** keep treating the identical shape at Lite effort, or one carrying an "Open (N)" listing or a "Previously missed" item, as a real not-clean verdict.
+  - **Don't:** let an empty Balanced "Needs a closer look" round count toward a clean-review quorum.
+  - **Don't:** let it clear a standing not-clean verdict from an earlier round by the same reviewer --- it is silently skipped, not treated as an all-clear.
+  (Directive from the user, 2026-09-25: "you can ignore empty 'balanced' copilot reviews like [Lacaedemon/sparta#1638#pullrequestreview-5316721676](https://github.com/Lacaedemon/sparta/pull/1638#pullrequestreview-5316721676)". Tracked as [ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004).)
 - **`reviewRequests` is uninformative for Copilot in-flight status.**
   Check runs and review bodies govern instead.
   As measured in `memories/gh-cli.md`, `gh pr view --json reviewRequests` and REST `requested_reviewers`

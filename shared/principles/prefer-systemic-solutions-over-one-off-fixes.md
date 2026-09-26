@@ -56,7 +56,7 @@ What it misses is that the sibling was never read as a **checklist** --- only as
 
 Measured on `Morrison-Lab/ai-config#4013` (2026-09-26, merged --- see below): `hooks/no-push-without-self-review.py`'s `_push_targets_default_branch` needed to port `shipped_commits`'s bare-push git-config handling.
 
-Across five automated review rounds plus one dispatched adversarial-reviewer subagent pass, five distinct overrides `shipped_commits` already checked (or a related refspec-parsing case) turned up missing from the port, one at a time.
+Across four automated review rounds plus one dispatched adversarial-reviewer subagent pass, five distinct overrides `shipped_commits` already checked (or a related refspec-parsing case) turned up missing from the port, one at a time.
 Round 1 found `push.default=matching`/`remote.<name>.push`.
 Round 2 found a `*`-glob wildcard refspec inside the shared `_refspec_dest_branch` helper.
 The same fix commit for round 2 also closed a `remote.<name>.mirror` gap, but that one was caught by a separately dispatched adversarial-reviewer subagent reviewing that commit, not by a distinct numbered review round --- so it was ported proactively alongside a requested fix rather than named by the automated reviewer itself.

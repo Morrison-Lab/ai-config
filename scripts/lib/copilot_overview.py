@@ -155,6 +155,84 @@ COPILOT_FINDINGS_LINE = re.compile(
 )
 
 
+# Copilot's ccr-overview-v2 body also states each review's own cost/
+# thoroughness level as a `**Review effort:**` line, immediately preceding
+# the `**Findings:**` line this module already parses ([ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004)) --
+# `Lite` or `Balanced` in every fixture seen so far. Anchored and bounded
+# identically to `COPILOT_FINDINGS_LINE`, for the same reasons documented
+# on that pattern: a 0-3-space indent (never a tab), and the captured value
+# stops at the line's own trailing whitespace rather than running on.
+COPILOT_REVIEW_EFFORT_LINE = re.compile(
+    r"(?:^|\n)[ ]{0,3}\*\*Review effort:\*\*(?:[ \t]*(?P<rest>\S(?:[^\r\n]*?\S)?))?(?=[ \t]*(?:\r?\n|$))",
+    re.IGNORECASE,
+)
+
+
+def copilot_v2_block_review_efforts(
+    scan: str,
+    blocks: List[Tuple[int, int]],
+    cited: bytearray,
+    match_is_cited: Callable[[bytearray, int, int], bool],
+) -> List[str]:
+    """Return the lower-cased value of every live, uncited
+    ``**Review effort:**`` line found within any of `blocks`.
+
+    Mirrors ``_copilot_v2_findings_count``'s own block-scoped scan: the same
+    citedness check, `match_content_start` for the same reason used
+    everywhere else in this module ([ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding -- see
+    below for why this now ALSO needs the comment-span exclusion that
+    mirror already applies), and the same one-bounded-scan-up-to-the-
+    furthest-block's-end shape for comment spans (see
+    `_copilot_v2_findings_count`'s own comment for the quadratic-scan
+    reasoning this avoids). The leading `(?:^|\\n)` anchor consumes a
+    preceding newline the citation mask never marks cited, so checking
+    from the raw match start would report a whole-line, code-span-cited
+    value as live.
+
+    Comment-hidden values are skipped ([ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding): a
+    body with a live 'Needs a closer look' heading and live `**Findings:**
+    None` but NO live `**Review effort:**` line anywhere -- only one hidden
+    inside an HTML comment within the same block -- must not read as
+    consistently Balanced. `_copilot_v2_findings_count` already excludes a
+    comment-hidden `**Findings:**` match this same way; this function did
+    not, so the caller's `efforts != {"balanced"}` guard never fired for a
+    comment-hidden-only effort line.
+
+    An empty live value (a bare `**Review effort:**` line with nothing
+    after the colon) is preserved as the empty string rather than dropped
+    ([ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding): a body carrying a genuine
+    `**Review effort:** Balanced` line ALONGSIDE a second, malformed, empty
+    effort line used to leave the aggregated set at `{"balanced"}` (the
+    empty one silently discarded), letting the caller's "every live effort
+    line reads Balanced" check pass over a line that reads nothing at all.
+    Keeping the empty string in the returned list makes the aggregated set
+    `{"balanced", ""}`, which correctly fails the caller's `== {"balanced"}`
+    equality instead.
+
+    Returns every value found rather than collapsing to the first, so a
+    caller combining results across several blocks (a quoted earlier round
+    ahead of the current one, say) can tell a body that consistently states
+    one effort level apart from one that states two different ones -- the
+    same "don't commit to the first match" reasoning
+    ``_copilot_v2_findings_count`` already applies to `**Findings:**`.
+    """
+    efforts: List[str] = []
+    if not blocks:
+        return efforts
+    max_end = max(end for _, end in blocks)
+    comment_spans = _find_html_comment_spans(scan[:max_end], cited, match_is_cited)
+    comment_span_starts = [s for s, _ in comment_spans]
+    for block_start, block_end in blocks:
+        for m in COPILOT_REVIEW_EFFORT_LINE.finditer(scan, block_start, block_end):
+            if match_is_cited(cited, match_content_start(m), m.end()):
+                continue
+            if _position_in_spans(m.start(), comment_span_starts, comment_spans):
+                continue
+            rest = (m.group("rest") or "").strip().lower()
+            efforts.append(rest)
+    return efforts
+
+
 def match_content_start(m: "re.Match[str]") -> int:
     """The position to check citedness FROM, for a match of a LINE-ANCHORED
     pattern -- the line's own first CONTENT character, past any consumed

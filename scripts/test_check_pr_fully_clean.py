@@ -6398,6 +6398,182 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "copilot_verdict: v2 'Needs a closer look' with 'Findings: None' is not clean",
         checker.copilot_verdict(v2_closer_look_none_body) == "not-clean",
     )
+
+    # [ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004): an EMPTY Balanced Copilot review under the 'Needs a
+    # closer look' heading is Copilot flagging a large/ambiguous diff for
+    # final human judgment with no finding of its own behind it, and must
+    # neither block a merge nor count as clean. Fixture provenance, per
+    # fixtures-are-not-evidence.md: transcribed VERBATIM from the review the
+    # issue links (Lacaedemon/sparta#1638, review 5316721676:
+    # https://github.com/Lacaedemon/sparta/pull/1638#pullrequestreview-5316721676,
+    # state COMMENTED, at commit b36fe3bb) -- blank lines between each
+    # section and two trailing spaces after "Balanced" (a Markdown hard line
+    # break), matching the actual fetched body byte-for-byte rather than a
+    # simplified single-newline paraphrase ([ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding: an
+    # earlier version of this fixture dropped both, leaving the checker
+    # untested against the exact production formatting that motivated the
+    # change).
+    copilot_empty_balanced_closer_look_body = (
+        "<!-- ccr-overview-v2 -->\n\n"
+        "## Copilot review overview\n\n"
+        "### \U0001f535 Needs a closer look\n\n"
+        "The broad routing, formation-geometry, and link-lifecycle changes "
+        "warrant final human review despite strong regression coverage.\n\n"
+        "**Review effort:** Balanced  \n"
+        "**Findings:** None"
+    )
+    check(
+        "copilot_verdict: an empty Balanced 'Needs a closer look' review "
+        "states no verdict rather than blocking",
+        checker.copilot_verdict(copilot_empty_balanced_closer_look_body) == "",
+    )
+    check(
+        "classify_verdict: an empty Balanced 'Needs a closer look' review "
+        "states no verdict -- neither clean nor not-clean",
+        checker.classify_verdict(
+            copilot_empty_balanced_closer_look_body, "COMMENTED", "copilot"
+        )
+        == "",
+    )
+
+    copilot_empty_lite_closer_look_body = copilot_empty_balanced_closer_look_body.replace(
+        "**Review effort:** Balanced", "**Review effort:** Lite"
+    )
+    check(
+        "copilot_verdict: the identical empty review at Lite effort still "
+        "blocks -- an empty Lite review still needs a Balanced re-request",
+        checker.copilot_verdict(copilot_empty_lite_closer_look_body) == "not-clean",
+    )
+
+    copilot_balanced_previously_missed_body = (
+        copilot_empty_balanced_closer_look_body
+        + "\n\n<details>\n<summary>Review details</summary>\n\n"
+        "### Suppressed comments (1)\n\n"
+        "**Previously missed (1)** in code that hasn't changed since the "
+        "last review.\n\n"
+        "**scripts/lib/copilot_overview.py:1**\n"
+        "* Some prior finding.\n\n"
+        "</details>"
+    )
+    check(
+        "copilot_verdict: a Balanced 'Needs a closer look' with a "
+        "'Previously missed' item still blocks",
+        checker.copilot_verdict(copilot_balanced_previously_missed_body) == "not-clean",
+    )
+
+    copilot_balanced_open_items_body = (
+        copilot_empty_balanced_closer_look_body
+        + "\n\n<details open>\n<summary><strong>Open (1)</strong></summary>\n\n"
+        f"- {_v2_picture} [Some open finding](#discussion_r1) · New\n"
+        "</details>"
+    )
+    check(
+        "copilot_verdict: a Balanced 'Needs a closer look' with an "
+        "'Open (N)' listing still blocks",
+        checker.copilot_verdict(copilot_balanced_open_items_body) == "not-clean",
+    )
+
+    copilot_balanced_nonzero_closer_look_body = (
+        copilot_empty_balanced_closer_look_body.replace(
+            "**Findings:** None", f"**Findings:** 1 {_v2_picture}"
+        )
+    )
+    check(
+        "copilot_verdict: a Balanced 'Needs a closer look' with Findings >= 1 "
+        "still blocks",
+        checker.copilot_verdict(copilot_balanced_nonzero_closer_look_body) == "not-clean",
+    )
+
+    # [ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding: `copilot_v2_block_review_efforts()` did not
+    # exclude an HTML-comment-hidden `**Review effort:**` line the way its
+    # sibling `_copilot_v2_findings_count` excludes a comment-hidden
+    # `**Findings:**` line, so a body with NO live effort statement at all
+    # -- only one hidden inside a comment -- still read as "consistently
+    # Balanced" and carved out.
+    copilot_comment_hidden_effort_body = (
+        "<!-- ccr-overview-v2 -->\n"
+        "## Copilot review overview\n"
+        "### \U0001f535 Needs a closer look\n"
+        "Some prose about the diff needing review.\n"
+        "<!--\n"
+        "**Review effort:** Balanced\n"
+        "-->\n"
+        "**Findings:** None"
+    )
+    check(
+        "copilot_verdict: an effort line hidden inside an HTML comment is "
+        "not a live Balanced statement, so this still blocks",
+        checker.copilot_verdict(copilot_comment_hidden_effort_body) == "not-clean",
+    )
+
+    # [ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding: a second, EMPTY live `**Review effort:**`
+    # line (nothing after the colon) alongside a genuine `Balanced` one used
+    # to be silently dropped by `if rest`, leaving the aggregated set at
+    # `{"balanced"}` instead of `{"balanced", ""}` -- incorrectly reading a
+    # malformed body as consistently Balanced.
+    copilot_malformed_empty_effort_body = (
+        "<!-- ccr-overview-v2 -->\n"
+        "## Copilot review overview\n"
+        "### \U0001f535 Needs a closer look\n"
+        "Some prose about the diff needing review.\n"
+        "**Review effort:** Balanced\n"
+        "**Review effort:**\n"
+        "**Findings:** None"
+    )
+    check(
+        "copilot_verdict: a second, empty live 'Review effort:' line "
+        "invalidates the carve-out rather than being silently dropped",
+        checker.copilot_verdict(copilot_malformed_empty_effort_body) == "not-clean",
+    )
+
+    # [ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding: `_copilot_is_empty_balanced_closer_look`
+    # used to return at the findings-count check, before ever reaching a
+    # `COPILOT_SUPPRESSED_BLOCK` veto of its own -- unlike the affirmative-
+    # heading path, which already checks `COPILOT_SUPPRESSED_BLOCK` (see
+    # `copilot_verdict`'s own `_has_valid_match(COPILOT_SUPPRESSED_BLOCK,
+    # scan)` call). A Balanced closer-look body with `Findings: None` and a
+    # "Suppressed comments" block naming a real finding -- one that names
+    # neither "Previously missed" nor an "Open (N)" listing, so neither of
+    # the two existing guards catches it -- must still block.
+    copilot_empty_balanced_suppressed_block_body = (
+        copilot_empty_balanced_closer_look_body
+        + "\n\n<details>\n<summary>Review details</summary>\n\n"
+        "### Suppressed comments (1)\n\n"
+        "**scripts/lib/copilot_overview.py:1**\n"
+        "* A style nit that was suppressed as low-value noise.\n\n"
+        "</details>"
+    )
+    check(
+        "copilot_verdict: a Balanced 'Needs a closer look' with a "
+        "Suppressed comments block still blocks",
+        checker.copilot_verdict(copilot_empty_balanced_suppressed_block_body) == "not-clean",
+    )
+
+    copilot_prior_not_clean_review = (
+        "review",
+        "2026-09-20T00:00:00Z",
+        "### \U0001f7e1 Changes recommended\n\nRename the helper.",
+        "priorsha0",
+        "COMMENTED",
+        "copilot-pull-request-reviewer[bot]",
+    )
+    copilot_empty_balanced_review_item = (
+        "review",
+        "2026-09-25T10:42:37Z",
+        copilot_empty_balanced_closer_look_body,
+        "b36fe3bb",
+        "COMMENTED",
+        "copilot-pull-request-reviewer[bot]",
+    )
+    eb_ok, eb_issues = checker.check_latest_verdict(
+        [copilot_prior_not_clean_review, copilot_empty_balanced_review_item]
+    )
+    check(
+        "check_latest_verdict: an empty Balanced Copilot review does not "
+        "supersede an earlier not-clean Copilot verdict",
+        (not eb_ok) and any("NOT clean" in i for i in eb_issues),
+    )
+
     check(
         "copilot_verdict: legacy 'Comments generated: 0' body is unchanged by the v2 path",
         checker.copilot_verdict(copilot_clean_body) == "clean",
@@ -6918,8 +7094,8 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) == "",
     )
 
-    # Site 1b: COPILOT_NEGATIVE_HEADER via `_has_valid_match`, the same
-    # gap on the sibling pattern `_has_valid_match` itself already covers.
+    # Site 1b: COPILOT_CHANGES_RECOMMENDED_HEADER via `_has_valid_match`, the
+    # same gap on the sibling pattern `_has_valid_match` itself already covers.
     # A double-backtick-cited `### Changes recommended` used to read as a
     # genuine, live blocking heading and won over a real, live affirmative
     # heading plus a real, live zero Findings block -- misclassifying a
@@ -8034,6 +8210,31 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             f"check_review_comments: Copilot {_label} review blocks",
             (not _ok) and any(not i.startswith("NOTE: ") for i in _issues),
         )
+
+    # [ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004): an empty Balanced 'Needs a closer look' review, end to
+    # end through `check_review_comments`, must neither report the
+    # "explicitly blocks" finding-pattern message NOR count toward the
+    # clean-review quorum -- it is no verdict, not clean.
+    _copilot_empty_balanced_review = dict(
+        copilot_review, body=copilot_empty_balanced_closer_look_body
+    )
+    _mock_eb = json.dumps(
+        {"comments": [], "reviews": [_copilot_empty_balanced_review]}
+    )
+    with patch.object(checker, "run_cmd", return_value=_mock_eb):
+        eb_review_ok, eb_review_issues = checker.check_review_comments(
+            "3066", "sha123", TEST_REPO
+        )
+    check(
+        "check_review_comments: an empty Balanced Copilot review never "
+        "reports 'explicitly blocks'",
+        not any("explicitly blocks" in i for i in eb_review_issues),
+    )
+    check(
+        "check_review_comments: an empty Balanced Copilot review alone does "
+        "not count as a clean review for the head",
+        not eb_review_ok,
+    )
 
     # Quorum: two Copilot login spellings are one provider, not two.
     _copilot_bot_spelling = dict(

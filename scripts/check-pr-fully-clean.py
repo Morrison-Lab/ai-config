@@ -77,10 +77,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from copilot_overview import (  # noqa: E402
     COPILOT_FINDINGS_LINE,
+    _copilot_overview_block_spans,
     _copilot_v2_findings_count,
     _find_details_regions,
     _find_html_comment_spans,
     _position_in_spans,
+    copilot_v2_block_review_efforts,
     match_content_start,
 )
 # Test-only re-export: not called anywhere in this file, but
@@ -2228,9 +2230,22 @@ COPILOT_AFFIRMATIVE_HEADER = re.compile(
     _COPILOT_HEADING_PREFIX + r"\bApproval\s+recommended(?=[ \t]*(?:\r?\n|$))",
     re.IGNORECASE,
 )
-COPILOT_NEGATIVE_HEADER = re.compile(
-    _COPILOT_HEADING_PREFIX
-    + r"\b(?:Changes\s+recommended|Needs\s+a\s+closer\s+look)\b",
+# Split into two patterns rather than kept as one alternation ([ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004)):
+# `Changes recommended` is always a genuine recommendation and stays
+# unconditionally blocking, but `Needs a closer look` is Copilot flagging a
+# large or ambiguous diff for human judgment, which can carry zero findings
+# behind it (an empty BALANCED review) -- see `_copilot_is_empty_balanced_
+# closer_look`'s docstring below, at this function's one call site. Neither
+# pattern gained the AFFIRMATIVE header's trailing `(?=[ \t]*(?:\r?\n|$))`
+# lookahead in this split: that stays the deliberate asymmetry the original
+# combined pattern already had (see `copilot_verdict`'s docstring for why
+# ANY occurrence -- comment-hidden, suffixed, or not -- must keep blocking).
+COPILOT_CHANGES_RECOMMENDED_HEADER = re.compile(
+    _COPILOT_HEADING_PREFIX + r"\bChanges\s+recommended\b",
+    re.IGNORECASE,
+)
+COPILOT_NEEDS_A_CLOSER_LOOK_HEADER = re.compile(
+    _COPILOT_HEADING_PREFIX + r"\bNeeds\s+a\s+closer\s+look\b",
     re.IGNORECASE,
 )
 # A `Suppressed comments` section carries real findings that appear in NO other
@@ -2238,6 +2253,25 @@ COPILOT_NEGATIVE_HEADER = re.compile(
 # (memories/copilot-reviews.md, rounds 35 and 36 on ai-config#2913). An
 # affirmative header standing over one is therefore not a clean round.
 COPILOT_SUPPRESSED_BLOCK = re.compile(r"\bSuppressed\s+comments\b", re.IGNORECASE)
+# The two shapes ai-config#4004's empty-Balanced carve-out must NOT apply
+# over, even when the overview's own `**Findings:**` line reads `None`:
+# Copilot's re-review vocabulary states these findings in a different
+# surface from the Findings count (`_copilot_v2_findings_count`'s own combine
+# rule already reads every `**Findings:**` line, but neither of these is
+# one). A "Previously missed (N)" item is exactly what
+# `copilot_closer_look_body`'s existing fixture already covers -- a finding
+# in code the diff never touched, surfaced only under the "Needs a closer
+# look" heading's own `<details>` block. An "Open (N)" listing is the
+# unresolved half of a re-review's own accounting (paired with "Resolved
+# since last review (N)", which carries no live finding and is deliberately
+# NOT matched here). Neither pattern is citedness-checked: see
+# `_copilot_is_empty_balanced_closer_look`'s docstring for why a false
+# positive here (an over-cautious not-clean) is the safe direction and a
+# false negative is not.
+COPILOT_PREVIOUSLY_MISSED = re.compile(r"\bPreviously\s+missed\b", re.IGNORECASE)
+COPILOT_OPEN_ITEMS_HEADING = re.compile(
+    r"<strong>[ \t]*Open[ \t]*\([0-9]+\)[ \t]*</strong>", re.IGNORECASE
+)
 # Copilot reports its own inline-finding count in the `Review details` block, as
 # `0`, `0 new`, or a positive integer. This is the only count available to a
 # body-only classifier, and its absence is not evidence of zero.
@@ -2297,6 +2331,82 @@ COPILOT_COMMENT_COUNT = re.compile(
 )
 
 
+def _copilot_is_empty_balanced_closer_look(
+    scan: str, cited: bytearray, closer_look_match: "re.Match[str]"
+) -> bool:
+    """True when `closer_look_match` (a live 'Needs a closer look' heading)
+    is the empty-Balanced shape [ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004) asks to read as no verdict
+    rather than not-clean: Copilot flagging a large or ambiguous diff for
+    final human judgment, with no finding of its own behind it.
+
+    All four of these must hold, exactly as the issue states them:
+
+    - the heading sits inside a genuine `ccr-overview-v2` block (the marker
+      and `## Copilot review overview` heading pair `_copilot_overview_
+      block_spans` looks for), not merely somewhere in the body;
+    - every live `**Review effort:**` line across every block in the body
+      reads `Balanced`, and at least one does -- an empty set (no effort
+      line at all, e.g. the legacy `Review effort level:` wording) or a set
+      containing any other value (a `Lite` round quoted alongside a
+      `Balanced` one) both fail this closed;
+    - `_copilot_v2_findings_count` -- the SAME whole-body, multi-block v2
+      parser `copilot_verdict`'s affirmative path already uses -- reads
+      exactly 0, not None (unparseable) and not nonzero;
+    - none of `COPILOT_PREVIOUSLY_MISSED`, `COPILOT_OPEN_ITEMS_HEADING`, or
+      `COPILOT_SUPPRESSED_BLOCK` appears anywhere in the body. Each is a
+      real finding the overview's own Findings count does not capture (see
+      their definitions above); `COPILOT_SUPPRESSED_BLOCK` is the same
+      veto the affirmative-heading path already applies at its own call
+      site below ([ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding -- this function used to
+      return early, at the findings-count check, before ever reaching a
+      suppressed-comments veto of its own, so a Balanced closer-look body
+      with `Findings: None` and a suppressed-comments block carrying a real
+      finding was read as no verdict instead of not-clean).
+
+    Deliberately conservative in every direction: any ambiguity here falls
+    through to the caller's pre-existing, unconditional not-clean for a
+    'Needs a closer look' heading, never to a wrong clean or a wrong
+    no-verdict. The two guard patterns are checked with NO citedness test,
+    unlike every other vocabulary scan in this module -- a false positive
+    on either only makes a genuinely clean review read as not-clean
+    (costs a merge a round of asking a human to look again), while a false
+    negative would let a real, unresolved finding disappear as no verdict
+    at all. That asymmetry is fail-fast.md's, applied to a pair of guard
+    phrases rather than to a single pattern.
+
+    This function itself does not check whether a live 'Changes recommended'
+    header is ALSO present elsewhere in the body -- `copilot_verdict` checks
+    that first and returns 'not-clean' before ever reaching the 'Needs a
+    closer look' branch this function serves, so a body carrying both
+    headings never reaches here at all.
+
+    It also does not check whether `closer_look_match` itself is comment-
+    hidden or nested inside a `<details>` region -- the caller does that
+    BEFORE calling this function at all (the same liveness check
+    `_has_live_match` applies to the affirmative heading), so a hidden or
+    details-nested occurrence never reaches here and keeps the caller's
+    unconditional not-clean instead.
+    """
+    blocks = _copilot_overview_block_spans(scan, cited, match_is_cited)
+    if not blocks:
+        return False
+    heading_pos = match_content_start(closer_look_match)
+    if not any(start <= heading_pos < end for start, end in blocks):
+        return False
+    efforts = set(copilot_v2_block_review_efforts(scan, blocks, cited, match_is_cited))
+    if efforts != {"balanced"}:
+        return False
+    if _copilot_v2_findings_count(scan, cited, match_is_cited) != 0:
+        return False
+    if (
+        COPILOT_PREVIOUSLY_MISSED.search(scan)
+        or COPILOT_OPEN_ITEMS_HEADING.search(scan)
+        or COPILOT_SUPPRESSED_BLOCK.search(scan)
+    ):
+        return False
+    return True
+
+
 def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str:
     """Classify a Copilot formal review body as 'not-clean', 'clean', or ''.
 
@@ -2305,6 +2415,19 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
     findings, and it carries no suppressed-findings block. Anything else that
     is recognisably a Copilot verdict returns ``not-clean``, and a body this
     function does not recognise returns ``''`` so the ordinary scans decide.
+
+    A `Needs a closer look` heading is one exception to that "anything else
+    is not-clean" rule ([ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004)): it returns ``''`` instead, but ONLY
+    for the exact empty-Balanced shape `_copilot_is_empty_balanced_closer_
+    look` checks for -- Copilot flagging a large or ambiguous diff for human
+    judgment with zero findings of its own behind it. `Changes recommended`
+    stays unconditionally ``not-clean`` regardless of effort or count, since
+    it is always a genuine recommendation rather than a flag for review. This
+    is a "no verdict" outcome, not "clean": it must never win a clean-review
+    quorum, and it must never supersede a standing not-clean verdict from an
+    earlier round by the same reviewer -- both already fall out of returning
+    ``''`` here, since `classify_verdict`'s caller (`check_latest_verdict`)
+    skips an item stating no verdict rather than treating it as clearing.
 
     The inline-finding count is read from EVERY uncited legacy
     `Comments generated: N` occurrence and every uncited `ccr-overview-v2`
@@ -2347,19 +2470,20 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
         """Return the first uncited match of `pattern`, or None.
 
         Checks citedness from `match_content_start(m)`, not `m.start()`
-        ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twenty-fourth round): both
-        COPILOT_NEGATIVE_HEADER and COPILOT_FINDINGS_LINE (two of this
-        helper's three callers below) are line-anchored with a leading
-        `(?:^|\n)`, which consumes the PRECEDING newline whenever the
-        match isn't at the very start of the body -- and the citation
-        mask never marks a newline offset as cited, by design. Checking
-        from the raw `m.start()` then always found that uncited newline
-        in range and reported the WHOLE match as uncited, even when the
-        heading itself sat wholly inside a code span (a double-backtick-
-        cited `### Changes recommended` on any line but the first). The
-        third caller (COPILOT_SUPPRESSED_BLOCK) is not line-anchored, so
-        `match_content_start` is a no-op for it -- see the function's own
-        docstring for why it is always a safe drop-in for `m.start()`.
+        ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twenty-fourth round): three of this
+        helper's four callers below -- COPILOT_CHANGES_RECOMMENDED_HEADER,
+        COPILOT_NEEDS_A_CLOSER_LOOK_HEADER, and COPILOT_FINDINGS_LINE --
+        are line-anchored with a leading `(?:^|\n)`, which consumes the
+        PRECEDING newline whenever the match isn't at the very start of
+        the body -- and the citation mask never marks a newline offset as
+        cited, by design. Checking from the raw `m.start()` then always
+        found that uncited newline in range and reported the WHOLE match
+        as uncited, even when the heading itself sat wholly inside a code
+        span (a double-backtick-cited `### Changes recommended` on any
+        line but the first). The fourth caller (COPILOT_SUPPRESSED_BLOCK)
+        is not line-anchored, so `match_content_start` is a no-op for it
+        -- see the function's own docstring for why it is always a safe
+        drop-in for `m.start()`.
         """
         for m in pattern.finditer(text):
             if not match_is_cited(cited, match_content_start(m), m.end()):
@@ -2443,7 +2567,44 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
     # heading costs a real clean round a wrongly-conservative "not-clean"
     # rather than the unsafe direction of a real blocking heading silently
     # stopping being read as blocking.
-    if _has_valid_match(COPILOT_NEGATIVE_HEADER, scan):
+    #
+    # `Changes recommended` is checked on its own first and always blocks:
+    # unlike `Needs a closer look`, it states an actual recommendation, and
+    # nothing about its own effort level or finding count changes that.
+    if _has_valid_match(COPILOT_CHANGES_RECOMMENDED_HEADER, scan):
+        return "not-clean"
+    # `Needs a closer look` gets one narrow carve-out ([ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004)): an
+    # empty BALANCED review under that heading is Copilot flagging the diff
+    # for human judgment with no finding of its own, and reads as "no
+    # verdict" rather than "not-clean" -- see
+    # `_copilot_is_empty_balanced_closer_look`'s docstring for the exact,
+    # conservative shape this requires.
+    #
+    # Still `_has_valid_match` to DECIDE whether to block at all -- ANY
+    # occurrence, comment-hidden or not, keeps blocking by default, matching
+    # the comment above. The carve-out itself is narrower still: it only
+    # ever fires for THIS SAME match, and only when that match is also LIVE
+    # (outside every HTML comment and `<details>` region) -- a
+    # comment-hidden or details-nested "Needs a closer look" heading that
+    # happens to look like the empty-Balanced shape still blocks, the same
+    # way a comment-hidden `### \U0001f7e2 Approval recommended` still fails
+    # to clear anything below.
+    closer_look_match = _has_valid_match(COPILOT_NEEDS_A_CLOSER_LOOK_HEADER, scan)
+    if closer_look_match is not None:
+        closer_look_is_live = not (
+            _position_in_spans(closer_look_match.start(), comment_span_starts, comment_spans)
+            or _position_in_spans(
+                match_content_start(closer_look_match), comment_span_starts, comment_spans
+            )
+            or _position_in_spans(closer_look_match.start(), details_span_starts, details_spans)
+            or _position_in_spans(
+                match_content_start(closer_look_match), details_span_starts, details_spans
+            )
+        )
+        if closer_look_is_live and _copilot_is_empty_balanced_closer_look(
+            scan, cited, closer_look_match
+        ):
+            return ""
         return "not-clean"
     if not _has_live_match(COPILOT_AFFIRMATIVE_HEADER, scan):
         return ""

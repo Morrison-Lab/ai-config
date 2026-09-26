@@ -51,15 +51,33 @@ def review(login, state, body="", commit=HEAD, assoc="MEMBER"):
     return r
 
 
+def inline_comment(login, commit_id=HEAD, original_commit_id=None):
+    """An inline review comment record in the REST `pulls/{n}/comments`
+    shape `fetch_pr_data` reduces each entry to.
+
+    `original_commit_id` defaults to `commit_id` (GitHub's own REST API does
+    the same for a comment that has never gone stale relative to a later
+    push); pass it explicitly to model a comment whose displayed commit has
+    moved on from the one it was originally posted against.
+    """
+    return {
+        "author": {"login": login},
+        "commit_id": commit_id or "",
+        "original_commit_id": (original_commit_id if original_commit_id is not None
+                                else commit_id) or "",
+    }
+
+
 def pr(reviews=(), comments=(), checks=(), head=HEAD,
        url="https://github.com/Lacaedemon/sparta/pull/1427",
-       author="pr-opener", review_requests=()):
+       author="pr-opener", review_requests=(), review_comments=()):
     return {
         "reviews": list(reviews),
         "comments": list(comments),
         "statusCheckRollup": list(checks),
         "headRefOid": head,
         "url": url,
+        "reviewComments": list(review_comments),
         "author": {"login": author},
         "reviewRequests": list(review_requests),
     }
@@ -247,6 +265,674 @@ class TestEvaluate(unittest.TestCase):
             decision = gate.evaluate(MERGE_CMD, state)
             self.assertEqual(decision["decision"], "deny", suppressed_block)
             self.assertIn("not clean", decision["reason"])
+
+    # ai-config#4004: an EMPTY Balanced Copilot review under the 'Needs a
+    # closer look' heading is Copilot flagging a large/ambiguous diff for
+    # human judgment with no finding of its own, and must not block a
+    # merge -- mirroring the identical carve-out in
+    # `scripts/check-pr-fully-clean.py`'s `copilot_verdict()`. Fixture
+    # provenance, per fixtures-are-not-evidence.md: the exact, verbatim
+    # body of the review the issue links (Lacaedemon/sparta#1638, review
+    # 5316721676, state COMMENTED, at commit b36fe3bb), re-fetched and
+    # re-confirmed byte-for-byte identical for `copilot_is_empty_balanced_
+    # closer_look`'s whole-body template design via:
+    #   gh api repos/Lacaedemon/sparta/pulls/1638/reviews/5316721676 \
+    #     --jq .body
+    # This is the ONE fixture the template MUST match -- see that
+    # function's own docstring for why a template, rather than another
+    # heuristic refinement, is what the carve-out settled on.
+    COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f535 Needs a closer look\n\n"
+        "The broad routing, formation-geometry, and link-lifecycle changes "
+        "warrant final human review despite strong regression coverage.\n\n"
+        "**Review effort:** Balanced  \n**Findings:** None"
+    )
+
+    def test_copilot_empty_balanced_closer_look_allows(self):
+        """An empty Balanced 'Needs a closer look' review states no verdict
+        -- it neither blocks nor counts as clean on its own, so the merge
+        proceeds on the standing human clean verdict (ai-config#4004)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY
+        self.assertTrue(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        bot_states = gate.latest_bot_review_states(
+            state["reviews"], state["headRefOid"]
+        )
+        self.assertNotIn("copilot-pull-request-reviewer", bot_states)
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
+
+    def test_copilot_empty_balanced_with_live_inline_comment_still_denies(self):
+        """The overview body's own 'Findings: None' is Copilot's summary of
+        its OWN overview, not proof that no inline comment/thread from that
+        same round is still live on the current head -- a live inline
+        comment from the SAME bot login, tied to the current head via
+        `commit_id`, must block the carve-out even though the body itself
+        is the identical empty-Balanced shape ([ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding:
+        `fetch_pr_data()` used to retrieve formal reviews and issue comments
+        only, never review comments/threads, so this branch could discard
+        Copilot's formal negative state while a real inline finding was
+        still live)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+            review_comments=[inline_comment("copilot-pull-request-reviewer", commit_id=HEAD)],
+        )
+        bot_states = gate.latest_bot_review_states(
+            state["reviews"], state["headRefOid"], state["reviewComments"]
+        )
+        self.assertEqual(bot_states.get("copilot-pull-request-reviewer"), "NOT_CLEAN")
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_empty_balanced_with_stale_inline_comment_still_allows(self):
+        """A stale inline comment from an EARLIER commit (neither its
+        `commit_id` nor `original_commit_id` matches the current head) must
+        not block the carve-out -- only a CURRENT-head item counts
+        ([ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+            review_comments=[inline_comment(
+                "copilot-pull-request-reviewer", commit_id="priorsha0",
+                original_commit_id="priorsha0",
+            )],
+        )
+        bot_states = gate.latest_bot_review_states(
+            state["reviews"], state["headRefOid"], state["reviewComments"]
+        )
+        self.assertNotIn("copilot-pull-request-reviewer", bot_states)
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
+
+    def test_copilot_empty_balanced_closer_look_crlf_still_allows(self):
+        """The identical #1638 fixture, with every line ending converted to
+        CRLF, still matches the template -- GitHub's own API normalizes
+        review bodies to LF, but nothing guarantees every future source of
+        a review body will (ai-config#4004)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY.replace("\n", "\r\n")
+        self.assertTrue(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
+
+    def test_copilot_empty_lite_closer_look_still_denies(self):
+        """The identical empty review at Lite effort still blocks -- an
+        empty Lite review still needs a Balanced re-request before it says
+        anything about the diff's content (ai-config#4004)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY.replace(
+            "**Review effort:** Balanced", "**Review effort:** Lite"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_balanced_previously_missed_in_trailing_details_denies(self):
+        """A Balanced 'Needs a closer look' review carrying a 'Previously
+        missed' item in a TRAILING <details> block is a real finding the
+        overview's own Findings count does not capture, and still blocks.
+        This covers trailing content specifically -- it denies for that
+        reason alone (the template permits nothing after the Findings
+        line) even before the dedicated `COPILOT_PREVIOUSLY_MISSED` guard
+        is consulted; see `test_copilot_previously_missed_in_prose_denies`
+        below for the guard actually being exercised, with the phrase
+        placed INSIDE the one permitted prose paragraph instead
+        (ai-config#4004)."""
+        body = (
+            self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY
+            + "\n\n<details>\n<summary>Review details</summary>\n\n"
+            "### Suppressed comments (1)\n\n"
+            "**Previously missed (1)** in code that hasn't changed since "
+            "the last review.\n\n"
+            "**scripts/lib/copilot_overview.py:1**\n"
+            "* Some prior finding.\n\n"
+            "</details>"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_changes_recommended_still_denies_regardless_of_effort(self):
+        """'Changes recommended' stays unconditionally blocking, even at
+        Balanced effort with 'Findings: None' -- only 'Needs a closer
+        look' gets the carve-out (ai-config#4004)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY.replace(
+            "Needs a closer look", "Changes recommended"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_empty_balanced_only_inside_details_still_denies(self):
+        """The empty-Balanced shape stated ONLY inside a collapsed
+        <details> section -- a re-review echoing a prior round's own
+        overview -- is not the CURRENT round's live state, and must fail
+        closed to not-clean rather than being carved out. Under the
+        whole-body template design this simply fails because the body
+        does not start with the marker as its first non-blank content
+        (ai-config#4004)."""
+        body = (
+            "<details>\n<summary>Older round</summary>\n\n"
+            + self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY
+            + "\n</details>"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_empty_balanced_only_inside_html_comment_still_denies(self):
+        """The identical shape stated ONLY inside an HTML comment must
+        fail closed the same way (ai-config#4004). The leading
+        `ccr-overview-v2` marker is itself a complete, self-closing HTML
+        comment, so it is dropped here before wrapping the rest in one
+        outer comment -- real HTML comments do not nest, and including it
+        would close the outer comment at the marker's own `-->` instead of
+        at the end of this fixture, which would make the wrapped text live
+        in real rendering too rather than testing the hidden case. Under
+        the whole-body template design this fails because the body does
+        not start with the marker as its first non-blank content either."""
+        text_without_marker = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY.replace(
+            "<!-- ccr-overview-v2 -->\n\n", ""
+        )
+        body = "<!--\n" + text_without_marker + "\n-->"
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_marker_and_block_must_be_the_same_overview(self):
+        """A live 'Needs a closer look' heading elsewhere in the body must
+        not combine with an unrelated Balanced/None block sitting after the
+        v2 marker -- the two have to belong to the SAME overview
+        (ai-config#4004, the reviewer's own reproduction: a live
+        closer-look heading before the marker, plain prose under it, then
+        a genuine but heading-less Balanced/None block after the marker).
+        Under the whole-body template design this fails a different way:
+        the body has no '## Copilot review overview' line at all, and its
+        prose paragraph precedes the marker rather than following the
+        required section order."""
+        body = (
+            "### Needs a closer look\n\n"
+            "Some prose here, no effort/findings lines directly under this "
+            "heading.\n\n"
+            "<!-- ccr-overview-v2 -->\n"
+            "## Copilot review overview\n\n"
+            "**Review effort:** Balanced\n**Findings:** None\n"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_two_v2_markers_still_denies(self):
+        """Two v2 overview markers in one body -- an earlier round's
+        overview quoted alongside the current one -- fails closed. Under
+        the whole-body template design this is simply a second marker line
+        the template does not expect anywhere after the first one's own
+        trailing blank lines (ai-config#4004)."""
+        body = (
+            self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY
+            + "\n\n"
+            + self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    # ai-config#4004, round 5: the block-scoped design from ed885eaa (round
+    # 4) was itself defeated by four fresh adversarial probes, which is
+    # exactly why the design changed to a whole-body template instead of a
+    # fourth heuristic refinement -- see `copilot_is_empty_balanced_closer_
+    # look`'s own docstring. Each probe test below is a genuine regression
+    # test against ed885eaa specifically: confirmed by hand-tracing that
+    # commit's own logic (never reading `## Copilot review overview` at
+    # all; a marker-liveness check that only knew about HTML comments and
+    # `<details>`, not code fences or inline code spans) before writing the
+    # fix, and each one is noted where it diverges.
+
+    def test_copilot_bare_marker_no_overview_heading_denies(self):
+        """A bare marker followed by prose, then the closer-look heading,
+        then the Balanced/None trio, with NO '## Copilot review overview'
+        line anywhere -- under CRLF endings. ed885eaa never checked for
+        that heading at all, so it read this as the carve-out (WRONGLY
+        allowed); the template requires the literal line and denies."""
+        body = (
+            "<!-- ccr-overview-v2 -->\r\n\r\n"
+            "Some prose here before the heading, with no overview heading "
+            "line anywhere in this body.\r\n\r\n"
+            "### Needs a closer look\r\n\r\n"
+            "**Review effort:** Balanced\r\n**Findings:** None\r\n"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_marker_inside_code_fence_denies(self):
+        """The v2 marker sitting inside a fenced code block, with a real
+        overview heading, closer-look heading, prose, and Balanced/None
+        trio following it. ed885eaa's marker-liveness check only knew
+        about HTML comments and `<details>` regions, never code fences, so
+        it read the fenced marker as live (WRONGLY allowed); the template
+        requires the marker to be the very first non-blank content and
+        denies."""
+        body = (
+            "```\n<!-- ccr-overview-v2 -->\n```\n\n"
+            "## Copilot review overview\n\n"
+            "### Needs a closer look\n\n"
+            "Some prose paragraph here.\n\n"
+            "**Review effort:** Balanced\n**Findings:** None"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_marker_inside_inline_code_span_denies(self):
+        """The identical shape with the marker wrapped in a single-line
+        inline code span instead of a fence -- the same ed885eaa gap, a
+        different Markdown construct (ai-config#4004)."""
+        body = (
+            "`<!-- ccr-overview-v2 -->`\n\n"
+            "## Copilot review overview\n\n"
+            "### Needs a closer look\n\n"
+            "Some prose paragraph here.\n\n"
+            "**Review effort:** Balanced\n**Findings:** None"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_effort_and_findings_inside_code_fence_denies(self):
+        """A genuine marker and overview heading and closer-look heading
+        and prose, but the '**Review effort:**'/'**Findings:**' trio
+        itself sits inside a fenced code block. ed885eaa's live-block
+        stripping only removed HTML comments and `<details>` regions, so
+        the fenced trio still read as live text and the effort/findings
+        checks still passed (WRONGLY allowed); a prose line may not start
+        with a backtick in the template, so a fence there denies."""
+        body = (
+            "<!-- ccr-overview-v2 -->\n\n"
+            "## Copilot review overview\n\n"
+            "### Needs a closer look\n\n"
+            "Some prose paragraph here.\n\n"
+            "```\n**Review effort:** Balanced\n**Findings:** None\n```"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_indented_fence_in_prose_denies(self):
+        """[ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding: `_COPILOT_TEMPLATE_PROSE_LINE`'s
+        lookahead only inspected the line's own FIRST character, so a line
+        indented by leading spaces -- `   ``` ` -- passed the lookahead at
+        that leading space and then matched the rest of the line (backticks
+        included) as ordinary prose, letting an indented fenced block ride
+        through the fullmatch as part of the one permitted paragraph. Real
+        Markdown renders a 0-3-space-indented fence as a real fence, so this
+        must deny exactly like the un-indented fence in
+        `test_copilot_effort_and_findings_inside_code_fence_denies` above."""
+        body = (
+            "<!-- ccr-overview-v2 -->\n\n"
+            "## Copilot review overview\n\n"
+            "### Needs a closer look\n\n"
+            "Some ordinary prose about the diff.\n"
+            "   ```\n"
+            "a fenced line hiding inside the 'prose' paragraph\n"
+            "   ```\n\n"
+            "**Review effort:** Balanced  \n**Findings:** None"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_indented_heading_in_prose_denies(self):
+        """The identical leading-indentation bypass, with an indented `###`
+        heading line instead of a fence ([ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008) review finding)."""
+        body = (
+            "<!-- ccr-overview-v2 -->\n\n"
+            "## Copilot review overview\n\n"
+            "### Needs a closer look\n\n"
+            "Some ordinary prose about the diff.\n"
+            "   ### Blocking concern\n\n"
+            "**Review effort:** Balanced  \n**Findings:** None"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_trailing_resolved_since_last_review_denies(self):
+        """The real #1638 fixture with a HARMLESS trailing 'Resolved since
+        last review' details block appended -- no live finding in it at
+        all. ed885eaa's `_strip_non_live_regions` silently removed this
+        block from the live text and neither the Previously-missed nor the
+        Open-items guard matches its wording, so it read as the identical
+        empty-Balanced shape (WRONGLY allowed); the template requires
+        NOTHING after the Findings line and denies. This is the documented
+        conservatism: a real empty-Balanced review that also lists
+        resolved items stays not-clean in this gate even though
+        `scripts/check-pr-fully-clean.py`'s own, more sophisticated parser
+        would correctly read it as no verdict (ai-config#4004)."""
+        body = (
+            self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY
+            + "\n\n<details>\n<summary><strong>Resolved since last review "
+            "(1)</strong></summary>\n\n"
+            "- [Some already-fixed nit](#discussion_r1)\n</details>"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_balanced_open_items_in_trailing_details_denies(self):
+        """A Balanced 'Needs a closer look' review carrying a genuine
+        'Open (N)' listing in a TRAILING <details> block -- an unresolved
+        item from a re-review -- still blocks, the same way a 'Previously
+        missed' item does. This covers trailing content specifically -- it
+        denies for that reason alone (the template permits nothing after
+        the Findings line) even before the dedicated `COPILOT_OPEN_COUNT`
+        guard is consulted; see `test_copilot_open_count_in_prose_denies`
+        below for the guard actually being exercised, with the phrase
+        placed INSIDE the one permitted prose paragraph instead
+        (ai-config#4004)."""
+        body = (
+            self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY
+            + "\n\n<details open>\n<summary><strong>Open (1)</strong>"
+            "</summary>\n\n"
+            "- [Some open finding](#discussion_r1) · New\n</details>"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    # ai-config#4004, round 6: f7faca5b's whole-body template only rejected
+    # a prose line whose FIRST character was #/*/</backtick/~, so a real
+    # finding stated in ordinary prose -- with none of those characters
+    # anywhere near it -- matched the template outright. Each test below
+    # is a genuine regression test against f7faca5b specifically: confirmed
+    # by running it against that commit's own code (not merely asserted)
+    # before writing the fix, and each one denied under the fix and was
+    # WRONGLY allowed (matched True) under f7faca5b.
+
+    def test_copilot_previously_missed_in_prose_denies(self):
+        """'Previously missed' stated in plain prose, inside the one
+        paragraph the template otherwise permits -- no heading, no tag, no
+        fence, nothing the prose-line pattern forbade on its own.
+        f7faca5b's fullmatch alone read this as the empty-Balanced shape
+        (WRONGLY allowed); `COPILOT_PREVIOUSLY_MISSED` now catches it
+        regardless of where in the body the phrase sits (ai-config#4004)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY.replace(
+            "The broad routing, formation-geometry, and link-lifecycle "
+            "changes warrant final human review despite strong regression "
+            "coverage.",
+            "Previously missed items were checked and none remain "
+            "outstanding.",
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_open_count_in_prose_denies(self):
+        """'Open (1)' stated in plain prose, no markup at all. f7faca5b's
+        fullmatch alone read this as the empty-Balanced shape (WRONGLY
+        allowed); `COPILOT_OPEN_COUNT` now catches the bare phrase with no
+        `<strong>` wrapping required (ai-config#4004)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY.replace(
+            "The broad routing, formation-geometry, and link-lifecycle "
+            "changes warrant final human review despite strong regression "
+            "coverage.",
+            "See the Open (1) section for details.",
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_open_count_with_inner_spaces_denies(self):
+        """'Open ( 1 )' with spaces inside the parentheses is still an Open
+        count; COPILOT_OPEN_COUNT tolerates whitespace inside the parens, not
+        only between 'Open' and '(' (ai-config#4004 review finding)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY.replace(
+            "The broad routing, formation-geometry, and link-lifecycle "
+            "changes warrant final human review despite strong regression "
+            "coverage.",
+            "See the Open ( 1 ) section for details.",
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+
+    def test_copilot_emphasis_mid_prose_denies(self):
+        """Bold emphasis partway through the prose paragraph falls outside the
+        template: `*` is excluded from the whole prose line, the same way `<`
+        is, so emphasis cannot hide a field-shaped fragment mid-sentence
+        (ai-config#4004 review finding)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY.replace(
+            "The broad routing, formation-geometry, and link-lifecycle "
+            "changes warrant final human review despite strong regression "
+            "coverage.",
+            "The broad routing has **critical** issues despite strong "
+            "regression coverage.",
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+
+    def test_copilot_strong_open_mid_sentence_denies(self):
+        """'<strong>Open (1)</strong>' sitting mid-sentence, inside the
+        prose paragraph -- not as the line's own first character, which
+        f7faca5b's prose-line pattern already forbade, but partway through
+        an otherwise ordinary-looking line. f7faca5b's fullmatch read this
+        as the empty-Balanced shape (WRONGLY allowed, since only the
+        FIRST character of the line was checked); the prose-line pattern
+        now forbids a `<` anywhere in the line, and `COPILOT_OPEN_COUNT`
+        catches the phrase itself too (ai-config#4004)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY.replace(
+            "The broad routing, formation-geometry, and link-lifecycle "
+            "changes warrant final human review despite strong regression "
+            "coverage.",
+            "See the <strong>Open (1)</strong> section for details.",
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
 
     def test_bot_changes_requested_superseded_by_approved(self):
         """A bot CHANGES_REQUESTED review superseded by APPROVED allows merge."""
@@ -1122,7 +1808,8 @@ def gh_result(rc=0, stdout="", stderr=""):
 class TestMain(unittest.TestCase):
     def run_main(self, payload, view=None, comments=None, side_effect=None):
         """Run main() with `gh` mocked: first call is `gh pr view`, second is
-        the paginated comments fetch."""
+        the paginated comments fetch, third is the paginated inline review
+        comments fetch, fourth is the paginated check-runs fetch."""
         stdout = io.StringIO()
         if side_effect is None:
             state = view if view is not None else pr()
@@ -1133,6 +1820,7 @@ class TestMain(unittest.TestCase):
                 gh_result(stdout=json.dumps(view_payload)),
                 gh_result(stdout=json.dumps(comments if comments is not None
                                             else state["comments"])),
+                gh_result(stdout=json.dumps(state.get("reviewComments", []))),
                 gh_result(stdout=json.dumps([])),
             ]
         with patch.object(sys, "stdin", io.StringIO(json.dumps(payload))), \
@@ -1320,14 +2008,42 @@ class TestMain(unittest.TestCase):
             self.payload(MERGE_CMD),
             side_effect=[gh_result(stdout=json.dumps(view_payload)),
                          gh_result(stdout=pages),
+                         gh_result(stdout=json.dumps([])),
                          gh_result(stdout=json.dumps([]))],
         )
         self.assertEqual(decision["decision"], "allow")
 
-    def test_check_runs_fetched_via_rest(self):
+    def test_review_comments_fetched_via_paginated_rest(self):
+        """`fetch_pr_data` must fetch the PR's INLINE review comments (a
+        different REST endpoint from the issue-comments fetch above) so
+        `latest_bot_review_states`'s carve-out can confirm no current-head
+        inline item exists before skipping a negative-header round
+        ([ai-config#4008](https://github.com/Morrison-Lab/ai-config/pull/4008))."""
         _, run_mock = self.run_main(
             self.payload(MERGE_CMD), view=pr(comments=[CLEAN_VERDICT]))
         api_cmd = run_mock.call_args_list[2][0][0]
+        self.assertIn("api", api_cmd)
+        self.assertIn("--paginate", api_cmd)
+        self.assertIn("repos/Lacaedemon/sparta/pulls/1427/comments", api_cmd)
+
+    def test_review_comments_fetch_failure_denies(self):
+        state = pr(comments=[CLEAN_VERDICT])
+        view_payload = {k: state[k] for k in
+                        ("url", "author", "reviews", "statusCheckRollup",
+                         "headRefOid", "reviewRequests") if k in state}
+        decision, _ = self.run_main(
+            self.payload(MERGE_CMD),
+            side_effect=[gh_result(stdout=json.dumps(view_payload)),
+                         gh_result(stdout=json.dumps(state["comments"])),
+                         gh_result(rc=1, stderr="rate limited")],
+        )
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("inline review comments", decision["reason"])
+
+    def test_check_runs_fetched_via_rest(self):
+        _, run_mock = self.run_main(
+            self.payload(MERGE_CMD), view=pr(comments=[CLEAN_VERDICT]))
+        api_cmd = run_mock.call_args_list[3][0][0]
         self.assertIn("api", api_cmd)
         self.assertIn("--paginate", api_cmd)
         self.assertIn(f"repos/Lacaedemon/sparta/commits/{HEAD}/check-runs", api_cmd)
@@ -1341,6 +2057,7 @@ class TestMain(unittest.TestCase):
             self.payload(MERGE_CMD),
             side_effect=[gh_result(stdout=json.dumps(view_payload)),
                          gh_result(stdout=json.dumps(state["comments"])),
+                         gh_result(stdout=json.dumps([])),
                          gh_result(rc=1, stderr="check-runs fetch failed")],
         )
         self.assertEqual(decision["decision"], "deny")
@@ -1356,6 +2073,7 @@ class TestMain(unittest.TestCase):
             self.payload(MERGE_CMD),
             side_effect=[gh_result(stdout=json.dumps(view_payload)),
                          gh_result(stdout=json.dumps(state["comments"])),
+                         gh_result(stdout=json.dumps([])),
                          gh_result(stdout=json.dumps(check_runs))],
         )
         self.assertEqual(decision["decision"], "deny")

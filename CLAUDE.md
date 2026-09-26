@@ -1060,32 +1060,41 @@ It lapsed.
 
 Standing grant, recorded universally in `AGENTS.md` ("Default to action without asking"): proceed with non-destructive steps without asking, and ask only for destructive, ambiguous, high-impact, or genuinely blocking choices.
 
-## Always fix merge conflicts immediately; never wait for approval
+## Fix a conflict on a PR you're driving the moment you notice it
 
-A `CONFLICTING` PR is a standing invitation to defer: resolving it is mechanical
-and fully reversible (merge the base into the head, resolve, push), so there is
-no reason to hold it for a check-in.
-The moment a merge-conflict notice arrives on any open PR --- content or
-infra --- merge the base branch in and resolve it right away, with no
-approval needed first.
-[`sync-with-main`](shared/workflow/sync-with-main.md) covers the mechanics
-(fetch, merge, re-check version parity, verify a claimed resolution is a real
-merge commit); this section covers the authorization, which that fragment does
-not state.
+Holding a `CONFLICTING` PR for a check-in wastes a round trip on work that's
+usually mechanical (merge the base into the head, resolve, push) and always
+reversible short of a force-push --- so resolve it right away rather than
+waiting to be told to.
+This is the specific case of this file's own "Watch and ARDI every PR you
+touch" standing yes: "touch" there already means driving the branch (you
+opened it, were asked to iterate it, or are pushing fixes to it), and
+conflict resolution is one of the things driving covers.
+It does **not** cover a PR you were asked only to review --- that section's own
+Review-only mode already says not to push fixes there, and a merge is a
+push.
+Nor does it cover a PR outside your scope: `memories/reviewing-prs.md`'s scope
+test still gates whose branch you touch, per
+`memories/preferences.md`'s "proactively re-sync EVERY trailing open PR branch
+that passes [that] scope test... an out-of-scope branch is reported to the
+user and left untouched".
+This section adds nothing to that scope; it only says that within it, a
+conflict is resolved on sight rather than parked for approval ---
+[`sync-with-main`](shared/workflow/sync-with-main.md) already states the same
+"don't wait for a conflict to surface or for someone to ask" for the plain
+sync-before-push case, and this generalizes it to the moment a conflict is
+*noticed*, from any source (a notification, a status check, a review-bot
+comment), not only a push you were about to make yourself.
 
-This narrows, rather than replaces, any standing rule that a human reviews and
-merges content themselves: that rule is about who **approves the content**,
-and this one is about who **resolves a conflict on the way there** --- two
-separate questions.
-A PR needing human review for its substance still needs its conflicts fixed
-without waiting for that review to start.
-
-- **Do:** merge base-into-head and resolve conflicts on any open PR the
-  moment a conflict is noticed, whether or not that PR's content still needs
-  a human's review or approval.
-- **Don't:** leave a `CONFLICTING` PR untouched pending a check-in, or treat
-  "this needs human review anyway" as a reason to also hold off on fixing its
-  conflicts.
+- **Do:** the moment a conflict is noticed on a PR you're driving, merge the
+  base branch into the head, resolve it, and push --- no approval needed
+  first.
+- **Don't:** leave such a PR `CONFLICTING` pending a check-in, or treat "this
+  still needs a human's review or approval before merge" as a reason to also
+  hold off on fixing its conflicts --- resolving is not approving.
+- **Don't:** push a conflict fix to a PR that fails the scope test, or to one
+  you were asked only to review --- resolve those by asking, or by reporting
+  the conflict, per the sections above.
 - **Don't:** force-push or push to `main` while resolving --- the standing
   scope limits on those still apply; resolve by merging the base into the PR
   branch, never by rewriting its history.

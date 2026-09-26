@@ -7017,8 +7017,8 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) == "",
     )
 
-    # Site 1b: COPILOT_NEGATIVE_HEADER via `_has_valid_match`, the same
-    # gap on the sibling pattern `_has_valid_match` itself already covers.
+    # Site 1b: COPILOT_CHANGES_RECOMMENDED_HEADER via `_has_valid_match`, the
+    # same gap on the sibling pattern `_has_valid_match` itself already covers.
     # A double-backtick-cited `### Changes recommended` used to read as a
     # genuine, live blocking heading and won over a real, live affirmative
     # heading plus a real, live zero Findings block -- misclassifying a
@@ -8113,6 +8113,31 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             f"check_review_comments: Copilot {_label} review blocks",
             (not _ok) and any(not i.startswith("NOTE: ") for i in _issues),
         )
+
+    # [ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004): an empty Balanced 'Needs a closer look' review, end to
+    # end through `check_review_comments`, must neither report the
+    # "explicitly blocks" finding-pattern message NOR count toward the
+    # clean-review quorum -- it is no verdict, not clean.
+    _copilot_empty_balanced_review = dict(
+        copilot_review, body=copilot_empty_balanced_closer_look_body
+    )
+    _mock_eb = json.dumps(
+        {"comments": [], "reviews": [_copilot_empty_balanced_review]}
+    )
+    with patch.object(checker, "run_cmd", return_value=_mock_eb):
+        eb_review_ok, eb_review_issues = checker.check_review_comments(
+            "3066", "sha123", TEST_REPO
+        )
+    check(
+        "check_review_comments: an empty Balanced Copilot review never "
+        "reports 'explicitly blocks'",
+        not any("explicitly blocks" in i for i in eb_review_issues),
+    )
+    check(
+        "check_review_comments: an empty Balanced Copilot review alone does "
+        "not count as a clean review for the head",
+        not eb_review_ok,
+    )
 
     # Quorum: two Copilot login spellings are one provider, not two.
     _copilot_bot_spelling = dict(

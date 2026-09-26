@@ -164,6 +164,22 @@ _COPILOT_HEADING_PREFIX = r"(?:^|\n)[ \t]*#{1,6}[ \t]*(?:[^\w\n\'\"]+[ \t]*)?"
 COPILOT_AFFIRMATIVE_HEADER = re.compile(
     _COPILOT_HEADING_PREFIX + r"\bApproval\s+recommended\b", re.IGNORECASE
 )
+# Split into two patterns rather than kept as one alternation ([ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004),
+# mirroring `scripts/check-pr-fully-clean.py`'s identical split): `Changes
+# recommended` is always a genuine recommendation and stays unconditionally
+# blocking, but `Needs a closer look` can be an empty BALANCED review with
+# no finding of its own -- see `copilot_is_empty_balanced_closer_look`
+# below, at this pair's one call site in `latest_bot_review_states`.
+COPILOT_CHANGES_RECOMMENDED_HEADER = re.compile(
+    _COPILOT_HEADING_PREFIX + r"\bChanges\s+recommended\b", re.IGNORECASE
+)
+COPILOT_NEEDS_A_CLOSER_LOOK_HEADER = re.compile(
+    _COPILOT_HEADING_PREFIX + r"\bNeeds\s+a\s+closer\s+look\b", re.IGNORECASE
+)
+# Kept as the union of the two split patterns above so every existing use
+# below (a general "is this a Copilot negative heading at all" test) reads
+# the same as it always has; only `latest_bot_review_states` needs to tell
+# the two spellings apart.
 COPILOT_NEGATIVE_HEADER = re.compile(
     _COPILOT_HEADING_PREFIX
     + r"\b(?:Changes\s+recommended|Needs\s+a\s+closer\s+look)\b",
@@ -172,6 +188,27 @@ COPILOT_NEGATIVE_HEADER = re.compile(
 COPILOT_SUPPRESSED_BLOCK = re.compile(
     r"\b(?:Suppressed\s+comments|Comments\s+suppressed\s+due\s+to\s+low\s+confidence)\b",
     re.IGNORECASE,
+)
+# The `ccr-overview-v2` body's own per-round fields, read at the same coarse
+# level of rigor as every other Copilot pattern in this file (no HTML-
+# comment stripping or citation masking -- this gate works on the raw body
+# throughout). `**Review effort:**` and `**Findings:**` mirror
+# `scripts/lib/copilot_overview.py`'s `COPILOT_REVIEW_EFFORT_LINE` /
+# `COPILOT_FINDINGS_LINE` shape (a 0-3-space indent, value stops at the
+# line's own trailing whitespace). `Previously missed` and an `Open (N)`
+# listing are each a real finding the overview's own Findings count does
+# not capture (module docstring in copilot_overview.py; [ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004)).
+COPILOT_REVIEW_EFFORT_LINE = re.compile(
+    r"(?:^|\n)[ ]{0,3}\*\*Review effort:\*\*(?:[ \t]*(?P<rest>\S(?:[^\r\n]*?\S)?))?(?=[ \t]*(?:\r?\n|$))",
+    re.IGNORECASE,
+)
+COPILOT_FINDINGS_LINE = re.compile(
+    r"(?:^|\n)[ ]{0,3}\*\*Findings:\*\*(?:[ \t]*(?P<rest>\S(?:[^\r\n]*?\S)?))?(?=[ \t]*(?:\r?\n|$))",
+    re.IGNORECASE,
+)
+COPILOT_PREVIOUSLY_MISSED = re.compile(r"\bPreviously\s+missed\b", re.IGNORECASE)
+COPILOT_OPEN_ITEMS_HEADING = re.compile(
+    r"<strong>[ \t]*Open[ \t]*\([0-9]+\)[ \t]*</strong>", re.IGNORECASE
 )
 # Shortest sha abbreviation a head-binding prefix test will accept.
 ABBREV_SHA_LEN = 7
@@ -407,6 +444,70 @@ def extract_request_names(review_requests):
     return names
 
 
+def _copilot_v2_line_values(pattern, raw_body):
+    """Every `rest` group `pattern` finds in `raw_body`, stripped and
+    lower-cased -- the same block-agnostic, citation-agnostic level of
+    rigor as every other Copilot check in this file. Used for both
+    `COPILOT_REVIEW_EFFORT_LINE` and `COPILOT_FINDINGS_LINE`: a body
+    carrying more than one round's overview quoted together is read
+    conservatively (see the two callers below), never by committing to the
+    first match.
+    """
+    return [
+        (m.group("rest") or "").strip().lower() for m in pattern.finditer(raw_body)
+    ]
+
+
+def copilot_is_empty_balanced_closer_look(raw_body):
+    """True when `raw_body` is the empty-Balanced 'Needs a closer look'
+    shape [ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004) asks this gate to read as no verdict rather than
+    not-clean: Copilot flagging a large or ambiguous diff for a human's own
+    judgment, with no finding of its own behind it.
+
+    Mirrors `scripts/check-pr-fully-clean.py`'s
+    `_copilot_is_empty_balanced_closer_look` at this file's own, coarser
+    level of rigor (no v2-block detection, no HTML-comment/`<details>`
+    exclusion, no citation masking -- consistent with every other Copilot
+    check here, which all work on the raw body). All four conditions must
+    hold, exactly as the issue states them:
+
+    - a live 'Needs a closer look' heading is present, and 'Changes
+      recommended' is not (that spelling is always blocking regardless of
+      effort or findings -- see this pair's one call site);
+    - every `**Review effort:**` line found reads `Balanced`, and at least
+      one exists -- an empty list (no effort line at all, e.g. the legacy
+      `Review effort level:` wording) or one containing any other value
+      both fail this closed;
+    - every `**Findings:**` line found reads `None`, and at least one
+      exists -- the same fail-closed shape as the effort check, and the
+      same reason: a body with no findings line at all states nothing this
+      function can confirm is finding-free;
+    - neither `COPILOT_PREVIOUSLY_MISSED` nor `COPILOT_OPEN_ITEMS_HEADING`
+      appears anywhere in the body. Either is a real finding the overview's
+      own Findings count does not capture, checked with no citedness test
+      -- a false positive here only makes a genuinely clean review read as
+      not-clean, while a false negative would let a real, unresolved
+      finding disappear as no verdict at all.
+
+    Deliberately conservative in every direction: any ambiguity here falls
+    through to the caller's pre-existing NOT_CLEAN for a 'Needs a closer
+    look' heading, never to a wrong CLEAN or a wrong no-verdict.
+    """
+    if not COPILOT_NEEDS_A_CLOSER_LOOK_HEADER.search(raw_body):
+        return False
+    if COPILOT_CHANGES_RECOMMENDED_HEADER.search(raw_body):
+        return False
+    efforts = _copilot_v2_line_values(COPILOT_REVIEW_EFFORT_LINE, raw_body)
+    if not efforts or any(e != "balanced" for e in efforts):
+        return False
+    findings = _copilot_v2_line_values(COPILOT_FINDINGS_LINE, raw_body)
+    if not findings or any(f != "none" for f in findings):
+        return False
+    if COPILOT_PREVIOUSLY_MISSED.search(raw_body) or COPILOT_OPEN_ITEMS_HEADING.search(raw_body):
+        return False
+    return True
+
+
 def latest_bot_review_states(reviews, head_oid=""):
     """Latest standing per bot author.
 
@@ -415,6 +516,17 @@ def latest_bot_review_states(reviews, head_oid=""):
     'Changes recommended' or 'Needs a closer look').
     A formal CHANGES_REQUESTED or an admissible negative verdict stands across commits
     until superseded by a clean review on the current head or dismissed.
+
+    A 'Needs a closer look' heading gets one narrow carve-out
+    ([ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004), `copilot_is_empty_balanced_closer_look`): an empty
+    BALANCED review under that heading states no verdict at all, so this
+    round is skipped entirely rather than setting NOT_CLEAN -- and,
+    exactly like an ordinary round with no recognizable verdict, it also
+    does not touch any standing state an earlier round already set. This
+    is checked only when `is_negative` fired SOLELY off the heading (never
+    when `NOT_CLEAN_VERDICT_RE` or the suppressed-block-over-affirmative
+    check also independently matched), so a genuinely blocking phrase
+    elsewhere in the same body is never carved out.
     """
     states = {}
     for r in reviews:
@@ -433,11 +545,19 @@ def latest_bot_review_states(reviews, head_oid=""):
             continue
         raw_body = r.get("body", "") or ""
         oid = ((r.get("commit") or {}).get("oid") or "")
-        is_negative = bool(
-            COPILOT_NEGATIVE_HEADER.search(raw_body)
-            or NOT_CLEAN_VERDICT_RE.search(raw_body)
-            or (COPILOT_SUPPRESSED_BLOCK.search(raw_body) if COPILOT_AFFIRMATIVE_HEADER.search(raw_body) else False)
+        is_negative_header = bool(COPILOT_NEGATIVE_HEADER.search(raw_body))
+        is_not_clean_verdict = bool(NOT_CLEAN_VERDICT_RE.search(raw_body))
+        is_suppressed_over_affirmative = bool(
+            COPILOT_SUPPRESSED_BLOCK.search(raw_body) if COPILOT_AFFIRMATIVE_HEADER.search(raw_body) else False
         )
+        is_negative = is_negative_header or is_not_clean_verdict or is_suppressed_over_affirmative
+        if (
+            is_negative_header
+            and not is_not_clean_verdict
+            and not is_suppressed_over_affirmative
+            and copilot_is_empty_balanced_closer_look(raw_body)
+        ):
+            continue
         if is_negative:
             states[login] = "NOT_CLEAN"
             continue

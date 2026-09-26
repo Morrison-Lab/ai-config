@@ -248,6 +248,113 @@ class TestEvaluate(unittest.TestCase):
             self.assertEqual(decision["decision"], "deny", suppressed_block)
             self.assertIn("not clean", decision["reason"])
 
+    # ai-config#4004: an EMPTY Balanced Copilot review under the 'Needs a
+    # closer look' heading is Copilot flagging a large/ambiguous diff for
+    # human judgment with no finding of its own, and must not block a
+    # merge -- mirroring the identical carve-out in
+    # `scripts/check-pr-fully-clean.py`'s `copilot_verdict()`. Fixture
+    # provenance, per fixtures-are-not-evidence.md: transcribed VERBATIM
+    # from the review the issue links (Lacaedemon/sparta#1638, review
+    # 5316721676, state COMMENTED, at commit b36fe3bb).
+    COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f535 Needs a closer look\n\n"
+        "The broad routing, formation-geometry, and link-lifecycle changes "
+        "warrant final human review despite strong regression coverage.\n\n"
+        "**Review effort:** Balanced  \n**Findings:** None"
+    )
+
+    def test_copilot_empty_balanced_closer_look_allows(self):
+        """An empty Balanced 'Needs a closer look' review states no verdict
+        -- it neither blocks nor counts as clean on its own, so the merge
+        proceeds on the standing human clean verdict (ai-config#4004)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY
+        self.assertTrue(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        bot_states = gate.latest_bot_review_states(
+            state["reviews"], state["headRefOid"]
+        )
+        self.assertNotIn("copilot-pull-request-reviewer", bot_states)
+        self.assertEqual(gate.evaluate(MERGE_CMD, state)["decision"], "allow")
+
+    def test_copilot_empty_lite_closer_look_still_denies(self):
+        """The identical empty review at Lite effort still blocks -- an
+        empty Lite review still needs a Balanced re-request before it says
+        anything about the diff's content (ai-config#4004)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY.replace(
+            "**Review effort:** Balanced", "**Review effort:** Lite"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_balanced_previously_missed_still_denies(self):
+        """A Balanced 'Needs a closer look' review carrying a 'Previously
+        missed' item is a real finding the overview's own Findings count
+        does not capture, and still blocks (ai-config#4004)."""
+        body = (
+            self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY
+            + "\n\n<details>\n<summary>Review details</summary>\n\n"
+            "### Suppressed comments (1)\n\n"
+            "**Previously missed (1)** in code that hasn't changed since "
+            "the last review.\n\n"
+            "**scripts/lib/copilot_overview.py:1**\n"
+            "* Some prior finding.\n\n"
+            "</details>"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_changes_recommended_still_denies_regardless_of_effort(self):
+        """'Changes recommended' stays unconditionally blocking, even at
+        Balanced effort with 'Findings: None' -- only 'Needs a closer
+        look' gets the carve-out (ai-config#4004)."""
+        body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY.replace(
+            "Needs a closer look", "Changes recommended"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
     def test_bot_changes_requested_superseded_by_approved(self):
         """A bot CHANGES_REQUESTED review superseded by APPROVED allows merge."""
         state = pr(

@@ -2248,14 +2248,6 @@ COPILOT_NEEDS_A_CLOSER_LOOK_HEADER = re.compile(
     _COPILOT_HEADING_PREFIX + r"\bNeeds\s+a\s+closer\s+look\b",
     re.IGNORECASE,
 )
-# Kept for readers of the module docstrings/comments below that still refer
-# to "the negative header" as one concept; `copilot_verdict` itself now uses
-# the two split patterns above so it can treat them differently.
-COPILOT_NEGATIVE_HEADER = re.compile(
-    _COPILOT_HEADING_PREFIX
-    + r"\b(?:Changes\s+recommended|Needs\s+a\s+closer\s+look)\b",
-    re.IGNORECASE,
-)
 # A `Suppressed comments` section carries real findings that appear in NO other
 # surface -- not in the inline comments, not in the check run
 # (memories/copilot-reviews.md, rounds 35 and 36 on ai-config#2913). An
@@ -2469,19 +2461,20 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
         """Return the first uncited match of `pattern`, or None.
 
         Checks citedness from `match_content_start(m)`, not `m.start()`
-        ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twenty-fourth round): both
-        COPILOT_NEGATIVE_HEADER and COPILOT_FINDINGS_LINE (two of this
-        helper's three callers below) are line-anchored with a leading
-        `(?:^|\n)`, which consumes the PRECEDING newline whenever the
-        match isn't at the very start of the body -- and the citation
-        mask never marks a newline offset as cited, by design. Checking
-        from the raw `m.start()` then always found that uncited newline
-        in range and reported the WHOLE match as uncited, even when the
-        heading itself sat wholly inside a code span (a double-backtick-
-        cited `### Changes recommended` on any line but the first). The
-        third caller (COPILOT_SUPPRESSED_BLOCK) is not line-anchored, so
-        `match_content_start` is a no-op for it -- see the function's own
-        docstring for why it is always a safe drop-in for `m.start()`.
+        ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twenty-fourth round): three of this
+        helper's four callers below -- COPILOT_CHANGES_RECOMMENDED_HEADER,
+        COPILOT_NEEDS_A_CLOSER_LOOK_HEADER, and COPILOT_FINDINGS_LINE --
+        are line-anchored with a leading `(?:^|\n)`, which consumes the
+        PRECEDING newline whenever the match isn't at the very start of
+        the body -- and the citation mask never marks a newline offset as
+        cited, by design. Checking from the raw `m.start()` then always
+        found that uncited newline in range and reported the WHOLE match
+        as uncited, even when the heading itself sat wholly inside a code
+        span (a double-backtick-cited `### Changes recommended` on any
+        line but the first). The fourth caller (COPILOT_SUPPRESSED_BLOCK)
+        is not line-anchored, so `match_content_start` is a no-op for it
+        -- see the function's own docstring for why it is always a safe
+        drop-in for `m.start()`.
         """
         for m in pattern.finditer(text):
             if not match_is_cited(cited, match_content_start(m), m.end()):

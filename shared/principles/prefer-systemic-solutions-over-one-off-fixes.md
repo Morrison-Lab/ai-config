@@ -47,39 +47,25 @@ When resolving an issue or defect:
 
 ## Porting a sibling function's logic: enumerate its whole table up front
 
-A specific case of "identical instances in siblings" below, worth naming on
-its own because it recurred three review rounds in a row on one PR before
-being generalized here.
-When a new function's job partially overlaps an existing sibling's --- it
-handles the same kind of decision (here, "does this push target the default
-branch?"), but for a narrower purpose than the sibling's own --- and the fix
-is to port some of the sibling's config-override handling into it, port the
-sibling's **whole** override table in one pass, not whichever member of it
-the current review round happens to name.
+A specific case of "identical instances in siblings" below, worth naming on its own because it recurred three review rounds in a row on one PR before being generalized here.
+When a new function's job partially overlaps an existing sibling's --- it handles the same kind of decision (here, "does this push target the default branch?"), but for a narrower purpose than the sibling's own --- and the fix is to port some of the sibling's config-override handling into it, port the sibling's **whole** override table in one pass, not whichever member of it the current review round happens to name.
 
-The one-off-patch instinct shows up here as: read the sibling function,
-notice it handles override X, port X, ship it, and consider the sibling's
-scope "covered".
-That reads as done, because the ported code runs and the one override
-inspected is now handled correctly.
-What it misses is that the sibling was never read as a **checklist** --- only
-as a source for the one thing already suspected of being missing --- so the
-sibling's other overrides stay invisible until a reviewer happens to think of
-each one in turn.
+The one-off-patch instinct shows up here as: read the sibling function, notice it handles override X, port X, ship it, and consider the sibling's scope "covered".
+That reads as done, because the ported code runs and the one override inspected is now handled correctly.
+What it misses is that the sibling was never read as a **checklist** --- only as a source for the one thing already suspected of being missing --- so the sibling's other overrides stay invisible until a reviewer happens to think of each one in turn.
 
-Measured on `Morrison-Lab/ai-config#4013` (2026-09-26): `hooks/no-push-without-self-review.py`'s
-`_push_targets_default_branch` needed to port `shipped_commits`'s bare-push
-git-config handling.
-Three review rounds each found exactly one more override `shipped_commits`
-already checked that the port had missed: `push.default`/`remote.<name>.push`
-first, then a `*`-glob wildcard refspec inside the shared
-`_refspec_dest_branch` helper, then `remote.<name>.mirror`.
-Each fix was correct and each round's suite went green, and the shape was
-identical to the allowlist-regex pattern in
-[`algorithmatize-checks.md`](../workflow/algorithmatize-checks.md)'s "When an
-allowlist regex keeps leaking" section: a fix that closes the case just found
-and opens a different one, because the population being drawn from (the
-sibling's own set of config knobs) was never enumerated, only sampled.
+Measured on `Morrison-Lab/ai-config#4013` (2026-09-26, still open as of this writing --- see below): `hooks/no-push-without-self-review.py`'s `_push_targets_default_branch` needed to port `shipped_commits`'s bare-push git-config handling.
+
+Across three automated review rounds plus one dispatched adversarial-reviewer subagent pass, four distinct overrides `shipped_commits` already checked turned up missing from the port, one at a time.
+Round 1 found `push.default=matching`/`remote.<name>.push`.
+Round 2 found a `*`-glob wildcard refspec inside the shared `_refspec_dest_branch` helper.
+The same fix commit for round 2 also closed a `remote.<name>.mirror` gap, but that one was caught by a separately dispatched adversarial-reviewer subagent reviewing that commit, not by a distinct numbered review round --- so it was ported proactively alongside a requested fix rather than named by the automated reviewer itself.
+Round 3 then found a fourth gap, `push.default=upstream` and its deprecated synonym `tracking`;
+a fix for it was pushed but had not yet been re-reviewed as of this writing.
+So read the count as four misses surfacing one at a time, not a closed three-round arc.
+
+Each fix made so far was correct and each round's suite went green, and the shape was identical to the allowlist-regex pattern in [`algorithmatize-checks.md`](../workflow/algorithmatize-checks.md)'s "When an allowlist regex keeps leaking" section: a fix that closes the case just found and opens a different one, because the population being drawn from (the sibling's own set of config knobs) was never enumerated, only sampled.
+That a fourth instance surfaced after this entry's first draft was written is itself evidence for the entry's point, not a reason to soften it: enumerating up front would have caught all four in one pass instead of four.
 
 The remedy is mechanical rather than a plea for more care: before porting,
 list every config key, branch, and special case the sibling function reads

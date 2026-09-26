@@ -1124,14 +1124,40 @@ def main():
     # them suppressed, because no two replies were byte-identical. Dropping
     # the text keys the sentinel on (path, reason) alone: a genuinely
     # unchanged state (same transcript, same derived reason) is suppressed
-    # after the first block, and any new or changed unshipped state still
-    # produces a different `reason` and blocks again.
-    key = hashlib.sha256((path + reason).encode()).hexdigest()[:16]
+    # after the first block. `reason` names only counts and paths, never a
+    # commit, so the key also carries the tip SHA of every local branch and
+    # worktree HEAD: a new unshipped commit at the same count (push A, then
+    # commit B) changes the key and blocks once again (#4010 review).
+    key = hashlib.sha256(
+        (path + reason + _state_fingerprint(payload.get("cwd") or "")).encode()
+    ).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-unshipped-commit-{key}")
     if os.path.exists(sentinel):
         return
     open(sentinel, "w").close()
     print(json.dumps({"decision": "block", "reason": reason}))
+
+
+def _state_fingerprint(cwd):
+    """Tip SHAs of every local branch and worktree HEAD, or "" when git fails.
+
+    Folded into the sentinel key so the once-per-state suppression is per
+    commit, not per count. An empty result falls back to (path, reason).
+    """
+    if not cwd:
+        return ""
+    parts = []
+    for args in (["for-each-ref", "--format=%(refname) %(objectname)", "refs/heads/"],
+                 ["worktree", "list", "--porcelain"]):
+        try:
+            out = subprocess.run(["git", "-C", cwd, *args], capture_output=True,
+                                 text=True, timeout=5)
+        except (OSError, subprocess.SubprocessError):
+            return ""
+        if out.returncode != 0:
+            return ""
+        parts.append(out.stdout)
+    return "\n".join(parts)
 
 
 if __name__ == "__main__":

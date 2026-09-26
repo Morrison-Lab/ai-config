@@ -1256,6 +1256,18 @@ try:
     _second = run_hook2(_payload)
     assert _second.stdout.strip() == "", \
         "a differently-worded reply over an unchanged state must not re-block: " + _second.stdout
+
+    # #4010 review: push the reported commit, then make a NEW one at the same
+    # count. The reason text is identical ("1 commit(s) on HEAD ..."), so only
+    # the commit fingerprint in the key can make this block again.
+    reworded_run("git push -q origin HEAD")
+    assert run_hook2(_payload).stdout.strip() == "", "a fully pushed state must not block"
+    reworded_run("git commit --allow-empty -q -m second-unshipped")
+    _third = run_hook2(_payload)
+    assert _third.stdout.strip(), \
+        "a new unshipped commit at the same count must block again, but the hook was silent"
+    assert json.loads(_third.stdout)["decision"] == "block", \
+        "a new unshipped commit at the same count must block again: " + _third.stdout
 finally:
     for _root in (noupstream_root, noupstream_bare, feature_root, feature_bare,
                   reworded_root, reworded_bare):

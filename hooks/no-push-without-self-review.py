@@ -1355,10 +1355,18 @@ def _push_targets_default_branch(directory: str | None, argv: list[str],
     """True if this push would update `main`/`master` on the remote; None if unclear.
 
     A bare `git push` (no refspec) ships the current branch under its own
-    name absent an override, so its branch is HEAD's. `push_is_exempt`'s own
-    caller already refuses the exemption on anything else this function
-    returns other than `False`, so an unresolved HEAD or an unrecognized
-    refspec shape denies the exemption rather than granting it.
+    name only under the modern `push.default`. `shipped_commits` already
+    established this is not safe to assume: under `push.default=matching`
+    (git's default before 2.0, still present in long-lived global configs) a
+    bare push ships every branch that also exists on the remote, and a
+    configured `remote.<name>.push` overrides the question entirely.
+    Checking only HEAD's own name here would grant the exemption to a bare
+    push that also ships `main` under either override -- exactly the gap
+    this function exists to close, reopened on its own bare-push path.
+    `push_is_exempt`'s own caller already refuses the exemption on anything
+    else this function returns other than `False`, so an unresolved HEAD, an
+    unresolvable override, or an unrecognized refspec shape denies the
+    exemption rather than granting it.
     """
     parsed = _parse_push(argv)
     if parsed is None:
@@ -1366,6 +1374,13 @@ def _push_targets_default_branch(directory: str | None, argv: list[str],
     positionals, _repo = parsed
     refspecs = positionals[1:]
     if not refspecs:
+        default = _git_config(directory, "--get", "push.default", argv, env)
+        if default and default.lower() == "matching":
+            return None
+        remote = _push_remote(directory, argv, env)
+        if remote and _git_config(directory, "--get-all",
+                                  f"remote.{remote}.push", argv, env):
+            return None
         branch = _rev_parse_ref(directory, env, "--abbrev-ref", "HEAD")
         return branch in DEFAULT_BRANCH_NAMES if branch else None
     dests = [_refspec_dest_branch(spec) for spec in refspecs]

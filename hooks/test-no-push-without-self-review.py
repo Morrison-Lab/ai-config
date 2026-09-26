@@ -3445,6 +3445,34 @@ def exempt_repo_cases() -> tuple[int, int]:
             detail = f"raised {type(exc).__name__}: {exc}"
         check(f"exempt e2e: {label} ({detail})", ok)
 
+    # A bare push does not simply ship HEAD's own branch under either override
+    # `shipped_commits` already guards against: `push.default=matching` ships
+    # every branch that also exists on the remote (which can include `main`),
+    # and a configured `remote.<name>.push` overrides the question entirely.
+    # `_push_targets_default_branch` must consult both rather than trusting
+    # HEAD's name alone, or a bare push under either override on a feature
+    # branch would read as `False` (not targeting main) while the real push
+    # ships main too (gha review finding, PR #4013).
+    for label, extra_config in (
+        ("an exempt remote is denied for a bare `git push` on a feature "
+         "branch when `push.default` is `matching`",
+         ["push.default", "matching"]),
+        ("an exempt remote is denied for a bare `git push` on a feature "
+         "branch when `remote.origin.push` is configured",
+         ["remote.origin.push", "refs/heads/*:refs/heads/*"]),
+    ):
+        try:
+            rc, denied = run_e2e(
+                origin_mln,
+                [["branch.feature.remote", "origin"], extra_config],
+                "push", None, "{git}", checkout="feature")
+            ok = rc == 0 and denied is True
+            detail = f"exit {rc}, denied={denied}"
+        except Exception as exc:
+            ok = False
+            detail = f"raised {type(exc).__name__}: {exc}"
+        check(f"exempt e2e: {label} ({detail})", ok)
+
     # A detached HEAD has no branch name, so `_rev_parse_ref` returns None and
     # `_push_targets_default_branch` reports the unclear case rather than
     # `False` -- and unclear must deny the exemption, same as everywhere else

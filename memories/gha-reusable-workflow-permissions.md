@@ -148,6 +148,89 @@ get a warning added to the example/README.
   identically-named group on a nested job, this deadlocks rather than merely
   racing.
 
+### The same deadlock has a second, silent signature, and the one above is the readable one
+
+Everything above describes `claude-code-review.yml`, which fails legibly:
+GitHub names the deadlock, names both sides, and reports the run as
+**cancelled**.
+
+`quarto-publish.yml` produces none of that.
+Measured 2026-09-15 on
+[machine_learning_lecture_materials run 35027908547](https://github.com/Morrison-Lab/machine_learning_lecture_materials/actions/runs/35027908547),
+whose caller declared a top-level `group: gh-pages` against the reusable
+workflow's own `deploy` job holding the same group:
+
+- `conclusion` is **`failure`**, not `cancelled`.
+- `created_at`, `started_at` and `completed_at` are all the same second.
+- The job object carries **zero steps**.
+- **The log is unretrievable**, which is worth stating carefully because
+  the layers disagree: `GET /actions/jobs/<id>/logs` answers **302** with a
+  blob URL, and fetching that URL answers **404**.
+  So a client that follows redirects reports 404 while a client that does not
+  reports a redirect to something real.
+  Neither yields any log text.
+  Do not read the 302 as evidence a log exists.
+- The job object's **`runner_id` and `runner_name` are `null`** --- present as
+  keys, not absent --- where a sibling job that actually ran carries real
+  values for both.
+
+That last one is the cleanest discriminator, because it is a positive fact
+rather than an absence you have to interpret: no runner was ever assigned, so
+the job did not fail, it never started.
+Compare the failing job against a sibling in the same run rather than reading
+it alone.
+
+**That combination defeats the entry above rather than merely differing from
+it.**
+A reader who knows this section goes looking for `Canceling since a deadlock
+was detected`, does not find it, sees `failure` where the entry says
+`cancelled`, and concludes this is some other problem.
+The recorded signature becomes a false negative for the unrecorded one, which
+is worse than no signature at all.
+
+So match on the **shape** rather than the message: a job that fails with no
+runner, no steps, and no retrievable log has not run, and a concurrency
+collision with the workflow calling it is the first thing to check.
+
+**gha's own example stub is the authority here, and it is more complete than
+this file was.**
+`examples/quarto-publish.yml` warns in its opening lines, names both the
+top-level and calling-job forms as deadlocking identically, and describes this
+exact signature --- "no runner, no steps, and no log, so the site silently
+stops publishing"
+([gha#809](https://github.com/Morrison-Lab/gha/issues/809),
+[gha#811](https://github.com/Morrison-Lab/gha/pull/811)).
+Read the stub for the workflow you are calling before writing the caller, not
+only this file.
+
+**The reason this generalizes is the mechanism, not the instance count.**
+Deadlock detection between a caller and a nested job is a GitHub Actions
+platform behaviour rather than anything either workflow implements, so any
+caller whose group name matches a nested job's will deadlock --- which is a
+stronger argument than the three occurrences now on record
+(`claude-code-review.yml`, this one, and the prior independent report in
+gha#809) could carry on their own.
+Count the instances as corroboration of a mechanism, not as the basis for the
+rule.
+
+So the safe group name is one derived from the caller's own workflow
+(`quarto-publish-${{ github.ref }}`) rather than from what the work is about
+--- a name chosen that way cannot collide with any nested job, whatever that
+job happens to be called, so it does not depend on having read the callee.
+
+- **Do:** read a zero-step, zero-log, instant job failure as a job that never
+  started, and check for a concurrency collision first.
+- **Do:** name a caller's group after the caller, so it cannot collide with
+  any nested job whatever that job is named.
+- **Don't:** rule the diagnosis out because the run says `failure` rather than
+  `cancelled`, or because no deadlock message appears --- one of the two known
+  instances emits neither.
+
+(Tracked as [ai-config#3719](https://github.com/Morrison-Lab/ai-config/issues/3719),
+which also carries the discoverability problem: this section is about
+concurrency and lives in a file named for permissions, where nobody debugging
+a concurrency failure would look.)
+
 ## A missing review is not a pending one; redispatch posts a comment but does not make the PR mergeable
 
 Fourth occurrence of the same permission-mismatch class this file already

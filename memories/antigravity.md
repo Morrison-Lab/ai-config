@@ -37,6 +37,16 @@ That leaves one correct form, an unquoted absolute interpreter path followed by 
 - **Do:** re-run `bootstrap.sh` rather than hand-editing the staged `hooks.json`, since a hand repair is what introduced the quoting.
 - **Don't:** quote a path in a Windows hook command, however correctly the JSON escapes it.
 
+### Windows plugin entry paths in `plugins.json` must be clean without quotes or escape characters
+
+Measured 2026-09-23 in an Antigravity Windows session:
+When a plugin path entry in `~/.gemini/config/plugins.json` or its command wrapper carries literal double quotes (e.g. from copy-pasting or nested JSON escaping), Node.js on Windows preserves literal quotes in `argv[1]`.
+Because the argument begins with a quote rather than a drive letter (e.g. `"C:\...` instead of `C:\...`), `path.isAbsolute()` evaluates to false, Node treats the path as relative to cwd, and every subsequent pre-tool hook execution crashes with `MODULE_NOT_FOUND`.
+Keeping `plugins.json` entries strictly formatted as standard unquoted JSON string paths (e.g. `{"entries": [{"path": "C:/Users/.../ai-config"}]}`) immediately restores hook dispatch.
+
+- **Do:** format `plugins.json` paths cleanly without extraneous quotes or escape wrappers.
+- **Don't:** leave quotes inside entry path strings in `plugins.json`.
+
 ### A hooked-tool failure leaves headless `agy` reporting success
 
 Same measurement ([ai-config#3091](https://github.com/Morrison-Lab/ai-config/issues/3091)), and it is why the quoting bug survived a full dispatch unnoticed.
@@ -45,6 +55,23 @@ Nothing in the exit code, the stdout, or the summary distinguishes that from a s
 
 - **Do:** verify a dispatched `agy` run's claimed edits against `git status` or `git diff` before believing its summary.
 - **Don't:** read exit 0 plus a work summary as evidence that any file changed.
+
+### Background tasks and console window popups on Windows
+
+Measured 2026-09-21 in an Antigravity Windows session:
+Commands sent to the background by `run_command`
+(either by setting `WaitMsBeforeAsync` smaller than execution time
+or running `.cmd`/`.bat` scripts and `Start-Sleep`)
+spawn visible console windows (`conhost.exe` / `cmd.exe` / `powershell.exe`)
+that disrupt the user's workspace.
+The harness provides the `schedule` tool for non-blocking timers;
+keep synchronous commands fast (< 10 seconds) with `WaitMsBeforeAsync: 10000`
+so they complete without falling into background execution,
+and invoke executables directly (`python scripts/...`)
+rather than through `.cmd` or `.bat` batch wrappers.
+
+- **Do:** use `schedule(DurationSeconds=N, Prompt="...")` for all delayed checks and polling loops.
+- **Don't:** run `Start-Sleep` or long background commands that spawn visible console windows on Windows.
 
 ### Lifecycle events & payload mapping
 - **`PreToolUse`**: Passed `{"toolCall": {"name": "<tool_name>", "args": { ... }}}`.
@@ -192,3 +219,33 @@ The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-anti
 - Neither active `/mwc` session grant nor `ALLOW_MERGE=1` overrides this review-gate requirement in `enforce-mwc-review-gate.py` (which evaluates review and CI status directly rather than delegating review vetting to a command-line wrapper).
 - In repositories without automated bot review workflows, merges must be executed either via an affirmative human review from another repository member or directly by the human from their terminal outside the Antigravity agent hook harness.
   (Observed in live Antigravity sessions 2026-09-11.)
+- **Exempt superseded CANCELLED checks in statusCheckRollup (ai-config#3800):** GitHub Actions concurrency groups (`cancel-in-progress: true`) cancel an in-progress workflow run when a new push or PR event occurs on the same branch.
+  This leaves a `CANCELLED` check run in `statusCheckRollup` alongside the subsequent run's `SUCCESS` entry for the exact same check name and workflow (ai-config#1697, #3343).
+  The merge gate must ignore `CANCELLED` conclusions only when superseded by a later `SUCCESS` entry in the same workflow;
+  otherwise, benign concurrency cancellation permanently blocks automated merge under MWC.
+  (Observed in live Antigravity sessions 2026-09-19 on PR #3797.)
+- **No parentheses in `gh pr merge` commit subjects or arguments:**
+  `enforce-mwc-review-gate.py` bans command-chaining and substitution characters in `CHAIN_CHARS` (including semicolons, ampersands, pipes, newlines, dollar-parentheses, backticks, and parentheses).
+  Passing parenthetical issue references in arguments (such as `--subject "fix: description (#1234)"`) trips the guard and blocks the merge.
+  Execute `gh pr merge -R <repo> <PR> --squash --delete-branch` without parentheses.
+- **Rerun cancelled concurrency checks to unblock fully-clean rollup:**
+  When a prior workflow run is cancelled by a higher-priority check or concurrency group (e.g. `review / preempt-previous`), it registers as `cancelled` in the statusCheckRollup, blocking `check-pr-fully-clean.py` and MWC merge.
+  Rerunning the failed/cancelled job via `gh run rerun -R <repo> <run-id> --failed` re-executes the check and clears the cancelled status without requiring a new commit or push.
+- **Verdict heading levels in `enforce-mwc-review-gate.py` (ai-config#3918):**
+  Review bodies commonly format their verdict section as `## Verdict` (H2) or `### Verdict` (H3).
+  `VERDICT_MARKER_RE` must match `#{2,4}\s*Verdict\b` rather than strictly requiring `### Verdict`;
+  otherwise, reviews with `## Verdict` are ignored by the gate and fall back to older comments, resulting in false `stale` merge denials.
+
+## Antigravity native task and subagent management APIs
+
+Antigravity provides built-in system tools for managing asynchronous background tasks and subagents:
+
+- **`manage_task`**: Manage background tasks.
+  - `Action='list'`: List all currently running background tasks.
+  - `Action='kill'`: Cancel the task's execution (`TaskId` required).
+  - `Action='status'`: Check the task's current status and log file location (`TaskId` required).
+  - `Action='send_input'`: Send input to a running task (`TaskId` and `Input` required).
+- **`manage_subagents`**: Manage existing subagents.
+  - `Action='list'`: List active direct subagents with their conversation IDs and live state.
+  - `Action='kill'`: Terminate specific subagents and all their descendants (`ConversationIds` required).
+  - `Action='kill_all'`: Terminate all subagents and all their descendants.

@@ -322,6 +322,14 @@ mechanical), and
 [`skill-checklists`](../workflow/skill-checklists.md) (the pause-point
 instrument where no script can decide).
 
+## Prefer systemic solutions over one-off fixes
+
+When addressing a defect, failure, edge case, or recurring mistake, prefer systemic, structural solutions over one-off, ad-hoc patches.
+Fix the underlying mechanism that allowed the error to occur, and install an automated guard, type constraint, or architectural invariant that prevents the entire class of defects from recurring.
+
+Full statement: [`prefer-systemic-solutions-over-one-off-fixes`](prefer-systemic-solutions-over-one-off-fixes.md).
+Operationalized by: [`algorithmatize-checks`](../workflow/algorithmatize-checks.md), [`deterministic-tools`](deterministic-tools.md), and [`fail-fast`](fail-fast.md).
+
 ## Don't use LLMs for algorithmic thinking --- use validated algorithmic software
 
 Never use probabilistic language models for algorithmic operations:
@@ -365,6 +373,51 @@ Operationalized by:
 [`specific-beats-general`](specific-beats-general.md),
 and the `clean` / `simplify` review passes.
 
+## Prefer more structure
+
+When content has a shape, show the shape in the markup
+rather than leaving the reader to recover it from a sentence:
+
+- items become a list;
+- steps become a numbered list;
+- a term's definition becomes its own definition div;
+- a worked or named example becomes its own example div (`#exm-` in Quarto);
+- a comparison becomes a table.
+
+Structure lets a reader scan, cite, and check each part, and lets a tool find it.
+Keep inline prose for a short series of single words,
+where a list would add scaffolding without clarity.
+
+Structure has to match a shape the content actually has, so it can be overdone.
+A header over a single figure or item,
+or one that repeats the topic of the header just before it,
+adds a level the content does not have.
+Before adding a header, check that it opens a part the reader would want to find on its own.
+
+- **Do:** put a list, a numbered list, a div or a table where the content has that shape.
+- **Do:** fold a header into its neighbour when it covers one item or names the same topic.
+- **Don't:** leave items, steps, definitions or examples buried in a sentence.
+- **Don't:** add a header, list or div to content that has no such shape just because structure is preferred.
+
+Stated by Ezra Morrison, 2026-09-25,
+with the bullet-list rule (below) as its first recorded instance.
+He added the limit the same day,
+about a course-overview header that came one figure after the previous one:
+"we like structure, but it's possible to overdo it".
+Operationalized by:
+[`plain-prose`](../writing/plain-prose.md) (inline lists become bullet lists,
+per PSW's "Put lists in bullet points", proposed in `Morrison-Lab/psw#60`),
+[`informal-definitions`](../writing/informal-definitions.md) (definitions become formal divs),
+and [Modularity](#modularity--small-single-purpose-composable-units) (the same preference applied to code).
+
+## "Or" always means "and/or" (inclusive or)
+
+In instructions, requirements, prompts, checklists, and specifications, treat "or" as inclusive ("and/or") unless exclusive choice is explicitly stated.
+Never interpret an unadorned "or" as an exclusive disjunction (XOR) that excuses dropping, ignoring, or omitting one of the alternatives when both apply.
+
+Full statement: [`or-means-and-or`](or-means-and-or.md).
+Operationalized by: the instruction interpretation rules in `AGENTS.md`, [`specific-beats-general`](specific-beats-general.md), and [`prefer-optionality-over-removal`](prefer-optionality-over-removal.md).
+
 ## Think outside the box --- distinguish real from artificial limitations
 
 Do not make unnecessary assumptions about structural limitations;
@@ -395,8 +448,15 @@ Operationalized by:
 [`fail-fast`](fail-fast.md) (loud failures over silent branching fallbacks)
 and [`algorithmatize-checks`](../workflow/algorithmatize-checks.md) (testable execution scripts).
 
-## Don't take anyone's word for it --- independent verification and constructive pushback
+## Don't take anyone's word for it --- no sycophancy and independent verification
 
+Give users the whole truth and nothing but the truth,
+including your full, honest opinions;
+never defer to the user's opinion when you disagree.
+Even when they state a claim or opinion without asking for your input,
+if you disagree, you must say so.
+When the user states a claim or opinion,
+always consider whether you agree before responding and/or acting.
 Never accept factual assertions, technical recommendations, or stated preferences blindly.
 Everyone makes mistakes --- all humans, all AI models, peer agents, coordinators, and domain experts alike.
 Always consider the possibility that any assertion may be mistaken, misinformed, outdated, or incomplete,
@@ -515,11 +575,16 @@ recurrence is observed rather than predicted.
 Feeling both at once usually means the count is one or two, and the way
 out is to wait rather than to argue.
 
+Prefer-systemic-solutions-over-one-off-fixes completes that family on the remediation axis: where algorithmatize-checks and deterministic-tools build instruments and automation, prefer-systemic-solutions directs that engineering at the root defect class rather than papering over individual symptoms or recurring review findings with manual patches.
+
 Specific-beats-general governs precedence across the entire catalog:
 it resolves conflicts between layers by establishing that explicit user
 instructions outrank repository defaults, scoped subsystem configs
 outrank top-level policies, and specific types and handlers outrank
 generic fallbacks in code.
+
+Or-means-and-or governs semantic interpretation of compound instructions: it resolves natural-language disjunctions by establishing that "or" is inclusive ("and/or") unless mutual exclusivity is explicitly specified.
+It works alongside interpret-instructions-broadly by ensuring agents satisfy all applicable parts of an instruction rather than arbitrarily dropping alternatives.
 
 Dead-code-is-tech-debt and prefer-optionality-over-removal draw the boundary
 between code deletion and preservation:

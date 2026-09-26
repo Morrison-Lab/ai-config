@@ -90,6 +90,34 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 ROOT = os.path.dirname(HERE)
 MAPPINGS_PATH = os.path.join(ROOT, "tool-mappings.yml")
 
+_LIB = os.path.join(ROOT, "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from transcript_meta import (
+        is_harness_meta,
+        is_hook_feedback,
+        is_hook_feedback_text,
+        is_skill_load_meta,
+    )
+except Exception as _exc:  # broken install: degrade, do not fail open silently
+    print(f"warn-stale-issue-edit: cannot load scripts/lib/transcript_meta.py "
+          f"({_exc}); is_user_prose will not recognize a loaded skill body, "
+          f"arming on any issue URL it quotes",
+          file=sys.stderr)
+
+    def is_skill_load_meta(entry):  # noqa: D103 -- fail-open fallback
+        return False
+
+    def is_harness_meta(entry):  # noqa: D103 -- fail-open fallback
+        return False
+
+    def is_hook_feedback(entry):  # noqa: D103 -- fail-open fallback
+        return False
+
+    def is_hook_feedback_text(text):  # noqa: D103 -- fail-open fallback
+        return False
+
 WRITE_TOOLS = frozenset({
     "Write", "Edit", "NotebookEdit",
     "StrReplace", "EditNotebook",  # Cursor names, if the adapter is skipped
@@ -327,6 +355,8 @@ def find_issue_ref(text):
     """
     if not text or not isinstance(text, str):
         return None
+    if is_hook_feedback_text(text):
+        return None
     # Drop pull URLs so a PR-only request cannot arm this guard via a
     # coincidental later owner/repo#N in the same blob.
     stripped = RX_PULL_URL.sub("", text)
@@ -428,10 +458,37 @@ def is_user_prose(entry):
     kind = entry.get("type") or entry.get("role") or entry.get("source")
     if kind not in ("user", "USER_EXPLICIT", "USER_INPUT"):
         return False
+    if is_skill_load_meta(entry):
+        # A loaded skill body arrives as a `type: "user"` entry with
+        # `isMeta: true` and a `sourceToolUseID`. It was never typed by the
+        # person, so a forge issue URL or number the skill quotes must not
+        # arm this guard. ai-config#3860.
+        #
+        # `isMeta: true` alone is NOT this: a scheduled check-in
+        # continuation also carries `isMeta: true` but no
+        # `sourceToolUseID`, and it IS a genuine new turn with real
+        # elapsed time -- see scripts/lib/transcript_meta.py for the
+        # transcript survey that pins the discriminator.
+        return False
+    if is_harness_meta(entry):
+        # Harness-injected metadata (isMeta: true, no sourceToolUseID, no
+        # promptSource: "sdk") contains hook feedback or system notifications.
+        # ai-config#3914.
+        return False
+    if is_hook_feedback(entry):
+        # Hook feedback or system notifications injected without isMeta
+        # (e.g. fixtures, adapters) matching recognized hook preambles.
+        # ai-config#3914.
+        return False
     blocks = _content_blocks(entry)
     if not blocks:
         return False
     if any(block.get("type") == "tool_result" for block in blocks):
+        return False
+    text = user_text(entry)
+    if not text.strip():
+        return False
+    if is_hook_feedback_text(text):
         return False
     return any(
         block.get("type") == "text" and isinstance(block.get("text"), str)
@@ -526,6 +583,26 @@ def mcp_views_issue(name, tool_input, issue, view_mcp):
         method = tool_input.get("method")
         if isinstance(method, str) and method != "get":
             return False
+        for key in ("issue_number", "issueNumber", "number"):
+            val = tool_input.get(key)
+            if val is not None and not isinstance(val, (dict, list)):
+                s = str(val).strip()
+                if s.isdigit():
+                    return s == str(issue["number"]).strip()
+        issue_val = tool_input.get("issue")
+        if issue_val is not None and not isinstance(issue_val, (dict, list)):
+            s = str(issue_val).strip()
+            if s.isdigit():
+                return s == str(issue["number"]).strip()
+            m = re.search(r"/issues/(\d+)\b", s)
+            if m:
+                return m.group(1) == str(issue["number"]).strip()
+        for key in ("url", "path"):
+            val = tool_input.get(key)
+            if isinstance(val, str):
+                m = re.search(r"/issues/(\d+)\b", val)
+                if m:
+                    return m.group(1) == str(issue["number"]).strip()
     blob = ""
     if isinstance(tool_input, dict):
         try:
@@ -534,7 +611,7 @@ def mcp_views_issue(name, tool_input, issue, view_mcp):
             blob = str(tool_input)
     elif isinstance(tool_input, str):
         blob = tool_input
-    number = re.escape(issue["number"])
+    number = re.escape(str(issue["number"]).strip())
     if re.search(rf"/issues/{number}\b", blob):
         return True
     # No whole-blob fallback beyond these two shapes: an issue_read of a

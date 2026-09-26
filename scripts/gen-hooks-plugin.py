@@ -6,9 +6,11 @@ through the ai-config marketplace plugin, which a session that opens this
 checkout itself (a remote/web session in ai-config) never installs, so every
 hook is inert there (ai-config#2004).
 
-`skills/ai-config-hooks/` is a plugin Claude Code discovers in place from the
-project's `.claude/skills/` (a symlink to `skills/`), with no marketplace and
-no install step. Its `hooks/hooks.json` is this script's output: the canonical
+`plugins/ai-config-hooks/` is that hooks-only plugin. It used to live in
+`skills/`, where Claude Code discovered it in place through the
+`.claude/skills` symlink; it moved out because a plugin manifest under
+`skills/` is the suspected cause of the claude.ai marketplace sync failure,
+so it is currently parked and does not load. Its `hooks/hooks.json` is this script's output: the canonical
 catalog with each command routed through `run-hook.sh` and its script path
 pointed two levels up, at the checkout's own `hooks/`.
 
@@ -23,7 +25,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "hooks" / "hooks.json"
-TARGET = ROOT / "skills" / "ai-config-hooks" / "hooks" / "hooks.json"
+TARGET = ROOT / "plugins" / "ai-config-hooks" / "hooks" / "hooks.json"
 
 PLUGIN_HOOKS = "${CLAUDE_PLUGIN_ROOT}/hooks/"
 CHECKOUT_HOOKS = "${CLAUDE_PLUGIN_ROOT}/../../hooks/"

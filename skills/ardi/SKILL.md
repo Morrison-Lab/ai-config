@@ -322,6 +322,12 @@ If the PR's CI checks are failing (not just the review), investigate and fix the
 This includes:
 
 - **Workflow syntax errors** --- fix them in this repo.
+- **Caller/bootstrap failures** --- trace the local caller and reusable
+  workflow interface before filing anything.
+  When a supported caller setting
+  can remove an unnecessary bootstrap step, make the scoped local repair in
+  the same round; reserve an issue-only response for a genuinely upstream or
+  externally blocked fix.
 - **Upstream template bugs** --- if the failure is in a reusable workflow from
   a shared CI library (e.g., HACtions) or a GitHub Action, file an issue (or open a PR) upstream using
   the `sup` skill, then either pin a working version or apply a local

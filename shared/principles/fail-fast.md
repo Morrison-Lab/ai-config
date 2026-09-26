@@ -42,6 +42,66 @@ Worked-example case records for the rules below live in
   job when neither attempt succeeded) --- the failure is deferred and
   handled, not ignored.
 
+## A `getattr(module, name, fallback)` import is only as loud as its fallback
+
+`getattr(sibling_module, "NAME", <fallback>)` is a common way to read an
+optional cross-module constant without a hard `import` dependency.
+The fallback decides, entirely on its own, whether a broken or renamed
+sibling attribute is discovered or absorbed --- and the two shapes look
+equally defensive side by side.
+
+A fallback that can never match anything real --- `re.compile(r"(?!)")`, an
+empty tuple, `None` --- fails loud: once the sibling attribute goes missing,
+every case depending on the real value stops passing, and the break is
+visible the next time the suite runs.
+A fallback that is a **hand-written copy of the same value** the import was
+trying to read fails silent: the code keeps working exactly as if the
+sibling attribute still existed, because it does, just duplicated rather
+than shared.
+Nothing about the second shape reads as riskier than the first while writing
+it --- both are one line, both look like "a sensible default", and the
+difference only shows up once the sibling actually changes.
+
+(Measured 2026-09-17 on `ai-config#3737`, `hooks/warn-unmeasured-capability-claim.py`.
+Two sibling imports sit a few lines apart:
+
+```python
+_NEVER = re.compile(r"(?!)")
+RX_COMMENT_POST = getattr(_rebuttal, "RX_COMMENT_POST", _NEVER)
+
+_CANONICAL_POST_TOOLS = getattr(_disclosure, "MCP_POST_TOOLS", (
+    "mcp__github__add_issue_comment", "mcp__github__add_comment_to_pending_review",
+    "mcp__github__add_reply_to_pull_request_comment", "mcp__github__pull_request_review_write",
+    "mcp__github__discussion_comment_write",
+))
+```
+
+The file's own comment on the second names the hazard it is nonetheless
+committing: a hand-maintained copy "is how a surface goes missing".
+Reproduced directly by renaming each sibling's attribute in a scratch copy
+and re-running the 97-case suite: renaming `RX_COMMENT_POST` in
+`flag-uncited-rebuttal.py` turns 4 cases red (`93/97 cases passed`), because
+`_NEVER` matches nothing they depend on.
+Renaming `MCP_POST_TOOLS` in `require-agent-disclosure.py` leaves the suite
+at `All 97 cases passed`, because the fallback tuple already contains the
+same five members the tests check for --- the import silently stopped
+reading the shared source of truth, and nothing observed it.)
+
+- **Do:** give a `getattr`-with-fallback import a fallback that cannot
+  satisfy any real case --- an empty collection, a never-matching pattern,
+  `None` --- when the fallback exists only to avoid a hard import error.
+- **Do:** if the fallback must be a working value (so the module keeps
+  functioning standalone), assert elsewhere that it still equals the live
+  import when both are available, rather than trusting silent agreement.
+- **Don't:** copy a sibling's constant into a fallback literal and consider
+  the dependency handled; a literal fallback with the same shape as the
+  import is the exact case [`avoid-hardcoding-external-data.md`](../coding/avoid-hardcoding-external-data.md)
+  warns against, here reached through `getattr` rather than through a second
+  hand-maintained list.
+- **Don't:** trust a passing suite as evidence a cross-module import still
+  resolves; rename the sibling's attribute in a scratch copy and re-run
+  before believing either fallback is safe.
+
 ## A secret-presence guard can mean two different things
 
 A step that checks whether a secret is set and exits 0 if it is not reads as
@@ -444,6 +504,79 @@ tools that already comply with it.
 - **Don't:** retract a check as vacuous on the strength of one line of its
   output.
 
+**The mirror of that block, and the reading its bullets cannot reach: a scope
+line reading ZERO is a finding, not a pass.**
+The block above guards the false-positive direction --- calling a zero-hit
+result vacuous when the instrument reported a healthy denominator.
+The opposite reading is the commoner mistake, and what enables it is the
+instrument's *full compliance* with "print the examined count".
+The count is printed, the eye lands on the verdict sentence beneath it, and a
+run that examined nothing reports in exactly the words a run that examined
+everything uses.
+
+So read the denominator, not only the exit status, and treat a zero one as
+unresolved rather than green.
+The resolving move is a **known-positive control**: feed the instrument an
+input it must flag, and confirm both that the denominator rises and that the
+verdict flips.
+That separates the three cases a bare zero cannot --- a collapsed selection
+stage, a genuinely empty input, or an instrument that is not running --- and it
+applies at the moment the number is zero, rather than after a diagnosis has
+already picked one of the four causes above to pursue.
+
+- **Do:** read a checker's examined count before its verdict, and stop at a
+  zero.
+- **Do:** run a known-positive input through the instrument whenever the
+  denominator is zero, and confirm the count and the verdict both change.
+- **Don't:** report a zero-denominator run as a passing check --- exit 0 there
+  says the instrument found nothing to look at, not that what it looked at was
+  clean.
+- **Don't:** treat the instrument having printed its denominator as the check;
+  printing it is the author's obligation, and reading it is a separate one.
+
+(Measured 2026-09-17 in `Morrison-Lab/ai-config`.
+On [ai-config#3692](https://github.com/Morrison-Lab/ai-config/pull/3692),
+`scripts/vendor/gha-check-new-line-breaks.py` printed
+`Examined 0 added line(s) across 0 file(s) (scope: committed).` followed by
+`No lines missing semantic breaks.` at exit 0, over a diff that does add
+markdown lines --- reported by the session that hit it.
+The mechanism reproduces directly: with `NLB_BASE_REF=HEAD` the same three
+lines appear at `rc=0`.
+The known-positive control settles it in one command --- staging a scratch
+`.md` carrying two sentences on one line gives
+`Examined 1 added line(s) across 1 file(s) (scope: working tree).` at `rc=1`,
+which is what the instrument looks like when it is running.
+Note that the scope word changes with the count, so the zero run was not
+reporting an empty input;
+it was reading a different scope.
+All four bullets follow from that pair, both halves of which were run here.)
+
+**The pass that wrote this section tripped it while running its own gates**,
+which is worth recording because the instrument was a different one and the
+zero was better hidden.
+`python3 scripts/check-ascii-punctuation.py` reported
+`Checked 340 file(s), 169826 line(s)` --- a large, healthy-looking denominator
+--- and that denominator is over `.py` and `.R` files, because
+`DEFAULT_EXTENSIONS` in whole-tree mode is `{".py", ".R"}`.
+The branch being gated was entirely markdown, so the number examined of it was
+zero while nothing on screen read as zero.
+The known-positive control is what exposed it: an em dash written into a
+scratch `.md` left the verdict, the file count and the line count all
+unchanged.
+`--diff --base origin/<default-branch>` is the mode that covers `.md`, and
+there the same control flips the run to `rc=1` immediately.
+
+So a healthy denominator is only evidence when it counts the thing you
+changed.
+Read the number *and* its units, and prefer a control over either --- a
+control needs no knowledge of the instrument's scoping rules, which is exactly
+what a reader of a summary line does not have.
+
+- **Do:** check that a denominator counts the population your change is in,
+  not merely that it is large.
+- **Don't:** treat a big examined count as the check when the instrument's
+  default scope is narrower than your diff.
+
 ### A background watcher reports failure as silence by default
 
 The cases above are all checks you read the output of.
@@ -515,12 +648,12 @@ drops".
 - **Do:** separate a prefix-compatible delimiter by **position**
   (`grep '^+' | tail -n +2`) rather than by a longer prefix, since a longer
   prefix is still a prefix and still collides.
-- **Don't:** read a narrowed pattern as a fixed one --- `^+++ ` collides with
-  an added `++ foo` exactly as `^+++` collides with an added `++i;`.
 - **Do:** ask what a pattern *feeds* --- a detector's extra match gets
   investigated, an extractor's becomes content.
 - **Do:** compare a moved block in both directions, so an added line is as
   visible as a dropped one.
+- **Don't:** read a narrowed pattern as a fixed one --- `^+++ ` collides with
+  an added `++ foo` exactly as `^+++` collides with an added `++i;`.
 - **Don't:** read a passing known-positive test as clearing this; the pattern
   matches the content correctly and takes one line more.
 - **Don't:** reuse `^+[^+]` on prose --- it eats added blank lines, and the
@@ -751,6 +884,54 @@ earlier.
 Three sibling files kept their fixes, so `git status` still listed
 modifications and looked plausible; only re-counting the specific file caught
 it.)
+
+### An eighth cause: the download or derived count is silently wrong, not absent
+
+Every cause above assumes the check ran against the right subject and
+misjudged it.
+A download and a derived page count fail one step earlier: the artifact
+itself is wrong, and nothing about fetching or reading it raises an error.
+
+**`curl -o <file>` exits 0 on an HTTP 404 and writes the error page's body
+into `<file>` anyway.**
+Without `-f`/`--fail`, curl treats a 404 response as a successfully
+transferred document --- it has bytes, a status line was received, the
+transfer completed --- so `curl -sSL -o report.pdf https://.../missing` exits
+0 having written an HTML error page into `report.pdf`.
+Nothing downstream complains until something tries to parse the file as a
+PDF, and by then the exit code and the file's existence have both already
+read as success.
+Measured twice in one session: two separate 404s each produced a file whose
+extension and exit status both said "downloaded", while its content was an
+HTML page.
+
+- **Do:** pass `-f`/`--fail` so curl itself turns a 4xx/5xx response into a
+  non-zero exit.
+- **Do:** verify the downloaded file's actual type (`file <path>`, or a
+  format-specific magic-byte check) before treating a download as having
+  succeeded, independent of the exit code.
+- **Don't:** read a zero exit status plus a file that now exists as evidence
+  the URL served the thing you asked for.
+
+**A PDF's page count read off `/Count` names one page-tree node, not the
+document.**
+The `file` command (and several other quick page-count tools) report a
+PDF's page count by reading the `/Count` entry of the first `/Pages` node it
+finds, which is correct only when the document's page tree is a single flat
+node.
+A page tree with intermediate nodes --- common in PDFs assembled or edited by
+tools that append rather than rebuild the tree --- has a `/Count` on each
+subtree, and the first one found can be far smaller than the true total.
+"3 pages" reported this way on a 26 MB file is not by itself evidence of a
+truncated download; it can equally be a correctly-sized file with a nested
+page tree.
+
+- **Do:** derive the real page count by walking the page tree (or by using a
+  tool that does, such as `pdfinfo`/`qpdf --show-npages`) rather than
+  reading a single `/Count` value.
+- **Don't:** treat a small `/Count` as proof of truncation, or a large one as
+  proof of completeness, without checking whether the tree has more than one
+  `/Pages` node.
 
 ## In a guard you ship: partial is worse than absent
 

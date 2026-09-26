@@ -243,7 +243,8 @@ def main() -> int:
     if not payload:
         return 0
     tool = payload.get("tool_name") or ""
-    inp = payload.get("tool_input") or {}
+    inp = payload.get("tool_input")
+    inp = inp if isinstance(inp, dict) else {}
     cmd = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or ""
 
     if tool not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell") or not cmd:

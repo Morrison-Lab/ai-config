@@ -416,6 +416,33 @@ This is the Agent tool's own criterion for `run_in_background: false` --- the ve
 The reviewer reports; the author disposes.
 A reviewer that can edit turns a finding into a silent fix, which loses the finding and the disposition together.
 
+**Freshly dispatched, not resumed --- and this applies per round, not just to the first one.**
+"Its own context window" above rules out reviewing in the author's own turn.
+It does not by itself rule out a second failure with the same shape: resuming the *same* reviewer session across rounds (`SendMessage` back to an existing subagent) instead of dispatching a new one each time.
+A resumed reviewer keeps its own context window separate from the author's, so it still satisfies the first bullet.
+What it no longer has is independence from **itself** --- a later round of a resumed reviewer is reading the diff with every earlier round's own conclusions already in its context, which is [`learn-from-review-findings`](learn-from-review-findings.md)'s convergence pattern happening *inside one reviewer* rather than across a series of different ones.
+Findings-per-round on a resumed reviewer characteristically decline toward zero, and the decline is not evidence the diff has actually gotten cleaner --- it is at least partly the reviewer running out of things it has not already told itself are fine, the same steerable-narrowing mechanism ["Narrowing severity is evidence about COVERAGE, not about the defect population"](#narrowing-severity-is-evidence-about-coverage-not-about-the-defect-population) describes for a series of rounds generally, here concentrated inside a single reviewer's own memory rather than spread across dispatches.
+
+This is the same failure ["The PR's own review history is rationale you cannot withhold"](#the-prs-own-review-history-is-rationale-you-cannot-withhold) describes, one layer more direct: there a *fresh* reviewer inherits the narrowing by reading about prior rounds in the artifact, while here the reviewer does not need to read about its own prior rounds because it remembers making them.
+
+A resumed reviewer is not useless.
+It is the right tool for a narrower job: confirming that the specific findings *it already raised* were actually fixed, where continuity of context is exactly what makes it efficient.
+What it cannot do is supply the go/no-go verdict that gates a push or a merge, because that verdict needs to be checking the diff against the standards, not against its own earlier self.
+
+- **Do:** gate a push or merge's go/no-go verdict on a freshly dispatched reviewer with no prior context on this diff, every round, not only the first.
+- **Do:** use a resumed reviewer for the narrower job of confirming that findings it already raised were fixed --- continuity is an asset there.
+- **Don't:** treat a resumed reviewer's declining finding count, or a "ready for merge" it restates after several resumes, as the gating verdict.
+- **Don't:** read "an `Agent` call was made" alone as satisfying independence --- a resumed call was made and still fails this bullet.
+
+(Measured 2026-09-18 on `fix/1601-baseline-tolerance-band` / [Lacaedemon/sparta#1603](https://github.com/Lacaedemon/sparta/pull/1603), reconstructed from the PR's own commit messages rather than from session-internal reviewer state, which is not recoverable after the fact --- so the quoted headline in each item below is a direct quote from that commit's own message, not a reconstructed round-by-round narrative layered on top of it.
+Round 1 (commit `d8fbc397`): "Six findings from the pre-push adversarial review, all addressed."
+Round 2 (commit `67b58d26`): "Three findings from the second adversarial review."
+A later round (commit `631c9216`) names the contrast this section is about directly: "A fresh adversarial review, run without the previous rounds' context, found two real defects the context-carrying reviewer had passed over."
+Another (commit `574c1fa2`) repeats the same shape: "A third reviewer, dispatched with no knowledge of the earlier rounds, found a real bug two previous reviewers had passed over."
+Three further rounds each self-label as a numbered, independently-dispatched reviewer and each found more: a corrupt-but-present baseline unpacked without raising, so the old gate read it as "no baseline" and routed the run into the bootstrap branch instead of reporting it as corrupt (commit `e21f2a4e`, "Three findings from a fourth independently-dispatched reviewer").
+Only the *average* of two benchmark runs was validated, so a `-1.0` raw run paired with a normal one would have averaged to a plausible positive value and been committed (commit `42b78526`, "Five findings from a fifth independently-dispatched reviewer").
+And `math.isfinite` raised `OverflowError` on an integer too large to convert to `float`, crashing the very predicate written to absorb corrupt input (commit `3453e113`, "Three findings from a sixth independently-dispatched reviewer").)
+
 **No Agent tool, or no reviewer registered here?**
 A separate CLI is the same move and a stronger one ---
 [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md),
@@ -427,6 +454,41 @@ specify a target directly (`--engine <name>`)
 or pass `--exclude-engine cursor` in alternate mode
 until headless cursor dispatch is enabled.
 The `adversarial-reviewer` persona also lives at `.claude/agents/` and `.opencode/agents/`, which are project agents: a session rooted in another repo may not be able to resolve it at all ([ai-config#1921](https://github.com/Morrison-Lab/ai-config/issues/1921) tracks shipping it alongside the guard).
+The plugin does not close that gap either: its root is the ai-config repository root, which ships `skills/`, `commands/` and `hooks/hooks.json` and no `agents/` directory (checked at `c7201140`, 2026-09-15), so a consumer repo installs the guard and none of the personas it names.
+
+**In that repo, use the fallback the guard already admits, and get its two conditions right.**
+`no-push-without-self-review.py`'s `FALLBACK_AGENT_NAME` accepts `general-purpose`, `general`, `reviewer`, `code-reviewer`, `research` and `self` (with an optional `-`, `_` or space inside the two-word spellings), but only when the dispatch's own prompt matches `REVIEW_PROMPT_RE` --- `adversarial review`, `adversarial self-review`, `pre-push review`, or `self-review`, again with an optional separator.
+"Review this adversarially" satisfies a reader and not the regex.
+The report then has to meet the verdict-line contract, which "A verdict phrase separated from its heading by a line break is no verdict" and "Structured review data (JSON payload)" state below between them.
+
+**Read which denial you got: the two messages fail at different stages, and the second has three causes.**
+"No `adversarial-reviewer` subagent or recognized external reviewer ... was dispatched" means the dispatch was not recognized --- wrong persona name, or a prompt the regex missed.
+"An `adversarial-reviewer` subagent was dispatched, but no verdict came back as that call's own result" means it *was* recognized and no verdict was extracted: a background dispatch, an errored result, or a verdict line that does not match that contract.
+A missing `Reviewed-Commit:` is not one of them --- that has its own message, about a clean verdict that does not say which commit it read.
+Where you chose to background the dispatch, the guard's own message gives the fix and it is a foreground re-dispatch.
+Where the harness backgrounds it regardless --- #3045's two variants, below --- re-dispatching changes nothing and the `ALLOW_UNREVIEWED_PUSH=1` route below is the remedy.
+
+- **Don't:** reach for `ALLOW_UNREVIEWED_PUSH=1` on the second message from a foreground dispatch that returned a report.
+  It says the report was read and no verdict was found in it, which is a formatting fix, not a case where the guard cannot see a verdict at all.
+
+(Measured on ucdavis/lbt, 2026-09-15, with the plugin enabled.
+Dispatching `adversarial-reviewer` returns an errored result reading "Agent type 'adversarial-reviewer' not found.
+Available agents: claude, claude-code-guide, Explore, general-purpose, Plan, statusline-setup".
+The session's `general-purpose` fallbacks were refused anyway, on both messages, and pushed under the override.
+Diagnosed in the same session by the step this file prescribes below.
+One prompt opened "You are an adversarial reviewer" and nothing else in it named the review, which `REVIEW_PROMPT_RE` misses because the word does not end at `review`, so that dispatch was never recognized at all.
+The prompts that were recognized produced reports with no `Verdict:` line in them: `read_latest_review` over that session's JSONL returns `(None, None, True)`, and `grep -c Reviewed-Commit` on the same file returns 0.
+Both are the brief rather than the guard, which refused correctly each time.
+A fallback dispatch has to name the review in words the regex matches, and has to *ask* for the verdict and fingerprint lines, because a persona file supplies them and a `general-purpose` prompt does not.)
+
+**A subagent cannot discharge this guard at all, and the reason is where the transcript lives.**
+Measured 2026-09-15 in the Claude Code desktop harness: an `Agent` dispatched *by a subagent* writes both the call and its report to `<session>/subagents/agent-<id>.jsonl`, while the guard reads the session JSONL at the top level.
+Every conforming review of one branch, the clean one included, was reachable only through those per-subagent files, with `grep -c Reviewed-Commit` on the session transcript returning 0.
+So the clean verdict exists, is about the right commit, and is unreadable to the guard by construction.
+This is not #3045, whose dispatch never returns synchronously.
+Here it returns synchronously to the subagent, which is not who the guard is reading, so it joins the cases below where the guard cannot see a verdict rather than the formatting case.
+Note which denial that produces: with no top-level dispatch, `saw_reviewer_call` is false, so it is the **first** message, and the Don't above does not bite.
+A subagent that reviews before pushing takes the override, and says in its report which reviews produced which verdicts and where they live.
 
 Note what that CLI fallback does to the pre-push guard, since the two rules meet here and pull opposite ways.
 A CLI's verdict never becomes an `Agent` call's `tool_result`, so the guard cannot see it however real the review was.
@@ -434,7 +496,7 @@ Prefix the push itself with `ALLOW_UNREVIEWED_PUSH=1` there, and say in the same
 The same applies to a session whose reviewer is registered from a stale definition, which is the case on any rollout of a change to the persona itself.
 Where no second context is reachable at all, say so in the review itself rather than letting an inline pass be reported as a dispatched one.
 
-**A harness that always backgrounds the `Agent` tool is a third case where the guard cannot see a verdict it should, alongside no reviewer being registered and a stale reviewer definition above --- and the guard's partial fix for this one has a specific extraction bug.**
+**A harness that always backgrounds the `Agent` tool is a fourth case where the guard cannot see a verdict it should, alongside no reviewer being registered, a stale reviewer definition, and a subagent's own transcript above --- and the guard's partial fix for this one has a specific extraction bug.**
 [`ai-config#3045`](https://github.com/Morrison-Lab/ai-config/issues/3045) tracks the general case: a harness whose `Agent` dispatch never returns synchronously, so the guard's own "dispatch in the foreground" remedy is unfollowable.
 That issue's own report is one manifestation --- `run_in_background: false` explicitly set, and the dispatch still backgrounded.
 A second, distinct manifestation is a harness whose `Agent` tool carries no `run_in_background` field in its schema at all, so there is nothing to set.
@@ -798,6 +860,12 @@ So an inline pass, a verdict quoted out of a file, the guard's own denial messag
 There is a **second** admitted provenance, which this paragraph read as the only one until the round-repetition section above was written: a `Bash` call matching the guard's own external-reviewer pattern, which today recognizes `agy --print` and not the other delegation CLIs.
 Both statements have to live in one file, so read the paragraph above as the rule for a Claude-side review and this as the rule for the external lane, rather than as two populations of what the guard accepts.
 
+**"A verdict quoted out of a file" has one narrow exception, added rather than relaxed.**
+Claude Code sometimes delivers a dispatched subagent's report as a message from the subagent's own `SubagentHandback` call instead of inside the `Agent` tool's own result (ai-config#3945): the tool_result then carries only a pointer sentence and an `agentId`, and the report lives in a sibling `subagents/agent-<agentId>.jsonl` file the guard cannot see by reading the parent transcript alone.
+The guard reads that ONE file, located by the `toolUseId` the original dispatch's own call id names (falling back to the `agentId` printed in the pointer sentence), and only after a `.meta.json` beside it independently confirms the subagent's `agentType` is an admitted reviewer -- the same persona check the dispatch itself already had to pass.
+See `_handback_report_text` in [`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py).
+Nothing else about "who said it" changes: a phrase search over any OTHER file, or over this same file located any other way, still fails.
+
 *What it said*: restricting provenance does not make a phrase search sound **inside** the admitted body, which is the same failure one layer in --- a review whose closing note quotes the clean verdict it is withholding would read as clean.
 So the verdict is the last line that **is** a verdict line, anchored at line start, and a quotation mid-sentence is not one.
 
@@ -858,6 +926,14 @@ The fix is the same one this section already gives: state the required line expl
 
 - **Do:** treat a report with no verdict line at all as the identical failure to a heading-separated one --- both leave the guard holding a stale prior verdict.
 - **Don't:** assume a report that "sounds clean" (ends in "No findings.", carries a clean JSON payload) discharges the guard without the literal verdict line the parser requires.
+- **Do:** leave the verdict's wording to the persona, or quote its phrases (`Ready for merge`, `Needs more work`) exactly when a brief has to mention them.
+- **Do:** dispatch one reviewer per repository, and push each repository before dispatching the next review.
+- **Don't:** ask the reviewer for a verdict in your own vocabulary ("end with clean / not clean") --- the brief overrides the persona's format, the reviewer answers `### Verdict: clean`, and that parses as no verdict.
+- **Don't:** review two repositories in one dispatch --- `parse_report` returns one `(verdict, Reviewed-Commit)` pair per report, so one report cannot clear both pushes.
+
+(Measured 2026-09-24 on Morrison-Lab/mlg#41 and Morrison-Lab/mln#92: two clean rounds reporting `### Verdict: clean` were invisible to the guard, which kept an earlier `Needs more work`.
+Both briefs asked for "clean / not clean" and covered both repositories.
+One dispatch per repository, left to the persona's own format, cleared each once it was the latest verdict.)
 
 **A separate, real constraint: the guard tracks one global latest verdict, not one per branch.**
 `read_latest_review` scans the whole transcript and keeps overwriting a single `(verdict, reviewed_commit)` pair with whatever it parses next, with no branch scoping at all.
@@ -898,6 +974,37 @@ Branch A reviewed clean;
 branch B then reviewed not-clean, was fixed, and re-reviewed clean;
 pushing A was then refused with "The clean verdict is for commit <B's sha>, but this push would ship <A's sha>", over a clean verdict for A's exact SHA that had been overwritten.
 The reverse happened earlier in the same session.)
+
+**A verdict from a resumed reviewer session may never reach the slot at
+all, which is a narrower and less certain claim than the section above.**
+The provenance chain `read_latest_review` walks is built from fresh
+`AGENT_TOOLS` dispatch tool_use/tool_result pairs (or a retrieval call whose
+`task_id` matches one such dispatch's own registered id) --- see the guard's
+own `_is_reviewer_dispatch` and `TASK_OUTPUT_TOOLS` handling in
+[`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py).
+A session that instead resumes an existing reviewer agent (sending it a
+follow-up message through a mechanism other than a fresh `Agent`/`Task`
+dispatch or a task-id-linked retrieval) is not obviously covered by that
+chain, and one observed session saw exactly the symptom this predicts: a
+resumed agent corrected its own previously-fabricated sha in its reply, and
+the guard's next push attempt still cited the old, wrong value.
+This half is **not** independently reproduced against the guard the way the
+overwrite mechanism above is --- it is recorded as consistent with reading
+the provenance code, and as matching one observed incident, rather than as
+a traced execution.
+This is a distinct failure from the overwrite above, so the sanctioned
+override does not answer it the same way: an overwritten slot still holds
+*a* genuine parsed verdict for a different commit, while a resumed-agent
+correction may never have been parsed into the slot at all, and there is
+nothing on record to paste over the guard's retained report in that case.
+
+- **Do:** treat a correction from a resumed reviewer as unconfirmed until a
+  fresh dispatch (or a push attempt) shows the guard picked it up.
+- **Do:** re-dispatch fresh rather than resuming, when a prior review needs
+  correcting and the correction must reach this guard.
+- **Don't:** treat this as a confirmed guard defect on the strength of one
+  observed incident and a code reading; file it for someone to trace with an
+  actual resumed-session transcript before hardening the guard against it.
 
 **The harness appends an `agentId:` trailer to a subagent's report, sometimes as its own block and sometimes concatenated onto the last line.**
 Which of those is common is the question this section could not settle, and an earlier draft asserted an answer to it by generalizing from the two dispatches it happened to watch.
@@ -1115,6 +1222,71 @@ on the brief-writer remembering to add it.
   proof its fingerprint is real; the two are independent, and a fabricated
   identifier can sit inside an accurate report undetected until something
   else (here, the guard) compares it.
+
+**A third occurrence, `Lacaedemon/sparta`, 2026-09-20 --- relayed from the
+session's own report rather than independently reconstructed (see the
+closing note below), and worth recording anyway because it repeats the
+FIRST occurrence's exact input mechanism after the fix aimed at the SECOND
+occurrence was already shipped.**
+A reviewer briefed with `d4691095` reported `Reviewed-Commit:
+d469109590de1c1f8b4a5b8e5b4a6b3f8a9e0d4f`.
+The real commit is `d46910953d5ea64ee58a295dd56a6f2b1ac55d80` --- the two
+strings agree on the first 8 characters and diverge for the remaining 32,
+matching the #3295 split above exactly (that occurrence's own abbreviated
+sha, with no derive instruction, produced a fabricated tail whose first 8
+characters matched the abbreviation and whose remaining 32 did not
+correspond to any real commit) and differing from the 2026-09-10 pair,
+which shares 7 characters and diverges for 33.
+So the input mechanism here is not new: a brief supplying only a short
+prefix is exactly what produced the very first occurrence, in violation of
+the "Don't abbreviate the sha in a review brief's template" bullet above.
+What is new is that it recurred after the OTHER remedy --- instructing the
+reviewer to derive its own fingerprint rather than trust the brief --- was
+already added to the persona file in response to the second occurrence.
+That fix addressed the reviewer's half of the contract and left the
+brief-writer's half exactly where the first occurrence found it: a persona
+told to derive its own fingerprint was evidently still willing to pad the
+one it was handed rather than discard it and run `git rev-parse`.
+
+- **Do:** treat a brief that abbreviates the sha as the first thing to fix,
+  before asking why the reviewer fabricated --- the derive-your-own
+  instruction is a second layer under the full-sha rule, not a replacement
+  for it, and this occurrence shows the first layer failing on its own.
+- **Don't:** read the persona-file fix from 2026-09-10 as closing this
+  failure mode; a brief-writer that abbreviates the sha is a distinct
+  recurring point of failure the persona file cannot reach.
+
+**A fourth failure shape, same session and relayed the same way (see the
+closing note below) rather than independently reconstructed, with no
+fabrication in it: the reviewer resolved a ref that had already moved.**
+A review resolved `origin/<branch>` for its fingerprint while the local
+branch already carried two commits not yet reflected in that remote ref, and
+reported a blocking finding that those two commits had already addressed.
+This is not the sha-fabrication failure above --- the fingerprint the
+reviewer reported was a real, correctly-transcribed commit, just not the one
+the push was about to ship.
+It is the `git rev-parse HEAD`-in-its-own-worktree instruction succeeding at
+exactly the wrong scope: `HEAD` in a worktree that has not fetched is a
+faithful answer to "what does this worktree currently point at," and a
+faithful answer to the wrong question.
+- **Do:** brief a reviewer to `git fetch` (or otherwise confirm its working
+  copy is current) before resolving its own fingerprint, not only to derive
+  the fingerprint from whatever ref is already checked out.
+- **Don't:** treat "the reviewer read its own `rev-parse` output" as
+  sufficient; a correctly-derived fingerprint for a stale ref reports a real
+  sha and a wrong verdict.
+- **Don't:** read a stale-ref finding as evidence the guard's sha-comparison
+  failed --- it did its job (the reported commit does not match what the
+  push ships); the miss is upstream, in what the reviewer resolved before it
+  ever wrote the fingerprint line.
+
+(Both measured on `Lacaedemon/sparta`, 2026-09-20, during a session driving
+several open PRs; the exact review transcripts were not preserved, so the
+narrative above is relayed from the session's own report rather than
+re-derived from a saved artifact.
+The real commit's identity is independently confirmed here: `git rev-parse
+d4691095` on that repository returns
+`d46910953d5ea64ee58a295dd56a6f2b1ac55d80`.)
 
 ## Structured review data (JSON payload)
 
@@ -1404,6 +1576,42 @@ Neither was a round happening to come back empty --- which, per the convergence 
 - **Don't:** treat an empty round as the answer to either question;
   a converging series narrows its own search space, so the empty round is the least informative one.
 
+### Narrowing severity is evidence about COVERAGE, not about the defect population
+
+The two sections above give reasons a shrinking series might not mean what it looks like: the work may be unjustified, or the fixes may be feeding the findings.
+The second already names the narrowing search space, in "a converging series narrows its own search space", and says an empty round is the least informative one.
+This section takes that from a caution about the series' END to a rule about its STEERING: if the space narrows because each round returns to the last finding, the narrowing is steerable, and the dispatcher is the only party positioned to steer it.
+
+A reviewer handed a change re-reads where the last finding landed.
+So round N+1's search space is set by round N's result, and the severity curve across rounds is a record of **where attention went**, not of what remains.
+A surface no round has opened contributes nothing to the curve however bad it is, and its absence from the findings is indistinguishable from its being clean.
+
+Observed 2026-09-15 on `Morrison-Lab/ai-config`, fourteen adversarial rounds on one branch, and recorded as an unverified session account rather than as a measurement: no issue, PR or SHA anchors it, and neither named defect is greppable in the corpus today.
+Read the round-by-round detail below as illustration of the mechanism, not as evidence for it --- the argument stands on why a reviewer's search space is set by the previous round's result, which is checkable from any review series, including this fragment's own.
+One episode, not three.
+The series ran fourteen rounds;
+eleven of them ran checkers, which is the subset [`derive-dont-enumerate`](derive-dont-enumerate.md)'s eighth occurrence counts;
+and thirteen pushes were refused across it, which is what [`get-under-the-hood`](../principles/get-under-the-hood.md)'s third refusal shape counts.
+Fourteen is the figure in the round unit;
+the other two are a subset of those rounds and a count of pushes, not competing totals.
+Rounds 1 through 5 each found one stale-count defect, each less severe than the last, and read as convergent.
+Round 6 was pointed deliberately at the files no earlier round had opened and immediately returned two defects that had been wrong for three rounds --- among them a function contract docstring naming the wrong regex.
+Its own verdict named the mechanism: every round after the first had re-read the file round 1 landed in, so the apparent convergence was sampling bias.
+Confirmed again at round 9, after three rounds returning only prose defects: steering at unswept surface found a real behavioural defect, a guard arm suppressed by any unrelated relocator in the command.
+
+The remedy is bookkeeping rather than judgement, which is what makes it survivable across rounds: **track which files each round actually opened, and point the next round at the complement.**
+That is a set the dispatcher can derive and the reviewer cannot.
+
+Rounds 9 through 11 corroborated this from the other direction: every real defect in them came from executing a prediction taken from the prose rather than from re-reading prose against prose.
+That half is already this file's, in "Tell it to RUN the repo's validation, not only to read the diff" and in "Give a docs-only diff describing an instrument a full round" --- the first of which closes on this section's own population point, that a set of rounds "covered the changed lines, which is a different population".
+What is added here is only the steering rule, which neither of those gives.
+
+- **Do:** record the files each round opened, and brief the next round at the ones no round has.
+- **Do:** read a run of shrinking findings as "this surface is exhausted" rather than "this change is nearly clean" --- the two are the same observation about different populations.
+- **Don't:** let a reviewer choose its own scope on a series of rounds;
+  left alone it returns to the last finding, which is the one place already swept.
+- **Don't:** count the severity trend as a stopping signal at all, separately from whether an empty round is one --- the trend and the empty round fail for the same reason, that the series narrows its own search space.
+
 ### Do not write to the tree a dispatched reviewer is reading
 
 The reviewer reads the working tree, so any write to it moves the ground under a read already in progress.
@@ -1420,6 +1628,7 @@ On the reviewer's side, pin the target to a commit and read `git show <sha>:<pat
 
 - **Do:** treat "don't touch the tree under review" as covering every write to it, an edit and a `git add` and a formatter run alike.
 - **Do:** have the reviewer read a pinned commit, so a dispatcher's slip degrades into a stale review rather than an incoherent one.
+- **Do:** push a reviewed branch with `git push origin <local-branch>`, which ships that branch's tip without checking it out, so shipping a review's result never needs a branch switch in a tree something else may be reading.
 - **Don't:** assume a live reviewer is safe from ordinary editing because no branch switch occurred.
 - **Don't:** start fixing a round's findings before that round has reported.
 

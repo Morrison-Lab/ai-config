@@ -447,6 +447,20 @@ check(
     False,
 )
 check(
+    "issue_read of a different issue does not view when target URL appears in an unrelated field",
+    subject.mcp_views_issue(
+        stems["view_mcp"],
+        {
+            "issue_number": 99,
+            "method": "get",
+            "body": "See https://github.com/o/r/issues/2282",
+        },
+        issue,
+        stems["view_mcp"],
+    ),
+    False,
+)
+check(
     "glab issue show is an alias for glab issue view",
     subject.command_views_issue("glab issue show 2282", issue, stems["view_cli"]),
     True,
@@ -594,6 +608,188 @@ weeks_ago = write_transcript([
 ])
 out = run_hook(weeks_ago)
 check("issue 2 weeks ago does not arm the write guard", warned(out), False)
+
+
+# ---------------------------------------------------------------------------
+# isMeta entries (a loaded skill body) are not user prose (ai-config#3860)
+# ---------------------------------------------------------------------------
+
+def meta_user(text, tool_use_id="toolu_x"):
+    """Shape of a loaded-skill-body transcript entry (ai-config#3860)."""
+    return {
+        "type": "user",
+        "isMeta": True,
+        "sourceToolUseID": tool_use_id,
+        "message": {"role": "user", "content": [{"type": "text", "text": text}]},
+    }
+
+
+# Real entry shape from the transcript named in the issue: a loaded skill's
+# body, injected as isMeta, quoting an issue URL the user never typed.
+SKILL_BODY_TEXT = (
+    "Base directory for this skill: C:\\Users\\dougm\\.claude\\skills\\mwc\n"
+    "... https://github.com/Morrison-Lab/ai-config/issues/3021 ..."
+)
+
+check(
+    "is_user_prose rejects an isMeta entry",
+    subject.is_user_prose(meta_user(SKILL_BODY_TEXT)),
+    False,
+)
+check(
+    "is_user_prose accepts the identical text from a real user entry",
+    subject.is_user_prose(user(SKILL_BODY_TEXT)),
+    True,
+)
+
+skill_meta_only = write_transcript([meta_user(SKILL_BODY_TEXT)])
+out = run_hook(skill_meta_only)
+check(
+    "a loaded skill body (isMeta user entry) does not arm the guard",
+    warned(out),
+    False,
+)
+
+skill_body_as_real_user = write_transcript([user(SKILL_BODY_TEXT)])
+out = run_hook(skill_body_as_real_user)
+check(
+    "the identical text as a genuine user message still warns (control)",
+    warned(out),
+    True,
+)
+
+
+def scheduled_continuation(text, prompt_id="p1"):
+    """Shape of a scheduled check-in continuation (ScheduleWakeup/cron fire),
+    delivered through a queue enqueue/dequeue pair: `isMeta: true` but NO
+    `sourceToolUseID`, often carrying `promptSource: "sdk"`. Verified against
+    real transcripts under ~/.claude/projects -- see
+    scripts/lib/transcript_meta.py. A genuine new turn with real elapsed
+    time, and must still count as user prose (ai-config#3860 coordinator
+    review finding)."""
+    return {
+        "type": "user",
+        "isMeta": True,
+        "promptId": prompt_id,
+        "promptSource": "sdk",
+        "message": {"role": "user", "content": text},
+    }
+
+
+SCHEDULED_TEXT = (
+    "Check status on Morrison-Lab/ai-config#2070 (head 7ecc61d7). "
+    "Drive it to fully-clean per ARDI."
+)
+
+check(
+    "is_user_prose accepts a scheduled check-in continuation "
+    "(isMeta, no sourceToolUseID)",
+    subject.is_user_prose(scheduled_continuation(SCHEDULED_TEXT)),
+    True,
+)
+
+scheduled = write_transcript([scheduled_continuation(SCHEDULED_TEXT)])
+out = run_hook(scheduled)
+check(
+    "a scheduled check-in continuation naming an issue/PR still arms the "
+    "guard (ai-config#3860 coordinator review finding)",
+    warned(out),
+    True,
+)
+
+
+# ---------------------------------------------------------------------------
+# Hook feedback and preambles are not user prose (ai-config#3914)
+# ---------------------------------------------------------------------------
+
+HOOK_PROSE = (
+    "Measured 2026-08-19 on ucdavis/bcs#651 at a5f4f3f2: "
+    "`gh pr checks` printed 21 rows, all passing, while the "
+    "commit endpoint returned 24 runs."
+)
+
+STOP_HOOK_FEEDBACK_TEXT = "Stop hook feedback:\n" + HOOK_PROSE
+STOP_HOOK_FEEDBACK_ENTRY = {
+    "type": "user",
+    "message": {"role": "user", "content": [
+        {"type": "text", "text": STOP_HOOK_FEEDBACK_TEXT}
+    ]},
+}
+
+check(
+    "is_user_prose rejects Stop hook feedback entry (ai-config#3914)",
+    subject.is_user_prose(STOP_HOOK_FEEDBACK_ENTRY),
+    False,
+)
+check(
+    "find_issue_ref returns None on Stop hook feedback text (ai-config#3914)",
+    subject.find_issue_ref(STOP_HOOK_FEEDBACK_TEXT),
+    None,
+)
+
+HOOK_BRACKET_ENTRY = {
+    "type": "user",
+    "message": {"role": "user", "content": [
+        {"type": "text", "text": "[hook: no-incomplete-check-enumeration] " + HOOK_PROSE}
+    ]},
+}
+check(
+    "is_user_prose rejects [hook: <name>] entry (ai-config#3914)",
+    subject.is_user_prose(HOOK_BRACKET_ENTRY),
+    False,
+)
+
+PRE_TOOL_USE_ENTRY = {
+    "type": "user",
+    "message": {"role": "user", "content": [
+        {"type": "text", "text": "PreToolUse:Write hook additional context:\n" + HOOK_PROSE}
+    ]},
+}
+check(
+    "is_user_prose rejects PreToolUse hook additional context entry (ai-config#3914)",
+    subject.is_user_prose(PRE_TOOL_USE_ENTRY),
+    False,
+)
+
+# Harness meta shape (isMeta: True, no sourceToolUseID, no promptSource)
+HARNESS_META_ENTRY = {
+    "type": "user",
+    "isMeta": True,
+    "message": {"role": "user", "content": [
+        {"type": "text", "text": HOOK_PROSE}
+    ]},
+}
+check(
+    "is_user_prose rejects harness meta entry without preamble (ai-config#3914)",
+    subject.is_user_prose(HARNESS_META_ENTRY),
+    False,
+)
+
+# End-to-end: a transcript containing only hook feedback does NOT arm the write guard
+stop_hook_transcript = write_transcript([STOP_HOOK_FEEDBACK_ENTRY])
+out = run_hook(stop_hook_transcript)
+check(
+    "Stop hook feedback quoting an issue does not arm the write guard (ai-config#3914)",
+    warned(out),
+    False,
+)
+
+# End-to-end retargeting check: user names issue #2282, fresh checks are performed,
+# then another hook fires citing ucdavis/bcs#651. The session must NOT retarget
+# to ucdavis/bcs#651 and must stay clean/silent for #2282!
+RETARGET_PREVENTION_TRANSCRIPT = write_transcript([
+    NAMING,
+    tool("Bash", {"command": "gh issue view 2282"}, "v1"),
+    result("title: foo\nstate: open\n", "v1"),
+    FETCH,
+    STOP_HOOK_FEEDBACK_ENTRY,
+])
+out = run_hook(RETARGET_PREVENTION_TRANSCRIPT)
+check(
+    "hook feedback does not retarget the session away from the user's issue (ai-config#3914)",
+    warned(out),
+    False,
+)
 
 
 # ---------------------------------------------------------------------------

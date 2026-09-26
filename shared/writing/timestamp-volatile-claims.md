@@ -160,6 +160,80 @@ touches only that file.
 Reported by the agent that made it.
 Tracked as ai-config#2149.)
 
+## The corpus prose a PR adds is the same class, and a sibling PR is a third trigger
+
+The section above names four surfaces --- a PR body, a review comment, a commit message, and a source-file comment --- and calls the fourth the one to watch, because it ships and stays where the other three scroll away.
+A fifth is easier to miss than any of them: the **corpus prose the PR is adding**.
+A memory entry or a shared fragment describing how a hook, a script, or a workflow behaves is not a comment riding alongside the change.
+It is the deliverable, so nothing about writing it feels like asserting mutable state --- and it ships and stays exactly as the fourth class does.
+
+The trigger widens too, and the new one is neither of the two already named.
+That section moved the trigger from a push to this PR out to this PR's own merge, keying on state **somebody else owns** --- a repository secret, an org setting, a dependency version.
+A sibling PR in the same repository is a third case, and it is nearer than either: it changes the very file the prose describes, in the tree this PR will merge into, while this PR sits open.
+No push happened here, the diff did not change, and the merge has not arrived, so neither existing trigger fires.
+
+The remedy is the same query aimed one step later: re-read the artifact the prose describes at its current state on the default branch, rather than trusting the reading that produced the sentence.
+A measurement is a statement about a moment, and the moment passes whether or not anything you did made it pass.
+
+- **Do:** re-read the file a corpus entry describes, on the current default branch, before the entry merges.
+- **Do:** write a preserved reading in the past tense ("the regex was then"), and state the present state separately.
+- **Don't:** treat corpus prose as exempt because it is the deliverable rather than a comment attached to one.
+- **Don't:** read "no push since I measured" as "nothing changed" --- a sibling PR merging is the commonest way the artifact moves underneath you.
+
+(Measured 2026-09-18 on ai-config#3778.
+A `memories/claude-code-hooks.md` entry quoted `hooks/no-push-without-self-review.py`'s `tid_match` regex as lacking `agentId`, which was true when it was measured.
+ai-config#3737 added `agentId` to that regex and to `TASK_ID_KEYS_SPECIFIC`, merging at 2026-09-18T07:15:19Z --- before #3778 was opened, and while its branch was being written.
+The reviewer caught it; the session had not re-read the file.
+That entry's own subject is trusting a measured artifact over a recollection.)
+
+## A date is coarser than the artifact it dates, when the artifact changes same-day
+
+Everything above treats a date or "as of" stamp as the fix for a volatile
+claim.
+That assumes the date resolves to one state of the artifact being measured.
+It does not when the artifact is edited more than once on the day the
+measurement is dated --- a hook, a script, a regex --- and a corpus-scale
+figure is quoted against it with no commit named.
+
+A date and a chunk size are not enough to make such a figure reproducible,
+because they under-determine the one thing a reader would need to re-run it:
+which revision of the code that produced the classification the figure
+counts.
+Two commits made hours apart on the same calendar day can each change what
+"fires" means, so "2026-09-17" resolves to several different true answers
+depending on which of that day's commits is meant.
+
+(Measured 2026-09-17 on `ai-config#3737`,
+`hooks/warn-unmeasured-capability-claim.py`'s docstring, which reports
+"2000-character chunks: 81 of 1992 fire, 4.1%, down from 5.7% before the
+branches below were trimmed" and dates the whole measurement to
+2026-09-17 with no commit named.
+Reproducing the sweep independently, over the same `shared/**/*.md` chunking
+at 2000 characters against the code as it stands on this branch, gives 83
+hits over 2004 chunks when every trailing partial chunk is kept, or 81 hits
+over 1849 chunks when partial trailing chunks are dropped --- neither
+matches the docstring's own 81/1992 exactly, because "how a chunk is formed"
+is a second undocumented parameter the date does nothing to pin.
+A parallel review round on the same PR reproduced 81 of 1994 against the
+committed tree and 80 of 1992 against the pre-PR base tree: the numerator
+the docstring quotes and the denominator it quotes came from two different
+tree states that never coexisted, which a same-day timestamp cannot reveal
+because both states share that timestamp.)
+
+- **Do:** name the commit SHA a corpus-scale figure was measured against,
+  not only the calendar date, whenever the code producing the classification
+  can plausibly change more than once that day.
+- **Do:** state the chunking, windowing, or sampling method precisely enough
+  that a reader's re-run and the original run count the same population ---
+  "2000-character chunks" is under-specified without saying whether a
+  trailing partial chunk counts.
+- **Don't:** treat a date as pinning a measurement once the measured
+  artifact is itself under active edit; pin the commit instead.
+- **Don't:** quote a numerator and a denominator as a pair without
+  confirming both came from one run against one tree --- a pair assembled
+  from two different revisions can be individually accurate and jointly
+  impossible.
+
 ## Relationship to other rules
 
 - [`fact-check-prose.md`](fact-check-prose.md) checks that a claim is *true*
@@ -241,3 +315,17 @@ Three rounds of increasingly careful pinning were solving the wrong
 problem: the rule containing the figure worked identically whether it read
 94 or 98, so the figure was never load-bearing, and removing it dissolved
 the volatility rather than requiring a fourth round of qualification.)
+
+**Second occurrence, 2026-09-21, same mechanism, a different surface: a source-code comment, not prose.**
+`Morrison-Lab/ai-config` PR [#3826](https://github.com/Morrison-Lab/ai-config/pull/3826), commit `8f0a0d28`, replaced an invented count ("fifteen-odd hooks") with a derived one and quoted the deriving query beside it so a reader could re-run it: `` `grep -rln '"tool_calls"' hooks/*.py` returns 33 files, 24 of them not tests ``, written into a comment in `hooks/no-unread-issue-claim.py`. Quoting the grep pattern verbatim put the literal string `"tool_calls"` into that same file's comment, so the file joined its own result set the instant the comment was committed --- re-running the quoted command afterward returns 34, not 33. The number was wrong by one at the moment of the commit that derived it, which is the same self-invalidation ai-config#3499 records ("writing the sentence added a literal occurrence of the very string being counted"), confirming the mechanism is not specific to prose: quoting a search pattern beside its own result count is unsafe wherever the quoting itself is greppable text, source comments included. The next commit, `da240cf2`, fixed it by deleting the number and describing the query instead of quoting it verbatim --- the same remedy this section already prescribes (delete rather than re-pin).
+
+**The same commit (`8f0a0d28`) had an adjacent, structurally identical figure and applied a THIRD remedy shape to it, distinct from both re-pinning and deriving-and-quoting.**
+A second invented figure, "nine lines from the end," named where a special case sat in the file.
+The commit's own working notes located it precisely ("the ANTIGRAVITY_AGENT check is at line 644 of 656"), but that derived line number never reached the source: the comment instead reads "in `main` below," pointing at the code by its role rather than by any number at all.
+Dissolving the reference beats deriving and pinning it, for the reason this section already argues about deleting a decorative figure: a derived number is accurate only until the file moves again, and a reader who trusts it without re-deriving inherits the same staleness risk a hand-typed figure carries --- while a reference by role survives the file changing shape entirely.
+The self-invalidating count above and this dissolved one are the same commit's two responses to "a number decorates this claim," and only one of them chose not to have a number at all.
+
+- **Do:** before quoting a search pattern beside a derived count, check whether writing that quotation into the destination file changes what the pattern matches there.
+- **Do:** prefer describing a location by its role ("the check below," "the function this hook borrows from") over citing a derived line number or count, when the reference does not need to be that precise --- a role survives edits a number does not.
+- **Don't:** assume applying the right general fix (derive, cite the query) once in a commit means every instance of the same figure-writing pattern in that commit is now safe --- check each one for the self-reference hazard separately.
+- **Don't:** treat "derive it and quote the query" as the only safe remedy for a decorative figure --- dissolving the figure into a role-based description is available whenever the number's only job was to locate something, and it needs no future re-derivation at all.

@@ -12,6 +12,7 @@ Run: python3 hooks/test-no-mistake-without-a-hook.py \\
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -43,6 +44,8 @@ CASES = [
      "'my mistake' reminds"),
     ([say("Correcting myself: that regex never matched.")], True,
      "'correcting myself' reminds"),
+    ([say("I removed redundant prose because it repeated an existing rule."), UNRELATED], True,
+     "recognizing redundant prose with no mechanism reminds"),
 
     # Discharged by doing the work.
     ([say("I was wrong."), WROTE_HOOK, say("Wrote the guard.")], False,
@@ -54,6 +57,19 @@ CASES = [
     ([say("I was wrong. That is not mechanizable -- there is no decidable "
           "condition in the transcript for a domain error like this.")],
      False, "an explicit not-mechanizable judgment discharges it"),
+    ([say("My mistake. That isn't mechanizable because it relies on domain knowledge.")],
+     False, "an explicit 'isn't mechanizable' judgment discharges it"),
+    ([say("I was mistaken. This isn't hookable since the state is external.")],
+     False, "an explicit 'isn't hookable' judgment discharges it"),
+    ([say("My mistake. That can't be automated reliably.")],
+     False, "an explicit 'can't be automated' judgment discharges it"),
+    ([say("I was wrong. This can't be caught by a hook.")],
+     False, "an explicit 'can't be caught by a hook' judgment discharges it"),
+    ([say("The redundant prose is not mechanizable because there is no decidable "
+          "condition in the transcript.")], False,
+     "an explicit non-mechanizable redundancy judgment discharges it"),
+    ([say("My mistake -- we should consider if this is mechanizable."), UNRELATED],
+     True, "merely mentioning 'mechanizable' without a negative judgment does not discharge"),
 
     # A UMS/memory write is the SIBLING hook's discharge, not this one's.
     # Recording the learning does not prevent the recurrence.
@@ -79,42 +95,45 @@ CASES = [
 
 
 def run(events):
-    fd, path = tempfile.mkstemp(suffix=".jsonl")
-    with os.fdopen(fd, "w") as fh:
-        for e in events:
-            fh.write(json.dumps(e) + "\n")
+    td = tempfile.mkdtemp()
     try:
+        path = os.path.join(td, "transcript.jsonl")
+        with open(path, "w", encoding="utf-8") as fh:
+            for e in events:
+                fh.write(json.dumps(e) + "\n")
+        env = dict(os.environ, TMPDIR=td, TEMP=td, TMP=td)
         r = subprocess.run(
             [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
-            capture_output=True, text=True,
+            capture_output=True, text=True, env=env,
         )
         # Must NEVER block: an error admission is right to send.
         assert '"decision"' not in r.stdout, "this hook must not block"
         assert r.returncode == 0, "must exit 0"
         return "no-mistake-without-a-hook" in r.stdout
     finally:
-        os.unlink(path)
+        shutil.rmtree(td, ignore_errors=True)
 
 
 def once_per_phrase():
     """Fires once per distinct phrase per session, per registration."""
-    fd, path = tempfile.mkstemp(suffix=".jsonl")
-    with os.fdopen(fd, "w") as fh:
-        fh.write(json.dumps(say("I was wrong about the base branch.")) + "\n")
-    payload = json.dumps({"transcript_path": path})
-
-    def invoke(stop=False):
-        env = dict(os.environ)
-        env.pop("AI_CONFIG_STOP", None)
-        if stop:
-            env["AI_CONFIG_STOP"] = "1"
-        r = subprocess.run(
-            [sys.executable, HOOK], input=payload, capture_output=True,
-            text=True, env=env,
-        )
-        return "no-mistake-without-a-hook" in r.stdout
-
+    td = tempfile.mkdtemp()
     try:
+        path = os.path.join(td, "transcript.jsonl")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps(say("I was wrong about the base branch.")) + "\n")
+        payload = json.dumps({"transcript_path": path})
+
+        def invoke(stop=False):
+            env = dict(os.environ, TMPDIR=td, TEMP=td, TMP=td)
+            env.pop("AI_CONFIG_STOP", None)
+            if stop:
+                env["AI_CONFIG_STOP"] = "1"
+            r = subprocess.run(
+                [sys.executable, HOOK], input=payload, capture_output=True,
+                text=True, env=env,
+            )
+            return "no-mistake-without-a-hook" in r.stdout
+
         checks = [
             (invoke(), True, "an admission reminds on the first prompt"),
             (invoke(), False, "the same phrase does not remind twice"),
@@ -123,14 +142,14 @@ def once_per_phrase():
             (invoke(stop=True), False,
              "the Stop registration also fires once per phrase"),
         ]
-        with open(path, "a") as fh:
+        with open(path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(say("I miscounted the open PRs.")) + "\n")
         checks.append(
             (invoke(), True,
              "a different admission in the same session still fires"))
         return checks
     finally:
-        os.unlink(path)
+        shutil.rmtree(td, ignore_errors=True)
 
 
 def window_bound():
@@ -140,27 +159,28 @@ def window_bound():
     to share a short common phrase with an earlier one, for the rest of the
     session. Reuses the sibling's LOOP_WINDOW/`_sentinel_gate` mechanism.
     """
-    fd, path = tempfile.mkstemp(suffix=".jsonl")
-    with os.fdopen(fd, "w") as fh:
-        fh.write(json.dumps(say("I was wrong about the base branch.")) + "\n")
-    payload = json.dumps({"transcript_path": path})
-
-    def invoke():
-        env = dict(os.environ)
-        env.pop("AI_CONFIG_STOP", None)
-        r = subprocess.run(
-            [sys.executable, HOOK], input=payload, capture_output=True,
-            text=True, env=env,
-        )
-        return "no-mistake-without-a-hook" in r.stdout
-
+    td = tempfile.mkdtemp()
     try:
+        path = os.path.join(td, "transcript.jsonl")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps(say("I was wrong about the base branch.")) + "\n")
+        payload = json.dumps({"transcript_path": path})
+
+        def invoke():
+            env = dict(os.environ, TMPDIR=td, TEMP=td, TMP=td)
+            env.pop("AI_CONFIG_STOP", None)
+            r = subprocess.run(
+                [sys.executable, HOOK], input=payload, capture_output=True,
+                text=True, env=env,
+            )
+            return "no-mistake-without-a-hook" in r.stdout
+
         checks = [(invoke(), True, "an admission reminds on the first prompt")]
 
         # The loop case: a few turns later, re-explaining the same mistake
         # names the same phrase again. That is a repeat, not a new
         # admission, and must not re-fire.
-        with open(path, "a") as fh:
+        with open(path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps({"type": "user", "message": {"content": [
                 {"type": "text", "text": "was that right?"}]}}) + "\n")
             fh.write(json.dumps(
@@ -173,7 +193,7 @@ def window_bound():
         # recorded at record index 0), so enough filler records push the
         # NEXT occurrence of the same phrase past LOOP_WINDOW records from
         # that index, and it must read as a new, unrelated admission.
-        with open(path, "a") as fh:
+        with open(path, "a", encoding="utf-8") as fh:
             for i in range(8):
                 fh.write(json.dumps({"type": "user", "message": {"content": [
                     {"type": "text", "text": f"filler turn {i}"}]}}) + "\n")
@@ -184,7 +204,7 @@ def window_bound():
              "the same phrase far beyond the window fires again"))
         return checks
     finally:
-        os.unlink(path)
+        shutil.rmtree(td, ignore_errors=True)
 
 
 def main():
@@ -221,10 +241,15 @@ def main():
 
     # Degrades to silence rather than crashing if the sibling it imports its
     # detection from is missing.
-    out = subprocess.run(
-        [sys.executable, HOOK], input='{"transcript_path": "/nonexistent"}',
-        capture_output=True, text=True,
-    )
+    td_unreadable = tempfile.mkdtemp()
+    try:
+        env_unreadable = dict(os.environ, TMPDIR=td_unreadable, TEMP=td_unreadable, TMP=td_unreadable)
+        out = subprocess.run(
+            [sys.executable, HOOK], input='{"transcript_path": "/nonexistent"}',
+            capture_output=True, text=True, env=env_unreadable,
+        )
+    finally:
+        shutil.rmtree(td_unreadable, ignore_errors=True)
     if out.returncode == 0 and "no-mistake" not in out.stdout:
         print("PASS: fails open on an unreadable transcript")
         passes += 1

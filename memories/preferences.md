@@ -18,6 +18,12 @@
   See [`shared/workflow/fully-clean.md`](../shared/workflow/fully-clean.md) and [`memories/mistake-patterns.md`](mistake-patterns.md) Pattern 5f. (User directive / CAI, 2026-08-31.)
 - **ARDI Loop Foreground Verification & Monitor Timers**: Run `python3 scripts/check-pr-fully-clean.py <pr>` synchronously in the foreground turn;
   see [`shared/workflow/ardi.md`](../shared/workflow/ardi.md) for foreground verification and turn-ending review monitor timer rules.
+- **Never pause without an armed wake mechanism**:
+  Whenever yielding a turn while tasks, tests, CI, or review checks remain incomplete, arm a timer (`schedule`, `ScheduleWakeup`, `CronCreate`, or background monitor) to resume the next concrete step.
+  Never yield a turn claiming to wait on background tasks or external results without an armed wake mechanism;
+  report the clock time in local time (Pacific Time) when the timer will fire.
+  See [`shared/workflow/flag-session-boundaries.md`](../shared/workflow/flag-session-boundaries.md).
+  (User directive, 2026-09-22).
 - Default to the most recent available package version.
   Use an older or pinned version only when compatibility, reproducibility,
   or another concrete project constraint gives a reason;
@@ -25,6 +31,9 @@
 - When the user corrects my behavior or identifies a workflow gap, invoke UMS
   immediately and persist the lesson before resuming the main task. Do not wait
   for the user to say `ums` or to remind me again.
+- When redundant prose is identified or removed, decide explicitly whether it
+  shows that the existing text needs a hook or other algorithmic safeguard;
+  record either the mechanism or why the condition is not mechanizable.
 - **Treat user profanity and frustration as an urgent defect signal**:
   Profanity, exasperation, or intense frustration from the user is almost always a signal that an agent made a severe mistake, regressed behavior, dropped context, violated a preference, or gave a cop-out offer.
   Never tone-police, scold the user, debate politeness, emit canned corporate apologies, or offer defensive excuses.
@@ -365,6 +374,8 @@
 - Always use `glab` (the GitLab CLI) for GitLab operations --- MR comments, file uploads, API calls, pipeline checks --- instead of raw `curl` against the GitLab REST API.
   `glab` handles auth via its own config (no `GITLAB_TOKEN` env var needed), so it works even when a token isn't exported in the current shell.
   Use `glab api` for endpoints without a dedicated subcommand (e.g. `POST /projects/:id/uploads` for file attachments).
+- Treat the browser GUI as a last resort for every task.
+  Prefer a CLI, MCP tool, or direct API whenever the task does not inherently require a visual/browser-only capability.
 - Run local validation before pushing R-pkg work: lintr::lint_package(), devtools::document(), devtools::test(), devtools::check(), pkgdown::build_site() (per repo copilot-instructions).
 - Before opening a PR, read the repo's own agent/contributor instructions (CLAUDE.md → the canonical reference it points to, e.g. `.github/copilot-instructions.md` / CONTRIBUTING) and front-load the required pre-PR housekeeping in the FIRST commit instead of discovering it via red CI.
   For R packages this means a NEWS.md entry AND a `usethis::use_version()` DESCRIPTION dev-version bump, even for a docs-only / vignette-only change --- see `r-quarto.md`'s "R-package PR CI gates" section for the full changelog-check / version-check / spellcheck / opt-out-label details.
@@ -635,8 +646,13 @@
   Example: [ucdavis/bcs#191 review comment r3437005734](https://github.com/ucdavis/bcs/pull/191/changes#r3437005734).
 - When adding or changing math (LaTeX/Quarto equations --- `$...$`, `$$...$$`, `\begin{equation}`, `\(...\)`), always verify it actually RENDERS --- open the rendered HTML page and confirm the equation displays, not just that the build succeeded.
   A typo in a macro can silently break MathJax while the build still passes.
-  For rme, open your PR's preview page --- e.g. `https://d-morrison.github.io/rme/pr-preview/pr-<N>/chapters/proportional-hazards-models.html` (the `pr-<N>` previews are per-PR and get deleted when the PR closes, so `<N>` is a placeholder for your PR number). (An instance of never assume; always verify, applied to math.)
-  - **In a remote/web sandbox the github.io preview may be unreachable** --- if the environment's network policy blocks `d-morrison.github.io` the proxy answers `403` to CONNECT (curl: `CONNECT tunnel failed, response 403`; Chromium: `ERR_TUNNEL_CONNECTION_FAILED`), so you can't load the preview to eyeball the math.
+  For rme, open your PR's preview page --- e.g. `https://morrison-lab.github.io/rme/pr-preview/pr-<N>/chapters/proportional-hazards-models.html`
+  (the `pr-<N>` previews are per-PR and get deleted when the PR closes, so `<N>` is a placeholder for your PR number).
+  (An instance of never assume; always verify, applied to math.)
+  - **In a remote/web sandbox the github.io preview may be unreachable** --- if the environment's network policy blocks `morrison-lab.github.io`,
+    the proxy answers `403` to CONNECT
+    (curl: `CONNECT tunnel failed, response 403`; Chromium: `ERR_TUNNEL_CONNECTION_FAILED`),
+    so you can't load the preview to eyeball the math.
     Verify locally instead: `npm i mathjax` (npmjs is allowed through the proxy), then init MathJax **with the `[tex]/noundefined` extension loaded** (`init({tex:{packages:{'[+]':['noundefined']}}}).then(MJ => MJ.tex2mml(defs + expr))`) and check the output.
     With `noundefined` an undefined macro shows as `<mtext mathcolor="red">\cmd</mtext>` (NOT an `<merror>` or a thrown exception), so grep for `mathcolor="red"`.
   - **MathJax ignores `\providecommand`** --- only `\newcommand` / `\def` / `\renewcommand` define a macro.
@@ -742,6 +758,11 @@
   On ai-config#336, two of three existing `shared/coding/*.md` fragments carried the comment but were never added to `coding-style.qmd` (only `avoid-nesting.md` was) --- the gap survived because the tracking issue (UCD-SERG/lab-manual#328) was closed "completed" with an unchecked follow-up box.
   Don't let a new PR's scope grow to fix an unrelated pre-existing gap like this; file a follow-up issue instead (UCD-SERG/lab-manual#377) and note it in the PR thread.
   Also: before closing a checklist-style issue as completed, verify no boxes are left unchecked --- an unchecked box under a "completed" issue is invisible to future sweeps.
+  **Generalizes beyond checkboxes: before closing any issue, re-read its full body for a condition whose premise differs from the reason you're closing it, not just for unchecked boxes.**
+  An issue titled "Before making this repository public: confirm permission, and re-run the disclosure sweep" also carried an unrelated third-party-permission condition.
+  When the public-launch plan was dropped, the issue was closed on that premise alone, and the permission condition --- still undischarged, and still pointed at by a README --- was silently dropped with it.
+  `shared/workflow/issue-first.md` already names the PR-driven version of this same failure ("a PR's `Closes #N` closes the whole issue, including every item in it the PR never addressed").
+  This is the same gap at manual `gh issue close` time, so it applies regardless of which action does the closing.
 - When writing a new shared standing-preference fragment that's wired into more than one skill (e.g. a tie-breaker used by both PR-ordering and issue-triage), check all the consuming skills first and write the fragment's prose generically enough to cover all of them --- don't phrase it around only the first skill you edit. (Learned on ai-config#297: a "PR" rule had to be broadened to "PR or issue" after it turned out to also apply to `gi`'s issue triage.)
 - When a new skill claims a convention holds across "all N" existing examples (e.g. "the existing three agents all carry this caveat"), check each example individually instead of generalizing from a couple you remember reading --- member-by-member verification catches the odd one out that a summary glosses over. (Learned on ai-config#343: `agent-builder` claimed all three existing `.claude/agents/*.md` files carried a Bash-caveat that `community-demand-scout` doesn't have.)
 - Don't describe a sibling skill's current behavior as covering a check it doesn't yet perform (e.g. "`link-skills` also checks X").
@@ -811,6 +832,22 @@
   One worktree in the batch genuinely did have an uncommitted diff worth checking on its own merits (verify content before assuming "has changes" means "has value" --- here it turned out redundant with `main`); excluding just that one already-distinct item let the rest through on retry.
   A follow-up `git branch -D` sweep on the same branches was denied again for the same reason, even though the safe `-d` refusing (making `-D` necessary) is expected on a squash-merge repo, not a sign something's wrong (see `clean-worktrees/SKILL.md`'s squash-merge note).
   The fix is a genuinely more explicit authorization, not a smaller batch chosen to dodge the same check: present the full per-item plan (the `clean-worktrees` skill's own dry-run step already requires this) so the user's confirmation is unambiguously itemized, and if still blocked, stop and hand the specific command to the user to run themselves, or ask them to grant a settings permission rule. (Learned on `Lacaedemon/sparta`, 2026-07-04.)
+- **Partition a deletion choice by BLAST RADIUS, not by size or location --- and remember the option's LABEL is the part that carries consent.**
+  Measured 2026-09-15, a Windows disk-cleanup session.
+  An `AskUserQuestion` option was labelled **"Clear its caches only"** and its description bundled a Temp directory, an npm cache, browser HTTP caches, downloaded ollama models --- and a WSL2 distribution's ~26 GB of storage, the whole set called "regenerable bulk".
+  A WSL2 `ext4.vhdx` is a filesystem, not a cache: it holds whatever home directory, git repos, dotfiles and uncommitted work that Linux install accumulated.
+  The other four genuinely rebuild on demand;
+  that one destroys data that may exist nowhere else.
+  The user approved the option, so the mischaracterization had already done its work by the time it was noticed;
+  the recovery was to narrow the action to the genuinely safe items and report the WSL portion for a separate explicit decision.
+  - **Do:** group options by what a wrong answer costs --- regenerable / re-downloadable / irreplaceable --- and give an irreplaceable item its own option with its own honest label.
+  - **Do:** check that every item under a load-bearing word ("cache", "temp", "regenerable", "safe to delete") independently earns that word, since the label is what the reader weighs the option by.
+  - **Don't:** let an accurate description stand in for an accurate label.
+    An approval obtained under a word that means "reversible" is uninformed even when the description lists the destructive item honestly, and it cannot be taken back once the deletion runs.
+  - **Don't:** bundle items because their size, location, or "cleanup" framing makes them look alike --- similarity of appearance is not similarity of blast radius.
+  - This is distinct from [`avoid-false-dichotomies.md`](../shared/workflow/avoid-false-dichotomies.md), which governs whether the options are mutually **exclusive**;
+    this governs what each option's label **claims about its own contents**, and the two compose.
+    [`hooks/warn-irreplaceable-under-cache-label.py`](../hooks/warn-irreplaceable-under-cache-label.py) is this bullet's mechanism.
 - **A user's status statement about one thing ("all merged") isn't blanket authorization for an adjacent-but-distinct action the statement never actually named (e.g. closing an unnamed tracking issue).** After the user said "all merged" (about a batch of PRs), the conductor inferred license to also close an issue whose fix had landed via one of those PRs but whose PR description never referenced it --- a reasonable-sounding inference the classifier correctly flagged as going beyond what was actually said.
   The issue-close action itself may still be right, but check the specific instruction's actual scope before taking an adjacent action on the strength of it, rather than let a true, narrow statement license everything downstream that logically follows from it. (Learned on `Lacaedemon/sparta`, 2026-07-04.)
 - **"You can merge X" authorizes the merge, not the branch-protection *bypass* (`gh pr merge --admin`) needed to merge past a required approving review --- the auto-mode classifier treats those as two separate grants.** When the user said "you can merge 317," a plain `gh pr merge --squash` was rejected by GitHub itself ("base branch policy prohibits the merge" --- protection requires an approving review, which the `@claude` bot comment doesn't satisfy), and the follow-up `--admin` was then denied by the classifier: the merge was authorized but the review/protection override was not.
@@ -1111,3 +1148,17 @@ safer/preferred choice merely because the repo has external consumers.
   - **Do:** Ship the accountability mechanism in the same turn you make a promise.
   - **Don't:** Make promises about future behavior without a mechanism.
   (Flagged 2026-08-29 in wai GIA session: two consecutive "will drive #146..." promises with no mechanism.)
+
+- **Never pause or stop early on wave boundaries;
+  babysit in-flight PRs to completion.**
+  Reaching a wave boundary (e.g. 5/5 in `gii`, per `skills/finish-wave/SKILL.md` and `shared/workflow/stack-dont-pause.md`) pauses *grabbing new issues*,
+  but mandates actively monitoring and babysitting all in-flight PRs until merged (where an `mwc`/`maw` grant is active) or reported clean and ready for decision.
+  Between review/CI steps, arm a wake timer or schedule rather than abandoning in-flight PRs.
+  - **Do:** Keep the session actively driving until every in-flight PR in the current wave is merged under MWC or reported clean and ready with monitoring armed.
+  - **Don't:** Exit or stop monitoring at the wave boundary while a PR in the wave is still awaiting review, CI, or clean resolution.
+
+- **Always answer user questions immediately in visible text as soon as the answer is known.**
+  When the user asks direct questions or inquiries, deliver the direct answer immediately in markdown text in that turn.
+  Do not defer answering behind tool calls, internal steps, or silent waiting loops.
+  - **Do:** State the direct answer to user questions at the top of the reply before initiating further actions.
+  - **Don't:** Defer answering or run background waiting loops without first delivering the answer.

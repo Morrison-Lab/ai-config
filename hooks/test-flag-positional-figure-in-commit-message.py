@@ -24,6 +24,7 @@ Run: python3 hooks/test-flag-positional-figure-in-commit-message.py \\
 """
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -264,8 +265,9 @@ def check_body_file():
     with os.fdopen(fd, "w") as fh:
         fh.write("docs: rewrite\n\nThe note sits 77 lines earlier in the file.\n")
     try:
-        short = fired(run(bash(f"git commit -F {path}")))
-        long = fired(run(bash(f"git commit --file={path}")))
+        shpath = shlex.quote(path)
+        short = fired(run(bash(f"git commit -F {shpath}")))
+        long = fired(run(bash(f"git commit --file={shpath}")))
     finally:
         os.unlink(path)
     ok = short and long
@@ -279,7 +281,8 @@ def check_cluster_body_file():
     with os.fdopen(fd, "w") as fh:
         fh.write("docs: rewrite\n\nThe note sits 77 lines earlier in the file.\n")
     try:
-        ok = fired(run(bash(f"git commit -aF {path}")))
+        shpath = shlex.quote(path)
+        ok = fired(run(bash(f"git commit -aF {shpath}")))
     finally:
         os.unlink(path)
     print(f"{'ok  ' if ok else 'FAIL'}  a clustered -aF reads the file too")
@@ -331,7 +334,8 @@ def check_body_file_clean():
     with os.fdopen(fd, "w") as fh:
         fh.write("docs: rewrite\n\n3 files changed, 2 insertions.\n")
     try:
-        out = run(bash(f"git commit -F {path}"))
+        shpath = shlex.quote(path)
+        out = run(bash(f"git commit -F {shpath}"))
     finally:
         os.unlink(path)
     ok = not fired(out)

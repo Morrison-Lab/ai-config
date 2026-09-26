@@ -28,6 +28,15 @@ jobs:
       - name: Run check-links tests
         # ai-config#2881: CommonMark autolinks and relative link verification.
         run: python3 scripts/test_check_links.py
+      - name: Check markdown table column counts (MD056)
+        # ai-config#3764: pure-Python detector for table column count mismatches and unescaped pipes.
+        run: python3 scripts/check-md056-table-columns.py
+      - name: Run check-md056-table-columns tests
+        run: python3 scripts/test_check_md056_table_columns.py
+      - name: Run split-qmd tests
+        # The splitter rewrites a Quarto chapter into a spine plus subfiles,
+        # so these pin that expanding the includes restores every line.
+        run: python3 scripts/test_split_qmd.py
       - name: Run resolve-equation-anchors tests
         # The page-side script numbers unlabeled display equations by
         # position, so a cited `#eq-anchor-N` silently renames when an
@@ -80,6 +89,9 @@ jobs:
         run: python3 scripts/test_check_unpinned_git_fixtures.py
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
+      - name: Run check-mr-fully-clean tests
+        # ai-config#3021: GitLab's equivalent fully-clean merge gate.
+        run: python3 scripts/test_check_mr_fully_clean.py
       - name: Run check-review-body tests
         run: python3 scripts/test_check_review_body.py
       - name: Check regex patterns for catastrophic backtracking
@@ -94,6 +106,13 @@ jobs:
         run: python3 scripts/check-python-escapes.py
       - name: Run invalid-escape check tests
         run: python3 scripts/test_check_python_escapes.py
+      - name: Run cardinality-vocabulary measurement tests
+        # ai-config#3904: `scripts/measure-cardinality-vocabulary.py`'s failure
+        # mode is a VACUOUS PASS -- a comparison reporting perfect stability
+        # over a population it never examined -- so that script's refusals,
+        # not its arithmetic, are what this suite pins. A refusal that stops
+        # firing turns no number wrong.
+        run: python3 scripts/test_measure_cardinality_vocabulary.py
       - name: Run git command regex helper tests
         run: python3 scripts/test_git_cmd.py
       - name: Run hook path resolution tests
@@ -142,6 +161,11 @@ jobs:
         # (a four-referent sentence) as the positive case and two
         # single-referent sentences as negative controls.
         run: python3 scripts/test_check_ambiguous_referents.py
+      - name: Run check-sentence-complexity tests
+        # scripts/check-sentence-complexity.py is a candidate detector and metric
+        # computer for convoluted sentence nesting, formulaic openers, and copula
+        # clefts (Refs #3108, shared/writing/ai-tells.md).
+        run: python3 scripts/test_check_sentence_complexity.py
       - name: Check lead-in counts against their enumerations
         # ai-config#3005. A lead-in count goes stale when a later edit splits
         # or merges one item, and a reader who counts along never reaches the
@@ -201,6 +225,17 @@ jobs:
       - name: Run markdown fences library tests
         # ai-config#2540: scripts/lib/fences.py code block and code span parsing.
         run: python3 scripts/test_fences.py
+      - name: Run transcript-meta library tests
+        # ai-config#3860: scripts/lib/transcript_meta.py's is_skill_load_meta()
+        # discriminates a loaded skill's body from a scheduled check-in
+        # continuation, both of which carry isMeta: true.
+        run: python3 scripts/test_transcript_meta.py
+      - name: Run transcript-meta fallback-messaging tests
+        # ai-config#3860 (fail-fast.md follow-up): each of the six consuming
+        # hooks must print an observable stderr message, naming itself and
+        # the import error, when scripts/lib/transcript_meta.py cannot be
+        # loaded, and its stdout must stay unaffected.
+        run: python3 scripts/test_transcript_meta_fallback.py
       - name: Run shell-command library tests
         # ai-config#2992: scripts/lib/shellcmd.py argv splitting, heredoc
         # blanking, and git-invocation classification.
@@ -249,6 +284,11 @@ jobs:
         # sweep in CI would prove nothing. Its classification logic is pure
         # over the GraphQL payload shape, so the tests cover it offline.
         run: python3 scripts/test_pr_sweep.py
+      - name: Run closing-keyword close audit tests
+        # Only the tests run here, for the same reason as pr-sweep: the audit
+        # queries GitHub via `gh`, while its classifier is pure over the
+        # GraphQL node shape and is covered offline.
+        run: python3 scripts/test_audit_closing_keyword_closes.py
       - name: Run PR-scope tests
         # Only the tests run here. pr-scope.py's --repo mode shells out to
         # `gh`, which a runner cannot do unauthenticated, but its predicate
@@ -335,6 +375,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 scripts/test_check_hook_catalog.py
+      - name: Run hook-delivery check tests
+        run: python3 scripts/test_check_hook_delivery.py
       - name: Check hook output shape (warn-only hooks emit systemMessage)
         run: python3 scripts/check-hook-output-shape.py
       - name: Run hook-output-shape check tests
@@ -577,6 +619,14 @@ jobs:
         # a fragment once and then names it bare is the miss this corpus
         # states in prose and, before this step, had no instrument for.
         run: python3 scripts/check-bare-fragment-mentions.py
+      - name: Check Do/Don't bullet ordering (advisory)
+        # ai-config#3751: in any contiguous block of guidance bullets, all
+        # `- **Do:**` bullets must appear before any `- **Don't:**` bullets.
+        # Advisory: reports examined blocks and violations, exiting 0 until
+        # historical violations are cleaned up in a separate sweep PR.
+        run: python3 scripts/check-do-dont-order.py
+      - name: Run check-do-dont-order tests
+        run: python3 scripts/test_check_do_dont_order.py
       - name: Check for chained commit-and-push in fenced blocks
         # ai-config#3199: a fenced bash block is a recipe a reader pastes, so
         # pasted whole it is ONE Bash call. A block whose lines commit and then
@@ -661,7 +711,7 @@ jobs:
           # the gate vacuous without turning anything red.
           fetch-depth: 0
       - name: Check new markdown lines for missing semantic breaks
-        uses: Morrison-Lab/gha/check-new-line-breaks@b91ecffc4db85baa2065c4ab2f0e7d25db74460f # v2, gha#826
+        uses: Morrison-Lab/gha/check-new-line-breaks@5e3525b38287aee0d397ffcde642caa7871ea56a # v2, gha#884
         with:
           # This value is a git pathspec, not a shell glob: `*.md` already
           # matches at any depth (CLAUDE.md and shared/**/foo.md alike), while

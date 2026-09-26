@@ -9,6 +9,7 @@ Run: python3 hooks/test-no-stale-pr-status.py hooks/no-stale-pr-status.py
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -56,6 +57,19 @@ CASES = [
      "counts quoted from a pre-push reading"),
     ([QUERY, PUSH, say("All checks green at this head.")], True,
      "'all green' after a push"),
+
+    # ai-config#2016: `0 fail` was unanchored, so it matched the participle
+    # every test runner prints for a green suite. Its sibling
+    # `\b\d+\s+pass\b` requires a boundary after `pass` and therefore
+    # ignores `14 passed` -- so the two patterns matched disjoint things, and
+    # the only one firing on a local mutation check was the fail rule. Fired
+    # on four consecutive turns of a bcs session, each reporting a hook's own
+    # test tally, none asserting anything about a pull request.
+    ([QUERY, PUSH, say("Mutation check on the hook's own suite: 15 passed, "
+                       "0 failed. Pushed the fix.")], False,
+     "a local test-runner tally is not a PR status claim"),
+    ([QUERY, PUSH, say("PR checks: 11 pass, 0 failures.")], True,
+     "the CI phrasing '0 failures' still asserts"),
     ([QUERY, MCP_PUSH, say("All checks green, ready to merge.")], True,
      "an MCP push_files is a push -- the reading predates it"),
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT, say("PR #1167 is fully clean.")], True,
@@ -395,29 +409,102 @@ CASES = [
                        "address.")], True,
      "nor must a trailing 'did not' -- this is the phrasing the RX_NEGATION "
      "comment says the guard must keep catching"),
+
+    # ai-config#3958: quoted push vocabulary in tool inputs must not be treated as a push.
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "edit", "input": {
+              "file_path": "hooks/no-stale-pr-status.py",
+              "text": "RX_PUSH = re.compile(r'git push|push_files')\n"
+          }}]}},
+      say("All checks green at this head.")], False,
+     "edit tool modifying code containing push vocabulary is not a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "replace_file_content", "input": {
+              "TargetFile": "/path/to/script.py",
+              "ReplacementContent": "def push_files():\n    pass\n"
+          }}]}},
+      say("All checks green at this head.")], False,
+     "replace_file_content writing push_files is not a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "run_command", "input": {
+              "command": "cat << 'EOF' > hooks/no-stale-pr-status.py\nRX_PUSH = re.compile(r'git push')\nEOF"
+          }}]}},
+      say("All checks green at this head.")], False,
+     "bash heredoc rewriting file with git push vocabulary is not a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "bash", "input": {
+              "command": 'git commit -m "fix(guard): ignore quoted git push in messages"'
+          }}]}},
+      say("All checks green at this head.")], False,
+     "git commit message mentioning git push is not a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "bash", "input": {
+              "command": "sed -i 's/git push/git push --dry-run/' script.sh"
+          }}]}},
+      say("All checks green at this head.")], False,
+     "sed substitution mentioning git push is not a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "run_command", "input": {
+              "command": "python -c \"print('git push')\""
+          }}]}},
+      say("All checks green at this head.")], False,
+     "python command mentioning git push in arguments is not a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "run_command", "input": {
+              "command": "git add -A && git push origin fix-branch"
+          }}]}},
+      say("All checks green at this head.")], True,
+     "chained git push after git add is recognized as a push"),
+    ([QUERY,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "run_command", "input": {
+              "CommandLine": "git push --force-with-lease origin main"
+          }}]}},
+      say("All checks green at this head.")], True,
+     "CommandLine parameter with git push is recognized as a push"),
+
+    # Local file tools mentioning query vocabulary must not register as a fresh status query.
+    ([QUERY, PUSH,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "view_file", "input": {
+              "AbsolutePath": "/path/to/scripts/check-pr-fully-clean.py"
+          }}]}},
+      say("All checks green at this head.")], True,
+     "view_file mentioning query vocabulary must not count as fresh status query"),
+    ([QUERY, PUSH,
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "edit", "input": {
+              "file_path": "scripts/ci.sh",
+              "text": "gh pr checks 123\n"
+          }}]}},
+      say("All checks green at this head.")], True,
+     "edit tool mentioning query vocabulary must not count as fresh status query"),
 ]
 
 
 def run(events):
-    fd, path = tempfile.mkstemp(suffix=".jsonl")
-    with os.fdopen(fd, "w") as fh:
-        for e in events:
-            fh.write(json.dumps(e) + "\n")
-    # The guard fires once per distinct message; clear sentinels so repeated
-    # runs of this suite stay deterministic.
-    for f in os.listdir(tempfile.gettempdir()):
-        if f.startswith(SENTINEL_PREFIX):
-            try:
-                os.remove(os.path.join(tempfile.gettempdir(), f))
-            except OSError:
-                pass
-    out = subprocess.run(
-        [sys.executable, HOOK],
-        input=json.dumps({"transcript_path": path}),
-        capture_output=True, text=True,
-    ).stdout.strip()
-    os.remove(path)
-    return bool(out)
+    td = tempfile.mkdtemp()
+    try:
+        path = os.path.join(td, "transcript.jsonl")
+        with open(path, "w", encoding="utf-8") as fh:
+            for e in events:
+                fh.write(json.dumps(e) + "\n")
+        env = dict(os.environ, TMPDIR=td, TEMP=td, TMP=td)
+        out = subprocess.run(
+            [sys.executable, HOOK],
+            input=json.dumps({"transcript_path": path}),
+            capture_output=True, text=True, env=env,
+        ).stdout.strip()
+        return bool(out)
+    finally:
+        shutil.rmtree(td, ignore_errors=True)
 
 
 
@@ -500,26 +587,59 @@ def check_attribution():
     """Each warning must describe what it matched, not what it assumed."""
     failures = 0
     for message, expected, label in ATTRIBUTION:
-        fd, path = tempfile.mkstemp(suffix=".jsonl")
-        with os.fdopen(fd, "w") as fh:
-            for e in (QUERY, PUSH, say(message)):
-                fh.write(json.dumps(e) + "\n")
-        for f in os.listdir(tempfile.gettempdir()):
-            if f.startswith(SENTINEL_PREFIX):
-                try:
-                    os.remove(os.path.join(tempfile.gettempdir(), f))
-                except OSError:
-                    pass
-        out = subprocess.run(
-            [sys.executable, HOOK],
-            input=json.dumps({"transcript_path": path}),
-            capture_output=True, text=True,
-        ).stdout.strip()
-        os.remove(path)
-        reason = (json.loads(out).get("reason") if out else "") or ""
-        ok = expected in reason
-        failures += 0 if ok else 1
-        print(f"{'ok  ' if ok else 'FAIL'}  attribution: {label}")
+        td = tempfile.mkdtemp()
+        try:
+            path = os.path.join(td, "transcript.jsonl")
+            with open(path, "w", encoding="utf-8") as fh:
+                for e in (QUERY, PUSH, say(message)):
+                    fh.write(json.dumps(e) + "\n")
+            env = dict(os.environ, TMPDIR=td, TEMP=td, TMP=td)
+            out = subprocess.run(
+                [sys.executable, HOOK],
+                input=json.dumps({"transcript_path": path}),
+                capture_output=True, text=True, env=env,
+            ).stdout.strip()
+            reason = (json.loads(out).get("reason") if out else "") or ""
+            ok = expected in reason
+            failures += 0 if ok else 1
+            print(f"{'ok  ' if ok else 'FAIL'}  attribution: {label}")
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+    return failures
+
+
+# ai-config#3958: warning must name the push command or tool that triggered the staleness.
+PUSH_ATTRIBUTION = [
+    (PUSH, "(git push -q)", "CLI git push summary in reason"),
+    (MCP_PUSH, "(mcp__github__push_files)", "MCP push tool name in reason"),
+    ({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "run_command", "input": {"command": "git push origin main"}}]}},
+     "(git push origin main)", "CLI chained/argument push in reason"),
+]
+
+
+def check_push_attribution():
+    """Warning must name the push command or tool that triggered the staleness."""
+    failures = 0
+    for push_event, expected, label in PUSH_ATTRIBUTION:
+        td = tempfile.mkdtemp()
+        try:
+            path = os.path.join(td, "transcript.jsonl")
+            with open(path, "w", encoding="utf-8") as fh:
+                for e in (QUERY, push_event, say("All checks green at this head.")):
+                    fh.write(json.dumps(e) + "\n")
+            env = dict(os.environ, TMPDIR=td, TEMP=td, TMP=td)
+            out = subprocess.run(
+                [sys.executable, HOOK],
+                input=json.dumps({"transcript_path": path}),
+                capture_output=True, text=True, env=env,
+            ).stdout.strip()
+            reason = (json.loads(out).get("reason") if out else "") or ""
+            ok = expected in reason
+            failures += 0 if ok else 1
+            print(f"{'ok  ' if ok else 'FAIL'}  push-attribution: {label}")
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
     return failures
 
 
@@ -533,8 +653,9 @@ def main():
         print(f"{'ok  ' if ok else 'FAIL'}  "
               f"{'block' if want_block else 'allow'}: {label}")
     failures += check_attribution()
+    failures += check_push_attribution()
     failures += check_query_forms()
-    total = len(CASES) + len(ATTRIBUTION) + len(QUERY_FORMS)
+    total = len(CASES) + len(ATTRIBUTION) + len(PUSH_ATTRIBUTION) + len(QUERY_FORMS)
     print(f"\n{total - failures}/{total} passed")
     return 1 if failures else 0
 

@@ -105,6 +105,13 @@ with os.fdopen(handle, "w") as stream:
         {"type": "text", "text": "Done with task."}
     ]}}) + "\n")
 
+handle, reply_path = tempfile.mkstemp()
+with os.fdopen(handle, "w") as stream:
+    stream.write(json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "text", "text": "internal narration nobody saw"},
+        {"type": "tool_use", "name": "mcp__hearthbot__reply", "input": {"text": "delivered reply text"}},
+    ]}}) + "\n")
+
 
 # --- ai-config#1806: a quoted example must not arm the guard -----------------
 # A corpus about git workflow quotes git commands in issue and PR bodies
@@ -288,6 +295,7 @@ try:
     assert subject.pending_commit(multiline_pushed) is None
     assert subject.pending_commit(malformed_path) == "git commit -m x"
     assert subject.last_assistant_text(text_path) == "Done with task."
+    assert subject.last_assistant_text(reply_path) == "delivered reply text"
     assert subject.pending_commit(quoted_example) is None, "a quoted example must not arm"
     assert subject.pending_commit(executed_heredoc) is not None, "an executed heredoc must still arm"
     assert subject.pending_commit(quoted_then_real) is not None, "a real commit after a quoted one must arm"
@@ -336,6 +344,7 @@ finally:
     os.unlink(openai_pushed)
     os.unlink(malformed_path)
     os.unlink(text_path)
+    os.unlink(reply_path)
     os.unlink(quoted_example)
     os.unlink(executed_heredoc)
     os.unlink(quoted_then_real)

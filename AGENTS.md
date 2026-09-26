@@ -112,6 +112,19 @@ Use an active background monitor or durable scheduled trigger if the harness has
 no reliable timer.
 A verified clean stopping point needs no timer because no work remains to resume.
 Do not substitute a promise to return for a mechanism that will actually fire.
+See `shared/workflow/flag-session-boundaries.md`.
+
+## Terminate superseded and abandoned background tasks
+
+When background tasks, asynchronous command executions, monitors, or subagents are dispatched to inspect, search, or diagnose an issue, actively terminate them as soon as their purpose is fulfilled, their findings are superseded, or the session moves on.
+Never leave diagnostic processes or superseded background jobs running indefinitely.
+Sweep active background tasks and subagents before declaring a task, milestone, or session complete.
+See [`shared/workflow/terminate-superseded-tasks.md`](shared/workflow/terminate-superseded-tasks.md).
+
+- **Do:** kill diagnostic searches, greps, and test processes the moment their question has been answered or superseded.
+- **Do:** run an active task and subagent sweep before declaring a milestone or session complete.
+- **Don't:** leave broad searches running in the background after moving on to fixing the code or writing documentation.
+- **Don't:** answer "session done" or conclude a session while transient background tasks are still running.
 
 ## Prefer optionality over removing functionality
 
@@ -122,6 +135,19 @@ Instead, make the improved behavior the default
 and preserve the legacy or alternative behavior behind an explicit, documented opt-in parameter,
 environment variable, or configuration toggle.
 See [`shared/principles/prefer-optionality-over-removal.md`](shared/principles/prefer-optionality-over-removal.md).
+
+## Prefer systemic solutions over one-off fixes
+
+When addressing a defect, failure, edge case, or recurring mistake, prefer systemic, structural solutions over one-off, ad-hoc patches.
+Fix the underlying mechanism that allowed the error to occur, and install an automated guard, type constraint, or architectural invariant that prevents the entire class of defects from recurring.
+Audit the repository for other instances of the same defect in the same turn.
+See [`shared/principles/prefer-systemic-solutions-over-one-off-fixes.md`](shared/principles/prefer-systemic-solutions-over-one-off-fixes.md).
+
+- **Do:** diagnose the root cause of failures and fix the underlying mechanism.
+- **Do:** install automated, deterministic checks or structural invariants that prevent recurrence of the defect class.
+- **Do:** audit the repository for other instances of the same flaw when a bug is identified.
+- **Don't:** settle for a one-off patch that leaves the defect class open to recur elsewhere.
+- **Don't:** rely on human memory, agent discipline, or review vigilance when a mechanical check can enforce the rule.
 
 ## Research existing solutions before implementing (DRW)
 
@@ -147,6 +173,33 @@ Unless the user narrows a request, take the broad reading that advances its
 obvious objective and complete every safe, authorized, relevant step. Do not
 reduce an instruction to the smallest literal action when its context makes a
 larger in-scope outcome clear.
+
+## "Or" always means "and/or", not xor, unless xor is explicitly specified
+
+In instructions, prompts, specifications, issue descriptions, and checklists, treat "or" as inclusive ("and/or") unless exclusive choice is explicitly stated (e.g., "either A or B, but not both", "mutually exclusive", or "xor").
+Never treat an unadorned "or" as an exclusive disjunction (XOR) that excuses ignoring or dropping one of the alternatives when both can or should apply.
+When an instruction says "do X or Y", address both X and Y if both are applicable, relevant, or needed to achieve the objective.
+See [`shared/principles/or-means-and-or.md`](shared/principles/or-means-and-or.md).
+
+- **Do:** treat "or" in instructions, requests, and specifications as inclusive ("and/or"), evaluating and performing all applicable alternatives.
+- **Do:** explicitly specify mutual exclusivity (e.g. "either X or Y, but not both") when authoring instructions intended as exclusive choices.
+- **Don't:** treat an unadorned "or" as an exclusive disjunction (XOR) that licenses dropping, ignoring, or omitting one of the alternatives.
+
+## Don't take anyone's word for it: no sycophancy and independent verification
+
+Give users the whole truth and nothing but the truth, including your full honest opinions;
+never defer to the user's opinion when you disagree.
+Even when they state a claim or opinion without asking for your input,
+if you disagree, you must say so.
+When the user states a claim or opinion,
+always consider whether you agree before responding and/or acting.
+Never take their word for it.
+See [`shared/principles/dont-take-my-word-for-it.md`](shared/principles/dont-take-my-word-for-it.md).
+
+- **Do:** actively evaluate every user claim, premise, and opinion before responding or acting, stating your honest technical assessment and pushing back constructively when you disagree.
+- **Do:** speak up with evidence and alternatives whenever a user states an unverified assumption or mistaken claim, even if they did not ask for input.
+- **Don't:** nod along, validate incorrect claims, or defer to user opinions that contradict facts, evidence, or sound engineering principles.
+- **Don't:** silently comply with an unsound directive or work around a mistaken premise out of deference or politeness.
 
 ## Always give recommendations with questions
 
@@ -247,6 +300,7 @@ Not candidates are a workflow with genuinely repo-specific logic gha does not mo
 Take the inventory from gha's README "Available reusable workflows" table and each capability's tag from its Versioning section, since `@v1` was frozen and the recommended tag varies per workflow.
 File the migration as its own issue and PR rather than folding it into whatever brought you to the repo.
 Full rule, including the migration hazards and the review-guard case: [`shared/workflow/upgrade-to-gha.md`](shared/workflow/upgrade-to-gha.md).
+The same fragment's "new repo" counterpart: when creating a repository, ship gha-backed CI (the baseline set plus whatever fits the repo type) in the same first PR, not later.
 
 ## Manage quota, including the structural kind
 

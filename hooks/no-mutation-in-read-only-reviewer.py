@@ -524,7 +524,8 @@ def main() -> int:
         return 0
 
     tool_name = payload.get("tool_name") or ""
-    tool_input = payload.get("tool_input") or {}
+    tool_input = payload.get("tool_input")
+    tool_input = tool_input if isinstance(tool_input, dict) else {}
 
     hit = offending(tool_name, tool_input, payload)
     if not hit:

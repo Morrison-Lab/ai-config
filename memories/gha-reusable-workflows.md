@@ -278,24 +278,29 @@ so the pattern is load-bearing rather than a workaround invented for this PR.
   (Measured 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826).)
 
 - **A `changelog.d/<slug>.<category>.md` fragment is scanned by gha's own `new-line-breaks` and `diff-scoped-guard` jobs, the same as any other `.md`/`.qmd` file.**
-There is no changelog-fragment exemption in either job's globs or paths-ignore.
-  A fragment written as one long bullet line fails `new-line-breaks` and triggers an avoidable `claude-review` round, exactly as a long line anywhere else would.
+  There is no changelog-fragment exemption in either job's globs or paths-ignore.
+  `check-new-line-breaks` in `Morrison-Lab/gha` is configured via the `NLB_BASE_REF` environment variable (e.g. `NLB_BASE_REF=origin/main`).
+  It flags markdown lines containing more than one sentence or clause, strictly enforcing Semantic Line Breaks (SemBr) across all `.md` files, including changelog fragments (`changelog.d/*.md`).
+  A fragment written as one long bullet line fails `new-line-breaks` and triggers an avoidable review round, exactly as a long line anywhere else would.
   Every sibling fragment in the directory is already clause-broken, which is the tell that the convention is enforced rather than merely stylistic.
-  - **Do:** write the fragment at clause boundaries like its siblings, and run gha's own checker from the worktree before pushing: `NLB_GLOBS='*.md *.qmd' NLB_BASE_REF=origin/main python3 check-new-line-breaks/check-new-line-breaks.py`.
+  - **Do:** write the fragment at clause boundaries like its siblings, placing each sentence on its own line, and run gha's own checker from the worktree before pushing: `NLB_GLOBS='*.md *.qmd' NLB_BASE_REF=origin/main python3 check-new-line-breaks/check-new-line-breaks.py`.
   - **Don't:** write a changelog bullet as one unbroken line on the reasoning that it is "just a changelog" and outside the line-break convention's scope.
-  (Measured 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826).)
+  (2nd occurrence, 2026-09-24 on [Morrison-Lab/gha#931](https://github.com/Morrison-Lab/gha/issues/931) ([PR #933](https://github.com/Morrison-Lab/gha/pull/933));
+  prior: 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826).)
 
-- **`check-new-line-breaks` does not see a sentence that opens with a digit or an opening parenthesis, so a two-sentence line passes silently whenever the second sentence starts with either.**
-  Its `_SENT_BREAK_RE` lookahead class is `` [A-Z"'`*\[] ``, which admits an uppercase letter or a markup character --- and neither a digit nor `(`.
-  This corpus opens sentences with derived counts constantly, because `CLAUDE.md` asks for numbers derived rather than recalled --- "19 sites across ...", "308 cases passed ..." --- so the blind spot sits exactly where the prose most often lands.
-  It is a false negative, so nothing reports it: the check goes green and the author reads that as the line being fine.
-  - **Do:** scan added prose lines yourself for a second sentence when the gate passes a long line, particularly one whose next sentence is a count.
-  - **Don't:** read a green `new-line-breaks` as evidence that a long added line carries only one sentence.
+- **Historically, `check-new-line-breaks` did not see a sentence that opens with a digit or an opening parenthesis, so a two-sentence line passed silently.**
+  Its `_SENT_BREAK_RE` lookahead class was `` [A-Z"'`*\[] ``, which admitted an uppercase letter or a markup character --- and neither a digit nor `(`.
+  This corpus opens sentences with derived counts constantly, because `CLAUDE.md` asks for numbers derived rather than recalled --- "19 sites across ...", "308 cases passed ..." --- so the blind spot sat exactly where the prose most often lands.
+  It was a false negative, so nothing reported it: the check went green and the author read that as the line being fine.
+  - **Do:** break before sentences opening with digits, parens, or underscore emphasis;
+    the widened lookahead now actively enforces these boundaries.
+  - **Don't:** assume a sentence opening with a digit or paren is invisible to `new-line-breaks`.
   (Measured 2026-09-13 on a `Morrison-Lab/ai-config` branch: two added lines each carrying two sentences passed green, and a matcher differing only by `0-9` in the lookahead flagged both.
   A later line on the same branch opened its second sentence with `(` and passed green too --- and the `0-9` widening does NOT catch it, so the fix is the wider class rather than the digit alone.
   Measured against the shipped regex: digit `False`, paren `False`, uppercase `True`.
-  With `0-9` added: digit `True`, paren still `False`.
-  Filed as [gha#878](https://github.com/Morrison-Lab/gha/issues/878).)
+  Filed as [gha#878](https://github.com/Morrison-Lab/gha/issues/878).
+  Resolved 2026-09-19: [Morrison-Lab/gha#884](https://github.com/Morrison-Lab/gha/pull/884) widened `_SENT_BREAK_RE` to `(?=[A-Z0-9\"'`*\[(_])`,
+  and [Morrison-Lab/ai-config#3789](https://github.com/Morrison-Lab/ai-config/issues/3789) vendored the update.)
 
 - **A `changelog.d/<slug>.<category>.md` fragment is also linted by markdownlint-cli2 and fails on multiple trailing blanks (MD012).**
   In Morrison-Lab/gha, `selftest` runs `lint-markdown` over all tracked markdown files using `.markdownlint.default.jsonc`.
@@ -319,3 +324,99 @@ There is no changelog-fragment exemption in either job's globs or paths-ignore.
   - **Do:** test multi-heading interactions in the same block when blanking rules operate per paragraph.
   - **Don't:** assert that losing a rejection heading always defaults to fail-closed when preceding blocks in the same body can state an approving verdict.
   (Measured 2026-09-12 on [Morrison-Lab/gha#873](https://github.com/Morrison-Lab/gha/pull/873).)
+
+## `formats` means the OPPOSITE thing in `preview.yml` and `quarto-publish.yml`
+
+Two consumer-facing traps in the Quarto pair, both measured 2026-09-15 on
+`Morrison-Lab/machine_learning_lecture_materials` against `@v2`.
+
+**The `formats` input.**
+An empty `formats` is the bare, all-formats-at-once `quarto render` in
+`quarto-publish.yml`, and is **not** that in `preview.yml`:
+
+- `quarto-publish/action.yml`: empty `formats` → `FORMAT_LIST` empty → a single
+  `quarto render`.
+- `preview/action.yml`: empty `formats` → a legacy branch that renders `pdf`
+  (when `tinytex: true`) and then `html` as **separate invocations**, and renders
+  `revealjs` only when the PR carries a `preview:revealjs` label.
+The bare render there is spelled `formats: default`.
+
+`preview/action.yml`'s own input description says so ("Set to 'default' to run a
+single bare `quarto render` letting `_quarto.yml` decide formats (note: unlike
+`quarto-publish` where empty string defaults to bare render)") --- which is easy
+to miss precisely because a consumer copying a working `quarto-publish.yml` call
+into a `preview.yml` call reads "empty" as meaning the same thing.
+
+Getting it wrong **does not fail the build**.
+It deploys a preview whose pages have no CSS, because per-format renders prune
+each other's `site_libs` (see [`quarto-sites.md`](quarto-sites.md)).
+
+**`tinytex: true` on `preview.yml` needs the R `tinytex` package.**
+The composite installs its extra TeX packages by shelling out to
+`Rscript -e "tinytex::tlmgr_install(c('luacolor', 'lua-ul'))"`.
+With `use-renv: false` and an empty `r-packages`, nothing puts that package on
+the runner and the build dies at that step with
+`Error in loadNamespace(x) : there is no package called 'tinytex'`.
+Pass `r-packages: any::tinytex`.
+`quarto-publish.yml` has no such step and needs no R at all --- which leaves a
+latent asymmetry worth knowing: `preview` prefetches `luacolor` and `lua-ul` and
+`publish` cannot, so a handout needing either goes green on the PR and red on
+the push to `main`.
+
+- **Do:** write `formats: default` on a `preview.yml` call that wants all formats.
+- **Do:** pair `tinytex: true` with `r-packages: any::tinytex` on `preview.yml`.
+- **Don't:** copy an empty `formats` across from a working `quarto-publish.yml` call.
+- **Don't:** read a green preview build as evidence the PDF path works on `main`.
+
+## `claude-code-review.yml` caller permissions: omit `id-token: write`
+
+A consumer workflow calling `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2` should declare:
+`contents: read`, `pull-requests: write`, `issues: write`, `actions: read`, `checks: read`.
+
+- **Do NOT grant `id-token: write` on the review job:**
+  The review callee processes an untrusted PR diff and specifically omits `id-token: write` in its own jobs.
+  Granting `id-token: write` on the caller ceiling bypasses this isolation and creates an unnecessary privilege escalation risk (e.g. if `claude-code-action` falls back to its default write token minting).
+- **Template propagation hazard:**
+  Permissions copied from a reference caller workflow often escape scrutiny in reviews because copying an existing template reads as standard consistency.
+  Keep caller templates strictly minimized so copy-pasted implementations do not propagate over-privileged permissions.
+  (Measured 2026-09-21, tracked in [#3842](https://github.com/Morrison-Lab/ai-config/issues/3842); surfaced during `@claude` review on `Morrison-Lab/mln#23`.)
+- **The permission was one of three defects from one copy, and the other two travel the same way.**
+  `Morrison-Lab/mln#23` and `Morrison-Lab/mlg#5` copied ai-config's own `claude-review.yml` and `claude-bot.yml` and condensed their comments.
+  Besides `id-token: write`, the agent caller had no caller-side `if:` trusted-author gate, which gha's `examples/claude.yml` carries,
+  and the condensed header said assigning an issue summons the agent, dropping the qualifier that the body or title must also mention it (or `dispatch-on-assignee` must be set).
+  Reviewers caught all three.
+  ai-config's own `claude-bot.yml` still lacks the `if:` gate and carries a stale header rationale for dropping `issues: opened` ([#3862](https://github.com/Morrison-Lab/ai-config/issues/3862));
+  its `id-token: write` is correct, since the agent writes.
+  A consumer caller is a *copy* of the blessed stub, with that repo's drift, so copying it inherits every grant, every missing gate, and every claim in its comments without their sources.
+  [`upgrade-to-gha`](../shared/workflow/upgrade-to-gha.md) already says to copy `permissions:` from `examples/<name>.yml`;
+  the `if:` gate and the header comments belong to the same diff.
+  A condensed comment is a fresh claim, per [`fact-check-prose`](../shared/writing/fact-check-prose.md)'s condensation section.
+  - **Do:** start from gha's `examples/<name>.yml` at the tag you pin, and diff the finished caller against it clause by clause: `permissions:`, job `if:`, `on:` types, and each header claim.
+  - **Do:** re-check every qualifier a condensed comment dropped against the callee at the pinned tag.
+  - **Don't:** copy a sibling consumer's caller, ai-config's own included, as the reference.
+  - **Don't:** treat a copied comment's rationale as true because the file it came from is blessed.
+
+## Bundled repository suites (`check-*.yml`) and callee input verification
+
+Added in Morrison-Lab/gha#903 (closes #865, 2026-09-21):
+six bundled composite actions and reusable workflows consolidate standard check suites by repository type:
+`check-repo-hygiene.yml` (general repos / base suite),
+`check-quarto-website.yml` (websites),
+`check-quarto-book.yml` (books),
+`check-quarto-manuscript.yml` (manuscripts),
+`check-r-package.yml` (R packages), and
+`check-python-package.yml` (Python packages).
+
+- **Read-only permission boundary vs PR label inspection:**
+  All six bundled workflows declare and require only `contents: read`.
+  Governance checks inspecting live PR labels (`check-news.yml`, `version-check.yml`)
+  must remain dedicated standalone workflows
+  because querying live labels from the GitHub API requires `pull-requests: read`.
+  Inlining them into a read-only bundle breaks label bypasses (`no-changelog`, `no version increment`).
+- **Callee input parity:**
+  When composing higher-level composite actions from existing single-purpose composites (`Morrison-Lab/gha/<action>@v2`),
+  always verify each step's `with:` keys against the callee's declared `action.yml` inputs.
+  For example, `check-non-standard-chars` takes only `python-version` and `extensions`;
+  passing `paths` or `fail` causes silent parameter drops.
+  Contract tests (`run-bundle-repo-actions-tests.py`) should parse callee `action.yml` files
+  and statically assert zero undeclared inputs.

@@ -664,180 +664,7 @@ rather than merely added.)
 
 ## An action that hard-gates on the event name can still be driven from another event
 
-A third-party action can refuse every event but the one it was written for,
-before it reads any of its own inputs:
-
-```js
-// sanjay3290/jules-pr-reviewer, src/index.ts:37 (at the pinned SHA)
-if (ctx.eventName !== 'pull_request') {
-  core.setFailed(`Unsupported event: ${ctx.eventName}. Use on: pull_request.`);
-  return;
-}
-```
-
-That reads like a hard constraint on the trigger, and it usually gets treated
-as one: the obvious conclusions are "this capability cannot be made
-on-demand" or "fork the action".
-Neither is necessary.
-`@actions/github`'s `Context` hydrates itself entirely from environment
-variables, so both halves of the gate are caller-supplied:
-
-```js
-if (process.env.GITHUB_EVENT_PATH) {
-  if (existsSync(process.env.GITHUB_EVENT_PATH)) {
-    this.payload = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, ...));
-  }
-}
-this.eventName = process.env.GITHUB_EVENT_NAME;
-```
-
-Step-level `env:` on a `uses:` step does **not** override those.
-GitHub documents `GITHUB_*` as reserved
-(https://docs.github.com/en/actions/reference/workflows-and-actions/variables,
-checked 2026-08-26):
-"You can't overwrite the value of the default environment variables named
-`GITHUB_*` and `RUNNER_*`."
-The runner still *prints* the YAML `env:` values in the step log, so the wrap
-looks applied.
-Measured 2026-08-26 on
-[run 32942088643](https://github.com/Morrison-Lab/ai-config/actions/runs/32942088643):
-the `uses: sanjay3290/jules-pr-reviewer` step logged
-`GITHUB_EVENT_NAME: pull_request` and then failed with
-`Unsupported event: issue_comment`.
-That was the wrap #857 shipped, and every `@jules` mention since has failed
-the same way (#2280).
-
-The override that actually reaches `Context()` is `env(1)` on a `run:` step
-that starts `node dist/index.js` as a child.
-`env(1)` sets the child's environment after the runner's reserved-name merge.
-A workflow triggered by `issue_comment` can still present the action with
-`pull_request` this way.
-For a `pull_request` gate the payload is close to one API call, because
-`GET /repos/{owner}/{repo}/pulls/{n}` returns nearly the shape the event
-delivers --- near enough to work, not near enough to skip the field check
-below:
-
-```yaml
-      - name: Resolve the PR into a pull_request event payload
-        run: |
-          gh api "${{ github.event.issue.pull_request.url }}" \
-            | jq '{pull_request: .}' > "$RUNNER_TEMP/pr_event.json"
-
-      - name: Fetch the action at the pinned SHA
-        run: |
-          dest="$RUNNER_TEMP/the-action"
-          git init --quiet "$dest"
-          git -C "$dest" remote add origin https://github.com/owner/the-action.git
-          git -C "$dest" fetch --depth 1 origin <sha>
-          git -C "$dest" checkout --quiet --detach FETCH_HEAD
-
-      - name: Run the action under a synthetic pull_request event
-        env:
-          INPUT_SOME_INPUT: value
-          SYNTHETIC_EVENT_PATH: ${{ runner.temp }}/pr_event.json
-          ACTION_DIR: ${{ runner.temp }}/the-action
-        run: |
-          env \
-            GITHUB_EVENT_NAME=pull_request \
-            GITHUB_EVENT_PATH="$SYNTHETIC_EVENT_PATH" \
-            node "$ACTION_DIR/dist/index.js"
-```
-
-`action.yml` defaults are applied only by a `uses:` step.
-A `run: node dist/index.js` invocation must set every `INPUT_*` the JS reads,
-including the ones a `uses:` step would have inherited.
-
-Two things make this safe rather than merely clever, and both need checking
-before relying on it:
-
-- **Read the action's own source for what it consumes past the gate**, and
-  confirm the synthesized payload covers it.
-  Everything after the gate in the case above read only the `pull_request`
-  object, so nothing else had to be faked.
-  A field the action reads and the API omits is the failure this check
-  catches; `labels` was the near-miss, and it survived only because the action
-  guards it as `(pr.labels || [])`.
-- **`ctx.repo` is unaffected**, since it prefers `GITHUB_REPOSITORY`, which
-  Actions always sets.
-
-Note what the override does **not** change: the token's permissions, and the
-security properties of the real trigger.
-An `issue_comment` run executes in the base repo with a write token even for a
-fork PR, so a gate the original event enforced implicitly (fork PRs get no
-secrets under `pull_request`) has to be re-established explicitly.
-
-- **Do:** read the pinned action's own code for how it reads `eventName` and
-  `payload` before concluding its trigger is fixed --- `src/` for a legible
-  version of the gate, and `dist/` to confirm what the pinned SHA actually
-  runs, since the bundle is what Actions executes and it can lag `src/`.
-- **Do:** invoke the action from a `run:` step with `env(1)` setting
-  `GITHUB_EVENT_NAME` and `GITHUB_EVENT_PATH` on the node child, and set
-  every `INPUT_*` the JS reads because `action.yml` defaults will not apply.
-- **Do:** pin Node to the interpreter GitHub actually runs for that
-  `runs.using`, not the label in `action.yml`.
-  Measured 2026-08-26 on run 32942088643:
-  this action declares `node20` and was forced onto Node 24.
-- **Do:** write `success()` on wrap steps even though GitHub auto-applies
-  it when `if:` has no status-check function.
-  The could-not-start notifier uses `failure()`, which overrides that
-  default, and a copy onto the node step would spawn node after a failed pin.
-- **Do:** keep wrap preflight (`test -f` on the synthetic payload and the
-  bundle) in its own step so a "could not start" comment can gate on it.
-  Assertions left on the `jules` step fail before the process assigns
-  `commentId`, and the notifier that excludes that step will not fire.
-- **Do:** gate a wrap checker on the `node ... dist/index.js` invocation
-  line, not a substring comments also contain.
-- **Don't:** spawn `env` from Python without `shutil.which("env")`.
-  Windows Python outside Git Bash has no `env` on PATH, so the call raises
-  `FileNotFoundError` before the suite can print its tally, and local
-  pre-commit goes red while ubuntu CI stays green.
-- **Don't:** set `INPUT_RULES_FILE` to a path and then comment that the
-  rules-file input is deliberately unused.
-  The empty string is the documented disable value.
-- **Do:** fetch a checker at the SHA the calling workflow **pins** when
-  reproducing a diff-scoped CI gate locally, not the action's default branch.
-  The first Do pins when *auditing* an action; the same applies when
-  *running* one to validate a fix pre-push, where a shallow default-branch
-  clone yields a plausible script with no sign it is the wrong one.
-  Measured 2026-08-19: `ai-config`'s `validate.yml` pins
-  `Morrison-Lab/gha/.github/workflows/check-new-line-breaks.yml@209bfb76`,
-  whose `check-new-line-breaks.py` differs from that repo's default branch by
-  **339 lines**, so validating against the default branch would have exercised
-  a different checker and reported a result about nothing.
-  Run `git fetch --depth 1 origin <sha>`, then `git diff --stat FETCH_HEAD --
-  <subdir>/` (empty output means the pin is current) *before*
-  `git checkout FETCH_HEAD -- <subdir>/`, which makes that question
-  unanswerable.
-- **Do:** re-derive any safety property the original event was providing for
-  free, once the event is synthesized.
-- **Don't:** fork an action, or abandon the feature, on the strength of an
-  `eventName` guard alone.
-- **Don't:** assume the API response is a drop-in payload without checking
-  every field the action reads.
-- **Don't:** treat a `uses:` step's logged `env:` as evidence the process
-  received those values --- reserved `GITHUB_*` names are printed and then
-  ignored.
-
-(Morrison-Lab/ai-config#857, 2026-07-30: making the Jules reviewer on-demand
-needed an `issue_comment` trigger, which its pinned action rejects outright.
-Both files were read at the pinned SHA rather than assumed --- `src/index.ts`
-for the gate quoted above, `dist/index.js` for the `Context` constructor that
-makes the override work --- and then this PR's own API object, for field
-coverage.
-The line number above was `:38` when first written, and a review round caught
-it: it is `:37`.
-Worth noting how, since it is the cheap lesson here.
-The reviewer inferred the citation was unverifiable because the case note named
-only `dist/`, which was the wrong reason --- but a `grep -n` settled the real
-question in one command, and the same off-by-one had already shipped into the
-workflow comment that makes the same claim.
-The wrap this case shipped --- YAML `env:` on the `uses:` step --- did not
-work.
-Measured 2026-08-26 on run 32942088643 / #2280: the step logged the override
-and the action still saw `issue_comment`.
-The working form is `env(1)` around `node dist/index.js`, recorded in
-`.github/workflows/jules-review.yml` and gated by
-`scripts/check-jules-review-workflow.py`.)
+Moved to [`github-actions-event-gating.md`](github-actions-event-gating.md) at the 1250-line gate.
 
 ## A SHA pin on a reusable workflow freezes the caller, not what the caller runs
 
@@ -1211,3 +1038,88 @@ Filed the checker-side fix as
 --- rename/copy-detection in the diff, or a base-tree existence check before
 flagging a line as added --- but until that lands, the workaround above is
 the only path to a green check on a split.)
+
+## How an agent session requests a review
+
+An agent session cannot reach the Claude reviewer the way a person does: the
+automatic `pull_request` path skips a Bot sender, and a `workflow_dispatch` it
+issues itself starts a run that `claude-code-action` short-circuits at zero
+cost.
+It posts a `/review` comment instead.
+[`agent-review-requests.md`](agent-review-requests.md) carries the measurement
+and the mechanism.
+
+## `check-new-line-breaks` has no local teeth in a repo that only consumes the reusable workflow
+
+A repo can enforce semantic line breaks in CI while having **no local copy** of the checker script at all --- the called workflow brings its own copy of `Morrison-Lab/gha` at run time, and nothing requires the consumer to vendor one.
+`Morrison-Lab/qbt` is exactly this shape (verified 2026-09-17 against its default branch): `.github/workflows/check-new-line-breaks.yml:17` calls the REUSABLE WORKFLOW, `uses: Morrison-Lab/gha/.github/workflows/check-new-line-breaks.yml@v2`, from a job named `check`, and the repo has no `scripts/` directory at all.
+Note the `uses:` form, since this file treats the distinction as load-bearing elsewhere: a reusable workflow is `<owner>/<repo>/.github/workflows/<file>.yml@<ref>`, while `Morrison-Lab/gha/check-new-line-breaks@vN` would be the composite ACTION.
+The two are also distinguishable from the emitted check name alone --- `check / check-new-line-breaks` is the `<caller job> / <inner job>` form a reusable workflow produces, where a composite-action step inside job `check` publishes `check` by itself.
+
+`ai-config`'s own local tooling for this rule --- both `hooks/warn-new-line-breaks-on-push.py` (warns before `git push`) and its composition-time sibling `hooks/warn-new-line-breaks-on-edit.py` (warns before a `Write`/`Edit` lands the violating line) --- resolves the checker by looking for that same local vendor copy inside the TARGET repo.
+Neither fires in a repo like `qbt`, so a session working there gets zero local warning at any point: not while composing the prose, not before pushing it.
+The only signal is the CI run itself, which is exactly what happened: a PR against `.github/rulesets/README.md` caught 6 added lines packing more than one sentence, and the very commit written to fix that failure introduced fresh violations of the same rule while narrating the fix (measured 2026-09-14/15, `Morrison-Lab/qbt` PR `ci: serialize gh-pages writes by adopting gha's two-tier preview split`).
+
+- **Do:** before composing prose in a repo you have not checked, grep its `scripts/` for a vendored NLB checker (or run `gh api repos/<owner>/<repo>/contents/scripts/vendor` / just look).
+  If there is none and the repo's workflows reference `Morrison-Lab/gha`'s `check-new-line-breaks` (in either the reusable-workflow or the composite-action form), assume no local hook will catch a violation and read each added line for "does this pack more than one sentence" before it leaves your hands.
+- **Do:** when no vendored copy exists, fetch the pinned script directly and run it locally (same remedy the file-split section above already gives) rather than relying on either `ai-config` hook to fire.
+- **Don't:** assume `ai-config`'s push-time or edit-time NLB hooks protect every repo that enforces the rule in CI --- they protect only repos that vendor the checker script locally, which is a strict subset.
+- **Don't:** read a composition-time or push-time silence from those hooks as "this repo does not enforce semantic line breaks" --- silence there is also the signature of a repo that enforces the rule purely through the reusable workflow, with no local copy to check against.
+
+Extending the hooks' checker resolution to fall back to `ai-config`'s own bundled `scripts/vendor/gha-check-new-line-breaks.py` for a target repo with no vendored copy of its own would close this gap for every `gha` consumer at once;
+tracked as [ai-config#3747](https://github.com/Morrison-Lab/ai-config/issues/3747) rather than folded into either hook, to keep each hook's behavior identical to its sibling's.
+
+## `concurrency:` accepts a `queue` key that actionlint (as of v1.7.12) does not know
+
+GitHub's [control-the-concurrency-of-workflows-and-jobs](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/control-the-concurrency-of-workflows-and-jobs) reference (read 2026-09-17) documents a `queue` key inside a `concurrency:` block, alongside the already-familiar `group` and `cancel-in-progress`.
+Two values: `single` (the default --- at most one run waits) and `max` (up to 100 runs may queue instead of the newest cancelling the one waiting).
+`queue: max` is mutually exclusive with `cancel-in-progress: true`;
+setting both is a GitHub-side validation error at job submission, not merely a lint warning.
+
+`actionlint` v1.7.12 (current release as of 2026-09-14) does not know this key at all, and reports it as a hard `syntax-check` error: `unexpected key "queue" for "concurrency" section`.
+Tracked upstream as [rhysd/actionlint#657](https://github.com/rhysd/actionlint/issues/657), open as of that date.
+A workflow using `queue: max` is therefore VALID GitHub Actions YAML that a current `actionlint` run (local, pre-commit, or CI) will flag as broken.
+
+The false positive is suppressible per-path via `.github/actionlint.yaml`:
+
+```yaml
+paths:
+  .github/workflows/some-workflow.yml:
+    ignore:
+      - 'unexpected key "queue" for "concurrency" section'
+```
+
+- **Do:** when a workflow genuinely needs `queue: max` (a caller that should queue several runs rather than cancelling all-but-the-latest), add the per-path `ignore:` entry rather than dropping the key or disabling `actionlint` more broadly.
+- **Do:** check whether `actionlint` has shipped a release past v1.7.12 that closes rhysd/actionlint#657 before assuming the suppression is still needed --- this is a volatile, time-stamped claim (see [`timestamp-volatile-claims.md`](../shared/writing/timestamp-volatile-claims.md)).
+- **Don't:** claim `queue: max`/`cancel-in-progress: true` can be combined --- GitHub rejects that combination outright.
+
+
+## Verify an experiment's preconditions before reporting a capability absent
+
+Testing whether `.github/actionlint.yaml`'s `paths:`/`ignore:` suppression (previous section) actually works, in a throwaway scratch directory, and watching `actionlint` still report the `queue` key error, is not evidence the suppression "cannot be suppressed."
+`actionlint` discovers `.github/actionlint.yaml` by walking up from the target file to the git project root it detects --- a scratch directory that is not itself a git repository has no project root for actionlint to find, so the config file sitting right next to the workflow is never loaded, and the run proceeds with zero config.
+Re-run inside an actual git repository (even a bare `git init` in the same scratch directory is enough) and the suppression takes effect.
+
+The actionlint-specific fact is the project-root walk: the config is found relative to a git root, so no git root means no config, and the run proceeds silently with zero config rather than reporting a missing one.
+
+The general lesson --- that a negative result is evidence about the experiment rather than about the capability, whenever the tool has its own notion of where to look --- is [`mistake-patterns.md`](mistake-patterns.md)'s Pattern 56, which carries the Do/Don't pair.
+Read it there rather than a second copy here.
+
+## GitHub counts a SKIPPED required check as SATISFIED, with consequences for splitting a job
+
+A required status check (branch protection, or a repository/org ruleset) that completes with conclusion `skipped` counts as SATISFIED for merge purposes, exactly like `success` --- GitHub does not distinguish "this check ran and passed" from "this check was skipped" when deciding whether a required context is met.
+This is a documented GitHub behavior, not an `ai-config`/`gha` convention: the [status-checks reference](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/collaborating-on-repositories-with-code-quality-features/about-status-checks) (read 2026-09-17) states that a skipped job "will report its status as 'Success'" and "will not prevent a pull request from merging, even if it is a required check."
+It has two concrete consequences worth keeping straight:
+
+1. **Splitting a job that emits a required check's context retires that context.**
+   A required check is matched by NAME against an emitted check-run --- `no-underived-required-check.py`'s own subject.
+   If a job named `lint` is split into `lint-markdown` + `lint-yaml` and the ruleset still requires the context `lint`, that context is never emitted again by anything, and it sits as `Expected` forever, blocking every future merge silently (the same failure mode `no-underived-required-check.py` guards against from the other direction --- a context nothing ever emitted).
+2. **An aggregator job that replaces a split context must treat every non-success outcome as a fail, not just `failure`.**
+   If a ruleset is updated to require a new aggregator job (e.g. `all-checks-passed`) that `needs:` the split jobs, that aggregator must explicitly check each dependency's result and fail on anything other than `success` --- `skipped` and `cancelled` included --- because GitHub's own required-check satisfaction logic does NOT do this filtering for you once the aggregator itself reports `skipped` or `success`.
+   Concretely: `if: always()` on the aggregator job (so it is never itself skipped, which would then count as satisfying the NEW required context too), followed by a step that inspects `needs.<job>.result` for each dependency and fails the aggregator if any of them is not `success`.
+
+- **Do:** before renaming or splitting a job that a ruleset/branch protection requires by name, update the required-context list in the same change, and verify the new context is actually emitted by a run OF THE DEFAULT BRANCH (`gh api "repos/<o>/<r>/actions/runs/<run-id-on-that-branch>/jobs"`), not just the workflow YAML.
+  Not a pull request's check-run list: [`gh-cli.md`](gh-cli.md) records, from a measured incident, that a required-context string must never be read off any PR's check runs, and [`verify-the-right-artifact.md`](../shared/workflow/verify-the-right-artifact.md) explains why --- a `pull_request` run resolves the workflow file from the head-into-base merge, so it is evidence about the merge rather than about the branch.
+- **Do:** write an aggregator job with `if: always()` and an explicit per-dependency result check, never a bare `needs:` with no result inspection.
+- **Don't:** assume `skipped` is safely distinct from `success` for a required check --- GitHub treats them the same for merge-gating purposes.
+- **Don't:** let a job rename/split ship without a same-change audit of every ruleset/branch-protection rule that names the old job.

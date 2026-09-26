@@ -599,14 +599,33 @@
   Neither surface therefore answers "was Copilot asked to review this", in either direction.
   (Probed on `ucdavis/bcs#479`, 2026-07-30.)
 
-  That disappearance is **not** explained by the `review_on_push: true` rule above, and [`shared/workflow/pr-on-claim.md`](../shared/workflow/pr-on-claim.md)'s "blocked-request test has a false positive" section owns the argument and the deriving queries.
+  **A GraphQL `requestReviews` mutation is a third way to add nobody, and `suggestedActors` is not the provisioning test it looks like.**
+  The reviewer-request POST returning 201 and adding nobody invites the next hypothesis, that Copilot code review is simply not enabled for the repository --- and `suggestedActors` looks like the query that would settle it.
+  It does not.
+  Measured 2026-09-15 with `gh api graphql -f query='query { repository(owner: "<o>", name: "<r>") { suggestedActors(capabilities: [CAN_BE_ASSIGNED], first: 20) { nodes { login __typename } } } }'`:
+  `ucdavis/lbt` returned exactly one `Bot`, `copilot-swe-agent`, and so did `Morrison-Lab/ai-config`, which had a `copilot-pull-request-reviewer[bot]` review on #3678 at `2026-09-15T05:32:36Z`.
+  Identical answers, opposite states, so the query discriminates nothing here: `CAN_BE_ASSIGNED` is about the **coding agent** you can assign an issue to, a different product from the PR reviewer, whose login never appears in that list on either repo.
+  A session also reported the GraphQL `requestReviews` mutation carrying the reviewer bot's node id behaving like the REST POST --- returning without errors while the reviewer list stayed empty --- but that one is narration rather than measurement here: no repo, PR, node id, or response body was kept, and re-running it would be an outward mutation.
+
+  The repository's own history is the closest thing to an answer, and it is weaker than it looks.
+  As of 2026-09-15, `gh api "repos/<o>/<r>/pulls/<N>/reviews"` over every PR `ucdavis/lbt` had that day returns no reviews at all.
+  That is 1 and 3 through 8, with #3 closed unmerged and #8 still open.
+  That is a fact about the repository, not about the endpoint that was probed, and it is still not a provisioning verdict: nobody controlled for whether a review was ever requested on those PRs, which is the confound the "both candidate directions are unconfirmed" passage below already states for this file.
+  Where a per-head answer is what you need, [`memories/copilot-reviews.md`](copilot-reviews.md)'s check-run query separates "never ran" from "ran and posted nothing".
+  This file's standing Do, to read the posted review body, is unchanged.
+
+  - **Don't:** read a `suggestedActors` list whose only bot is `copilot-swe-agent` as evidence about PR code review --- ai-config returns the same single bot while being reviewed.
+  - **Don't:** escalate from REST to GraphQL when the REST call already returned success ---
+    the mutation was reported to add the same nobody, and each attempt spends quota that is often the real cause.
+
+  That 201-then-empty disappearance is **not** explained by the `review_on_push: true` rule above, and [`shared/workflow/pr-on-claim.md`](../shared/workflow/pr-on-claim.md)'s "blocked-request test has a false positive" section owns the argument and the deriving queries.
   The short version: `Morrison-Lab/ai-config` reproduces the identical 201-then-empty signature while carrying no `copilot_code_review` rule at either scope, so an empty pending list is evidence neither that the request was blocked nor that a review is coming.
   Only the posted review **body** settles whether a review is actually coming.
-  Measured on `Morrison-Lab/ai-config` on 2026-09-15: no body ever came.
+  Measured on `Morrison-Lab/ai-config` on 2026-09-15, across the eight POSTs below: no body came for any of them, though #3678 took a `copilot-pull-request-reviewer[bot]` review the same day at `05:32:36Z`.
   Across roughly three hours and eight POSTs spread over three PRs (#3629, #3696, #3699), every request returned 200 with an empty `requested_reviewers`, and `gh pr view --json reviews` counted zero Copilot reviews at every head throughout.
-  So for this repo the open question above currently resolves to "no review is coming".
+  So for those requests the open question above resolves to "no review is coming", and no further: the review on #3678 is what stops this being a fact about the repository.
   What that does NOT affect is `hooks/no-unreviewed-pr.py`: its `_argv_request` discharges on a successful mutating POST to the endpoint, never on a review arriving, so the obligation is satisfiable here whatever Copilot does.
-  What it does affect is [`copilot-review-before-human`](../shared/vendored/copilot-review-before-human.md), whose point is an AI review BEFORE a human one --- on this repo that cannot be had from Copilot, so the adversarial self-review is the only AI reader a PR gets.
+  What it does affect is [`copilot-review-before-human`](../shared/vendored/copilot-review-before-human.md), whose point is an AI review BEFORE a human one --- which those three PRs did not get from Copilot, so the adversarial self-review was the only AI reader they had.
   That is a claim about a repository setting and can change, so re-measure rather than carrying it forward.
   The timeline event described next settles the strictly narrower question of whether the request was *accepted*, which those three surfaces also cannot answer --- so the two conclusions divide the question rather than competing for it.
 
@@ -680,6 +699,15 @@
   The `review_on_push: true` rule above re-requests Copilot on **every push**, so there is a window after each push in which Copilot is already a pending reviewer and a manual request is a duplicate.
   That would make the response depend on *when* you ask rather than on how, and it fits both observations without either being wrong.
   It stays untested on purpose: probing consumes the per-user quota that is usually the actual reason Copilot is absent, so the experiment damages the thing it would explain.
+
+  **A third observation, on `Morrison-Lab/ai-config#3852` (2026-09-21), narrows what a `201` proves without resolving that disagreement.**
+  The POST returned `201`.
+  Afterwards `requested_reviewers` read `{"users":[],"teams":[]}`,
+  the issue timeline carried no `review_requested` event among its three events,
+  and `get_reviews` was still `[]`.
+  So a `201` is not evidence that a reviewer is now pending, and the timeline settles it where the status code cannot.
+  `mcp__github__request_copilot_review` returned no output and registered nothing on the same PR,
+  which is a second sighting of that silent result after #3799.
 
   The operational advice does not depend on resolving it.
   Don't spend a call on this endpoint either way while a `copilot-pull-request-reviewer` check run is queued or in progress on the head -- the ruleset already requested the review, and neither response tells you whether one is pending.
@@ -914,6 +942,23 @@
   The command exits 1 with `could not resolve to a unique workflow; found: workflow-a.yml workflow-b.yml`.
   This happens commonly when reusable workflows (like a review action) are called by multiple caller workflows, or when two different files just happen to use the same `name`.
   The fix is to query by the **exact filename** instead of the display name: `gh run list -w workflow-b.yml`.
+
+- **`gh issue comment` on a PR uses GraphQL `addComment`, requiring `pull_requests: write`.**
+  When commenting on a pull request from a workflow job or token with only `issues: write` scope, `gh issue comment <pr-number>` fails with an authorization error.
+  This happens because `gh issue comment` calls GraphQL's `addComment` mutation under the hood, and GitHub's GraphQL schema requires `pull_requests: write` whenever the commented issue is a pull request.
+  In contrast, the REST endpoint `POST /repos/{owner}/{repo}/issues/{issue_number}/comments` with `Content-Type: application/json` accepts either `issues: write` or `pull_requests: write`.
+  - **Do:** in workflows with `issues: write` commenting on PRs (e.g. comment-triggered dispatchers), use the REST endpoint piping JSON through stdin without an added newline and with explicit JSON content-type:
+    `printf '%s' "$BODY" | jq -Rs '{body: .}' | gh api "repos/{owner}/{repo}/issues/{issue_number}/comments" --method POST -H "Content-Type: application/json" --input -`.
+  - **Don't:** use `gh issue comment` in jobs lacking `pull_requests: write` when commenting on pull requests, or pass raw markdown bodies via unescaped `-f body=...` flags.
+  (Measured 2026-09-24 on [Morrison-Lab/gha#931](https://github.com/Morrison-Lab/gha/issues/931) ([PR #933](https://github.com/Morrison-Lab/gha/pull/933)).)
+
+- **`gh workflow run` without `--ref` queries GraphQL `repository.defaultBranchRef`, failing when missing `contents: read`.**
+  Calling `gh workflow run <file.yml>` without an explicit `--ref` causes `gh` to attempt determining the default branch by querying GraphQL `repository.defaultBranchRef`.
+  On private repositories or with limited-permission tokens (such as a GitHub Actions job with only `actions: write`), this query fails with `unable to determine default branch for <owner>/<repo>: GraphQL: Resource not accessible by integration (repository.defaultBranchRef)`.
+  Explicitly passing `--ref "$DEFAULT_BRANCH"` (or `--ref <branch>`) skips the GraphQL query entirely and allows workflow dispatch under `actions: write` alone.
+  - **Do:** always pass `--ref "$DEFAULT_BRANCH"` or `--ref <branch>` to `gh workflow run` on fallback dispatch paths and in automated workflow steps.
+  - **Don't:** omit `--ref` in automated `gh workflow run` calls and rely on `gh` to query the default branch dynamically.
+  (Measured 2026-09-24 on [Morrison-Lab/gha#931](https://github.com/Morrison-Lab/gha/issues/931) ([PR #933](https://github.com/Morrison-Lab/gha/pull/933)).)
 
 ## `gh pr view --json` returns ONLY the requested fields, so a consumer reading an unrequested key is dead
 

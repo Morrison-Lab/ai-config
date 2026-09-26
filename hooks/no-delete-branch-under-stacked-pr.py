@@ -223,6 +223,13 @@ def _parse_merge(argv):
     return target, repo, deletes
 
 
+NO_WINDOW = {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)} if sys.platform == "win32" else {}
+
+
+def _gh_cmd():
+    return shutil.which("gh") or "gh"
+
+
 def find_child_prs(repo, branch):
     """Numbers of open PRs whose base is `branch`. None means 'unknown'.
 
@@ -233,9 +240,10 @@ def find_child_prs(repo, branch):
     """
     try:
         out = subprocess.run(
-            ["gh", "pr", "list", "-R", repo, "--base", branch,
+            [_gh_cmd(), "pr", "list", "-R", repo, "--base", branch,
              "--state", "open", "--json", "number"],
             capture_output=True, text=True, timeout=8,
+            **NO_WINDOW,
         )
     except Exception:
         return None
@@ -257,9 +265,10 @@ def find_child_prs(repo, branch):
 def head_branch_of(repo, target):
     try:
         out = subprocess.run(
-            ["gh", "pr", "view", str(target), "-R", repo,
+            [_gh_cmd(), "pr", "view", str(target), "-R", repo,
              "--json", "headRefName", "--jq", ".headRefName"],
             capture_output=True, text=True, timeout=8,
+            **NO_WINDOW,
         )
     except Exception:
         return None
@@ -303,7 +312,8 @@ def main():
         if is_dry_run:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
-    inp = payload.get("tool_input") or {}
+    inp = payload.get("tool_input")
+    inp = inp if isinstance(inp, dict) else {}
     command = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or ""
 
     argvs = _simple_commands(command)

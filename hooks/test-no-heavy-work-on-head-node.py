@@ -33,7 +33,9 @@ HEAVY = "Rscript -e 'devtools::test()'"
 def run(command, host="shiva", nodes=frozenset({"c1", "c2", "c3", "c4"}), env=None):
     """Drive main() with the host, cluster and environment faked."""
     guard.compute_nodes = lambda: nodes
-    guard.os.uname = lambda: os.uname_result(("Linux", host, "", "", ""))
+    guard.platform.node = lambda: host
+    if hasattr(os, "uname_result"):
+        guard.os.uname = lambda: os.uname_result(("Linux", host, "", "", ""))
     saved, buf = dict(os.environ), io.StringIO()
     os.environ.clear()
     os.environ.update(env or {})

@@ -318,13 +318,16 @@ try:
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
     from shellcmd import (shell_c_expansions, nested_shell_commands,
-                          COMMAND_WRAPPERS)
+                          COMMAND_WRAPPERS, native_path)
 except Exception as _exc:  # broken install: degrade, do not fail open further
     print(f"no-clobbering-push: cannot load scripts/lib/shellcmd.py ({_exc}); "
           f"a push wrapped in an interpreter's -c will not be seen",
           file=sys.stderr)
     shell_c_expansions = nested_shell_commands = None
     COMMAND_WRAPPERS = frozenset()
+
+    def native_path(path, is_windows=None):
+        return path  # the pre-helper behaviour: a /c/... path stays unreadable
 
 RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
 
@@ -681,7 +684,11 @@ def _shell_expand(target):
         target = os.path.expanduser(target)
         if target.startswith("~"):
             return None  # an unknown user
-    return target
+    # Git Bash spells a drive path `/c/...`, which native Windows Python and
+    # git.exe cannot open -- and on Python 3.13 `os.path.isabs` calls it
+    # relative, so it would be joined onto the current directory. Convert it
+    # before either sees it.
+    return native_path(target)
 
 
 def _resolve_cd(argv, cur):
@@ -1632,7 +1639,8 @@ def main() -> int:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
-    inp = payload.get("tool_input") or {}
+    inp = payload.get("tool_input")
+    inp = inp if isinstance(inp, dict) else {}
     command = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script")
     if not isinstance(command, str) or not command.strip():
         if is_dry_run:

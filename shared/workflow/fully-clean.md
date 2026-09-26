@@ -1041,8 +1041,42 @@ so a human's comment carrying verdict-shaped text enters on body text alone.
   read the matched pattern and reword your own comment,
   rather than requesting another bot round that cannot supersede it.
 - **Don't:** write "Blocking", "Changes requested", "Rejected",
+  "Needs more work",
   or the other not-clean vocabulary in a comment you post on your own PR,
   even inside "X: Addressed".
+
+**Quoting a reviewer's verdict is the same hazard, and it is the likelier one,
+because quoting reads as reporting rather than as declaring.**
+The bullets above govern vocabulary you write as your own disposition.
+They do not obviously cover the sentence that opens a review-response
+comment --- "the review returned **Needs more work** with five findings" ---
+which is a factual report about a round you have just closed, and feels like
+the opposite of asserting a verdict.
+The scanner cannot tell the two apart, so a comment announcing that every
+finding is fixed scores the PR not-clean on its own first line.
+
+Single backticks are the fix, not bold and not double backticks:
+`strip_cited_finding_vocab` blanks single-backtick spans only
+(ai-config#2449), so a bolded or double-backticked quotation stays live in
+the scan.
+Note that "Needs more work" is this repo's reviewer's own verdict string,
+which is exactly why it is the phrase a response comment quotes.
+
+- **Do:** single-backtick every verdict phrase you quote, including in a
+  comment reporting that the round is resolved.
+- **Don't:** bold it for emphasis --- that is the formatting the sentence
+  invites, and it leaves the phrase live.
+
+(Measured 2026-09-17 on ai-config#3750: a review-response comment opened
+"An adversarial subagent review of `f8d7aec6` returned **Needs more work**
+with five findings", and `check-pr-fully-clean.py` then reported
+`examined 1 dated automated review item(s), 1 bore a verdict, latest =
+not-clean`, naming the comment's own author as the not-clean reviewer.
+Single-backticking the phrase took the same scan to
+`0 bore a verdict, latest = NONE`.
+The repo's `claude-review.yml` prompt-addendum already warns the *reviewer*
+about this at length, citing #2449 and #2497;
+nothing warned the author writing back.)
 - **Don't:** expect a later "all addressed" comment of yours to clear it;
   as of 2026-09-09 the phrase scan does not read that shape as clean.
 
@@ -1339,11 +1373,11 @@ esac
 - **Do:** re-verify the agent and the head yourself before reporting ready,
   since the exit status is necessary and this file's own SHA-surface caveats
   still apply.
-- **Don't:** grep a purpose-built checker's output for a phrase --- its prose
-  is a human-facing report, not an API.
 - **Do:** pass `-R OWNER/REPO` from any poller or script, since the repo comes
   from the working directory otherwise and a background loop inherits whatever
   cwd the session happened to be in.
+- **Don't:** grep a purpose-built checker's output for a phrase --- its prose
+  is a human-facing report, not an API.
 - **Don't:** collapse the status to a boolean either; `rc != 0` reports a
   broken check as a regressed PR, which is the same conflation wearing the
   remedy's clothes.
@@ -1585,8 +1619,21 @@ A clean-gate check the queue cannot block on is a check the queue does not run a
 Those two conditions are the specification the queue form of this gate has to prove ([#3030](https://github.com/Morrison-Lab/ai-config/issues/3030)), and until it lands the exception is unavailable: a base that requires a merge queue stops the merge, since a required check supplied by a GitHub App cannot be verified from workflow files at all.
 The proof will read the required checks from `gh api --paginate "repos/<owner>/<repo>/rules/branches/<base-encoded>"` (encode the base name as one path segment, `jq -rn --arg b "<base>" '$b|@uri'`, since `release/1.x` would otherwise split into two, and paginate, since the first page can omit rules), and each clean-gate workflow's `on:` block and job and step `if:` conditions for `merge_group`.
 
-The rule splits by merge mode: a direct merge from a session with `git` and `gh`, a direct merge from a remote session without `git`, and, once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) lands, a merge queue.
-It is GitHub-specific as written (`headRefOid`, `gh`, the compare endpoint, the update-branch and merge pins), so a GitLab merge has no equivalent gate until [#3021](https://github.com/Morrison-Lab/ai-config/issues/3021) supplies one, and `merge-it`, `mwc`, and `chores` inherit that scope.
+The rule splits by merge mode: a direct merge from a session with `git` and `gh`, a direct merge from a remote session without `git`, a direct GitLab merge from a session with `git` and `glab`, a direct GitLab merge from a remote session without `git`, and, once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) lands, a merge queue.
+GitLab uses `scripts/check-mr-fully-clean.py` for the equivalent gate.
+It reads the MR `sha` and `target_branch`, every pipeline on that SHA, every paginated note and discussion, and then re-reads the head before reporting a verdict.
+For a local session, it proves currency with `git merge-base --is-ancestor <target-branch> <head-sha>` after fetching the target.
+For a remote session, the agent gathers the same payload through the GitLab API and passes it with `--from-json`, including an explicit `base_ancestor` result and the final head re-read.
+The instrument prints the full pinned SHA for the merge call.
+After the gate, re-read the MR, and merge only with `sha=<pinned-sha>` and
+`auto_merge=false`.
+GitLab rejects the request if the head moved.
+If currency fails, update with `PUT /projects/:id/merge_requests/:iid/rebase`,
+poll the MR with `include_rebase_in_progress=true` until
+`rebase_in_progress` is false, then rerun the entire gate on the new SHA.
+The GitLab direct-merge form is now part of `merge-it`, `mwc`, and `chores`.
+A merge train remains a separate mode because its speculative pipeline must be
+verified by the server.
 It binds every direct-merge path, including the dependency-bump merges in [`chores`](../../skills/chores/SKILL.md), not only `mwc` and `merge-it`.
 For a bot bump, the gate to rerun after an update is CI plus conflict state, which is what those PRs are gated on, since `@claude` review is skipped on them by design.
 `chores` states that form.
@@ -1622,11 +1669,16 @@ Merge synchronously, right after the check, with the merge command pinned.
   Pin the update itself to the head that failed the currency check.
   Locally that is `gh api -X PUT "repos/<owner>/<repo>/pulls/<N>/update-branch" -f expected_head_sha="<pinned-sha>"`, since the `gh pr update-branch` wrapper has no flag for it in `gh` 2.98.0.
   Remotely it is `expectedHeadSha` on the MCP `update_pull_request_branch` tool.
-  A `422` whose message names an expected-head mismatch means the head already moved.
+  A `422` whose message names an expected-head mismatch does not by itself discriminate a moved head from a wrong pin: a correctly-lengthed but wrong-content SHA --- most often one guessed or padded from an abbreviation instead of read in full --- produces the byte-identical message with no other writer involved.
   Match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show.
-  That is the another-writer signal, so it routes to the ownership rule (settle who owns the branch per [`claim-pr`](claim-pr.md)) instead of merging the base into someone else's push.
+  So re-read `headRefOid` and compare it to the SHA you sent before routing to the ownership rule (settle who owns the branch per [`claim-pr`](claim-pr.md)) instead of merging the base into someone else's push: only a head that has actually changed is the another-writer signal, and treating the message alone as that signal sends a self-inflicted bad pin into a concurrent-writer investigation instead of the one-command fix (re-read the real SHA and retry).
   The endpoint uses `422` for other validation failures too, so any other message is a failed update: stop and read it rather than treating it as a moved head.
   Measured 2026-09-02 (Pacific) on [#2989](https://github.com/Morrison-Lab/ai-config/pull/2989): a deliberately wrong `expected_head_sha` returned `422` with a message reading "expected head sha didn't match current head ref." (curly apostrophe in the live text) and changed nothing.
+  Measured 2026-09-20 on [Lacaedemon/sparta#1615](https://github.com/Lacaedemon/sparta/pull/1615): a 40-character SHA constructed by padding the 8-character abbreviation that `check-pr-fully-clean.py` had printed (`d4691095`) returned the identical `422`, with no other writer involved --- the padded string was never a real commit on the PR.
+  - **Do:** re-read the live `headRefOid` and compare it to the SHA you pinned before concluding a writer moved the head.
+  - **Do:** read the full SHA from the API or `git rev-parse` at the point of use.
+  - **Don't:** read the `422` message alone as proof of a concurrent writer.
+  - **Don't:** construct or pad a full SHA from an abbreviation printed by a script or a checker.
   Then poll `headRefOid` until it changes, with a deadline (five minutes is generous for a merge commit GitHub has accepted), and treat expiry as a failed update to stop on and report, since a `202` can be returned without a new head ever appearing.
   Once it changes, record that SHA, rerun the base-currency check on it, and only then rerun the gate, pinned to that SHA.
   The gate itself takes minutes, so the base can advance again while it runs, and so can the head: a concurrent push that already contains the current base passes a currency-only recheck while the gate's verdict belongs to the earlier SHA ([`github`](../../memories/github.md) records that unpinned-head race).
@@ -1760,3 +1812,141 @@ finding.**
 **Algorithmic safeguards:** Algorithmic checks and hooks can only invalidate, not validate, a PR.
 You still need to use your own judgment in addition to satisfying the algorithmic safeguards;
 they are a safety net, not a gold standard.
+
+**Never characterize a PR with a verdict word.**
+`clean`, `green`, `clear`, `ready` --- each is a claim quantified over the whole PR: every required check, every review pathway, every touched file.
+It is produced from whatever subset happened to be looked at, so the word asserts far more than the reading behind it.
+
+The gap is mechanical rather than a matter of tone, and on a repo whose review jobs skip for bot-sender pushes it runs the wrong way by construction.
+A skipped required check satisfies branch protection, so the PR's own status display, `mergeable_state`, and a conclusions sweep all agree the PR is fine while **nothing has reviewed that head** ([`claude-bot-workflows`](../../memories/claude-bot-workflows.md) carries the measurement and the four occurrences).
+Relaying the display as a whole-PR verdict converts an absence of evidence into a report of evidence, which is strictly worse than an ordinary overreach: the more you trust the summary, the further off you are.
+
+Report the **triple** instead --- *what was measured*, *on which SHA*, *what remains unverified*:
+
+> no merge conflict;
+> `validate` concluded `success` on `38368e1`;
+> the six `review /` jobs are `skipped` on this head, so nothing has reviewed it.
+
+The word also carries three meanings in this corpus at once --- conflict-free, CI green, and fully clean in this fragment's sense --- so a stopping-point declaration reading "clean stopping point" in the same message that reports on a PR merges the session sense into the PR sense.
+A caveat placed after a headline does not survive being skimmed: disclosing "no verdict exists" below a sentence that already said clean is not a correction, it is a footnote to a claim the reader has already taken.
+
+- **Do:** state what was measured, on which SHA, and what is still unverified, and let the human draw the conclusion --- including when asked point-blank whether a PR is ready.
+- **Do:** pin the SHA on every status sentence;
+  a status without a head SHA is not a measurement, because the head moves under it.
+- **Do:** say so explicitly when a bot pushed the head, since that is the condition that silences the review jobs.
+- **Do:** lead with the fully-clean status when it is negative --- "not fully clean, no verdict on this head, and the conflict is gone" --- rather than trailing it as a caveat.
+- **Don't:** write a verdict word about a PR anywhere: project chat, a thread reply, a PR body, a commit message, or a handback summary.
+- **Don't:** read `skipped` as satisfied, whatever the required-checks rollup shows.
+  Enumerate the check runs and read each `conclusion` rather than reading the rollup.
+- **Don't:** use "clean stopping point" in a message that also characterizes a PR;
+  the session sense and the PR sense need different words when they share a message.
+
+(Maintainer directive, 2026-09-18, after ai-config#3767 was reported `fully clear` on the strength of two readings --- no merge conflict, and `validate` concluding `success` on `38368e1`.
+All six `review /` jobs were `skipped` on that head under the ai-config#3743 sender gate, and a real review landed hours later on that same commit returning `NOT_CLEAN` with two findings, one of them a `permissions:` block missing `pull-requests: read`.
+It is [`metacognitive-monitoring`](metacognitive-monitoring.md)'s scope claim applied to check status rather than to file coverage.)
+
+**`check-pr-fully-clean.py` exits 1 for two distinct reasons, and they need different things.**
+Both produce identical green checks and an identical `mergeable_state`, so nothing on the PR page separates them --- only the scorer's `verdict scan` line does.
+
+1. **No verdict on the head** --- `verdict scan: examined N ... 0 bore a verdict, latest = NONE`.
+   Nothing has ever reviewed this commit.
+2. **A standing not-clean verdict** --- `latest = not-clean`, dated before the current head.
+   The scorer reports these from the reviewer's review-data payload, with the prose phrase scan skipped.
+
+Score every PR rather than generalizing from one.
+Asserting that a group of PRs "all fail on the same line" is the scope claim again, one level up: measured 2026-09-17 across five open ai-config PRs, three were case 1 and two were case 2.
+
+Both scripts take **positional** arguments, and calling either wrong costs a round trip:
+
+```bash
+python3 scripts/build-pr-payload.py <owner>/<repo> <N> <OUT.json>
+python3 scripts/check-pr-fully-clean.py -R <owner>/<repo> --from-json <OUT.json> <N>
+```
+
+The checker requires `pr_number` even with `--from-json`, and omitting it exits 2 --- the same exit code the missing-`review_threads` failure produces (ai-config#3653), so an argument mistake reads as the known GraphQL blocker.
+
+- **Do:** read the `verdict scan` line per PR before characterizing any group of them.
+- **Do:** splice measured review threads from `GET /repos/{owner}/{repo}/pulls/{n}/ccr/review_threads` before `--from-json` where the builder's GraphQL fetch is blocked;
+  substituting `[]` for a failed fetch manufactures the same output as a PR with no threads.
+- **Don't:** summarize several PRs' blockers from one PR's output.
+- **Don't:** chase the NOTE's cited issue on a case-2 reading --- ai-config#3054 is closed as completed, so the citation is the checker's own stale message text rather than a live blocker.
+
+(Measured 2026-09-17 on ai-config#3745, #3750 and #3760 for case 1, and on #3690 and #3692 for case 2, the latter carrying verdicts dated two days before their current heads.
+Both classes clear the same way --- a push from a non-bot account re-runs the reviewer --- so the remedy is shared even though the diagnosis is not.)
+
+## A blocked claim expires exactly as a clean one does
+
+Everything above governs the claim that a PR is ready.
+Its mirror gets no attention anywhere in this corpus, and it is the one a session repeats: the claim that a PR is **not** ready.
+
+The asymmetry is what hides it.
+Understating readiness reads as caution rather than as a claim that could be wrong, so "not eligible yet" feels like the safe thing to say while being a live-state assertion exactly as "ready to merge" is.
+`hooks/no-stale-pr-status.py` mechanizes the clean direction, and nothing points the other way.
+
+**No hook can cover it, and widening that one would cost more than the gap.**
+It works because the event invalidating a clean claim is *your own push*, which the transcript carries.
+The event invalidating a blocked claim is a third party's review landing, which never appears in the transcript at all.
+The hook's own comments name "waiting on CI" as honest phrasing it must not trip --- the exact sentence at issue --- so widening it would fire on nearly every truthful status line.
+
+**The evidence gap is a wrong artifact rather than a missing query.**
+A session repeating "blocked" is usually querying every turn, on the current head, and a check-runs query cannot see a verdict.
+Where review jobs skip for a bot-pushed head, a skipped required check reads as satisfied, so conclusions say nothing in either direction.
+Only `scripts/check-pr-fully-clean.py`, or the verdict comment body itself, settles it.
+That is [`verify-the-right-artifact`](verify-the-right-artifact.md)'s substitution in its most convincing form, because querying the wrong artifact felt like checking.
+
+- **Do:** re-run the scorer before repeating that a PR is blocked, not only before saying it is ready.
+- **Do:** run the query before answering, when someone asks why something has not happened yet.
+- **Don't:** read a check-runs sweep as evidence about a verdict --- it is evidence about jobs.
+- **Don't:** carry a status claim across a turn boundary in either direction, since a verdict can land on an unchanged head at any moment.
+
+(Measured 2026-09-18 on ai-config#3760.
+A clean verdict landed at 18:20:12Z, and at 18:25:44Z the maintainer asked why the PR had not merged under this repository's standing `mwc` grant.
+It had been reported blocked several times, each report repeated rather than re-derived.
+The scorer exited 0 the moment it was actually run, and the PR merged.)
+
+## A pending review request is a second, independent blocker
+
+`scripts/check-pr-fully-clean.py` prints the pending-request blocker on its
+**own line**, separate from the verdict line:
+`PR has pending review request(s) still in flight: <login>`.
+The two coexist.
+A PR can carry a standing not-clean verdict and a pending request at once, so
+clearing the verdict clears one blocker and the scorer still exits 1 ---
+which reads as the verdict fix having failed.
+
+**A hand-check of the PR object and the scorer can disagree, and the cause is
+staleness rather than the field.**
+An earlier revision of this entry claimed the two fields themselves
+disagree.
+They cannot: `scripts/build-pr-payload.py` builds `reviewRequests` from
+`requested_reviewers` and `requested_teams` off the same
+`GET /repos/{owner}/{repo}/pulls/{n}` response, so one fetch can never
+produce both an empty hand-check and a populated payload.
+What separates them is *when* each was read.
+A request is added and removed repeatedly over a PR's life --- ai-config#3778
+carries three `review_requested` and three `review_request_removed` events
+between 2026-09-18T18:48:11Z and 2026-09-20T00:09:17Z --- so a payload built
+minutes before a hand-check describes a different moment, and neither reading
+is wrong about the moment it took.
+
+The remedy is the same one this file applies to verdicts: re-derive rather
+than compare two readings taken at different times.
+Take the pending request from the scorer's own output, or from the payload
+that same run consumed, rather than from a separate fetch made alongside it.
+
+Only the named reviewer clears it, by reviewing or by being un-requested.
+Where the request was created in error --- by a session requesting human
+review before any AI verdict, against this corpus's own ordering rule ---
+withdrawing it is repair rather than gaming the gate, and the
+review workflow restores only what it stashed, so the withdrawal is durable.
+See
+[`fixing-mistakes-is-top-priority`](fixing-mistakes-is-top-priority.md)'s
+"Undo it yourself, the moment you notice it".
+
+- **Do:** read every blocker line the scorer prints, not the first one.
+- **Do:** take a pending request from the scorer's own output, or from the
+  payload that run consumed.
+- **Don't:** compare a hand-fetched `requested_reviewers` against a payload
+  built at another moment and read the difference as a field asymmetry.
+- **Don't:** read a still-failing exit after a verdict fix as the fix having
+  failed --- check whether a second blocker line is doing it.

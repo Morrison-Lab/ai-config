@@ -130,6 +130,48 @@ git show <commit>:<path>
 - **Don't:** build on a remembered tally, however recent the session that
   produced it.
 
+## Browser work leaves no artifact, so keep a log of it
+
+The count above is derived from artifacts, and browser work leaves none.
+A form toggled in a web UI, a repository created from a template by
+clicking, a property set up in an admin console: none of them produces a
+commit, a file, or a run, so there is nothing to query afterwards, and the
+third occurrence cannot be recognized as the third.
+That is also why browser work is where the eight-small-instances failure
+above is most common.
+
+So keep a running log of every task a person or agent had to do in a
+browser, one line per task, carrying:
+
+- the date of each occurrence;
+- the running count;
+- the scripting route, meaning the API, CLI, or script that could do it
+  instead, or a note that none exists.
+
+Keep the log in the project's shared memory, where every session working on
+that project can read and append to it.
+When a line reaches two occurrences, mark it as a scripting candidate.
+When it comes up a third time, propose the script, or write it.
+A task with no API still gets its line: when it recurs, the line is what
+shows that the missing API is worth an upstream request or a workaround.
+
+This composes with `memories/preferences.md`'s rule that the browser is a
+last resort.
+That rule says to prefer a CLI or API when one exists.
+The log catches the tasks where none was known yet.
+
+- **Do:** append a line, or bump its count, the same day a browser-only
+  task is done, whoever did it.
+- **Do:** name the scripting route on the line, even when it is "no API".
+- **Don't:** count browser occurrences from memory at the third request;
+  the log is the artifact the count is derived from.
+- **Don't:** script a browser task after a single occurrence, which is the
+  speculative case YAGNI governs.
+
+(Directive from Ezra Morrison, 2026-09-25: "keep track of what we keep
+needing to do via browser, and be prepared to script anything we do
+repeatedly".)
+
 ## A follow-up question gets a hastier instrument than the main task did
 
 The test above fires on recurrence across occasions, which leaves a gap

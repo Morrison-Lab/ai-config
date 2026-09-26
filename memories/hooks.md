@@ -6,6 +6,7 @@ No count is written here on purpose: it moves whenever any hook-adding PR merges
 This document describes those hooks --- their lifecycle events, triggering conditions, verification mechanisms, and rules for **proactive compliance** so agents can satisfy requirements naturally without tripping guards.
 The registry is the authority;
 the tables below are still catching up, and two registered hooks have no row yet: `flag-config-deletion-without-ref-check.py` and `warn-stale-review-diff-base.py`.
+Add the row in the same PR that registers a hook, rather than leaving it to a later sweep that nothing schedules.
 The gap survives because `scripts/check-hook-catalog.py` compares the registry against README.md rather than against this file.
 
 For agents operating in this repository or consuming its skills, proactive compliance means following these rules by default rather than waiting for a hook to fire or block.
@@ -70,7 +71,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 | [`warn-nonglobal-substitution.py`](../hooks/warn-nonglobal-substitution.py) | Warn | Warns on in-place `perl -i` / `sed -i` substitutions lacking the global `g` flag or occurrence specifier. | Ensure substitution expressions include `g` (e.g. `s/pattern/replacement/g`) when replacing across files. | None. |
 | [`warn-dupe-check-chained-to-create.py`](../hooks/warn-dupe-check-chained-to-create.py) | Warn | Warns when a duplicate search and a `gh pr create` / `gh issue create` share the same Bash command string. | Execute the search command first, inspect the results, and then execute the create command in a separate, subsequent tool call. | None. |
 | [`warn-status-read-after-pipe.py`](../hooks/warn-status-read-after-pipe.py) | Warn | Warns when checking `$?` immediately after a pipeline without `pipefail` enabled. | Add `set -o pipefail` before executing pipelines whose non-tail exit status must be checked, or use `$PIPESTATUS`. | None. |
-| [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py) | **Block** | Blocks `git push` unless a clean verdict for the exact commit being pushed came from an adversarial self-review subagent or from a review by a CLI the guard recognizes (today `agy --print`, and no other). | Dispatch the `adversarial-reviewer` subagent against `HEAD`, address any findings, and obtain a clean verdict matching `Reviewed-Commit: <HEAD_SHA>` before pushing. | Set `ALLOW_UNREVIEWED_PUSH=1 git push ...` for initial empty PR branches, a review by a CLI the guard does not recognize, or unregistered personas. An `agy --print` review needs no override: the guard admits it directly. Out-of-band publish routes (GitHub Contents API, GraphQL mutations, MCP `push_files`) bypass the guard without an auditable trail and are strictly prohibited when blocked (ai-config#3601; technical guard gap tracked in ai-config#1929). |
+| [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py) | **Block** | Blocks `git push` unless a clean verdict for the exact commit being pushed came from an adversarial self-review subagent or from a review by a CLI the guard recognizes (today `agy --print`, and no other). A push whose every resolved URL is in the hook's `EXEMPT_REPOS` constant (`Morrison-Lab/mln`, `mlg`, `mlr`) is not gated at all. The report scanner blanks block fences, inline code spans, and HTML comments in one render-faithful pass so quoted comment openers (like `<!--`) in code spans never blank subsequent verdicts (ai-config#3961). | Dispatch the `adversarial-reviewer` subagent against `HEAD`, address any findings, and obtain a clean verdict matching `Reviewed-Commit: <HEAD_SHA>` before pushing. | Set `ALLOW_UNREVIEWED_PUSH=1 git push ...` (or `env ALLOW_UNREVIEWED_PUSH=1 git push ...` on Windows shells) as a single unchained command for initial empty PR branches, a review by a CLI the guard does not recognize, or unregistered personas. Never chain the push with `;` or `&&` or append a pipe, which the guard rejects as unparseable. An `agy --print` review needs no override: the guard admits it directly. Out-of-band publish routes (GitHub Contents API, GraphQL mutations, MCP `push_files`) bypass the guard without an auditable trail and are strictly prohibited when blocked (ai-config#3601; technical guard gap tracked in ai-config#1929). |
 | [`flag-uncited-rebuttal.py`](../hooks/flag-uncited-rebuttal.py) | Warn | Warns when posting a comment disputing a finding that cites an external URL when no `WebFetch` or `WebSearch` fetched that URL. | Fetch and inspect the external URL cited by the reviewer before posting a rebuttal comment. | None. |
 | [`require-agent-disclosure.py`](../hooks/require-agent-disclosure.py) | Warn | Warns when posting a forge comment lacking the agent disclosure trailer. | Append `\n\n_Posted by <Agent Name> (AI agent) --- not written by a human._` to every posted comment. Never use the robot emoji. | None. |
 | [`flag-uncounted-comment-claims.py`](../hooks/flag-uncounted-comment-claims.py) | Warn | Warns when a forge comment asserts file counts or lists identifiers without a deriving command. | Run deriving commands (`grep -c`, `wc -l`, `ls`, etc.) in the session and cite the deriving command when stating cardinality. | None. |
@@ -78,6 +79,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 | [`flag-cd-into-main-checkout.py`](../hooks/flag-cd-into-main-checkout.py) | Warn | Warns when a worktree-rooted session `cd`s into the primary/main checkout of the repository. | Keep all file edits and command executions rooted within the dedicated worktree directory. | None. |
 | [`warn-unlabelled-agent-issue.py`](../hooks/warn-unlabelled-agent-issue.py) | Warn | Warns when `gh issue create` / `glab issue create` runs with no `ai-authored` label in the command. | Pass `--label ai-authored --label "model:<model-id>"` (both CLIs also accept the comma-separated `--label "ai-authored,model:<model-id>"`) in the creating command, per `shared/workflow/issue-first.md`. | None. |
 | [`no-mutation-in-read-only-reviewer.py`](../hooks/no-mutation-in-read-only-reviewer.py) | **Block** | Blocks mutating git commands (`commit`, `checkout`, `switch`, `restore`, `stash`, `merge`, `reset`, `rebase`, `branch`, `tag`, `add`, `stage`, `pull`, `push`) and write tools when executing in read-only personas (`adversarial-reviewer`, `Explore`, `Plan`). | Reviewer personas must stay strictly read-only and report findings to the authoring session rather than mutating working tree or branch state. | Set `ALLOW_READ_ONLY_MUTATION=1 <cmd>` if mutation is explicitly intended. |
+| [`no-find-root-on-windows.py`](../hooks/no-find-root-on-windows.py) | **Block** | Blocks `find` or `find.exe` starting at `/` or bare drive roots on Windows/MSYS. Disambiguates Windows `find.exe` text search (e.g. `find /c "needle" file.txt`), which does not traverse directories. | Search a bounded path (`find . -name ...`, `find src/ ...`, `~/.claude`, `find /c/Users/dougm/repo`), or use `command -v`, `where.exe`, or `gh api` to locate files or binaries. | Set `ALLOW_FIND_ROOT=1 <cmd>` if a whole-system search is intentional. |
 
 ### 2.2 Agent, Task & SendMessage Interceptors
 
@@ -91,7 +93,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 
 | Hook Script | Type | Trigger / Purpose | Proactive Compliance Rule |
 |---|---|---|---|
-| [`no-unauthorized-merge.py`](../hooks/no-unauthorized-merge.py) | **Block** | Blocks `merge_pull_request` MCP calls without authorization. | Do not invoke MCP merge tools without explicit permission or active `/mwc`. |
+| [`no-unauthorized-merge.py`](../hooks/no-unauthorized-merge.py) | **Block** | Blocks `merge_pull_request` and the `enable`/`disable_auto_merge` tools, under any `mcp__<server>__` prefix, without authorization. `check_mcp_merge` reads `owner`/`repo` out of `tool_input` and clears the call on an `allow_merge` override, an active `mwc` grant, or a target in `STANDING_MERGE_GRANT_REPOS` --- the same three grounds the shell path uses. | Do not invoke MCP merge tools without explicit permission or an active `/mwc`; a target carrying the standing per-repository grant needs neither. |
 | [`warn-pr-create-without-dupe-check.py`](../hooks/warn-pr-create-without-dupe-check.py) | Warn | Warns when creating PRs/issues via MCP without a prior search query. | Run `search_issues` or `search_pull_requests` before creating items via MCP tools. |
 | [`warn-unlabelled-agent-issue.py`](../hooks/warn-unlabelled-agent-issue.py) | Warn | Warns when `mcp__github__issue_write` (`method: create`) files an issue with no `ai-authored` label. | Pass `labels: ["ai-authored", "model:<model-id>"]` on the create call. |
 | [`require-agent-disclosure.py`](../hooks/require-agent-disclosure.py) | Warn | Warns when posting comments via MCP without the disclosure trailer. | Include `\n\n_Posted by <Agent Name> (AI agent) --- not written by a human._` in the `body` argument of MCP comment tools. |
@@ -118,7 +120,7 @@ Blocking hooks prevent the turn from ending until the missing artifact or requir
 | [`no-unfiled-finding.py`](../hooks/no-unfiled-finding.py) | **Block** | Blocks declarative statements that an issue or finding is "worth filing" without having filed it. | File the tracking issue immediately before concluding the turn. | None. |
 | [`no-stale-pr-status.py`](../hooks/no-stale-pr-status.py) | **Block** | Blocks replies declaring PR check status based on readings taken prior to the latest push. | Always query fresh PR status (`gh pr checks <N> -R ...`) after any `git push` before stating check results. | None. |
 | [`no-incomplete-check-enumeration.py`](../hooks/no-incomplete-check-enumeration.py) | **Block** | Blocks declaring a PR fully clean based solely on surface rollup checks (`gh pr checks`). | Run `python3 scripts/check-pr-fully-clean.py <pr>` to evaluate full CI run logs and reviewer verdicts. | None. |
-| [`no-unreviewed-pr.py`](../hooks/no-unreviewed-pr.py) | **Block** | Blocks ending a turn after creating/updating a PR without requesting an AI reviewer. | Request a review on opened/updated PRs (`gh pr create` with reviewer request, or request review via forge tools). | Set `ALLOW_UNREVIEWED_REDACTION_PR=1` on redaction PRs or use `no-ai-review` label. |
+| [`no-unreviewed-pr.py`](../hooks/no-unreviewed-pr.py) | **Block** | Blocks ending a turn after creating/updating a PR without requesting an AI reviewer. Discharges automatically if the PR reached a terminal state (`MERGED` or `CLOSED`) or if Copilot already answered the current head commit. | Request a review on opened/updated PRs (`gh pr create` with reviewer request, or request review via forge tools). | Set `ALLOW_UNREVIEWED_REDACTION_PR=1` on redaction PRs or use `no-ai-review` label. |
 | [`no-unshipped-commit.py`](../hooks/no-unshipped-commit.py) | **Block** | Blocks ending a turn when unpushed commits remain on the local branch. | Push all commits (`git push`) or cleanly drop temporary exploratory commits before ending the turn. | None. |
 | [`no-report-unfixed-hook-test.py`](../hooks/no-report-unfixed-hook-test.py) | **Block** | Blocks status replies reporting a missing hook test identified by CI without writing the test. | Implement the companion `hooks/test-<name>.py` test suite in the same turn before reporting status. | None. |
 | [`no-unmonitored-pr.py`](../hooks/no-unmonitored-pr.py) | **Block** | Ensures a PR poller or model scheduler is armed when a PR remains open. | Arm an explicit timer or rely on the detached PR monitor service. | None. |
@@ -126,6 +128,7 @@ Blocking hooks prevent the turn from ending until the missing artifact or requir
 | [`no-placeholder-reply.py`](../hooks/no-placeholder-reply.py) | **Block** | Blocks placeholder replies (`N/A`, `No response requested.`, bare acknowledgments). | Always provide substantive, informative recaps explaining completed work and current state. | None. |
 | [`flag-cop-out-offer.py`](../hooks/flag-cop-out-offer.py) | Warn | Warns when a response closes with a passive offer on already-authorized work ("let me know if you'd like me to..."). | Execute in-scope authorized tasks directly. If a genuine decision is required, present concrete options accompanied by an explicit recommendation. | None. |
 | [`no-misattributed-quote.py`](../hooks/no-misattributed-quote.py) | **Block** | Blocks attributing a quote to a main rule file when the text resides in a `.rationale.md` or `.cases.md` companion file. | Confirm the exact file path where quoted passages reside before citing them. | None. |
+| [`no-unchecked-empty-pr-claim.py`](../hooks/no-unchecked-empty-pr-claim.py) | Warn | Warns when a reply characterizes a pull request as abandoned, or as empty and disposable, near a pull-request number, and no commit-list QUERY naming that number was issued this session. Evidence comes from an allowlist of query-bearing tool calls, never from a message body, a file read, or a tool result, and never from the mergeability query that returns the field. | Read the commit list (`pull_request_read` with `get_commits`, `pulls/<n>/commits`, `build-pr-payload.py`, or `git log origin/main..origin/<branch>`) and the pull request's body before calling it empty --- `pr-on-claim` opens pull requests against an empty commit on purpose, so `changed_files: 0` is also what a live claim reads. A reply naming the convention is exempt, and a close whose own sentence states another basis is exempt for that close. | None. |
 | [`require-stopping-point.py`](../hooks/require-stopping-point.py) | **Block** | Blocks final completion replies lacking an explicit stopping-point declaration. | Conclude summaries with an explicit stopping-point statement: `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point --- [reason]`. | None. |
 
 ### 3.1 A documented workaround for one guard can arm another
@@ -176,6 +179,96 @@ fail-fast.
 - **Don't:** treat "the subagent added a raise" as having satisfied a
   fail-loudly instruction --- a raise into a blanket `except Exception` is a
   silent fail-open wearing a safeguard's shape.
+
+**The same handler erases a whole SCAN when the exception is incidental
+rather than deliberate.**
+The case above is a `raise` written on purpose and swallowed.
+The commoner one carries no intent at all: a loop under that same blanket
+`except Exception: return 0` meets one record of an unexpected shape --- a
+string-valued `message`, a bare JSON list, a `tool_use` whose `input` is a
+string, a null `text` --- and the exception unwinds past every record still
+unread.
+The guard then returns 0 with empty stdout, which is the ALLOW outcome, for
+the rest of the session.
+
+Note the difference in blast radius, which is what makes this the worse half.
+A swallowed `raise` loses the one check it guarded.
+A swallowed parse error loses **everything the loop had not reached yet**, so
+a single malformed record early in a transcript disables the guard entirely
+--- silently, since the fail-open path prints nothing by design.
+
+The remedy is a per-item guard inside the loop, not a narrower handler at the
+top.
+Skipping one record loses at most one event;
+aborting loses the guard.
+Where the top-level fail-open is deliberate --- and in a `Stop` or
+`PreToolUse` hook it usually is, because a crashing guard must not break the
+session --- every loop beneath it owes its own `try` / `except ...: continue`.
+
+- **Do:** wrap each iteration of a guard's scan loop in its own handler, so a
+  malformed item is skipped rather than terminal.
+- **Do:** ask, of every blanket fail-open you keep, what the largest thing an
+  inner exception could cancel is --- the answer is rarely the one statement
+  that raised.
+- **Don't:** read a top-level `except Exception: return 0` as covering a loop
+  beneath it; it converts one parse error into a whole-session no-op.
+- **Don't:** narrow the top-level handler instead --- a guard that crashes on
+  an unexpected payload obstructs correct work, which is the shape section 4.5
+  below records getting switched off, taking its true positives with it.
+
+(Measured 2026-09-17 on
+[ai-config#3692](https://github.com/Morrison-Lab/ai-config/pull/3692),
+`hooks/no-clean-stop-with-live-agent.py`.
+An `adversarial-reviewer` dispatch against `79363d7a` found the whole reader
+loop of `scan()` sitting under `main()`'s `except Exception: return 0` with no
+per-record guard;
+`f947dc94` accepted the finding and wrapped each record's body in
+`try` / `except Exception: continue`.
+Its comment names the reachable input rather than a hypothetical one: the
+Antigravity adapter already handles a subagent argument arriving as a JSON
+string.
+Both `Do`s and the first `Don't` are derived from reading those two revisions
+of the file directly.
+The second `Don't` is inferred --- nothing measured here shows a narrowed
+handler causing a guard to be switched off.)
+
+### 3.3 Editing a fail-open guard: the suite is the only thing that can see the breakage
+
+Section 3.2 above is about a `raise` written *deliberately* into a blanket handler, and its closing note about an incidental exception is the same handler seen from a third angle.
+The commoner case is an *accidental* breakage reaching the same handler, and it presents as success rather than as an error.
+
+Measured 2026-09-17 while fixing ai-config#3485.
+A patch removed a block of code by slicing between two textual anchors, and the slice swallowed two unrelated module-level constants that happened to sit between them.
+Every call then raised `NameError` inside `scan()`, `main()`'s `except Exception: return 0` converted it to the allow outcome, and the hook exited 0 on every input.
+It parsed, it imported, it ran, and it authorized everything.
+
+What caught it was the test suite reporting 36 failures, and specifically the 36 cases asserting **block** or **warn**.
+A suite composed only of allow-cases would have gone green on a guard that had stopped guarding --- which is the shape a fail-open hook's suite drifts toward, since allow-cases are the cheap ones to write.
+
+- **Do:** re-run the hook's own suite after every edit to it, and read the pass count rather than the exit status of the edit.
+- **Do:** keep block/warn cases in the majority, since only a case that expects the guard to FIRE can detect a guard that has stopped firing.
+- **Do:** prefer an anchored replace of an exact known string over a slice between two anchors, whose span you are asserting rather than reading.
+- **Don't:** read "it parses" or "it exits 0" as evidence an edited fail-open guard still works --- both are exactly what total breakage looks like.
+
+### 3.4 Widening an inner branch without widening the dispatch guard ahead of it
+
+Adding an alternative command caller (such as `curl` or `wget` alongside `gh`)
+in an inner branch of a parser or guard function,
+while leaving an upstream guard (e.g. `argv[0] != "gh"`) that short-circuits execution
+before the inner branch can ever be reached,
+creates permanently unreachable dead code for the new caller shapes.
+
+Measured 2026-09-23 on [ai-config#3893](https://github.com/Morrison-Lab/ai-config/pull/3893) (`hooks/no-unreviewed-pr.py`).
+`_argv_close` added REST merge detection for `gh api`, `curl`, and `wget`.
+Its leading guard retained `if not argv or argv[0] != "gh" or len(argv) < 2: return False, None, None`.
+Consequently, `curl` and `wget` calls returned `(False, None, None)` immediately at the top.
+The sibling function `_argv_update_branch` added in the same commit had the correct guard (`if not argv or len(argv) < 2:`).
+The code parsed and imported cleanly,
+and the regression was surfaced by Claude code review.
+
+- **Do:** audit all early-return guards between the function signature and the modified branch whenever adding new supported tools or command shapes.
+- **Do:** add unit tests for every distinct tool or prefix added to an alternative branch.
+- **Don't:** assume that because an adjacent sibling function implemented the widened guard correctly, a duplicate or sibling function in the same file did as well without direct inspection.
 
 ---
 
@@ -273,6 +366,92 @@ Resolved by restoring the permissive skip-loop and documenting the trade-off.)
 
 ---
 
+## 4.7 A guard's discharge condition is where it dies silently
+
+Warn-only buys tolerance for false **positives** --- noise a reader dismisses.
+It buys nothing for a false **discharge**, which makes the hook indistinguishable from one that never ran.
+So the trigger gets the attention and the discharge gets the defect, because a guard that fires too often is visible and a guard that has quietly disarmed itself is not.
+
+Five failures, all measured on drafts of [`no-unchecked-empty-pr-claim.py`](../hooks/no-unchecked-empty-pr-claim.py) (ai-config#3755, review rounds 1 to 3), and all invisible to a passing test suite.
+
+**The query that produces the defect is not evidence against it.**
+The guard warns when a pull request is called empty without its commit list being read, and its first draft accepted the mergeability query --- the very query that returns `changed_files` --- as that read.
+So performing the misreading discharged the guard against the misreading, and it was silent on the incident its own registry entry cited as its measurement.
+Ask of every accepted read: could this read be the one that caused the error?
+
+**An unscoped discharge is satisfied by the wrong subject.**
+That same draft asked whether a commit-list read appeared anywhere in the session rather than whether one appeared for *the pull request the claim was about*, and a triage sweep reads many.
+Scoping it per number is not enough either: returning on the first number that has evidence silences a batch close because one of its pull requests was checked.
+Require evidence for **each** subject the claim names.
+
+**Evidence must be a query, and a tool call is not automatically one.**
+The second draft drew the line at calls versus results, reasoning that results carry file content while calls carry a query.
+That distinction does not hold.
+A `Bash` call carries a path, and a `reply`, `update_status` or `add_issue_comment` call carries the agent's own prose --- so writing "I have not run `get_commits` for #3737" into a comment discharged the guard, which is the first draft's failure with the direction reversed.
+Allowlist the tools whose input is a query, and reject a command carrying a message body.
+
+**A serialized blob is not the text the pattern was written for.**
+The third draft read evidence from `json.dumps(tool_input)`, which encodes a newline as the two characters backslash and `n`.
+So `[^\n]` never terminated at a line, and a window meant to span one command spanned the whole script --- discharging the guard from a `git log` two lines away from an unrelated PR number.
+The mirror case is a `\b` before a command name, defeated by the `n` that escaping glues to it, so a genuine `gh api .../commits` read at the start of a later line was rejected and its author warned to do what they had just done.
+Both were found on the real transcript rather than on a fixture.
+The same call's free-prose `description` field rode into the blob beside its command, so a PR number mentioned there discharged the guard as though a query had named it.
+Extract the field you mean, and match it as text rather than as its serialization.
+
+**An exemption needs a scope as much as a trigger does.**
+The claim was windowed to 240 characters and the "this close is justified" exemption was searched over the whole message, so one correctly-justified close in a batch recap exempted every unjustified one beside it.
+Scope a per-item exemption to the item --- here, to the sentence.
+
+None of this is caught by the test suite, because a fixture transcript contains only what the case needs.
+The session that produces the defect contains everything else, which is what [`fixtures-are-not-evidence`](../shared/workflow/fixtures-are-not-evidence.md) is about.
+Two things follow.
+Run a new transcript-reading hook against a real transcript truncated at the message it is meant to catch, before believing a green suite.
+And take the tool mix from that transcript rather than from intuition: the measured session ran 323 `Bash` calls, 44 `update_status`, 39 `pull_request_read` and 23 `reply`, and **zero** `Read`, `Grep` or `Glob` --- so a denylist naming the file tools excluded nothing at all while the two families that defeat it were most of the traffic.
+
+A measurement quoted in the lesson has to be the measurement.
+The first version of this section said an unscoped test "was discharged by the 39 unrelated reads the real session had already issued".
+Both halves were wrong: the 39 were all the pull-request reads, of which 13 (method `get`) plus one REST call actually matched, and **zero** were commit-list reads of any kind.
+The causal claim was wrong too --- the silence came from accepting the mergeability query, and either narrowing alone would have fixed it.
+`shared/workflow/metacognitive-monitoring.md`'s rule for a cause claim, ask what else explains the same observation, is the check that was skipped.
+
+- **Do:** exclude the query whose misreading is the defect.
+- **Do:** require evidence for every subject the claim names.
+- **Do:** allowlist query-bearing tools, and derive the mix from a real transcript.
+- **Do:** scope a per-item exemption to the item.
+- **Do:** replay a real transcript at the offending message as the last check.
+- **Don't:** accept a session-global "did this token appear anywhere" test.
+- **Don't:** assume a tool call carries a query --- most of them carry prose or a path.
+- **Don't:** read a passing fixture suite as evidence the guard fires in a real session.
+
+## 4.8 A guard that cannot resolve a legitimate action, with an unreliable override, manufactures a dead end at the prohibited bypass
+
+This is a design duty for the person (or session) **authoring** a guard, not a rule about how to respond once blocked by one --- that half is already covered above, in the `no-push-without-self-review.py` table row and in [`check-before-pushing.md`](../shared/workflow/check-before-pushing.md)'s "Out-of-band publish channels must not bypass push guards": the sanctioned response to a refused push with no working override is to stop and report, never to route around the guard through the Contents API, GraphQL, or an MCP write tool.
+That prohibition is correct and this section does not weaken it.
+
+The design gap it exposes is upstream of the prohibition.
+`no-push-without-self-review.py` resolves the commits a push would ship against the **session's own working directory** rather than the repository and worktree the push actually targets, so a legitimate cross-repo or cross-worktree push --- one carrying a genuine clean verdict for the right commit --- can be refused with "could not be resolved to a commit," a failure that has nothing to do with whether the commit was reviewed.
+`ALLOW_UNREVIEWED_PUSH=1` is the documented escape valve for exactly this situation, but the auto-mode permission classifier can deny that override too --- see [`mistake-patterns.md`](mistake-patterns.md)'s Pattern 43 ("Auto-Mode Push-Guard Deadlock") and its recurrences in [`mistake-patterns.cases.md`](mistake-patterns.cases.md), which record the same override succeeding on an unrephrased retry more often than not.
+So the refusal measured here is **intermittent, not stable**: the guard's own message, when it fires, recommends exactly the sanctioned response --- stop, explain, and let the user add a Bash permission rule or push manually --- which is a real path forward, not a dead end.
+
+What composing a mis-resolving guard with a classifier-vulnerable override actually costs is narrower than "no way forward": it makes the **unguarded** path (the Contents API, `gh api`, an MCP write tool) the most *available* one at the exact moment the sanctioned ones look exhausted, which is a design cost worth naming even though a sanctioned path --- retry, then escalate --- remains open throughout.
+That is the failure mode worth designing against, not a structural deadlock: a session under `Stop`-hook pressure, several denials into a session, is more likely to reach for the channel that asks no questions than to retry the identical command once more or stop and report, even though retrying or stopping is what the guard's own refusal message asks for.
+
+The transferable design principle, for any guard we author that gates a real action behind a resolution step and an override: **the resolution should correctly handle every legitimate invocation shape (not just the common one), and the override should be reliably reachable when resolution fails** --- not because getting either wrong strands the session, but because it raises the pull toward the one channel the corpus has to prohibit outright.
+
+- **Do:** when authoring a guard that resolves a target (a repo, a worktree, a ref) before deciding, test it against an invocation from **outside** the common case --- a different repo, a different worktree, a fresh branch with no remote-tracking ref --- not just the case the guard was written for.
+- **Do:** when a guard's own documented override can itself be denied by a separate mechanism (the auto-mode classifier, a permission policy), treat that composition as a first-class failure mode of the guard, not a separate, unrelated problem.
+- **Do:** retry an identical denial once, and stop and report if it still fails, per Pattern 43's canonical Do --- both are sanctioned paths that a mis-resolving guard makes easy to skip past.
+- **Don't:** treat "there's a sanctioned override" as having closed the gap if that override's own reliability was never verified under the conditions that make the primary guard fail.
+- **Don't:** read a single denial, or a single mis-resolution, as evidence of a structural deadlock --- Pattern 43's own retry evidence shows the same override succeeding minutes later with nothing changed.
+
+(Measured 2026-09-21, [ai-config#3412](https://github.com/Morrison-Lab/ai-config/issues/3412), a cross-repo/cross-worktree push refusal on branch `fix/unread-issue-comments-guard`: "With `git push` refused and the env prefix denied, what remains reachable is the Contents API or `gh api` --- both of which reach the remote and consult no guard at all.
+A guard that cannot evaluate a legitimate push, whose documented override is blocked, makes the unguarded path the only path."
+That framing was itself corrected in a later comment on the same issue thread: the refusal turned out to be intermittent rather than stable, and the override succeeded on a later, unrephrased retry --- see Pattern 43's occurrence ledger in [`mistake-patterns.cases.md`](mistake-patterns.cases.md).
+The session did not take the unguarded path;
+it retried the override and reported the corrected scope rather than the first, more alarming reading.)
+
+---
+
 ## 5. Adding & Modifying Hooks: Checklist
 
 When authoring a new hook:
@@ -296,6 +475,11 @@ When authoring a new hook:
    ```
    The third is the gate a new hook trips most easily: resolve the hook's own path with `os.path.realpath(__file__)`, never `abspath`.
    See [Resolve a hook's own directory with `realpath`, never lexical `abspath`](#resolve-a-hooks-own-directory-with-realpath-never-lexical-abspath).
+   Add `python3 scripts/check-leadin-counts.py` whenever the change touches prose, since a bold-header paragraph added to an enumerated section moves a count stated several lines above it.
+7. Run every gate again after the LAST edit to any file in the change, and read a reading taken before that edit as expired.
+   A formatter is an edit: `scripts/semantic-line-breaks.py --write` reflowed a paragraph in this file after the gates had been run and turned its first line into a bold header, which broke `check-leadin-counts.py` on a branch already reported green (measured 2026-09-17, ai-config#3755, review round 3).
+   The failure is not carelessness about running checks --- the checks were run --- but the same stale-reading class `hooks/no-stale-pr-status.py` guards for a PR's check state, applied to a local gate.
+   It reads as finished precisely because the work of checking was genuinely done.
 
 ## 5.5 A hook test that invokes the real hook is not hermetic against live git state
 
@@ -325,6 +509,47 @@ A failure that survives it is not --- it is a real gap in what the test covers, 
 The natural reading was contamination from the several worktrees active at once, and [ai-config#3431](https://github.com/Morrison-Lab/ai-config/issues/3431) rules that out for all three: the failure text varied only between "uncommitted tracked changes" and "unpushed commits", tracking whichever pending-work condition held at that moment, and "both are real, live facts about the checkout, not stale or racing state."
 Every run was `flag-unassigned-worktree.py` correctly returning `deny` against a fixture that only ever constructed the `warn` case.
 The quiet-tree run is what makes that distinguishable: without a control run on a committed, unedited tree, "several worktrees were active" explains a real defect exactly as comfortably as a contaminated one.)
+
+**CI structurally cannot see this failure, which is why it survives being
+diagnosed.**
+The section above establishes what the failure is and how to tell it from
+contamination.
+What it leaves implicit is where it can occur, and that turns out to be one
+place only.
+`flag-unassigned-worktree.py` reaches its deny path solely on a non-default
+branch carrying uncommitted tracked changes or unpushed commits, and its own
+docstring records that every read on that path fails toward *not* denying ---
+a non-repository working directory, a detached `HEAD`, an unresolved default
+branch, or any error.
+A pull-request checkout satisfies the branch half and never the pending-work
+half, because `actions/checkout` leaves no uncommitted tracked changes, so the
+deny path is unreachable there and the warn assertion holds.
+
+That makes the red a local-only event, appearing in a pre-push sweep and
+nowhere else --- which is exactly the setting in which a red is cheapest to
+attribute to the several worktrees running at once and re-run away.
+The section above gives the quiet-tree control that settles it; this says why
+nothing else will.
+Read a test that can only fail locally as under-covered rather than as flaky,
+and note that a green CI run is not evidence about it in either direction.
+
+- **Do:** ask where a hook test's deny path can be reached before reading a
+  green CI run as covering it.
+- **Don't:** treat CI green on a hook that branches on live repository state as
+  evidence the branch the test misses is fine --- a PR checkout can reach only
+  one of the branches.
+
+Tracked as [ai-config#3431](https://github.com/Morrison-Lab/ai-config/issues/3431)
+(2026-09-09) and again as
+[ai-config#3744](https://github.com/Morrison-Lab/ai-config/issues/3744)
+(2026-09-17, filed by a session that hit the identical failure on
+`test_flag_unassigned_worktree` and reached the same root cause and the same
+proposed fixes; read as a probable duplicate of #3431, and confirm before
+working either).
+Issue #3744 carries the two-tree measurement this paragraph rests on: the same
+commit and the same suite give `Ran 17 tests ... OK` from a clean checkout of
+`aa32a3c1` and `FAILED (failures=1)` from #3690's dirty `work/3690` worktree,
+while `validate` on that PR's own head passed the suite in CI.
 
 ## 5.6 A hot-path guard's own correctness suite does not exercise its performance envelope --- test adversarial-length input separately
 
@@ -381,6 +606,47 @@ The mechanism now exists as `check_executable_bits` in
 `memories/git.md`'s `git ls-files -s` stage-semantics entry and
 `shared/principles/fail-fast.md`'s aggregate-count entry for how that check
 itself needed two more rounds to land soundly.)
+
+## 5.8 A splice that locates only the first occurrence silently under-inspects a `replace_all` edit
+
+`hooks/warn-new-line-breaks-on-edit.py` classifies an `Edit` by splicing its `new_string` over `old_string` into the file on disk, then running the checker on the spliced result.
+(That hook is not on `main` yet: it lives on the still-open ai-config#3690, so a reader looking for `splice_edit` in the tree will not find it until that PR merges, and this entry goes stale if the PR changes further or does not land.)
+Its `splice_edit` located the match with `existing.find(old)` and stopped there, never reading `tool_input.get("replace_all")`.
+A single-occurrence edit is inspected correctly.
+A bulk find-and-replace is inspected at exactly one of its occurrences and silently misses every violation the edit introduces at the others --- and a bulk substitution is the edit most likely to introduce a style violation at scale, since the same inserted text lands repeatedly with no per-site review.
+
+The docstring said the function returns "the file as the edit would leave it," which was true for the input every hand-written test fixture used (a single occurrence) and false for the input `replace_all` names.
+This is the code-correctness form of [`ardi`](../shared/workflow/ardi.md)'s "Attempting the base form of a command is not attempting its variants": the base case was verified, the flagged variant was not, and the claim in the docstring does not scope itself to the case it actually covers.
+The discriminating test case is non-obvious for the same reason a mutation can survive by masking (see `shared/workflow/algorithmatize-checks.md`'s "A surviving mutation is a question before it is a coverage gap"): the same substituted text is inserted at every occurrence, so it looks like it must violate at all of them or none, and a fixture built that way can never separate "checks every occurrence" from "checks the first one."
+It discriminates only when the *context* differs across occurrences --- one inside a fenced code block, one in prose --- which generalizes to any check whose verdict depends on surrounding context rather than on the inserted text alone.
+
+A second, distinct finding from the same review round belongs beside it rather than folded in: no fixture placed a violation exactly on the edit window's boundary, so off-by-one mutants at either edge of the `(lo, hi)` range survived the whole suite (19 assertions, 5 declared mutations) with nothing to show for it.
+A one-line `new_string` that lands on both boundaries at once kills both mutants with one case, which is what closed it (24 assertions, 8 mutations).
+This is not the masking mechanism the "surviving mutation" section above covers --- nothing hides the boundary mutant's effect --- it is a plainer gap: the boundary is a distinguished value of the input space, and a fixture assembled from typical inputs never happens to land on it.
+
+- **Do:** when a splice, scan, or match locates one occurrence via `find`/`search`, check whether the tool schema carries a "do this everywhere" flag (`replace_all`, `global`, `all`) before trusting the single-match result covers the call (measured: the pre-fix `splice_edit` at `ad5601b0` used a bare `existing.find(old)` and never read `replace_all`).
+- **Do:** for a check whose match spans a numeric window, add at least one fixture whose interesting condition sits exactly on the window's boundary, not only strictly inside it (measured: 19 assertions and 5 mutations before, 24 and 8 after, with the two boundary mutants surviving the former suite).
+- **Don't:** read a docstring's "the file/result as the edit would leave it" as verified for every flag the tool accepts, when every fixture backing it used the same flag value (measured: that docstring shipped at `ad5601b0` over a first-occurrence-only splice).
+- **Don't:** treat a same-inserted-text-everywhere fixture as covering a `replace_all` path --- it cannot distinguish "checked once" from "checked at every site" unless the surrounding context differs per occurrence (inferred from the mechanism: the checker's verdict depends on each occurrence's surrounding context, so identical inserted text cannot separate the two behaviours).
+
+(Morrison-Lab/ai-config#3690, review round 3, 2026-09-17, fixed in `01b8b07b5b`.
+Three findings on `splice_edit`; the two above are recorded here.
+The third, a fixture repo missing a vendored `scripts/semantic-line-breaks.py` that let every warning take an unguarded branch, is a fixture-completeness instance already covered by [`fixtures-are-not-evidence`](../shared/workflow/fixtures-are-not-evidence.md) rather than restated here.)
+
+## 5.9 A denial message's remedy should name the condition, not prescribe an action the harness may not support
+
+Section 4.5 above asks whether a warning "already names the concrete remedy" before treating a recurrence as an escalation signal.
+Concreteness is not the whole test: a remedy can be perfectly concrete and still be wrong for the session reading it, when it prescribes one specific action ("dispatch it in the foreground") that assumes a capability the current harness does not actually offer.
+
+A harness whose subagent dispatch never returns synchronously -- no `run_in_background` field to set, or the field set and ignored -- cannot follow "dispatch in the foreground" at all.
+The message then reads as a mistake the author must have made (they must have backgrounded it) rather than as a gap in what the harness reports, and it leaves no next step: the one action named is unavailable, and nothing else is offered.
+
+`shared/workflow/adversarial-self-review.md`'s "A harness that always backgrounds the `Agent` tool" section (ai-config#3045) is the concrete instance and its concrete escape hatch (`ALLOW_UNREVIEWED_PUSH=1`, stated plainly, with the reason recorded).
+This entry is the general authoring lesson it implies for any future guard: prefer describing the **condition** the guard needs satisfied ("a synchronous reviewer verdict for this commit exists") over prescribing the **action** most sessions would take to satisfy it, and pair a prescribed action with a stated fallback whenever the harness might not support it.
+
+- **Do:** phrase a guard's remedy around the condition it is checking for, naming the usual action as one way to satisfy it rather than the only way.
+- **Do:** when a specific action is genuinely required (an env var, a specific flag), still name the fallback that applies when the harness cannot perform the usual action.
+- **Don't:** write a remedy that assumes every harness can perform the same action synchronously -- a dispatch, a foreground run, a specific tool call -- without naming what to do when it cannot.
 
 ## 6. A guard that keeps firing after you satisfied it: stop, and read the copy that runs
 
@@ -612,3 +878,106 @@ a set named for a behaviour has a membership test by construction, so derive the
 
 (Tracked as [#2981](https://github.com/Morrison-Lab/ai-config/issues/2981).
 An earlier wave's snapshot branch `fix/2981-self-review-guard-sibling-import` treated it as a missing install and added a `.git`-rooted fallback search, which is why the root cause is stated here rather than only the remedy.)
+
+## Evaluating multiple declare phrases across a message (#3761)
+
+A guard scanning for terminal claims (`no-incomplete-check-enumeration.py`) must evaluate all claim phrases (`finditer`),
+not only the first match:
+
+- **Iterate all claims rather than stopping at the first:**
+  A multi-sentence recap often covers several PRs sequentially.
+  Stopping at the first match allows later unverified claims to slip past unchecked.
+- **Enforce canonical BLOCK precedence across all hits:**
+  If any claim in the message warrants a block (e.g. core declare vocabulary backed only by a short CI surface without a subagent or complete check),
+  block the turn regardless of whether other claims in the message warn or are clean.
+- **Union uncovered PRs across claims:**
+  Collect missing PRs across all evaluated claim hits so the warning accurately enumerates the full set of unverified PRs.
+- **Mutation testing for window bounds:**
+  To ensure label windows (`_LABEL_WINDOW`) cannot be silently inflated to whole-message scope,
+  test a message containing a covered claim followed by an unrelated PR mention (without a claim phrase) well outside the window.
+  If the window is inflated,
+  the unrelated PR is falsely swept into the claim's scope and triggers a coverage mismatch.
+- **Compose multi-bucket warnings without cross-suppression:**
+  When multiple claims in a message have distinct warning needs (e.g. coverage mismatch on one PR and subagent-only evidence on another),
+  do not let one warning bucket suppress another or stop at the first entry.
+  Compose all warning notices into the emitted `systemMessage` so every unverified claim is surfaced.
+
+## A fixture's own padding can push its trigger outside the window under test (PR #3799)
+
+`flag-cop-out-offer.py` scans only the last `TAIL_CHARS` (400) of a reply, and that bound creates two hazards rather than one.
+The production side is already documented in the hook, in the comment above `STOPPING_POINT_RX` rather than beside the constant itself: a long stopping-point declaration displaces the real closing move, so the hook goes blind (ai-config#3694).
+The two rounds that followed corrected the remedy rather than the mechanism, one for over-firing and one for a new blind spot (ai-config#3695).
+The test side shares the mechanism and inverts the author.
+
+Measured 2026-09-19 on this file's own PR, ai-config#3799.
+A fixture written to exercise a different property --- which output channel the hook reads --- appended filler after its offer phrase, putting that phrase past the 400-character tail.
+The case asserted "no warning", got one for the wrong reason, and so passed against the exact commit it had been written to catch.
+
+Nothing about the fixture looked wrong.
+Re-reading it confirms the offer is present and the expectation is right.
+Only running it against the pre-fix version separates a case that detects the defect from one that cannot reach it.
+
+The general shape: **when the code under test bounds what it examines --- a tail window, a line cap, a first-N-matches scan, a time window --- a fixture's own bulk is part of its input.**
+Padding added for realism can move the trigger out of scope, and every verdict that follows is the expected one.
+
+- **Do:** put a fixture's trigger where the bound actually reaches, and prefer the shortest fixture that exercises the property.
+- **Do:** run every new case against the version it was written to catch, and read a pass there as the case being vacuous rather than as the fix being unnecessary.
+- **Don't:** read a green suite as evidence a new case is sound --- a case that cannot reach the defect is green for the same reason a correct one is.
+- **Don't:** widen the bound to make a fixture fit;
+  that re-admits whatever the bound excludes, which is the production-side fix this hook already rejected.
+
+## Target PR scoping for hook evidence and warning diagnostics (#3838)
+
+When a hook correlates transcript events (such as CI check readings, git pushes, or subagent reports) with claims made in assistant output:
+
+- **Scope evidence to target PRs consistently across all claim vocabularies:**
+  If a claim targets a specific PR, all evidence variables (`rel_last_partial`, `rel_last_push`, `rel_last_complete`) must be resolved with respect to that target PR across both core and secondary ("awaiting merge") vocabularies.
+  Falling back to global unscoped indexes when `claim_pr_refs` is non-empty causes an unrelated PR's partial check to falsely convert a silent-allow claim into an unverified warning.
+- **Pass scoped variables to warning formatters:**
+  Ensure warning formatters receive the PR-scoped indices (`w_partial`, `w_push`, `w_complete`) rather than global indices (`last_complete`).
+  Otherwise, diagnostic messages will cite events (such as an unrelated PR's complete read or a recent `git push`) from unrelated PRs as reasons why a claim is stale or uncovered.
+
+## Windows command-line batch argument corruption and native launcher shimming (#3881)
+
+When testing hooks or mocking commands on Windows:
+- **`cmd.exe` strips `^` in unquoted arguments:**
+  When `subprocess.run` invokes a `.cmd` or `.bat` file without `shell=True`,
+  Windows CreateProcess wraps it in `cmd.exe /c`.
+  `cmd.exe` treats `^` outside double quotes as an escape character,
+  mutating `HEAD^{commit}` into `HEAD{commit}` and breaking git subcommands.
+- **Generate native PE executables with ScriptMaker:**
+  Instead of brittle batch files,
+  use `from pip._vendor.distlib.scripts import ScriptMaker` (or `distlib.scripts`).
+  Calling `ScriptMaker(None, d).make("cmd = module:func")` generates a genuine `.exe` launcher
+  that forwards command-line arguments verbatim without shell interpolation or batch escaping quirks.
+- **Only resolve `shutil.which` when PATH is customized:**
+  In `_run_git`, resolving `"git"` via `shutil.which` unconditionally on Windows
+  replaces `"git"` with the full system path (e.g. `C:\Program Files\Git\cmd\git.exe`),
+  breaking unit tests that mock `subprocess.run` and expect `cmd[0] == "git"`.
+  Only call `shutil.which` when `overlay.get("PATH") != os.environ.get("PATH")`.
+- **Win32 path resolution collapses `..` lexically across directory symlinks:**
+  Win32 `os.path.normpath` collapses `..` against the path text rather than
+  traversing the physical symlink target's parent directory
+  (`dir/symlink/../..` resolves to `dir` rather than `target/..`).
+  Tests asserting symlinked plugin root traversal must guard with `os.path.exists()`
+  on platforms without lexical traversal.
+
+## PreToolUse denial emission hardening: distinguishing guard crashes from authorized pushes (#3756)
+
+When a PreToolUse hook decides to deny an action (such as an unreviewed git push):
+- **Distinguish pre-decision crashes from post-decision failures:**
+  PreToolUse guards typically wrap inspection in a fail-open handler (`return 0`)
+  so unhandled parser crashes or missing metadata do not wedge ordinary shell execution.
+  However, once a denial decision is issued (`permissionDecision: deny`),
+  any subsequent exception or write failure must fail closed (exit code 2) rather than failing open.
+  Failing open after a denial decision silently converts a blocked command into an authorized one.
+- **Save unpoisoned stdout fd at module initialization:**
+  Inspecting Python scripts or external modules can inadvertently close stdout
+  (e.g., via `open(True)` because `isinstance(True, int)` evaluates to True and opens fd 1).
+  Save `_ORIGINAL_STDOUT_FD = os.dup(1)` during initial module load before running inspection helpers.
+  In `deny()`, restore stdout with `os.dup2(_ORIGINAL_STDOUT_FD, 1)` or write directly to `_ORIGINAL_STDOUT_FD`.
+- **Fail closed when stdout is completely unwriteable:**
+  If stdout cannot be written or restored,
+  log the full denial reason to stderr and exit with code 2.
+  Harnesses (such as Claude Code) treat exit code 2 as a hook execution failure and block the tool,
+  preventing a silent bypass when output streaming is broken.

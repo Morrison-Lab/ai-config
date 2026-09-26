@@ -630,3 +630,38 @@ Nothing in the function changes; the cost of its limits does.
 `#1973`'s Scope section names six token-comparing hooks that would consume such a helper, and its defect section reports the bypass measured against two of them --- `hooks/no-clobbering-push.py` and `hooks/flag-reset-hard-uncommitted-work.py`.
 Read the issue for the proposal and its measurements;
 the rule here needs only `_poller_executed` itself, since the give-up branches and their stated direction are both in front of you.)
+
+## A template you copied is not a prior-art search, and it feels like one
+
+Every section above governs a structure you decided to reuse.
+This one governs the structure you never looked for, because reusing a different one already satisfied the instinct to check.
+
+The shape: you need to write something new, you open the nearest existing file of that kind as a model, you follow its layout faithfully, and you write your own mechanism for the substantive problem.
+Reading a sibling *is* consulting the codebase, so the reuse question feels asked and answered --- and it was, for **layout**.
+It was never asked about the **mechanism**, and that is where the prior art actually lived.
+
+Measured 2026-09-15 on `Morrison-Lab/ai-config` ([#3692](https://github.com/Morrison-Lab/ai-config/pull/3692)).
+A new `Stop` hook needed to recognize a harness task-notification in a transcript.
+Its author opened `require-stopping-point.py` as a structural model, matched its file layout closely, and then wrote a substring match on the literal marker text.
+`no-push-without-self-review.py` had already solved exactly that recognition problem, keyed on the record's `origin.kind`, **specifically because literal text is spoofable** --- and its own suite already carried the negative case.
+The substring version was self-spoofing on arrival: the new hook's source, its test file, and its README row all contain that literal string, so reading any of them registered as a notification.
+Review caught it;
+no local check could have, because both files were individually well-formed.
+
+The asymmetry worth naming is that the two searches have **different keys**.
+A structural search asks "what does a file of this kind look like", and any sibling answers it.
+A prior-art search asks "has this specific problem been solved here", and only the sibling that solved it answers --- which is usually not the one with the most similar shape.
+Consulting the first cannot satisfy the second, and nothing about doing the first feels incomplete.
+
+So run the second search on the **problem**, not the file type, and say what you searched.
+Grep for the concept (`grep -rn "task-notification" hooks/`), not for the kind of file you are writing.
+[`grep-is-not-coverage`](grep-is-not-coverage.md) still governs the result: report the query, not the conclusion.
+
+**The obvious mechanical proxy does not work**, which is why this is a rule rather than a hook.
+"A new file was added and no sibling of its kind was read" would not have fired on the measured case --- a sibling *was* read, just the wrong one.
+The real condition is semantic equivalence between two mechanisms, which no transcript scan decides.
+
+- **Do:** search for the problem by concept, separately from opening a structural model, and name the query in the PR or commit message.
+- **Do:** treat "I already read a file in this directory" as evidence about layout only.
+- **Don't:** let following a template closely stand in for asking whether something here already solves the substantive problem.
+- **Don't:** reach for the most structurally similar sibling as the authority on mechanism --- similarity of shape is uncorrelated with which file solved your problem.

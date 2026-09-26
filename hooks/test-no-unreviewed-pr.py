@@ -42,7 +42,8 @@ HOOK = sys.argv[1]
 # production, which is exactly the dangerous direction its discharge paths
 # already refuse; a test-side override is unavailable to any session.
 RUNNER = """
-import datetime, importlib.util, sys
+import datetime, importlib.util, os, sys
+os.environ["NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK"] = "1"
 spec = importlib.util.spec_from_file_location("_h", sys.argv[1])
 m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
@@ -2315,6 +2316,185 @@ def obligations_of(events):
         os.unlink(path)
 
 
+def _test_update_branch_and_live_checks():
+    passes = failures = 0
+    hookmod = load_hook()
+
+    # 1. update_branch_ident
+    cmd1 = "gh pr update-branch 3859"
+    ok, num, repo = hookmod.update_branch_ident(cmd1)
+    if ok and num == "3859" and repo is None:
+        print("PASS: update_branch_ident parses gh pr update-branch")
+        passes += 1
+    else:
+        print(f"FAIL: update_branch_ident on gh pr: {(ok, num, repo)}")
+        failures += 1
+
+    cmd2 = 'gh api -X PUT repos/Morrison-Lab/ai-config/pulls/3859/update-branch -f expected_head_sha="2a0281b1"'
+    ok, num, repo = hookmod.update_branch_ident(cmd2)
+    if ok and num == "3859" and repo == "Morrison-Lab/ai-config":
+        print("PASS: update_branch_ident parses gh api PUT update-branch")
+        passes += 1
+    else:
+        print(f"FAIL: update_branch_ident on gh api: {(ok, num, repo)}")
+        failures += 1
+
+    # 2. _argv_close with REST merge endpoint
+    merge_argv = ["gh", "api", "-X", "PUT", "repos/Morrison-Lab/ai-config/pulls/1038/merge"]
+    ok, num, repo = hookmod._argv_close(merge_argv)
+    if ok and num == "1038" and repo == "Morrison-Lab/ai-config":
+        print("PASS: _argv_close recognizes gh api merge endpoint")
+        passes += 1
+    else:
+        print(f"FAIL: _argv_close on REST merge: {(ok, num, repo)}")
+        failures += 1
+
+    curl_argv = ["curl", "-X", "PUT", "https://api.github.com/repos/Morrison-Lab/ai-config/pulls/1038/merge"]
+    ok, num, repo = hookmod._argv_close(curl_argv)
+    if ok and num == "1038" and repo == "Morrison-Lab/ai-config":
+        print("PASS: _argv_close recognizes curl REST merge endpoint")
+        passes += 1
+    else:
+        print(f"FAIL: _argv_close on curl merge: {(ok, num, repo)}")
+        failures += 1
+
+    wget_argv = ["wget", "--method=PUT", "https://api.github.com/repos/Morrison-Lab/ai-config/pulls/1038/merge"]
+    ok, num, repo = hookmod._argv_close(wget_argv)
+    if ok and num == "1038" and repo == "Morrison-Lab/ai-config":
+        print("PASS: _argv_close recognizes wget REST merge endpoint")
+        passes += 1
+    else:
+        print(f"FAIL: _argv_close on wget merge: {(ok, num, repo)}")
+        failures += 1
+
+    # 3. _check_live_pr logic with mock subprocess.run
+    real_subproc = hookmod.subprocess.run
+
+    def mock_run(payload, returncode=0):
+        class DummyProc:
+            def __init__(self):
+                self.returncode = returncode
+                self.stdout = json.dumps(payload) if payload is not None else ""
+        return lambda *args, **kwargs: DummyProc()
+
+    # Case A: PR is MERGED
+    hookmod.subprocess.run = mock_run({"state": "MERGED", "closed": True, "headRefOid": "abc"})
+    if hookmod._check_live_pr("3859", "Morrison-Lab/ai-config") is True:
+        print("PASS: _check_live_pr returns True for MERGED PR")
+        passes += 1
+    else:
+        print("FAIL: _check_live_pr failed to retire MERGED PR")
+        failures += 1
+
+    # Case B: PR is CLOSED
+    hookmod.subprocess.run = mock_run({"state": "CLOSED", "closed": True, "headRefOid": "abc"})
+    if hookmod._check_live_pr("3859", "Morrison-Lab/ai-config") is True:
+        print("PASS: _check_live_pr returns True for CLOSED PR")
+        passes += 1
+    else:
+        print("FAIL: _check_live_pr failed to retire CLOSED PR")
+        failures += 1
+
+    # Case C: PR is OPEN and Copilot answered current head
+    hookmod.subprocess.run = mock_run({
+        "state": "OPEN", "closed": False, "headRefOid": "2a0281b1e2de",
+        "reviews": [{"author": {"login": "copilot-pull-request-reviewer"},
+                     "commit": {"oid": "2a0281b1e2de"}, "state": "COMMENTED"}]
+    })
+    if hookmod._check_live_pr("3859", "Morrison-Lab/ai-config") is True:
+        print("PASS: _check_live_pr returns True when Copilot answered current head")
+        passes += 1
+    else:
+        print("FAIL: _check_live_pr failed to retire answered head")
+        failures += 1
+
+    # Case D: PR is OPEN and Copilot answered an OLD head (not current head)
+    hookmod.subprocess.run = mock_run({
+        "state": "OPEN", "closed": False, "headRefOid": "2a0281b1e2de",
+        "reviews": [{"author": {"login": "copilot-pull-request-reviewer"},
+                     "commit": {"oid": "oldhead1234"}, "state": "COMMENTED"}]
+    })
+    if hookmod._check_live_pr("3859", "Morrison-Lab/ai-config") is False:
+        print("PASS: _check_live_pr returns False when Copilot answered an old head")
+        passes += 1
+    else:
+        print("FAIL: _check_live_pr retired PR with stale Copilot review")
+        failures += 1
+
+    # Case E: PR is OPEN and no reviews exist
+    hookmod.subprocess.run = mock_run({
+        "state": "OPEN", "closed": False, "headRefOid": "2a0281b1e2de", "reviews": []
+    })
+    if hookmod._check_live_pr("3859", "Morrison-Lab/ai-config") is False:
+        print("PASS: _check_live_pr returns False for open unreviewed PR")
+        passes += 1
+    else:
+        print("FAIL: _check_live_pr retired unreviewed open PR")
+        failures += 1
+
+    # Case F: subprocess error
+    hookmod.subprocess.run = mock_run(None, returncode=1)
+    if hookmod._check_live_pr("3859", "Morrison-Lab/ai-config") is False:
+        print("PASS: _check_live_pr returns False on subprocess error")
+        passes += 1
+    else:
+        print("FAIL: _check_live_pr did not fail safe on error")
+        failures += 1
+
+    # Restore real subprocess.run
+    hookmod.subprocess.run = real_subproc
+
+    # 4. End-to-end main() retirement check
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    events = [
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "t1", "name": "Bash",
+             "input": {"command": "gh pr create --title 'Test PR'"}}
+        ]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": "t1",
+             "content": "https://github.com/Morrison-Lab/ai-config/pull/3859\n"}
+        ]}},
+        {"type": "assistant", "message": {"content": [
+            {"type": "text", "text": "Created PR."}
+        ]}},
+    ]
+    with os.fdopen(fd, "w") as fh:
+        for e in events:
+            fh.write(json.dumps(e) + "\n")
+
+    try:
+        # Without mock (live check returns False in test runner), it blocks
+        runner_block = subprocess.run(
+            hook_argv(), input=json.dumps({"transcript_path": path}),
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
+        ).stdout
+        blocks_without_live = "block" in runner_block
+
+        # With mock returning True, test main() in python directly
+        hookmod._today = lambda: datetime.date.fromisoformat(AFTER)
+        hookmod._check_live_pr = lambda n, r=None: True
+        import io
+        old_stdin = sys.stdin
+        sys.stdin = io.StringIO(json.dumps({"transcript_path": path}))
+        try:
+            exit_code = hookmod.main()
+        finally:
+            sys.stdin = old_stdin
+
+        if blocks_without_live and exit_code == 0:
+            print("PASS: main() retires unreviewed obligation when live PR is merged/reviewed")
+            passes += 1
+        else:
+            print(f"FAIL: main() retirement failed (blocks_without={blocks_without_live}, exit_code={exit_code})")
+            failures += 1
+    finally:
+        os.unlink(path)
+
+    return passes, failures
+
+
 def main():
     passes = failures = 0
     hookmod = load_hook()
@@ -2544,6 +2724,10 @@ def main():
     else:
         print("FAIL: push re-arm reuses the open wording")
         failures += 1
+
+    p, f = _test_update_branch_and_live_checks()
+    passes += p
+    failures += f
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

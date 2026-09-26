@@ -6,7 +6,7 @@ running its generator.
 
 Morrison-Lab/ai-config, 2026-09-10 (#3524): `hooks/hooks.json` was hand-edited
 and pushed. That file has a generated companion,
-`skills/ai-config-hooks/hooks/hooks.json`, produced by
+`plugins/ai-config-hooks/hooks/hooks.json`, produced by
 `scripts/gen-hooks-plugin.py`. Both `validate` runs went red on the mismatch,
 and the review round was spent on a defect the repo's own generator would have
 prevented in one command.
@@ -78,7 +78,9 @@ def main() -> int:
     except Exception:
         return 0
 
-    cmd = (payload.get("tool_input") or {}).get("command") or ""
+    inp = payload.get("tool_input")
+    inp = inp if isinstance(inp, dict) else {}
+    cmd = inp.get("command") or ""
     if not PUSH.search(cmd):
         return 0
 

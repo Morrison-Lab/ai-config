@@ -62,6 +62,20 @@ import tempfile
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 
+_LIB = os.path.join(os.path.dirname(HERE), "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from transcript_meta import is_skill_load_meta
+except Exception as _exc:  # broken install: degrade, do not fail open silently
+    print(f"remind-ums-on-scrutiny: cannot load scripts/lib/transcript_meta.py "
+          f"({_exc}); a skill body's quoted text may open a false "
+          f"review-read or question window",
+          file=sys.stderr)
+
+    def is_skill_load_meta(entry):  # noqa: D103 -- fail-open fallback
+        return False
+
 
 def _sibling(name):
     """Import a hyphenated sibling module, or None if unavailable."""
@@ -213,6 +227,17 @@ def scan(path):
 
     for i, m in enumerate(records(path)):
         if m.get("isSidechain"):
+            continue
+        if is_skill_load_meta(m):
+            # A loaded skill body arrives as a `type: "user"` entry with
+            # `isMeta: true` and a `sourceToolUseID`. It was never typed by
+            # the person, so a skill quoting review-shaped or
+            # question-shaped language (e.g. a linked issue's title) must
+            # not count as a review read or a "are you sure" question
+            # (ai-config#3860). `isMeta` alone is not this test: a
+            # scheduled check-in continuation also carries `isMeta: true`
+            # but no `sourceToolUseID`, and its own real question or review
+            # read must still count -- see scripts/lib/transcript_meta.py.
             continue
 
         blocks = _blocks(m)

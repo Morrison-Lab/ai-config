@@ -170,22 +170,62 @@ def write_json(path, value):
     os.replace(temporary, path)
 
 
+def _alive_windows(pid):
+    # memories/python.md: os.kill(pid, 0) on Windows maps to
+    # GenerateConsoleCtrlEvent, where success does not track liveness, so
+    # the probe goes through OpenProcess instead. A recycled pid whose new
+    # process happened to exit with STILL_ACTIVE (259) reads as alive;
+    # accepted, since a wrong True only delays one respawn cycle.
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        return False
+    try:
+        exit_code = wintypes.DWORD()
+        if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+            return False
+        return exit_code.value == 259  # STILL_ACTIVE
+    finally:
+        kernel32.CloseHandle(handle)
+
+
 def alive(pid):
     try:
-        os.kill(int(pid), 0)
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if pid <= 0:
+        return False
+    if sys.platform == "win32":
+        return _alive_windows(pid)
+    try:
+        os.kill(pid, 0)
         return True
-    except (OSError, TypeError, ValueError):
+    except OSError:
         return False
 
 
 MAX_CONSECUTIVE_ERRORS = 15
+NO_WINDOW = ({"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)}
+             if sys.platform == "win32" else {})
 
 
 def pr_url(cwd):
     try:
         result = subprocess.run(["gh", "pr", "view", "--json", "url", "--jq", ".url"],
                                 cwd=cwd, capture_output=True, text=True,
-                                timeout=5, check=True)
+                                timeout=5, check=True, **NO_WINDOW)
     except (OSError, subprocess.SubprocessError):
         return ""
     return result.stdout.strip()
@@ -201,7 +241,7 @@ def start_monitor_for_url(url, cwd):
         process = subprocess.Popen([sys.executable, os.path.realpath(__file__), "--poll", url, path],
                                    cwd=cwd, stdin=subprocess.DEVNULL,
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                   start_new_session=True)
+                                   start_new_session=True, **NO_WINDOW)
     except OSError:
         return None
     write_json(path, {"url": url, "pid": process.pid, "started_at": time.time()})
@@ -224,8 +264,10 @@ def poll(url, path):
         state.update({"url": url, "pid": os.getpid(), "checked_at": time.time()})
         try:
             result = subprocess.run(["gh", "pr", "view", url, "--json",
-                                     "url,state,updatedAt,reviewDecision,statusCheckRollup,reviews"],
-                                    capture_output=True, text=True, timeout=30, check=True)
+                                     "url,state,updatedAt,reviewDecision,statusCheckRollup,reviews,"
+                                     "mergeable,mergeStateStatus"],
+                                    capture_output=True, text=True, timeout=30, check=True,
+                                    **NO_WINDOW)
             state["data"] = json.loads(result.stdout)
             state.pop("error", None)
             consecutive_errors = 0

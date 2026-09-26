@@ -23,6 +23,7 @@ Run: python3 hooks/test-no-empty-promise.py hooks/no-empty-promise.py
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -67,6 +68,38 @@ SUBAGENT_WROTE = {"type": "assistant", "isSidechain": True, "message": {
     "content": [{"type": "tool_use", "name": "Write",
                  "input": {"file_path": "shared/workflow/x.md",
                            "content": "the rule"}}]}}
+# A loaded skill body (ai-config#3860): a `type: "user"` entry with
+# `isMeta: true`, injected by the harness rather than typed by the person.
+# It must not reset the pending-mechanism state the way a real new user
+# turn does.
+META = {
+    "type": "user",
+    "isMeta": True,
+    "sourceToolUseID": "toolu_x",
+    "message": {
+        "role": "user",
+        "content": [{
+            "type": "text",
+            "text": "Base directory for this skill: ...\\skills\\mwc\n"
+                    "... https://github.com/Morrison-Lab/ai-config/issues/3021 ...",
+        }],
+    },
+}
+# A scheduled check-in continuation (ai-config#3860 coordinator review
+# finding): `isMeta: true` but no `sourceToolUseID`. Unlike a loaded
+# skill's body this IS a genuine new turn with real elapsed time, so it
+# MUST reset accumulated promise/discharge state -- see
+# scripts/lib/transcript_meta.py.
+SCHEDULED = {
+    "type": "user",
+    "isMeta": True,
+    "promptId": "p1",
+    "promptSource": "sdk",
+    "message": {
+        "role": "user",
+        "content": "Scheduled check-in: continue the task.",
+    },
+}
 SUBAGENT_SAID = {"type": "assistant", "isSidechain": True, "message": {
     "content": [{"type": "text",
                  "text": "Going forward I will always do X."}]}}
@@ -222,6 +255,28 @@ CASES = [
     ([say("Going forward I'll run the checker."), WROTE_FRAGMENT,
       say("Recorded the rule.")],
      False, "a shared/ fragment write discharges it"),
+    # A loaded skill body (isMeta) must not be treated as a new user turn: it
+    # would wipe BOTH the promise text and the already-shipped write's
+    # discharge together, which happens to still read as "not blocked" --
+    # the discriminating shape needs a promise restated AFTER the isMeta
+    # entry, so a pre-fix reset shows up as a FALSE block on a turn that did
+    # in fact ship the mechanism (ai-config#3860).
+    ([say("Going forward I'll run the checker before reporting status."),
+      WROTE_FRAGMENT, META,
+      say("Going forward I'll run the checker before reporting status.")],
+     False, "a write shipped before a mid-turn skill load (isMeta) still "
+            "discharges a promise restated after it (ai-config#3860)"),
+    # The opposite discriminator: a SCHEDULED continuation is a genuine new
+    # turn with real elapsed time, so it MUST reset promise/discharge state
+    # -- an old write's discharge must NOT carry across it into a promise
+    # restated afterward with no fresh mechanism (ai-config#3860
+    # coordinator review finding).
+    ([say("Going forward I'll run the checker before reporting status."),
+      WROTE_FRAGMENT, SCHEDULED,
+      say("Going forward I'll run the checker before reporting status.")],
+     True, "a scheduled check-in continuation (isMeta, no sourceToolUseID) "
+           "resets state, so an old write's discharge does not carry over "
+           "into a promise restated after it (ai-config#3860)"),
     ([say("From now on I won't skip it."), WROTE_MEMORY],
      False, "a memories/ write discharges it"),
     ([say("I'll always request the reviewer."), WROTE_HOOK],
@@ -755,15 +810,17 @@ CASES = [
 
 
 def run(events):
-    fd, path = tempfile.mkstemp(suffix=".jsonl")
-    with os.fdopen(fd, "w") as fh:
-        for e in events:
-            fh.write(json.dumps(e) + "\n")
+    td = tempfile.mkdtemp()
     try:
+        path = os.path.join(td, "transcript.jsonl")
+        with open(path, "w", encoding="utf-8") as fh:
+            for e in events:
+                fh.write(json.dumps(e) + "\n")
+        env = dict(os.environ, TMPDIR=td, TEMP=td, TMP=td)
         r = subprocess.run(
             [sys.executable, HOOK],
             input=json.dumps({"transcript_path": path}),
-            capture_output=True, text=True,
+            capture_output=True, text=True, env=env,
         )
         assert r.returncode == 0, f"must exit 0, got {r.returncode}"
         if not r.stdout.strip():
@@ -771,7 +828,7 @@ def run(events):
         payload = json.loads(r.stdout)
         return payload.get("decision") == "block"
     finally:
-        os.unlink(path)
+        shutil.rmtree(td, ignore_errors=True)
 
 
 def main():
@@ -791,10 +848,15 @@ def main():
             failures += 1
 
     # Fails open rather than crashing when the transcript is unreadable.
-    out = subprocess.run(
-        [sys.executable, HOOK], input='{"transcript_path": "/nonexistent"}',
-        capture_output=True, text=True,
-    )
+    td_unreadable = tempfile.mkdtemp()
+    try:
+        env_unreadable = dict(os.environ, TMPDIR=td_unreadable, TEMP=td_unreadable, TMP=td_unreadable)
+        out = subprocess.run(
+            [sys.executable, HOOK], input='{"transcript_path": "/nonexistent"}',
+            capture_output=True, text=True, env=env_unreadable,
+        )
+    finally:
+        shutil.rmtree(td_unreadable, ignore_errors=True)
     if out.returncode == 0 and not out.stdout.strip():
         print("PASS: fails open on an unreadable transcript")
         passes += 1
@@ -875,10 +937,15 @@ def main():
         passes += 1
 
     # Malformed stdin must not crash the Stop event either.
-    out = subprocess.run(
-        [sys.executable, HOOK], input="not json",
-        capture_output=True, text=True,
-    )
+    td_malformed = tempfile.mkdtemp()
+    try:
+        env_malformed = dict(os.environ, TMPDIR=td_malformed, TEMP=td_malformed, TMP=td_malformed)
+        out = subprocess.run(
+            [sys.executable, HOOK], input="not json",
+            capture_output=True, text=True, env=env_malformed,
+        )
+    finally:
+        shutil.rmtree(td_malformed, ignore_errors=True)
     if out.returncode == 0 and not out.stdout.strip():
         print("PASS: fails open on malformed stdin")
         passes += 1

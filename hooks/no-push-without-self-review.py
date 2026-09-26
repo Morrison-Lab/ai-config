@@ -14,13 +14,44 @@ this corpus quotes verdict vocabulary constantly. Here it was self-defeating
 rather than merely unsound -- a `PreToolUse` deny reason is surfaced back into
 the transcript as the blocked call's result, so one blocked push authorized
 every retry after it, and `Read`ing any of this repo's prose did the same. So a
-verdict is admitted from the `tool_result` of an `Agent` call whose
-`subagent_type` IS the reviewer, and only when that result is not an error.
+verdict is admitted from the `tool_result` of a subagent-dispatch call whose
+named persona IS the reviewer, and only when that result is not an error.
+Which tool names count as a dispatch is `AGENT_TOOLS` MINUS `TASK_OUTPUT_TOOLS`,
+spanning harnesses -- Claude's `Agent`/`Task` and Codex's `spawn_agent` among
+them. The subtracted names retrieve a dispatch's output instead of making one.
+On the native path they reach a task-id gate rather than a persona check; on the
+flat OMO records there is no such gate to reach, since nothing on that path
+records task ids, so they reach nothing. See `TASK_OUTPUT_TOOLS`. A review that
+never happened must block a push; a harness whose dispatch records this guard
+cannot read must be taught to it, not left to present as the first. The two are
+indistinguishable from inside this function, which is why the remedy is the
+tool-name set rather than any softening here (ai-config#3707).
 A second provenance is admitted alongside it: a `Bash` call matching this
 file's own external-reviewer pattern, which today recognizes `agy --print`
 and none of the other delegation CLIs.
 Both are narrow for the same reason.
-Neither admits a verdict read out of a file, or out of this guard's own denial.
+Neither admits a verdict read out of a file, or out of this guard's own denial
+-- with one narrow exception, added for the same reason `TASK_OUTPUT_TOOLS`
+was: a harness shape this guard could not see was reproducing #3707's own
+denial rather than presenting as a new one.
+
+Claude Code sometimes delivers a dispatched subagent's report as a message
+from the subagent's own `SubagentHandback` call rather than inside the
+`Agent` tool's own result (ai-config#3945). When that happens the parent
+transcript's `tool_result` carries only a pointer sentence and an `agentId`,
+and the report lives in a sibling file this guard cannot reach by reading
+the parent transcript alone: `<transcript-dir>/<session-id>/subagents/
+agent-<agentId>.jsonl`, as the `message` input of that subagent's own LAST
+`SubagentHandback` tool call. A `.meta.json` file beside it names the
+dispatching call's `toolUseId` and the subagent's own `agentType`. So this
+is not a phrase search over an arbitrary file: the file is found by the
+`toolUseId` the ORIGINAL dispatch's own call id names (falling back to the
+`agentId` printed in the pointer sentence only when no `.meta.json` matches
+by id), and it is admitted only after its `agentType` independently confirms
+the SAME persona check `_is_reviewer_dispatch` already ran against the
+dispatch's `inp` -- the harness's own record of who actually ran has to
+agree, not merely the label the dispatching call claimed. See
+`_handback_report_text`.
 
 **WHAT it said.** Restricting provenance does not make a phrase search sound
 INSIDE the admitted body, which is the same #1297 failure one layer in: a
@@ -43,12 +74,29 @@ Resolving the shipped commits means reading the refspec, not just `HEAD`.
 earlier revision of this guard waved it through while its own docstring claimed
 otherwise.
 
+A report may state more than one `Reviewed-Commit:` line under its one
+verdict -- a review that covered several tips in one pass. Every line found
+after the verdict counts, and a push is covered when what it ships matches
+ANY of them, not only the first (ai-config#3945). Each is still resolved and
+compared exactly as a single fingerprint always was; widening the count
+widens nothing about how strict one comparison is.
+
 CONSEQUENCES FOR HOW THE REVIEWER IS DISPATCHED
 ------------------------------------------------
 Dispatch it in the FOREGROUND (`run_in_background: false`): a background
 dispatch returns an agent id rather than a report, so no verdict ever becomes
 that call's result. This is also the Agent tool's own criterion -- the push is
 waiting on the answer.
+
+Re-dispatch FRESH for each re-review round, rather than resuming the finished
+reviewer with `SendMessage` to its agent id. A resumed reviewer's verdict
+arrives later as a task notification, not as that `SendMessage` call's result,
+so this guard still sees only the earlier verdict it already cached from the
+original foreground call and blocks the push -- even though the session that
+sent the message may believe the re-review already happened and came back
+clean. See `shared/workflow/adversarial-self-review.md`'s "Freshly dispatched,
+not resumed" section for why a resumed reviewer also converges on its own
+prior verdict, independent of this guard's visibility gap.
 
 Review AFTER committing, which is where `shared/workflow/ardi.md` already puts
 the pause point. A review of uncommitted work names a commit that does not
@@ -69,6 +117,14 @@ WHERE IT DELIBERATELY DOES NOT FIRE
   `push_files`) commit straight to a remote branch with no local commit to
   fingerprint, so nothing here can check them. They are an open gap, tracked as
   ai-config#1929, not a decision that they are safe.
+- A push whose every resolved push URL ends in an `EXEMPT_REPOS` entry
+  (Morrison-Lab's mln, mlg and mlr) passes with no verdict and no override.
+  Only a github.com URL (https or ssh) on a configured remote counts, and only
+  for a plain push in a plain command (`[cd DIR &&] git ... [| tail N]`): no
+  `-c`, no environment setting of any kind, and no ssh command, proxy, exec
+  path or receive-pack program that could deliver the pack elsewhere. A
+  push URL on any other host, a local path, a literal URL in the remote
+  position, or anything else is still gated.
 
 Authorized override: `ALLOW_UNREVIEWED_PUSH=1`, as an environment assignment on
 the pushing command itself.
@@ -93,9 +149,22 @@ import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import time
+
+NO_WINDOW = {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)} if sys.platform == "win32" else {}
+
+# Save an independent duplicate of stdout (fd 1) as early as possible, so that
+# any subsequent closure, poisoning, or redirection of fd 1 (e.g. from open(1))
+# does not silence a denial decision into a silent allow (ai-config#3756).
+try:
+    _ORIGINAL_STDOUT_FD: int | None = os.dup(1)
+except Exception:
+    _ORIGINAL_STDOUT_FD = None
+
+_DENIAL_ISSUED: list[bool] = [False]
 
 # --- what counts as a verdict ----------------------------------------------
 
@@ -114,6 +183,18 @@ VERDICT_LINE = re.compile(
 # and four-space indentation by the `{0,3}` bound, but a fence can hold a line
 # that is anchored and indented exactly like the real thing.
 FENCE = re.compile(r"^[ \t]{0,3}(`{3,}|~{3,}).*$", re.M)
+
+# An inline code span is also quoted material. Blanking code spans ensures
+# that literal comment openers (like `<!--`) or spoofed verdict lines inside
+# inline code are not mistaken for live HTML comments or verdicts.
+# Matches backtick runs of equal length that do not span blank lines or
+# paragraph-interrupting block constructs (ATX headings, verdict lines,
+# fences, blockquotes, or HTML comment openers), per CommonMark
+# (ai-config#3961).
+CODE_SPAN = re.compile(
+    r"(?<!`)(`+)(?!`)(?:[^\n\r]|\r?\n(?![ \t]*(?:\r?\n|$|[#>`]|Verdict\b|<!--)))*?(?<!`)\1(?!`)",
+    re.I,
+)
 
 # The reviewer's statement of what it read, required to appear AFTER the
 # verdict it belongs to: that ordering is what makes a truncated report fail,
@@ -143,7 +224,182 @@ REVIEW_PROMPT_RE = re.compile(
     r"\b(?:adversarial[-_ ]?(?:self[-_ ]?)?review|pre[-_ ]?push[-_ ]?review|self[-_ ]?review)\b", re.I
 )
 
-AGENT_TOOLS = {"agent", "task", "invoke_subagent", "taskoutput", "task_output", "manage_task"}
+# Tool names that dispatch a subagent, lowercased. Membership here does not
+# authorize anything on its own: the dispatch's persona must still match
+# ADVERSARIAL_AGENT_NAME (or FALLBACK_AGENT_NAME plus a review prompt), the
+# verdict must still come back as that call's own non-errored result, and the
+# `Reviewed-Commit` fingerprint must still resolve and cover what the push
+# ships. So this set decides which harnesses the guard can SEE, not which
+# reviews it trusts.
+#
+# `spawn_agent` is Codex's native subagent interface. Its absence was the whole
+# of ai-config#3707: a Codex session dispatched the reviewer, got a clean report
+# naming the exact commit, and was denied for never having dispatched a reviewer
+# at all.
+#
+# The two spellings have DIFFERENT standing, and conflating them is what an
+# earlier revision of this comment did. `spawn_agent` is attested in this
+# repository, by `TOOL_ALIASES` in `plugins/ai-config/codex-hook-adapter.py`.
+# `collaboration.spawn_agent` is the name ai-config#3707's reporter used for the
+# interface in prose; nothing here has measured it as the name a Codex
+# TRANSCRIPT carries, and the adapter cannot match it, since `matcher_hits` does
+# an exact dict lookup. It is listed anyway because a name that Codex never
+# emits costs nothing -- membership admits no verdict on its own -- while its
+# absence would reproduce #3707. Replace it with a measurement when one exists;
+# ai-config#3741 tracks that, and the adapter gap it implies.
+#
+# That earlier revision also claimed this was the only missing half of the
+# alias. It is not: sibling hooks gate on their own hard-coded subagent
+# tool-name sets that omit `spawn_agent` entirely, so they are silently inert
+# in a Codex session -- the Fable prohibition among them. Tracked as
+# ai-config#3740 rather than fixed here.
+#
+# The adapter's copy and this one are deliberately not shared: the adapter maps
+# a live payload's tool name onto a matcher, this reads names out of a
+# transcript, and a Codex rename would want re-attesting on both paths rather
+# than propagating silently through one constant.
+AGENT_TOOLS = {
+    "agent", "task", "invoke_subagent", "taskoutput", "task_output",
+    "manage_task",
+    "spawn_agent", "collaboration.spawn_agent",
+}
+
+# The subset of AGENT_TOOLS that RETRIEVES a dispatch's output rather than
+# making one. The distinction decides provenance, so it cannot be left implicit.
+#
+# For a dispatching tool the persona names who will run. For one of these the
+# persona field is decorative -- `task_id` names whose output is coming back --
+# so admitting one on its label alone severs the WHO-said-it chain this module
+# is built on. Measured: a background `Agent` dispatch of `doc-writer` returning
+# `{"task_id": "T7"}`, followed by `taskoutput({"task_id": "T7", "persona":
+# "adversarial-reviewer"})` whose result is a well-formed clean report, yielded
+# a clean verdict with no reviewer having run.
+#
+# That hole PRE-DATES the persona-key widening -- `name` was already read, and
+# reproduces it on origin/main -- so this is not a regression introduced here;
+# ai-config#3742 tracks the pre-existing variant. It is closed here because the
+# widening turned one spelling into three, and because a diff asserting that
+# nothing downstream is relaxed owes the check.
+#
+# `manage_task` is here on INFERENCE, not measurement, and it is the one entry
+# whose standing differs from its neighbours -- said plainly because the
+# `collaboration.spawn_agent` note above discloses its own gap, and a disclosed
+# neighbour makes an undisclosed one read as checked. The repository's only
+# evidence is `memories/antigravity.md:151`, `plugins/ai-config/rules/ai-config.md:28`
+# and `memories/preferences.md:118`. The first two show `Action='status'`; the
+# third names the tool with no `Action` at all ("lists harness-managed background
+# tasks"). So all three describe retrieval and none covers creation, which is the
+# conclusion -- but "all of which show `Action='status'`" was how this comment put
+# it, and that was false for one of the three (ai-config#3737 round 6). A comment
+# whose whole purpose is to state its evidence has to state it exactly, or it
+# reads as checked while resting on a file that says something else.
+#
+# The name and that `Action` parameter both suggest the tool also creates,
+# which is the risk this listing forecloses. Listing it here therefore
+# CHANGES behaviour for a `manage_task` reviewer dispatch, from admitted to
+# denied. That direction is the safe one for an authorization guard, and it is
+# not free: the denial such a session gets is #3707's own misleading one. It is
+# listed anyway because discriminating on the payload would readmit the bypass
+# (a retrieval call can carry a decorative `prompt` as easily as a decorative
+# persona). ai-config#3746 tracks measuring it and giving that case its own
+# denial; `codex_cases` pins the current behaviour either way.
+TASK_OUTPUT_TOOLS = {"taskoutput", "task_output", "manage_task"}
+
+# Spellings a harness may use for a background task's id, read by BOTH ends of
+# the dispatch chain: the result that announces a task (the producer, which puts
+# the id into `reviewer_task_ids`) and the retrieval call that names one (the
+# consumer, which tests membership). They share one tuple because they are two
+# ends of a single chain -- a spelling present at one end and missing at the
+# other denies a review that genuinely ran, with #3707's own misleading message,
+# and that is exactly how `taskId` was missed: the consumer read it, the
+# producer did not. An earlier comment here asserted the two already agreed;
+# they did not, and stating an invariant is not enforcing one (ai-config#3737
+# round 6). Widening the producer cannot admit anything, since the set is built
+# only from reviewer dispatch results.
+#
+# `agentId` is in the tuple because it is the ONE spelling this repository
+# has actually observed in a live session: `shared/workflow/adversarial-self-review.md`
+# records a Claude Code CLI result reading `agentId: a29a955ac15b38f72`, four
+# genuine reviews refused on the strength of it, and a one-line widening
+# proposed on ai-config#3045. The first revision of this constant rewrote both
+# ends of that exact chain and still omitted the spelling the measurement named
+# -- the tuple was assembled from what the code already read rather than from
+# what the corpus had already recorded (ai-config#3737 round 7).
+# The generic `id` is split out, because it is the one spelling that is not
+# self-evidently a task id. Under the earlier first-wins producer it was a LAST
+# RESORT, reached only when no specific spelling was present. Registering every
+# spelling instead made it a peer, and a low-entropy value safe as a fallback is
+# not safe as a peer: a dispatch result carrying `{"task_id": "REAL", "id": "7"}`
+# then trusted `7`, so an unrelated task-output call numbered 7 authorized the
+# push. Measured against `d25ea1e`: base DENY, widened ALLOW, with three
+# controls denying on both sides (ai-config#3737 round 9).
+#
+# The same argument is already written thirty lines below, as the reason
+# `TASK_ID_KEYS_ORIGIN` omits the key. It was not applied to this constant.
+TASK_ID_KEYS_SPECIFIC = ("task_id", "taskId", "TaskId", "conversationId", "agentId")
+TASK_ID_KEYS_GENERIC = ("id",)
+TASK_ID_KEYS = TASK_ID_KEYS_SPECIFIC + TASK_ID_KEYS_GENERIC
+
+# The task-notification `origin` envelope gets a NARROWER list, deliberately.
+# `origin` identifies a notification, so its `id` is the notification's own id
+# rather than the task's -- a different identifier space, and admitting it would
+# test membership for a value that was never a task id. The other four mean the
+# same thing here as above. This is the one site where the sets legitimately
+# differ, and the reason is the payload's meaning rather than an oversight.
+TASK_ID_KEYS_ORIGIN = ("task_id", "taskId", "TaskId", "conversationId")
+
+
+def _task_ids(source, keys=TASK_ID_KEYS):
+    """Every task-id spelling present in `source`, as `str`, in `keys` order.
+
+    Returning only the FIRST spelling is the gap the shared tuple above could
+    not close on its own, and the comment there used to imply it had. A real
+    harness result carries several id keys at once, so a producer registering
+    one of them and a retrieval naming another miss each other -- the same
+    denial the shared tuple exists to prevent, reached by a different route,
+    and one the suite could not see because its fixture built single-key dicts
+    on both ends (ai-config#3737 round 7).
+
+    Neither guard below is decorative. A malformed `tool_input` yields a list
+    or a string here, and `.get` on it would raise `AttributeError` out into a
+    generic handler reporting "Failed reading transcript" rather than
+    evaluating the session. The `str()` coercion is equally load-bearing: a
+    harness reporting an id as a JSON number on one end and quoting it as text
+    on the other must still match.
+    """
+    if not isinstance(source, dict):
+        return []
+    out = []
+    for k in keys:
+        v = source.get(k)
+        if v:
+            out.append(str(v))
+    return out
+
+
+def _registrable_task_ids(source):
+    """The ids a reviewer dispatch result may be TRUSTED for, most specific first.
+
+    Asymmetric with `_task_ids` on purpose. The consumer reads every spelling
+    of its OWN input, which is not a trust decision -- it asks "is any id I
+    name already trusted?". The producer decides what BECOMES trusted, so the
+    generic `id` stays a last resort here: taken only when no specific spelling
+    is present, exactly as the first-wins producer took it.
+
+    Relaxing a lookup from first-match to any-match makes every previously
+    shadowed key independently trusted, which is a change to the set's SAFETY
+    rather than only its completeness. Dropping `id` altogether would close the
+    collision and reopen the false denial this chain exists to prevent, since a
+    result whose only id key is `id` would then register nothing.
+    """
+    specific = _task_ids(source, TASK_ID_KEYS_SPECIFIC)
+    return specific if specific else _task_ids(source, TASK_ID_KEYS_GENERIC)
+
+
+def _first_task_id(source, keys=TASK_ID_KEYS) -> str:
+    """The first task-id spelling present in `source`, as a `str`, else ""."""
+    ids = _task_ids(source, keys)
+    return ids[0] if ids else ""
 
 # A cross-family reviewer invoked as a CLI, whose print-mode output IS its
 # review. Each value lists the flags putting that program in non-interactive
@@ -302,6 +558,40 @@ OVERRIDE_ENV = re.compile(r"\AALLOW_UNREVIEWED_PUSH=1\Z")
 # a PreToolUse deny is not user-overridable.
 DEGRADED_OVERRIDE = re.compile(r"(?:^|[;&|`(\s])ALLOW_UNREVIEWED_PUSH=1\s")
 
+# Repositories whose pushes this guard does not gate at all, as lowercase
+# `owner/repo`. A push is exempt only when EVERY URL it would push to names one
+# of these (see `push_is_exempt`), so the list narrows the guard by
+# destination and never by what the command says about itself.
+#
+# Morrison-Lab's DATA 571 course repositories, at the owner's request
+# (2026-09-23): their agent sessions push feature branches under a standing
+# grant, and the harness there backgrounds every reviewer dispatch, so the
+# guard could never see a verdict (ai-config#3045) and every push ended in the
+# override. A constant rather than an environment variable or a file in the
+# pushed repository, because both of those are writable by the session the
+# guard is checking; widening this list is a reviewed change to this file.
+EXEMPT_REPOS = frozenset({
+    "morrison-lab/mln",
+    "morrison-lab/mlg",
+    "morrison-lab/mlr",
+})
+
+# `owner/repo` of a push URL, accepted only on github.com: `https://` (with
+# or without credentials), scp-style `git@github.com:owner/repo`, or
+# `ssh://git@github.com/owner/repo`. Each form takes exactly the separator git
+# itself reads it with -- `git@github.com/owner/repo` is a local path to git,
+# and `ssh://git@github.com:owner/repo` drops the owner from the path it
+# requests -- so neither is matched. Matching the trailing path alone let one
+# inline `-c remote.origin.pushurl=https://any.host/x/Morrison-Lab/mln` read
+# as exempt while shipping somewhere else, so the host is part of the match.
+# The host is case-insensitive, as DNS is; any other host or a local path is
+# never exempt.
+_URL_OWNER_REPO = re.compile(
+    r"(?:(?i:https://(?:[^@/\s]+@)?github\.com/)"
+    r"|(?i:git@github\.com:)"
+    r"|(?i:ssh://git@github\.com/))"
+    r"([^/:\s]+)/([^/:\s]+?)(?:\.git)?/*")
+
 # Options after which no single reviewed commit can describe the push.
 # `--branches` is git's own documented alias of `--all` (`git push -h`), so it
 # ships every branch while looking like an ordinary unknown option.
@@ -411,6 +701,30 @@ try:
     _extract_review_payload, _payload_is_blocking = _load_review_payload()
 except Exception:
     _extract_review_payload, _payload_is_blocking = None, None
+
+
+def _load_native_path():
+    """`scripts/lib/shellcmd.py`'s `native_path`, or the identity.
+
+    The Bash tool on Windows is Git Bash, so a `-C` or `cd` target arrives as
+    `/c/Users/...`, which native `git.exe` cannot open ("cannot change to
+    '/c/Users/...'"). Every git call here would then fail, and a cross-repo
+    push with a clean verdict was refused as unresolvable. The identity
+    fallback reproduces that refusal rather than an allow, so a broken install
+    fails in the safe direction.
+    """
+    lib_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                           "scripts", "lib")
+    try:
+        if lib_dir not in sys.path:
+            sys.path.insert(0, lib_dir)
+        from shellcmd import native_path
+        return native_path
+    except Exception:
+        return lambda path, is_windows=None: path
+
+
+_native_path = _load_native_path()
 
 
 ENV_ASSIGNMENT = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*=")
@@ -687,11 +1001,15 @@ def _resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
         # Unexpanded shell variables/substitutions cannot be resolved statically.
         return None
 
-    if os.path.isabs(target):
-        return os.path.normpath(target)
-    if cur_dir is not None:
-        return os.path.normpath(os.path.join(cur_dir, target))
-    return os.path.normpath(target)
+    # Before `isabs`: on Windows under Python 3.13, `isabs("/c/Users/x")` is
+    # False, so a Git Bash drive path was joined onto `cur_dir` and then
+    # normalized into a drive-less path nothing downstream could repair.
+    target = _native_path(target)
+    was_windows_drive_forward = bool(re.match(r"^[A-Za-z]:/", target))
+    resolved = os.path.normpath(os.path.join(cur_dir, target) if cur_dir is not None else target)
+    if was_windows_drive_forward:
+        resolved = resolved.replace("\\", "/")
+    return resolved
 
 
 def _hints_by_position(command: str) -> list[str | None]:
@@ -869,8 +1187,12 @@ def iter_pushes(command: str):
                 tok = rest[i]
                 if tok == "-C" and i + 1 < len(rest):
                     # Chained: each -C is relative to the accumulated path.
-                    directory = os.path.join(directory or "", rest[i + 1]) \
-                        if directory not in (None, REDIRECTED) else rest[i + 1]
+                    # Converted here, not only in `_run_git`: the join above
+                    # and the `isabs` test in the hint merge below both
+                    # misread a Git Bash drive path.
+                    value = _native_path(rest[i + 1])
+                    directory = os.path.join(directory or "", value) \
+                        if directory not in (None, REDIRECTED) else value
                     i += 2
                     continue
                 head = tok.partition("=")[0]
@@ -1039,15 +1361,20 @@ def _run_git(directory: str | None, env: list[str], *args: str) -> str | None:
     remaining = _DEADLINE[0] - time.monotonic()
     if remaining <= 0:
         raise TimeoutError("ran out of time resolving what this push would ship")
-    cmd = ["git"] + (["-C", directory] if directory else []) + list(args)
+    overlay = dict(os.environ)
+    for assignment in env:
+        key, sep, value = assignment.partition("=")
+        if sep:
+            overlay[key] = value
+    git_bin = "git"
+    custom_path = overlay.get("PATH")
+    if custom_path and custom_path != os.environ.get("PATH"):
+        git_bin = shutil.which("git", path=custom_path) or "git"
+    cmd = [git_bin] + (["-C", _native_path(directory)] if directory else []) + list(args)
     try:
-        overlay = dict(os.environ)
-        for assignment in env:
-            key, sep, value = assignment.partition("=")
-            if sep:
-                overlay[key] = value
         out = subprocess.run(cmd, capture_output=True, text=True, env=overlay,
-                             timeout=min(PER_CALL_SECONDS, remaining))
+                             timeout=min(PER_CALL_SECONDS, remaining),
+                             **NO_WINDOW)
     except subprocess.TimeoutExpired:
         raise TimeoutError("ran out of time resolving what this push would ship")
     except Exception:
@@ -1168,6 +1495,148 @@ def _push_remote(directory: str | None, argv: list[str],
         if value:
             return value
     return "origin"
+
+
+def _owner_repo(url: str) -> str | None:
+    """Lowercase `owner/repo` of a github.com push URL, or None."""
+    m = _URL_OWNER_REPO.fullmatch(url.strip())
+    return f"{m.group(1)}/{m.group(2)}".lower() if m else None
+
+
+# What can send a push somewhere its URL does not name. `git remote get-url`
+# reports the URL after `insteadOf`/`pushurl` rewriting, but a command git runs
+# to reach it (an ssh wrapper, a proxy, a replaced remote helper, a
+# `--receive-pack` program) can deliver the pack anywhere while git still
+# prints the github.com URL. So a push that carries or inherits any of these is
+# never exempt. Disabling TLS verification belongs here too: with it off, any
+# HTTP proxy in the path can answer for github.com.
+#
+# An HTTP proxy and a custom CA bundle are deliberately NOT refused, because
+# the cloud sessions this exemption exists for need both (HTTPS_PROXY and
+# GIT_SSL_CAINFO are set in every one). The exemption therefore trusts the
+# session's configured proxy and CA store. It is not a sandbox against a
+# session that sets up a hostile transport in an earlier command: `main`
+# already fails open on errors, MCP pushes are ungated (#1929), and the
+# override exists, so that threat was never in this hook's scope.
+TRANSPORT_ENV = frozenset({
+    "GIT_SSH", "GIT_SSH_COMMAND", "GIT_SSH_VARIANT", "GIT_PROXY_COMMAND",
+    "GIT_EXEC_PATH", "GIT_SSL_NO_VERIFY",
+})
+TRANSPORT_CONFIG = (r"^(core\.sshcommand|core\.gitproxy"
+                    r"|remote\..*\.(receivepack|vcs)"
+                    r"|http\.(.*\.)?sslverify)$")
+
+
+def _is_plain_command(command: str) -> bool:
+    """True when the whole Bash command is `[cd DIR &&]... git ... [2>&1] [| tail|head N]`.
+
+    `iter_pushes` reports only the environment PREFIX of a push, so anything
+    that sets the push's environment another way -- `export X=... &&`, an
+    `env -i X=... git push` wrapper whose assignments `_strip_env` skips, a
+    sourced file, a function, a substitution -- is invisible to
+    `_is_plain_push`. Rather than enumerate those, the exemption accepts only
+    this one shape and sends every other command to the ordinary review check.
+
+    `#` is refused anywhere. shlex treats it as a comment wherever it appears,
+    while bash starts a comment only at the beginning of a word, so
+    `git push origin main#z && touch x` lexes here as one bare push while bash
+    runs both commands. A `#` is legal in a ref name, so this is reachable.
+    """
+    if re.search(r"[$`;()<#\n\\]", command):
+        return False
+    try:
+        lex = shlex.shlex(command, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        toks = list(lex)
+    except ValueError:
+        return False
+    i = 0
+    while toks[i:i + 1] == ["cd"]:
+        if len(toks) < i + 3 or toks[i + 2] != "&&" or not _is_word(toks[i + 1]):
+            return False
+        i += 3
+    if toks[i:i + 1] != ["git"]:
+        return False
+    j = i + 1
+    while (j < len(toks) and _is_word(toks[j])
+           and toks[j:j + 3] != ["2", ">&", "1"]):
+        j += 1
+    rest = toks[j:]
+    if rest[:3] == ["2", ">&", "1"]:
+        rest = rest[3:]
+    if not rest:
+        return True
+    return (rest[0] == "|" and rest[1:2] in (["tail"], ["head"])
+            and all(re.fullmatch(r"-n|-?\d+", t) for t in rest[2:]))
+
+
+def _is_word(tok: str) -> bool:
+    """A shlex token that is not shell punctuation."""
+    return not re.fullmatch(r"[|&;<>()]+", tok)
+
+
+def _is_plain_push(directory: str | None, argv: list[str],
+                   env: list[str]) -> bool:
+    """True when nothing in or around this push can redirect its transport.
+
+    Plain means: no environment prefix at all, no git global option but `-C`,
+    no `--receive-pack`/`--exec`, none of TRANSPORT_ENV in the inherited
+    environment, and none of TRANSPORT_CONFIG in the repository's resolved
+    config. Stricter than it needs to be on purpose: an exempt push that is
+    not plain just goes through the ordinary review check.
+    """
+    if env or any(os.environ.get(k) for k in TRANSPORT_ENV):
+        return False
+    i = 1
+    while i < len(argv) and argv[i] != "push":
+        if argv[i] != "-C" or i + 1 >= len(argv):
+            return False
+        i += 2
+    for tok in argv[i + 1:]:
+        # git accepts any unambiguous prefix of a long option, so match the
+        # prefixes that can only mean these two (`--rec`, `--ex`).
+        if tok.startswith(("--rec", "--ex")):
+            return False
+    return not _run_git(directory, env, "config", "--get-regexp",
+                        TRANSPORT_CONFIG)
+
+
+def push_is_exempt(directory: str | None, argv: list[str],
+                   env: list[str], command: str) -> bool:
+    """True when every URL this push would write to is in EXEMPT_REPOS.
+
+    Only a plain command (`_is_plain_command`) running a plain push
+    (`_is_plain_push`) qualifies, so no `-c`, environment setting or transport
+    command is in play. The remote is resolved the way
+    `_push_remote` resolves it, and its URLs are read with
+    `git remote get-url --push --all`, so `pushurl` and `insteadOf` rewrites
+    in the repository's config are seen as git will apply them.
+    A remote with several push URLs is exempt only if all of them are. A
+    command naming a URL or path instead of a configured remote is never
+    exempt: `git remote get-url` cannot resolve it, and git still applies
+    `insteadOf`/`pushInsteadOf` to it, so its literal text says nothing
+    reliable about where the push goes.
+
+    Anything unresolvable is NOT exempt, which leaves the push to the ordinary
+    review check: the exemption can only ever narrow the guard by destination.
+    That includes running out of the shared time budget, and any parse error:
+    `_run_git` raises `TimeoutError` then, and letting any exception escape
+    here would reach `main`'s fail-open `except` -- a silent allow for the
+    whole command, which is what `push_refspecs` guards against the same way.
+    """
+    try:
+        if not (_is_plain_command(command)
+                and _is_plain_push(directory, argv, env)):
+            return False
+        remote = _push_remote(directory, argv, env)
+        if not remote:
+            return False
+        listed = _run_git(directory, env,
+                          "remote", "get-url", "--push", "--all", remote)
+    except Exception:  # TimeoutError included; see above.
+        return False
+    urls = [u.strip() for u in (listed or "").splitlines() if u.strip()]
+    return bool(urls) and all(_owner_repo(u) in EXEMPT_REPOS for u in urls)
 
 
 def _rev_parse_ref(directory: str | None, env: list[str], *args: str) -> str | None:
@@ -1301,31 +1770,23 @@ def _iter_blocks(record: dict):
 
 
 def _blank_quoted_regions(text: str) -> tuple[str, bool]:
-    """Blank fenced code AND HTML comments in one render-faithful pass.
+    """Blank fenced code, HTML comments, and code spans in one render-faithful pass.
 
-    Two sequential linear passes cannot be correct in both directions: with
-    fences first, a fence that swallows a comment's opener leaves the
-    comment interior live (a spoofed verdict "hidden" there decides the
-    report), and a fence that swallows only the true closer makes the
-    comment pass pair the opener with a later decoy arrow, exposing
-    whatever follows the decoy (both measured in the #2479 review rounds).
-    Comments first fails the mirror cases. CommonMark resolves the
-    ambiguity by ORDER: whichever construct opens first swallows the
-    other's markers until its own closer, so this scanner walks the text
-    once and enters whichever region begins next -- a fence per FENCE's
-    dialect (closing only on a same-character, at-least-as-long BARE
-    marker: positional pairing mis-pairs the moment fences nest, e.g. an
-    outer 4-tick fence quoting an inner 3-tick pair), or a comment at
-    ``<!--``
-    (closing only at the first literal ``-->``, fence markers inside
-    swallowed, matching how a renderer treats an open comment). The
-    blanked region is then exactly what a renderer hides, and any live
-    verdict line is one a reader of the rendered report would see.
+    Linear passes cannot be correct across interleaved constructs: CommonMark
+    resolves ambiguity by ORDER: whichever construct opens first swallows the
+    other's markers until its own closer. This scanner walks the text once and
+    enters whichever region begins next:
+    - a fence per FENCE's dialect (closing only on a same-character,
+      at-least-as-long BARE marker; blocks take precedence over inlines),
+    - an inline code span per CODE_SPAN (closing on an identical backtick run),
+    - or an HTML comment at ``<!--`` (closing at ``-->``).
 
-    An unclosed fence or comment at end of text reports True, and
-    parse_report fails the report closed: a structure that cannot be
-    resolved is a verdict that cannot be read, and truncation mid-region
-    leaves exactly this state. Offsets are preserved throughout.
+    The blanked region is then what a renderer hides, ensuring literal
+    comment openers in inline code (e.g. `<!--`) do not blank subsequent
+    verdicts (ai-config#3961).
+
+    An unclosed fence or comment at end of text reports True, and parse_report
+    fails closed. Offsets are preserved throughout.
     """
     out = list(text)
     n = len(text)
@@ -1338,11 +1799,34 @@ def _blank_quoted_regions(text: str) -> tuple[str, bool]:
     pos = 0
     while pos < n:
         fence = FENCE.search(text, pos)
+        span = CODE_SPAN.search(text, pos)
         comment_at = text.find("<!--", pos)
-        if fence is None and comment_at == -1:
+
+        # A block fence takes precedence over any inline code span that
+        # starts at or spans across the fence opener.
+        span_start = None
+        if span is not None and (fence is None or fence.start() >= span.end()):
+            span_start = span.start()
+
+        fence_start = fence.start() if fence is not None else None
+        comment_start = comment_at if comment_at != -1 else None
+
+        candidates: list[tuple[int, str]] = []
+        if fence_start is not None:
+            candidates.append((fence_start, "fence"))
+        if span_start is not None:
+            candidates.append((span_start, "span"))
+        if comment_start is not None:
+            candidates.append((comment_start, "comment"))
+
+        if not candidates:
             break
-        if comment_at == -1 or (fence is not None
-                                and fence.start() < comment_at):
+
+        candidates.sort(key=lambda c: c[0])
+        chosen = candidates[0][1]
+
+        if chosen == "fence":
+            assert fence is not None
             open_char = fence.group(1)[0]
             open_len = len(fence.group(1))
             close = None
@@ -1362,6 +1846,10 @@ def _blank_quoted_regions(text: str) -> tuple[str, bool]:
                 return "".join(out), True
             blank(fence.start(), close.end())
             pos = close.end()
+        elif chosen == "span":
+            assert span is not None
+            blank(span.start(), span.end())
+            pos = span.end()
         else:
             close_at = text.find("-->", comment_at + 4)
             if close_at == -1:
@@ -1372,14 +1860,21 @@ def _blank_quoted_regions(text: str) -> tuple[str, bool]:
     return "".join(out), False
 
 
-def parse_report(text: str) -> tuple[str | None, str | None]:
-    """(verdict, reviewed_commit) from one reviewer report.
+def parse_report_all(text: str) -> tuple[str | None, list[str]]:
+    """(verdict, reviewed_commits) from one reviewer report.
 
-    The verdict is the LAST verdict LINE, and the fingerprint is the first one
-    after it. Both halves matter: taking the last verdict anywhere lets a
-    closing sentence that quotes the other verdict decide the report, and
-    taking the fingerprint from anywhere lets a fingerprint quoted in the
-    findings stand in for the report's own.
+    The verdict is the LAST verdict LINE, and the fingerprints are every one
+    found after it, in order, deduplicated. Both halves matter: taking the
+    last verdict anywhere lets a closing sentence that quotes the other
+    verdict decide the report, and taking a fingerprint from anywhere lets a
+    fingerprint quoted in the findings stand in for the report's own.
+
+    A report may name MORE THAN ONE `Reviewed-Commit:` line under its single
+    verdict -- a review that covered several tips in one pass -- and every
+    one found is returned rather than only the first, so a push matching any
+    of them is covered (ai-config#3945). This does not relax which lines
+    count: each is still found by the same scan, over the same blanked text,
+    starting at the same position, that always looked for one.
     """
     # BOTH searches run against the blanked text. Blanking only the verdict
     # search left the asymmetry that mattered: a fenced example whose
@@ -1395,13 +1890,19 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
     # correct.
     blanked, unresolved = _blank_quoted_regions(text)
     if unresolved:
-        return None, None
+        return None, []
     matches = list(VERDICT_LINE.finditer(blanked))
     if not matches:
-        return None, None
+        return None, []
     last = matches[-1]
     verdict = "clean" if last.group(1).lower().startswith("ready") else "needs_work"
-    sha = REVIEWED_COMMIT.search(blanked, last.end())
+    shas: list[str] = []
+    seen: set[str] = set()
+    for m in REVIEWED_COMMIT.finditer(blanked, last.end()):
+        sha = m.group(1).lower()
+        if sha not in seen:
+            seen.add(sha)
+            shas.append(sha)
     if verdict == "clean" and _extract_review_payload is not None and _payload_is_blocking is not None:
         try:
             payload = _extract_review_payload(text)
@@ -1409,7 +1910,16 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
                 verdict = "needs_work"
         except Exception:
             pass
-    return verdict, (sha.group(1).lower() if sha else None)
+    return verdict, shas
+
+
+def parse_report(text: str) -> tuple[str | None, str | None]:
+    """(verdict, reviewed_commit) from one reviewer report -- the FIRST
+    `Reviewed-Commit:` line after the verdict, for a caller that only wants
+    one. See `parse_report_all` for every line a report may state.
+    """
+    verdict, shas = parse_report_all(text)
+    return verdict, (shas[0] if shas else None)
 
 
 
@@ -1417,7 +1927,30 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
 def _agent_subtypes(inp: dict) -> list[str]:
     """Subagent names an Agent/Task dispatch names, from any observed key."""
     sub_types: list[str] = []
-    for k in ("subagent_type", "subagentType", "agent_type", "TypeName", "name", "Role"):
+    # `agent`, `persona` and `role` are here because `_is_reviewer_record` below
+    # already treats them as persona-naming keys, and two predicates in one file
+    # disagreeing about what names a persona is how a dispatch gets seen by one
+    # and not the other. Widening the TOOL set without widening this one left
+    # exactly that hole: a `spawn_agent` record keyed on `agent` reproduced
+    # ai-config#3707's denial verbatim after the tool name was recognized.
+    #
+    # Parity is with the persona KEYS, not with that function's key list, and
+    # the difference is deliberate. `_is_reviewer_record` also reads
+    # `attributionAgent`, which this must not: that one names who AUTHORED a
+    # transcript record, while this reads a tool's INPUT. Copying it across
+    # would be structural fit standing in for a transferred purpose
+    # (`check-purpose-before-reusing`). `role` does transfer -- `Role` is
+    # already read here and the two are one key in different casings -- and it
+    # is safe on its own terms besides: a message's `role` value can only be
+    # `user`, `assistant` and the like, which is why `_is_reviewer_record`
+    # filters them and this does not have to. Neither name regex matches any of
+    # them.
+    #
+    # Nothing downstream is relaxed -- every name found here is still matched
+    # against ADVERSARIAL_AGENT_NAME, or FALLBACK_AGENT_NAME plus a review
+    # prompt.
+    for k in ("subagent_type", "subagentType", "agent_type", "TypeName",
+              "name", "Role", "role", "agent", "persona"):
         if inp.get(k):
             sub_types.append(str(inp.get(k)))
     if isinstance(inp.get("Subagents"), list):
@@ -1474,8 +2007,164 @@ def _is_reviewer_record(record: dict) -> bool:
     return any(ADVERSARIAL_AGENT_NAME.match(c) for c in candidates)
 
 
-def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bool]:
-    """(verdict, reviewed_commit, saw_reviewer_call) from the transcript.
+# --- hand-back delivery (ai-config#3945) ------------------------------------
+#
+# Matched against free text (a dispatch result's pointer sentence), not
+# against a structured field -- the harness states the id in prose
+# ("delivered to you as a message from ... (its SubagentHandback call)")
+# alongside a plain `agentId: <id>` line, and this is the fallback route to
+# it, used only when no `.meta.json` in the subagents directory names the
+# dispatch's own `toolUseId`. `[\w-]+` matches the same id shape
+# `TASK_ID_KEYS`' own text-mined fallback already accepts elsewhere in this
+# file.
+AGENT_ID_IN_TEXT = re.compile(r"\bagentId[:=]\s*[`\"']?([\w-]+)", re.I)
+
+
+def _subagents_dir(transcript_path: str) -> str:
+    """The `subagents/` directory a hand-back subagent's own transcript and
+    `.meta.json` live under, next to the PARENT session's own transcript file.
+
+    Measured layout (Claude Code desktop, Windows, 2026-09-25): a transcript
+    at `<dir>/<session-id>.jsonl` has its subagents under
+    `<dir>/<session-id>/subagents/`.
+    """
+    base = os.path.basename(transcript_path)
+    session_id = base[:-len(".jsonl")] if base.lower().endswith(".jsonl") else base
+    return os.path.join(os.path.dirname(transcript_path), session_id, "subagents")
+
+
+def _read_json_file(path: str):
+    try:
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _agent_type_is_admitted(agent_type) -> bool:
+    """True when a `.meta.json`'s bare `agentType` string names an admitted
+    reviewer persona.
+
+    Mirrors `_is_reviewer_dispatch`'s two persona checks, with no prompt to
+    consult here: the prompt-based fallback branch already ran once, against
+    the ORIGINAL dispatch's own `inp`, before this call's id was ever added
+    to `reviewer_call_ids`. This is independent confirmation that the
+    harness's own record of which agent actually ran agrees with that
+    dispatch -- not a replacement for the check that already happened.
+    """
+    if not isinstance(agent_type, str) or not agent_type:
+        return False
+    return bool(ADVERSARIAL_AGENT_NAME.match(agent_type) or FALLBACK_AGENT_NAME.match(agent_type))
+
+
+def _last_subagent_handback_message(subagent_transcript_path: str) -> str | None:
+    """The `message` input of the LAST `SubagentHandback` tool_use in this
+    subagent's own transcript, or None.
+
+    Only a `SubagentHandback` tool_use's own `input.message` counts. The
+    subagent's reasoning text, its other tool calls, and any tool RESULT in
+    its transcript are never read here -- none of those is the report the
+    subagent chose to hand back, and admitting them would let a verdict the
+    subagent merely discussed while exploring stand in for the one it
+    actually returned.
+    """
+    last: str | None = None
+    try:
+        with open(subagent_transcript_path, "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except Exception:
+                    continue
+                if not isinstance(record, dict):
+                    continue
+                for b in _iter_blocks(record):
+                    if b.get("type") != "tool_use":
+                        continue
+                    if str(b.get("name") or "").lower() != "subagenthandback":
+                        continue
+                    inp = b.get("input") or {}
+                    msg = inp.get("message") if isinstance(inp, dict) else None
+                    if isinstance(msg, str) and msg:
+                        last = msg
+    except OSError:
+        return None
+    return last
+
+
+def _handback_report_text(transcript_path: str, call_id, res_text: str) -> str | None:
+    """The report text a hand-back-only dispatch result points at, or None.
+
+    Claude Code sometimes delivers a dispatched subagent's report as a
+    message from the subagent's own `SubagentHandback` call rather than
+    inside the `Agent` tool's own result (ai-config#3945): the parent
+    transcript's `tool_result` then carries only a pointer sentence and an
+    `agentId`, and the actual report lives in a sibling
+    `subagents/agent-<agentId>.jsonl` file this function reads directly.
+
+    Located by `toolUseId` FIRST -- the `.meta.json` beside that subagent's
+    transcript names the dispatching call's own id, which is an EXACT match
+    against `call_id` -- falling back to the `agentId` printed in the
+    pointer sentence only when no `.meta.json` names this call. The fallback
+    is intentionally the weaker of the two: a text-mined id could in
+    principle collide with an unrelated id string elsewhere in a result, so
+    it is used only when the exact match finds nothing, and even then the
+    matching `.meta.json`'s `agentType` must still independently confirm an
+    admitted reviewer before anything in that file is read.
+    """
+    if not isinstance(call_id, str) or not call_id:
+        return None
+    subagents_dir = _subagents_dir(transcript_path)
+    try:
+        entries = os.listdir(subagents_dir)
+    except OSError:
+        return None
+
+    meta_path = None
+    for name in entries:
+        if not name.endswith(".meta.json"):
+            continue
+        candidate = os.path.join(subagents_dir, name)
+        meta = _read_json_file(candidate)
+        if isinstance(meta, dict) and str(meta.get("toolUseId") or "") == call_id:
+            meta_path = candidate
+            break
+
+    if meta_path is None:
+        agent_id_match = AGENT_ID_IN_TEXT.search(res_text)
+        if not agent_id_match:
+            return None
+        candidate = os.path.join(subagents_dir, f"agent-{agent_id_match.group(1)}.meta.json")
+        if os.path.isfile(candidate):
+            meta_path = candidate
+
+    if meta_path is None:
+        return None
+
+    meta = _read_json_file(meta_path)
+    if not isinstance(meta, dict) or not _agent_type_is_admitted(meta.get("agentType")):
+        return None
+
+    base = os.path.basename(meta_path)
+    if not (base.startswith("agent-") and base.endswith(".meta.json")):
+        return None
+    agent_id = base[len("agent-"):-len(".meta.json")]
+    subagent_jsonl = os.path.join(subagents_dir, f"agent-{agent_id}.jsonl")
+    if not os.path.isfile(subagent_jsonl):
+        return None
+
+    return _last_subagent_handback_message(subagent_jsonl)
+
+
+def read_latest_review(transcript_path: str) -> tuple[str | None, list[str], bool]:
+    """(verdict, reviewed_commits, saw_reviewer_call) from the transcript.
+
+    `reviewed_commits` is every `Reviewed-Commit:` line the winning report
+    named (see `parse_report_all`), not just one -- empty when no report
+    supplied a fingerprint.
 
     Only the reviewer's own call results and attributed subagent reports are
     consulted, and an errored result on the dispatch itself is skipped -- a failed
@@ -1493,12 +2182,17 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
     runs tools sequentially per session, so the nearest outstanding use of that
     name is the result's partner -- and fed through the same dispatch predicate
     and report parser as the native path.
+
+    A third shape is read only at the native `tool_result` site: Claude Code's
+    hand-back delivery, where the dispatch's own result carries no report at
+    all, only a pointer to a sibling subagent transcript (ai-config#3945,
+    `_handback_report_text`).
     """
     reviewer_call_ids: set[str] = set()
     reviewer_task_ids: set[str] = set()
     saw_reviewer_call = False
     verdict: str | None = None
-    reviewed_commit: str | None = None
+    reviewed_commits: list[str] = []
     pending_omo_uses: dict[str, list[str]] = {}
     ambiguous_omo_names: set[str] = set()
 
@@ -1527,7 +2221,8 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                     call_id = f"omo-{_OMO_SEQ[0]}"
                     pending_omo_uses.setdefault(name, []).append(call_id)
                     inp = record.get("tool_input")
-                    if name in AGENT_TOOLS and isinstance(inp, dict):
+                    if (name in AGENT_TOOLS and name not in TASK_OUTPUT_TOOLS
+                            and isinstance(inp, dict)):
                         if _is_reviewer_dispatch(inp):
                             saw_reviewer_call = True
                             reviewer_call_ids.add(call_id)
@@ -1589,11 +2284,11 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                         # complete, correctly-fingerprinted report WILL
                         # authorize. No signal available here distinguishes it.
                         if not record.get("is_error"):
-                            found, sha = parse_report(
+                            found, shas = parse_report_all(
                                 _result_text({"content": record.get("tool_output")})
                             )
                             if found:
-                                verdict, reviewed_commit = found, sha
+                                verdict, reviewed_commits = found, shas
                 continue
 
             is_assistant = (
@@ -1609,9 +2304,9 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                     record.get("message") if isinstance(record.get("message"), dict) else record
                 )
                 if content_text:
-                    found, sha = parse_report(content_text)
+                    found, shas = parse_report_all(content_text)
                     if found:
-                        verdict, reviewed_commit = found, sha
+                        verdict, reviewed_commits = found, shas
 
             for b in _iter_blocks(record):
                 b_type = b.get("type")
@@ -1621,16 +2316,35 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                     call_id = b.get("id")
                     inp = b.get("input") or {}
 
-                    if tool_name in AGENT_TOOLS:
+                    # Task-output tools are tested FIRST so a persona label on
+                    # one can never short-circuit the task-id gate below, which
+                    # is their only sound provenance (see TASK_OUTPUT_TOOLS).
+                    if tool_name in TASK_OUTPUT_TOOLS:
+                        # Since the reorder above, this gate is the ONLY
+                        # provenance a retrieval tool has -- the persona path it
+                        # used to fall back on is exactly the bypass that was
+                        # closed -- so a spelling missing from either end of the
+                        # chain is no longer a near-miss that something else
+                        # catches. It denies a review that genuinely ran, with
+                        # #3707's own misleading message.
+                        #
+                        # Both ends now read `TASK_ID_KEYS`, which is why this
+                        # site no longer carries a key list of its own. An
+                        # earlier revision of this comment INSTRUCTED the two to
+                        # agree, and they did not agree at the moment it said so:
+                        # the consumer read `TaskId` and the producer did not,
+                        # the producer read `conversationId` and the consumer did
+                        # not. A comment cannot hold an invariant that a shared
+                        # constant can (ai-config#3737 round 6).
+                        if any(t in reviewer_task_ids
+                               for t in _task_ids(inp)):
+                            if isinstance(call_id, str) and call_id:
+                                reviewer_call_ids.add(call_id)
+                    elif tool_name in AGENT_TOOLS:
                         if _is_reviewer_dispatch(inp):
                             saw_reviewer_call = True
                             if isinstance(call_id, str) and call_id:
                                 reviewer_call_ids.add(call_id)
-                        elif tool_name in ("taskoutput", "task_output", "manage_task"):
-                            task_id = str(inp.get("task_id") or inp.get("TaskId") or inp.get("id") or "")
-                            if task_id and task_id in reviewer_task_ids:
-                                if isinstance(call_id, str) and call_id:
-                                    reviewer_call_ids.add(call_id)
                     elif tool_name == "bash" and external_reviewer_command(
                             str(inp.get("command") or "")):
                         saw_reviewer_call = True
@@ -1639,9 +2353,9 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                     elif tool_name == "send_message" and record_is_reviewer:
                         msg_text = str(inp.get("Message") or inp.get("message") or "")
                         if msg_text:
-                            found, sha = parse_report(msg_text)
+                            found, shas = parse_report_all(msg_text)
                             if found:
-                                verdict, reviewed_commit = found, sha
+                                verdict, reviewed_commits = found, shas
 
                 elif b_type == "tool_result":
                     call_id = b.get("tool_use_id")
@@ -1651,19 +2365,30 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                         try:
                             res_data = json.loads(res_text)
                             if isinstance(res_data, dict):
-                                tid = res_data.get("task_id") or res_data.get("conversationId") or res_data.get("id")
-                                if tid:
-                                    reviewer_task_ids.add(str(tid))
+                                for tid in _registrable_task_ids(res_data):
+                                    reviewer_task_ids.add(tid)
                         except Exception:
-                            tid_match = re.search(r"\b(?:task[-_ ]?id|conversationId)[:=]\s*[`\"']?([\w-]+)", res_text, re.I)
+                            tid_match = re.search(r"\b(?:task[-_ ]?id|conversationId|agentId)[:=]\s*[`\"']?([\w-]+)", res_text, re.I)
                             if tid_match:
                                 reviewer_task_ids.add(tid_match.group(1))
 
                         if not b.get("is_error"):
-                            found, sha = parse_report(res_text)
+                            found, shas = parse_report_all(res_text)
+                            if not found:
+                                # The result itself carries no report -- the
+                                # hand-back shape this dispatch's OWN result
+                                # points at, if any (ai-config#3945). Tried
+                                # only here, and only after the direct read
+                                # found nothing: a report already present in
+                                # the result is read from the result, exactly
+                                # as before.
+                                handback_text = _handback_report_text(
+                                    transcript_path, call_id, res_text)
+                                if handback_text:
+                                    found, shas = parse_report_all(handback_text)
                             if found:
                                 saw_reviewer_call = True
-                                verdict, reviewed_commit = found, sha
+                                verdict, reviewed_commits = found, shas
 
                 # Genuine task notifications from tracked background reviewer dispatches
                 origin = record.get("origin")
@@ -1672,19 +2397,19 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                     and origin.get("kind") in ("task-notification", "task_notification")
                 )
                 if is_task_notification and not is_assistant and not b.get("is_error"):
-                    origin_task_id = str(origin.get("taskId") or origin.get("task_id") or "")
+                    origin_ids = _task_ids(origin, TASK_ID_KEYS_ORIGIN)
                     sender_id = str(record.get("sender") or "")
                     if (
-                        (origin_task_id and origin_task_id in reviewer_task_ids)
+                        any(t in reviewer_task_ids for t in origin_ids)
                         or (sender_id and sender_id in reviewer_task_ids)
                     ):
                         text = str(b.get("text") or b.get("content") or "")
-                        found, sha = parse_report(text)
+                        found, shas = parse_report_all(text)
                         if found:
                             saw_reviewer_call = True
-                            verdict, reviewed_commit = found, sha
+                            verdict, reviewed_commits = found, shas
 
-    return verdict, reviewed_commit, saw_reviewer_call
+    return verdict, reviewed_commits, saw_reviewer_call
 
 
 def _opencode_transcript_fallback(session_id) -> str:
@@ -1715,16 +2440,57 @@ def verify_review(transcript_path: str, directory: str | None,
     """(is_clean, reason) -- is there a clean verdict for what this push ships?"""
     saw_reviewer_call = False
     verdict: str | None = None
-    reviewed_commit: str | None = None
+    reviewed_commits: list[str] = []
 
+    # `transcript_path and` stays here, unlike the two conjuncts removed below,
+    # and the difference is not cosmetic. Those two restated a fact a preceding
+    # `return` had already proven, so removing them changed nothing. This one
+    # guards a non-`str` argument: the annotation is not enforced, and
+    # `os.path.exists(None)` raises. With the conjunct a `None` falls through to
+    # the denial below instead. Measured both ways, and pinned by a case that
+    # calls this function directly.
+    #
+    # It is defence in depth for a hypothetical second caller, NOT the thing
+    # standing between this repository and a fail-open. An earlier version of
+    # this comment claimed the latter, and that was wrong in a way worth keeping
+    # on the record: the sole caller's `or ""` already foreclosed the `None` this
+    # conjunct catches, while the live bypass sat one line EARLIER in that
+    # caller, on the `list`/`dict`/`True` values `or ""` does not rescue. The
+    # comment named a real mechanism, attached it to the wrong site, and so read
+    # as a fail-open having been closed while it was open (ai-config#3752). The
+    # caller now coerces, which is where the fix belongs; this stays because a
+    # future caller need not.
     if transcript_path and os.path.exists(transcript_path):
         try:
-            verdict, reviewed_commit, saw_reviewer_call = read_latest_review(transcript_path)
+            verdict, reviewed_commits, saw_reviewer_call = read_latest_review(transcript_path)
         except Exception as e:
             return False, f"Failed reading transcript: {e}"
 
-    if not transcript_path and not saw_reviewer_call:
+    # Neither this condition nor the one below carries `and not
+    # saw_reviewer_call`. That conjunct cannot be False on either path:
+    # `saw_reviewer_call` is assigned only inside the `os.path.exists` branch
+    # above, which both of these conditions exclude, so it is still False here.
+    # Dropped from both rather than one, so the two read alike
+    # (`dead-code-is-tech-debt`).
+    if not transcript_path:
         return False, "No transcript available to verify the adversarial self-review."
+
+    if not os.path.exists(transcript_path):
+        # Distinguished from the denial below because the two have different
+        # remedies and only one of them is the pusher's to apply. Reporting a
+        # harness integration gap as "you did not dispatch a reviewer" sends
+        # someone to re-run a review they already ran, and it is what made
+        # ai-config#3707 read as a reviewer problem rather than a discovery
+        # one. `fail-fast` wants the real condition named, not a plausible
+        # nearby one.
+        return False, (
+            f"This session reported a transcript at `{transcript_path}`, but no file "
+            "exists there, so no review could be read either way.\n"
+            "That is a harness gap rather than a verdict: nothing here says whether a "
+            "reviewer ran. Check that your harness writes the transcript it names in "
+            "the hook payload, and file the gap. Use the override and say so if you "
+            "need to push before it is fixed."
+        )
 
     if not saw_reviewer_call:
         return False, (
@@ -1749,7 +2515,7 @@ def verify_review(transcript_path: str, directory: str | None,
             "Address, rebut, or defer every finding, commit, and re-dispatch the reviewer."
         )
 
-    if not reviewed_commit:
+    if not reviewed_commits:
         return False, (
             "The clean verdict does not say which commit it read.\n"
             "The reviewer must state `Reviewed-Commit: <full sha>` on its own line "
@@ -1759,25 +2525,33 @@ def verify_review(transcript_path: str, directory: str | None,
             "not a verdict."
         )
 
-    try:
-        resolved_commit = _rev_parse(directory, env, f"{reviewed_commit}^{{commit}}")
-    except TimeoutError as e:
-        return False, (
-            f"This guard {e}.\n"
-            "It refuses rather than letting the push through unchecked; re-run once the "
-            "repository is responsive, or use the override and say so."
-        )
-    if resolved_commit is None:
-        return False, (
-            f"The clean verdict's fingerprint `{reviewed_commit}` does not resolve to any "
-            "commit in this repository.\n"
-            "That is a fabricated or corrupted fingerprint, not a stale verdict for a "
-            "different commit -- a reviewer that recalls or reconstructs a SHA instead of "
-            "reading it can get a prefix right and invent the rest. Re-dispatch the "
-            "reviewer and tell it to obtain the SHA by running `git rev-parse HEAD` and "
-            "copy the 40-character output verbatim, not reconstruct or abbreviate it."
-        )
-    reviewed_commit = resolved_commit
+    # Every stated fingerprint must resolve. A report naming several
+    # `Reviewed-Commit:` lines under one verdict (ai-config#3945) is accepted
+    # when the push ships ANY of them, but a fabricated or corrupted line
+    # anywhere in that list is still refused outright rather than silently
+    # dropped -- the same fail-fast posture a single fingerprint already had,
+    # extended rather than loosened by there being more than one.
+    resolved_commits: list[str] = []
+    for candidate in reviewed_commits:
+        try:
+            resolved = _rev_parse(directory, env, f"{candidate}^{{commit}}")
+        except TimeoutError as e:
+            return False, (
+                f"This guard {e}.\n"
+                "It refuses rather than letting the push through unchecked; re-run once the "
+                "repository is responsive, or use the override and say so."
+            )
+        if resolved is None:
+            return False, (
+                f"The clean verdict's fingerprint `{candidate}` does not resolve to any "
+                "commit in this repository.\n"
+                "That is a fabricated or corrupted fingerprint, not a stale verdict for a "
+                "different commit -- a reviewer that recalls or reconstructs a SHA instead of "
+                "reading it can get a prefix right and invent the rest. Re-dispatch the "
+                "reviewer and tell it to obtain the SHA by running `git rev-parse HEAD` and "
+                "copy the 40-character output verbatim, not reconstruct or abbreviate it."
+            )
+        resolved_commits.append(resolved)
 
     try:
         commits, why = shipped_commits(directory, argv, env)
@@ -1796,17 +2570,18 @@ def verify_review(transcript_path: str, directory: str | None,
     if not commits:
         return True, "This push ships no commits (a ref deletion)."
 
-    unreviewed = sorted(c for c in commits if not c.startswith(reviewed_commit))
+    unreviewed = sorted(c for c in commits
+                        if not any(c.startswith(rc) for rc in resolved_commits))
     if unreviewed:
         return False, (
-            f"The clean verdict is for commit {reviewed_commit}, but this push would ship "
-            f"{', '.join(c[:12] for c in unreviewed)}.\n"
+            f"The clean verdict is for commit {', '.join(resolved_commits)}, but this push "
+            f"would ship {', '.join(c[:12] for c in unreviewed)}.\n"
             "A push ships commits, so whatever differs -- a later commit, a `main` merge, "
             "a rebase, or a branch other than the reviewed one -- is unreviewed. "
             "Re-dispatch the reviewer against what you are actually pushing."
         )
 
-    return True, f"Clean adversarial self-review verified at {reviewed_commit}."
+    return True, f"Clean adversarial self-review verified at {', '.join(resolved_commits)}."
 
 
 DENY_TAIL = (
@@ -1827,7 +2602,8 @@ DENY_TAIL = (
 
 
 def deny(reason: str) -> None:
-    print(json.dumps({
+    _DENIAL_ISSUED[0] = True
+    payload = json.dumps({
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
@@ -1835,7 +2611,49 @@ def deny(reason: str) -> None:
                 f"git push blocked by the pre-push self-review policy:\n{reason}{DENY_TAIL}"
             ),
         }
-    }))
+    }) + "\n"
+
+    # Attempt 1: If fd 1 was closed or redirected, restore it using our saved duplicate
+    if _ORIGINAL_STDOUT_FD is not None:
+        try:
+            os.dup2(_ORIGINAL_STDOUT_FD, 1)
+        except Exception:
+            pass
+
+    # Attempt 2: Write via standard sys.stdout
+    written = False
+    try:
+        sys.stdout.write(payload)
+        sys.stdout.flush()
+        written = True
+    except Exception:
+        pass
+
+    # Attempt 3: If standard sys.stdout write failed, write directly to the saved descriptor
+    if not written and _ORIGINAL_STDOUT_FD is not None:
+        try:
+            os.write(_ORIGINAL_STDOUT_FD, payload.encode("utf-8"))
+            written = True
+        except Exception:
+            pass
+
+    # Attempt 4: If emission to stdout could not succeed, we have already decided
+    # to deny the push. Failing open into return 0 would silently permit an unauthorized
+    # push. Emit an emergency failure log to stderr and fail closed (exit 2).
+    if not written:
+        try:
+            sys.stdout = open(os.devnull, "w")
+        except Exception:
+            pass
+        try:
+            sys.stderr.write(
+                "no-push-without-self-review: FATAL: denial could not be written to stdout;\n"
+                f"blocking push. Denial reason:\n{reason}\n"
+            )
+            sys.stderr.flush()
+        except Exception:
+            pass
+        sys.exit(2)
 
 
 def _read_payload() -> tuple[dict, bool]:
@@ -1873,7 +2691,8 @@ def main() -> int:
                 print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
             return 0
 
-        inp = payload.get("tool_input") or {}
+        inp = payload.get("tool_input")
+        inp = inp if isinstance(inp, dict) else {}
         cmd = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or ""
         if not cmd:
             if is_dry_run:
@@ -1919,11 +2738,65 @@ def main() -> int:
                      "(`--git-dir`/`--work-tree`/`GIT_DIR`/`GIT_WORK_TREE`), "
                      "so a verdict naming a commit in this one cannot cover it")
                 return 0
-            transcript_path = payload.get("transcript_path") or ""
-            if not transcript_path or not os.path.exists(transcript_path):
-                transcript_path = _opencode_transcript_fallback(
+            if push_is_exempt(directory, argv, env, cmd):
+                continue
+            # Coerce before `os.path.exists` rather than after. `or ""` rescues
+            # only the FALSY non-`str` values: a truthy `list` or `dict` reaches
+            # `os.path.exists`, which raises `TypeError` (it catches `OSError`
+            # and `ValueError` and not that), and the raise lands in this
+            # function's deliberate `except Exception: return 0` -- a silent
+            # ALLOW, no denial emitted, indistinguishable in the transcript from
+            # an authorized push. Measured on this branch AND on `main`, so the
+            # bypass predates the branch; filed as ai-config#3752.
+            #
+            # `True` allows by a SECOND and worse route, and the first account of
+            # it here was wrong in a way worth keeping: it said the bool was
+            # "carried into `verify_review`". Measured, it never gets there.
+            # `os.path.exists(True)` is indeed `True` (fd 1 exists), so the
+            # value survives the check above -- but `read_latest_review` then
+            # calls `open(True)`, which opens FILE DESCRIPTOR 1, raises
+            # `OSError: [Errno 9]` on read, and CLOSES STDOUT leaving the
+            # `with`. The guard does reach a denial; it cannot EMIT one,
+            # because every `print` after that raises into the deliberate
+            # `except Exception: return 0`. Measured on `main`: of the five
+            # non-`str` values case 22 pins, exactly three produce zero bytes on
+            # stdout AND on stderr, by TWO different routes.
+            #
+            #   None        falsy, so `or ""` rescues it     denial emitted
+            #   123         truthy; exists(123) is False     denial emitted
+            #   True        truthy; exists(True) is True      SILENT
+            #   ["/tmp/x"]  TypeError inside exists()         SILENT
+            #   {"p": 1}    TypeError inside exists()         SILENT
+            #
+            # The list and the dict raise at `os.path.exists` itself. `True`
+            # does not: fd 1 is open, so it passes, and the failure arrives
+            # later -- `open(True)` succeeds, raises on read, and closes stdout
+            # on the way out of the `with`, so the guard reaches a denial it can
+            # no longer emit. Naming "all three" without naming WHICH three read
+            # as a count of the pinned matrix, which has five (round 9).
+            #
+            # `isinstance` closes this instance. For the wider class of failures
+            # (stdout closure, bad file descriptors, broken pipes, or serialization
+            # errors), `deny()` duplicates fd 1 at startup to restore stdout or
+            # write directly, tracks `_DENIAL_ISSUED`, and fails closed (exit 2)
+            # if stdout cannot be written or if an exception occurs after a denial
+            # decision, closing the silent-allow bypass (ai-config#3756).
+            _tp = payload.get("transcript_path")
+            transcript_path = _tp if isinstance(_tp, str) else ""
+            if not os.path.exists(transcript_path):
+                # Adopt the fallback only when it resolves to a real file.
+                # Overwriting unconditionally erased a reported-but-missing
+                # path, so `verify_review` saw "" and reported no transcript
+                # available -- or, when the fallback was itself constructed but
+                # absent, reported that no reviewer had been dispatched. Both
+                # describe the session rather than the gap, and neither is
+                # something the pusher can act on. Keeping the reported path
+                # lets the denial name it (ai-config#3707).
+                fallback = _opencode_transcript_fallback(
                     payload.get("session_id")
                 )
+                if fallback and os.path.exists(fallback):
+                    transcript_path = fallback
             is_clean, reason = verify_review(
                 transcript_path, directory, argv, env
             )
@@ -1931,7 +2804,20 @@ def main() -> int:
                 deny(reason)
                 return 0
         return 0
-    except Exception:
+    except Exception as exc:
+        if _DENIAL_ISSUED[0]:
+            try:
+                sys.stdout = open(os.devnull, "w")
+            except Exception:
+                pass
+            try:
+                sys.stderr.write(
+                    f"no-push-without-self-review: exception raised after denial decision: {exc}\n"
+                )
+                sys.stderr.flush()
+            except Exception:
+                pass
+            return 2
         # Fail open, deliberately and in the same direction as the parse-failure
         # rule in the docstring: a guard that crashed closed would block every
         # push in the session, which is a worse failure than missing one review.

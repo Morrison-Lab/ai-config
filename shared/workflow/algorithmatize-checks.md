@@ -241,6 +241,79 @@ a sweep reporting zero leaks and a sweep that never ran print the same line.
   an enumeration of realistic shapes is worth more there than nothing,
   and nothing is what a rewrite silently spends.
 
+**Two loops over two dimensions are not the product,
+and the shape that gets written instead is the sum.**
+`for a in A: check(a, fixed)` followed by `for b in B: check(fixed, b)`
+reads as having enumerated both dimensions,
+and it has ---
+marginally.
+It visits `len(A) + len(B)` cells where the product has `len(A) * len(B)`,
+and the cells it skips are every one where both dimensions vary at once.
+
+That distinction is invisible in a diff and decisive when the invariant
+is *agreement between the two dimensions*.
+The held-fixed value has to be one both sides accept,
+or the sweep would fail on its own baseline ---
+so a sum-shaped sweep is **structurally incapable** of detecting a disagreement,
+however many members each loop carries.
+Every row passes, the count looks thorough,
+and the defect the sweep exists for cannot reach it.
+
+The check is arithmetic rather than judgment:
+count the cells the sweep actually runs,
+and compare that against the product of the dimension sizes.
+Where those differ, say which cells are missing and why,
+rather than reading two loops as coverage of two dimensions.
+
+- **Do:** write the nested loop when the invariant relates two dimensions,
+  and report the cell count alongside the dimension sizes.
+- **Don't:** read consecutive single-dimension loops as having covered the product ---
+  they cover the margins, and the margins are where agreement is assumed rather than tested.
+
+**And where the invariant is agreement between two sites,
+prefer making it structural over asserting it in prose.**
+A comment instructing two key lists to stay in step
+is the least enforceable form the invariant can take:
+it is not compiled, not tested, and not read at the moment either list is edited.
+One shared constant both sites read
+converts the invariant from something maintained into something true by construction,
+and leaves the sweep above to catch what the constant cannot ---
+a site that reads the wrong constant, or none.
+
+Prefer the constant, then generate the product, then report the count.
+Asserting the invariant in a comment is the rung below all three,
+and it reads exactly like the rung above it.
+
+- **Do:** hoist a cross-site invariant into a shared constant before writing a comment about it.
+- **Don't:** treat a comment stating an invariant as any evidence the invariant holds ---
+  stating one is not enforcing one.
+
+(Measured on [ai-config#3737](https://github.com/Morrison-Lab/ai-config/pull/3737), 2026-09-17.
+A guard read a background task's id at three sites with three different key lists,
+under a comment asserting that two of them must carry every spelling the module knows.
+They did not, in both directions, at the moment the comment was written:
+one read `TaskId` and the other did not,
+the other read `conversationId` and the first did not.
+Two loops pinned the spellings,
+one per end, each holding the opposite end at `task_id` ---
+a spelling both ends had always read.
+Both loops ran green under exactly the defect,
+and had done so through a full review round.
+The 25-cell product fails on nine cells;
+the two marginal loops fail on none.
+Nine rather than four, which is what the first version of this paragraph said:
+five rows where the retrieval names `conversationId`,
+which the consumer's list omitted,
+plus four more where the result announces `TaskId`,
+which the producer's list omitted.
+The count was written from the shape of the defect rather than from the run,
+inside the one passage arguing that the check is arithmetic rather than judgment ---
+so the example asserted a product it had not multiplied.
+A later round re-ran it: post-fix suite against the pre-fix hook,
+with the post-fix pair as a negative control first,
+giving `All 416 cases passed` and then `15/416 cases failed`,
+nine of them cross-product rows.)
+
 (Measured on [ai-config#1947](https://github.com/Morrison-Lab/ai-config/pull/1947),
 merged 2026-08-22 after six review rounds.
 Four of those rounds each closed one more way of wrapping a read of the same path ---
@@ -514,6 +587,69 @@ not the void tag had reparented anything.
 The first replacement test asserted on anchors and passed under the mutation;
 the one that discriminates asserts on parents.)
 
+**Before either reading, confirm the suite actually survived --- a mutation
+harness needs a negative control of its own.**
+The section above asks what a survivor *means*.
+This asks whether there was one.
+A harness scores each mutant by reading the suite's output, and that reader is
+an instrument like any other: key it on a signal the suite does not always
+emit, and a suite that went red is scored SURVIVED.
+The harness then reports a coverage gap that does not exist.
+
+The failure direction is the unusual one, which is why the rest of this file's
+checks do not reach it.
+Almost all of them are written against an instrument failing toward **clean**.
+This one fails toward **alarm**: it invents an untested behaviour, and the work
+that follows --- a test for something already tested, or worse, an edit to code
+the suite was guarding correctly --- all looks like diligence.
+Nothing about a SURVIVED verdict invites the question either, because a
+survivor is exactly what the harness was dispatched to find.
+
+[`batch-merge-and-resolve`](batch-merge-and-resolve.md) already states the
+general form: any sweep needs a negative control, run first, because a zero
+matrix is indistinguishable from a detector that never ran.
+A mutation harness is such a sweep.
+Its negative control is the **unmutated** tree, run through the same scoring
+path, which must report SURVIVED.
+An unmutated run scored CAUGHT means the scorer is keyed on something other
+than the suite's verdict;
+a deliberately-caught mutation also scored SURVIVED means it is keyed on
+nothing at all.
+
+Prefer the suite's **exit status** to a grep of its stdout, for the reason this
+file's "Reading an instrument's PROSE instead of its exit status, generalized
+past the PR checker" section gives about every other instrument here: the prose
+is written for a human and the status is the stable interface.
+A grep for a phrase additionally narrows the population without saying so, to
+whichever test paths happen to print it.
+
+- **Do:** score each mutant on the suite's exit status, not on a string in its
+  output.
+- **Do:** run an unmutated control through the harness's own scoring path
+  before reading any SURVIVED verdict, and report that the control came back
+  SURVIVED alongside the results.
+- **Don't:** treat a SURVIVED verdict as a finding about the suite until the
+  harness has been shown able to report CAUGHT.
+- **Don't:** key a scorer on output only some of the suite's cases emit --- a
+  table-driven case's progress line is not the suite's verdict.
+
+(Measured 2026-09-17 on
+[ai-config#3692](https://github.com/Morrison-Lab/ai-config/pull/3692).
+An ad-hoc harness written to mutation-test
+`hooks/no-clean-stop-with-live-agent.py` detected a caught mutation by grepping
+the suite's stdout for a string only its table-driven cases print.
+Removing a sentinel scored SURVIVED while the suite had in fact gone red,
+producing a false "this behaviour is untested" verdict.
+Re-keying the scorer on the suite's exit status, and running an unmutated
+control through the same harness to confirm it reported SURVIVED, corrected it;
+the finding and both halves of the fix came from an `adversarial-reviewer`
+dispatch and were accepted in `f947dc94`.
+Reported by that session rather than re-measured here --- the harness was
+ad-hoc and is not in the tree.
+The generalization past this one harness to any sweep's scorer is
+[`batch-merge-and-resolve`](batch-merge-and-resolve.md)'s, restated for the
+mutation case.)
+
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 
 "Test the instrument against the incident that prompted it, verbatim"'s closing **Don't** governs a comment claiming *what* a matcher matches.
@@ -668,6 +804,74 @@ an added-lines scan for the same shape found it immediately.
 
 - **Do:** write a diff-scoped scan for the property when the rule is disabled, rather than re-enabling it.
 - **Don't:** re-enable a repo-wide disable to close the gap --- that reflags the drift the disable exists to tolerate.
+
+## A control that borrows its near-copy from content the test does not own
+
+The three sections above audit whether a control fires, whether it fires for
+the right reason, and whether the instrument it cites can ever disagree.
+This audits where the control's own *material* came from.
+
+A negative control needs a near-copy: something that resembles the thing under
+test closely enough that its survival proves the check was specific rather than
+lucky.
+The cheapest near-copy is usually already lying around, elsewhere in the very
+file the check scans, and reaching for it feels like reuse rather than like
+coupling --- the corpus supplied it, so nobody wrote it, so there is nothing
+that looks like a fixture to review.
+
+Two costs follow, and only the first announces itself.
+
+**The test becomes hostage to edits it has no relationship with.**
+The borrowed passage belongs to whoever wrote it, for their own reasons, and
+they may move it, reword it, or split the file it lives in without ever opening
+the test.
+The suite then goes red with the checker unchanged and the property under test
+untouched, which is the most expensive failure shape there is: it reads as a
+regression in the thing being guarded.
+
+**The control may also never have discriminated**, and that half is silent.
+A borrowed passage sits wherever its own author put it, which is usually
+outside whatever scope the checker actually applies --- so the mutation the
+control exists to catch was always going to be caught by the scoping, and the
+control was measuring nothing.
+Nothing distinguishes the two cases from a green run, which is why the
+mutation-testing sections above are the instrument here rather than a
+re-reading.
+
+The remedy is that a test constructs its own near-copy.
+A literal written in the test file is owned by the test, reviewed with it, and
+moves only when someone editing the test moves it.
+
+- **Do:** write a control's near-copy as a literal in the test file, so the
+  test owns every string its verdict depends on.
+- **Do:** when a control must reference live corpus content, assert on the
+  property the check is scoped to rather than on a passage the check never
+  reads.
+- **Do:** treat a control going red after an unrelated edit as a finding about
+  the control's provenance, not only as a merge conflict to patch.
+- **Don't:** reach for an existing mention elsewhere in the scanned file as a
+  near-copy --- its author owes your test nothing.
+- **Don't:** read a control's green run as evidence it discriminates; mutate
+  the checker and confirm the control goes red.
+
+(Measured 2026-09-17 in `Morrison-Lab/ai-config`.
+`scripts/test_check_github_actions_step_if.py` replaces one required sentence
+in `memories/github-actions.md` with a variant, then asserts that a bare
+`GitHub auto-applies` still appears in the mutated text --- a mention it
+borrows from a different bullet several hundred lines further down the same
+file, which the test never wrote.
+The first cost was reported by the session that hit it: splitting that file at
+the 1250-line cap moved the borrowed bullet out and turned the assertion red
+with `scripts/check-github-actions-step-if.py` unchanged.
+That split is not in this tree, where the borrowed mention is still present, so
+it is recorded as that session's account rather than as a measurement.
+The second cost was measured directly and is reproducible here: loosening the
+checker's own required needle to a bare `GitHub auto-applies` leaves the suite
+at 31 passed, 0 failed.
+The mutation survives because `required_findings()` is scoped by
+`extract_section()` to the step-if bullet, and the borrowed mention sits
+outside that bullet --- so the specificity the control is written to
+demonstrate is supplied by the scoping, and the control never tested it.)
 
 ## Widening an instrument invalidates every figure it produced, not only the one that exposed it
 
@@ -998,6 +1202,45 @@ failure reported under the wrong mutation's name.**
 See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
 "A shared scratch directory reporting one mutation's failure under another's
 name".
+
+**Both outcomes above assume the control PASSED, and the case that bites is the
+one where it did not.**
+The seventh's last Don't warns against reading per-row names as attributable
+*because* the control passed; nothing yet says what to do when it plainly did
+not.
+Measured 2026-09-17: a matrix reported 15 of 17 mutants KILLED over a control
+line reading `88/97 cases passed` rather than `All 97`.
+With nine standing failures, a row's KILLED means only "not all cases passed",
+which every applicable mutant satisfies trivially --- so the column carried no
+information about any mutation, while reading exactly like a strong result.
+
+That is a placement problem as much as a reading one.
+The control is one line, the verdicts are seventeen, and the table looks more
+authoritative than the line above it --- which inverts what each is worth,
+since the control establishes the run's VALIDITY and the table carries only its
+content.
+
+Two cheap instruments, neither of which the outcomes above imply:
+
+- Print the control again at the END of the matrix, not only at the start.
+  A restore that corrupts the copy mid-run is invisible to an opening control
+  by construction, and that is exactly how one matrix left a mutant written
+  back permanently.
+- `sha256sum` the copy's subject file against the checkout's before starting,
+  and treat a mismatch as a corrupted copy rather than as a diff to explain.
+
+- **Do:** read the control line before any verdict, and discard a run whose
+  control is not a full pass rather than interpreting it.
+- **Do:** print the control at both ends of the matrix.
+- **Don't:** report a kill count from a run whose control failed --- it is not
+  a weaker result, it is not a result.
+
+A row reporting that a replacement string was not found is a second reason to
+look at the copy, though not on its own evidence of corruption: a mistyped
+anchor is the commoner cause, and
+[`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md)'s fourth
+outcome records one arising from a `repr()` mismatch.
+Check which before concluding either.
 
 **One more belongs to the matrix, and it is not an outcome but the matrix's own
 PASS CONDITION: a case that flipped for a reason other than the clause.**
@@ -1877,6 +2120,72 @@ Both halves are strings a session can type, and neither names a workflow definit
 The issue is open and no hook file exists on `main`, so this section is the argument that its discharge should be dropped rather than a description of a shipped file;
 a comment recording that argument was posted on the issue on 2026-09-03.)
 
+**A third component neither matcher covers: the WINDOW the scan runs over, and
+where its lower bound sits.**
+The trigger and the discharge above are both *matchers* --- questions about
+whether a record is the kind of thing being looked for.
+A guard that asks "has anything happened **since** X" carries a third thing,
+which is the choice of X.
+It is not a pattern, so neither of the rules above fires on it, and it is
+usually one line: a `max`, an index, a `baseline =`.
+
+The failure is that X gets chosen as **the most recent event of one kind**,
+when what it has to be is the **maximum over every event that can start the
+thing being guarded**.
+Those two agree on the sequence you have in mind while writing the guard,
+which is why the line reads as obviously correct, and they come apart exactly
+when a second instance of the guarded thing begins after the last event of the
+chosen kind.
+
+Note which way it fails, because it is the discharging direction and it is
+*inverted* rather than merely weakened: the guard is silent for the whole
+interval in which its condition is true, and fires once that condition has
+become false.
+A guard that fires late is worse than one that never fires at all, since it
+goes on producing output often enough to look alive, and a correctly-timed
+silence is indistinguishable from this one.
+
+- **Do:** write the lower bound as a `max` over every event kind that can put
+  the guarded thing in flight, and say in the code why each kind is in that
+  set.
+- **Do:** trace the guard by hand over the *standard* sequence its subject
+  actually performs, not over the incident that prompted it --- the incident
+  is the sequence whatever bound you chose already handles.
+- **Do:** ask of any late-firing guard whether its bound excludes a starter,
+  rather than whether its matcher is too narrow.
+- **Don't:** take the most recent event of one kind as "since when", however
+  obviously that kind is the relevant one.
+- **Don't:** read a guard's own docstring statement of its decidable condition
+  as independent evidence --- the specification is where this defect is
+  usually written down first, and the code then implements it faithfully.
+
+(Measured 2026-09-17 on
+[ai-config#3692](https://github.com/Morrison-Lab/ai-config/pull/3692),
+`hooks/no-clean-stop-with-live-agent.py` --- a `Stop` guard that blocks a clean
+stopping-point declaration made while a dispatched subagent is still live.
+At `79363d7a` its bound read
+`baseline = notification if notification >= 0 else dispatch`, so any dispatch
+later than the last notification was discarded.
+On this corpus's own standard sidecar shape --- dispatch, read the result,
+check liveness, dispatch a sidecar, declare clean --- the sidecar has never
+notified, so the liveness check taken *before* it still cleared the bound and
+the guard stayed quiet while that agent ran.
+It would then fire once the sidecar finally notified, which is after the moment
+it exists to catch.
+The docstring stated the same bound in prose --- "a liveness check taken AFTER
+the last notification" --- so the implementation was faithful to a
+specification that was itself wrong, and reading the two against each other
+could not have found it.
+An `adversarial-reviewer` dispatch did;
+`f947dc94` changed the bound to `max(notification, dispatch)` and rewrote the
+stated condition to match.
+Both revisions were read directly, and the three `Do`s and the first `Don't`
+follow from that pair.
+That a late-firing guard is worse than an absent one is inferred rather than
+measured, and rests on
+[`deterministic-tools`](../principles/deterministic-tools.md)'s argument that
+an instrument which has stopped measuring reports what an all-clear reports.)
+
 ## Your own command's shape is part of a transcript-read discharge condition
 
 The section above is the guard author's side of a discharge: does the matcher separate the obligation from prose that merely quotes it?
@@ -2586,3 +2895,112 @@ to one interpreter bucket while the total counted rows.
 A genuinely dropped row would have moved that number by one against a
 baseline shortfall already in the dozens --- invisible in exactly the way
 the line was added to prevent.)
+
+## Widening a matcher that gates evidence is the unsafe direction, and a suite that gains only a positive case proves nothing about it
+
+The negative-control sections above are about an instrument's *first* run.
+This one is about its *repair*, which is where the control is likeliest to be skipped: a fix aimed at a reported false negative arrives with a case attached, that case passes, the suite stays green, and nothing in the run looks at the direction the fix opened.
+
+Measured 2026-09-18 on [ai-config#3760](https://github.com/Morrison-Lab/ai-config/pull/3760), twice in one hour, on eight lines of change.
+
+`RX_QUERY_COMMAND` in `hooks/no-unchecked-empty-pr-claim.py` decides whether a Bash line counts as a **query at all** --- it is the recognizer for the evidence that discharges the guard.
+The reported defect was real: the alternation was spelled `https?ie`, which matches only the literal `httpie`, so a genuine `urllib.request.urlopen('https://.../pulls/N/commits')` read was invisible and the guard over-warned.
+The posted fix widened it to `https?`.
+The positive case was added, mutation-proved a real control, every gate ran green, and it was pushed.
+
+The widening was wrong.
+A bare scheme is satisfied by any line *mentioning* a URL, so `echo "see https://api.github.com/.../pulls/3737/commits -- not read yet"` followed by "PR #3737 is empty, so I closed it" left the guard **silent**, where the pre-fix code fires.
+A silent discharge --- which the commit message accompanying the fix had named as the intolerable direction one paragraph earlier.
+The correct fix recognizes the **call** that performs the read (`urlopen|urllib|requests\.(?:get|post)`) rather than the scheme, leaving `http` at its pre-fix spelling, since it is HTTPie's command name and `\b` already stops it matching inside `https`.
+
+**Widening and narrowing are not symmetric for a recognizer that gates evidence.**
+Narrowing it produces a false positive: the guard fires when it should not, which is noisy and visible and gets reported.
+Widening it produces a false negative: the guard stays silent, which is invisible and *is* the failure the guard exists to prevent.
+So for anything of the form "does this count as evidence", ask what a **wider** pattern now admits before asking what a narrower one excludes.
+
+**The second half is the more transferable one.**
+A suite that gains only a positive case is evidence about that positive case.
+This one passed 50 cases and 11 mutations, and the added case was a genuine mutation-proved control --- for the direction it tested.
+Nothing in it could see the direction the change broke, so green meant nothing about the defect.
+The repo's own `BASH_CAT_PATH` fixture ("a path resembling the endpoint is not a query") was the missing counterpart, sitting one screen up in the same file and unpaired.
+
+- **Do:** write the negative control in the same commit as the widening, and mutation-check it against the pattern you are replacing **and** the one you are adding --- two controls, two mutations.
+- **Do:** look for an existing negative fixture beside the one you are extending;
+  its absence for your new alternative is the tell.
+- **Do:** enumerate what else a new alternation branch matches before adding it.
+  `https?` is not "the urllib line", it is every URL in every string.
+- **Do:** state in the code any pre-existing hole you are not closing, rather than narrowing scope silently.
+  Here `echo "curl .../commits"` still reads as a query under every pattern, and that is now a comment.
+- **Don't:** read a green suite as covering more than it exercises.
+  Ask which added case would fail if the change were wrong;
+  if none would, the suite proves nothing about the risk.
+- **Don't:** treat an eight-line diff as too small to dispatch an adversarial review on.
+  This one found a defect that three gates, a 50-case suite and the author's own reading had all passed.
+- **Don't:** post a fix recipe for another session to apply and call it validated on a positive case alone.
+  A recipe carries the same standard as a push and is harder to retract --- here a peer session committed it before the adversarial pass caught it, and the correction landed on `9fd7e424`.
+
+## One assertion on two handlers' shared message prefix covers neither
+
+The section above is about a matcher widened with only a positive case.
+This one is about a case that looks like the negative half and is not:
+it exercises real code, it produces a real refusal, and it still cannot
+tell the two code paths apart, because the string it asserts on is the
+prefix they share.
+
+Measured 2026-09-23 in this repository.
+`scripts/measure-cardinality-vocabulary.py`'s `load_hook()` refuses two ways:
+
+```python
+except FileNotFoundError:
+    sys.exit(f"cannot load {HOOK}: no such file.")
+except Exception as exc:  # noqa: BLE001 -- re-raised as a refusal
+    sys.exit(f"cannot load {HOOK}: {type(exc).__name__}: {exc}")
+```
+
+Its suite asserted `"cannot load" in msg` against a nonexistent path.
+Delete either handler and that case still passes, because whichever one
+survives catches the other's exception and emits the same stem.
+An adversarial reviewer found it; the author had not.
+
+**It is a different failure from the vacuous case.**
+A vacuous case walks no guarded path at all, so the code under test is
+never reached.
+Here the code is reached and the refusal is genuine.
+What is missing is *discrimination*, and nothing about the case's own
+output says so --- the message is correct, the exit is correct, and the
+coverage arithmetic reads two handlers, one test.
+
+**The tell is structural rather than about any particular string.**
+Whenever two branches end in messages built from a shared stem --- an
+f-string prefix, a common `sys.exit` wrapper, a fallback that re-emits the
+caller's framing --- one assertion on that stem covers neither branch.
+So ask, of each handler, what string **only** it can produce, and assert on
+that: `no such file.` for the first arm above, `SyntaxError` for the second.
+
+**The fix needs a second case, not a sharper one**, and that is the part
+that gets skipped.
+Tightening the existing assertion still leaves one case, and one case can
+only ever reach one handler --- so the other arm stays uncovered while the
+suite now *looks* precise.
+A `try` block with N `except` arms needs N cases, each built to land in its
+own arm: here a nonexistent path for `FileNotFoundError`, and a real file
+carrying a syntax error for the general handler, since a `SyntaxError` is
+not a `FileNotFoundError` and nothing else in the function raises one.
+
+**Confirm each by mutation, one handler at a time.**
+Deleting handler i must redden case i and leave the others green;
+if deleting it reddens two cases, or none, the mapping is not what the
+suite claims.
+Back the file up with `cp` and restore from that copy --- `git checkout --`
+restores from the index, which silently discards the very fix the mutation
+is testing.
+
+- **Do:** assert on the substring only one branch can emit.
+- **Do:** write one case per `except` arm, each constructed to raise that
+  arm's own exception type.
+- **Do:** delete each handler separately and confirm exactly one named case
+  goes red.
+- **Don't:** assert on a message prefix a sibling handler, a fallback, or a
+  shared wrapper also emits.
+- **Don't:** count a `try` block with several `except` arms as covered by
+  one case, however precisely that case is worded.

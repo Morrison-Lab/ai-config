@@ -2148,6 +2148,28 @@ with tempfile.TemporaryDirectory() as tmp:
 print(f"\n{len(MUTATIONS) - mutation_wrong}/{len(MUTATIONS)} clauses behaved "
       "as declared under reversion")
 
+# A Git Bash `cd /c/...` or `-C /c/...` target must reach git as `C:/...`:
+# native Windows Python cannot use the MSYS form as a `cwd` (measured:
+# NotADirectoryError, WinError 267), and on Python 3.13 `os.path.isabs` calls
+# it relative, so it was joined onto the current directory. The rewrite is off
+# on Linux, where CI runs, so it is forced here to pin the wiring.
+import importlib.util as _ilu
+_spec = _ilu.spec_from_file_location("ncp_msys", HOOK)
+_ncp = _ilu.module_from_spec(_spec)
+_spec.loader.exec_module(_ncp)
+_real_native = _ncp.native_path
+msys_ok = _real_native("/c/Users/x", True) == "C:/Users/x"
+print(f"{'ok  ' if msys_ok else 'WRONG'} the hook loads shellcmd's native_path")
+_ncp.native_path = lambda path, is_windows=None: _real_native(path, True)
+try:
+    expanded = _ncp._shell_expand("/c/Users/x/repo")
+finally:
+    _ncp.native_path = _real_native
+expand_ok = expanded == "C:/Users/x/repo"
+print(f"{'ok  ' if expand_ok else 'WRONG'} _shell_expand hands on a native path "
+      f"for a Git Bash target (got {expanded!r})")
+wrong += (not msys_ok) + (not expand_ok)
+
 for d in _TMPDIRS:
     shutil.rmtree(d, ignore_errors=True)
 

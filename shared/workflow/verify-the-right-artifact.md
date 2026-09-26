@@ -204,6 +204,26 @@ When a brief, an issue body, or a review finding asserts what a repository says,
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale branch read that produced two issues and a config edit".
 
+## A different endpoint is another shape, and the two names read as synonyms
+
+Two APIs can describe overlapping but distinct populations under names that read as synonyms.
+GitHub's `GET /repos/{owner}/{repo}/pages/builds` documents itself as listing *builds* of a Pages site ([REST API docs](https://docs.github.com/en/rest/pages/pages), read 2026-09-17), while `GET /repos/{owner}/{repo}/deployments?environment=github-pages` lists *deployments* to an environment.
+Both answer to "how many times has this site deployed" in English, and they enumerate different objects, so a count taken from one is not comparable to a count taken from the other.
+
+What distinguishes it is not that the substitution is silent --- [`A working-directory checkout is another shape, and it stays silent`](#a-working-directory-checkout-is-another-shape-and-it-stays-silent) says the same of a stale read, and says it first.
+It is that there is no authoritative store to go to.
+Every other shape's remedy presumes one of the two artifacts is the right one, so suspecting the substitution is most of the work of undoing it.
+Here both endpoints are authoritative, each for its own population, and neither is the correct one in the abstract --- only the endpoint the original measurement used is comparable to the original measurement.
+So the usual move, go and check against the real thing, does not terminate: whichever endpoint you reach for is a real thing.
+
+Re-measuring a prior claim through the *other* endpoint and getting a different number is therefore evidence that the two endpoints disagree, not evidence that the original figure decayed.
+A drift claim needs both readings taken the same way, and the endpoint is part of "the same way".
+
+- **Do:** use the endpoint the original measurement named, and say which one it was.
+- **Do:** use the other party's endpoint when checking someone else's number, before concluding drift.
+- **Don't:** read a different number from a different endpoint as decay.
+- **Don't:** treat two API paths as interchangeable because their names describe the same thing in English.
+
 ## A mechanism's prose is not the mechanism's definition
 
 A hook's comment, a skill's description, a docstring: each one explains a
@@ -475,6 +495,40 @@ the fix here is a stricter version of the same falsifying-question test, aimed a
 The Pandoc-bypass and the empty-submodule-baseline are also written up in that PR's own thread and in d-morrison/rme#1154's "Two instrument traps" section;
 the bypass produced a wrong "fix" and two issues filed on the false "math does not compile" premise, one of them d-morrison/macros#85, closed not-planned once the Pandoc-expansion mistake was found.)
 
+## A sweep's PREDICATE is a choice too, and a named standard can stand in for the policy actually being applied
+
+The section above keeps the predicate and narrows the scope: the right question was asked of too little.
+This one inverts that.
+The scope is complete --- every file read, every one of them scanned --- and the *question* is somebody else's.
+
+The evidence is unusually strong here, which is the whole problem.
+A sweep that visits every file and returns zero is a true statement about the predicate the sweep ran, and that predicate was exhaustively applied.
+Nothing is missing from the coverage, so none of the width remedies above fire, and none of the emptiness remedies fire either --- a negative control would have confirmed the pattern works, because the pattern *does* work.
+It answers a different question than the decision needed.
+
+**The tell is that the sweep's terms came from a named standard rather than from the decision in hand.**
+FERPA, HIPAA, PII, GDPR, an SPDX license list, a secrets-scanner ruleset: each is real, externally validated, and thorough about its own subject, so completing one reads as diligence in a way an improvised list never does.
+That authority is exactly what suppresses the next question.
+A standard is written for *its* decision, so its predicate and yours overlap rather than coincide, and the residue --- everything your policy forbids that the standard never contemplated --- is invisible by construction.
+
+The check is one sentence, written before any pattern is typed: **state the predicate the decision actually turns on**, in the policy's own terms.
+Then derive each search term from a clause of that sentence, and report which clause each pattern discharges.
+A clause with no pattern beside it is the gap, and it is visible in the report rather than in the material.
+The named standard then appears where it belongs --- as one clause among several, not as the sweep.
+
+- **Do:** write the deciding policy's predicate as a sentence first, and derive every pattern from a clause of it.
+- **Do:** report the clause each pattern discharges, so a clause nothing searched for shows up as a blank row rather than as silence.
+- **Don't:** let a named compliance standard's checklist stand in for the policy's predicate --- it was written for a different decision and only overlaps yours.
+- **Don't:** read a thorough, externally validated checklist's zero as clearing a decision that checklist was not written to make.
+
+(Measured 2026-09-18, importing course material from a OneDrive folder into two sibling repos --- `Morrison-Lab/mln`, student-facing and intended to become public, and `Morrison-Lab/mlg`, private grading.
+The decision being made was *which repo each file goes in*, whose predicate is "does this reveal anything a student is to be graded on".
+The sweep that ran scanned every imported file for PII and for health keywords, found nothing, and reported the material clean.
+It never searched for `Exercise Solution`, `answer`, or `solution`.
+An adversarial review round then found a PowerPoint slide hidden with `show="0"`, titled `Exercise Solution:`, carrying worked answers to a graded exercise, in the repo intended to go public.
+Both sweeps were sound.
+Only one of them was about the decision.)
+
 ## A ref that resolves to a different commit than it did a moment ago
 
 Every shape above substitutes one artifact for another, and a **moving ref** is
@@ -606,11 +660,11 @@ Amending the commit message to carry the three-row table above did both jobs at 
 A durable artifact that states its own discriminator is [`quotable-findings`](quotable-findings.md)'s standard turned around --- a claim that names the exact measurement that would falsify it is the one nobody can plausibly misread.
 
 - **Do:** treat a reviewer's own counter-test as a claim requiring the same re-derivation any other claim does, whichever side of the finding you are on.
-- **Don't:** read "the reviewer ran a command" as equivalent to "the reviewer ran the command that could have shown the claim false" --- a command that cannot exhibit the failure mode has not tested the claim, however real its output is.
 - **Do:** when rebutting a finding, name the precondition the original claim relied on and confirm the counter-test carried it.
+- **Do:** write the discriminating measurement --- including the null case that shows what a non-discriminating test looks like --- into the durable artifact (commit message, PR body) rather than only into a comment thread.
+- **Don't:** read "the reviewer ran a command" as equivalent to "the reviewer ran the command that could have shown the claim false" --- a command that cannot exhibit the failure mode has not tested the claim, however real its output is.
 - **Don't:** rebut by re-asserting the original claim against the counter-test's bare output;
   that answers confidence with confidence and settles nothing --- name the specific precondition the counter-test dropped.
-- **Do:** write the discriminating measurement --- including the null case that shows what a non-discriminating test looks like --- into the durable artifact (commit message, PR body) rather than only into a comment thread.
 - **Don't:** leave a verification claim as a bare tool invocation ("verified through X") with no stated discriminator;
   that vagueness is what makes a plausible-but-wrong counter-finding possible in the first place.
 
@@ -910,7 +964,8 @@ the code.)
 that capability through a different one.**
 
 The shapes above substitute a cached copy for an origin, a checkout for a run,
-half a mechanism for the whole, a neighbour for the target.
+half a mechanism for the whole, a neighbour for the target, a different
+endpoint for the same-sounding metric.
 This is another: the documentation is correct, your reading of it is correct,
 every quotation checks out --- and it describes the feature as reached through
 a surface your code does not use.
@@ -1909,3 +1964,111 @@ The remedy is to read the file an unresolved thread names on the default branch 
 
 - **Do:** read the file an unresolved thread names on the default branch (e.g., with `git show origin/main:<path>`), and file only what is still true there.
 - **Don't:** treat an unresolved review thread on a merged pull request as evidence of an open defect in the code.
+
+## When the check that would refute the claim is unavailable, the claim is unverified --- not merely caveated
+
+The four shapes above all describe verifying the *wrong* artifact.
+This one describes the case where the right artifact is identified correctly
+and simply **cannot be reached** --- a blocked egress proxy, a missing
+credential, a UI with no API behind it.
+
+The failure is not that the check is skipped.
+It is what happens to the claim afterwards.
+The unreachable check gets demoted to a parenthetical, the claim is stated at
+full confidence, and the caveat reads as thoroughness rather than as the
+warning it is.
+Nobody is deceived about the blocked check, because it is disclosed --- they
+are deceived about the claim, which was never downgraded to match.
+
+Measured 2026-09-15.
+A Quarto site was rendered, deployed to `gh-pages`, and the branch confirmed to
+hold 36 HTML pages, 21 PDFs and every asset directory.
+Every one of those is a fact about the **branch**.
+The claim made was that the site was *published*, with one routine settings
+step left --- a fact about **serving**, which the session could not check
+because its proxy blocked `github.io`, and which it noted in passing while
+stating the claim anyway.
+The setting did not exist: the repository was a private fork, and GitHub Pages
+was unavailable to it entirely (see
+[`github-repo-transfers`](../../memories/github-repo-transfers.md)).
+The maintainer had to supply what the blocked check would have shown.
+
+**The asymmetry to notice is that a blocked check removes evidence against the
+claim while leaving every piece of evidence for it intact.**
+So the remaining evidence looks unanimous, and confidence goes *up* exactly
+when it should go down.
+That inverts the usual relationship between missing information and certainty,
+which is why disclosing the gap does not correct for it.
+
+The test is the one this fragment already states, applied to reachability
+rather than to identity: ask what would have to be true for the claim to be
+false, then ask whether the artifact that would show it is one you can
+actually reach.
+When it is not, say the claim is unverified and name what would settle it.
+
+- **Do:** state the claim at the confidence the reachable evidence supports,
+  and say plainly which part is unverified.
+- **Do:** name the specific check that would settle it, so whoever can run it
+  knows what to run.
+- **Don't:** disclose the blocked check and then assert the claim anyway --- a
+  caveat beside a confident claim is read as rigour, not as doubt.
+- **Don't:** treat unanimous surviving evidence as strong when the blocked
+  check was the only thing that could have disagreed.
+
+## A local test run is not the CI job's conclusion
+
+This is the "a checkout for the run" substitution in its most available form, and the one least likely to register as a substitution: the local run is faster, it is under your hand, and it tests the same code.
+
+Measured 2026-09-18 on [`Morrison-Lab/gha`](https://github.com/Morrison-Lab/gha) PR 883.
+A session ran `python3 -m unittest discover -s antigravity-review/tests` at head `dd243dc`, got 42 of 42, and reported the `antigravity-tests` job green.
+The check-runs query in that same turn reported the job `in_progress`.
+It did conclude `success` a minute later --- so the conclusion was right and the evidence for it did not exist yet, which is the dangerous case, because nothing corrects it.
+
+`hooks/no-stale-pr-status.py` caught it: it compares a clean-state assertion against the most recent status query in the transcript, so the gap was visible to an instrument even though the claim turned out true.
+
+The two artifacts genuinely differ.
+A CI job can diverge on runner OS, tool versions, steps wrapped around the suite, and inputs the job's own `with:` block overrides --- `gha`'s `CLAUDE.md` records `PHI_DETECTORS` and `NLB_GLOBS` doing exactly that, so a local run of the same script exercises a different configuration from the one CI runs.
+
+- **Do:** use a local run to decide whether to push, never to report a job's state.
+- **Do:** report a job by its `conclusion` field, and name the job id so the claim is checkable.
+- **Do:** read `status` before `conclusion` --- `in_progress` has no conclusion, and an absent conclusion is not a pass.
+- **Do:** read the job's own `with:` block before trusting a local invocation of the script it calls.
+- **Don't:** characterize the PR when some checks are still running;
+  say which jobs concluded and that others are in flight.
+  A whole-PR claim is a scope claim over every check.
+
+## A file's metadata is another shape, and it is the one that never feels like a substitution
+
+Every shape above swaps one *document-like* artifact for another --- a cached copy, a checkout, an endpoint, a summary --- so each at least looks like the thing it stands in for.
+This one swaps a document for its **filesystem metadata**, which resembles it not at all, and is easier to miss for exactly that reason: nothing about reading a modification date feels like reading the file, so no substitution registers as having happened.
+
+Measured 2026-09-23 on [`Morrison-Lab/mlg`](https://github.com/Morrison-Lab/mlg) PR 20.
+A vendored mirror of Stanford's CS229 was described as "Autumn 2008" in two repositories' READMEs, in two directory names (`cs229-stanford-2008`, `cs229-see-2008`), in three commit messages and in four issue comments.
+No document said so.
+`practice-midterm.pdf` heads itself "CS 229, Autumn 2007";
+all four problem sets and all four solution keys head themselves "CS 229, Public Course" and name no term at all;
+the mirror's own course page names only the instructor, and its sole `2007` and `2008` strings sit inside markup rather than visible text.
+
+The year came from `ls -la` --- the files' October 2008 modification dates.
+That is a real measurement of a real property, and it answers a different question: **when this copy was written**, not **which offering produced it**.
+The two answers are both dates attached to the same file, which is what makes the substitution invisible;
+and a publication date being later than the term it publishes is the normal case rather than a warning sign.
+
+Three things made it durable rather than a passing slip.
+The claim was written into directory *names*, so every later reference restated it as established fact.
+The files had been handled extensively --- checksummed, sized, typed, moved --- so the session had every feeling of familiarity with them and had still never opened one.
+And `file` was run, which reports a PDF's page-tree metadata: on a 26 MB, 1098-page book it said "3 pages", which is the same metadata-for-content confusion one level down.
+
+The general form is worth stating because it is not specific to dates: **a property that a file *has* is not a property the file *asserts*.**
+Size, mtime, permissions, path, and the filename itself are all facts about the copy in front of you.
+Provenance --- who made it, when, for which offering, under what licence --- is a claim, and a claim has to be read out of the content or its source page.
+A filename that encodes provenance (`Bishop-...-2006.pdf`) is somebody else's undocumented claim, not a source.
+
+`hooks/flag-unsourced-term-attribution.py` is the instrument: it warns when a write pins a term to a year beside a document filename and no text-extraction command appears anywhere in the transcript.
+It deliberately does not count a `WebFetch` as evidence --- the measured session fetched two course sites and still got the term wrong, because neither page stated one.
+
+- **Do:** extract the document's own text (`pdftotext -f 1 -l 1 <file> -`) before writing any provenance claim about it, and quote what it returned.
+- **Do:** treat a filename that encodes a date or a term as a claim needing the same check, not as the check.
+- **Don't:** derive a provenance fact from an mtime, a size, or a path --- those describe the copy, not the work.
+- **Don't:** read familiarity with a file as having read it;
+  checksumming, moving and typing a file all leave its content unopened.

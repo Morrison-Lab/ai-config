@@ -644,6 +644,7 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertEqual(len(out["injectSteps"]), 2)
         self.assertEqual(out["injectSteps"][0]["ephemeralMessage"], "Message 1")
         self.assertEqual(out["injectSteps"][1]["ephemeralMessage"], "Message 2")
+        self.assertEqual(mock_stderr.getvalue(), "")
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
@@ -1870,12 +1871,11 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
-    def test_pre_invocation_invalid_json_output_logs_diagnostic_and_falls_back_to_raw_text(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
-        # Regression guard: the PreInvocation JSON-parse fallback used to be
-        # the file's only `except Exception: pass` with no diagnostic. A
-        # hook returning non-JSON text must still fall back to using that
-        # raw text (unchanged behavior) AND must log a stderr diagnostic,
-        # like every sibling parse handler in this file.
+    def test_pre_invocation_raw_text_falls_back_quietly(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        # Regression guard: several UserPromptSubmit hooks intentionally emit
+        # raw text. It must become injected context without a stderr parse
+        # diagnostic, because Antigravity treats that diagnostic as a hook
+        # failure and retries the invocation.
         mock_result = MagicMock(returncode=0, stdout="not valid json {", stderr="")
         mock_run.return_value = mock_result
 
@@ -1892,7 +1892,7 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertEqual(len(out["injectSteps"]), 2)
         for step in out["injectSteps"]:
             self.assertEqual(step["ephemeralMessage"], "not valid json {")
-        self.assertIn("failed to parse PreInvocation hook output", mock_stderr.getvalue())
+        self.assertEqual(mock_stderr.getvalue(), "")
 
     def test_default_timeout_applied_at_all_three_call_sites(self):
         # Regression guard for the resolve_cmd_and_timeout() extraction:
@@ -2445,6 +2445,114 @@ class TestAgyHookAdapter(unittest.TestCase):
             migrated_paths = [e.get("path") for e in migrated_data.get("entries", [])]
             self.assertIn(staging_dir, migrated_paths)
             self.assertNotIn(os.path.join(ROOT, "plugins", "ai-config"), migrated_paths)
+
+    def test_windows_sh_hook_resolution_wraps_in_git_bash(self):
+        adapter = load_adapter()
+        hook = {
+            "type": "command",
+            "command": '"${CLAUDE_PLUGIN_ROOT}/hooks/inject-local-time.sh"',
+            "timeout": 10,
+        }
+        with patch("os.name", "nt"), patch.object(adapter, "find_windows_bash", return_value=r"C:\Program Files\Git\bin\bash.exe"):
+            cmd, timeout = adapter.resolve_cmd_and_timeout(hook, r"C:\fake\repo")
+            self.assertEqual(cmd, r'"C:\Program Files\Git\bin\bash.exe" "C:\fake\repo/hooks/inject-local-time.sh"')
+            self.assertEqual(timeout, 10.0)
+
+    def test_windows_sh_hook_resolution_preserves_non_sh_command(self):
+        adapter = load_adapter()
+        hook = {
+            "type": "command",
+            "command": 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/some-hook.py"',
+            "timeout": 15,
+        }
+        with patch("os.name", "nt"):
+            cmd, timeout = adapter.resolve_cmd_and_timeout(hook, r"C:\fake\repo")
+            self.assertEqual(cmd, r'python3 "C:\fake\repo/hooks/some-hook.py"')
+            self.assertEqual(timeout, 15.0)
+
+    def test_run_hook_command_windows_sets_create_no_window(self):
+        adapter = load_adapter()
+        with patch("os.name", "nt"), patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='{"decision": "allow"}', stderr="")
+            adapter.run_hook_command("echo test", {}, os.getcwd(), 10.0)
+            mock_run.assert_called_once()
+            _, kwargs = mock_run.call_args
+            self.assertEqual(kwargs.get("creationflags"), 0x08000000)
+
+    def test_session_id_forwarded_to_pre_tool_use(self):
+        adapter = load_adapter()
+        payload = {
+            "toolCall": {"name": "run_command", "args": {"CommandLine": "ls"}},
+            "transcriptPath": "/Users/fake/.gemini/antigravity/brain/12345678-1234-1234-1234-123456789abc/.system_generated/logs/transcript.jsonl",
+        }
+        with patch.object(adapter, "find_repo_root", return_value=ROOT), \
+             patch("builtins.open", mock_open(read_data=json.dumps(MOCK_HOOKS_DEF))), \
+             patch("os.path.exists", return_value=True), \
+             patch.object(adapter, "run_hook_command") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='{"decision": "allow"}', stderr="")
+            with patch("sys.stdin", io.StringIO(json.dumps(payload))), patch("sys.stdout", new_callable=io.StringIO):
+                adapter.main()
+            self.assertTrue(mock_run.called)
+            called_payload = mock_run.call_args[0][1]
+            self.assertEqual(called_payload.get("session_id"), "12345678-1234-1234-1234-123456789abc")
+            self.assertEqual(called_payload.get("transcript_path"), payload["transcriptPath"])
+
+    def test_session_id_forwarded_to_stop_hook(self):
+        adapter = load_adapter()
+        payload = {
+            "terminationReason": "user_cancelled",
+            "conversation_id": "87654321-4321-4321-4321-cba987654321",
+        }
+        mock_hooks = {
+            "hooks": {
+                "Stop": [
+                    {
+                        "hooks": [
+                            {"type": "command", "command": "python3 fake_stop.py", "timeout": 5}
+                        ]
+                    }
+                ]
+            }
+        }
+        with patch.object(adapter, "find_repo_root", return_value=ROOT), \
+             patch("builtins.open", mock_open(read_data=json.dumps(mock_hooks))), \
+             patch("os.path.exists", return_value=True), \
+             patch.object(adapter, "run_hook_command") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='{}', stderr="")
+            with patch("sys.stdin", io.StringIO(json.dumps(payload))), patch("sys.stdout", new_callable=io.StringIO):
+                adapter.main()
+            self.assertTrue(mock_run.called)
+            called_payload = mock_run.call_args[0][1]
+            self.assertEqual(called_payload.get("session_id"), "87654321-4321-4321-4321-cba987654321")
+
+    def test_session_id_forwarded_to_pre_invocation_hook(self):
+        adapter = load_adapter()
+        payload = {
+            "invocationNum": 1,
+            "sessionId": "abcdef01-2345-6789-abcd-ef0123456789",
+            "messages": [{"role": "user", "content": "hello"}],
+        }
+        mock_hooks = {
+            "hooks": {
+                "UserPromptSubmit": [
+                    {
+                        "hooks": [
+                            {"type": "command", "command": "python3 fake_ups.py", "timeout": 5}
+                        ]
+                    }
+                ]
+            }
+        }
+        with patch.object(adapter, "find_repo_root", return_value=ROOT), \
+             patch("builtins.open", mock_open(read_data=json.dumps(mock_hooks))), \
+             patch("os.path.exists", return_value=True), \
+             patch.object(adapter, "run_hook_command") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='{"systemMessage": "hi"}', stderr="")
+            with patch("sys.stdin", io.StringIO(json.dumps(payload))), patch("sys.stdout", new_callable=io.StringIO):
+                adapter.main()
+            self.assertTrue(mock_run.called)
+            called_payload = mock_run.call_args[0][1]
+            self.assertEqual(called_payload.get("session_id"), "abcdef01-2345-6789-abcd-ef0123456789")
 
 if __name__ == "__main__":
     unittest.main()

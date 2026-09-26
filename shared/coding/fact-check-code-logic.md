@@ -252,18 +252,105 @@ A **duplicated block counted as two passes** inflates the total in the opposite 
 `Morrison-Lab/ai-config#2725` measured this directly on `scripts/test_check_pr_fully_clean.py`: two checks each ran twice on `main`, inflating the reported total by exactly the duplicate's size, and it was caught only because a reviewer diffed two line ranges byte for byte while porting tests in a later PR --- not a check anyone runs by habit.
 The pass count is routinely quoted in commit messages and reviews as evidence of coverage, which is exactly what makes a silently double-counted total worth naming as its own hazard alongside the two above.
 
+**A GENUINE survivor then forks again, and only one branch of that fork is about the tests.**
+The hazards above separate a real survivor from a mutant that never ran.
+Once the survivor is real, it means either that the suite has a coverage hole, or that the mutated code is **redundant** --- something else in the same diff already handles the input the mutant should have broken.
+Nothing in the run separates the two readings: the mutant applies, the baseline pass count reproduces, nothing fails.
+Only the second is a finding about production code, and it is the one nothing prompts, because every other survivor in this section resolves by adding a test.
+
+Reaching for a test is the worse default when the reading is redundancy.
+It locks the redundant branch in behind an assertion, so the next reader treats it as load-bearing --- the shape [`dead-code-is-tech-debt`](../principles/dead-code-is-tech-debt.md) is about, arrived at through a step that felt like improving coverage.
+The tell is having to construct contrived input to kill the mutant: where the only input reaching a branch is input nobody produces, the branch covers nothing.
+
+So ask the discriminating question before writing the test --- does another change in this same diff already handle the input this mutant should have broken?
+The situation that produces it is ordinary rather than exotic: two fixes landed in one round for one review finding, which is how a review round usually goes.
+
+Measured 2026-09-21 on `scripts/check-hook-delivery.py` ([ai-config#3833](https://github.com/Morrison-Lab/ai-config/pull/3833)), where [`83bafbef`](https://github.com/Morrison-Lab/ai-config/commit/83bafbef) records the survivor and [`472408f8`](https://github.com/Morrison-Lab/ai-config/commit/472408f8) records what it was worth.
+Both are pre-merge commits on that PR's branch, linked by SHA because a squash merge will leave neither reachable from `main`.
+A review finding about a crash on a malformed records file drew a type filter that dropped every non-string `installPath` at read time, upstream of the `Path().resolve()` that consumed it.
+Mutating the filter failed a test.
+Widening the `except` around that `resolve()` past `OSError` survived, because the filter had already removed the input that would have reached it, so the narrow catch shipped with a comment stating which exceptions were unreachable and why.
+
+**That comment was half wrong, and the reason is worth more than the rule it illustrates.**
+`TypeError` really was unreachable.
+`ValueError` was not: an embedded NUL raises it on POSIX and returns quietly on Windows, where the mutation run happened, and CI runs on Linux.
+So the survivor was a true reading of an incomplete experiment, and the next round widened the catch back.
+What the narrow catch would have let through, unexercised, is a crash in the environment the code actually runs in --- which no CI run ever observed, because that commit never stood as a head of its own.
+
+The mutation experiment itself is uncommitted --- widening the catch and reverting it happened inside `83bafbef`'s own authoring, so its diff shows a catch narrow before and narrow after --- and is carried only by that commit's message: "A widened catch would have been a branch no input can take, which is what mutation testing reported when it survived".
+An experiment nobody committed is not evidence anyone else can check, which is why both SHAs are cited directly rather than through the PR.
+
+A survivor is therefore evidence about redundancy only across the conditions the run covered.
+Before deleting, ask what the mutation run did not vary --- platform, locale, Python version, filesystem --- and whether the branch could be reachable there.
+[`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md)'s falsifying question is the tool for it: ask what would have to be true for "this branch is unreachable" to be FALSE, and whether the run you have could show you that.
+A run on one platform cannot, which is decidable before the run rather than after it.
+
+### The boundary with deliberate redundancy
+
+Not every unkillable branch is redundant in this sense, and two places in this corpus say so about cases that look identical from the mutation run.
+
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s "tenth outcome" covers a property enforced at more than one site: each site's mutant survives because the other still enforces it, and the remedy there is to keep both and document the pair rather than to delete either.
+[`simplify`](../../skills/simplify/SKILL.md) treats a duplicate constraint as belt-and-suspenders worth keeping.
+
+So the question is what the sibling actually does to the input, and there are three answers rather than two.
+A sibling that **removes** the input --- a filter upstream of the branch --- leaves that branch nothing to do, and it goes.
+A sibling that **enforces the same property independently** is defence in depth, and both sites stay.
+And a branch with **no sibling at all** is not redundant in any sense: its mutant survived because the suite lacks the input, which is the coverage hole this section's first reading names.
+
+That third answer is the one most easily assumed away, because a branch can look like a duplicate of a neighbour without being one.
+[`dead-code-is-tech-debt`](../principles/dead-code-is-tech-debt.md)'s worked example (ai-config#3707) is exactly that: a `transcript_path and` conjunct, structurally identical to inert siblings a few lines away in the same function, was read as inert by analogy with them.
+Those siblings were inert because the statement above them guaranteed the operand truthy.
+This one sat where nothing did, and dropping it would have turned `os.path.exists(None)`'s `TypeError` into a silent allow through the caller's blanket `except`.
+
+That case states this section's limit more sharply than anything else here, in its own words:
+
+> a clean mutation run over that suite could not have told the two cases apart --- it would have reported both as safe to remove, for opposite reasons.
+
+Keep that counterfactual as a counterfactual.
+No such run was ever made: the live conjunct was found by a same-file grep for the operand, and settled by measuring the guard with and without it against a `None` input.
+That measurement is the remedy to copy, and it is neither a test for the inert pair nor a deletion of the live one.
+So establish what makes a neighbour's branch dead before transferring the verdict, which is [`check-purpose-before-reusing`](../workflow/check-purpose-before-reusing.md)'s question asked about a diagnosis rather than about a template.
+
 - **Do:** write the members as literals in the test, and assert separately that the constant contains them.
+- **Do:** ask whether a sibling change in the same diff already covers a genuine survivor's input, before writing a test for it.
+- **Do:** delete the redundant branch instead, but only where the sibling REMOVES the input rather than independently enforcing the same property.
+- **Do:** name what the mutation run did not vary --- platform above all --- before reading a survivor as proof that a branch is unreachable.
+- **Do:** establish that a neighbouring branch is dead for a reason that also applies here, before transferring the verdict to this one.
 - **Do:** compare each mutation run's PASS count against the baseline's, and treat a run that reports no count at all as "mutant not applied".
-- **Don't:** discriminate on exit status --- a malformed mutant and a real failure both exit 1, so it cannot separate them.
 - **Do:** count skips separately, so a weakened run and a full one differ in the totals.
+- **Do:** have the check runner refuse a name it has already seen (`ai-config#2725`'s suggested fix), turning a silent duplicate into an immediate failure rather than an inflated count.
+- **Don't:** discriminate on exit status --- a malformed mutant and a real failure both exit 1, so it cannot separate them.
+- **Don't:** read every genuine survivor as a coverage hole --- that is the reading that adds code rather than removing it.
+- **Don't:** construct contrived input to kill a mutant.
+  Needing to is the evidence that the branch is redundant.
+- **Don't:** write "unreachable" into a comment on the strength of one platform's run --- that is a survivor promoted to an assertion a later reader will trust instead of re-measuring.
 - **Don't:** generate a test's cases from the value under test --- the DRY form is the defective one here.
 - **Don't:** record a skip with `check(..., True)`; that is a pass asserting nothing.
-- **Do:** have the check runner refuse a name it has already seen (`ai-config#2725`'s suggested fix), turning a silent duplicate into an immediate failure rather than an inflated count.
 - **Don't:** treat a rising pass count as evidence of rising coverage without a name registry (or an equivalent dedup check) backing it.
 
 (Measured 2026-08-28 on [ai-config#2539](https://github.com/Morrison-Lab/ai-config/pull/2539), where it occurred **twice in one file** against two different constants, the second after the first had been fixed --- which is why it is written down rather than noted.
 A third instance in the same suite iterated the flag list, so dropping the flag that marks harness-injected records stayed green.
 The malformed-mutant hazard was hit in the same session while checking these very fixes.)
+
+**Fourth occurrence, 2026-09-17 on [ai-config#3737](https://github.com/Morrison-Lab/ai-config/pull/3737) round 9, `hooks/test-warn-unmeasured-capability-claim.py`.**
+Its surfaces case is exactly this shape:
+
+```python
+for tool in hook.MCP_POST_TOOLS:            # generates one case per entry
+    fired, _ = run(mcp(REAL_2, tool=tool))
+    check(f"`{tool}` is in scope", fired is True)
+```
+
+Verified by reproducing the suite (97 cases, all passing) and re-running it
+against a copy of the sibling module with its shared `MCP_POST_TOOLS`
+constant renamed, which forces the hook's `getattr(..., MCP_POST_TOOLS,
+<fallback tuple>)` to fall through to its own hand-written fallback: the
+suite still reports `All 97 cases passed`, because the fallback tuple
+duplicates the same five members the generated loop already iterates.
+This file's own remedy is already present for one member --- a by-name
+check that `"mcp__github__discussion_comment_write" in hook.MCP_POST_TOOLS`
+--- which pins that one entry against deletion but not the other seven, so
+the class is only partly closed rather than absent.)
 
 ### A verdict script must not grep an interpreter's own echoed source
 
@@ -544,6 +631,11 @@ for eight of the nine;
 against a source outside the diff instead, since there is no correct fix yet
 to mutate away from.
 
+A tenth failure mode lives at the SUITE level rather than in any one test.
+When a fix is applied identically to two parallel code paths --- two transcript shapes, two harness formats, any pair of branches implementing one logical rule --- a single combined pass/fail total is not evidence about either path on its own.
+A suite whose cases concentrate on one shape can report every case passing with the other shape's half of the fix fully reverted, simply because nothing in the suite ever exercises that shape's branch.
+The total reads as coverage of "the fix" when it is coverage of one of its two copies.
+
 - **Do:** mutate the exact fix and watch the new test fail before trusting it.
 - **Do:** route the fixture through the real entry point
   and confirm it reaches the branch whose behaviour the test names.
@@ -553,6 +645,12 @@ to mutate away from.
 - **Do:** give a mapping or ordering bug a fixture whose order differs
   from the implementation's,
   since the two paths agree on every fixture that shares it.
+- **Do:** when a fix touches two parallel code paths, mutate (revert) each path's own copy separately and confirm a case fails for that specific reversion --- run the mutation once per path, not once for the suite.
+- **Do:** for an expected value about a third-party tool's own behaviour,
+  derive it from that tool's documentation or a fresh measurement,
+  never from what the implementation under test already returns.
+- **Don't:** read a single aggregate PASS total as having pinned every path a fix touches;
+  a suite concentrated on one shape can stay green with the other shape's half of the fix reverted out entirely.
 - **Don't:** accept a test because it mentions the helper that changed,
   or because a coverage report marks the line covered.
 - **Don't:** trust a test label as evidence of what the assertion checks.
@@ -561,9 +659,6 @@ to mutate away from.
 - **Don't:** read a representative fixture as a discriminating one ---
   representativeness is a claim about typical inputs,
   and a guard needs an input the two candidate behaviours disagree on.
-- **Do:** for an expected value about a third-party tool's own behaviour,
-  derive it from that tool's documentation or a fresh measurement,
-  never from what the implementation under test already returns.
 - **Don't:** trust agreement between a test and its implementation as evidence either is right ---
   when both were written from the same mental model,
   agreement is exactly what a **Mirrored misunderstanding** produces.
@@ -1191,6 +1286,27 @@ The four comment lines directly above went untouched, so they still said 6, thei
 Only the directive line was ever read.
 An AI reviewer returned "Needs more work" on the contradiction.)
 
+## A disclosed gap next to an undisclosed one makes the second read as checked
+
+When two adjacent comments each classify or assert something about the code, and only one of them labels its own uncertainty, the labelled one does not just describe itself --- it changes how the unlabelled one reads.
+A reader (including the author, on a later pass) sees the careful hedging on the first claim and infers the same diligence was applied to its neighbour, precisely because the neighbour offers no hedge to notice.
+Disclosure discipline applied unevenly within one change is worse than applied nowhere: an undisclosed guess sitting alone reads as a guess, while the same guess sitting beside a disclosed one reads as verified.
+
+This is a distinct failure from stating a claim confidently in isolation.
+The mechanism here is contrast: the disclosed neighbour is what manufactures the undisclosed claim's appearance of having been checked, so the tell is "does this comment have a sibling that hedges, right where this one doesn't."
+
+- **Do:** when one classification in a group carries a disclosed gap (unmeasured, inferred, unattested), audit every sibling classification in the same comment or block for the same standard, not just the one already flagged.
+- **Do:** state the actual evidence for a classification next to the classification itself --- "the repo's only evidence is X, which does not cover Y" --- rather than a bare assertion, so a reader can tell it apart from a measured fact without needing a neighbour's hedge as a contrast.
+- **Don't:** leave one classification in a group stated as flat fact while a sibling in the same group is explicitly labelled as inference or unmeasured --- fix the labelling in the same pass that adds the disclosed one, not in a later round.
+- **Don't:** treat "I disclosed the other gap" as having discharged scrutiny on the whole group;
+  disclosure of one item says nothing about a different item's evidence.
+
+(Morrison-Lab/ai-config#3707, commit `0a125ec`, 2026-09-17: a hook's dispatch-tool-name set carried two comments about names added on incomplete evidence.
+One explicitly said "`collaboration.spawn_agent` is the name a reporter used for the interface in prose;
+nothing here has measured it as the name a transcript carries" --- a disclosed, cited gap.
+Three entries later, `manage_task` was classified retrieval-only with no such hedge, stated as settled fact, though the repository's only evidence for it (three files, two showing `Action='status'` and the third naming the tool with no `Action` at all) never covers the creation case the classification also assumes.
+A review round found it by asking whether every classification in the group met the same bar the disclosed one had already set, not by doubting the `manage_task` line on its own.)
+
 ## A comment asserting the state of ANOTHER artifact is a claim with an expiry across commits
 
 A comment asserting facts about *another* file, prompt format, or test expectation
@@ -1429,6 +1545,26 @@ ordinary commit, the same failure mode the heuristic existed to prevent.
 Caught and fixed before merge, so the shipped hook implements the correct
 precedence; the false rationale never reached `main`, but it did reach a
 draft of the code that acted on it.)
+
+**Second occurrence, 2026-09-17, `ai-config#3737` round 9, and the false
+claim is about what a POSITION anchor excludes rather than about a git
+command.**
+`hooks/warn-unmeasured-capability-claim.py` gates a forge-write command on
+one of several position-anchored regexes (`RX_COMMENT_POST`, `RX_GLAB_POST`,
+`RX_GH_CREATE_EDIT`), each anchored with `(?:^|[;&|\n])` so the command must
+start a line or a statement.
+A comment beside the gate reads: "Each shape is position-anchored, so prose
+or a heredoc quoting the command does not count as issuing it."
+That is false for the heredoc half, and the code built from it is wrong in
+exactly the way the belonged-elsewhere case above is not: a `cat <<'EOF' ...
+EOF` heredoc's body is literal text whose every line begins right after a
+`\n`, which is the same character the anchor accepts as a line start, so a
+heredoc merely documenting a `gh pr comment` invocation is read as issuing
+one.
+Reproduced directly: `RX_COMMENT_POST.search()` against a heredoc body
+quoting `gh pr comment 123 --body "hi"` inside a `cat <<'EOF2' > /tmp/notes.md`
+block returns a match at the embedded line, confirming the gate fires on
+exactly the case the comment says it does not.)
 
 ## A reported digit finer than its Monte Carlo error is a claim about precision
 

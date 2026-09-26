@@ -41,6 +41,9 @@ def run_hook_command(cmd, claude_payload, cwd, timeout_val):
     # there only block via an explicit exit-code-2 (or JSON deny) response,
     # never via failing to answer at all.
     try:
+        kwargs = {}
+        if os.name == "nt":
+            kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
         result = subprocess.run(
             cmd, 
             shell=True, 
@@ -49,7 +52,8 @@ def run_hook_command(cmd, claude_payload, cwd, timeout_val):
             capture_output=True,
             env=os.environ,
             cwd=cwd,
-            timeout=timeout_val
+            timeout=timeout_val,
+            **kwargs
         )
         if result.returncode != 0:
             err_msg = result.stderr.strip() if result.stderr else f"process exited with code {result.returncode}"
@@ -116,6 +120,16 @@ def parse_timeout(val):
 # runnable command.
 DEFAULT_HOOK_TIMEOUT = 30.0
 
+def find_windows_bash():
+    for candidate in (
+        r"C:\Program Files\Git\bin\bash.exe",
+        r"C:\Program Files\Git\usr\bin\bash.exe",
+        r"C:\Program Files (x86)\Git\bin\bash.exe",
+    ):
+        if os.path.isfile(candidate):
+            return candidate
+    return "bash"
+
 def resolve_cmd_and_timeout(hook, repo_root):
     """Extract the runnable command and effective timeout from a single
     hook entry, or return None when the entry has nothing runnable to skip
@@ -132,6 +146,22 @@ def resolve_cmd_and_timeout(hook, repo_root):
     if not cmd:
         return None
     cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
+    if os.name == "nt":
+        stripped = cmd.strip()
+        if stripped.startswith('"'):
+            end_quote = stripped.find('"', 1)
+            if end_quote != -1:
+                prog = stripped[1:end_quote]
+                rest = stripped[end_quote + 1:].strip()
+                if prog.lower().endswith(".sh"):
+                    bash_bin = find_windows_bash()
+                    cmd = f'"{bash_bin}" "{prog}" {rest}'.strip()
+        else:
+            parts = stripped.split(None, 1)
+            if parts and parts[0].lower().endswith(".sh"):
+                bash_bin = find_windows_bash()
+                rest = parts[1] if len(parts) > 1 else ""
+                cmd = f'"{bash_bin}" "{parts[0]}" {rest}'.strip()
     timeout_val = parse_timeout(hook.get("timeout"))
     if timeout_val is None:
         timeout_val = DEFAULT_HOOK_TIMEOUT
@@ -305,7 +335,18 @@ def main():
         return
 
     # Common fields for Claude payload
-    transcript_path = payload.get("transcriptPath")
+    transcript_path = payload.get("transcriptPath") or payload.get("transcript_path")
+    session_id = (
+        payload.get("session_id")
+        or payload.get("sessionId")
+        or payload.get("sessionID")
+        or payload.get("conversation_id")
+        or payload.get("conversationId")
+    )
+    if not session_id and isinstance(transcript_path, str):
+        m = re.search(r"[/\\](?:brain|conversations)[/\\]([0-9a-fA-F-]{36})", transcript_path)
+        if m:
+            session_id = m.group(1)
 
     if event_type == "PreToolUse":
         tool_call = payload.get("toolCall") or {}
@@ -499,6 +540,13 @@ def main():
 
         flattened_hooks = []
         for hooks_list, c_payload, cwd, desc in tasks_to_run:
+            if session_id:
+                c_payload.setdefault("session_id", session_id)
+                c_payload.setdefault("sessionId", session_id)
+                c_payload.setdefault("conversation_id", session_id)
+                c_payload.setdefault("conversationId", session_id)
+            if transcript_path:
+                c_payload.setdefault("transcript_path", transcript_path)
             for hook in hooks_list:
                 resolved = resolve_cmd_and_timeout(hook, repo_root)
                 if resolved is None:
@@ -568,6 +616,11 @@ def main():
         }
         if transcript_path:
             stop_payload["transcript_path"] = transcript_path
+        if session_id:
+            stop_payload["session_id"] = session_id
+            stop_payload["sessionId"] = session_id
+            stop_payload["conversation_id"] = session_id
+            stop_payload["conversationId"] = session_id
             
         hooks_to_run = extract_hook_list(stop_groups)
         warn_messages = []
@@ -643,6 +696,11 @@ def main():
         }
         if transcript_path:
             ups_payload["transcript_path"] = transcript_path
+        if session_id:
+            ups_payload["session_id"] = session_id
+            ups_payload["sessionId"] = session_id
+            ups_payload["conversation_id"] = session_id
+            ups_payload["conversationId"] = session_id
 
         injected_messages = []
         total_injected_bytes = 0
@@ -690,11 +748,14 @@ def main():
                             text_out = parsed.get("systemMessage") or parsed.get("additionalContext") or nested_context or ""
                     except Exception as exc:
                         # Not valid JSON -- fall back to the raw text as-is
-                        # (text_out is left unchanged), same as every other
-                        # parse-failure path in this file, but this one was
-                        # the sole exception silently swallowed with no
-                        # stderr diagnostic.
-                        print(f"claude-hook-adapter: failed to parse PreInvocation hook output: {exc}", file=sys.stderr)
+                        # (text_out is left unchanged). Plain text is the
+                        # documented and intentional output of several
+                        # UserPromptSubmit hooks, so it is not an adapter
+                        # error and must not be reported on stderr: the
+                        # Antigravity hook runner treats that diagnostic as
+                        # a hook failure and can repeatedly retry the
+                        # invocation.
+                        pass
                     # A parsed field (systemMessage / additionalContext / the
                     # nested hookSpecificOutput.additionalContext) is not
                     # guaranteed to be a string -- a hook may return a dict,

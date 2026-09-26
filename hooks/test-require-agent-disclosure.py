@@ -10,6 +10,7 @@ import json
 import pathlib
 import subprocess
 import sys
+import tempfile
 
 _spec = importlib.util.spec_from_file_location(
     "guard", pathlib.Path(__file__).with_name("require-agent-disclosure.py"))
@@ -17,6 +18,20 @@ guard = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(guard)
 
 MARKER = "_Posted by Claude Code (AI agent) --- not written by a human._"
+
+# Fixture commands carry this placeholder wherever they need a path that does
+# NOT exist. run() substitutes a path inside a fresh temporary directory, so
+# "unreadable" holds by construction rather than by assuming some ambient file
+# is absent. These fixtures used to name `@@NOFILE@@`, and a real one left by an
+# earlier session silently flipped two of them once a resolvable path started
+# being read (ai-config#3786).
+NOFILE_TOKEN = "@@NOFILE@@"
+_nofile = NOFILE_TOKEN
+
+
+def sub(command):
+    """Resolve the nonexistent-path placeholder in a fixture command."""
+    return command.replace(NOFILE_TOKEN, _nofile)
 
 
 def GQL(body):
@@ -146,7 +161,7 @@ CASES = [
     ("gh pr review --approve posts no prose",
      'gh pr review 12 --approve', False),
     ("gh pr review WITH a body is a post",
-     'gh pr review 12 --request-changes --body-file /tmp/r.md', None),
+     'gh pr review 12 --request-changes --body-file @@NOFILE@@', None),
 
     # --- forge-API comment routes; round-2 review finding 8 ------------------
     ("glab api discussion note",
@@ -219,7 +234,7 @@ CASES = [
     ("--raw-field body= is inline and readable",
      'gh api repos/o/r/issues/12/comments --raw-field body="hi"', "missing"),
     ("-F body=@file is a file reference, so unreadable",
-     'gh api repos/o/r/issues/12/comments -F body="@/tmp/b.md"', None),
+     'gh api repos/o/r/issues/12/comments -F body="@@@NOFILE@@"', None),
 
     # --- round-4: the body sits INSIDE what used to be the gap ---------------
     #
@@ -272,7 +287,7 @@ CASES = [
      'gh pr review 12 --request-changes \\\n  --body "Findings: one thing."',
      "missing"),
     ("review with body-file on a continuation line",
-     'gh pr review 12 --comment \\\n  --body-file /tmp/r.md', None),
+     'gh pr review 12 --comment \\\n  --body-file @@NOFILE@@', None),
 
     # --- round-5: naming a mutation is not posting ---------------------------
     # SUPERSEDED by the #2185 cross-vendor round. This asserted silence for
@@ -310,13 +325,13 @@ CASES = [
      'gh api repos/o/r/issues/1/comments -f "body=Done.\n\n' + MARKER + '"',
      False),
     ("the registry's own quoted body=@file reply command",
-     'gh api -X POST "repos/o/r/pulls/1/comments/9/replies" -F "body=@/tmp/r.md"',
+     'gh api -X POST "repos/o/r/pulls/1/comments/9/replies" -F "body=@@@NOFILE@@"',
      None),
     ("a quoted typed field does not look like a body-file",
      'gh api repos/o/r/pulls/1/comments -F "in_reply_to=5" -f body="Addressed."',
      "missing"),
     ("an unquoted -F file is still a body-file",
-     'gh pr comment 12 -F "/tmp/body.md"', None),
+     'gh pr comment 12 -F "@@NOFILE@@"', None),
 
     # --- round-6: executing a GraphQL mutation vs naming one -----------------
     ("a GraphQL mutation whose body is not in a body= field",
@@ -557,7 +572,7 @@ CASES = [
     # rounds. Fixed structurally: one `_FIELD_FLAGS` constant, used everywhere,
     # since the four independent lists had now drifted three separate times.
     ("--form body=@file is unreadable, not missing",
-     'glab api projects/:id/merge_requests/1/notes --form body=@/tmp/reply.md',
+     'glab api projects/:id/merge_requests/1/notes --form body=@@@NOFILE@@',
      None),
     ("--form body=$VAR is unreadable, not missing",
      'glab api projects/:id/merge_requests/1/notes --form body=$BODY', None),
@@ -599,7 +614,7 @@ CASES = [
 
     # --- unreadable vs missing must not be confused (review finding 9) -------
     ("gh pr comment -F <file> is a body-file, reported unreadable",
-     'gh pr comment 12 -F /tmp/body.md', None),
+     'gh pr comment 12 -F @@NOFILE@@', None),
     ("--editor is unreadable",
      'gh pr comment 12 --editor', None),
     ("glab api --form body= with marker discloses",
@@ -616,10 +631,10 @@ ROBOT_CASE = (
 
 # --- the unreadable-body branch ---------------------------------------------
 INDIRECT_CASES = [
-    ("body-file", 'gh pr comment 12 --body-file /tmp/b.md'),
-    ("api body file", 'gh pr comment 12 -F body=@/tmp/b.md'),
-    ("glab api body file", 'glab api projects/1/merge_requests/2/notes --form body=@/tmp/b.md'),
-    ("glab api quoted body file", 'glab api projects/1/merge_requests/2/notes --form body="@/tmp/b.md"'),
+    ("body-file", 'gh pr comment 12 --body-file @@NOFILE@@'),
+    ("api body file", 'gh pr comment 12 -F body=@@@NOFILE@@'),
+    ("glab api body file", 'glab api projects/1/merge_requests/2/notes --form body=@@@NOFILE@@'),
+    ("glab api quoted body file", 'glab api projects/1/merge_requests/2/notes --form body="@@@NOFILE@@"'),
     ("variable body", 'gh pr comment 12 --body "$BODY"'),
     ("glab api variable body", 'glab api projects/1/merge_requests/2/notes --form body=$BODY'),
     ("glab api quoted variable body", 'glab api projects/1/merge_requests/2/notes --form body="$BODY"'),
@@ -627,9 +642,18 @@ INDIRECT_CASES = [
 
 
 def run():
+    """Resolve the nonexistent-path placeholder, then run the suite."""
+    global _nofile
+    with tempfile.TemporaryDirectory() as tmp:
+        # Never created, so it cannot exist however the runner is configured.
+        _nofile = str(pathlib.Path(tmp) / "absent" / "body.md")
+        return _run()
+
+
+def _run():
     failed = 0
     for label, command, expect in CASES:
-        reason = guard.verdict(command)
+        reason = guard.verdict(sub(command))
         if expect == "missing":
             ok = reason is not None and "no agent-disclosure marker" in reason
             print(f"{'PASS' if ok else 'FAIL'}: {label} "
@@ -664,11 +688,65 @@ def run():
           f"treated as disclosing with it")
 
     for label, command in INDIRECT_CASES:
-        reason = guard.verdict(command)
+        reason = guard.verdict(sub(command))
         ok = reason is not None and "cannot read" in reason
         failed += not ok
         print(f"{'PASS' if ok else 'FAIL'}: {label} reports an unreadable body "
               f"rather than a missing marker")
+
+
+    # A literal `--body-file` IS readable, and punting on it is what let an
+    # undisclosed comment go out on ucdavis/bcs#1020 (ai-config#3786): the
+    # advisory fired, asserted nothing, and read exactly like a pass. Both
+    # directions, because a check that only ever warns is indistinguishable
+    # from one that never fires.
+    with tempfile.TemporaryDirectory() as tmp:
+        tmpdir = pathlib.Path(tmp)
+        nl = chr(10)
+        with_marker = tmpdir / "with.md"
+        with_marker.write_text("Findings." + nl + nl + MARKER + nl,
+                               encoding="utf-8")
+        without = tmpdir / "without.md"
+        without.write_text("Findings, undisclosed." + nl, encoding="utf-8")
+        emoji_body = tmpdir / "emoji.md"
+        emoji_body.write_text("Findings." + nl + nl + chr(0x1f916)
+                              + " Posted by an agent." + nl, encoding="utf-8")
+        spaced = tmpdir / "my notes.md"
+        spaced.write_text("Findings, undisclosed." + nl, encoding="utf-8")
+
+        for label, command, expect in [
+            ("a body-file carrying the marker passes silently",
+             "gh issue comment 12 --body-file " + str(with_marker), None),
+            ("a body-file without the marker is reported MISSING",
+             "gh issue comment 12 --body-file " + str(without),
+             "no agent-disclosure marker"),
+            ("the --body-file=<path> form is read too",
+             "gh issue comment 12 --body-file=" + str(without),
+             "no agent-disclosure marker"),
+            ("gh api -F body=@<path> is read too",
+             "gh api repos/o/r/issues/1/comments -F body=@" + str(without),
+             "no agent-disclosure marker"),
+            ("a quoted path containing spaces is read, not truncated",
+             'gh issue comment 12 --body-file "' + str(spaced) + '"',
+             "no agent-disclosure marker"),
+            ("a robot-emoji body-file gets the emoji advice, not MISSING",
+             "gh issue comment 12 --body-file " + str(emoji_body),
+             "robot emoji"),
+            ("a body-file path that does not exist stays unreadable",
+             "gh issue comment 12 --body-file " + str(tmpdir / "absent.md"),
+             "cannot read"),
+            ("a body-file path built from a variable stays unreadable",
+             'gh issue comment 12 --body-file "$BODY_PATH"', "cannot read"),
+            ("a directory is not a body, so it stays unreadable",
+             "gh issue comment 12 --body-file " + str(tmpdir), "cannot read"),
+        ]:
+            reason = guard.verdict(command)
+            if expect is None:
+                ok = reason is None
+            else:
+                ok = reason is not None and expect in reason
+            failed += not ok
+            print(("PASS" if ok else "FAIL") + ": " + label)
 
     # The hook must never block. Its only output shape is additionalContext.
     src = pathlib.Path(__file__).with_name(
@@ -780,7 +858,7 @@ def run():
         print(f"{'PASS' if ok else 'FAIL'}: {label} "
               f"(warned={got}, expected={expect})")
 
-    total = len(CASES) + 2 + len(INDIRECT_CASES) + 1 + 4 + 13
+    total = len(CASES) + 2 + len(INDIRECT_CASES) + 1 + 4 + 13 + 9
     print(f"\n{total - failed} passed, {failed} failed")
     return 1 if failed else 0
 

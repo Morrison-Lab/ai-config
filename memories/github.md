@@ -78,6 +78,32 @@ When starting a GII loop, do a cleanup pass before diving into ARDI:
 2. **Close empty PRs** — bot-opened branches with no commits (e.g. a `@claude`
    task run that posted a comment but never pushed code). Check `get_commits`
    on each PR before closing.
+
+   **Read `get_commits`, never `changed_files`, and never the two as if they
+   were the same signal.**
+   [`pr-on-claim`](../shared/workflow/pr-on-claim.md) has this repo open a PR
+   against an empty commit *before* implementing, deliberately, so a
+   zero-diff PR is the convention working rather than a PR nobody filled.
+   `changed_files: 0` is therefore the expected reading on a live claim, on a
+   thread whose commits exist but cannot be pushed, and on an abandoned
+   branch alike, and the three are indistinguishable by that field.
+   `get_commits` separates them: a claim PR carries its claim commit, so the
+   count is 1 and not 0.
+   The PR's own body usually settles it outright, since the claim template
+   says what is in flight.
+
+   - **Do:** read `get_commits` and the PR body before calling a PR empty.
+   - **Don't:** infer abandonment from `changed_files: 0` --- this repo's own
+     convention manufactures that reading on purpose.
+
+   (Measured 2026-09-17: a triage sweep read `changed_files: 0` on
+   ai-config#3737 and reported it to the user as "an empty PR someone opened
+   and never filled".
+   It was a live claim PR for #3707 whose body opens with a bolded callout
+   saying fourteen finished commits could not be pushed,
+   and `get_commits` returns its claim commit `be17951b`.
+   The field that would have settled it was one request away,
+   and the body said so in its first paragraph.)
 3. **Identify the canonical PR** for each in-flight issue. Superseded drafts
    should be closed with a note pointing to the canonical one.
 4. **Collapse stacked changes** — if two open PRs address the same issue or
@@ -285,13 +311,16 @@ gh api repos/<owner>/<repo>/pulls/<N> -X PATCH -F body=@<file>
 `-F body=@<file>` keeps the body-file discipline (backtick-safe, no shell
 interpolation), same as `--body-file` on the porcelain command.
 
-- **Do:** fall back to the REST PATCH when `gh pr edit` errors on
+- **Do:** fall back to the REST API when `gh pr edit` errors on
   `projectCards`, rather than retrying or hand-editing on the web.
+  For labels on a PR, use `gh api -X POST repos/{owner}/{repo}/issues/{number}/labels -f "labels[]=<label>"`,
+  which bypasses the porcelain GraphQL `projectCards` query entirely.
 - **Don't:** read the error as a permissions or repo problem --- the failing
   field is one the edit never needed.
 
-(Measured 2026-08-23 on Morrison-Lab/ai-config#1976, gh in a local Windows session;
-the REST PATCH succeeded immediately on the same body file.)
+(Measured 2026-08-23 on Morrison-Lab/ai-config#1976 and 2026-09-23 on Morrison-Lab/gha#913,
+gh in local Windows sessions;
+the REST endpoints succeeded immediately.)
 
 ## `gh pr merge` "not up to date with the base branch" does not fire consistently on an equally-stale PR
 

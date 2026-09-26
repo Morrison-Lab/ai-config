@@ -848,9 +848,11 @@ def run_hook(command, cwd=None, tpath=""):
     try:
         payload = {"tool_name": "Bash", "tool_input": {"command": command},
                    "cwd": cwd or os.getcwd(), "transcript_path": tpath}
+        child_env = dict(os.environ, TMPDIR=tmpdir, TMP=tmpdir, TEMP=tmpdir)
+        child_env.pop("ANTIGRAVITY_AGENT", None)
         proc = subprocess.run([sys.executable, SUBJECT], input=json.dumps(payload),
                               capture_output=True, text=True,
-                              env=dict(os.environ, TMPDIR=tmpdir))
+                              env=child_env)
         return proc.stdout.strip()
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
@@ -859,6 +861,119 @@ def run_hook(command, cwd=None, tpath=""):
 # --------------------------------------------------------------------------
 # Unit-level checks on the pure functions
 # --------------------------------------------------------------------------
+
+def vocabulary_checks(mod):
+    """The number words above twelve, added 2026-09-23.
+
+    The founding case is a real miscount posted to a Morrison-Lab/mlg pull
+    request body: "Fourteen such references remain in text at this head",
+    where the true figure was 23. It matched nothing, because the vocabulary
+    stopped at `twelve`.
+
+    The widening MOVES the set rather than holding it fixed, which is the
+    reading to carry away from it.
+    `scripts/measure-cardinality-vocabulary.py` is the instrument and owns
+    every figure: run it for the counts, which it prints beside what it
+    examined. Two things about them decide whether the widening earned its
+    place, and the script reports both -- whether the newly flagged bodies
+    carry a positional line reference rather than a count, and how many of
+    the gained claims are counts of things (`Fourteen markdown files`,
+    `Fifteen tests`), the shape the widening was written for.
+
+    Every case here was confirmed by mutation to go red, and the note on each
+    names the mutation that kills it. Two earlier drafts of this block --
+    "sixteenth" and "fortifications" as word-boundary cases -- are deliberately
+    absent: no single-token mutation turns either red, because no vocabulary
+    word occurs in "fortifications" at all, and "sixteenth" stays unreachable
+    when the trailing boundary and the whitespace requirement are each removed
+    on their own. Removing both at once does reach it, through the shorter
+    "six" alternative, but that is a compound mutation rather than the single
+    one each case here is written against. A case that passes under every
+    single-token mutation tests nothing.
+    """
+    # Each positive case asserts the WHOLE return value rather than that some
+    # cardinality claim is present. The quoted span is what reaches the
+    # warning a reader acts on, so a case that only counts kinds would pass
+    # over a truncated or over-long quote -- which is exactly the defect the
+    # hyphen cases below exist for.
+    #
+    # Dies when the teens branch is dropped from CARDINALITY_COUNT.
+    check("a teens number word is a cardinality claim",
+          mod.find_claims(
+              "Fourteen such references remain in text at this head."),
+          [("cardinality", "Fourteen such references")])
+    # Dies when the tens branch is dropped, while the teens case stays green
+    # -- so the two branches are pinned separately rather than together.
+    check("a tens number word is a cardinality claim",
+          mod.find_claims("Ninety rows were rewritten."),
+          [("cardinality", "Ninety rows")])
+    # Dies when the `|hundred` alternative is dropped, while the tens case
+    # stays green -- measured in both directions, so these two are pinned
+    # separately rather than together. They share one source line
+    # (`|{CARDINALITY_TENS}|hundred`), which is what made an earlier revision
+    # of this comment claim the tens branch killed this case too; dropping
+    # that branch alone leaves `|hundred` intact and this case passing.
+    check("`hundred` is a cardinality claim",
+          mod.find_claims("A hundred files still carry it."),
+          [("cardinality", "hundred files")])
+    # Dies when the hyphenated compound alternative is dropped: the match
+    # then restarts at the trailing word and the quote reads "three files",
+    # silently dropping the tens digit from a figure the hook is about to
+    # ask someone to justify.
+    #
+    # Its POSITION in the alternation is not what these two cases pin --
+    # moving it after the bare ones words was measured to keep both green,
+    # because the engine backtracks within the group at the same start
+    # position rather than committing to the first alternative that begins
+    # to match. Ordering it first is readability, not correctness.
+    check("a hyphenated compound keeps its tens word in the quote",
+          mod.find_claims("Twenty-three files remain unchanged."),
+          [("cardinality", "Twenty-three files")])
+    # The same alternative, at the top of its range, where the trailing word
+    # is itself a tens-range word rather than a small one.
+    check("a hyphenated compound at the top of the range",
+          mod.find_claims("Ninety-nine files still fail."),
+          [("cardinality", "Ninety-nine files")])
+    # Dies when the compound alternative admits anything after the hyphen
+    # (`-[a-z]+` rather than the ones words), which is the whole of why this
+    # string yields nothing: `odd` is not a ones word, so the compound
+    # alternative rejects it exactly as it would reject `Twenty-purple`.
+    #
+    # An earlier revision of this comment read the outcome as a designed
+    # exemption for hedged approximations, on the same reasoning that exempts
+    # a negated `no` above. That reading is wrong twice over, and
+    # ai-config#3907 measures both halves. Nothing in `CARDINALITY_RE`
+    # recognises a hedge: `Roughly fifty files` and `Several hundred files`
+    # both flag, because the match begins at the count itself. And the cost
+    # runs the opposite way from `no` -- the hook exists to catch a figure
+    # nobody counted, and "roughly" is what an author writes when they did
+    # not count -- so an exemption here would remove recall rather than
+    # protect trust. So this case pins the OUTCOME, which the mutation below
+    # makes worth pinning, and asserts nothing about hedges.
+    #
+    # Two earlier drafts of this case tested nothing, and both read as
+    # discriminating. "The twenty-first commit touched it" carries no plural
+    # noun at all, so the pattern's trailing group never matches whatever the
+    # vocabulary admits. Pluralizing it to "the twenty-first commits were
+    # dropped" does not fix that: `find_claims` filters every match through
+    # `LISTABLE_NOUN_RE`, and `commits` is not listable, so the claim is
+    # dropped one step later than before and just as silently. Measured under
+    # the mutation, this phrasing yields
+    # [("cardinality", "Twenty-odd files")]; under the real pattern, [].
+    check("a compound with a non-ones word after the hyphen is not a count",
+          mod.find_claims("Twenty-odd files still carry it."), [])
+    # Dies when CARDINALITY_RE's LEADING \b is removed, which lets a number
+    # word embedded at the end of an ordinary word start a match. This guard
+    # predates the widening; the case is here because the widening edits the
+    # pattern that carries it.
+    check("a number word inside a longer word is not a count",
+          mod.find_claims("I asked someone files be renamed."), [])
+    # Dies when `no` is restored to CARDINALITY_COUNT. The negation exemption
+    # predates this change and the widening must not undo it: "no matches" is
+    # hedging, not a derived figure someone could have gotten wrong.
+    check("a negation is still not a cardinality claim",
+          mod.find_claims("No occurrences found in that file."), [])
+
 
 def unit_checks(mod):
     # find_claims: the incident text yields both claim shapes.
@@ -892,6 +1007,12 @@ def unit_checks(mod):
     # Regression: bug 2 (routine review-summary phrasing must stay silent).
     check("find_claims silent on routine 'found N issues'/'N commits' phrasing",
           mod.find_claims(ROUTINE_REVIEW_PHRASING), [])
+
+    # Review-housekeeping words (findings, PRs, commits, issues, fixes, bugs)
+    # are deliberately excluded from LISTABLE_NOUN_PATTERN (ai-config#3901).
+    for excluded in ("findings", "PRs", "commits", "issues", "fixes", "bugs"):
+        check(f"LISTABLE_NOUN_RE excludes review-housekeeping noun '{excluded}'",
+              bool(mod.LISTABLE_NOUN_RE.fullmatch(excluded)), False)
 
     # Regression: bug 2's path-citation variant, both shapes.
     check("find_claims silent on a skills/<slug>/SKILL.md path citation",
@@ -1393,6 +1514,7 @@ def main():
     global failures
     mod = load(SUBJECT)
     unit_checks(mod)
+    vocabulary_checks(mod)
     end_to_end_checks()
 
     if failures:

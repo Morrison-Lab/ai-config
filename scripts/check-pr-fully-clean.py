@@ -453,6 +453,7 @@ REVIEW_BODY_MARKERS = (
     "### \U0001f916",
     "code review",
     "**claude finished",
+    "## verdict",
     "### verdict",
     "_posted by codex (ai agent)",
     "_posted by opencode (ai agent)",
@@ -1982,7 +1983,28 @@ NOT_CLEAN_NEGATION_PREFIX = re.compile(
 # those branches would swallow it. Missing a not-clean signal is the dangerous
 # direction here (see the prefix comment above), so the risky branches keep
 # the plain-punctuation prefix they always had.
+#
+# The leading run tolerates horizontal whitespace and at most one newline, but
+# strictly forbids a blank line / paragraph break (`\n\s*\n`) across the run
+# (ai-config#3937): a next paragraph opening with "None are deferred..." or
+# "None are blocked." is ordinary review or ARD disposition prose, not a
+# same-line negation of a preceding "Needs more work" verdict.
 NOT_CLEAN_NEGATION_SUFFIX = re.compile(
+    r"^(?:"
+    r"[ \t*_:.\-]*(?:\r?\n[ \t*_:.\-]*)?"
+    r"(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
+    r"|"
+    r"[ \t:.\-]*(?:\r?\n[ \t:.\-]*)?"
+    r"(?:nothing\b|0\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
+    r")",
+    re.IGNORECASE,
+)
+
+# Suffix for section headings in FINDING_HEADING_PATTERNS (e.g. `## Nits`,
+# `## Non-blocking`, `### Issues`, `### Remaining`), where markdown formatting
+# separates the heading from an empty-section declaration (`**None.**`,
+# `none identified`) with a newline or blank line.
+FINDING_HEADING_NEGATION_SUFFIX = re.compile(
     r"^\s*(?:"
     r"[*_:.\-]*\s*(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
     r"|"
@@ -2562,7 +2584,10 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
                 if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
                     continue
                 suffix = scan_body[match.end():match.end() + 60]
-                if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
+                if pat == r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b":
+                    if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
+                        continue
+                elif FINDING_HEADING_NEGATION_SUFFIX.search(suffix):
                     continue
             return pat
     return None

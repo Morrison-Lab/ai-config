@@ -274,6 +274,27 @@ Recorded for that cluster in `ucdavis/bcs#592` / `#593`; the correction to
 the retracted figure and its retracted replacement were in different places on
 the page.)
 
+(A second case, of a different claim type, with the same shape: a
+reachability claim, not a numeric one, "corrected" by re-reading rather than
+by re-running the instrument.
+`Morrison-Lab/mln` PR #15 pushed filled notebooks and 32 lecture decks in
+commit `c98d5f450f`; later commits on the branch removed them, and an early
+write-up said the leak "reached mln".
+A later pass "corrected" that to "none was pushed, so nothing reached mln's
+history" by rereading the branch's final diff, rather than by fetching the
+PR's own refs and walking them.
+The correction was false: `refs/pull/15/head` and `refs/pull/15/merge` both
+still reach the commit, a non-admin user cannot delete those refs, and they
+survive the repository going public.
+It read as more careful than the claim it replaced, which is what let it pass
+two rounds of adversarial review and spread into a merged workflow-prompt
+addendum, two merged PR bodies, and a second repository's addendum before a
+fourth review round caught it.
+Full recipe and remedy in
+[`memories/git-branches.md`](../../memories/git-branches.md), "Scrubbing a
+later commit does not remove what an earlier commit already pushed -- PR refs
+keep it reachable".)
+
 ## A re-measurement with a different instrument
 
 (2026-08-12, `ucdavis/bcs#615`: a PHI-count figure was published as a
@@ -868,8 +889,87 @@ A checker that maps `\alias{}` to declaring file and reports the population cann
 
 - **Do:** enumerate the population a review claim quantifies over (`grep`/an instrument over every file, not the files the diff already named) before writing "every one" or "all of them".
 - **Do:** ask, once a review has correctly named *why* a diff exists, whether the diff addresses that cause or only removes the thing that detected it -- a warning silenced and a defect fixed are not the same outcome even when both diffs are one line.
+- **Do:** run the instrument against the commit the claim was made at, not against the branch head, before offering its output as a counterexample.
 - **Don't:** accept a stated sample --- "spot-checked a few" --- as support for a universal claim when the population was derivable at that commit.
 - **Don't:** read a correct mechanism diagnosis in a review as license to skip asking whether the fix under review acts on that mechanism or merely hides its symptom.
-- **Do:** run the instrument against the commit the claim was made at, not against the branch head, before offering its output as a counterexample.
 - **Don't:** treat "this claim was underived" as equivalent to "this claim was false" --- the first is about method and is usually right, the second needs an artifact that existed at the time.
 - **Don't:** author a new rule for a case without first searching for an existing one --- and check whether the existing rule was even loaded, since an uninstalled rule wants an install and a bypassed one wants an instrument.
+
+## A parity comment justified a fix that only partly achieved the parity it named
+
+(Morrison-Lab/ai-config#3707, commit `1cfcd075`, 2026-09-17, addressing a review round against `d256d23`: a guard function, `_agent_subtypes`, was widened to read two more dict keys (`agent`, `persona`), and the comment introducing the widening gave its reason as a scope claim about a sibling function in the same file: "`agent` and `persona` are here because `_is_reviewer_record` below already treats them as persona-naming keys, and two predicates in one file disagreeing about what names a persona is how a dispatch gets seen by one and not the other."
+
+That sentence states a population --- the keys the sibling predicate reads --- and a target: this function should read the same ones.
+Nobody derived either set.
+`_is_reviewer_record` reads ten distinct keys across its two passes: `attributionAgent`, `agent_type`, `subagent_type`, `subagentType`, `TypeName`, `Role`, `agent`, `name` and `persona` in both, plus a lowercase `role` read only from a nested `message` dict.
+`_agent_subtypes` before the widening read six of those;
+the widening added two more, landing at eight and leaving two uncovered (`role`, `attributionAgent`) that the justifying comment's own wording already promised to close.
+The fix read as complete because the comment supplied the reason and the diff visibly acted on it --- two keys were added, disagreement was reduced, and a reader checking the diff against the stated reason finds them consistent.
+Consistent with the reason is not the same as satisfying it: the reason was a claim about two full sets matching, and "some progress toward matching" confirms a directional claim while leaving a quantified one unchecked.
+A later review round derived both sets and found the gap by counting, not by rereading the comment.
+
+**The record of that gap was itself under-derived on the first pass.**
+A companion case describing this incident first named the miss as "two keys a sibling predicate read that this one did not" --- the two the fixture had happened to surface (see [`fixtures-are-not-evidence.cases.md`](fixtures-are-not-evidence.cases.md)).
+Deriving both key-lists directly (rather than reading the number off the test fixture that had exposed part of it) showed the true gap was four, not two.
+A count copied from evidence that was real but partial repeats exactly the error the parity comment made one level up: it reports what a nearby artifact showed, not what the population contains.
+
+**The resolution was not "close the gap completely," and that half of the fix is the more useful fact to keep.**
+`role` was added, because it is the same key as the already-read `Role` in a different casing --- reading one and not the other is the identical split-predicate defect one level in, and it is safe on its own terms besides (a message's `role` can only hold values like `user`/`assistant`, which the sibling predicate itself filters).
+`attributionAgent` was deliberately left out, with the comment now saying why: it names who *authored* a transcript record, while `_agent_subtypes` reads a tool's *input* --- a different question, so copying the key across would be structural fit standing in for a transferred purpose (see [`check-purpose-before-reusing`](check-purpose-before-reusing.md)).
+Parity with the sibling function's *principle* ("a name key means the same thing to both predicates") is not parity with its *key list*: the correct target set was never "every key the sibling reads," and deriving the list without also asking whether each key's purpose transfers would have produced the wrong fix by symmetry.)
+
+- **Do:** when a fix's own comment states a parity or consistency claim between two predicates, derive both key/case sets and diff them, rather than confirming the diff moves toward the stated reason.
+- **Do:** when the gap between two derived sets was found via a fixture or other partial evidence, re-derive it directly before recording its size --- the fixture's own coverage is a fact about the fixture, not the gap.
+- **Do:** ask separately, for each item the diff would need to add for full parity, whether its *purpose* transfers to the new site --- a name that recurs in both structures can still mean two different things.
+- **Don't:** read "the diff added items toward the stated reason" as "the diff satisfies the stated reason" --- a directional claim and a quantified one need different checks.
+- **Don't:** treat full parity with a sibling's key list as the correct fix by default;
+  parity is owed to the principle the comment states, and a key whose purpose does not transfer is correctly excluded even when doing so leaves the sets unequal.
+
+## A "this costs nothing" claim was measured against one of two shapes it implicitly covered
+
+(Morrison-Lab/ai-config#3707 / #3746, commit `1cfcd075`, 2026-09-17: a guard excludes certain tool names from being treated as reviewer dispatches on a flat, call-id-less transcript shape (OpenCode/OMO), since that shape never populates the field the exclusion's ordinary safety net depends on.
+The comment defending the exclusion read: "That costs no real capability: a genuine OMO dispatch-then-retrieve returns no verdict on origin/main either."
+
+The sentence's subject --- "a genuine OMO [reviewer report]" --- is not one shape.
+A dispatch-then-retrieve (two paired records, a dispatch call and a separate retrieval call under an excluded tool name) is one;
+a single flat record under an excluded tool name that both dispatches the reviewer and carries its report in its own paired result is a second, and the comment's claim was checked against only the first.
+The second shape does lose authorization under the exclusion where it would not on `origin/main`, which a new regression case (case 18) pins directly: denied here, admitted on the unpatched branch.
+The claim was true of the instance it was written against and false of the instance it never named, and both instances are equally "a genuine OMO [report]" under the sentence's own wording.
+
+This is the "costs nothing" shape of the "Do: scope the claim to what was measured" bullet under ["Search for the artifact instead of arguing about whether it would exist"](metacognitive-monitoring.md#search-for-the-artifact-instead-of-arguing-about-whether-it-would-exist): a no-loss claim quantifies over every way the excluded population can arise, so it needs that population enumerated --- every shape the transcript format allows a reviewer dispatch to take --- not one representative shape checked and generalized from.
+Writing the claim felt like reporting a measurement, because the checked shape genuinely does cost nothing;
+the population it was silently generalized to was never listed.)
+
+- **Do:** before writing "this costs nothing" or "this loses no capability," enumerate every shape the excluded input can take, not only the one a test or a mental model already covers.
+- **Do:** add the regression case for the unchecked shape in the same round that names the gap, so the population claim becomes checkable rather than merely narrowed in prose.
+- **Don't:** generalize a no-loss claim from a single checked shape to "a genuine [format]" when the format admits more than one paired-record layout --- name the shape actually measured instead.
+- **Don't:** treat a claim as safe because it is true of the case that prompted writing it;
+  a no-loss claim's failure mode is the case nobody thought to name.
+
+## "All three whitespace runs are bounded now" was true of the source; "and the tests pin it" was checked by rereading, not by counting
+
+(`Morrison-Lab/ai-config` PR [#3826](https://github.com/Morrison-Lab/ai-config/pull/3826), commits `0388cdfa` and `f05793e8`, 2026-09-21.
+A regex in `hooks/no-unread-issue-claim.py` had three separate `\s*` runs;
+an earlier round bounded two of them and left the third unbounded, so the pattern's longest possible match was still unbounded end to end.
+`0388cdfa` bounded the third run too and stated, correctly, that the source now had all three bounded --- and added a second claim in the same commit message: "Four cases now pin what the comment claims --- a prefix at the full 38 characters, the bound at exactly 8, one character past it at 9, and a padded run inside `pull request` that only a bounded inner run rejects."
+
+The source claim was **Scope** over the regex's own three quantifiers and was true;
+a differential read of the pattern confirms all three are bounded.
+The test claim was **also Scope**, over the same three quantifiers, this time asking whether each has a case that fails if that specific bound is removed --- and it was false.
+`f05793e8`, one commit later: "The cases pinned ONE.
+Widening either of the other two by a single character, or reverting the trailing one to unbounded, left 72 of 72 green."
+Two of the three runs had no case that depended on their own bound at all;
+the suite was green regardless of what those two runs allowed.
+
+`0388cdfa`'s own commit message states the general form of the mistake it was about to make, one clause before making it: "the whitespace is bounded now" is not a claim you can check by rereading the sentence you just wrote.
+It is a claim you check by counting the quantifiers.
+That sentence is correct about the **source** claim it was defending and was never applied to the **test** claim two sentences later in the same message --- the general rule was stated and a different, structurally identical instance of the exact violation it names shipped in the same commit.
+
+Recognizing a claim as **Scope** ("all N of X now do Y") is not, by itself, the check.
+The check is deriving N and confirming each member independently --- here, one assertion per whitespace run, not a shared prefix-length case that happens to move if any of the three shrinks.
+A single passing case that is *consistent with* all three bounds holding is not evidence that all three are independently pinned, the same gap ["A parity comment justified a fix that only partly achieved the parity it named"](#a-parity-comment-justified-a-fix-that-only-partly-achieved-the-parity-it-named) above names for a different claim shape: a directional or aggregate check confirms movement toward a claim, not the claim's exact scope.)
+
+- **Do:** for a claim of the shape "all N of X now do Y," derive N (count the quantifiers, list the branches, enumerate the members) and confirm each one has its own independent check, rather than confirming the surrounding sentence reads correctly.
+- **Do:** treat "I already stated the general rule this violates, earlier in the same message" as no defense --- stating the rule and checking against it are different acts, and the first does not perform the second.
+- **Don't:** accept a single case that is consistent with several claimed properties as pinning all of them --- widen or revert each property independently and confirm the suite catches it.
+- **Don't:** read a source-level Scope claim ("all three runs are bounded") as carrying a test-level Scope claim ("and all three are independently tested") for free --- they are two different populations that happen to share a sentence.

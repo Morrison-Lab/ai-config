@@ -57,8 +57,16 @@ without asking confirmation before every merge.
   [`fully-clean`](../../shared/workflow/fully-clean.md) for the payload keys.
   A later all-clear from a different reviewer does not supersede a standing
   not-clean; only a later clean from the same reviewer does.
-  On GitHub (a GitLab MR has no equivalent gate until
-  [#3021](https://github.com/Morrison-Lab/ai-config/issues/3021)),
+  On GitHub, use `check-pr-fully-clean.py`; on GitLab, use
+  `scripts/check-mr-fully-clean.py` with the MR IID and project ID/path.
+  The GitLab instrument reads every pipeline, paginated note and discussion,
+  proves target currency, and re-reads the head before printing the pinned SHA.
+  Merge with `sha=<pinned-sha>` and `auto_merge=false`, passing
+  `--quorum <number-of-reachable-providers>` to the checker; if currency
+  fails, rebase through `PUT /projects/:id/merge_requests/:iid/rebase`, poll
+  with `include_rebase_in_progress=true` until `rebase_in_progress` clears,
+  and rerun the whole gate on the new head.
+  On GitHub,
   record `headRefOid` and `baseRefName` before the instrument runs and
   require both live values to equal them immediately before every direct
   merge, so a retarget at the same tip cannot pass with an old verdict and a
@@ -78,7 +86,11 @@ without asking confirmation before every merge.
   recorded head (`PUT .../pulls/<N>/update-branch` with
   `expected_head_sha`, or the MCP tool's `expectedHeadSha`; a `422`
   whose message names an expected-head mismatch (match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show)
-  means another writer moved the head, so settle ownership instead,
+  means another writer moved the head only if the live `headRefOid` no longer
+  equals the SHA you pinned --- re-read it and compare before settling
+  ownership, since a correctly-lengthed but wrong-content SHA (most often one
+  guessed or padded from an abbreviation instead of read in full) produces
+  the byte-identical message with no other writer involved,
   and any other `422` is a failed update to stop on),
   a wait of a few minutes at most until `headRefOid` changes (the update is
   asynchronous; expiry is a failed update to stop on and report),
@@ -337,6 +349,30 @@ They were closed forward by
 revert, for the reason
 [`revert-premature-merge`](../../shared/workflow/revert-premature-merge.md)
 now records.)
+
+### `ListAgents` does not reach a project-thread session, and the author field cannot tell you whose PR it is
+
+Both mechanics above assume a peer you can enumerate and a PR you can attribute.
+In a Claude Code **project thread** session neither holds, and both fail quietly rather than erroring.
+
+**`ListAgents` names in-process subagents and local peer sessions, and returns nothing for a sibling thread session in the same project.**
+So the "ask the session directly" step reads as unavailable when it is merely being asked through the wrong tool, and a session that stops there falls straight to comment-and-wait for no reason.
+The route that does reach them is `mcp__hearthbot__list_thread_sessions` to enumerate, then `mcp__claude-code-remote__send_message` to the returned `session_id`.
+
+**Every thread session posts as `claude[bot]`, so the PR's `user.login` is the same for yours and the peer's.**
+The author arm of the scope test is satisfied by all of them at once, which makes it useless for telling them apart.
+The `head.ref` does distinguish: a thread's own branch is `claude/project-thread-<slug>`, and a named feature branch belongs to whoever cut it.
+
+- **Do:** enumerate peers with `list_thread_sessions` and message them with `send_message` before falling back to comment-and-wait.
+- **Do:** compare the PR's `head.ref` against your own branch to decide whether a PR is yours.
+- **Don't:** read an empty `ListAgents` in a thread session as "no peer is reachable".
+- **Don't:** use the PR's author to decide whose PR it is under a shared bot identity.
+
+(Measured 2026-09-18 on [ai-config#3737](https://github.com/Morrison-Lab/ai-config/pull/3737), as a violation of the rule above rather than an application of it.
+A thread session merged that peer-owned PR nine minutes after its clean verdict landed, with no hold-off comment and no message to the session driving it.
+Nothing was lost --- the PR was fully clean and the maintainer had told that session to merge when ready --- but its own merge call had failed with a `409 Head branch was modified` seconds earlier, so it was actively working the PR at the moment it was taken.
+The scorer is what made this feel authorized: `check-pr-fully-clean.py` answers *is this PR mergeable*, which is a different question from *is this PR mine to merge*, and nothing in it knows the second --- so a clean exit reads as complete authorization when it is half of it.
+A clean scorer exit is not the hold-off, and neither is a standing merge grant.)
 
 ## The standing per-repository grant
 
@@ -603,12 +639,13 @@ Here that mechanism is itself one of at least three candidates, so the first rea
 
 **The marker is per-repository, so a grant in one repo authorizes nothing in another.**
 `check_mwc_active()` looks for `<git-common-dir>/ai-sessions/<session>.mwc`,
-resolved from the current working directory and `CLAUDE_PROJECT_DIR`.
-Enabling MWC while working in repo A therefore leaves a merge in repo B blocked,
+resolved from the session's working directory (`cwd`) and `CLAUDE_PROJECT_DIR`
+(where the merge command executes), which may differ from the repository named in a `-R` target.
+Enabling MWC while working in repo A therefore leaves a merge issued from repo B blocked,
 which is correct and easy to misread as the guard malfunctioning.
 It also requires `AI_SESSION_ID` or `CLAUDE_SESSION_ID` to be set; with neither
 set the function returns `False` and the guard denies even with a valid marker.
-Run `check-mwc` from the repo you intend to merge in, not merely once per session.
+Run `enable-mwc` and `check-mwc` from the repository of the session's working directory (where the merge command runs), not merely once per session or from the `-R` target repository.
 
 **The grant does not expire, but its LIVENESS PROOF does, and a long session loses merge authority mid-session because of it.**
 This is the property most likely to bite, because the two facts that produce it are individually reassuring.

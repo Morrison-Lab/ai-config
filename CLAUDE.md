@@ -210,8 +210,9 @@ Either is reason enough to compress or recommend a lighter model, on the same te
 
 The two levers above spend less on the work **as shaped**, and their saving expires with the session.
 This one changes the shape, so it pays every future session --- and it is the one that never announces itself, because following an expensive procedure correctly reads as compliance, and pulling either lever above reads as having managed quota.
-So ask separately what a procedure costs *by construction*: always-loaded content only some sessions read, a judgment made twice that wants an instrument, a serial loop the base outruns, an enumerated brief that should have been a query, work at this tier a free CLI could do.
+So ask separately what a procedure costs *by construction*: always-loaded content only some sessions read, a judgment made twice that wants an instrument, a serial loop the base outruns, a monitoring loop polling state only a human can change, an enumerated brief that should have been a query, work at this tier a free CLI could do.
 The deliverable is a change to the corpus --- fixed in stride when small, filed with its measurement when not, per `report-mistakes-proactively` --- never a quieter run of the same procedure.
+That last clause covers a loop you armed yourself: once repeated firings return the same reading, delete the routine rather than lengthening its interval.
 `python3 scripts/check-context-closure.py` is the built instrument for the always-loaded pool.
 Its budget is advisory by design, so read an over-budget line as the prompt it is.
 Two boundaries.
@@ -1284,6 +1285,7 @@ The corpus's other gha triggers each wait for an event (a bug to patch, a port t
 Candidates are duplication, drift, a named missing fix, or a directory that already calls gha for some workflows and not others.
 Not candidates are repo-specific logic gha does not model, a repo deliberately pinned off gha, and a repo we cannot merge a PR to.
 The fragment carries the rest: taking the inventory from gha's README table rather than its directory listing, pinning per capability, filing the migration as its own issue and PR, the private-consumer access precondition, the `permissions:` and `concurrency:` traps, and how to confirm the self-edit guard when a migration PR gets no review.
+Its "new repo" counterpart: a brand-new repository gets gha-backed CI (the baseline set, plus whatever fits the repo type) in the same first PR that creates it, never deferred to later.
 
 ## Don't incur technical debt
 
@@ -1449,6 +1451,17 @@ same weight as the other modularity checks above.
 
 <!-- Not yet shared with the lab manual; edit shared/coding/regex-backtracking-pitfalls.md, not here. -->
 [`shared/coding/regex-backtracking-pitfalls.md`](shared/coding/regex-backtracking-pitfalls.md)
+
+## Coding: a test harness reading embedded script from a YAML block scalar must not re-strip indentation
+
+<!-- Not yet shared with the lab manual; edit shared/coding/yaml-embedded-script-double-dedent.md, not here. -->
+[`shared/coding/yaml-embedded-script-double-dedent.md`](shared/coding/yaml-embedded-script-double-dedent.md)
+
+`yaml.safe_load` already dedents a `run: |` block relative to its own first
+content line; a harness that also strips a fixed number of leading spaces on
+top of that double-dedents, corrupting any line shallower than the fixed
+width and producing an `IndentationError` that reads as a bug in the
+workflow file rather than in the harness.
 
 ## Writing style: plain, direct prose
 

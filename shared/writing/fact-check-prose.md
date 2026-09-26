@@ -641,6 +641,21 @@ of having left it alone.
 - **Don't:** read this as covered by the import rule above; there is no source
   to have been faithful to, which is what removes the moment of doubt.
 
+**The worst case is a rewrite that raises the burden on the clause it left alone.**
+Above, the carried clause keeps asserting what it always asserted, and the defect is that nobody re-checked it.
+Here the rewrite changes what the clause has to support.
+A sentence rewritten to say where in a source something appears --- "in his conclusion", "in the opening section", "in the abstract" --- turns a locator that only had to land somewhere in the document into a claim about that document's structure.
+The citation's text is unchanged, so it reads as untouched; its job is not.
+The tell is a rewrite that adds a structural noun about the source, and the check is to open the source and find that structure, not merely the content.
+
+- **Do:** re-verify a locator whenever the rewritten sentence makes a claim about where in the source the material sits, even though the locator itself was not edited.
+- **Don't:** treat a pre-existing citation as pre-verified --- it was only ever as good as the weaker claim it used to carry.
+
+(ucdavis/lbt#7, 2026-09-15: replacing a hollow "In conclusion," opening with "Pinter states in his conclusion that ... (pp. 32-33)" made the inherited, already-wrong citation load-bearing.
+The conclusion is on p. 31.
+pp. 32-33 are the references and the author's address.
+Caught by foreground adversarial review, and the same pass had to re-check the other four "In conclusion," rewrites in the branch for the same reason.)
+
 ## When each rewrite is refuted on a NEW clause, the passage is over-specified
 
 The section above governs one rewrite: every clause you carried through it is
@@ -1186,6 +1201,13 @@ And the rewrite destroys its own evidence, per the case record above: there is
 no diff between a message and its predecessor, so nothing a later reader sees
 shows that the figure ever changed.
 
+(Recurrence, ucdavis/lbt#7, 2026-09-15: the original commit and its first amend each carried the same two figures that disagreed with their own diff, and the second amend fixed both.
+"145 packed lines" where the diff showed 117, and "three negation-reversal antitheses" where two were antitheses and the third was a metaphor removal.
+The second widens the class this section states.
+It counts the *kinds* of edit in the diff, not its size, so `git show --stat` cannot settle it and only reading the hunks can --- which is why a message describing a mixed cleanup is likelier to carry one of these than a message describing a single mechanical change.
+A parenthetical in the same message named four of the five items its own lead-in counted, which is [`check-leadin-counts.py`](../../scripts/check-leadin-counts.py)'s defect class on a surface that checker does not read --- and not its shape: that checker requires the count to open the last sentence of a lead-in line with the enumeration below it, while this count sat mid-sentence inside a bullet with the items inline in parentheses.
+[`hooks/flag-positional-figure-in-commit-message.py`](../../hooks/flag-positional-figure-in-commit-message.py) shows the surface is reachable --- a `PreToolUse` guard sees the message before the commit exists --- so a commit-message count check is buildable, though it needs a predicate for the inline-parenthetical form rather than a port of the existing bounds.)
+
 **A *positional* figure is in scope here, not only a measurement of the
 change.**
 "Thirteen lines above", "the section three lines below", "the sibling 39 lines
@@ -1470,3 +1492,97 @@ and that the repo's actual gate is the sentence-and-clause checker,
 documented in [`semantic-line-breaks`](semantic-line-breaks.md),
 not a raw character-length pass.
 The author had run an ad-hoc `awk` and `grep` during the session and wrote them up as if they were repo instruments.)
+
+## A prompt is a standing instruction, so it gets more checking than documentation
+
+Prose that steers a model --- a review workflow's `prompt-addendum`, an agent's `CLAUDE.md`, a skill body, a subagent brief --- is not read once and judged.
+It is executed on every future run,
+by a reader that cannot ask which of two readings was meant.
+So a false sentence in it does not mislead one reader;
+it propagates into every verdict or edit made under it,
+and nothing downstream reports where it came from.
+
+In practice it gets less checking than a PR body,
+because it sits inside a YAML or config file and reads as configuration rather than as a claim.
+The checks above apply unchanged.
+The ones that bite hardest are state claims (what a repository contains, what happened in it)
+and unhedged absolutes,
+since an instruction that says where *not* to look is a scope claim the reviewer will obey.
+
+- **Do:** fact-check prompt text sentence by sentence before committing it,
+  running the same state queries you would for a PR body.
+- **Do:** describe the tree the prompt runs against,
+  which is the default branch at run time rather than the unmerged branch you wrote it on.
+- **Do:** state a hazard as what to check and what makes it easy to miss,
+  not as a story of how it was found --- a list of hazards over a narrative about them.
+- **Don't:** write an incident, a repository's contents, or a "this is safe" absolute into a prompt from recall.
+- **Don't:** treat prompt text as configuration because it lives in a YAML string.
+- **Don't:** encode a relation between events --- which check caught which,
+  what happened before what, who is responsible --- when a claim about the
+  hazard itself would do the reader's job just as well.
+
+([`Morrison-Lab/mln#25`](https://github.com/Morrison-Lab/mln/pull/25), 2026-09-21:
+nine false or misleading claims in the review workflows merged in `mln#23`,
+found by an adversarial review of the sibling `mlg#5`.
+It carried the unhedged "material arriving is safe"
+in the sentence telling the reviewer where not to look.
+
+That round also "corrected" the addendum's claim that three disclosure leaks
+"reached this repository" to say nothing had been pushed,
+on the evidence that `main`'s history held none of the files.
+**That correction was itself false**, and is the worked example
+in [`git-branches`](../../memories/git-branches.md)'s
+"Scrubbing a later commit does not remove what an earlier commit already pushed" section:
+the material was pushed on a pull-request branch and stays reachable through that PR's refs,
+so a clean `main` was the wrong artifact to check.
+The original claim was right, and a round of review replaced it with a wrong one.)
+
+**Narrative structure is a defect factory in its own right, independent of any single false claim inside it.**
+A prompt that *narrates* an incident --- what happened, in what order, which
+check caught it, who is responsible --- asserts a relation between events on
+top of every claim about the events themselves.
+A relation costs more to keep true than a claim about a thing, because it
+decays whenever any one element is edited: fix the date of one leak and the
+"after" clause pointing at it goes stale, fix which check caught a leak and
+the ordinal position in the list is now wrong, without either edit touching
+the sentence that broke.
+No single query settles an ordering or attribution claim the way a query can
+settle "does this secret exist", so nobody re-derives the relation when
+editing one sentence near it --- and the narrative reads as informative
+precisely because it sounds like it is telling the reader something, when
+what it is telling them adds no instruction value a hazard list would not
+carry on its own.
+
+(`Morrison-Lab/mlg#5`, 2026-09-22: two GitHub Actions caller workflows carried
+a `prompt-addendum` that told the review bot about three past disclosure leaks,
+in narrative form, so it would check for the same classes.
+Because gha#904 means a repository's first-workflow PR cannot get an automated
+review, ten rounds of adversarial fallback review ran against the addendum.
+Rounds 4 through 10 produced 23 findings, and almost none were YAML or logic
+defects.
+A few were claims about what the pinned callee does: an exhausted quota is not
+caught pre-flight, only a missing secret is; a draft, fork, or bot-sender skip
+concludes `skipped` rather than `success`; a `GITHUB_TOKEN` push fires no
+`synchronize` event at all, so no run exists for the sender gate to skip.
+One was a permission claim that got acted on and then had to be reverted: a
+round singled out `id-token: write` as the worst scope to expose, the next
+commit dropped it, and two rounds later a further commit put it back, because
+all five scopes the callee's job requests are required and a caller missing
+any one fails the run before it starts.
+The rest, and the majority, were the incident narration: the wrong three leaks
+(two list items described the same mistake, and the first leak actually caught
+was missing), in an order the commits refute, credited to checks that did not
+catch them, with a claim that a sweep could not have caught something the
+sweep's own README says it did catch.
+Three consecutive rounds found a new error in the chronology alone, and each
+fix was locally correct and introduced the next, because the narration
+asserted relations between events that no single query settles.
+**Patching each narration error individually reads as diligence, and is what
+kept the defect alive for three rounds** --- what ended it was deleting the
+chronology: state what each hazard is and what makes it hard to see, and drop
+every claim about sequence and attribution.
+A prompt's job is to tell the reader what to check, not to recount how the
+team found out.
+A related, narrower finding from the same rounds: a secrets listing returns
+names, not scopes, so it cannot support "no secret here can do X" --- name the
+specific secret the consumer reads instead.)

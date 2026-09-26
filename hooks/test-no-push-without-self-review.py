@@ -3168,6 +3168,53 @@ def exempt_repo_cases() -> tuple[int, int]:
           mod._owner_repo("https://github.com/Morrison-Lab/mln-evil.git")
           not in mod.EXEMPT_REPOS)
 
+    check("DEFAULT_BRANCH_NAMES is exactly main and master",
+          mod.DEFAULT_BRANCH_NAMES == {"main", "master"})
+
+    # `_refspec_dest_branch` is pure text parsing, so these need no repository.
+    # The `refs/for/...` and `refs/tags/...` rows are deliberately None rather
+    # than the string they hold: neither is a plain branch, and reading either
+    # as "not main" would defeat the fail-closed direction this function
+    # exists to serve for a shape it cannot classify.
+    for spec, want in (
+        ("main", "main"),
+        ("master", "master"),
+        ("feature", "feature"),
+        ("feature:main", "main"),
+        ("+feature:main", "main"),
+        ("refs/heads/main", "main"),
+        ("feature:refs/heads/main", "main"),
+        ("feature:refs/for/main", None),
+        ("v1.0:refs/tags/v1.0", None),
+        (":main", "main"),
+        ("main:", None),
+        ("", None),
+    ):
+        try:
+            got = mod._refspec_dest_branch(spec)
+        except Exception as exc:
+            got = f"raised {type(exc).__name__}"
+        check(f"`_refspec_dest_branch({spec!r})` is {want!r} (got {got!r})",
+              got == want)
+
+    for argv, want in (
+        (["git", "push", "origin", "main"], True),
+        (["git", "push", "origin", "feature"], False),
+        (["git", "push", "origin", "master"], True),
+        (["git", "push", "origin", "+feature:main"], True),
+        (["git", "push", "origin", ":main"], True),
+        (["git", "push", "origin", "feature", "other"], False),
+        (["git", "push", "origin", "feature", "main"], True),
+        (["git", "push", "origin", "feature:refs/for/main"], None),
+        (["git", "log"], None),
+    ):
+        try:
+            got = mod._push_targets_default_branch(None, argv, [])
+        except Exception as exc:
+            got = f"raised {type(exc).__name__}"
+        check(f"`_push_targets_default_branch(None, {argv!r}, [])` is "
+              f"{want!r} (got {got!r})", got is want)
+
     for command, want in (
         ("git push origin main", True),
         ("git -C /tmp/r push origin main", True),
@@ -3226,11 +3273,16 @@ def exempt_repo_cases() -> tuple[int, int]:
     mln = "https://github.com/Morrison-Lab/mln.git"
     other = "https://github.com/Morrison-Lab/other.git"
 
-    def run_e2e(remotes, configs, args, extra_env=None, shape="{git}"):
+    def run_e2e(remotes, configs, args, extra_env=None, shape="{git}",
+               checkout=None, detach=False):
         d = make_repo(("x",))
         tf = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False)
         tf.close()
         try:
+            if checkout:
+                _git(d, "checkout", "-q", "-b", checkout)
+            if detach:
+                _git(d, "checkout", "-q", "--detach")
             for name, url in remotes:
                 _git(d, "remote", "add", name, url)
             for cfg in configs:
@@ -3254,20 +3306,32 @@ def exempt_repo_cases() -> tuple[int, int]:
 
     origin_mln = [("origin", mln)]
     for label, remotes, configs, args, env, shape, want_deny in (
+        # These push a feature branch rather than `main`: EXEMPT_REPOS
+        # membership alone no longer suffices once the destination is the
+        # default branch -- see the dedicated `main`/`master`-targeting rows
+        # below and the bare-push/detached-HEAD checks right after this loop.
         ("an exempt https remote is allowed with no review",
-         origin_mln, [], "push origin main", None, "{git}", False),
+         origin_mln, [], "push origin feature", None, "{git}", False),
         ("an exempt remote matches case-insensitively",
          [("origin", "https://github.com/morrison-lab/MLG.git")], [],
-         "push origin main", None, "{git}", False),
+         "push origin feature", None, "{git}", False),
         ("an exempt scp-style remote is allowed",
          [("origin", "git@github.com:Morrison-Lab/mlr.git")], [],
-         "push origin main", None, "{git}", False),
-        ("an exempt remote is allowed for a bare `git push`",
-         origin_mln, [["branch.main.remote", "origin"]], "push", None,
-         "{git}", False),
+         "push origin feature", None, "{git}", False),
         ("an exempt push under `cd DIR &&` with `2>&1 | tail` is allowed",
-         origin_mln, [], "push origin main", None,
+         origin_mln, [], "push origin feature", None,
          "cd {d} && git {args} 2>&1 | tail -3", False),
+        ("an exempt push to `main` is still denied (branch-scoped exemption)",
+         origin_mln, [], "push origin main", None, "{git}", True),
+        ("an exempt push to `master` is still denied",
+         origin_mln, [], "push origin master", None, "{git}", True),
+        ("a force-push refspec targeting `main` on an exempt remote is denied",
+         origin_mln, [], "push origin +feature:main", None, "{git}", True),
+        ("a `:branch` deletion of `main` on an exempt remote is denied",
+         origin_mln, [], "push origin :main", None, "{git}", True),
+        ("an unresolvable refspec on an exempt remote is denied",
+         origin_mln, [], "push origin feature:refs/for/main", None,
+         "{git}", True),
         ("a non-exempt repository is denied",
          [("origin", other)], [], "push origin main", None, "{git}", True),
         ("a lookalike repository name is denied",
@@ -3359,6 +3423,42 @@ def exempt_repo_cases() -> tuple[int, int]:
             ok = False
             detail = f"raised {type(exc).__name__}: {exc}"
         check(f"exempt e2e: {label} ({detail})", ok)
+
+    # A bare `git push` ships whatever branch is checked out, so these two
+    # need real repository state rather than a refspec string: one on a
+    # feature branch (still exempt) and one on `main` (denied). `make_repo`
+    # always checks out `main` first, hence the explicit `checkout=`.
+    for label, checkout, branch_config, want_deny in (
+        ("an exempt remote is allowed for a bare `git push` on a feature branch",
+         "feature", "feature", False),
+        ("an exempt remote is denied for a bare `git push` on `main`",
+         None, "main", True),
+    ):
+        try:
+            rc, denied = run_e2e(origin_mln,
+                                 [[f"branch.{branch_config}.remote", "origin"]],
+                                 "push", None, "{git}", checkout=checkout)
+            ok = rc == 0 and denied is want_deny
+            detail = f"exit {rc}, denied={denied}"
+        except Exception as exc:
+            ok = False
+            detail = f"raised {type(exc).__name__}: {exc}"
+        check(f"exempt e2e: {label} ({detail})", ok)
+
+    # A detached HEAD has no branch name, so `_rev_parse_ref` returns None and
+    # `_push_targets_default_branch` reports the unclear case rather than
+    # `False` -- and unclear must deny the exemption, same as everywhere else
+    # in this file.
+    try:
+        rc, denied = run_e2e(origin_mln, [], "push", None, "{git}",
+                             detach=True)
+        ok = rc == 0 and denied is True
+        detail = f"exit {rc}, denied={denied}"
+    except Exception as exc:
+        ok = False
+        detail = f"raised {type(exc).__name__}: {exc}"
+    check(f"exempt e2e: a bare `git push` from detached HEAD is denied "
+          f"({detail})", ok)
 
     return failures, ran
 

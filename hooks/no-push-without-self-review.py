@@ -96,7 +96,12 @@ WHERE IT DELIBERATELY DOES NOT FIRE
   `-c`, no environment setting of any kind, and no ssh command, proxy, exec
   path or receive-pack program that could deliver the pack elsewhere. A
   push URL on any other host, a local path, a literal URL in the remote
-  position, or anything else is still gated.
+  position, or anything else is still gated. The exemption is also refused
+  outright -- regardless of URL -- for a push that would (or might,
+  unresolvably) update `main`/`master`: see `_push_targets_default_branch`.
+  A feature-branch push stays exempt; a direct push to the default branch
+  does not, since that is exactly the case with no GitHub-side PR/mwc gate
+  to fall back on.
 
 Authorized override: `ALLOW_UNREVIEWED_PUSH=1`, as an environment assignment on
 the pushing command itself.
@@ -570,6 +575,22 @@ EXEMPT_REPOS = frozenset({
     "morrison-lab/mlg",
     "morrison-lab/mlr",
 })
+
+# A second adversarial round on the ai-config addition above found the backstop
+# argument overclaimed its own coverage: `EXEMPT_REPOS` was checked by URL
+# alone, with no branch discrimination, so a direct `git push origin main`
+# read as exempt exactly like a feature-branch push, and this repo's own
+# `claude-review.yml` triggers only on `pull_request`/`issue_comment`/
+# `workflow_dispatch` -- never on a plain `push`. So the "it still becomes a
+# reviewed PR" argument was true of the branch-then-PR path and false of a
+# direct push to the default branch, which is precisely the case a confused
+# or compromised session would take. `DEFAULT_BRANCH_NAMES` and
+# `_push_targets_default_branch` below close that: the exemption is refused,
+# regardless of URL, for a push that would update `main` or `master` --
+# unresolvable cases (an unclear refspec, a config-driven bare push) are
+# refused the exemption too, in the same fail-closed direction as everything
+# else in this file that cannot determine what a push ships.
+DEFAULT_BRANCH_NAMES = frozenset({"main", "master"})
 
 # `owner/repo` of a push URL, accepted only on github.com: `https://` (with
 # or without credentials), scp-style `git@github.com:owner/repo`, or
@@ -1306,6 +1327,53 @@ def _parse_push(argv: list[str]) -> tuple[list[str], str | None] | None:
     return positionals, repo
 
 
+def _refspec_dest_branch(spec: str) -> str | None:
+    """The bare branch name a refspec would write on the remote, or None if unclear.
+
+    Only a spec naming an ordinary branch is resolved: a leading `+` (force)
+    is stripped, the destination side of a `src:dest` pair is taken (or the
+    whole spec when there is no colon, which is git's own "same name on both
+    sides" reading), and a `refs/heads/<name>` form is reduced to `<name>`.
+    Anything in another ref namespace (`refs/tags/...`, `refs/for/...`, a bare
+    `:dest` with an empty source that deletes a ref) or otherwise not a plain
+    branch name returns None -- unclear must not be read as "not the default
+    branch", since that is the direction `push_is_exempt` fails closed in.
+    """
+    spec = spec.lstrip("+")
+    dest = spec.split(":", 1)[1] if ":" in spec else spec
+    if not dest:
+        return None
+    if dest.startswith("refs/heads/"):
+        return dest[len("refs/heads/"):] or None
+    if dest.startswith("refs/") or ":" in dest:
+        return None
+    return dest
+
+
+def _push_targets_default_branch(directory: str | None, argv: list[str],
+                                  env: list[str]) -> bool | None:
+    """True if this push would update `main`/`master` on the remote; None if unclear.
+
+    A bare `git push` (no refspec) ships the current branch under its own
+    name absent an override, so its branch is HEAD's. `push_is_exempt`'s own
+    caller already refuses the exemption on anything else this function
+    returns other than `False`, so an unresolved HEAD or an unrecognized
+    refspec shape denies the exemption rather than granting it.
+    """
+    parsed = _parse_push(argv)
+    if parsed is None:
+        return None
+    positionals, _repo = parsed
+    refspecs = positionals[1:]
+    if not refspecs:
+        branch = _rev_parse_ref(directory, env, "--abbrev-ref", "HEAD")
+        return branch in DEFAULT_BRANCH_NAMES if branch else None
+    dests = [_refspec_dest_branch(spec) for spec in refspecs]
+    if any(d is None for d in dests):
+        return None
+    return any(d in DEFAULT_BRANCH_NAMES for d in dests)
+
+
 # This hook is registered with a 10s timeout in `hooks/hooks.json`, and a
 # PreToolUse hook killed on timeout does not deny -- the push simply proceeds.
 # So the budget is enforced here rather than left to the harness: one call per
@@ -1618,10 +1686,17 @@ def push_is_exempt(directory: str | None, argv: list[str],
     `_run_git` raises `TimeoutError` then, and letting any exception escape
     here would reach `main`'s fail-open `except` -- a silent allow for the
     whole command, which is what `push_refspecs` guards against the same way.
+
+    A push that would (or might, unresolvably) update `main`/`master` is
+    never exempt either, regardless of the destination URL: see
+    `_push_targets_default_branch` and the comment above
+    `DEFAULT_BRANCH_NAMES`.
     """
     try:
         if not (_is_plain_command(command)
                 and _is_plain_push(directory, argv, env)):
+            return False
+        if _push_targets_default_branch(directory, argv, env) is not False:
             return False
         remote = _push_remote(directory, argv, env)
         if not remote:

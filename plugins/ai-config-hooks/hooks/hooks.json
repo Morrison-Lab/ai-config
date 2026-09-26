@@ -304,6 +304,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-rm-live-render-intermediate.py\"'",
+            "timeout": 10,
+            "script": "no-rm-live-render-intermediate.py",
+            "why": "2026-09-24, health-analytics-core/abridge: an agent deleted a gitignored paper-with-supplement.rmarkdown, reasoning it was a leftover from its own failed render -- it was not, the user was rendering that exact worktree from their own terminal, and Quarto recreates that intermediate at the START of every render. The render had already knitted all 251 chunks (~10 min, including a forced cache rebuild) before failing on the missing file. AGENTS.md's 'verify a dispatched agent's liveness before touching a worktree' rule already existed and did not fire at composition time. DENIES rm/trash/find -delete/git clean of *.rmarkdown, *.knit.md, *.knit.qmd, *_files/, *.quarto_ipynb, or .quarto/ ONLY when a live quarto render/preview or an Rscript/R process running knitr/rmarkdown/rmd_render is also found (pgrep -fl, injectable in tests). Clearable with ALLOW_RM_RENDER_INTERMEDIATE=1 on the same command. Fails open with no live-process check available, on any parse trouble, and when scripts/lib/shellcmd.py cannot be imported."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/flag-add-a-outside-pathspec.py\"'",
             "timeout": 10,
             "script": "flag-add-a-outside-pathspec.py",

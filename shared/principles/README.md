@@ -406,7 +406,7 @@ about a course-overview header that came one figure after the previous one:
 "we like structure, but it's possible to overdo it".
 Operationalized by:
 [`plain-prose`](../writing/plain-prose.md) (inline lists become bullet lists,
-per PSW's "Put lists in bullet points"),
+per PSW's "Put lists in bullet points", proposed in `Morrison-Lab/psw#60`),
 [`informal-definitions`](../writing/informal-definitions.md) (definitions become formal divs),
 and [Modularity](#modularity--small-single-purpose-composable-units) (the same preference applied to code).
 

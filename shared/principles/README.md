@@ -194,6 +194,36 @@ as a parameter, not buried as a literal), and the
 flag duplicated logic, functions that do too much, and steps that
 should be extracted and named).
 
+The principle reaches past code, into prose documents and their structure
+(Ezra Morrison, 2026-09-25: "this falls under the general principle of
+favoring modularity and decomposition").
+Three instances he named the same day:
+
+- **Documents decompose into subfiles.**
+  A Quarto chapter is a spine of `{{< include >}}` calls over one subfile
+  per unit of content, roughly one div per file, so a reorder moves an
+  include line instead of a block of prose.
+  `d-morrison/rme` stated it first: its `CLAUDE.md` caps a `.qmd` source
+  at about 100 lines, and its `.github/copilot-instructions.md`
+  ("Decomposing content into subfiles") asks for one subtopic per subfile.
+  `Morrison-Lab/mln`'s `AUTHORING.md` ("Subfiles") adapts it for the
+  course notes.
+  The [SERG lab manual](https://ucd-serg.github.io/lab-manual/)'s
+  "Using Includes for Modular Content" (`quarto/advanced-features.qmd`)
+  gives the same reasons: a reorder touches only the spine,
+  and review sees organization and content changes separately.
+- **Theorem-type divs do not nest.**
+  A definition, theorem, lemma, corollary, proposition, example or remark
+  never sits inside another; a special case gets its own div after the
+  general one, and links to it.
+  `mln`'s `AUTHORING.md` states it for the course notes.
+- **Functions do not nest** without a specific efficiency or simplicity
+  reason, stated beside the nested definition
+  ([`avoid-nesting`](../coding/avoid-nesting.md)).
+
+Whenever one unit sits inside another only because it was written there
+first, split it out.
+
 ## Least astonishment (POLA)
 
 Prefer the construction a knowledgeable reader expects: idiomatic R
@@ -372,6 +402,43 @@ Operationalized by:
 [`configurable-parameters`](../coding/configurable-parameters.md) (expose variations as parameters/toggles),
 [`specific-beats-general`](specific-beats-general.md),
 and the `clean` / `simplify` review passes.
+
+## Prefer more structure
+
+When content has a shape, show the shape in the markup
+rather than leaving the reader to recover it from a sentence:
+
+- items become a list;
+- steps become a numbered list;
+- a term's definition becomes its own definition div;
+- a worked or named example becomes its own example div (`#exm-` in Quarto);
+- a comparison becomes a table.
+
+Structure lets a reader scan, cite, and check each part, and lets a tool find it.
+Keep inline prose for a short series of single words,
+where a list would add scaffolding without clarity.
+
+Structure has to match a shape the content actually has, so it can be overdone.
+A header over a single figure or item,
+or one that repeats the topic of the header just before it,
+adds a level the content does not have.
+Before adding a header, check that it opens a part the reader would want to find on its own.
+
+- **Do:** put a list, a numbered list, a div or a table where the content has that shape.
+- **Do:** fold a header into its neighbour when it covers one item or names the same topic.
+- **Don't:** leave items, steps, definitions or examples buried in a sentence.
+- **Don't:** add a header, list or div to content that has no such shape just because structure is preferred.
+
+Stated by Ezra Morrison, 2026-09-25,
+with the bullet-list rule (below) as its first recorded instance.
+He added the limit the same day,
+about a course-overview header that came one figure after the previous one:
+"we like structure, but it's possible to overdo it".
+Operationalized by:
+[`plain-prose`](../writing/plain-prose.md) (inline lists become bullet lists,
+per PSW's "Put lists in bullet points", proposed in `Morrison-Lab/psw#60`),
+[`informal-definitions`](../writing/informal-definitions.md) (definitions become formal divs),
+and [Modularity](#modularity--small-single-purpose-composable-units) (the same preference applied to code).
 
 ## "Or" always means "and/or" (inclusive or)
 

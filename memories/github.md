@@ -315,11 +315,12 @@ interpolation), same as `--body-file` on the porcelain command.
   `projectCards`, rather than retrying or hand-editing on the web.
   For labels on a PR, use `gh api -X POST repos/{owner}/{repo}/issues/{number}/labels -f "labels[]=<label>"`,
   which bypasses the porcelain GraphQL `projectCards` query entirely.
+  Likewise, `gh pr edit --remove-reviewer <user>` fails on the same deprecated GraphQL `projectCards` query;
+  the reliable REST workaround is `gh api -X DELETE repos/<owner>/<repo>/pulls/<pr>/requested_reviewers -f "reviewers[]=<user>"`.
 - **Don't:** read the error as a permissions or repo problem --- the failing
   field is one the edit never needed.
 
-(Measured 2026-08-23 on Morrison-Lab/ai-config#1976 and 2026-09-23 on Morrison-Lab/gha#913,
-gh in local Windows sessions;
+(Measured 2026-08-23 on [ai-config#1976](https://github.com/Morrison-Lab/ai-config/issues/1976), 2026-09-23 on [gha#913](https://github.com/Morrison-Lab/gha/issues/913), and 2026-09-24 on [wai#245](https://github.com/Morrison-Lab/wai/pull/245), gh in local Windows sessions;
 the REST endpoints succeeded immediately.)
 
 ## `gh pr merge` "not up to date with the base branch" does not fire consistently on an equally-stale PR
@@ -352,3 +353,18 @@ Capture the SHA `update-branch` produces (or re-read `head.sha` / `headRefOid` i
 `gh api repos/Morrison-Lab/ai-config/branches/main/protection` reported `required_status_checks.strict: true` (read 2026-08-30, during the ai-config#2638 merge described in [`gh-cli.md`](gh-cli.md)'s update-branch section).
 That settles the setting's presence, not the #2470/#2480 asymmetry above --- the queue-ordering account of why one comparably-stale PR merged while the other was refused remains unverified.
 Enabling a GitHub merge queue ([`shared/workflow/merge-queue.md`](../shared/workflow/merge-queue.md)) eliminates the O(N^2) review rounds caused by this strict mode by building speculative merge trees on the forge side.
+
+## Line-anchoring HTML block tags in automated review classifiers
+
+Automated code review bodies often quote prior review findings or conversation history inside collapsible `<details>` blocks (e.g. "Resolved since last review").
+When scanning review bodies for verdict markers, headings, or section boundaries:
+
+- **Do:** line-anchor BOTH opening and closing HTML block tags (such as `<details>` and `</details>`) with `(?:^|\n)[ ]{0,3}` and compile with `re.IGNORECASE`.
+  CommonMark treats up to 3 spaces of indentation as an HTML block;
+  4 spaces is an indented code block, and `>` is a blockquote.
+- **Do:** reject affirmative verdict headings (such as `### Approval recommended`) that fall inside `<details>` regions, while allowing live count-in-details behavior for legacy Copilot bodies (`Comments generated:`) when the heading itself is top-level (v2 `**Findings:**` lines inside `<details>` are always treated as quoted history).
+- **Don't:** use unanchored substring searches (`str.find("</details>")`) for HTML block tags --- blockquoted occurrences (e.g. ` > </details>`) or mid-line text occurrences will prematurely close the region, leaking nested overview blocks or findings out as top-level clean verdicts.
+- **Don't:** cite issues or PRs in markdown comments or code as bare `#123` or `PR #123` --- always format them as clickable forge links per `AGENTS.md` (e.g. `[ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)`).
+
+(Measured 2026-09-24 on [Morrison-Lab/ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review round 12.)
+

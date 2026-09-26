@@ -6143,6 +6143,1845 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "copilot_verdict: quoted heading is not affirmative",
         checker.copilot_verdict("## \"Approval recommended\"? No.\n\n- **Comments generated:** 0") == "",
     )
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, fifteenth round: `COPILOT_AFFIRMATIVE_HEADER`
+    # was word-bounded, accepting suffixed text on the same heading line
+    # ("### Approval recommended was the previous verdict").
+    check(
+        "copilot_verdict: a suffixed affirmative heading ('### Approval recommended was the previous verdict') "
+        "is not an affirmative heading (states no verdict)",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended was the previous verdict\n\n- **Comments generated:** 0"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: a suffixed affirmative heading with v2 findings line states no verdict",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended was the previous verdict\n\n**Findings:** None\n"
+        ) == "",
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899): Copilot's `ccr-overview-v2` body format drops the
+    # `Comments generated:` field the checks above rely on in favor of a
+    # `**Findings:**` line -- `None`, or one or more `<n> <severity-badge>`
+    # pairs. Fixture provenance, per fixtures-are-not-evidence.md:
+    # `v2_approval_none_body` and `v2_approval_nonzero_body` below are
+    # transcribed, INCLUDING their trailing `<details>` blocks ("Resolved
+    # since last review" / "Open (1)"), from Copilot's real reviews on
+    # [Lacaedemon/sparta#1635](https://github.com/Lacaedemon/sparta/pull/1635), fetched 2026-09-23 -- reviews 5295055730 (the
+    # `None` approval) and 5294462601 (the single-finding approval). Only the
+    # repeated severity-badge markup inside each `<picture>` element is
+    # replaced with the `_v2_picture` placeholder, so the classifier is
+    # exercised against the real surrounding shape rather than a stripped-down
+    # approximation of it. No real review combining a negative v2 heading with
+    # `**Findings:** None` (or a mixed-severity `**Findings:**` line) was
+    # available at fetch time, so `v2_changes_none_body`,
+    # `v2_closer_look_none_body`, and `v2_approval_mixed_severity_body` are
+    # constructed from the same overview shape rather than transcribed.
+    _v2_picture = (
+        "<picture><source media=\"(prefers-color-scheme: dark)\" "
+        "srcset=\"low-v2-dark.svg\"><source media=\"(prefers-color-scheme: light)\" "
+        "srcset=\"low-v2-light.svg\"><img src=\"low-v2-light.png\" "
+        "alt=\"Low severity\" width=\"62\" height=\"18\" align=\"texttop\"></picture>"
+    )
+    v2_approval_none_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n"
+        "No unresolved review issues remain.\n\n"
+        "**Review effort:** Lite  \n**Findings:** None\n\n"
+        "<details>\n<summary><strong>Resolved since last review (1)</strong></summary>\n\n"
+        f"- {_v2_picture} [Break documentation line after mid-line colon]"
+        "(#discussion_r4085342719)\n</details>"
+    )
+    v2_approval_nonzero_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n"
+        "No blocking issues were identified; the remaining comment is a minor "
+        "documentation-style nit.\n\n"
+        f"**Review effort:** Lite  \n**Findings:** 1 {_v2_picture}\n\n"
+        "<details open>\n<summary><strong>Open (1)</strong></summary>\n\n"
+        f"- {_v2_picture} [Break documentation line after mid-line colon]"
+        "(#discussion_r4085342719) · New\n</details>\n\n"
+        "<details>\n<summary><strong>Resolved since last review (2)</strong></summary>\n\n"
+        f"- {_v2_picture} [Add new fog behavior to permanent demo catalog]"
+        "(#discussion_r4083921526)\n"
+        f"- {_v2_picture} [Update fog guidance to document the new visibility exception]"
+        "(#discussion_r4083921456)\n</details>"
+    )
+    v2_approval_mixed_severity_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n"
+        "Mixed-severity findings remain.\n\n"
+        f"**Review effort:** Lite  \n**Findings:** 2 {_v2_picture} · 1 {_v2_picture}"
+    )
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding: a bare `\d{1,4}` still matches inside a
+    # longer digit run by taking only its last 1-4 digits, so `10000` was
+    # misread as `0000` (sums to 0, the unsafe fail-open direction) and
+    # `12345` as `2345`. A five-digit finding count is not realistic Copilot
+    # output, but the parser must not silently misparse one into a wrong
+    # small number -- it has to fail closed instead. Constructed, since no
+    # real review reports five-digit findings.
+    v2_approval_five_digit_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n"
+        "A five-digit finding count is not realistic, but must not parse as 0.\n\n"
+        f"**Review effort:** Lite  \n**Findings:** 10000 {_v2_picture}"
+    )
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, second round: a digit-boundary lookaround
+    # alone still let a thousands or decimal separator reset the boundary --
+    # `1,000 <picture>` and `10,000 <picture>` both parsed as their trailing
+    # `000` (three digits, since `,`/`.` are not `\d`), summing to 0 exactly
+    # as the unbounded five-digit case did. Constructed, since no real review
+    # reports a comma- or decimal-separated finding count.
+    _v2_comma_thousand_rest = f"1,000 {_v2_picture}"
+    _v2_comma_ten_thousand_rest = f"10,000 {_v2_picture}"
+    _v2_decimal_rest = f"1.000 {_v2_picture}"
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, third round: `_copilot_v2_findings_count`
+    # committed to the FIRST uncited `**Findings:**` match, so a body quoting
+    # an earlier round's `**Findings:** None` ahead of its own current
+    # `**Findings:** 5 <picture...>` -- or the reverse order -- let the
+    # zero-reading line win regardless of position. Constructed (transcribed
+    # bodies never carry two uncited Findings lines), covering both orders
+    # since the fix must not merely favor whichever line comes first.
+    v2_none_then_five_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n"
+        "**Review effort:** Lite  \n**Findings:** None\n\n"
+        f"**Findings:** 5 {_v2_picture}"
+    )
+    v2_five_then_none_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n"
+        f"**Review effort:** Lite  \n**Findings:** 5 {_v2_picture}\n\n"
+        "**Findings:** None"
+    )
+    v2_changes_none_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e1 Changes recommended\n\n"
+        "The overview sentence carries the only complaint.\n\n"
+        "**Review effort:** Lite  \n**Findings:** None"
+    )
+    v2_closer_look_none_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f535 Needs a closer look\n\n"
+        "The overview sentence carries the only complaint.\n\n"
+        "**Review effort:** Lite  \n**Findings:** None"
+    )
+
+    check(
+        "copilot_verdict: v2 approval with 'Findings: None' is clean",
+        checker.copilot_verdict(v2_approval_none_body) == "clean",
+    )
+    check(
+        "copilot_verdict: v2 approval with a nonzero 'Findings:' count is not clean",
+        checker.copilot_verdict(v2_approval_nonzero_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: v2 'Findings:' line sums counts across several severity badges",
+        checker.copilot_verdict(v2_approval_mixed_severity_body) == "not-clean",
+    )
+    check(
+        "_copilot_v2_line_findings_count does not read the last 4 digits of a "
+        "5-digit run: '12345<picture' is not misread as 2345",
+        checker._copilot_v2_line_findings_count("12345<picture>") is None,
+    )
+    check(
+        "copilot_verdict: a 5-digit 'Findings:' count states no verdict rather "
+        "than misreading it as a wrong small number",
+        checker.copilot_verdict(v2_approval_five_digit_body) == "",
+    )
+    check(
+        "_copilot_v2_line_findings_count fails closed on a comma thousands "
+        "separator: '1,000 <picture' does not sum to 0",
+        checker._copilot_v2_line_findings_count(_v2_comma_thousand_rest) is None,
+    )
+    check(
+        "_copilot_v2_line_findings_count fails closed on '10,000 <picture'",
+        checker._copilot_v2_line_findings_count(_v2_comma_ten_thousand_rest) is None,
+    )
+    check(
+        "_copilot_v2_line_findings_count fails closed on a decimal separator: "
+        "'1.000 <picture'",
+        checker._copilot_v2_line_findings_count(_v2_decimal_rest) is None,
+    )
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, fifth round: `str.find(close_token, ...)`
+    # lands on whichever close marker comes FIRST, so nested/malformed
+    # `<picture>` markup lets it land on an INNER `</picture>` and silently
+    # swallow whatever count sits between the two openers, undercounting
+    # rather than failing closed -- the coordinator's own reprex.
+    check(
+        "_copilot_v2_line_findings_count fails closed on nested <picture> "
+        "markup rather than swallowing the inner count: "
+        "'1 <picture 2 <picture></picture></picture>'",
+        checker._copilot_v2_line_findings_count(
+            "1 <picture 2 <picture></picture></picture>"
+        ) is None,
+    )
+    check(
+        "copilot_verdict: nested <picture> markup in the 'Findings:' line "
+        "states no verdict rather than an undercounted clean/not-clean",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Review effort:** Lite  \n"
+            "**Findings:** 1 <picture 2 <picture></picture></picture>"
+        ) == "",
+    )
+    # A nested `<img>` is the opposite case and must NOT trip the same
+    # guard: real Copilot markup wraps a fallback `<img>` inside
+    # `<picture>...</picture>` (see `_v2_picture` above), so only a nested
+    # `<picture` -- never a nested `<img` -- disqualifies a badge.
+    check(
+        "_copilot_v2_line_findings_count still counts a badge whose "
+        "<picture> legitimately wraps an <img> fallback",
+        checker._copilot_v2_line_findings_count("2 <picture><img></picture>") == 2,
+    )
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, nineteenth round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
+    # Copilot review, fourth round): `_consume_copilot_badge` accepted a
+    # `<source>` tag unconditionally, regardless of whether an `<img>` had
+    # already been seen -- `0 <picture><img><source></picture>` parsed as
+    # a real zero-finding badge, even though the documented grammar says
+    # `<source>` elements come before the `<img>` fallback (matching real
+    # `<picture>` markup, where a `<source>` after the `<img>` is invalid
+    # too). `not saw_img` now gates the `<source>` branch the same way it
+    # already gated the `<img>` branch.
+    check(
+        "_copilot_v2_line_findings_count fails closed on a <source> "
+        "appearing AFTER the <img> fallback",
+        checker._copilot_v2_line_findings_count(
+            "0 <picture><img><source></picture>"
+        ) is None,
+    )
+    check(
+        "_copilot_v2_line_findings_count still counts a badge whose "
+        "<source> elements correctly precede the <img> fallback",
+        checker._copilot_v2_line_findings_count(
+            "2 <picture><source><source><img></picture>"
+        ) == 2,
+    )
+    # Three fail-closed paths with no prior direct coverage ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899)
+    # review finding): a badge with no leading count at all, stray text
+    # between two badges that is not itself a count, and a trailing count
+    # after the last badge with no badge following it.
+    check(
+        "_copilot_v2_line_findings_count fails closed on a badge with no "
+        "leading count: '<picture></picture>'",
+        checker._copilot_v2_line_findings_count("<picture></picture>") is None,
+    )
+    check(
+        "_copilot_v2_line_findings_count fails closed on stray text between "
+        "two badges: '1 <picture></picture> extra text 2 <picture></picture>'",
+        checker._copilot_v2_line_findings_count(
+            "1 <picture></picture> extra text 2 <picture></picture>"
+        ) is None,
+    )
+    check(
+        "_copilot_v2_line_findings_count fails closed on a trailing count "
+        "after the last badge: '1 <picture></picture> 2'",
+        checker._copilot_v2_line_findings_count("1 <picture></picture> 2") is None,
+    )
+    check(
+        "copilot_verdict: a 'None' Findings line followed by a later "
+        "nonzero one is not clean regardless of order",
+        checker.copilot_verdict(v2_none_then_five_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: a nonzero Findings line followed by a later "
+        "'None' one is not clean regardless of order",
+        checker.copilot_verdict(v2_five_then_none_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: v2 'Changes recommended' with 'Findings: None' is not clean",
+        checker.copilot_verdict(v2_changes_none_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: v2 'Needs a closer look' with 'Findings: None' is not clean",
+        checker.copilot_verdict(v2_closer_look_none_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: legacy 'Comments generated: 0' body is unchanged by the v2 path",
+        checker.copilot_verdict(copilot_clean_body) == "clean",
+    )
+    check(
+        "classify_verdict: v2 approval with 'Findings: None' classifies clean",
+        checker.classify_verdict(v2_approval_none_body, "COMMENTED", "copilot") == "clean",
+    )
+    check(
+        "classify_verdict: v2 approval with a nonzero 'Findings:' count classifies not-clean",
+        checker.classify_verdict(v2_approval_nonzero_body, "COMMENTED", "copilot") == "not-clean",
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, seventh round (FAIL-OPEN): the legacy
+    # `Comments generated: N` field and the v2 `**Findings:**` line are NOT
+    # mutually exclusive, and treating the legacy field as authoritative
+    # whenever present let an uncited `Comments generated: 0` phrase --
+    # even plain prose quoting an earlier round -- override a real nonzero
+    # v2 `**Findings:**` line and read as clean. Both present sources are
+    # now combined with the same fail-closed rule the multi-line v2 scan
+    # already uses: any nonzero wins, otherwise any unparseable yields no
+    # verdict, zero only when every present source reads zero.
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, sixteenth round: the v2 Findings-line
+    # search is now restricted to the actual overview block (the marker
+    # through the first `<details>`/next `##` heading -- see
+    # scripts/lib/copilot_overview.py), so these three bodies need the
+    # marker+heading and the Findings line ahead of the `<details>` block
+    # that carries the legacy field, matching where a real body would put
+    # each one, for the v2 side to still be found at all.
+    _legacy0_v2_3_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n"
+        f"**Review effort:** Lite  \n**Findings:** 3 {_v2_picture}\n\n"
+        "<details>\n<summary>Review details</summary>\n\n"
+        "- **Comments generated:** 0\n"
+        "</details>"
+    )
+    _legacy3_v2_none_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n"
+        "**Review effort:** Lite  \n**Findings:** None\n\n"
+        "<details>\n<summary>Review details</summary>\n\n"
+        "- **Comments generated:** 3\n"
+        "</details>"
+    )
+    _legacy0_v2_none_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n"
+        "**Review effort:** Lite  \n**Findings:** None\n\n"
+        "<details>\n<summary>Review details</summary>\n\n"
+        "- **Comments generated:** 0\n"
+        "</details>"
+    )
+    check(
+        "copilot_verdict: a legacy 'Comments generated: 0' no longer "
+        "overrides a real nonzero v2 'Findings:' line",
+        checker.copilot_verdict(_legacy0_v2_3_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: a nonzero legacy count combined with a v2 "
+        "'Findings: None' line is not clean",
+        checker.copilot_verdict(_legacy3_v2_none_body) == "not-clean",
+    )
+    check(
+        "copilot_verdict: legacy 0 combined with v2 'Findings: None' "
+        "(both present, both zero) is clean",
+        checker.copilot_verdict(_legacy0_v2_none_body) == "clean",
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, eighth round: Python's `\d` matches
+    # every Unicode `Nd`-category digit, not just ASCII, contradicting the
+    # grammar's own stated "1-4 ASCII digits" rule -- a full-width digit
+    # (U+FF15, "5") would otherwise parse as a real count.
+    check(
+        "_copilot_v2_line_findings_count fails closed on a full-width "
+        "Unicode digit rather than reading it as ASCII 5",
+        checker._copilot_v2_line_findings_count(
+            "５ " + _v2_picture
+        ) is None,
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, fifteenth round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
+    # Copilot review): the legacy COPILOT_COMMENT_COUNT regex's boundary
+    # lookarounds were `[0-9]`-only, not `\d`, so a non-ASCII digit sitting
+    # right after an ASCII digit never tripped the "not immediately
+    # followed by another digit" check -- `[0-9]` genuinely does not
+    # recognise it as a digit, even though it plainly is one, just not an
+    # ASCII one. "Comments generated: 0" + a full-width "5" (U+FF15)
+    # matched `0` as a complete legacy count and classified clean. Fixed
+    # by switching the boundary lookarounds to `\d` (Unicode-aware),
+    # keeping the capture group itself ASCII-only `[0-9]{1,6}`. The v2
+    # count regexes (`_COPILOT_FIRST_COUNT`/`_COPILOT_SEP_COUNT`) do NOT
+    # have the same shape and need no equivalent change: they are anchored
+    # with `^...$` against the whole token rather than floating boundary
+    # lookarounds at one position, so a trailing full-width digit already
+    # broke their `$` anchor and failed the match outright (see the
+    # "fails closed on a full-width Unicode digit" check just above,
+    # which already covered this and passed before this round's fix).
+    check(
+        "copilot_verdict: a legacy 'Comments generated: 0' immediately "
+        "followed by a full-width digit is not read as a complete zero "
+        "count",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "<details>\n- **Comments generated:** 0５\n</details>"
+        ) != "clean",
+    )
+    check(
+        "copilot_verdict: a v2 'Findings:' count immediately followed by "
+        "a full-width digit is not read as a complete zero count",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            f"**Review effort:** Lite  \n**Findings:** 0５ {_v2_picture}"
+        ) != "clean",
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, ninth round: the tokenizer ended a tag
+    # at the first '>' even inside a quoted attribute value, so
+    # `<img alt="a>5">` truncated mid-attribute and a `>` hidden inside a
+    # quoted value could evade the nested-tag/unterminated-tag checks
+    # entirely (`5 <img alt="z> · 3 <img>` summed to 8 instead of
+    # failing closed, since the quote-blind scan read the badge boundaries
+    # wrong).
+    check(
+        "_copilot_v2_line_findings_count parses a badge whose attribute "
+        "value contains a quoted '>' without truncating early",
+        checker._copilot_v2_line_findings_count(
+            '1 <img alt="a>5">'
+        ) == 1,
+    )
+    check(
+        "_copilot_v2_line_findings_count fails closed on an unterminated "
+        "quoted attribute value rather than misreading the tag boundary",
+        checker._copilot_v2_line_findings_count(
+            '5 <img alt="z> · 3 <img>'
+        ) is None,
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, tenth round (FAIL-OPEN, new in this
+    # PR): `_COPILOT_NONE_LINE`'s predecessor was `re.match(r"[ \t]*None\b",
+    # rest, ...)`, which only checked the START of the line -- the word
+    # boundary after "None" is satisfied by the following space regardless
+    # of what comes after it, so `**Findings:** None but actually 5
+    # <picture></picture>` read as zero and classified clean.
+    # `_COPILOT_NONE_LINE` now anchors both ends, so any trailing content
+    # falls through to the grammar parser, which fails the line closed.
+    check(
+        "copilot_verdict: a 'Findings:' line reading 'None but actually N "
+        "<badge>' states no verdict rather than reading as clean",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            f"**Findings:** None but actually 5 {_v2_picture}"
+        ) == "",
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, eleventh round: the legacy path used
+    # `_has_valid_match`, which returns only the FIRST uncited match --
+    # pre-existing on main, the same class of bug this PR already fixed
+    # for the v2 multi-line scan. "Comments generated: 0 ... Comments
+    # generated: 3" classified clean off the first match alone.
+    check(
+        "copilot_verdict: a second uncited legacy 'Comments generated:' "
+        "occurrence is not shadowed by the first",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "<details>\n- **Comments generated:** 0\n</details>\n\n"
+            "A later round:\n"
+            "<details>\n- **Comments generated:** 3\n</details>"
+        ) == "not-clean",
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twentieth round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
+    # Copilot review, fourth round): the legacy `Comments generated:` loop
+    # only checked the `cited` mask (fences/quotes/code-spans), not an
+    # HTML comment -- exactly the gap the v2 Findings-line path was fixed
+    # for two rounds ago. `<!--\n- **Comments generated:** 0\n-->` counted
+    # as a real zero. Now reuses `_find_html_comment_spans` /
+    # `_position_in_spans` from copilot_overview, the same helpers the v2
+    # path already uses, rather than a second detector.
+    check(
+        "copilot_verdict: a legacy 'Comments generated:' occurrence "
+        "hidden inside an HTML comment is not read as a real zero count",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "<!--\n- **Comments generated:** 0\n-->\n"
+        ) == "",
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twentieth round: `_copilot_overview_
+    # block_spans` trusted a marker+heading pair sitting inside an
+    # already-open `<details>...</details>` region -- exactly what a
+    # re-review's "Resolved since last review" listing quotes, since that
+    # listing can carry a PRIOR round's complete marker+heading+Findings
+    # sequence, genuine by every other check. Now excludes any pair whose
+    # own start falls inside a `<details>` region (`_find_details_regions`
+    # / `_position_in_spans`, reusing the same bisect-backed containment
+    # check), while a genuinely later TOP-LEVEL block -- one that starts
+    # AFTER a `<details>` region has already closed -- still counts.
+    check(
+        "copilot_verdict: a marker+heading pair nested inside an "
+        "already-open <details> region is not counted as a real block",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n\n"
+            "<details>\n<summary>Resolved since last review (1)</summary>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+            "</details>\n"
+        ) == "not-clean",
+    )
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twenty-first round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
+    # Copilot review, fifth round): `_find_details_regions` matched a
+    # `<details` opener wherever it appeared, including inside an HTML
+    # comment. A fake `<!--\n<details>\n-->` opener then paired with the
+    # NEXT real `</details>` -- however far away -- producing a region
+    # that engulfed everything in between, including a genuine
+    # marker+heading+Findings block. That read as no block found at all
+    # (fail-closed: no verdict rather than a wrong clean), but it
+    # silently dropped a real not-clean finding down to no-verdict, and
+    # was asymmetric with the containment check this same round already
+    # added for a marker+heading pair. Now skips any `<details` opener
+    # whose own start falls inside an HTML comment.
+    check(
+        "copilot_verdict: a fake <details> opener hidden inside an HTML "
+        "comment does not pair with a later real </details> and engulf "
+        "the real block between them",
+        checker.copilot_verdict(
+            "<!--\n<details>\n-->\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n\n"
+            "<details>\nx\n</details>"
+        ) == "not-clean",
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twenty-second round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
+    # Copilot review, sixth round): the CLOSER search in
+    # `_find_details_regions` was asymmetric with the opener guard just
+    # added -- `scan.find("</details>", ...)` accepted the FIRST literal
+    # `</details>` it found, even one hidden inside a comment. A real
+    # `<details>` containing a commented-out `<!-- </details> -->` before
+    # its own genuine closer then truncated the region early, so content
+    # still inside the real details section -- including a QUOTED
+    # marker+heading+Findings sequence, exactly what a re-review's
+    # "Resolved since last review" listing carries -- read as outside any
+    # region and was wrongly treated as a genuine top-level block. Fixed
+    # by looping the closer search past any candidate that itself falls
+    # inside a comment. This is the reviewer's own reprex.
+    check(
+        "copilot_verdict: a real <details> containing a commented-out "
+        "fake </details> before its true closer still correctly excludes "
+        "a quoted marker+heading inside it",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n\n"
+            "<details>\n<summary>Resolved since last review (1)</summary>\n\n"
+            "<!-- </details> -->\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n\n"
+            "</details>\n"
+        ) == "clean",
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twenty-second round: sweeping every
+    # OTHER boundary search in copilot_overview.py for the same
+    # comment-blindness (per the review's own instruction) found two more
+    # genuine gaps, neither previously covered by any test:
+    #
+    # (a) The marker+heading START search itself (`_COPILOT_OVERVIEW_START`
+    # in `_copilot_overview_block_spans`) never checked its own match
+    # against comment spans at all. A marker whose own `<!--` got consumed
+    # as the CLOSE of an EARLIER, unrelated, unclosed comment (which
+    # `_find_html_comment_spans` already treats as extending to the end of
+    # the string, matching every other unterminated-comment handling in
+    # this module) was still trusted as a real block start.
+    # The swallowed marker still opens no block. Since the orphan scan now
+    # runs when no block is found (sixteenth round, r4101514487), the live
+    # nonzero Findings line after the comment's close is read as an orphan,
+    # and a nonzero orphan is decisive: not-clean, the fail-closed direction.
+    check(
+        "copilot_verdict: a marker swallowed by an earlier unclosed HTML "
+        "comment is not trusted as a real block start, and its live nonzero "
+        "Findings line still reads as not-clean",
+        checker.copilot_verdict(
+            "<!-- unterminated comment with no close\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n"
+        ) == "not-clean",
+    )
+    # (b) The block-END search (`<details`/`##`, via `.search()`) also
+    # never checked its own candidate against comment spans. A fake,
+    # line-anchored `<details>` hidden inside a comment BETWEEN a genuine
+    # marker+heading and its own real `**Findings:**` line truncated the
+    # block before ever reaching that line, silently losing a real clean
+    # finding down to no verdict. Both are fixed with the new
+    # `_search_outside_comments` helper (the marker-start check needed a
+    # STRICT containment variant, since a marker's own text IS a complete
+    # HTML comment and a non-strict check would exclude every genuine
+    # marker as "inside its own comment" -- see `_position_in_spans`'s own
+    # docstring).
+    check(
+        "copilot_verdict: a fake <details> hidden inside a comment "
+        "between a real marker+heading and its own real Findings line "
+        "does not truncate the block before reaching that line",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "<!--\n<details>\n-->\n\n"
+            "**Findings:** None\n\n"
+            "<details>\nreal content\n</details>"
+        ) == "clean",
+    )
+
+    # The FIRST block reads zero here, deliberately (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
+    # Copilot review, fifth round on this same pair of tests): the
+    # previous version put the nonzero finding in the FIRST block, so the
+    # test passed regardless of whether the second block was read at all
+    # -- the first block's own nonzero already forces not-clean on its
+    # own. Only the SECOND, later, top-level block carries the nonzero
+    # finding here, so this test can only pass if that block is actually
+    # recognised. Confirmed this discriminates: monkey-patched
+    # `_copilot_overview_block_spans` in a scratch interpreter to return
+    # only `spans[:1]` (simulating a broken later-block recognition that
+    # silently discards every block after the first), re-ran this exact
+    # body through `copilot_verdict`, and got 'clean' -- the wrong
+    # answer, since only the first block's zero was then visible.
+    # Reverting the patch and re-running produced 'not-clean' again, so
+    # this check genuinely fails if the later-block path breaks.
+    check(
+        "copilot_verdict: a genuinely later top-level block AFTER a "
+        "CLOSED <details> region still counts",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n\n"
+            "<details>\n<summary>x</summary>\ny\n</details>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n"
+        ) == "not-clean",
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twenty-third round: three more fail-open
+    # gaps, each in a surface the twenty-second round's comment-blindness
+    # sweep did not reach.
+    #
+    # (a) `copilot_verdict`'s AFFIRMATIVE-heading scan (`_has_valid_match`
+    # over `COPILOT_AFFIRMATIVE_HEADER`) checked only the `cited`
+    # backtick/quote mask, never HTML comment spans -- unlike the legacy
+    # `Comments generated:` scan a few lines below it, already fixed for
+    # exactly this gap. A commented-out `### Approval recommended`
+    # followed by a live, uncited `Comments generated: 0` line was read
+    # as a genuine affirmative heading and classified clean, with no live
+    # heading anywhere in the body at all. Fixed with a new
+    # comment-aware `_has_live_match`, used ONLY for the affirmative
+    # heading -- see the fail-closed rationale in the comment above the
+    # (deliberately unchanged) negative-heading check in
+    # `copilot_verdict` for why the negative heading keeps the
+    # citation-only scan: making IT comment-aware too would let a
+    # commented-out `### Changes recommended` stop blocking, which is the
+    # unsafe direction.
+    check(
+        "copilot_verdict: a commented-out affirmative heading does not "
+        "pair with a live 'Comments generated: 0' to read as clean, with "
+        "no live heading anywhere in the body",
+        checker.copilot_verdict(
+            "<!--\n### \U0001f7e2 Approval recommended\n-->\n\n"
+            "Comments generated: 0\n"
+        ) == "",
+    )
+    # The fail-closed choice from (a) stated explicitly: a commented-out
+    # NEGATIVE heading must still count as blocking, alongside a live
+    # affirmative heading -- reversing this (making the negative heading
+    # comment-aware too) is the change this round deliberately did NOT
+    # make.
+    check(
+        "copilot_verdict: a commented-out negative heading still blocks "
+        "(fail-closed) even alongside a live affirmative heading and a "
+        "live zero count",
+        checker.copilot_verdict(
+            "<!--\n### \U0001f534 Changes recommended\n-->\n\n"
+            "### \U0001f7e2 Approval recommended\n\nComments generated: 0\n"
+        ) == "not-clean",
+    )
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, fifteenth round: `COPILOT_COMMENT_GENERATED`
+    # was unanchored, treating prose ending with the phrase as a real count field
+    # ("The documentation correctly describes Comments generated: 0").
+    check(
+        "copilot_verdict: unanchored prose ending with 'Comments generated: 0' "
+        "is not a count field (states no verdict)",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "The documentation correctly describes Comments generated: 0\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: real bare 'Comments generated: 0' line still classifies as clean",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "Comments generated: 0\n"
+        ) == "clean",
+    )
+    check(
+        "copilot_verdict: real bulleted '- **Comments generated:** 0' line still classifies as clean",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "- **Comments generated:** 0\n"
+        ) == "clean",
+    )
+    #
+    # (b) `_find_details_regions`'s CLOSER search (scripts/lib/
+    # copilot_overview.py) was `scan.find("</details>", ...)` -- plain,
+    # case-SENSITIVE -- while its own opener pattern
+    # (`_COPILOT_DETAILS_OPEN`) is `re.IGNORECASE`. A real `</DETAILS>`
+    # (uppercase) closer was never recognised, so that `<details>`
+    # region silently extended to the end of the string, swallowing
+    # every marker+heading pair AND every orphan `**Findings:**` line
+    # after it -- including a genuine, live, nonzero one, which is the
+    # unsafe direction (a real not-clean signal disappearing rather than
+    # a real clean one appearing). Fixed with a case-insensitive closer
+    # search over an ASCII-only lowercased copy (`str.translate`, always
+    # length-preserving), matching the opener; the U+0130 check below
+    # pins why `str.lower()` could not be used.
+    check(
+        "copilot_verdict: an uppercase </DETAILS> closer is still "
+        "recognised, so a real nonzero orphan Findings line after it is "
+        "not swallowed into 'clean'",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Review effort:** Lite  \n**Findings:** None\n\n"
+            "<details>\n<summary>Resolved since last review</summary>\n\n"
+            "- some quoted content\n</DETAILS>\n\n"
+            f"**Findings:** 5 {_v2_picture}\n"
+        ) == "not-clean",
+    )
+    # The adversarial review of the fix above found its `str.lower()`
+    # length guard reachable: one U+0130 anywhere in the body changed the
+    # lowered length, fell back to the case-sensitive search, and let the
+    # same uppercase closer swallow a real nonzero block again.
+    check(
+        "copilot_verdict: a U+0130 (dotted capital I) elsewhere in the body "
+        "does not disable the case-insensitive </DETAILS> closer match",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "No unresolved review issues remain (reviewer İlker).\n\n"
+            "**Findings:** None\n\n"
+            "<details>\n<summary>Resolved since last review (1)</summary>\n\n"
+            "- item\n</DETAILS>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Findings:** 5 <picture><img></picture>\n"
+        ) == "not-clean",
+    )
+    #
+    # (c) `COPILOT_FINDINGS_LINE`'s own leading `(?:^|\n)` consumes the
+    # PRECEDING newline when the match is not at the very start of the
+    # string, so `m.start()` then points at that newline rather than at
+    # the line's own first character. The citation mask never marks a
+    # newline offset as cited (by design -- see
+    # `_copilot_overview_block_spans`'s docstring), so
+    # `match_is_cited(cited, m.start(), m.end())` always found an uncited
+    # newline in range and reported the WHOLE line as uncited, even when
+    # every real character of the line sat inside a double-backtick code
+    # span: a whole `` **Findings:** None `` line, wrapped in double
+    # backticks, still read as a live, uncited zero. Fixed with
+    # `match_content_start` (originally `_findings_line_cite_start`,
+    # generalised twenty-fourth round below), which checks citedness from
+    # the line's own first CONTENT character (skipping the consumed
+    # leading newline), in BOTH the block scan and the orphan scan.
+    check(
+        "copilot_verdict: an affirmative heading plus a double-backtick-"
+        "wrapped '**Findings:** None' line (no other real field) states "
+        "no verdict rather than clean",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            + B + B + "**Findings:** None" + B + B + "\n"
+        ) == "",
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twenty-fourth round ("fix the class, not
+    # only the three instances" directive): item (c) above fixed ONE
+    # occurrence of a class that recurred through several more surfaces --
+    # a citedness check reading a span that starts on a character the
+    # `cited` mask never marks (a consumed newline or leading
+    # indentation), or a structural tag scan that ignores citedness
+    # entirely. `match_content_start` is now the ONE shared helper for
+    # the first half, applied at every citedness check in both this file
+    # and copilot_overview.py that touches a line-anchored pattern
+    # (`_has_valid_match`/`_has_live_match` here, the VERDICT_CLEAN_
+    # PATTERNS and FINDING_PATTERNS prose scans here, and
+    # `COPILOT_FINDINGS_LINE`'s own two call sites in copilot_overview.py
+    # -- see (c) above); `_find_details_regions`'s opener AND closer scans
+    # and `_search_outside_comments`'s block-end scan now also consult the
+    # `cited` mask at all, for the second half. Each check below reproduces
+    # a distinct site; every one classified WRONG on `origin/main`
+    # (verified against the pre-fix source directly, not inferred).
+
+    # Site 1a: COPILOT_AFFIRMATIVE_HEADER via `_has_live_match`, the exact
+    # heading-prefix counterpart to (c) above -- never fixed for the
+    # heading patterns even though `_findings_line_cite_start` fixed it
+    # for the Findings line two rounds ago. A double-backtick-cited
+    # `### Approval recommended` heading (no other verdict field in the
+    # body at all) used to read as a genuine, live affirmative heading,
+    # and combined with a real, live v2 `**Findings:** None` block
+    # elsewhere in the body -- with nothing that actually states approval
+    # -- misclassified the whole thing clean.
+    check(
+        "copilot_verdict: a double-backtick-cited affirmative heading on a "
+        "non-first line, with no other approval signal, states no verdict "
+        "rather than clean",
+        checker.copilot_verdict(
+            "Some preceding narration line.\n\n"
+            + B + B + "### \U0001f7e2 Approval recommended" + B + B + "\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "**Findings:** None\n"
+        ) == "",
+    )
+
+    # Site 1b: COPILOT_NEGATIVE_HEADER via `_has_valid_match`, the same
+    # gap on the sibling pattern `_has_valid_match` itself already covers.
+    # A double-backtick-cited `### Changes recommended` used to read as a
+    # genuine, live blocking heading and won over a real, live affirmative
+    # heading plus a real, live zero Findings block -- misclassifying a
+    # genuinely clean review as not-clean (the safe direction, but still
+    # the wrong answer for a review that never said "Changes recommended"
+    # at all).
+    check(
+        "copilot_verdict: a double-backtick-cited negative heading on a "
+        "non-first line does not block a genuinely clean review",
+        checker.copilot_verdict(
+            "Some preceding narration line.\n\n"
+            + B + B + "### \U0001f534 Changes recommended" + B + B + "\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Findings:** None\n"
+        ) == "clean",
+    )
+
+    # Site 2: `COPILOT_FINDINGS_LINE` itself still had a narrower gap even
+    # after (c)'s fix: `_findings_line_cite_start` only skipped the
+    # consumed newline, not the up-to-3 literal leading spaces the pattern
+    # also permits. Two literal indentation spaces (genuinely OUTSIDE the
+    # double-backtick citation) ahead of a wholly-cited
+    # `` **Findings:** None `` line made `match_is_cited` check from an
+    # uncited indentation offset and report the whole line uncited, live,
+    # zero -- misclassifying a body with no real overview field at all as
+    # clean.
+    check(
+        "copilot_verdict: two leading indentation spaces before a "
+        "double-backtick-wrapped '**Findings:** None' line still states "
+        "no verdict rather than clean",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "  " + B + B + "**Findings:** None" + B + B + "\n"
+        ) == "",
+    )
+
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, fourteenth round: `COPILOT_FINDINGS_LINE` consumed
+    # trailing whitespace at the end of the line inside `rest` and the match,
+    # so when `**Findings:** None` was cited inside double backticks with
+    # trailing spaces (` ``**Findings:** None``  \n`), `m.end()` included
+    # those uncited trailing spaces, causing `match_is_cited` to return False
+    # and treating the cited zero as live clean evidence.
+    check(
+        "copilot_verdict: trailing spaces on a line with a double-backtick-wrapped "
+        "'**Findings:** None' line do not cause the match to include uncited offsets",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "  " + B + B + "**Findings:** None" + B + B + "  \n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: uncited '**Findings:** None' with trailing spaces "
+        "still classifies as clean",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Findings:** None  \n"
+        ) == "clean",
+    )
+    check(
+        "copilot_verdict: a bare '**Findings:**  ' line with no count fails closed (states no verdict)",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Findings:**  \n"
+        ) == "",
+    )
+
+    # Site 3: `_find_details_regions`'s CLOSER scan checked comment spans
+    # but never the `cited` mask at all -- a double-backtick-quoted
+    # `` </details> `` sitting inside a genuinely open `<details>` region,
+    # ahead of that region's own real closer, was accepted as the real
+    # closer and truncated the region there. Content still nested inside
+    # the real `<details>` (a full marker+heading+Findings:None sequence,
+    # exactly what a re-review's "Resolved since last review" listing
+    # quotes) then read as OUTSIDE any details region and was trusted as a
+    # genuine, current, top-level block -- misclassifying purely
+    # historical/quoted content as a real clean verdict.
+    check(
+        "copilot_verdict: a double-backtick-cited fake </details> closer "
+        "inside a live <details> region does not expose the quoted "
+        "marker+heading+Findings sequence nested past it as a real block",
+        checker.copilot_verdict(
+            "<details>\n<summary>Resolved since last review (1)</summary>\n\n"
+            + B + B + "</details>" + B + B + "\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+            "</details>\n"
+        ) == "",
+    )
+
+    # Site 3, opener half: the OPENER scan had the identical gap,
+    # symmetrically. A double-backtick-cited `` <details> `` used to be
+    # accepted as a real opener and paired with the NEXT genuine
+    # `</details>` closer, however far away, engulfing a real, live,
+    # nonzero marker+heading+Findings block in between -- dropping a real
+    # not-clean finding down to no-verdict, the dangerous direction (the
+    # same shape PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)'s fifth round already fixed for an opener hidden
+    # inside an HTML comment).
+    check(
+        "copilot_verdict: a double-backtick-cited fake <details> opener "
+        "does not pair with a later real </details> and engulf a real "
+        "nonzero block between them",
+        checker.copilot_verdict(
+            B + B + "<details>" + B + B + "\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n\n"
+            "<details>\nx\n</details>"
+        ) == "not-clean",
+    )
+
+    # Site 4: `_search_outside_comments`, used for `_copilot_overview_
+    # block_spans`'s own block-END search over `_COPILOT_DETAILS_OPEN` /
+    # `_COPILOT_NEXT_HEADING`, had the same gap as the details-region scans
+    # above -- it checked comment spans but never the `cited` mask. A
+    # double-backtick-quoted `` <details> `` mid-body, describing the
+    # format in prose rather than opening a region, was still read as a
+    # live block-end marker and truncated the v2 block there, before it
+    # ever reached the real `**Findings:**` line -- reading a genuinely
+    # clean review as no verdict at all.
+    check(
+        "copilot_verdict: a double-backtick-cited <details> mention "
+        "between an overview heading and its real Findings line does not "
+        "truncate the block early",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            + B + B + "<details>" + B + B + "\n\n"
+            "**Findings:** None\n"
+        ) == "clean",
+    )
+
+    # Site 5: `VERDICT_CLEAN_PATTERNS`'s Anthropic-plugin clean template is
+    # `^[ \t]*(?:\*{1,3})?No\s+issues\s+found\...` under MULTILINE -- `^`
+    # is zero-width so it never consumes a newline, but the match still
+    # includes any literal leading `[ \t]*` indentation it permits. Two
+    # literal indentation spaces (genuinely outside a double-backtick
+    # citation) ahead of an otherwise wholly-cited
+    # `` No issues found. Checked for bugs and CLAUDE.md compliance. ``
+    # line made `match_is_cited` check from an uncited indentation offset
+    # and misclassify a mere citation of the template as a real clean
+    # verdict.
+    check(
+        "classify_verdict: two leading indentation spaces before a "
+        "double-backtick-wrapped clean-template citation do not classify "
+        "clean",
+        checker.classify_verdict(
+            "  " + B + B
+            + "No issues found. Checked for bugs and CLAUDE.md compliance."
+            + B + B + "\n"
+        ) == "",
+    )
+
+    # Site 6: `FINDING_PATTERNS` carries two more line-anchored entries --
+    # `(?:^|\n)[ \t]*\*\*Nits?\*\*` and `(?:^|\n)[ \t]*\*\*Non-blocking\*\*`
+    # -- with the identical newline-consumption gap as (c) and site 1
+    # above, reached through `_unresolved_finding_pattern` rather than
+    # `copilot_verdict`. A double-backtick-cited `**Nits**` heading on a
+    # non-first line, with nothing else in the body, used to read as a
+    # real unresolved finding.
+    check(
+        "_unresolved_finding_pattern: a double-backtick-cited '**Nits**' "
+        "heading on a non-first line is not an unresolved finding",
+        checker._unresolved_finding_pattern(
+            "Some preceding line of review prose.\n\n"
+            + B + B + "**Nits**" + B + B + "\n"
+        ) is None,
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twelfth round: COPILOT_COMMENT_COUNT's
+    # `(\d+)` was unbounded, and `int()` on a run past a few thousand
+    # digits raises ValueError uncaught -- pre-existing on main, crashing
+    # the merge-gate classifier instead of failing closed. Now bounded to
+    # 1-6 digits with a lookbehind/lookahead pair, so a longer run matches
+    # nothing at all (not a truncated head or tail of itself) and is
+    # treated as a present-but-unparseable source.
+    check(
+        "copilot_verdict: a 5000-digit legacy 'Comments generated:' count "
+        "does not crash and does not classify clean",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "<details>\n- **Comments generated:** " + ("9" * 5000) + "\n</details>"
+        ) != "clean",
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, sixteenth round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
+    # Copilot review, "fix the class" directive): two more fail-open
+    # shapes, one per item in the review.
+    #
+    # Item 1: `(?!\d)` on COPILOT_COMMENT_COUNT only guards against MORE
+    # DIGITS following the count, not against arbitrary trailing text of
+    # any other kind -- `Comments generated: 0oops` matched `0` as a
+    # complete count, since `o` is not a digit either. Checked every
+    # legacy fixture in this file for what actually follows a real count:
+    # only whitespace, end of line, end of body, or the literal word
+    # `new` ever appear (`0 new`, bare `2`, bare `0` at the end of the
+    # body) -- never anything else -- so the fix requires the token to
+    # actually END there rather than merely not be followed by one more
+    # digit.
+    check(
+        "copilot_verdict: a legacy 'Comments generated: 0oops' does not "
+        "read as a complete zero count",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "<details>\n- **Comments generated:** 0oops\n</details>"
+        ) != "clean",
+    )
+    #
+    # Item 2: even a correctly-anchored, correctly-unindented-per-the-old-
+    # rule `**Findings:**` line can still be non-rendered content: an
+    # indented CommonMark code block (4+ spaces), or hidden inside a
+    # multi-line HTML comment starting at column zero -- neither of which
+    # a citation mask (fences/quotes/code-spans only) or a bare line
+    # anchor excludes. The fix is structural: `COPILOT_FINDINGS_LINE` is
+    # now bounded to at most 3 leading spaces, and the search is further
+    # restricted to the actual overview block
+    # (`_copilot_overview_block_spans` in scripts/lib/copilot_overview.py)
+    # with any match landing inside an HTML comment rejected outright.
+    # These four constructed bodies all carry a REAL overview block (the
+    # marker and heading are present and correctly formed) with the fake
+    # `**Findings:** None` specifically placed to trip one of the four
+    # new rules: 4-space indentation, an HTML comment, after the block's
+    # own `<details>`, and in a later `##` section.
+    check(
+        "copilot_verdict: a 4-space-indented '**Findings:** None' (a "
+        "CommonMark code block) inside a real overview block is not read "
+        "as the real field",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "Real content, no genuine Findings field.\n\n"
+            "    **Findings:** None\n\n"
+            "<details>\n<summary>x</summary>\ny\n</details>"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: a '**Findings:** None' hidden inside a "
+        "multi-line HTML comment inside a real overview block is not "
+        "read as the real field",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "Real content, no genuine Findings field.\n\n"
+            "<!--\n**Findings:** None\n-->\n\n"
+            "<details>\n<summary>x</summary>\ny\n</details>"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: a '**Findings:** None' placed AFTER the block's "
+        "own <details> section is not read as the real field",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "Real content.\n\n"
+            "<details>\n<summary>x</summary>\ny\n</details>\n\n"
+            "**Findings:** None\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: a '**Findings:** None' in a LATER '##' section "
+        "is not read as the real field",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "Real content.\n\n"
+            "## Something else\n\n"
+            "**Findings:** None\n"
+        ) == "",
+    )
+    # Negative control, alongside the four rejections above: the real
+    # overview block itself must still classify clean, proving the region
+    # restriction excludes the fake ZERO lines without excluding the real
+    # one. (A fake NONZERO line outside every block is no longer excluded;
+    # see the note after this check.)
+    check(
+        "copilot_verdict: the real overview block's own 'Findings: None' "
+        "still classifies clean alongside a LATER, fake one in a "
+        "different section",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Findings:** None\n\n"
+            "<details>\n<summary>x</summary>\ny\n</details>\n\n"
+            "## Something else\n\n"
+            "**Findings:** None\n"
+        ) == "clean",
+    )
+    # The fake line above is a ZERO on purpose. An uncited top-level
+    # NONZERO Findings line outside every block is decisive (see
+    # _copilot_v2_findings_count's orphan scan), because it can be a real
+    # block's own content orphaned by a cited marker -- the PR
+    # [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
+    # adversarial review's regression, pinned below.
+    check(
+        "copilot_verdict: a real block orphaned by a code-span-cited marker "
+        "still counts its nonzero Findings line, even when a later clean "
+        "block follows",
+        checker.copilot_verdict(
+            "``<!-- ccr-overview-v2 -->``\n\n## Copilot review overview\n\n"
+            "### Approval recommended\n\n**Findings:** 5 <picture><img></picture>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "not-clean",
+    )
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, sixteenth round:
+    # `_copilot_v2_findings_count` previously returned `None` early when `blocks` was empty,
+    # skipping the orphan scan entirely. A cited marker followed by a live nonzero Findings line
+    # with NO later block returned no verdict ("") instead of "not-clean".
+    check(
+        "copilot_verdict: a real block orphaned by a code-span-cited marker "
+        "with no subsequent blocks still counts its nonzero Findings line as not-clean",
+        checker.copilot_verdict(
+            "``<!-- ccr-overview-v2 -->``\n\n## Copilot review overview\n\n"
+            "### Approval recommended\n\n**Findings:** 5 <picture><img></picture>\n"
+        ) == "not-clean",
+    )
+    check(
+        "copilot_verdict: a cited marker with an uncited Findings: None line "
+        "and no subsequent block yields no verdict (absent overview, cannot manufacture clean)",
+        checker.copilot_verdict(
+            "``<!-- ccr-overview-v2 -->``\n\n## Copilot review overview\n\n"
+            "### Approval recommended\n\n**Findings:** None\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: an uncited top-level nonzero Findings line in a "
+        "LATER section is decisive, not ignored",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Findings:** None\n\n"
+            "## Something else\n\n"
+            "**Findings:** 5 <picture><img></picture>\n"
+        ) != "clean",
+    )
+    check(
+        "copilot_verdict: an uncited top-level UNPARSEABLE Findings line "
+        "outside every block gives no verdict",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Findings:** None\n\n"
+            "## Something else\n\n"
+            "**Findings:** several\n"
+        ) == "",
+    )
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
+    # Copilot review, eleventh round: both fields are one-line constructs in
+    # every real body, so a line break inside either is malformed prose and
+    # must not be trusted as the real field.
+    check(
+        "copilot_verdict: a legacy 'Comments generated' phrase split across "
+        "a line break is not a zero-count source",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\nComments\ngenerated: 0\n"
+        ) != "clean",
+    )
+    check(
+        "copilot_verdict: a line-broken '<!--\\nccr-overview-v2\\n-->' "
+        "comment does not open a v2 block",
+        checker.copilot_verdict(
+            "<!--\nccr-overview-v2\n-->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) != "clean",
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, seventeenth round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
+    # Copilot review, second round on `_copilot_overview_block_spans`):
+    # the marker and heading were two INDEPENDENTLY optional block-start
+    # signals rather than one combined requirement, and the marker had no
+    # line anchor.
+    check(
+        "copilot_verdict: a bare marker with no heading following it "
+        "opens no block",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n### \U0001f7e2 Approval recommended\n\n"
+            "prose\n\n**Findings:** None\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: a marker followed (much later, past an "
+        "unrelated section) by the heading opens no block",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n### \U0001f7e2 Approval recommended\n\n"
+            "prose\n\n## Some unrelated section\n\nmore prose\n\n"
+            "## Copilot review overview\n\n**Findings:** None\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: a blockquoted marker does not open a block",
+        checker.copilot_verdict(
+            "> <!-- ccr-overview-v2 -->\n> \n> ## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: a mid-line marker (quoted in prose) does not "
+        "open a block",
+        checker.copilot_verdict(
+            "Quoting: <!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: a marker whose heading is separated from it by "
+        "a line of prose does not open a block",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\nSome prose in between.\n"
+            "## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: the real fixture shape (marker immediately "
+        "followed by its heading, blank line between) still classifies "
+        "clean",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Review effort:** Lite  \n**Findings:** None\n\n"
+            "<details>\n<summary>x</summary>\ny\n</details>"
+        ) == "clean",
+    )
+    check(
+        "copilot_verdict: a marker directly adjacent to its heading (no "
+        "blank line at all) still opens a block",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None"
+        ) == "clean",
+    )
+    # Several marker+heading pairs: the any-nonzero-wins rule already
+    # combining several Findings lines WITHIN one block extends across
+    # separate blocks with no additional logic, since every block's
+    # candidate lines feed the same combine loop.
+    check(
+        "copilot_verdict: two blocks, first 'None' then second nonzero, "
+        "is not clean (order does not matter)",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n\n"
+            "<details>\nx\n</details>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n"
+        ) == "not-clean",
+    )
+    check(
+        "copilot_verdict: two blocks, first nonzero then second 'None', "
+        "is not clean (order does not matter)",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n\n"
+            "<details>\nx\n</details>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "not-clean",
+    )
+    check(
+        "copilot_verdict: two blocks, both 'None', is clean",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n\n"
+            "<details>\nx\n</details>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "clean",
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, eighteenth round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
+    # Copilot review, third round): the heading in `_COPILOT_OVERVIEW_START`
+    # was only `\b`-bounded, so `## Copilot review overview quoted` --
+    # extra text after the real heading words -- still satisfied the word
+    # boundary (the space before "quoted" already is one) and opened a
+    # trusted block. Anchored the heading to the end of its own line
+    # instead (`[ \t]*(?=\r?\n|$)`), so any real trailing content fails
+    # the match. Also fixed [ai-config#3917](https://github.com/Morrison-Lab/ai-config/issues/3917) item 2 while touching this same
+    # pattern: the marker-to-heading bridge required a bare `\n`, so a
+    # CRLF body's marker line (ending `\r\n`) could never satisfy it --
+    # the `\r` is neither `[ \t]` nor `\n` -- and the whole body read as
+    # carrying no v2 overview. Fixed to `\r?\n`, matching every other
+    # line-anchor in this module, which already tolerate a `\r` for free.
+    check(
+        "copilot_verdict: a heading with trailing text after it "
+        "('## Copilot review overview quoted') opens no block",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview quoted\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: a CRLF marker-to-heading bridge still finds "
+        "the block",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\r\n\r\n## Copilot review overview\r\n\r\n"
+            "### \U0001f7e2 Approval recommended\r\n\r\n**Findings:** None"
+        ) == "clean",
+    )
+
+    # This PR's own review, finding 1: `_COPILOT_DETAILS_OPEN` used a
+    # trailing `\b`, which only asserts a transition between a word and
+    # non-word character -- `<details:evil>` and `<details-evil>` both
+    # satisfy that at the character right after "details" (":" and "-"
+    # are equally non-word), so either malformed shape was accepted as a
+    # real `<details>` opener. Since it has no matching `</details>`
+    # anywhere, the (fail-closed) unterminated-opener handling then
+    # extends a bogus details region all the way to the end of the
+    # string, and a genuine marker+heading pair following it gets
+    # wrongly excluded as "inside an already-open details region" --
+    # hiding a real, uncited, would-be-clean v2 block down to no verdict.
+    # Fixed with a lookahead requiring a real tag-name delimiter
+    # (whitespace, `/`, or `>`), the same set `_copilot_tag_name` already
+    # uses for a badge's own tag name.
+    check(
+        "copilot_verdict: a malformed '<details:evil>' opener does not "
+        "exclude a genuine block that follows it",
+        checker.copilot_verdict(
+            "<details:evil>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "clean",
+    )
+    check(
+        "copilot_verdict: a malformed '<details-evil>' opener does not "
+        "exclude a genuine block that follows it",
+        checker.copilot_verdict(
+            "<details-evil>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "clean",
+    )
+    # A malformed `<details/evil>` opener must NOT open a details region
+    # (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, eleventh round): accepting any trailing slash
+    # in `_COPILOT_DETAILS_OPEN` let `<details/evil>` hide later nonzero
+    # findings down to a false clean.
+    check(
+        "copilot_verdict: a malformed '<details/evil>' opener does not "
+        "hide a later live nonzero finding inside a fake details region",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n\n"
+            f"<details/evil>\n\n**Findings:** 5 {_v2_picture}\n\n"
+            "</details>\n"
+        ) == "not-clean",
+    )
+    # A genuine `<details open>`/`<details/>` opener must still match
+    # (the delimiter set admits whitespace and `/`, not just `>`).
+    check(
+        "copilot_verdict: a marker+heading pair still nested inside a "
+        "genuine '<details open>' region is still excluded",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n\n"
+            "<details open>\n<summary>Resolved since last review (1)</summary>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+            "</details>\n"
+        ) == "not-clean",
+    )
+
+    # This PR's own review, finding 2: the marker+heading block-start
+    # scan (`_COPILOT_OVERVIEW_START.finditer` inside
+    # `_copilot_overview_block_spans`) never checked its own match
+    # against the caller's `cited` mask (fences/quotes/code-spans) at
+    # all -- only the details-region and HTML-comment exclusions were
+    # applied there. A single-line two-backtick code span wrapping just
+    # the marker (` ``<!-- ccr-overview-v2 --> `` `) or just the heading
+    # (` ``## Copilot review overview`` `) on its own line is a genuine
+    # citation: `strip_cited_finding_vocab_with_mask`'s inline-code pass
+    # only strips the SINGLE backtick pairs (consuming each doubled
+    # backtick as an empty span), leaving the quoted text itself intact
+    # in `scan` with the mask correctly marking it cited -- exactly the
+    # shape a body describing the ccr-overview-v2 format in prose would
+    # produce. Checking the mask against the WHOLE combined multi-line
+    # match would never fire (a mask's newline positions are always 0,
+    # and the marker-to-heading bridge always crosses one), so the fix
+    # checks the marker's own span and the heading's own span
+    # separately, rejecting the block start if EITHER is wholly cited.
+    check(
+        "copilot_verdict: a marker cited as a single-line code span "
+        "does not open a real block, even with a genuine affirmative "
+        "heading and an uncited 'Findings: None' line following it",
+        checker.copilot_verdict(
+            "``<!-- ccr-overview-v2 -->``\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) != "clean",
+    )
+    check(
+        "copilot_verdict: a heading cited as a single-line code span "
+        "does not open a real block, even with a genuine affirmative "
+        "heading and an uncited 'Findings: None' line following it",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n``## Copilot review overview``\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) != "clean",
+    )
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, fourteenth round: `_COPILOT_OVERVIEW_START`
+    # capture group 2 included trailing spaces `[ \t]*`, so when the heading
+    # was cited in double backticks with trailing spaces on the line
+    # (` ``## Copilot review overview``  \n`), group 2's span included those
+    # uncited trailing spaces, causing `match_is_cited` to return False and
+    # opening a trusted block.
+    check(
+        "copilot_verdict: a heading cited as a single-line code span with trailing spaces "
+        "does not open a real block",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n``## Copilot review overview``  \n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) != "clean",
+    )
+    check(
+        "copilot_verdict: a marker/heading pair BOTH cited as separate "
+        "single-line code spans does not open a real block",
+        checker.copilot_verdict(
+            "``<!-- ccr-overview-v2 -->``\n\n``## Copilot review overview``\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) != "clean",
+    )
+    # A genuine, uncited marker+heading must still open a real block --
+    # the fix must not exclude every block outright.
+    check(
+        "copilot_verdict: an uncited marker+heading pair still opens a "
+        "real block after the citation-mask fix",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "clean",
+    )
+
+    # This PR's own review, finding 3: `_find_details_regions` closed an
+    # OUTER `<details>` at the FIRST `</details>` found after it, which
+    # for a NESTED body is the INNER details' own closer, not the
+    # outer's true one. Content between that inner closer and the
+    # outer's real closer then read as OUTSIDE any details region at
+    # all, so a marker+heading pair placed there -- still genuinely
+    # nested inside the outer `<details>`, exactly what a re-review's
+    # own "Resolved since last review" listing can quote -- was wrongly
+    # treated as a real top-level block. Fixed by tracking depth across
+    # a merged, position-ordered walk of every opening and closing tag,
+    # so a region only closes when depth returns to 0 and a nested
+    # opening never starts a region of its own. The nonzero finding
+    # sits ONLY in the wrongly-included block, discriminating exactly
+    # like the "twentieth round" single-level-nesting test above: if the
+    # depth tracking regresses to closing on the first inner
+    # `</details>` again, this reads not-clean instead of clean.
+    check(
+        "copilot_verdict: a marker+heading pair placed after an INNER "
+        "</details> but before its OUTER </details> is still excluded "
+        "as a real top-level block",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n\n"
+            "<details>\n<summary>Outer</summary>\n\n"
+            "<details>\n<summary>Inner (nested)</summary>\n\ninner content\n"
+            "</details>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n"
+            "</details>\n"
+        ) == "clean",
+    )
+
+    # Timing regression test for the depth-tracking merge above: a
+    # single `<details>` nested ~12,000 levels deep, at a fixed 262,144
+    # characters, so a future reimplementation that sorts the combined
+    # open/close event list (O(m log m)) or re-scans per level (O(n^2))
+    # regresses this rather than silently shipping.
+    _deep_nest_header = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n\n"
+    )
+    _deep_nest_open = "<details>\n"
+    _deep_nest_close = "</details>\n"
+    _deep_nest_depth = (
+        262144 - len(_deep_nest_header) - len("x\n")
+    ) // (len(_deep_nest_open) + len(_deep_nest_close))
+    _deep_nest_body = (
+        _deep_nest_header
+        + _deep_nest_open * _deep_nest_depth
+        + "x\n"
+        + _deep_nest_close * _deep_nest_depth
+    )
+    _dn_secs, _dn_verdict = best_of_three(checker.copilot_verdict, _deep_nest_body)
+    check(
+        "copilot_verdict on a single <details> nested ~12,000 levels "
+        "deep at 262,144 characters scales linearly (< 1s)",
+        _dn_verdict == "clean" and _dn_secs < 1.0,
+    )
+
+    # Timing regression tests ([ai-config#3917](https://github.com/Morrison-Lab/ai-config/issues/3917), PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot
+    # review, third round): `_position_in_spans` scanned every HTML-comment
+    # span linearly for every Findings-line match, making the OVERALL cost
+    # O(comments x findings) -- and since each block's own marker is
+    # itself a complete HTML comment, the comment-span list grows with the
+    # block count too. Measured before the fix (`bisect` over the
+    # start-sorted spans instead of a linear scan) at a fixed 262,144
+    # characters: 1000 blocks 0.053s, 2000 blocks 0.188s -- clearly
+    # super-linear. Two adversarial shapes, both at 262,144 characters:
+    # many small HTML comments interleaved with many Findings lines
+    # within ONE block (stresses a large comment-span list against many
+    # lookups), and many separate marker+heading blocks (the exact [#3917](https://github.com/Morrison-Lab/ai-config/issues/3917)
+    # reprex shape).
+    _many_comments_unit = "<!-- c -->\n**Findings:** None\n"
+    _many_comments_header = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n"
+    )
+    _many_comments_reps = (262144 - len(_many_comments_header)) // len(_many_comments_unit)
+    _many_comments_body = (
+        _many_comments_header + _many_comments_unit * _many_comments_reps
+    )
+    _mc_secs, _mc_verdict = best_of_three(
+        checker.copilot_verdict, _many_comments_body
+    )
+    check(
+        "copilot_verdict on 262,144 characters of many HTML comments "
+        "interleaved with many Findings lines in one block scales "
+        "linearly (< 1s)",
+        _mc_verdict == "clean" and _mc_secs < 1.0,
+    )
+    _many_blocks_unit = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n\n"
+        "<details>\nx\n</details>\n\n"
+    )
+    _many_blocks_reps = 262144 // len(_many_blocks_unit)
+    _many_blocks_body = _many_blocks_unit * _many_blocks_reps
+    _mb_secs, _mb_verdict = best_of_three(
+        checker.copilot_verdict, _many_blocks_body
+    )
+    check(
+        "copilot_verdict on 262,144 characters of many separate "
+        "marker+heading blocks (the [#3917](https://github.com/Morrison-Lab/ai-config/issues/3917) reprex shape) scales linearly "
+        "(< 1s)",
+        _mb_verdict == "clean" and _mb_secs < 1.0,
+    )
+
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, eighth round: the shape above still
+    # includes a `<details>...</details>` after every block, so each
+    # block's own END search finds `<details` almost immediately and
+    # never exercises the actual regression. A body with many
+    # marker+heading blocks and NO `<details` anywhere ran that END
+    # search all the way to end-of-string for EVERY block instead --
+    # `_COPILOT_DETAILS_OPEN.search()` never matches, and a regex search
+    # that fails to match still costs O(remaining length) to conclude
+    # that, making the total cost O(blocks x body-length). Measured
+    # before the fix (bounding each block's END search at the next
+    # block's own start, since blocks come from one ordered `finditer`),
+    # at a fixed 262,144 characters: 10 blocks 0.0002s, 100 blocks
+    # 0.0076s, 500 blocks 0.1874s, ~2,570 blocks (the full 262,144-char
+    # fill) 4.68s -- clearly super-linear, and this test fails at
+    # ec596d5f. After the fix, the same ~2,570-block body runs in
+    # ~0.01-0.1s depending on entry point.
+    _many_blocks_no_details_unit = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n\n"
+    )
+    _many_blocks_no_details_reps = (
+        262144 // len(_many_blocks_no_details_unit)
+    )
+    _many_blocks_no_details_body = (
+        _many_blocks_no_details_unit * _many_blocks_no_details_reps
+    )
+    _mbnd_secs, _mbnd_verdict = best_of_three(
+        checker.copilot_verdict, _many_blocks_no_details_body
+    )
+    check(
+        "copilot_verdict on 262,144 characters of 500+ separate "
+        "marker+heading blocks with NO <details anywhere scales "
+        "linearly (well under 1s), not O(blocks x body-length)",
+        _mbnd_verdict == "clean" and _mbnd_secs < 1.0,
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, thirteenth round (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)
+    # Copilot review): COPILOT_FINDINGS_LINE was unanchored, matching
+    # `**Findings:**` anywhere in the body -- mid-sentence prose quoting an
+    # earlier round's overview, or a blockquoted copy -- and reading it as
+    # the real v2 zero-count source for an affirmative review that carries
+    # no genuine overview field. Anchored to the start of a Markdown line
+    # (optional leading whitespace only, matching the real [#1635](https://github.com/Lacaedemon/sparta/pull/1635) fixture
+    # shape), so neither case matches any more and the affirmative heading
+    # states no verdict instead of clean.
+    check(
+        "copilot_verdict: an affirmative heading plus a mid-line prose "
+        "'**Findings:** None' phrase (no real overview field) states no "
+        "verdict rather than clean",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "Earlier output said **Findings:** None\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: an affirmative heading plus a blockquoted copy "
+        "of '**Findings:** None' (no real overview field) states no "
+        "verdict rather than clean",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "> **Findings:** None\n"
+        ) == "",
+    )
+    check(
+        "copilot_verdict: the real overview shape ('**Findings:**' as its "
+        "own line, inside the real block) still classifies clean after "
+        "the anchoring fix",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Review effort:** Lite  \n**Findings:** None"
+        ) == "clean",
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, fourteenth round: `_copilot_tag_name`
+    # stopped its alnum scan at the first non-alnum character without
+    # checking that character was a valid tag-name delimiter, so
+    # `<img:evil>` and `<picture:evil>` -- neither a real tag -- scanned as
+    # plain "img"/"picture" names and counted as real badges.
+    # `0 <img:evil>` used to parse as a real zero-finding badge.
+    check(
+        "_copilot_v2_line_findings_count fails closed on '<img:evil>' "
+        "rather than reading it as a real <img> badge",
+        checker._copilot_v2_line_findings_count("0 <img:evil>") is None,
+    )
+    check(
+        "_copilot_v2_line_findings_count fails closed on "
+        "'<picture:evil>' rather than reading it as a real <picture> badge",
+        checker._copilot_v2_line_findings_count(
+            "0 <picture:evil></picture>"
+        ) is None,
+    )
+
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, twelfth round: an affirmative
+    # heading nested inside `<details>` must NOT satisfy the affirmative heading
+    # check -- a quoted prior-round approval inside `<details>` does not classify
+    # clean when no live current-round approval exists.
+    check(
+        "copilot_verdict: a prior-round affirmative heading nested inside "
+        "<details> with a zero legacy count is not classified as clean",
+        checker.copilot_verdict(
+            "<details>\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "- **Comments generated:** 0\n"
+            "</details>\n"
+        ) == "",
+    )
+    # A live legacy review with an affirmative heading outside <details> and
+    # a zero legacy count inside <details> remains classified as clean.
+    check(
+        "copilot_verdict: a live affirmative heading outside <details> with "
+        "legacy count inside <details> is classified clean",
+        checker.copilot_verdict(
+            "### \U0001f7e2 Approval recommended\n\n"
+            "<details>\n"
+            "- **Comments generated:** 0\n"
+            "</details>\n"
+        ) == "clean",
+    )
+
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, twelfth round: the closer sweep
+    # must reject blockquoted ` > </details>` so nested content inside `<details>`
+    # does not prematurely close the region and leak out as a top-level clean overview.
+    check(
+        "copilot_verdict: a blockquoted ' > </details>' does not prematurely "
+        "close a details region and leak a nested overview block",
+        checker.copilot_verdict(
+            "<details>\n"
+            " > </details>\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+            "</details>\n"
+        ) == "",
+    )
+    # Case-insensitive line-anchored closer still closes the details region.
+    check(
+        "copilot_verdict: case-insensitive '</DETAILS>' closes details region",
+        checker.copilot_verdict(
+            "<details>\n"
+            "some details content\n"
+            "</DETAILS>\n\n"
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
+        ) == "clean",
+    )
+
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, thirteenth round: in `copilot_verdict()`,
+    # double-backtick code spans remain in `scan` while only the citation mask
+    # marks them. `_find_html_comment_spans` without citation awareness treated
+    # a cited literal `<!--` (e.g. inside ``<!--``) as a real comment opener,
+    # swallowing a later live `**Findings:** 5 <img>` line up to a plain `-->`
+    # as being inside an HTML comment. With an earlier live `**Findings:** None`,
+    # the body was incorrectly classified clean (FAIL-OPEN). Delimiters wholly
+    # inside cited text are now ignored for both openers and closers.
+    check(
+        "copilot_verdict: a cited literal '<!--' inside double backticks does "
+        "not open an HTML comment and hide later live nonzero findings",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Findings:** None\n\n"
+            "Here is an example: ``<!--``\n\n"
+            f"**Findings:** 5 {_v2_picture}\n\n"
+            "-->\n"
+        ) == "not-clean",
+    )
+    check(
+        "copilot_verdict: a cited literal '-->' inside double backticks does "
+        "not close an HTML comment prematurely",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Findings:** None\n\n"
+            "<!--\n"
+            "A commented block with ``-->`` inside\n"
+            f"**Findings:** 5 {_v2_picture}\n"
+            "-->\n"
+        ) == "clean",
+    )
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, eleventh round: `_copilot_tag_name` accepted
+    # any slash after the tag name, so `<img/evil>` and `<picture/evil>`
+    # scanned as valid tags. Requiring `/` to be followed by `>` fails them closed.
+    check(
+        "_copilot_v2_line_findings_count fails closed on '<img/evil>' "
+        "rather than reading it as a real <img> badge",
+        checker._copilot_v2_line_findings_count("0 <img/evil>") is None,
+    )
+    check(
+        "_copilot_v2_line_findings_count fails closed on "
+        "'<picture/evil>' rather than reading it as a real <picture> badge",
+        checker._copilot_v2_line_findings_count(
+            "0 <picture/evil></picture>"
+        ) is None,
+    )
+
+    # Timing regression test ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding): the original
+    # unbounded `\d+` counting regex backtracked quadratically on a long
+    # digit run with no trailing `<picture`/`<img` -- 25s for the isolated
+    # regex and 19.6s end to end through copilot_verdict() at 65,536 digits.
+    # `_copilot_v2_line_findings_count`'s tokenizer-plus-grammar parser (see
+    # its module comment above `_COPILOT_FIRST_COUNT`) replaced that regex
+    # entirely, so this now also guards the replacement: one linear
+    # tokenisation pass plus one linear grammar walk, not a scan whose cost
+    # depends on the run's length or position.
+    # Carries the marker+heading ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, sixteenth
+    # round) so the v2 Findings-line search actually reaches this line's
+    # scan rather than short-circuiting at "no overview block found" --
+    # the timing guard needs to exercise the same linear scan a real body
+    # would, not a faster-but-different code path.
+    _adversarial_findings_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n" "**Findings:** " + "1" * 65536
+    )
+    _av_secs, _av_verdict = best_of_three(
+        checker.copilot_verdict, _adversarial_findings_body
+    )
+    check(
+        "copilot_verdict on a 65,536-digit adversarial 'Findings:' line scales linearly (< 1s)",
+        _av_verdict == "" and _av_secs < 1.0,
+    )
+
+    # Timing regression test ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, fourth round): a
+    # lazy-dot `<picture\b.*?</picture>` alternative re-scanned to the end of
+    # the line at EVERY unclosed `<picture ` opener, since DOTALL's `.`
+    # crosses further openers looking for a `</picture>` that never comes.
+    # Measured before the str.find-based closing-marker lookup: 1.34s at
+    # 64KB, 5.5s at 128KB (~4x per doubling), 1.37s end to end through
+    # copilot_verdict() at 7,280 repeats of "<picture ". The fix -- fail the
+    # whole line closed the moment ANY opener's close marker is missing,
+    # instead of resuming past it to rescan for the next one -- means this
+    # now costs one `str.find` call, not one per opener.
+    _unclosed_picture_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n**Findings:** " + "<picture " * 7280
+    )
+    _up_secs, _up_verdict = best_of_three(
+        checker.copilot_verdict, _unclosed_picture_body
+    )
+    check(
+        "copilot_verdict on 65,520 characters of unclosed '<picture ' openers "
+        "scales linearly (< 0.1s)",
+        _up_verdict == "" and _up_secs < 0.1,
+    )
+
+    # Companion negative control: many CLOSED badges must stay linear too --
+    # a fix that merely stops on the first unterminated opener could still
+    # be quadratic on well-formed input if `pos` did not monotonically
+    # advance past each completed badge.
+    _closed_badges_line = " · ".join(["1 <picture></picture>"] * 8000)
+    _closed_badges_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n**Findings:** " + _closed_badges_line
+    )
+    _cb_secs, _cb_verdict = best_of_three(
+        checker.copilot_verdict, _closed_badges_body
+    )
+    # Budget widened from 0.1s to 0.5s ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding,
+    # sixteenth round): the block-region and HTML-comment-span detection
+    # this round added run once per call on top of the existing scan, and
+    # measured 0.07-0.09s across ten runs on this machine for this ~190KB
+    # body -- comfortably linear (matching the "many well-formed entries"
+    # timing test's own 0.5s budget for a similarly-sized adversarial
+    # shape just below), but too close to 0.1s to stay non-flaky under
+    # load; this was observed to intermittently fail a full-suite run at
+    # the old threshold even though the underlying scan is still linear.
+    check(
+        "copilot_verdict on 8000+ repeated CLOSED badges scales linearly (< 0.5s)",
+        _cb_verdict == "not-clean" and _cb_secs < 0.5,
+    )
+
+    # [ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, sixth round: a digit sitting INSIDE a
+    # malformed tag (a second `<` opening before the first tag's own `>`)
+    # was silently skipped rather than rejected, since `str.find` treated
+    # the whole `<picture 5 <img>` span as one opaque tag. The coordinator's
+    # own reprex: `_copilot_v2_line_findings_count` returned 0 (read as
+    # clean) instead of failing closed. This is what drove the rewrite from
+    # a sequence of one-off exclusions to a tokenizer plus a strict
+    # grammar: `_tokenize_copilot_line` now refuses to fold a `<` that
+    # opens before its enclosing tag's `>` into one token, so the `5`
+    # never has a chance to be silently absorbed.
+    check(
+        "_copilot_v2_line_findings_count fails closed on a digit inside a "
+        "malformed tag rather than skipping it: '0 <picture 5 <img></picture>'",
+        checker._copilot_v2_line_findings_count(
+            "0 <picture 5 <img></picture>"
+        ) is None,
+    )
+    check(
+        "copilot_verdict: a Findings line with a digit inside a malformed "
+        "tag states no verdict rather than reading as clean",
+        checker.copilot_verdict(
+            "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+            "### \U0001f7e2 Approval recommended\n\n"
+            "**Review effort:** Lite  \n"
+            "**Findings:** 0 <picture 5 <img></picture>"
+        ) == "",
+    )
+    check(
+        "_copilot_v2_line_findings_count fails closed on stray non-whitespace "
+        "text inside a <picture> badge: '1 <picture>x</picture>'",
+        checker._copilot_v2_line_findings_count("1 <picture>x</picture>") is None,
+    )
+
+    # Timing regression test: a 262,144-character line of many well-formed
+    # entries must stay linear too -- the tokenizer-plus-grammar rewrite
+    # adds a second full pass over the token list on top of the earlier
+    # str.find-based scan, so this confirms that second pass did not
+    # reintroduce quadratic cost on legitimate, well-formed input.
+    _many_entries_unit = "1 <picture><source media=\"x\"><img src=\"y\"></picture> · "
+    _many_entries_reps = 262144 // len(_many_entries_unit)
+    _many_entries_line = (_many_entries_unit * _many_entries_reps).rstrip(" ·")
+    _many_entries_body = (
+        "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
+        "### \U0001f7e2 Approval recommended\n\n**Findings:** " + _many_entries_line
+    )
+    _me_secs, _me_verdict = best_of_three(
+        checker.copilot_verdict, _many_entries_body
+    )
+    check(
+        "copilot_verdict on a 262,144-character line of many well-formed "
+        "entries scales linearly (< 0.5s)",
+        _me_verdict == "not-clean" and _me_secs < 0.5,
+    )
+
     check(
         "_is_bot_author admits Copilot's bare login as well as the [bot] form",
         checker._is_bot_author("copilot-pull-request-reviewer")

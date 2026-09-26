@@ -75,6 +75,26 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+from copilot_overview import (  # noqa: E402
+    COPILOT_FINDINGS_LINE,
+    _copilot_v2_findings_count,
+    _find_details_regions,
+    _find_html_comment_spans,
+    _position_in_spans,
+    match_content_start,
+)
+# Test-only re-export: not called anywhere in this file, but
+# scripts/test_check_pr_fully_clean.py reaches it as
+# `checker._copilot_v2_line_findings_count` (matching how the test file
+# already gets at every other lib helper -- e.g. `checker.extract_structured_review`
+# for review_payload.py's function -- rather than importing straight from
+# the lib module). Deleting this import as dead code would silently break
+# those 12+ call sites. The `# noqa: F401` documents intent for a human
+# reader (and any future flake8 run); bare `python -m pyflakes` does not
+# honor `# noqa` at all -- that suppression is a flake8-only convention --
+# so this line still shows in a bare pyflakes run, same as this file's
+# pre-existing `# noqa: E402` markers do.
+from copilot_overview import _copilot_v2_line_findings_count  # noqa: E402,F401
 from fences import (  # noqa: E402
     CODE_SPAN_RE,
     find_fence_spans,
@@ -2205,7 +2225,8 @@ def _is_marked_or_in_verdict_section(scan: str, match_start: int) -> bool:
 # matching a fourth.
 _COPILOT_HEADING_PREFIX = r"(?:^|\n)[ \t]*#{1,6}[ \t]*(?:[^\w\n\"\']+[ \t]*)?"
 COPILOT_AFFIRMATIVE_HEADER = re.compile(
-    _COPILOT_HEADING_PREFIX + r"\bApproval\s+recommended\b", re.IGNORECASE
+    _COPILOT_HEADING_PREFIX + r"\bApproval\s+recommended(?=[ \t]*(?:\r?\n|$))",
+    re.IGNORECASE,
 )
 COPILOT_NEGATIVE_HEADER = re.compile(
     _COPILOT_HEADING_PREFIX
@@ -2220,8 +2241,59 @@ COPILOT_SUPPRESSED_BLOCK = re.compile(r"\bSuppressed\s+comments\b", re.IGNORECAS
 # Copilot reports its own inline-finding count in the `Review details` block, as
 # `0`, `0 new`, or a positive integer. This is the only count available to a
 # body-only classifier, and its absence is not evidence of zero.
+#
+# Split into two regexes rather than one, and the digit group is bounded
+# ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding): the field's own real counts are always
+# small, and an unbounded `(\d+)` let `int()` on a >4300-digit run raise
+# ValueError uncaught, crashing the merge-gate classifier instead of
+# failing closed. `COPILOT_COMMENT_GENERATED` matches just the phrase
+# prefix; `COPILOT_COMMENT_COUNT` is then `.match()`-anchored at that
+# phrase's end, bounded to 1-6 ASCII digits, with `(?<!\d)`/`(?!\d)`
+# guarding both ends so a run LONGER than 6 digits cannot match a
+# truncated head or tail of itself -- it fails to match at all, and the
+# caller treats that as a present-but-unparseable source (fail closed)
+# rather than silently reading its first 6 digits as a small count. Each
+# check is a single bounded match (at most 6 backtrack attempts, O(1)) at
+# one fixed anchor position, so this stays O(1) per occurrence regardless
+# of how long the adversarial digit run is.
+#
+# The boundary lookarounds use `\d` (Unicode-aware in Python's `re` by
+# default, matching every Unicode `Nd`-category digit) rather than
+# `[0-9]`, even though the CAPTURE stays ASCII-only `[0-9]{1,6}`
+# ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review): an
+# `[0-9]`-only boundary lets a non-ASCII digit sit right where the
+# boundary is checked without tripping it, since `[0-9]` doesn't
+# recognise it as a digit at all. `Comments generated: 0５` (a
+# full-width "5" after an ASCII "0") matched `0` as a complete count under
+# `(?![0-9])`, because the following character genuinely isn't in the
+# `[0-9]` class -- but it plainly IS more digit, just not an ASCII one,
+# and a real Copilot count is never followed by another digit of any
+# script.
+#
+# A trailing `\d` lookaround alone still only guards against MORE DIGITS,
+# not against arbitrary trailing text of any other kind: `(?!\d)` lets
+# `Comments generated: 0oops` match `0` as a complete count too, since `o`
+# is not a digit either (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, second finding
+# on the same class -- shape-by-shape patching of "what can follow the
+# count" was the wrong level to fix this at, the same lesson already
+# learned for the v2 grammar parser). The actual field never has anything
+# but whitespace, end of line, end of body, or the literal word `new`
+# after the digits -- checked against every legacy fixture in
+# scripts/test_check_pr_fully_clean.py, which show only `0 new`, `2`
+# (nothing after), and `0` at the very end of the body, never any other
+# suffix -- so the trailing condition now requires the token to actually
+# END there: optionally `[ \t]+new\b`, then only whitespace up to a
+# newline or the end of the string. Anything else (a random word, a
+# non-ASCII digit sitting right after, a stray character) fails the whole
+# match, not just a same-shaped variant of it, and the caller then treats
+# the occurrence as present but unparseable rather than as a clean 0 --
+# see `copilot_verdict`'s combine rule.
+COPILOT_COMMENT_GENERATED = re.compile(
+    r"(?:^|\n)[ ]{0,3}(?:[-*+][ \t]+)?(?:\*\*)?(?P<label>Comments[ \t]+generated:\**)[ \t]*",
+    re.IGNORECASE,
+)
 COPILOT_COMMENT_COUNT = re.compile(
-    r"\bComments\s+generated:\**[ \t]*(\d+)", re.IGNORECASE
+    r"(?<!\d)([0-9]{1,6})(?=(?:[ \t]+new\b)?[ \t]*(?:\r?\n|$))"
 )
 
 
@@ -2234,10 +2306,37 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
     is recognisably a Copilot verdict returns ``not-clean``, and a body this
     function does not recognise returns ``''`` so the ordinary scans decide.
 
-    Fails closed on a missing comment count. An affirmative heading with no
-    `Comments generated:` field states an approval this function cannot confirm
-    is finding-free, so it yields no verdict rather than a clean one -- the
-    same direction ``_is_bot_author`` and the quorum tag already take.
+    The inline-finding count is read from EVERY uncited legacy
+    `Comments generated: N` occurrence and every uncited `ccr-overview-v2`
+    `**Findings:**` line ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899)), not just the first of either --
+    a body reading "Comments generated: 0 ... Comments generated: 3"
+    used to classify clean off the first match alone, a pre-existing gap
+    of the same class this function's v2 handling was already fixed for.
+    The two formats are also NOT mutually exclusive with each other:
+    treating them as such was itself a fail-open defect, since a body
+    carrying an uncited legacy `Comments generated: 0` phrase anywhere
+    (even in plain prose quoting an earlier round) used to override a
+    real nonzero v2 `**Findings:**` line and read as clean.
+
+    Each PRESENT source -- one per uncited legacy occurrence, plus the v2
+    multi-line scan's own combined result if any uncited `**Findings:**`
+    line exists -- contributes its own count, or None if that particular
+    occurrence does not parse (an over-long legacy digit run past
+    COPILOT_COMMENT_COUNT's bound, or a v2 line in an unrecognised
+    shape). A source that is simply absent (the field never appears)
+    contributes nothing, so a body carrying only the legacy field behaves
+    exactly as it did before v2 existed. All contributed sources are
+    combined the same way the v2 multi-line scan combines several
+    `**Findings:**` lines on its own: any nonzero count from any present
+    source is decisive and wins (not-clean); failing that, any
+    unparseable present source yields no verdict; zero only when every
+    present source reads zero.
+
+    Fails closed when no source is present at all. An affirmative
+    heading with no count field states an approval this function cannot
+    confirm is finding-free, so it yields no verdict rather than a clean
+    one -- the same direction ``_is_bot_author`` and the quorum tag
+    already take.
     """
     if not body:
         return ""
@@ -2245,25 +2344,138 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
         scan, cited = strip_cited_finding_vocab_with_mask(body)
 
     def _has_valid_match(pattern, text):
+        """Return the first uncited match of `pattern`, or None.
+
+        Checks citedness from `match_content_start(m)`, not `m.start()`
+        ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twenty-fourth round): both
+        COPILOT_NEGATIVE_HEADER and COPILOT_FINDINGS_LINE (two of this
+        helper's three callers below) are line-anchored with a leading
+        `(?:^|\n)`, which consumes the PRECEDING newline whenever the
+        match isn't at the very start of the body -- and the citation
+        mask never marks a newline offset as cited, by design. Checking
+        from the raw `m.start()` then always found that uncited newline
+        in range and reported the WHOLE match as uncited, even when the
+        heading itself sat wholly inside a code span (a double-backtick-
+        cited `### Changes recommended` on any line but the first). The
+        third caller (COPILOT_SUPPRESSED_BLOCK) is not line-anchored, so
+        `match_content_start` is a no-op for it -- see the function's own
+        docstring for why it is always a safe drop-in for `m.start()`.
+        """
         for m in pattern.finditer(text):
-            if not match_is_cited(cited, m.start(), m.end()):
+            if not match_is_cited(cited, match_content_start(m), m.end()):
                 return m
+        return None
+
+    # The `cited` mask (fences/quotes/code-spans) is not the only citation
+    # shape: an HTML comment is invisible to it too, exactly the gap the
+    # v2 path was fixed for two rounds ago ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding,
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, fourth round) -- `<!--\n-
+    # **Comments generated:** 0\n-->` counted as a real zero, since only
+    # `match_is_cited` was checked. Computed once, up front, and reused by
+    # every scan below that needs it (the affirmative-heading scan and the
+    # legacy `Comments generated:` scan further down -- previously a second,
+    # separate `_find_html_comment_spans(scan)` call right before that loop)
+    # via `_find_html_comment_spans`/`_position_in_spans` from
+    # copilot_overview (the same linear, bisect-backed helpers the v2 path
+    # already uses), rather than inventing a second HTML-comment detector.
+    comment_spans = _find_html_comment_spans(scan, cited, match_is_cited)
+    comment_span_starts = [s for s, _ in comment_spans]
+    details_spans = _find_details_regions(
+        scan, comment_spans, comment_span_starts, cited, match_is_cited
+    )
+    details_span_starts = [s for s, _ in details_spans]
+
+    def _has_live_match(pattern, text):
+        """Like `_has_valid_match`, but ALSO rejects a match whose own start
+        falls inside an HTML comment ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, PR
+        [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review) or an already-open `<details>` region
+        (PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, twelfth round): a commented-out
+        `<!--\n### \U0001f7e2 Approval recommended\n-->` or a details-nested
+        affirmative heading from a prior round quoted inside `<details>` used
+        to satisfy the affirmative heading test while the legacy count loop
+        accepted the `Comments generated: 0` inside that same details section.
+        Reserved for the AFFIRMATIVE heading only: see the comment at its one
+        call site for why the NEGATIVE heading deliberately keeps using the
+        citation-only `_has_valid_match` instead.
+
+        The citedness check itself is from `match_content_start(m)`, not
+        `m.start()`, for the same reason `_has_valid_match` above now uses
+        it: COPILOT_AFFIRMATIVE_HEADER is line-anchored, so `m.start()` on
+        any match past the first line is the consumed newline, which the
+        citation mask never marks cited -- a double-backtick-cited
+        `### Approval recommended` on a non-first line used to read as
+        live regardless of the quoting ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding,
+        twenty-fourth round). The HTML-comment and details containment checks
+        just below keep using the raw `m.start()`: comment and details spans
+        are plain character ranges with no "always uncited at a newline" quirk,
+        so a newline genuinely inside an open span is correctly found inside
+        it either way, and there is no matching gap to close here.
+        """
+        for m in pattern.finditer(text):
+            if match_is_cited(cited, match_content_start(m), m.end()):
+                continue
+            if _position_in_spans(m.start(), comment_span_starts, comment_spans):
+                continue
+            if _position_in_spans(
+                m.start(), details_span_starts, details_spans
+            ) or _position_in_spans(
+                match_content_start(m), details_span_starts, details_spans
+            ):
+                continue
+            return m
         return None
 
     # Checked first: a negative heading is a verdict on its own, and reading it
     # before the affirmative test means a body carrying both spellings (a
-    # re-review quoting its own earlier round) cannot resolve to clean.
+    # re-review quoting its own earlier round) cannot resolve to clean. This
+    # also covers a v2 negative heading whose `**Findings:** None` line would
+    # otherwise read as finding-free: the heading itself already decided.
+    #
+    # Deliberately still `_has_valid_match`, NOT the comment-aware
+    # `_has_live_match` the affirmative heading uses just below ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899)
+    # review finding): making the NEGATIVE heading comment-aware too would
+    # let a commented-out `### Changes recommended` stop blocking, and this
+    # function cannot tell that apart from a live blocking heading whose
+    # `<!--`/`-->` delimiters themselves got mangled or partly stripped by
+    # some upstream rendering step. The fail-closed choice is to keep
+    # treating ANY occurrence of the negative heading -- comment-hidden or
+    # not -- as blocking: at worst a truly stale, commented-out negative
+    # heading costs a real clean round a wrongly-conservative "not-clean"
+    # rather than the unsafe direction of a real blocking heading silently
+    # stopping being read as blocking.
     if _has_valid_match(COPILOT_NEGATIVE_HEADER, scan):
         return "not-clean"
-    if not _has_valid_match(COPILOT_AFFIRMATIVE_HEADER, scan):
+    if not _has_live_match(COPILOT_AFFIRMATIVE_HEADER, scan):
         return ""
     if _has_valid_match(COPILOT_SUPPRESSED_BLOCK, scan):
         return "not-clean"
-    count = _has_valid_match(COPILOT_COMMENT_COUNT, scan)
-    if count is None:
+    counts = []
+    legacy_comment_spans = comment_spans
+    legacy_comment_span_starts = comment_span_starts
+    for gm in COPILOT_COMMENT_GENERATED.finditer(scan):
+        if match_is_cited(cited, gm.start("label"), gm.end("label")):
+            continue
+        if _position_in_spans(
+            gm.start("label"), legacy_comment_span_starts, legacy_comment_spans
+        ):
+            continue
+        dm = COPILOT_COMMENT_COUNT.match(scan, gm.end())
+        if dm is not None and not match_is_cited(cited, dm.start(), dm.end()):
+            counts.append(int(dm.group(1)))
+        else:
+            # The phrase is present but no bounded 1-6 digit count follows
+            # it immediately -- most likely an over-long digit run that
+            # COPILOT_COMMENT_COUNT's lookaround refuses to match a
+            # truncated head/tail of. Present but unparseable, not absent.
+            counts.append(None)
+    if _has_valid_match(COPILOT_FINDINGS_LINE, scan) is not None:
+        counts.append(_copilot_v2_findings_count(scan, cited, match_is_cited))
+    if not counts:
         return ""
-    if int(count.group(1)) != 0:
+    if any(c is not None and c != 0 for c in counts):
         return "not-clean"
+    if any(c is None for c in counts):
+        return ""
     return "clean"
 
 
@@ -2375,7 +2587,19 @@ def classify_verdict(body: str, state: str = "", author: str = "") -> str:
 
     for pat in VERDICT_CLEAN_PATTERNS:
         for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
-            if match_is_cited(cited, match.start(), match.end()):
+            # `match_content_start`, not `match.start()`: the "No issues
+            # found." pattern above is `^[ \t]*...` under MULTILINE, so a
+            # match with real leading indentation checks citedness from
+            # that indentation rather than from the line's actual content
+            # -- a `  ``No issues found. ...`` ` line (two literal
+            # indentation spaces the citation does not cover, then the
+            # rest wholly inside a double-backtick span) used to read as
+            # uncited on the strength of those two uncited spaces alone
+            # ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding, twenty-fourth round, generalising
+            # the same fix already applied to COPILOT_FINDINGS_LINE).
+            # `match_content_start` is a no-op for this loop's other,
+            # unanchored patterns.
+            if match_is_cited(cited, match_content_start(match), match.end()):
                 continue
             # Position and negation are about how the phrase is INTRODUCED, so
             # they apply only to a bare phrase -- a `Verdict:` label is itself
@@ -2554,7 +2778,18 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
     scan_body, cited = strip_cited_finding_vocab_with_mask(body)
     for pat in FINDING_PATTERNS:
         for match in re.finditer(pat, scan_body, re.IGNORECASE | re.MULTILINE):
-            if match_is_cited(cited, match.start(), match.end()):
+            # `match_content_start`, not `match.start()` ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review
+            # finding, twenty-fourth round): two entries in this list --
+            # `(?:^|\n)[ \t]*\*\*Nits?\*\*` and
+            # `(?:^|\n)[ \t]*\*\*Non-blocking\*\*` -- are line-anchored the
+            # same way COPILOT_FINDINGS_LINE is, so a match on any line but
+            # the first consumes the preceding newline into `match.start()`,
+            # and the citation mask never marks a newline offset as cited.
+            # A double-backtick-cited `**Nits**` heading on a non-first
+            # line used to read as a live, uncited finding regardless of
+            # the quoting. `match_content_start` is a no-op for every
+            # other, unanchored pattern in this list.
+            if match_is_cited(cited, match_content_start(match), match.end()):
                 continue
             if pat in BARE_NOT_CLEAN_PATTERNS:
                 if not _is_marked_or_in_verdict_section(scan_body, match.start()):

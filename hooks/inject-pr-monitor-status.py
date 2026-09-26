@@ -29,8 +29,10 @@ A per-PR state is reduced to a summary (state, mergeability, review
 decision, check counts, failing and pending check names) and is emitted only
 when that summary changes.  A list-shaped state is reduced to the entries
 that appeared or disappeared since the last report, so `updatedAt` churn on
-an unchanged set is silent.  An error is emitted whenever the state carries
-one, exactly as before.
+an unchanged set is silent (GitHub `updatedAt` and GitLab `updated_at`
+alike), and a source left out of a poll because it errored keeps its last
+reported set.  An error is emitted whenever the state carries one, exactly as
+before, and its clearing is emitted as `recovered_from`.
 """
 import hashlib
 import json
@@ -40,7 +42,8 @@ import tempfile
 STATE_DIR = os.path.join(tempfile.gettempdir(), "claude-pr-monitors")
 PERSISTENT_ERROR_POLLS = 3
 MAX_LISTED = 20
-VOLATILE_KEYS = {"updatedAt", "createdAt", "checked_at"}
+VOLATILE_KEYS = {"updatedAt", "createdAt", "updated_at", "created_at",
+                 "checked_at"}
 FAILING = {"FAILURE", "TIMED_OUT", "CANCELLED", "ERROR", "ACTION_REQUIRED",
            "STARTUP_FAILURE"}
 PENDING = {"IN_PROGRESS", "QUEUED", "PENDING", "WAITING", "REQUESTED",
@@ -100,14 +103,19 @@ def summarize_pr(data):
     if pending:
         summary["pending"] = sorted(pending)[:5]
     if isinstance(data.get("reviews"), list):
-        summary["reviews"] = len(data["reviews"])
+        verdicts = {}
+        for review in data["reviews"]:
+            verdict = str(review.get("state") or "UNKNOWN").upper()
+            verdicts[verdict] = verdicts.get(verdict, 0) + 1
+        summary["reviews"] = dict(sorted(verdicts.items()))
     return summary
 
 
 def item_identity(item):
     if isinstance(item, dict):
-        if item.get("url"):
-            return item["url"]
+        url = item.get("url") or item.get("web_url")
+        if url:
+            return url
         return {key: value for key, value in item.items()
                 if key not in VOLATILE_KEYS}
     return item
@@ -161,11 +169,13 @@ def data_digest(state):
                 changes[source]["added"] = cap(added)
             if removed:
                 changes[source]["removed"] = cap(removed)
-    for source in sorted(set(previous) - set(current)):
-        changes[source] = {
-            "open": 0,
-            "removed": cap([json.loads(key) for key in previous[source]]),
-        }
+    # A source absent from the data was not checked this poll (its CLI
+    # failed or is missing; monitor-open-prs.py records that as an error and
+    # leaves the key out), which is not the same as "checked, none open".
+    # Carry its last reported set forward instead of reporting every entry
+    # removed and then re-added on recovery.
+    for source in set(previous) - set(current):
+        current[source] = previous[source]
     state["reported_items"] = current
     return {"changes": changes} if changes else None
 
@@ -205,6 +215,11 @@ def main():
         entry = data_digest(state) or {}
         if has_error:
             entry["error"] = state["error"]
+        elif state.get("reported_error") is not None:
+            # A reported error clearing is itself news, even when the data
+            # it hid turns out unchanged.
+            entry["recovered_from"] = state["reported_error"]
+        state["reported_error"] = state.get("error")
         temporary = f"{path}.{os.getpid()}.tmp"
         with open(temporary, "w", encoding="utf-8") as stream:
             json.dump(state, stream, sort_keys=True)

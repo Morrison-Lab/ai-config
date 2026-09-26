@@ -524,6 +524,12 @@ On the field-absent variant there is no field to change, and on #3045's own vari
 (Diagnosed 2026-09-14, driving `Morrison-Lab/ai-config#3684`: four `Agent` dispatches to `adversarial-reviewer` in that session, each with `isolation: "worktree"`, all returned "Async agent launched successfully" with no `run_in_background` field available on the call to begin with.
 Each review's full report arrived only via a later task-notification, and each push attempt was refused until `ALLOW_UNREVIEWED_PUSH=1` was used on a push whose `Reviewed-Commit` matched the final CLEAN verdict's head.)
 
+**The other, original #3045 manifestation --- `run_in_background: false` explicitly passed, and the dispatch still backgrounded --- recurred again on the same variant it was first reported under.**
+
+(Diagnosed 2026-09-26, driving `Morrison-Lab/ai-config#4013`: three separate `Agent` dispatches to `adversarial-reviewer` in one session, each with `run_in_background: false` set on the call, each came back an async `agentId` rather than a synchronous result.
+This is the field-present variant, not the field-absent one #3684 recorded above: the field existed, was set to the value that should have forced a synchronous call, and the harness ignored it three times in a row.
+Confirming that both variants keep recurring independently, rather than one having been a one-off, is the point of recording this instance: `ALLOW_UNREVIEWED_PUSH=1` was used twice in that session with the review's own verdict and `Reviewed-Commit` stated in the same reply, per the remedy given above.)
+
 **Cursor Cloud has a subagent dispatch.**
 On Cursor Cloud, when the session's `Task` tool lists
 `adversarial-reviewer`, that is the dispatch

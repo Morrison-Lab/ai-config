@@ -379,6 +379,65 @@ What an accepted review finding adds is that someone else has now told you a pie
 and that the deletion is measurable per branch, where a demotion is a judgement.
 Before deleting, ask what else in the file cites the clause you are about to remove --- a dependent is the thing the deletion breaks and the thing no reviewer is looking at.
 
+**A third shape: the fix that widens a mechanism.**
+Closing a finding on a detector almost always means widening something --- a
+regex, an elision scope, an anchor, a bound.
+The finding names one input the detector got wrong, and names none of the
+inputs the widening will now get wrong, so those go unmeasured by
+construction while the suite stays green.
+
+Measured across two rounds on `hooks/flag-self-authored-verdict-echo.py`.
+Four of round 4's seventeen fixes widened a mechanism;
+round 5 found three of those four net-negative against the pre-fix file ---
+whole-window aside blanking made five honest self-reviews warn, end-anchoring
+a heredoc terminator made every CRLF command unreadable *on the path that
+reads a body through the heredoc tie*, and bounding a quadratic scan by
+counting `<<` silently exempted any body whose own prose wrote `<<`.
+Round 6 then found two of round 5's own fixes net-negative in turn: an opener
+counter whose trailing `[^\n]*\n` folded every opener sharing a line into one
+match, so a 6463-byte command stalled the hook for 13.35 seconds, and a
+narrowed aside lookahead that silenced three comma splices because a comma
+after `and` had become the discriminator.
+Each fix was correct about the case it named, and the recurrence is the point:
+this is the rule's third consecutive round.
+
+**What decides the trade is the guard's own asymmetry, and it has to be stated
+rather than felt.**
+For a warn-only guard a missed warning costs nothing and a false warning is
+how the guard gets switched off, so the whole-window elision was reverted for
+comma spans even though that reopens a real miss.
+A reopened miss is then pinned as a fixture asserting the new behaviour, with
+the reason in the check's own name, and filed
+([ai-config#3947](https://github.com/Morrison-Lab/ai-config/issues/3947)) ---
+an accepted regression that is neither pinned nor filed is indistinguishable
+from an ordinary one.
+The asymmetry can also run the other way than it first looks: dropping an
+untested `|yet|nor` union from that same guard produced *more* warnings, not
+fewer, because eliding is leftmost-first and refusing one span spends the
+elision on the next.
+
+**A finding's own reproduction can be stopped at an earlier gate than the
+finding names.**
+Round 5's finding 2 was right that the aside vocabulary was too narrow, and
+its sample body never reached the aside test at all: the body's first sentence
+made `classify_verdict` return empty, so the function returned at its first
+gate, silent before and after the fix for a reason unrelated to the finding.
+Copying that body into the regression fixture would have produced a case that
+passes under its own mutation.
+This is not the wrong-figure failure the sections above describe --- every
+figure in the finding was right, and re-deriving it confirms it and still
+tells you nothing.
+The check is whether the input reaches the code, not whether the arithmetic
+holds.
+
+- **Do:** construct three inputs a widening newly captures, and measure them
+  against the pre-fix file, before shipping a fix that widens a mechanism.
+  Not being able to construct one means the widening is not yet understood.
+- **Do:** name the guard's asymmetry out loud and let it decide the trade,
+  rather than the finding's urgency.
+- **Do:** run a finding's sample input through the function the finding names,
+  and treat "silent before and after my fix" as a sign the input is
+  short-circuited rather than as evidence the finding was wrong.
 - **Do:** ask what a fix does outside the finding it answers --- what it now hides, admits, or can newly fail at, and what it altered in passing --- and probe that before reporting the fix.
 - **Do:** re-run the original failing case after a fix, alongside the far-side case, so the fix is shown still to do its own job.
 - **Do:** ask which single change is sufficient for a finding, and ship only that one.

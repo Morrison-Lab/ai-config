@@ -519,6 +519,7 @@ The payload gaps that remain and the per-guard status are in
 | `require-agent-disclosure.py` | `PreToolUse` (Bash, mcp__github__.*) | warns, never blocks, on a `gh`/`glab` command or MCP call that posts a forge comment without the agent-disclosure marker -- such a comment carries the account holder's own login and reads as `type: User`, indistinguishable from one they typed. Three verdicts, not one: the marker is missing, the body is somewhere the check cannot read (`--body-file`, `--editor`, `$BODY`) so it says so rather than accusing, or the body discloses with the robot emoji, which `check-pr-fully-clean.py` matches as a review-body marker |
 | `flag-uncounted-comment-claims.py` | `PreToolUse` (Bash) | warns, never blocks, on a `gh pr comment`/`gh issue comment`/`gh api .../comments` body about to post an unverified count (`grep -c`/`wc -l`-shaped discharge) or a hand-typed enumerated list of hyphenated identifiers with no deriving command beside it in the body or elsewhere in the same Bash call -- `remind-brief-premises.py`'s cardinality/enumeration heuristic extended to forge-comment bodies, since that hook's own PATH clause is anchored to this corpus and a comment can be about any repo (ai-config#2377's sparta file-list incident) |
 | `flag-unmeasured-timestamp.py` | `PreToolUse` (Bash, mcp__github__.*, Write, Edit, NotebookEdit) | warns, never blocks, when a `gh pr comment`/`gh issue comment`/`gh pr review`/`gh api .../comments` body, or an MCP comment tool body, or a `Write`/`Edit`/Bash append to a session notebook (`session-*.md`) or memory file (`memory/*.md`), about to execute states a Pacific clock time (or `ish` suffix) and no clock read appears in the transcript since the current turn began, or the stamp runs ahead of the harness's injected reading (ai-config#2900, #2903, #2947) |
+| `flag-self-authored-verdict-echo.py` | `PreToolUse` (Bash, mcp__github__.*) | warns, never blocks, when a forge comment about to post or be edited (read from `--body-file`, an inline `--body`, or the heredoc that writes either) classifies as a NOT-CLEAN verdict by `scripts/check-pr-fully-clean.py`'s own `classify_verdict()` while carrying ARD disposition vocabulary that no negator or hedge grammatically reaches (bounded by `flag-clean-claim-over-findings.py`'s own `_ATTACHES`, and by BRACKETED asides blanked from the window first, so a negator in a neighbouring clause does not silence it and a negator inside a parenthetical does not govern the sentence -- a comma span is blanked from the connector only, because its extent is a guess and the wrong guess deletes the sentence's own subject, so a negator inside a lone comma appositive is an accepted miss: ai-config#3947) and no `review-data:` payload of its own; the three MCP surfaces a review is SUBMITTED through are subtracted in the script, so a formal not-clean review SUBMITTED through one of them is left alone (a fallback self-review posted as a plain comment still warns --- ai-config#3938) --- the shape of a reply that ANSWERS findings rather than a review that states them, which on Morrison-Lab/mln#49 gave its own author a standing not-clean verdict (unsupersedable per ai-config#2274) on a head with 14 check runs green and a live clean review verdict; blockquoting the echoed line and wrapping it in a backtick code span were both measured and neither exempts it, so the message says to describe the call rather than reproduce it |
 | `flag-unmeasured-digest.py` | `PreToolUse` (Bash, mcp__github__.*) | warns, never blocks, when a body about to leave through `gh` (a comment, or an issue or PR being created or edited), `glab` (`-d`/`--description`), an MCP comment tool, or a `cat >>` append to a session notebook or memory file cites a digest-shaped token -- 7 to 64 hex characters bounded on both sides with at least one `a`-`f`, at a canonical length (32/40/64), truncated with an ellipsis, or near a boundary-anchored digest word -- that no prior `user` transcript record contains as a prefix, so a legitimate abbreviation of a measured hash stays quiet while an invented one does not. Reads the body from `--body-file`, `-b`, `-F`, `-d`, or a heredoc in the same command (ai-config#3779). Carries a second, independent surface for a **pinning argument** -- `expected_head_sha`, `expectedHeadSha`, or `--match-head-commit` -- which needs none of the digest shaping above, since the flag already establishes the value is a commit SHA, so it warns on any such value the transcript never observed and names the padded prefix where one was. Matched against shell **words** after heredoc and comment stripping, so a `--body` that merely quotes a pin is prose rather than a pin, and evaluated independently of any body with no fire-once sentinel, since a pinning SHA cannot legitimately originate outside the session (ai-config#3392) |
 | `flag-unread-commit-citation.py` | `PreToolUse` (Bash, mcp__github__.*, Write, Edit, NotebookEdit) | warns, never blocks, when a forge comment/review body about to post, or a `Write`/`Edit`/`NotebookEdit` to a non-scratch prose file (`.md`/`.markdown`/`.txt`/`.rst`/`.qmd`/`.rmd`/`.ipynb`), cites a commit SHA and no command reading that commit (`git show`/`git diff`/`git cat-file -p`/`git log -p`/`gh api .../commits/<sha>`/`gh api .../pulls/N/commits`/`mcp__github__get_commit`) appears in the transcript since the current turn began -- a `git log --oneline`, or a `git show -s`/`--stat` printing no patch, does not count, nor does a position-report phrasing ("pushed at `X`", "MERGED (squash, `X`)") that reports the artifact's own state rather than asserting what the commit did (ai-config#3471) |
 | `flag-unsourced-term-attribution.py` | `PreToolUse` (Write, Edit, NotebookEdit) | warns, never blocks, when new content pins a term-and-year to an unread document file |
@@ -728,6 +729,108 @@ paragraph naming three.
   carrying both warns twice.
 - **Don't:** key it on a bare identifier --- prose about the absence of a gate
   reads as the gate itself.
+
+### A guard's prescribed remedy is a claim about every other guard
+
+A blocking hook usually tells you how to comply: state the pending work,
+re-run the query, name the input.
+That sentence is not advice about the world --- it is an assertion that the
+form it prescribes trips nothing else, and nothing in this repo checks it.
+The hooks are written one at a time, by whoever met the failure that motivated
+one, and several bind the same event.
+So two of them can be individually correct and jointly unsatisfiable.
+
+Measured 2026-09-24, on two `Stop` hooks that both read the reply text.
+`no-incomplete-check-enumeration.py` prescribes its remedy by example:
+
+> `"13 pass, 5 pending"` trips nothing
+
+`no-stale-pr-status.py`'s `RX_ASSERT` matched `13 pass` inside that exact
+string, so writing the form the first hook asks for produced a block from the
+second.
+The trap is that the block reads as a finding about the reply rather than as a
+collision, and conceding it means retracting a claim the evidence supports ---
+see [`challenge-the-assignment`](shared/workflow/challenge-the-assignment.md)'s
+"A guard's own blocking message" shape.
+The fix was on the second hook: a bare count alongside a disclosed pending
+state is now exempt **on the branch that fires when a query returned a
+failing state**, and its message names the sibling by file, so a reader who
+meets the collision again is pointed at the rule rather than left to
+re-derive it.
+That scope is the whole of it, and an earlier revision of this paragraph
+stated the exemption without it (round 8, finding 6).
+"Disclosed" is narrower than it first reads, too.
+A state the message names outright --- not fully clean, still failing, not a
+clean stopping point --- exempts on its own, because none of those phrases
+has a sense that is not about the work.
+The pending vocabulary does: `pending`, `queued`, `in progress`, `in flight`
+and `still running` are ordinary English about anything at all, so each needs
+a count or a check noun beside it before it discloses anything about a check.
+
+It is narrower in a second way, added in round 14: the disclosure has to be
+affirmative and non-zero.
+A denial names the same vocabulary --- "0 checks queued", "no checks
+pending", "checks pending: 0" --- while asserting the opposite of a
+disclosure, so reading one as exempt switches the guard off on exactly the
+clean claim it exists to surface.
+The negator is looked for on both sides of the phrase and never inside it,
+which is what keeps "not yet clean" working while "checks pending 0" does
+not.
+The trailing side has to be ANCHORED to the phrase, though: scanning the rest
+of the clause let "3 checks pending with zero drama" read as a denial, so a
+progress report that disclosed pending work was silenced by the second half of
+its own sentence (round 15, finding 3).
+What keeps that case out is not the connector list but the COPULA: a word may
+sit in front of the negator only when a copula follows it, so "pending today
+are none" is a denial and "pending with zero drama" is not.
+Round 16 attributed it to the list instead, which reads as a reason to keep
+enumerating (round 17, finding 6).
+The list itself is a colon, an equals sign, an opening paren, a run of hyphens
+of any length, and the two Unicode dashes.
+The run is unbounded because spelling it as exactly two missed this corpus's
+own dominant spaced dash by a factor of eight: counted at `7b9fb345`, the
+merge base for this change, over its 746 tracked `*.md` files,
+`grep -hoE ' --- '` returns 9604 and `grep -hoE ' -- '` 1200.
+The count is taken at a commit rather than in a working tree because
+documenting the ratio adds dashes and moves it
+(round 17, finding 1).
+And an explicit COUNT is never retracted by any of them.
+The trailing negator supplies a quantity the phrase left open, which a count
+does not leave open, so applying it to "3 checks pending -- zero drama"
+refused four honest progress reports at once (round 17, finding 6).
+The miss that buys is the self-contradicting "3 checks pending -- none", which
+now reads as the disclosure of three.
+When the pending count has genuinely drained to zero, a disclosed failing
+count ("14 pass, 1 fail, 0 pending") is what carries the exemption instead;
+when nothing is pending and nothing is failing, there is no progress to
+report and re-querying is the escape.
+Without that, "Merge pending your approval" and "Her application is pending"
+each turned a bare count into an exempt progress report, and a false
+exemption is the expensive direction here, since the exemption is what stops
+the guard firing (round 9, finding 6).
+The same hook's *staleness* branch --- the one that fires when the last
+query predates the last push --- is deliberately not exempt, because
+disclosing pending work answers the first branch's question and not the
+second's: a count taken before a push may describe a commit that is no
+longer the head whatever the message says about it.
+That branch names its own escape, which is to re-query and state the head
+SHA, so the two guards are not jointly unsatisfiable there --- which is the
+property this section is about, and it is a weaker claim than exemption.
+
+Two properties make this hard to notice.
+A guard's prescribed form is **prose**, so no test asserts it --- the suite
+tests what the hook fires on, never what its message recommends.
+And the collision only appears when one hook's remedy is actually written,
+which happens in a live session rather than in a test.
+
+- **Do:** run a new hook's own prescribed form through every other hook bound
+  to the same event, before shipping the message that prescribes it.
+- **Do:** name the sibling by filename in the message when a collision is
+  resolved, so the next reader meets the rule rather than the symptom.
+- **Don't:** treat a guard's remedy sentence as advice --- it asserts
+  satisfiability, and that assertion is untested.
+- **Don't:** concede a block whose premise you have not checked; the guard
+  compared its own inputs, which may not reach your claim.
 
 Every hook must ship a companion `test-<name>.py` beside it in the same change before pushing;
 `scripts/test_hooks.py` runs

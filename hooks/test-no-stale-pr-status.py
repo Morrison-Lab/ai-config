@@ -13,11 +13,17 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 HOOK = sys.argv[1]
 
 PUSH = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {"command": "git push -q"}}]}}
+# A push RESULT that really ran, for the staleness-branch cost shape
+# below: `PUSH` alone is an ATTEMPT, and this hook deliberately reads a
+# refused attempt as no push at all, so the result part is load-bearing.
+PUSH_OK = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "content": "Exit code 0\nEverything up-to-date"}]}}
 QUERY = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {"command": "gh pr checks 493 -R o/r"}}]}}
 MCP_QUERY = {"type": "assistant", "message": {"content": [
@@ -49,6 +55,75 @@ READ_FILE_QUERY = {"type": "assistant", "message": {"content": [
 READ_FILE_RESULT = {"type": "user", "message": {"content": [
     {"type": "tool_result", "tool_use_id": "t2", "content": "print('\u274c PR is NOT fully clean:')"}]}}
 
+# A push ATTEMPT and the four shapes its result can take. The guard used to set
+# `last_push` from the tool_use alone, so a push the harness refused counted as
+# a push that happened -- invalidating a reading that was still current.
+PUSH_ATTEMPT = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "p1", "input": {"command": "git push -q"}}]}}
+PUSH_BLOCKED = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "p1", "is_error": True,
+     "content": "PreToolUse:Bash [python3 hooks/no-push-without-self-review.py]"
+                " hook error: git push blocked by the pre-push self-review policy"}]}}
+PUSH_DENIED = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "p1", "is_error": True,
+     "content": "Permission for this action was denied by the Claude Code"
+                " auto-mode classifier."}]}}
+# A non-zero EXIT is not a refusal: `git push && something-else` can fail after
+# the push has already moved the branch.
+PUSH_EXIT_FAILED = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "p1", "is_error": True,
+     "content": "Exit code 1\nerror: failed to push some refs"}]}}
+# The refusal wording QUOTED rather than reported. This corpus writes about
+# blocked pushes constantly, so an unanchored match would read a transcript
+# discussing one as a push that never ran.
+PUSH_QUOTES_REFUSAL = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "p1",
+     "content": "Exit code 0\nThe docstring says: PreToolUse:Bash hook error:"
+                " git push blocked by the pre-push self-review policy"}]}}
+# An explicit `is_error: false` overrides the text: a result the harness marked
+# successful DID run, whatever it happens to quote. An ABSENT `is_error` is not
+# read as false, so a transcript format omitting the field keeps the fix.
+PUSH_MARKED_OK = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "p1", "is_error": False,
+     "content": "PreToolUse:Bash hook error: git push blocked"}]}}
+# Round 20, finding 8. Round 19 rewrote the leading run from
+# three adjacent quantifiers to ONE over a union, to kill a quadratic. That
+# also WIDENED the accepted language: the old form required the escaped
+# newlines to be contiguous, and the union admits any interleaving of them
+# with real whitespace. The widening is kept, because that interleaving is
+# exactly what a serialized transcript produces, and the only strings it
+# newly admits are ones carrying a real refusal marker at the anchor. It is
+# pinned here rather than left to be rediscovered, since over-matching is
+# the expensive direction for this predicate and nothing else tests the
+# boundary in either form.
+PUSH_BLOCKED_INTERLEAVED = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "p1", "is_error": True,
+     "content": "\\n  \\n PreToolUse:Bash hook error: git push blocked"}]}}
+PUSH_SECOND_ATTEMPT = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "p2", "input": {"command": "git push -q"}}]}}
+# Round 13, finding 9. A `content` LIST, which is the shape `_result_parts`
+# exists for and which no row previously used. `RX_NEVER_RAN` anchors at `^`
+# with no `re.M`, so joining the parts before searching left the anchor
+# reachable only by the first one and a refusal delivered as a later part read
+# as a real push. Both directions are pinned, because the anchor has to keep
+# doing its job per part: the refusal STARTS the second part here, and merely
+# sits inside the second part below.
+PUSH_BLOCKED_PARTS = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "p1", "is_error": True,
+     "content": [
+         {"type": "text", "text": "Running git push -q"},
+         {"type": "text",
+          "text": "PreToolUse:Bash [python3 hooks/no-push-without-self-review.py]"
+                  " hook error: git push blocked by the pre-push self-review policy"}]}]}}
+PUSH_PARTS_QUOTE_REFUSAL = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "p1",
+     "content": [
+         {"type": "text", "text": "Exit code 0"},
+         {"type": "text",
+          "text": "The docstring says: PreToolUse:Bash hook error: git push"
+                  " blocked by the pre-push self-review policy"}]}]}}
+
+
 # (events, should_block, label)
 CASES = [
     ([QUERY, PUSH, say("493 is green, conflict-free.")], True,
@@ -74,6 +149,630 @@ CASES = [
      "an MCP push_files is a push -- the reading predates it"),
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT, say("PR #1167 is fully clean.")], True,
      "claiming fully clean when check-pr-fully-clean.py returned NOT fully clean"),
+
+    # `no-incomplete-check-enumeration.py` PRESCRIBES the bare-count form as
+    # the safe progress report -- its blocking message says verbatim that
+    # "13 pass, 5 pending" trips nothing, and its source repeats the claim as
+    # a comment. This guard's ASSERT list matched `13 pass` in that exact
+    # string, so following one guard's remedy tripped the other, using the
+    # first guard's own example. Measured 2026-09-24 on a message reading
+    # "9 pass, 8 skipped, 2 runs still in progress, none failing", which the
+    # failing-query branch blocked as a clean assertion.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("13 pass, 5 pending.")], False,
+     "the sibling guard's own prescribed progress form must not block here"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("19 checks on #3928: 9 pass, 8 skipped, 2 still in progress, "
+          "none failing.")], False,
+     "a count in a message disclosing its own pending work is a progress report"),
+    # The exemption is self-disclosure, not the presence of a count: a message
+    # may disclose ONE PR's pending checks and still call ANOTHER clean, and
+    # that second claim is exactly what this branch exists to catch.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("#3928 has 2 checks still in progress. #49 is fully clean.")], True,
+     "disclosing one PR's pending work does not license calling another clean"),
+    # ... but the exemption is blind to WHICH PR each count concerns, so a
+    # bare COUNT about a second PR rides on the first PR's disclosure and
+    # goes unblocked. That is the guard's actual behaviour rather than its
+    # intended one -- whether to scope it by `RX_PR_NEARBY` is
+    # ai-config#3968 -- and it was asserted in a comment and pinned by
+    # nothing, so a scoping change would have landed with a green suite.
+    # It is the counterpart of the case above: a CLEAN CLAIM about the
+    # second PR blocks, a plain count about it does not.
+    #
+    # The mutation that kills this row and nothing else is the #3968 fix
+    # itself: skip a bare count only while the message names at most one
+    # PR. The obvious mutation does not reach it -- the match object is
+    # `9 pass` alone, so a `#` test over `cand.group(0)` is a no-op and
+    # leaves the suite fully green, and disabling the exemption outright
+    # kills five rows rather than this one.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("#50 has 2 checks still in progress. 9 pass on #49.")], False,
+     "a count about a second PR rides on the first PR's disclosure"),
+    # ... and the exemption is scoped to THIS branch. The staleness branch
+    # still fires on the sibling's prescribed form, deliberately: disclosure
+    # answers "did a query report failure", not "is your reading older than
+    # your push". Round 8, finding 6 --- the hook's message and README both
+    # claimed the exemption unscoped, and every case above exercises the
+    # failing-query branch, so nothing pinned which branch it reached.
+    ([QUERY, PUSH, say("13 pass, 5 pending.")], True,
+     "the disclosure exemption does not reach the staleness branch"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("9 pass.")], True,
+     "a bare count with nothing disclosed still blocks"),
+    # A push the harness REFUSED moved no commit, so the earlier query is not
+    # stale. The guard read the tool_use and never the result, so every
+    # refused push counted -- 79 of them in one session's own transcript.
+    # Queries already tracked their tool_use_id and read the matching result;
+    # the push side simply never did.
+    ([QUERY, PUSH_ATTEMPT, PUSH_BLOCKED, say("All checks pass.")], False,
+     "a push blocked by a PreToolUse hook does not make a query stale"),
+    ([QUERY, PUSH_ATTEMPT, PUSH_DENIED, say("All checks pass.")], False,
+     "a push denied by the permission classifier does not make a query stale"),
+    # The other direction, which is the expensive one: dropping a push that DID
+    # run licenses a merge on a stale reading, so every shape that is not an
+    # unambiguous refusal still counts.
+    ([QUERY, PUSH_ATTEMPT, PUSH_EXIT_FAILED, say("All checks pass.")], True,
+     "a push that ran and exited non-zero still makes a query stale"),
+    ([QUERY, PUSH_ATTEMPT, PUSH_QUOTES_REFUSAL, say("All checks pass.")], True,
+     "a result QUOTING the refusal wording is not a refusal"),
+    ([QUERY, PUSH, say("All checks pass.")], True,
+     "a push with no tool_use id at all still makes a query stale"),
+    ([QUERY, PUSH_ATTEMPT, PUSH_MARKED_OK, say("All checks pass.")], True,
+     "an explicit is_error false overrides the refusal wording"),
+    ([QUERY, PUSH_ATTEMPT, PUSH_BLOCKED_PARTS, say("All checks pass.")], False,
+     "a refusal arriving as a LATER content part is still a refusal"),
+    ([QUERY, PUSH_ATTEMPT, PUSH_BLOCKED_INTERLEAVED, say("All checks pass.")],
+     False,
+     "escaped newlines interleaved with whitespace still open a refusal"),
+    ([QUERY, PUSH_ATTEMPT, PUSH_PARTS_QUOTE_REFUSAL, say("All checks pass.")],
+     True,
+     "a later content part QUOTING the refusal wording is not a refusal"),
+    ([QUERY, PUSH_ATTEMPT, PUSH_BLOCKED, PUSH_SECOND_ATTEMPT,
+      say("All checks pass.")], True,
+     "a real push after a blocked one still makes a query stale"),
+    # Round 9, finding 6. `pending`, `queued`, `in progress`, `in flight` and
+    # `still running` are ordinary English about anything at all, so matching
+    # them bare let four sentences that disclose no pending CHECK work exempt
+    # a bare count. The exemption is the thing that stops this guard firing,
+    # so a false exemption is the expensive direction. The polysemous half
+    # now needs a count or a check noun; the state half -- "not fully clean",
+    # "still failing", "not a clean stopping point" -- does not, because none
+    # of those has a sense that is not about the work.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("9 pass. Merge pending your approval.")], True,
+     "'pending your approval' is not a disclosed pending check"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("12 pass. The release is queued for Friday.")], True,
+     "a queued RELEASE is not a disclosed pending check"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("9 pass. The write-up is still in progress.")], True,
+     "a write-up in progress is not a disclosed pending check"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("9 pass. Her application is pending.")], True,
+     "an application pending is not a disclosed pending check"),
+    # ... and the check-context forms the narrowing must keep.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("9 pass. Checks are still running.")], False,
+     "a check noun governing the vocabulary still exempts"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("9 pass, but the PR is not fully clean.")], False,
+     "the state half needs no check noun to exempt"),
+    # Polarity, from the adversarial review of this branch. The round-9 split
+    # above stopped a polysemous word exempting itself outside check context
+    # and left the mirror case open: a sentence DENYING pending work bought
+    # the exemption by naming the thing it denies, which switches this guard
+    # off on exactly the clean assertion it exists to surface. All four
+    # measured sentences exempted before the fix; none of the 139 rows that
+    # predate these distinguishes them from a real disclosure.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 0 pending.")], True,
+     "a ZERO count denies pending work rather than disclosing it"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 0 checks queued.")], True,
+     "a zero count denies it with a check noun too"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, no checks pending.")], True,
+     "a negator before the check noun denies pending work"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, zero jobs pending.")], True,
+     "`zero` before the check noun denies it as `no` does"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 0 of 14 checks pending.")], True,
+     "a bare zero governs a count the slot itself cannot see"),
+    # ... and the disclosures the polarity guard must NOT reach. A negator
+    # inverts only the phrase it governs, so the window is the CLAUSE; a
+    # sentence-wide one suppresses the first of these, which is this repo's
+    # own commonest recap opening.
+    #
+    # Every row here opens with a clean assertion, and that is load-bearing
+    # rather than scene-setting. Written without one they were VACUOUS: the
+    # hook returns at `find_unnegated_assert` before the exemption is ever
+    # consulted, so each passed with the construct it names deleted, while
+    # reading exactly like coverage. The second row is also comma-free,
+    # because a comma puts the negator outside the window on its own and the
+    # carve-out is then never reached.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. No findings remain, 2 checks still pending.")], False,
+     "a negation in ANOTHER clause leaves the disclosure standing"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. No longer blocked and 2 checks are still pending.")], False,
+     "`no longer` is resolution, not denial"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. v1.0 has 3 checks pending.")], False,
+     "a version's zero is not a zero count"),
+    # ...and the same for a version whose zero LEADS it, which the round-14
+    # narrowing of that bound could have reopened: `0.9012` must still not
+    # read as a denial, while `0.` ending a sentence must.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Bumped to 0.9012 with 3 checks pending.")], False,
+     "a version's LEADING zero is not a zero count either"),
+    # A hyphen is a non-word character, so `\bno\b` matches inside `no-op`
+    # and `\bzero\b` inside `zero-findings`. In a NEGATOR set that silences
+    # the exemption with nothing red, so the bounds are `(?<![-\w])` /
+    # `(?![-\w])`. This row is what makes that choice falsifiable.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. The no-op rebase left 2 checks pending.")], False,
+     "a negator inside a hyphenated compound is not a negator"),
+
+    # Round 14, finding 1: the round-13 window was the clause PREFIX, which
+    # is not the clause its own docstring claimed. A negator that TRAILS the
+    # phrase it governs was never scanned, so each of these denials bought
+    # the exemption and switched the guard off. The negator is now looked
+    # for on both sides of the match and never inside it -- inside is what
+    # `not yet clean` needs, and the row below pins that it still works.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, checks pending 0.")], True,
+     "a zero TRAILING the check noun denies it"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, checks pending are none.")], True,
+     "a word negator trailing the check noun denies it"),
+    # A colon is a clause break for the PREFIX scan and must not be one for
+    # the SUFFIX scan: here it is what attaches the zero to the noun it
+    # denies, so breaking there hid the negator entirely.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending: 0.")], True,
+     "a label's colon does not hide the value that denies it"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. No findings: 2 checks pending.")], False,
+     "...while the prefix scan still breaks on that same colon"),
+    # Round 14, finding 2: round 13 excluded a zero from the count slot and
+    # reopened the false positive the exemption exists to prevent. These are
+    # honest progress reports whose pending count has genuinely drained to
+    # zero while a failure stands, and round 13 blocked all of them.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 1 fail, 0 pending.")], False,
+     "a disclosed failing count is a disclosure, zero pending or not"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 2 failed, 0 checks pending.")], False,
+     "...in its inflected forms too"),
+    # The NOUN forms were missing from the first draft of that alternative,
+    # so this row -- the commonest spelling of a failing count there is --
+    # was still blocked, and the zero row below passed vacuously because
+    # `failures` matched nothing at all rather than being excluded as a zero.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 1 failure, 0 pending.")], False,
+     "...and in its noun forms, which is how a failing count is usually written"),
+    # Two rows, because the obvious one cannot isolate the zero-exclusion.
+    # "0 failures" is itself a non-bare clean assertion, so the re-aim finds
+    # it and blocks whether or not the exemption fired -- dropping the
+    # exclusion left the whole suite green. "0 failed" is not an assertion,
+    # so there the exemption alone decides and the mutation flips the row.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 0 failed, 0 pending.")], True,
+     "a ZERO failing count discloses nothing, so the exemption stays shut"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 0 failures, 0 pending.")], True,
+     "...and its noun form is covered twice over, being a clean claim itself"),
+    # Round 14, finding 8: `and` and `but` join independent clauses without
+    # a comma, so this read as one clause and the leading denial suppressed
+    # a genuine disclosure of three queued jobs.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. No checks pending and 3 jobs queued.")], False,
+     "a conjunction breaks the clause as a comma does"),
+    # A breaker with no space after it puts the match's own start exactly ON
+    # a clause start, which is the one index where bisect_right and
+    # bisect_left disagree: left hands back the PREVIOUS clause, so the
+    # earlier denial governs a disclosure it has nothing to do with. Found by
+    # mutating the search, which the rest of the suite could not see.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. No findings remain;3 jobs queued.")], False,
+     "a clause starting flush against its breaker is its own clause"),
+    # Round 15, finding 3: the round-14 SUFFIX scan ran to the next value
+    # break, so any negator anywhere in the tail cancelled the disclosure.
+    # Each of these discloses pending work in its first phrase and reports
+    # something ABSENT in a second, independent one, and round 14 read the
+    # second as denying the first -- blocking an honest progress report. The
+    # trailing negator is anchored to the match now, so a preposition or a
+    # second verb between them ends its reach.
+    #
+    # The finding's OWN sentence cannot pin that, and saying so is the point:
+    # "no failures" is itself a non-bare clean claim, so the re-aim finds it
+    # and the hook blocks whichever way the exemption goes -- the same
+    # twice-over shape as the "0 failures" row above. The three rows after it
+    # isolate the anchor, because "nothing else outstanding", "none of the
+    # release jobs" and "zero drama" assert nothing about this PR's checks.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 3 checks pending with no failures.")], True,
+     "the finding's own sentence blocks either way, on its second claim"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 3 checks pending with nothing else outstanding.")], False,
+     "...for each word in the negator set, not just the commonest one"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 3 checks pending on none of the release jobs.")], False,
+     "...and for a negator that is the object of that preposition"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 3 checks pending with zero drama.")], False,
+     "...including the bare-zero arm, which reads no differently"),
+    # The same sentence with no count in it. Round 17's count rule exempts
+    # every row above before the tail is consulted, so both the anchoring
+    # and the mandatory copula went unexercised by them -- measured, with
+    # the negator unanchored or the copula made optional beside the word
+    # slot, the whole suite stayed green. This row is what moves.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending with zero drama.")], False,
+     "an UNCOUNTED disclosure is what still exercises the anchor"),
+    # Round 16, finding 2. Round 15 closed the finding-2 leak by refusing a
+    # preposition after the count, which caught that sentence and not its
+    # class: the tense sits IN FRONT of the count, so every past-tense
+    # sentence about a count already resolved still ended on a terminator
+    # the tail admits. Each of these blocks at HEAD~1 only by accident of
+    # phrasing and not at all as shipped; measured at the parent, all four
+    # went unblocked over a failing status query.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. I fixed 3 errors.")], True,
+     "a resolved count ending on a terminator buys no exemption"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. That resolved 2 failures.")], True,
+     "...for the verb in its own right, not just the first-person form"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. The last round closed 3 failures.")], True,
+     "...with two words between the verb and the count"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. I fixed the CI and 3 errors remain.")], False,
+     "...but three words is out of reach, so this still discloses"),
+    # ...and the same bound with no conjunction in it. The row above stopped
+    # pinning the window once round 17 added the conjunction exclusion:
+    # "and" is refused independently, so it passes under a two-word bound
+    # and a three-word one alike and says nothing about which is shipped.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. I fixed the very last 3 errors.")], False,
+     "...on the two-word bound alone, with no conjunction doing the work"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. I fixed the last 3 errors.")], True,
+     "...and its control, one word shorter and so within reach"),
+    # Round 16, finding 3. Anchoring the trailing negator admitted only an
+    # empty connector, a colon and a copula, so every other way of joining
+    # a label to its value read as a disclosure and exempted the clean
+    # claim. The first row is the one that matters: `--` is this corpus's
+    # own house substitute for an em dash, so it is what an author writing
+    # in house style types. All four block at HEAD~2 and not at HEAD~1.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending -- none.")], True,
+     "a denial joined by the house em-dash substitute is still a denial"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending - none.")], True,
+     "...and by a single hyphen"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending = 0.")], True,
+     "...and by an equals sign, with the bare-zero arm"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending (none).")], True,
+     "...and by a paren, which closes after the negator"),
+    # Round 17, finding 1. The connector was spelled as EXACTLY two hyphens,
+    # and this corpus's dominant spaced dash is three: 9604 occurrences of
+    # `---` against 1200 of `--` over the 746 tracked `*.md` files, counted
+    # at `7b9fb345` with `grep -hoE`. The figure is anchored to a commit
+    # because prose citing the ratio adds dashes and moves it. So the form
+    # an author writing in house style actually types read as a disclosure
+    # and exempted the clean claim beside it. Round 18 finding 1 replaced
+    # the whole connector enumeration with its complement, which is one
+    # closed set fewer to keep current.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending --- none.")], True,
+     "a denial joined by the corpus's dominant dash is still a denial"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending ---- none.")], True,
+     "...and by any longer run, which the unbounded form covers"),
+    # Round 17, finding 6. A COUNT is its own disclosure. Round 16 let the
+    # trailing negator retract one, which refused four honest reports whose
+    # second phrase is independent of the first. The three sibling rows
+    # above ("with zero drama" and friends) pass at both commits because a
+    # WORD connector was already refused; these three carry a connector the
+    # tail admits, so they are the ones that isolate the count rule.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 3 checks pending -- zero drama.")], False,
+     "a counted disclosure is not retracted by a dash and a negator"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 3 checks pending (zero drama).")], False,
+     "...nor by a parenthesis"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 3 checks pending -- nothing else outstanding.")], False,
+     "...for another word in the negator set"),
+    # ...and the miss that rule buys, stated rather than left to be found:
+    # a sentence that discloses a count and then denies it outright now
+    # reads as the disclosure. It is self-contradicting either way, and the
+    # four rows above are ordinary prose.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. 3 checks pending -- none.")], False,
+     "a counted disclosure denied outright is a known miss, not a block"),
+    # Round 17, finding 3. A count re-targeted off this PR was refused by
+    # the tail and admitted by the lead, so one word order disclosed and
+    # the other did not. The first row is the tail form, already pinned
+    # above; these three are the front-loaded forms it disagreed with.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. On main, 3 checks failed.")], True,
+     "a re-target in front of the count buys no more exemption than behind"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. In the sibling repo 3 checks failed.")], True,
+     "...with three words between the preposition and the count"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Last week 3 checks failed.")], True,
+     "...and for a temporal re-target, which names no place at all"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. On this PR, 3 checks failed.")], False,
+     "...but a self-referential object is a disclosure, not a re-target"),
+    # The first sentence must disclose NOTHING, or it returns True on its
+    # own hit and the lead in front of the second is never consulted. The
+    # round-17 draft of this row opened "2 runs still in progress", which
+    # made it vacuous: widening the gap to any non-word character killed
+    # nothing.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. The rebase landed in main. 3 checks failed.")], False,
+     "...and the lead cannot reach across a sentence boundary"),
+    # Round 18, finding 1. The connector between a label and the value that
+    # denies it was a CLOSED set, so the two spellings a status recap
+    # actually uses went unrecognised while the enumerated ones blocked.
+    # It is the complement now: any run of punctuation that is not a
+    # sentence terminator or a comma.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending -> 0.")], True,
+     "an arrow attaches the value that denies the phrase"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending => 0.")], True,
+     "...in its fat-arrow spelling too"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("| 14 pass | checks pending | 0 |")], True,
+     "...and a markdown table cell, which is this corpus's recap format"),
+    # The counterweight, and the reason the complement excludes `,` and the
+    # terminators: a comma SEPARATES rather than attaches, so the zero
+    # belongs to its own clause and the phrase in front still discloses.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending, 0 of them are mine.")], False,
+     "a comma separates rather than attaches, so the phrase still discloses"),
+    # Round 18, finding 8. The absence vocabulary missed the spellings a
+    # table uses.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending: nil.")], True,
+     "nil denies the phrase it trails"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending: n/a.")], True,
+     "...and so does the n/a a status table writes"),
+    # ...and the regression that widening nearly shipped. Folding the new
+    # words into the guarded alternative put `no` in front of a `no longer`
+    # lookahead the new alternative did not carry, so a phrase saying the
+    # blockage is GONE read as a denial of the pending work.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending -- no longer blocked.")], False,
+     "`no longer` is still exempt from the widened negator set"),
+    # Round 18, finding 4. `patched` is a resolution in the same force as
+    # `fixed`, and its absence let the count it governs read as live work.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. I patched 3 errors.")], True,
+     "a resolved count buys no exemption for the synonyms of `fixed` either"),
+    # Round 18, finding 6. The re-target guard sat inside the digit branch,
+    # so only the COUNTED spelling of a re-target was ever tested against
+    # it. Both spellings name work on `main`, not on this PR.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. On main, checks are still running.")], True,
+     "a re-target is refused for a disclosure that names no number"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. On this PR, checks are still running.")], False,
+     "...and the self-referential object is still a disclosure, not a re-target"),
+    # Round 19, finding 4. A waiting verb's own preposition is not a
+    # re-target lead. Each of these discloses pending work and was blocked,
+    # while the same sentence punctuated with a colon was exempt -- so the
+    # guard's answer turned on punctuation carrying no meaning here.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Waiting on CI, 2 checks pending.")], False,
+     "`waiting on` is a disclosure of pending work, not a re-target"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Blocked on CI, 3 checks pending.")], False,
+     "...and so is `blocked on`"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Held up on the runner, 2 checks pending.")], False,
+     "...and `held up on`, whose verb phrase no fixed-width lookbehind fits"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Depends on CI, 2 checks pending.")], False,
+     "...and `depends on`"),
+    # The exemption is tied to the SPAN, not to the lead as a whole: the
+    # waiting phrase must supply the very preposition the re-target lead
+    # opened with. A waiting verb elsewhere in the lead leaves the re-target
+    # reading intact, which a bare search over the lead would destroy.
+    #
+    # That has to happen inside `_RESOLVED_LEAD_WINDOW`, which is 48
+    # characters, AND with more than three words between the two
+    # prepositions, since `_RETARGET_LEAD` reaches back only three. Two
+    # earlier drafts of this row satisfied neither -- the first was too long
+    # for the re-target lead to match at all, the second pushed the waiting
+    # verb out of the window -- and each passed while pinning nothing. Only
+    # the mutation sweep reported it: relaxing the span test to a bare
+    # search killed zero rows.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Waiting on a slow flaky build, "
+          "on main, 2 checks pending.")], True,
+     "a waiting verb elsewhere in the lead does not cancel a re-target"),
+    # Round 20, finding 1. That span test was written as
+    # `w.end() > retarget.start()`, which is only its trailing half, so ANY
+    # waiting phrase later in the lead cancelled an earlier re-target. The
+    # row above could not see it: its waiting phrase sits BEFORE the
+    # re-target, so the half test and containment agree there. Here the
+    # waiting phrase sits INSIDE the re-target's own match.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Earlier, waiting on infra, 2 checks failed.")], True,
+     "a waiting phrase inside the re-target's own span does not cancel it"),
+    # ...and that row does NOT separate the two tests, though its comment
+    # claimed it was the only arrangement that did. Reverting the span test
+    # to the trailing half kills zero rows, because the re-anchor below
+    # rescues the same verdict by a longer route: the half test takes
+    # `waiting on` for the supplier, truncates to `Earlier, `, and matches
+    # the re-target again on what is left. A differential over the two
+    # predicates found 374 leads of 37914 where they do disagree, all of
+    # one shape -- a SECOND waiting phrase before the re-target, which
+    # cancels the re-anchored lead as well and so has nothing left to
+    # rescue. This is that shape, and it is the row that kills the
+    # mutation. `earlier` carries no preposition for a waiting verb to have
+    # supplied, so the containment answer is also the one the round-19 rule
+    # asks for; the half test mis-attributes `blocked on`'s `on` to it and
+    # then loses `on CI, earlier, ` to `Waiting on` on the next pass.
+    # A semicolon in place of the first comma does not discriminate.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Waiting on CI, earlier, blocked on review, "
+          "2 checks failed.")], True,
+     "a second waiting phrase before the re-target does not cancel it either"),
+    # ...and when the containment DOES hold, the lead before the waiting
+    # phrase may still carry a re-target of its own. `_RETARGET_LEAD` is
+    # anchored at the end of the lead, so it only ever sees the re-target
+    # adjacent to the count: here that is `on infra`, whose preposition the
+    # waiting verb supplied. Re-anchoring at the waiting phrase finds the
+    # `On main` the anchor could not. The parent exempted this sentence by
+    # reading `on infra` as a re-target to something called infra, so
+    # dropping the re-anchor keeps the verdict and loses the reason.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. On main, blocked on infra, 3 checks failed.")], True,
+     "a cancelled re-target re-anchors on the lead before the waiting phrase"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. On main, waiting for review, 3 checks failed.")], True,
+     "...for a waiting phrase whose preposition is `for` rather than `on`"),
+    # Round 18, finding 5. A CI noun the set omitted turned an honest
+    # progress report into a block. Widening the noun list constrains the
+    # polysemous pending word to check context rather than loosening it.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, 3 tests still running.")], False,
+     "a count of running tests discloses as a count of running checks does"),
+    # Round 18, finding 9. The subordinators were half present, so one
+    # conjunction broke the resolved lead and its synonym did not.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. I fixed it so 3 checks failed.")], False,
+     "a subordinating conjunction breaks the resolved lead as `and` does"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. I fixed it and 3 checks failed.")], False,
+     "...which is the behaviour the listed conjunction already had"),
+    # Round 18, finding 2, the correctness half. Precomputing the sentence
+    # starts and bisecting is not identical to the per-hit rescan: that
+    # rescan bounded `finditer` at the hit, where `$` matches AT the endpos,
+    # so a terminator sitting flush against the hit was a boundary for it
+    # and is not one for a whole-text scan. Without the O(1) abutment test
+    # beside the bisect, the sentence here runs back to index 0 and the
+    # `not` in the previous sentence negates a claim it does not govern.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("I have not rebased.All checks pass.")], True,
+     "a terminator flush against the hit still ends the previous sentence"),
+    # Round 17, findings 4 and 5. A past-tense verb in front of a count is
+    # an exemption only for a count of things that FAILED: a review can be
+    # addressed while the runs it triggered are still queued. And a
+    # coordinating conjunction opens a new clause, so it can never be
+    # filler inside one. The first of these is close to the remedy this
+    # guard itself prints, which is the jointly-unsatisfiable pair.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Addressed review and 3 runs still in progress.")], False,
+     "a resolution verb does not retract a count of work still queued"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Fixed lint and 3 checks pending.")], False,
+     "...for the pending alternative in its own right"),
+    # ...and the same shape with no conjunction, which is what isolates the
+    # failing-count gate: both rows above also fail on the conjunction
+    # exclusion, so either fix alone keeps them green.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Addressed the 3 reviews still in progress.")], False,
+     "...with the verb reaching the count, and the count still queued"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Two fixes and 3 errors remain.")], False,
+     "a conjunction is not filler, so the verb does not reach the count"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Fixed CI and 3 errors remain.")], False,
+     "...with no article to pad the window past its two-word bound"),
+    # Round 16, finding 3, the other side. The connector set is closed on
+    # purpose: admitting an arbitrary word would let "with" fill the slot
+    # and "no" satisfy the negator, which is round 15 finding 3 reopened.
+    # An adverb is admitted anyway, by the optional word in front of the
+    # MANDATORY copula -- so this row pins a recognized denial rather than
+    # a miss, and it is the copula that separates it from "with zero
+    # drama". Round 16 described it as a deliberate miss, which inverts the
+    # mechanism: a genuine miss here reads as a disclosure and exempts the
+    # clean claim silently, which is the opposite of what this row sees
+    # (round 17, finding 7).
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Checks pending today are none.")], True,
+     "an adverb before the copula is admitted, so the denial is recognized"),
+    # Round 16, finding 4. The count alternative required the digit to be
+    # adjacent to the verb, so the commonest honest disclosure there is was
+    # a false alarm -- and the comment above it told the author to write
+    # exactly the form that did not work. The noun slot is `_CHECK_NOUN`,
+    # shared with the pending alternatives. The last row pins that the tail
+    # still refuses a count re-targeted somewhere other than this PR.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. 3 checks failed.")], False,
+     "a count with its noun between it and the verb still discloses"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. 1 check failed.")], False,
+     "...in the singular"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. 2 jobs failing.")], False,
+     "...for another noun in the shared vocabulary"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. 3 checks failed on main.")], True,
+     "...but the tail still refuses one re-targeted off this PR"),
+    # Round 15, finding 2: a failing count says nothing about what it counts,
+    # so an unattached one bought the whole exemption and let the clean claim
+    # in front of it through. The count now has to land on a clause end or on
+    # a word that keeps it current. The middle row is a count of something
+    # that is not a check at all; the last two pin the admitted side, one
+    # landing on a state word and one on the end of the text.
+    #
+    # The sentence has to carry a BARE count and nothing else, because the
+    # re-aim blocks on any non-bare assert regardless: with "fully clean" in
+    # front of it the defect is invisible, and a row written that way would
+    # have passed at both commits. Measured against the parent commit: these
+    # two do not block there and do here.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. I fixed 3 errors in the docs.")], True,
+     "a failing count re-targeted by a preposition buys no exemption"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. I corrected 2 failures of imagination.")], True,
+     "...whatever the count is actually counting"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. 3 errors remain.")], False,
+     "...while a word that keeps the count current still discloses"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. 2 failures outstanding")], False,
+     "...at the end of the text, where there is no terminator to land on"),
+    # That row lands on a state WORD, so it says nothing about the tail's
+    # end-of-text arm; this one has neither a terminator nor a state word
+    # after it, and dropping `\Z` flips it alone.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. 3 failures")], False,
+     "...and a bare failing count ending the text still discloses"),
+    # Three rows found by mutating the round-15 code rather than by the
+    # review, each pinning a boundary the sentences above cannot reach.
+    #
+    # A negator sitting EXACTLY on a clause start is the one index where the
+    # two bisect sides disagree about the negator list, and a line break is
+    # how that happens in ordinary writing: the breaker ends on the capital.
+    # Reading right past it turns a denial into a disclosure, which is the
+    # direction that switches the guard off.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass.\nNo checks pending.")], True,
+     "a denial opening its own line still denies"),
+    # The decimal guard on the clause breaker is load-bearing in BOTH
+    # directions, and only this one is dangerous. Round 14 recorded the false
+    # ALARM: splitting inside `v1.0` left a window whose leading `0` read as
+    # a denial. Splitting also SHORTENS the window, which drops a real
+    # negator out of it -- here the `no` that denies the pending checks --
+    # and the guard then goes silent on the count in front of it.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass, no v1.0 checks pending.")], True,
+     "a version number inside a denial does not split it into two clauses"),
 
     ([READ_FILE_QUERY, READ_FILE_RESULT, say("Checked the file contents.")], False,
      "reading script source containing failure text must not trip query block"),
@@ -462,22 +1161,42 @@ CASES = [
           }}]}},
       say("All checks green at this head.")], True,
      "chained git push after git add is recognized as a push"),
+    # Round 20, finding 5. This row used to carry a bare
+    # `git push --force-with-lease origin main`, and stayed green with
+    # `args.get("CommandLine")` deleted from `_check_push`: `cmd_str` became
+    # None, control fell through to the step-3 blob fallback, and `RX_PUSH`
+    # matched `git push` inside the serialized JSON whatever key had held it.
+    # So it pinned the fallback rather than the extraction its label names.
+    # `git -C <dir> push` is recognised by the shell parse and invisible to
+    # `RX_PUSH`, whose `git\s+push` cannot span the `-C` and its argument, so
+    # only the parsed path can see it. (`--git-dir=...git push` does NOT work
+    # here: the blob then literally contains `git push`.)
     ([QUERY,
       {"type": "assistant", "message": {"content": [
           {"type": "tool_use", "name": "run_command", "input": {
-              "CommandLine": "git push --force-with-lease origin main"
+              "CommandLine": "git -C /home/user/ai-config push origin HEAD"
           }}]}},
       say("All checks green at this head.")], True,
      "CommandLine parameter with git push is recognized as a push"),
 
     # Local file tools mentioning query vocabulary must not register as a fresh status query.
+    # Round 20, finding 4. This row used to read `view_file` on
+    # `/path/to/scripts/check-pr-fully-clean.py`, and stayed green with BOTH
+    # `LOCAL_FILE_TOOLS` guards deleted -- `RX_QUERY` never matched that blob
+    # at all, because the path alone carries none of its vocabulary (the
+    # `check-pr-fully-clean.py` alternative requires a leading `python3`), so
+    # the row asserted nothing about the set its label names. A `grep_search`
+    # for `statusCheckRollup` is both the realistic shape of the false
+    # positive -- an agent searching the corpus for the vocabulary while
+    # writing about it -- and one `RX_QUERY` really does match.
     ([QUERY, PUSH,
       {"type": "assistant", "message": {"content": [
-          {"type": "tool_use", "name": "view_file", "input": {
-              "AbsolutePath": "/path/to/scripts/check-pr-fully-clean.py"
+          {"type": "tool_use", "name": "grep_search", "input": {
+              "SearchDirectory": "/home/user/ai-config",
+              "Query": "statusCheckRollup"
           }}]}},
       say("All checks green at this head.")], True,
-     "view_file mentioning query vocabulary must not count as fresh status query"),
+     "grep_search for query vocabulary must not count as fresh status query"),
     ([QUERY, PUSH,
       {"type": "assistant", "message": {"content": [
           {"type": "tool_use", "name": "edit", "input": {
@@ -487,6 +1206,199 @@ CASES = [
       say("All checks green at this head.")], True,
      "edit tool mentioning query vocabulary must not count as fresh status query"),
 ]
+
+
+def check_cost():
+    r"""Bounded cost on the two shapes that have each gone quadratic here.
+
+    This suite had no timing assertion of any kind until round 16, which is
+    why it could not see either. The verdict is identical under a quadratic
+    and a linear pattern, so every other row in this file passes in both
+    states -- a cost ceiling is the only instrument that can tell them
+    apart, exactly as in the sibling suite for the verdict-echo hook.
+
+    The two shapes are independent and a fix for one does not bound the
+    other, so both are asserted:
+
+    A LONG CLAUSE WITH MANY HITS. Round 15, finding 1: the prefix scan
+    re-sliced and re-searched a growing window once per hit, so k hits over
+    n characters cost O(n*k). What makes the loop run to completion is that
+    every hit is SKIPPED -- the first hit it does not skip returns True and
+    the rest are never read, which is how round 16's own shape came to time
+    a body of 8000 disclosures after looking at one of them (round 17,
+    finding 2). A resolution verb in front of each count skips all 8000.
+    Measured at 160017 characters: 0.107s as shipped, against 40.99s with
+    the per-hit prefix rescan reinstated and 41.50s with the window
+    unbounded -- the two regressions this shape exists to catch, each
+    confirmed to turn it red and each invisible to round 16's version.
+
+    ONE LONG RUN OF SPACES. Round 16, finding 1: the rewrite spelled the
+    trailing negator with two adjacent unbounded `[ \t]*` runs, so a
+    FAILING match tried every split of one run between them. Measured at
+    8000 spaces: 5.63s as that commit shipped, 0.003s once written as one
+    run plus an optional connector. Note the asymmetry that makes this the
+    easier one to miss: cost is quadratic in the length of a single run and
+    only linear in how many runs there are, so a padded markdown table does
+    not trigger it and nothing short of one long run will.
+
+    Its disclosure is UNCOUNTED, which round 17 made load-bearing: a
+    counted hit never reaches the trailing negator now, so the round-16
+    wording of this shape stopped timing the pattern it names. The sweep
+    caught it -- reinstating the two adjacent runs killed nothing -- which
+    is finding 2's vacuity arriving by way of this round's own fix.
+
+    The ceiling is 5s against a whole-process baseline of about 0.04s,
+    which the larger shape takes to 0.107s -- ample headroom on a slow
+    runner, and still red on every regression above by two to three orders
+    of magnitude.
+    """
+    failures = 0
+    # Both shapes must OPEN with a clean claim. `main()` returns at
+    # `find_unnegated_assert` when there is none, so a pathological body
+    # with no assertion in it never reaches `discloses_pending` at all --
+    # the first draft of this check omitted the opener and passed against
+    # the very commit whose regression it was written to catch, in 0.04s.
+    CLEAN = "All checks pass. "
+    # Every hit in the first shape is SKIPPED, which is what makes the loop
+    # run to completion. Round 16 wrote it as a repeated bare disclosure,
+    # so the very first hit returned True and the other 7999 were never
+    # reached: the check passed in 0.07s against a body it had not read,
+    # and it would have passed identically with the per-hit prefix rescan
+    # reinstated (round 17, finding 2). A resolved lead in front of each
+    # count skips every one of them, so the per-hit work is what is timed.
+    # Round 18, finding 3. Neither shape above reaches
+    # `all_unnegated_asserts` with work to do: the first never calls it at
+    # all, because its `discloses_pending` is False, and the second calls it
+    # over a body holding ONE assert. So the per-assert quadratic in
+    # `_sentence_start` was invisible to both -- a mutant whose cost is
+    # proportional to the assert count passed 207/207 with both rows
+    # unmoved. A row needs many asserts AND a disclosed pending state
+    # together, which is an ordinary multi-PR status recap: one line
+    # disclosing the pending work, then one bullet per PR.
+    #
+    # Round 20, finding 2. What this row ACTUALLY kills is narrower than the
+    # revision above claimed, and the difference matters because round 18
+    # finding 2 was fixed by TWO mechanisms -- the precomputed sentence
+    # starts read by bisect in `_sentence_start`, and the generator form of
+    # `all_unnegated_asserts` -- and this row was cited as pinning the pair.
+    # Each reverted ALONE against this suite at f6e6d242, before the LAZY
+    # row below existed (so out of 245):
+    #
+    #   `_sentence_start` rescan, `if starts is None:` -> `if True:`
+    #       244/245. The row that reddens is the STALE one below, at
+    #       16.02s. THIS row stays green, at 0.08s.
+    #   `all_unnegated_asserts` eager, `return iter([...])`
+    #       245/245. Every cost row green, this one at 0.17s -- the whole
+    #       suite passed with half the fix reverted.
+    #   both together
+    #       243/245. This row reddens, at 29.86s.
+    #
+    # So it fires only on the CONJUNCTION, and on the conjunction the STALE
+    # row fires too -- its kill set is a subset of that row's. It is kept
+    # as the only shape covering the `discloses_pending` re-aim path, not
+    # as the pin for either mechanism; the LAZY row below is what pins the
+    # generator half, which had no killing row at all. With that row added
+    # the same three states read 245/246, 245/246 and 243/246, and each
+    # mechanism has a row of its own.
+    #
+    # The times are samples under load rather than constants: the round-20
+    # review's own sweep of these same three states read 14.91s, 0.18s and
+    # 14.38s where this one reads 16.02s, 0.17s and 29.86s. The VERDICTS
+    # agreed exactly, which is what the sweep is for -- the 5s ceiling
+    # rests on the two to three orders of magnitude between a reverted and
+    # a shipped reading, not on any one number.
+    #
+    # Recording the kills per mechanism rather than asserting coverage is
+    # the rule this branch adds to `shared/workflow/ardi.md`.
+    RECAP = (CLEAN + "3 checks still running.\n" + "".join(
+        "- PR #%d: all checks green, 12 pass, ready to merge; "
+        "rebased on main and fully clean.\n" % i for i in range(1500)))
+    # ...and the STALENESS branch reaches the same helper by the other
+    # route, which is why this shape carries its own events. The mutation
+    # sweep is what separated them: reverting the bisect alone killed
+    # nothing, because on the failing-query branch the lazy generator stops
+    # at candidate 0 and the quadratic never runs. The `soft` loop below
+    # runs to completion instead, so it needs many BARE counts with no PR
+    # reference anywhere near them -- one `#N` and it breaks on the first
+    # hit. Measured with the bisect reverted, 14.84s; it is 0.60s here.
+    STALE = "".join("Suite %d: 12 pass.\n" % i for i in range(6000))
+    # ...and the GENERATOR half of that same fix, which no shape above can
+    # see. Two conditions have to hold together for the eager form to cost
+    # anything: a caller must stop early, AND the candidates it skipped must
+    # be expensive to evaluate. Each shape above misses one. The two single-
+    # assert bodies have nothing to skip. STALE's asserts are all bare counts
+    # with no PR reference, so the `soft` loop runs to completion and reads
+    # every one of them under either form. RECAP stops at candidate 0, but
+    # `RX_SENTENCE_BREAK` treats a bare newline as a break, so each of its
+    # asserts sits in a one-line sentence and evaluating all 7501 is cheap
+    # once `_sentence_start` bisects -- which is why it reddens only when the
+    # bisect is reverted too. (Counted directly: 7501 asserts, the `soft`
+    # loop and the re-aim each reading 1; STALE 6000 asserts and 6000 read;
+    # LAZY 2500 and 1.)
+    #
+    # One unbroken LINE satisfies both conditions at once. Every assert then
+    # shares the same whole-line prefix, so evaluating one is O(offset) and
+    # evaluating all of them is quadratic whatever `_sentence_start` costs;
+    # and candidate 0 is a non-bare-count phrase, so `find_unnegated_assert`
+    # returns there and the `soft` loop below breaks on it -- 2499 of the
+    # 2500 are never evaluated. That is exactly the shape the helper's
+    # docstring describes and nothing pinned.
+    #
+    # Measured against the hook at f6e6d242, in the suite: 0.05s to 0.28s
+    # as shipped across runs, and 17.78s with `all_unnegated_asserts`
+    # reverted to `return iter([...])`, against the same 5s ceiling. It
+    # stays green under the `_sentence_start` revert alone, at 0.05s, so the
+    # two rows separate the two mechanisms rather than both answering to
+    # the conjunction. Outside the suite the reverted reading is 17.26s at
+    # k=2500, 11.89s at k=2000 and 6.13s at k=1500, so the size is chosen
+    # for headroom over the ceiling rather than to be just past it.
+    LAZY = "Status on the stack: " + "PR ready to merge, " * 2500 + "done"
+    # Round 19, finding 3. `RX_NEVER_RAN` opened with three adjacent
+    # unbounded runs, so a FAILING match over a long whitespace prefix tried
+    # every split of it between them. It runs once per PART of every push
+    # tool_result, and a push result is exactly where a padded harness
+    # banner lands, so the shape is eight parts each opening with a long run
+    # and going on to say the call succeeded. Measured at 8 x 16000:
+    # 18.47s with the three runs reinstated, 0.05s as written. The other
+    # three shapes above cannot see it -- none of them carries a push
+    # tool_result at all, so the helper is never called.
+    NEVER_RAN_COST = [
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "pz", "name": "bash",
+             "input": {"command": "git push origin main"}}]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": "pz", "content": [
+                {"type": "text", "text": " " * 16000 + "Exit code 0"}
+                for _ in range(8)]}]}},
+        say(CLEAN),
+    ]
+    shapes = [
+        ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+          say(CLEAN + "fixed 3 errors left " * 8000)],
+         "many skipped hits, loop run to completion"),
+        ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+          say(CLEAN + "Checks pending" + " " * 16000 + "x")],
+         "one long run of spaces"),
+        ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT, say(RECAP)],
+         "many asserts beside a disclosed pending state"),
+        ([PUSH, PUSH_OK, say(STALE)],
+         "many bare counts on the staleness branch"),
+        ([PUSH, PUSH_OK, say(LAZY)],
+         "many asserts in one sentence, all but the first unread"),
+        (NEVER_RAN_COST, "long whitespace runs in a push result"),
+    ]
+    for events, label in shapes:
+        started = time.time()
+        run(events)
+        elapsed = time.time() - started
+        ok = elapsed < 5.0
+        failures += 0 if ok else 1
+        print(f"{'ok  ' if ok else 'FAIL'}  cost: {label} "
+              f"under 5s (took {elapsed:.2f}s)")
+    return failures
+
+
+COST_CHECKS = 6
 
 
 def run(events):
@@ -518,6 +1430,23 @@ def run(events):
 # a detector that is right about the important part and wrong about the
 # visible part survives a green suite.
 ATTRIBUTION = [
+    # The comparison behind this block is by TIME alone: the most recent
+    # status query against the most recent push, with no notion of which
+    # repository or branch either touched. A push to a DIFFERENT repo
+    # therefore trips it over a reading that was perfectly current. Firing
+    # there is the safe direction and stays, but the message must not assert
+    # the premise -- an earlier wording said flatly that the reading
+    # "describes a commit that is no longer the head", which is false in that
+    # case, and the author conceded a retraction the evidence did not support.
+    ("All checks green on the four PRs.",
+     "by TIME, not by repository or branch",
+     "the message discloses that the comparison is repo-blind"),
+    ("All checks green on the four PRs.",
+     "MAY describe a commit",
+     "the staleness is stated as possible, not asserted"),
+    ("All checks green on the four PRs.",
+     "do not write a retraction the evidence does not support",
+     "the message warns against over-conceding to it"),
     ("Local suite: 33 pass.",
      "states a pass/fail count",
      "a bare count with no PR reference reads as possibly-local"),
@@ -583,15 +1512,37 @@ def check_query_forms():
     return failures
 
 
-def check_attribution():
+# The failing-query branch is PR-blind in the same way the staleness branch is
+# repo-blind: it pairs any unnegated ASSERT in the message against any failing
+# query in the transcript, without checking they concern the same PR. Firing
+# is still the safe direction; the message must say what it matched.
+ATTRIBUTION_FAILING_QUERY = [
+    ("#3928 has 2 checks still in progress. #49 is fully clean.",
+     "by TEXT and TIME, not by pull request",
+     "the message discloses that the match is PR-blind"),
+    ("#3928 has 2 checks still in progress. #49 is fully clean.",
+     "may concern a DIFFERENT PR",
+     "it names the specific way the premise can miss"),
+    ("#3928 has 2 checks still in progress. #49 is fully clean.",
+     "do not retract a claim the evidence supports",
+     "it warns against over-conceding, as the staleness branch does"),
+    ("#3928 has 2 checks still in progress. #49 is fully clean.",
+     "no longer fires",
+     "it names the progress-report form that is now exempt"),
+]
+
+
+def check_attribution(table=None, events=None, prefix="attribution"):
     """Each warning must describe what it matched, not what it assumed."""
     failures = 0
-    for message, expected, label in ATTRIBUTION:
+    table = ATTRIBUTION if table is None else table
+    events = (QUERY, PUSH) if events is None else events
+    for message, expected, label in table:
         td = tempfile.mkdtemp()
         try:
             path = os.path.join(td, "transcript.jsonl")
             with open(path, "w", encoding="utf-8") as fh:
-                for e in (QUERY, PUSH, say(message)):
+                for e in tuple(events) + (say(message),):
                     fh.write(json.dumps(e) + "\n")
             env = dict(os.environ, TMPDIR=td, TEMP=td, TMP=td)
             out = subprocess.run(
@@ -602,19 +1553,29 @@ def check_attribution():
             reason = (json.loads(out).get("reason") if out else "") or ""
             ok = expected in reason
             failures += 0 if ok else 1
-            print(f"{'ok  ' if ok else 'FAIL'}  attribution: {label}")
+            print(f"{'ok  ' if ok else 'FAIL'}  {prefix}: {label}")
         finally:
             shutil.rmtree(td, ignore_errors=True)
     return failures
 
 
-# ai-config#3958: warning must name the push command or tool that triggered the staleness.
 PUSH_ATTRIBUTION = [
     (PUSH, "(git push -q)", "CLI git push summary in reason"),
     (MCP_PUSH, "(mcp__github__push_files)", "MCP push tool name in reason"),
     ({"type": "assistant", "message": {"content": [
         {"type": "tool_use", "name": "run_command", "input": {"command": "git push origin main"}}]}},
      "(git push origin main)", "CLI chained/argument push in reason"),
+
+    # Two pushes in ONE assistant message share a message index, so the
+    # tie-break decides which one the warning names. `max` returns the first
+    # maximal element and would name `first`; the head was moved by `second`.
+    ({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": "t1", "name": "run_command",
+         "input": {"command": "git push origin first"}},
+        {"type": "tool_use", "id": "t2", "name": "run_command",
+         "input": {"command": "git push origin second"}}]}},
+     "(git push origin second)",
+     "two pushes in one message: the LAST is named, not the first"),
 ]
 
 
@@ -653,9 +1614,20 @@ def main():
         print(f"{'ok  ' if ok else 'FAIL'}  "
               f"{'block' if want_block else 'allow'}: {label}")
     failures += check_attribution()
+    failures += check_attribution(
+        ATTRIBUTION_FAILING_QUERY,
+        (CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT),
+        "attribution (failing-query)",
+    )
     failures += check_push_attribution()
     failures += check_query_forms()
-    total = len(CASES) + len(ATTRIBUTION) + len(PUSH_ATTRIBUTION) + len(QUERY_FORMS)
+    failures += check_cost()
+    # `ATTRIBUTION_FAILING_QUERY` runs above and its failures are counted,
+    # so leaving it out of the denominator understated the suite by four:
+    # it printed `117/117 passed` over 121 executed checks, and a reader
+    # comparing runs saw the population unchanged (round 7, finding 7).
+    total = (len(CASES) + len(ATTRIBUTION) + len(ATTRIBUTION_FAILING_QUERY)
+             + len(PUSH_ATTRIBUTION) + len(QUERY_FORMS) + COST_CHECKS)
     print(f"\n{total - failures}/{total} passed")
     return 1 if failures else 0
 

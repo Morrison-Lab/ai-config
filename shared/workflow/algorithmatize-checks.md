@@ -650,6 +650,41 @@ The generalization past this one harness to any sweep's scorer is
 [`batch-merge-and-resolve`](batch-merge-and-resolve.md)'s, restated for the
 mutation case.)
 
+**The positive control is the half that actually catches a harness whose
+suite never ran, and it is the half easiest to skip.**
+The section above prescribes both controls and gives the reason for each.
+In practice the unmutated control is the one that gets run, because it is
+the one already in front of you -- and it cannot see this failure at all:
+a harness that never runs the suite scores the unmutated tree SURVIVED,
+which is exactly what a healthy harness reports.
+The control passes, and every mutant then reads as a coverage gap.
+
+A whole sweep of zeroes is the tell.
+Read it the way a CLUSTERED baseline failure is read -- as a question about
+the harness before it is a question about the suite -- because a real suite
+is never uniformly blind, and the odds that ten unrelated mutations all
+survive are worse than the odds that the scorer is broken.
+
+Measured 2026-09-24 on `Morrison-Lab/ai-config`'s own hook suites, which
+take the hook path as `sys.argv[1]`.
+A harness copied from a working one invoked `[sys.executable, SUITE]` and
+dropped the path, so every run died with `IndexError` before a single case
+executed.
+The scorer collected lines beginning `FAIL`, found none in a traceback, and
+reported `kills 0` for all four mutations -- including one that removes the
+guard under test outright.
+Passing the path turned that same mutation into `kills 5`.
+
+- **Do:** run a mutation you KNOW the suite catches through the harness
+  before reading any survivor, and report that it came back CAUGHT.
+- **Do:** read a sweep in which nothing is caught as a harness fault until
+  shown otherwise.
+- **Don't:** treat the unmutated control as sufficient -- it agrees with a
+  harness that never ran the suite.
+- **Don't:** copy a harness between suites without re-checking how the new
+  suite is invoked, since a missing argument fails before any case runs and
+  looks identical to a suite that guards nothing.
+
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 
 "Test the instrument against the incident that prompted it, verbatim"'s closing **Don't** governs a comment claiming *what* a matcher matches.

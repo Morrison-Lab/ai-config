@@ -355,6 +355,57 @@ class TestEvaluate(unittest.TestCase):
         self.assertEqual(decision["decision"], "deny")
         self.assertIn("not clean", decision["reason"])
 
+    def test_copilot_empty_balanced_only_inside_details_still_denies(self):
+        """The empty-Balanced shape stated ONLY inside a collapsed
+        <details> section -- a re-review echoing a prior round's own
+        overview -- is not the CURRENT round's live state, and must fail
+        closed to not-clean rather than being carved out (ai-config#4004)."""
+        body = (
+            "<details>\n<summary>Older round</summary>\n\n"
+            + self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY
+            + "\n</details>"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_empty_balanced_only_inside_html_comment_still_denies(self):
+        """The identical shape stated ONLY inside an HTML comment must
+        fail closed the same way (ai-config#4004). The leading
+        `ccr-overview-v2` marker is itself a complete, self-closing HTML
+        comment, so it is dropped here before wrapping the rest in one
+        outer comment -- real HTML comments do not nest, and including it
+        would close the outer comment at the marker's own `-->` instead of
+        at the end of this fixture, which would make the wrapped text live
+        in real rendering too rather than testing the hidden case."""
+        text_without_marker = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY.replace(
+            "<!-- ccr-overview-v2 -->\n\n", ""
+        )
+        body = "<!--\n" + text_without_marker + "\n-->"
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
     def test_bot_changes_requested_superseded_by_approved(self):
         """A bot CHANGES_REQUESTED review superseded by APPROVED allows merge."""
         state = pr(

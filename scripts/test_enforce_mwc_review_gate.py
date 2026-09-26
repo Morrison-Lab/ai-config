@@ -406,6 +406,80 @@ class TestEvaluate(unittest.TestCase):
         self.assertEqual(decision["decision"], "deny")
         self.assertIn("not clean", decision["reason"])
 
+    def test_copilot_marker_and_block_must_be_the_same_overview(self):
+        """A live 'Needs a closer look' heading elsewhere in the body must
+        not combine with an unrelated Balanced/None block sitting after the
+        v2 marker -- the two have to belong to the SAME overview
+        (ai-config#4004, the reviewer's own reproduction: a live
+        closer-look heading before the marker, plain prose under it, then
+        a genuine but heading-less Balanced/None block after the marker)."""
+        body = (
+            "### Needs a closer look\n\n"
+            "Some prose here, no effort/findings lines directly under this "
+            "heading.\n\n"
+            "<!-- ccr-overview-v2 -->\n"
+            "## Copilot review overview\n\n"
+            "**Review effort:** Balanced\n**Findings:** None\n"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_two_v2_markers_still_denies(self):
+        """Two v2 overview markers in one body -- an earlier round's
+        overview quoted alongside the current one -- is not a single
+        unambiguous block to scope to, and fails closed (ai-config#4004)."""
+        body = (
+            self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY
+            + "\n\n"
+            + self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
+    def test_copilot_heading_before_marker_with_empty_block_after_denies(self):
+        """A live heading before the marker with nothing at all after it --
+        the block is empty -- fails closed the same way as the reviewer's
+        fuller reproduction above (ai-config#4004)."""
+        body = (
+            "### Needs a closer look\n\nSome prose here.\n\n"
+            "<!-- ccr-overview-v2 -->"
+        )
+        self.assertFalse(gate.copilot_is_empty_balanced_closer_look(body))
+        state = pr(
+            reviews=[review(
+                "copilot-pull-request-reviewer",
+                "COMMENTED",
+                body=body,
+                commit=HEAD,
+            )],
+            comments=[CLEAN_VERDICT],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
     def test_bot_changes_requested_superseded_by_approved(self):
         """A bot CHANGES_REQUESTED review superseded by APPROVED allows merge."""
         state = pr(

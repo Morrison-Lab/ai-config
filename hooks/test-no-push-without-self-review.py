@@ -263,6 +263,82 @@ def subagent_transcript(text=None, agent_name="adversarial-reviewer",
     return events
 
 
+def handback_pointer(agent_id: str) -> str:
+    """The `Agent` tool's entire result when a subagent's report was
+    delivered as a `SubagentHandback` message instead (ai-config#3945) --
+    the parent transcript never carries the report itself, only this."""
+    return (f'This agent\'s report was delivered to you as a message from '
+            f'"{agent_id}" (its SubagentHandback call). Read it there; it is '
+            f"not repeated here.\nagentId: {agent_id}")
+
+
+def subagenthandback_use(message_text: str, call_id=None):
+    return {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": call_id or _fresh_id(), "name": "SubagentHandback",
+         "input": {"message": message_text}}]}}
+
+
+def run_hook_handback(cmd: str, agent_id: str, subagent_events: list,
+                      agent_type: str = "adversarial-reviewer",
+                      main_events_before=None, tool_use_id: str | None = None,
+                      meta_overrides: dict | None = None) -> tuple[int, dict]:
+    """Run the hook against a main transcript whose reviewer dispatch result
+    is hand-back-only, plus the sibling `subagents/agent-<id>.jsonl` and
+    `.meta.json` files Claude Code actually writes the report to
+    (ai-config#3945) -- reproducing the on-disk layout rather than only the
+    in-memory shapes `run_hook` builds.
+
+    `tool_use_id` defaults to the dispatch's own call id, matching the
+    measured layout where the `.meta.json` names the dispatching call. Pass a
+    different value to test the id-mismatch (agentId-text-fallback) path.
+    """
+    call_id = _fresh_id()
+    main_events = list(main_events_before or []) + [
+        agent_call(call_id=call_id),
+        agent_result(call_id, handback_pointer(agent_id)),
+    ]
+
+    tmpdir = tempfile.mkdtemp(prefix="npwsr-handback-")
+    try:
+        session_id = "sess"
+        tpath = os.path.join(tmpdir, f"{session_id}.jsonl")
+        with open(tpath, "w", encoding="utf-8") as f:
+            for ev in main_events:
+                f.write(json.dumps(ev) + "\n")
+
+        subagents_dir = os.path.join(tmpdir, session_id, "subagents")
+        os.makedirs(subagents_dir, exist_ok=True)
+
+        with open(os.path.join(subagents_dir, f"agent-{agent_id}.jsonl"),
+                  "w", encoding="utf-8") as f:
+            for ev in subagent_events:
+                f.write(json.dumps(ev) + "\n")
+
+        meta = {"agentType": agent_type,
+                "toolUseId": tool_use_id if tool_use_id is not None else call_id,
+                "requestShape": "foreground"}
+        if meta_overrides:
+            meta.update(meta_overrides)
+        with open(os.path.join(subagents_dir, f"agent-{agent_id}.meta.json"),
+                  "w", encoding="utf-8") as f:
+            json.dump(meta, f)
+
+        payload = {"tool_name": "Bash", "tool_input": {"command": cmd},
+                   "transcript_path": tpath}
+        res = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
+                             capture_output=True, text=True, cwd=REPO,
+                             env=os.environ)
+        data = {}
+        if res.stdout.strip():
+            try:
+                data = json.loads(res.stdout)
+            except Exception:
+                pass
+        return res.returncode, data
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
 PUSH = f"git -C {REPO} push origin main"
 
 CASES = [
@@ -1637,9 +1713,13 @@ def transcript_scoping_cases() -> tuple[int, int]:
         tf.write(json.dumps(rec1) + "\n" + json.dumps(rec2) + "\n")
 
     try:
+        # `read_latest_review`'s second element is a LIST of every
+        # `Reviewed-Commit:` line the winning report named (ai-config#3945),
+        # not a single string -- a single-fingerprint report still names
+        # exactly one, as a one-element list.
         v, s, saw = mod.read_latest_review(tf_path)
         check("transcript_scoping: unattributed main-session prose cannot overwrite reviewer blocking verdict",
-              (v, s, saw) == ("needs_work", HEAD.lower(), True))
+              (v, s, saw) == ("needs_work", [HEAD.lower()], True))
     finally:
         if os.path.exists(tf_path):
             os.remove(tf_path)
@@ -2393,6 +2473,115 @@ def omo_cases() -> tuple[int, int]:
 
     return failures, ran
 
+
+def handback_cases() -> tuple[int, int]:
+    """Claude Code's hand-back delivery (ai-config#3945).
+
+    Sometimes the dispatched reviewer's report never reaches the parent's own
+    `Agent` tool_result at all: the result carries only a pointer sentence
+    and an `agentId`, and the report lives in a sibling
+    `subagents/agent-<agentId>.jsonl` file, as the `message` input of that
+    subagent's own LAST `SubagentHandback` tool_use, with a `.meta.json`
+    naming the dispatching call's `toolUseId` and the subagent's `agentType`.
+    `run_hook_handback` reproduces that on-disk layout.
+    """
+    failures = 0
+    ran = 0
+
+    def check(label, ok, detail=""):
+        nonlocal failures, ran
+        ran += 1
+        if ok:
+            print(f"PASS: {label}")
+        else:
+            print(f"FAIL: {label}{' - ' + detail if detail else ''}")
+            failures += 1
+
+    def blocked_of(out):
+        return (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+
+    def reason_of(out):
+        return (out.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
+
+    # 1. A clean verdict delivered only through SubagentHandback allows the push.
+    rc, out = run_hook_handback(PUSH, "hb0001agent", [subagenthandback_use(body())])
+    check("a hand-back-only clean verdict allows the push",
+          rc == 0 and not blocked_of(out), reason_of(out)[:200])
+
+    # 2. A blocking verdict delivered the same way still refuses.
+    rc, out = run_hook_handback(
+        PUSH, "hb0002agent", [subagenthandback_use(body("Needs more work"))])
+    check("a hand-back-only blocking verdict refuses the push",
+          rc == 0 and blocked_of(out), reason_of(out)[:200])
+    check("that refusal names the blocking verdict",
+          "returned a blocking verdict" in reason_of(out), reason_of(out)[:200])
+
+    # 3. A verdict string that appears only OUTSIDE the SubagentHandback
+    #    message -- in the subagent's own prose, or in a tool result it
+    #    read while exploring -- is not consulted. Only the
+    #    `SubagentHandback` call's own `message` counts.
+    stray_call_id = _fresh_id()
+    subagent_events = [
+        {"type": "assistant", "message": {"content": [
+            {"type": "text", "text": body()}]}},
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": stray_call_id, "name": "Bash",
+             "input": {"command": "echo report"}}]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": stray_call_id, "content": body()}]}},
+    ]
+    rc, out = run_hook_handback(PUSH, "hb0003agent", subagent_events)
+    check("a verdict appearing only outside the SubagentHandback message is ignored",
+          rc == 0 and blocked_of(out), reason_of(out)[:200])
+
+    # 4. A `.meta.json` naming a non-reviewer agentType is ignored, even
+    #    though the SubagentHandback message itself is a clean report --
+    #    the harness's own record of who ran has to agree independently.
+    rc, out = run_hook_handback(PUSH, "hb0004agent", [subagenthandback_use(body())],
+                                agent_type="doc-writer")
+    check("a hand-back whose meta.json names a non-reviewer agentType is ignored",
+          rc == 0 and blocked_of(out), reason_of(out)[:200])
+
+    # 5. A `.meta.json` located by the fallback `agentId` text (no toolUseId
+    #    match) is still admitted, once its agentType confirms the reviewer.
+    rc, out = run_hook_handback(PUSH, "hb0005agent", [subagenthandback_use(body())],
+                                tool_use_id="toolu_unrelated_0000")
+    check("a hand-back located by the agentId text fallback still authorizes",
+          rc == 0 and not blocked_of(out), reason_of(out)[:200])
+
+    # 6. A report naming several `Reviewed-Commit:` lines under one verdict
+    #    authorizes a push shipping ANY one of them (ai-config#3945).
+    multi_text = ("### Verdict: Ready for merge\n\n"
+                  f"Reviewed-Commit: {HEAD}\n"
+                  f"Reviewed-Commit: {PREV}\n"
+                  f"Reviewed-Commit: {FEATURE}\n")
+
+    rc, out = run_hook_handback(PUSH, "hb0006agenta", [subagenthandback_use(multi_text)])
+    check("a multi-Reviewed-Commit hand-back report allows the first listed sha",
+          rc == 0 and not blocked_of(out), reason_of(out)[:200])
+
+    rc, out = run_hook_handback(
+        f"git -C {REPO} push origin main~1:refs/heads/npwsr-prev-check",
+        "hb0006agentb", [subagenthandback_use(multi_text)])
+    check("a multi-Reviewed-Commit hand-back report allows the second listed sha",
+          rc == 0 and not blocked_of(out), reason_of(out)[:200])
+
+    rc, out = run_hook_handback(
+        f"git -C {REPO} push origin feature",
+        "hb0006agentc", [subagenthandback_use(multi_text)])
+    check("a multi-Reviewed-Commit hand-back report allows the third listed sha",
+          rc == 0 and not blocked_of(out), reason_of(out)[:200])
+
+    # 7. The inline shape -- the report already embedded in the tool_result
+    #    text, prefixed and indented -- must keep working alongside the
+    #    hand-back-only shape.
+    rc, out = run_hook(PUSH, subagent_transcript())
+    check("the inline subagent-report shape still authorizes the push",
+          rc == 0 and not blocked_of(out), reason_of(out)[:200])
+
+    return failures, ran
+
+
 def codex_cases() -> tuple[int, int]:
     """Codex's native `spawn_agent` subagent dispatch (ai-config#3707).
 
@@ -3129,6 +3318,7 @@ def exempt_repo_cases() -> tuple[int, int]:
     mod = _load_subject()
 
     for url, want in (
+        ("https://github.com/Morrison-Lab/ai-config.git", "morrison-lab/ai-config"),
         ("https://github.com/Morrison-Lab/mln.git", "morrison-lab/mln"),
         ("https://github.com/Morrison-Lab/mlg", "morrison-lab/mlg"),
         ("https://GitHub.com/morrison-lab/MLR.git/", "morrison-lab/mlr"),
@@ -3154,9 +3344,9 @@ def exempt_repo_cases() -> tuple[int, int]:
             got = f"raised {type(exc).__name__}"
         check(f"`_owner_repo({url!r})` is {want!r} (got {got!r})", got == want)
 
-    check("EXEMPT_REPOS is exactly mln, mlg and mlr, lowercase",
-          mod.EXEMPT_REPOS == {"morrison-lab/mln", "morrison-lab/mlg",
-                               "morrison-lab/mlr"})
+    check("EXEMPT_REPOS is exactly ai-config, mln, mlg and mlr, lowercase",
+          mod.EXEMPT_REPOS == {"morrison-lab/ai-config", "morrison-lab/mln",
+                               "morrison-lab/mlg", "morrison-lab/mlr"})
     # Pinned by equality, like EXEMPT_REPOS, so trimming either list to the
     # members the end-to-end rows below happen to exercise still fails here.
     check("TRANSPORT_ENV is exactly the six transport-redirecting variables",
@@ -3166,6 +3356,59 @@ def exempt_repo_cases() -> tuple[int, int]:
     check("`_owner_repo` of a lookalike repository is not in EXEMPT_REPOS",
           mod._owner_repo("https://github.com/Morrison-Lab/mln-evil.git")
           not in mod.EXEMPT_REPOS)
+
+    check("DEFAULT_BRANCH_NAMES is exactly main and master",
+          mod.DEFAULT_BRANCH_NAMES == {"main", "master"})
+
+    # `_refspec_dest_branch` is pure text parsing, so these need no repository.
+    # The `refs/for/...` and `refs/tags/...` rows are deliberately None rather
+    # than the string they hold: neither is a plain branch, and reading either
+    # as "not main" would defeat the fail-closed direction this function
+    # exists to serve for a shape it cannot classify.
+    for spec, want in (
+        ("main", "main"),
+        ("master", "master"),
+        ("feature", "feature"),
+        ("feature:main", "main"),
+        ("+feature:main", "main"),
+        ("refs/heads/main", "main"),
+        ("feature:refs/heads/main", "main"),
+        ("feature:refs/for/main", None),
+        ("v1.0:refs/tags/v1.0", None),
+        (":main", "main"),
+        ("main:", None),
+        ("", None),
+        # A single `*` is a valid glob on either side of a refspec (man
+        # git-push), so a dest reducing to it is not a plain branch name and
+        # must not be read as a clean non-match against DEFAULT_BRANCH_NAMES.
+        ("refs/heads/*:refs/heads/*", None),
+        ("*:*", None),
+        ("feature:main*", None),
+    ):
+        try:
+            got = mod._refspec_dest_branch(spec)
+        except Exception as exc:
+            got = f"raised {type(exc).__name__}"
+        check(f"`_refspec_dest_branch({spec!r})` is {want!r} (got {got!r})",
+              got == want)
+
+    for argv, want in (
+        (["git", "push", "origin", "main"], True),
+        (["git", "push", "origin", "feature"], False),
+        (["git", "push", "origin", "master"], True),
+        (["git", "push", "origin", "+feature:main"], True),
+        (["git", "push", "origin", ":main"], True),
+        (["git", "push", "origin", "feature", "other"], False),
+        (["git", "push", "origin", "feature", "main"], True),
+        (["git", "push", "origin", "feature:refs/for/main"], None),
+        (["git", "log"], None),
+    ):
+        try:
+            got = mod._push_targets_default_branch(None, argv, [])
+        except Exception as exc:
+            got = f"raised {type(exc).__name__}"
+        check(f"`_push_targets_default_branch(None, {argv!r}, [])` is "
+              f"{want!r} (got {got!r})", got is want)
 
     for command, want in (
         ("git push origin main", True),
@@ -3225,11 +3468,16 @@ def exempt_repo_cases() -> tuple[int, int]:
     mln = "https://github.com/Morrison-Lab/mln.git"
     other = "https://github.com/Morrison-Lab/other.git"
 
-    def run_e2e(remotes, configs, args, extra_env=None, shape="{git}"):
+    def run_e2e(remotes, configs, args, extra_env=None, shape="{git}",
+               checkout=None, detach=False):
         d = make_repo(("x",))
         tf = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False)
         tf.close()
         try:
+            if checkout:
+                _git(d, "checkout", "-q", "-b", checkout)
+            if detach:
+                _git(d, "checkout", "-q", "--detach")
             for name, url in remotes:
                 _git(d, "remote", "add", name, url)
             for cfg in configs:
@@ -3253,20 +3501,36 @@ def exempt_repo_cases() -> tuple[int, int]:
 
     origin_mln = [("origin", mln)]
     for label, remotes, configs, args, env, shape, want_deny in (
+        # These push a feature branch rather than `main`: EXEMPT_REPOS
+        # membership alone no longer suffices once the destination is the
+        # default branch -- see the dedicated `main`/`master`-targeting rows
+        # below and the bare-push/detached-HEAD checks right after this loop.
         ("an exempt https remote is allowed with no review",
-         origin_mln, [], "push origin main", None, "{git}", False),
+         origin_mln, [], "push origin feature", None, "{git}", False),
         ("an exempt remote matches case-insensitively",
          [("origin", "https://github.com/morrison-lab/MLG.git")], [],
-         "push origin main", None, "{git}", False),
+         "push origin feature", None, "{git}", False),
         ("an exempt scp-style remote is allowed",
          [("origin", "git@github.com:Morrison-Lab/mlr.git")], [],
-         "push origin main", None, "{git}", False),
-        ("an exempt remote is allowed for a bare `git push`",
-         origin_mln, [["branch.main.remote", "origin"]], "push", None,
-         "{git}", False),
+         "push origin feature", None, "{git}", False),
         ("an exempt push under `cd DIR &&` with `2>&1 | tail` is allowed",
-         origin_mln, [], "push origin main", None,
+         origin_mln, [], "push origin feature", None,
          "cd {d} && git {args} 2>&1 | tail -3", False),
+        ("an exempt push to `main` is still denied (branch-scoped exemption)",
+         origin_mln, [], "push origin main", None, "{git}", True),
+        ("an exempt push to `master` is still denied",
+         origin_mln, [], "push origin master", None, "{git}", True),
+        ("a force-push refspec targeting `main` on an exempt remote is denied",
+         origin_mln, [], "push origin +feature:main", None, "{git}", True),
+        ("a `:branch` deletion of `main` on an exempt remote is denied",
+         origin_mln, [], "push origin :main", None, "{git}", True),
+        ("an unresolvable refspec on an exempt remote is denied",
+         origin_mln, [], "push origin feature:refs/for/main", None,
+         "{git}", True),
+        ("a wildcard refspec pushing every branch on an exempt remote is "
+         "denied (review finding, PR #4013)",
+         origin_mln, [], "push origin refs/heads/*:refs/heads/*", None,
+         "{git}", True),
         ("a non-exempt repository is denied",
          [("origin", other)], [], "push origin main", None, "{git}", True),
         ("a lookalike repository name is denied",
@@ -3358,6 +3622,94 @@ def exempt_repo_cases() -> tuple[int, int]:
             ok = False
             detail = f"raised {type(exc).__name__}: {exc}"
         check(f"exempt e2e: {label} ({detail})", ok)
+
+    # A bare `git push` ships whatever branch is checked out, so these two
+    # need real repository state rather than a refspec string: one on a
+    # feature branch (still exempt) and one on `main` (denied). `make_repo`
+    # always checks out `main` first, hence the explicit `checkout=`.
+    for label, checkout, branch_config, want_deny in (
+        ("an exempt remote is allowed for a bare `git push` on a feature branch",
+         "feature", "feature", False),
+        ("an exempt remote is denied for a bare `git push` on `main`",
+         None, "main", True),
+    ):
+        try:
+            rc, denied = run_e2e(origin_mln,
+                                 [[f"branch.{branch_config}.remote", "origin"]],
+                                 "push", None, "{git}", checkout=checkout)
+            ok = rc == 0 and denied is want_deny
+            detail = f"exit {rc}, denied={denied}"
+        except Exception as exc:
+            ok = False
+            detail = f"raised {type(exc).__name__}: {exc}"
+        check(f"exempt e2e: {label} ({detail})", ok)
+
+    # A bare push does not simply ship HEAD's own branch under either override
+    # `shipped_commits` already guards against: `push.default=matching` ships
+    # every branch that also exists on the remote (which can include `main`),
+    # and a configured `remote.<name>.push` overrides the question entirely.
+    # `_push_targets_default_branch` must consult both rather than trusting
+    # HEAD's name alone, or a bare push under either override on a feature
+    # branch would read as `False` (not targeting main) while the real push
+    # ships main too (review finding, PR #4013).
+    #
+    # A third override, `remote.<name>.mirror`, makes a bare push behave as
+    # `--mirror` -- every ref under `refs/`, `main` included -- with no
+    # `--mirror` flag on the command line for anything to catch. This is the
+    # one entry `shipped_commits`' own `CONFIG_LIKE_INDETERMINATE_FLAGS` loop
+    # already checks (unconditionally, on the bare-push path) that this
+    # function's first two-override fix still left unported (adversarial
+    # review finding, PR #4013).
+    for label, extra_config in (
+        ("an exempt remote is denied for a bare `git push` on a feature "
+         "branch when `push.default` is `matching`",
+         ["push.default", "matching"]),
+        ("an exempt remote is denied for a bare `git push` on a feature "
+         "branch when `remote.origin.push` is configured",
+         ["remote.origin.push", "refs/heads/*:refs/heads/*"]),
+        ("an exempt remote is denied for a bare `git push` on a feature "
+         "branch when `remote.origin.mirror` is configured",
+         ["remote.origin.mirror", "true"]),
+        # A fourth override, `push.default=upstream` (and its deprecated
+        # synonym `tracking`), is the one where the destination can differ in
+        # NAME from HEAD's own: it pushes to `@{upstream}`, so a `feature`
+        # branch whose `branch.feature.merge` names `refs/heads/main` ships
+        # straight to `main` on a bare push regardless of what HEAD is
+        # called. Checking only `push.default == "matching"` misses this
+        # (adversarial review finding, PR #4013).
+        ("an exempt remote is denied for a bare `git push` on a feature "
+         "branch when `push.default` is `upstream`",
+         ["push.default", "upstream"]),
+        ("an exempt remote is denied for a bare `git push` on a feature "
+         "branch when `push.default` is `tracking`",
+         ["push.default", "tracking"]),
+    ):
+        try:
+            rc, denied = run_e2e(
+                origin_mln,
+                [["branch.feature.remote", "origin"], extra_config],
+                "push", None, "{git}", checkout="feature")
+            ok = rc == 0 and denied is True
+            detail = f"exit {rc}, denied={denied}"
+        except Exception as exc:
+            ok = False
+            detail = f"raised {type(exc).__name__}: {exc}"
+        check(f"exempt e2e: {label} ({detail})", ok)
+
+    # A detached HEAD has no branch name, so `_rev_parse_ref` returns None and
+    # `_push_targets_default_branch` reports the unclear case rather than
+    # `False` -- and unclear must deny the exemption, same as everywhere else
+    # in this file.
+    try:
+        rc, denied = run_e2e(origin_mln, [], "push", None, "{git}",
+                             detach=True)
+        ok = rc == 0 and denied is True
+        detail = f"exit {rc}, denied={denied}"
+    except Exception as exc:
+        ok = False
+        detail = f"raised {type(exc).__name__}: {exc}"
+    check(f"exempt e2e: a bare `git push` from detached HEAD is denied "
+          f"({detail})", ok)
 
     return failures, ran
 
@@ -3496,7 +3848,7 @@ def main():
                    structured_payload_cases, transcript_scoping_cases,
                    cd_tracking_cases, fallback_cases,
                    fingerprint_guidance_cases, fingerprint_resolution_cases,
-                   omo_cases, codex_cases, external_reviewer_cases,
+                   omo_cases, handback_cases, codex_cases, external_reviewer_cases,
                    symlinked_plugin_root_cases, exempt_repo_cases,
                    deny_resilience_cases):
             f, r = fn()

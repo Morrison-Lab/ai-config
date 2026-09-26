@@ -1079,10 +1079,10 @@ def _copilot_v2_findings_count(
     A second, orphan scan then reads live lines outside every block, so
     a real block whose own marker was excluded is not silently dropped:
     nonzero is decisive, unparseable gives no verdict, zero is ignored
-    (see the comment above that loop). No
-    block found at all means this body carries no v2 overview -- absent,
-    not merely unparseable -- so this returns None exactly as it already
-    does when a recognisable line is missing.
+    (see the comment above that loop). No block found at all still runs
+    the orphan scan so a decisive nonzero finding is never missed; if no
+    valid block was found and no decisive orphan line was returned, this
+    returns None exactly as it does when a recognisable line is missing.
 
     Scans every uncited line across every block rather than committing to
     the first ([ai-config#3899](https://github.com/Morrison-Lab/ai-config/issues/3899) review finding), the same way the caller
@@ -1103,43 +1103,42 @@ def _copilot_v2_findings_count(
     dependency from this library module back onto its only consumer.
     """
     blocks = _copilot_overview_block_spans(scan, cited, match_is_cited)
-    if not blocks:
-        return None
-    # Comment spans are computed ONCE, up to the FURTHEST block's end, not
-    # once per block: a per-block `scan[:block_end]` call would repeat an
-    # O(distance-from-start) scan for every block, which is quadratic-ish
-    # when many marker+heading pairs are scattered through a large body
-    # (block N's own scan would re-walk everything blocks 1..N-1 already
-    # covered). One bounded scan up to `max(end for _, end in blocks)`
-    # both avoids that and keeps the earlier-established property that a
-    # comment opening before a block and extending into it is still
-    # detected, for every block, not just the first (a measured 780KB
-    # body with a small real block and a huge trailing section cost
-    # ~0.2s scanning for comments that could not possibly affect the
-    # block, against ~0.09s for a comparably-sized body whose content
-    # stayed within the block, before this bound was added; the max-end
-    # form preserves that fix across multiple blocks).
-    max_end = max(end for _, end in blocks)
-    comment_spans = _find_html_comment_spans(scan[:max_end], cited, match_is_cited)
-    comment_span_starts = [s for s, _ in comment_spans]
     saw_line = False
     saw_unparseable = False
-    for block_start, block_end in blocks:
-        for m in COPILOT_FINDINGS_LINE.finditer(scan, block_start, block_end):
-            if match_is_cited(cited, match_content_start(m), m.end()):
-                continue
-            if _position_in_spans(m.start(), comment_span_starts, comment_spans):
-                continue
-            saw_line = True
-            rest = m.group("rest") or ""
-            if _COPILOT_NONE_LINE.match(rest):
-                continue
-            count = _copilot_v2_line_findings_count(rest)
-            if count is None:
-                saw_unparseable = True
-                continue
-            if count != 0:
-                return count
+    if blocks:
+        # Comment spans are computed ONCE, up to the FURTHEST block's end, not
+        # once per block: a per-block `scan[:block_end]` call would repeat an
+        # O(distance-from-start) scan for every block, which is quadratic-ish
+        # when many marker+heading pairs are scattered through a large body
+        # (block N's own scan would re-walk everything blocks 1..N-1 already
+        # covered). One bounded scan up to `max(end for _, end in blocks)`
+        # both avoids that and keeps the earlier-established property that a
+        # comment opening before a block and extending into it is still
+        # detected, for every block, not just the first (a measured 780KB
+        # body with a small real block and a huge trailing section cost
+        # ~0.2s scanning for comments that could not possibly affect the
+        # block, against ~0.09s for a comparably-sized body whose content
+        # stayed within the block, before this bound was added; the max-end
+        # form preserves that fix across multiple blocks).
+        max_end = max(end for _, end in blocks)
+        comment_spans = _find_html_comment_spans(scan[:max_end], cited, match_is_cited)
+        comment_span_starts = [s for s, _ in comment_spans]
+        for block_start, block_end in blocks:
+            for m in COPILOT_FINDINGS_LINE.finditer(scan, block_start, block_end):
+                if match_is_cited(cited, match_content_start(m), m.end()):
+                    continue
+                if _position_in_spans(m.start(), comment_span_starts, comment_spans):
+                    continue
+                saw_line = True
+                rest = m.group("rest") or ""
+                if _COPILOT_NONE_LINE.match(rest):
+                    continue
+                count = _copilot_v2_line_findings_count(rest)
+                if count is None:
+                    saw_unparseable = True
+                    continue
+                if count != 0:
+                    return count
     # A live, uncited `**Findings:**` line OUTSIDE every recognised block
     # is one this function cannot place: typically a block whose own
     # marker was excluded (cited) while its real content was not, so that

@@ -362,7 +362,7 @@ When scanning review bodies for verdict markers, headings, or section boundaries
 - **Do:** line-anchor BOTH opening and closing HTML block tags (such as `<details>` and `</details>`) with `(?:^|\n)[ ]{0,3}` and compile with `re.IGNORECASE`.
   CommonMark treats up to 3 spaces of indentation as an HTML block;
   4 spaces is an indented code block, and `>` is a blockquote.
-- **Do:** reject affirmative verdict headings (such as `### Approval recommended`) that fall inside `<details>` regions, while allowing live count-in-details behavior for live reviews when the heading itself is top-level.
+- **Do:** reject affirmative verdict headings (such as `### Approval recommended`) that fall inside `<details>` regions, while allowing live count-in-details behavior for legacy Copilot bodies (`Comments generated:`) when the heading itself is top-level (v2 `**Findings:**` lines inside `<details>` are always treated as quoted history).
 - **Don't:** use unanchored substring searches (`str.find("</details>")`) for HTML block tags --- blockquoted occurrences (e.g. ` > </details>`) or mid-line text occurrences will prematurely close the region, leaking nested overview blocks or findings out as top-level clean verdicts.
 - **Don't:** cite issues or PRs in markdown comments or code as bare `#123` or `PR #123` --- always format them as clickable forge links per `AGENTS.md` (e.g. `[ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906)`).
 

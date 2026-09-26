@@ -30,7 +30,28 @@ A second provenance is admitted alongside it: a `Bash` call matching this
 file's own external-reviewer pattern, which today recognizes `agy --print`
 and none of the other delegation CLIs.
 Both are narrow for the same reason.
-Neither admits a verdict read out of a file, or out of this guard's own denial.
+Neither admits a verdict read out of a file, or out of this guard's own denial
+-- with one narrow exception, added for the same reason `TASK_OUTPUT_TOOLS`
+was: a harness shape this guard could not see was reproducing #3707's own
+denial rather than presenting as a new one.
+
+Claude Code sometimes delivers a dispatched subagent's report as a message
+from the subagent's own `SubagentHandback` call rather than inside the
+`Agent` tool's own result (ai-config#3945). When that happens the parent
+transcript's `tool_result` carries only a pointer sentence and an `agentId`,
+and the report lives in a sibling file this guard cannot reach by reading
+the parent transcript alone: `<transcript-dir>/<session-id>/subagents/
+agent-<agentId>.jsonl`, as the `message` input of that subagent's own LAST
+`SubagentHandback` tool call. A `.meta.json` file beside it names the
+dispatching call's `toolUseId` and the subagent's own `agentType`. So this
+is not a phrase search over an arbitrary file: the file is found by the
+`toolUseId` the ORIGINAL dispatch's own call id names (falling back to the
+`agentId` printed in the pointer sentence only when no `.meta.json` matches
+by id), and it is admitted only after its `agentType` independently confirms
+the SAME persona check `_is_reviewer_dispatch` already ran against the
+dispatch's `inp` -- the harness's own record of who actually ran has to
+agree, not merely the label the dispatching call claimed. See
+`_handback_report_text`.
 
 **WHAT it said.** Restricting provenance does not make a phrase search sound
 INSIDE the admitted body, which is the same #1297 failure one layer in: a
@@ -52,6 +73,13 @@ Resolving the shipped commits means reading the refspec, not just `HEAD`.
 `git push origin other-branch` ships something the reviewer never saw, and an
 earlier revision of this guard waved it through while its own docstring claimed
 otherwise.
+
+A report may state more than one `Reviewed-Commit:` line under its one
+verdict -- a review that covered several tips in one pass. Every line found
+after the verdict counts, and a push is covered when what it ships matches
+ANY of them, not only the first (ai-config#3945). Each is still resolved and
+compared exactly as a single fingerprint always was; widening the count
+widens nothing about how strict one comparison is.
 
 CONSEQUENCES FOR HOW THE REVIEWER IS DISPATCHED
 ------------------------------------------------
@@ -90,13 +118,18 @@ WHERE IT DELIBERATELY DOES NOT FIRE
   fingerprint, so nothing here can check them. They are an open gap, tracked as
   ai-config#1929, not a decision that they are safe.
 - A push whose every resolved push URL ends in an `EXEMPT_REPOS` entry
-  (Morrison-Lab's mln, mlg and mlr) passes with no verdict and no override.
+  (Morrison-Lab's ai-config, mln, mlg and mlr) passes with no verdict and no override.
   Only a github.com URL (https or ssh) on a configured remote counts, and only
   for a plain push in a plain command (`[cd DIR &&] git ... [| tail N]`): no
   `-c`, no environment setting of any kind, and no ssh command, proxy, exec
   path or receive-pack program that could deliver the pack elsewhere. A
   push URL on any other host, a local path, a literal URL in the remote
-  position, or anything else is still gated.
+  position, or anything else is still gated. The exemption is also refused
+  outright -- regardless of URL -- for a push that would (or might,
+  unresolvably) update `main`/`master`: see `_push_targets_default_branch`.
+  A feature-branch push stays exempt; a direct push to the default branch
+  does not, since that is exactly the case with no GitHub-side PR/mwc gate
+  to fall back on.
 
 Authorized override: `ALLOW_UNREVIEWED_PUSH=1`, as an environment assignment on
 the pushing command itself.
@@ -542,11 +575,50 @@ DEGRADED_OVERRIDE = re.compile(r"(?:^|[;&|`(\s])ALLOW_UNREVIEWED_PUSH=1\s")
 # override. A constant rather than an environment variable or a file in the
 # pushed repository, because both of those are writable by the session the
 # guard is checking; widening this list is a reviewed change to this file.
+#
+# `morrison-lab/ai-config` joined the same list on 2026-09-26, at the same
+# owner's request: the DATA 571 project's cloud sessions push infra/config
+# fixes to this repository itself (not only to the three course repos above),
+# under the same background-every-dispatch harness, so the same #3045
+# starvation blocked those pushes too -- confirmed live: this repo's own
+# `git diff` on this constant was, itself, the pending change that a
+# foreground reviewer dispatch could never return a verdict on before the
+# push it was gating.
+#
+# Exempting this repo's OWN name here is a larger step than exempting the
+# three course repos, because this file -- and every sibling guard --
+# lives in it: a push under this entry could weaken a guard with no LOCAL
+# self-review at all. What still stands between such a push and `main` is
+# the ordinary GitHub-side gate: a feature-branch push is a pull request,
+# and this repo's own CLAUDE.md scopes its standing `mwc` merge grant to a
+# PR that is fully clean -- CI green and every review finding addressed --
+# so the automated reviewer (or a human) still reads the diff before it
+# merges. This entry removes the PRE-push check on ai-config pushes, not
+# the PRE-merge one; widening it further, or relying on it as the only
+# safeguard for a change to a guard, is exactly the "reviewed change to
+# this file" the paragraph above already calls for.
 EXEMPT_REPOS = frozenset({
+    "morrison-lab/ai-config",
     "morrison-lab/mln",
     "morrison-lab/mlg",
     "morrison-lab/mlr",
 })
+
+# A second adversarial round on the ai-config addition above found the backstop
+# argument overclaimed its own coverage: `EXEMPT_REPOS` was checked by URL
+# alone, with no branch discrimination, so a direct `git push origin main`
+# read as exempt exactly like a feature-branch push, and this repo's own
+# `claude-review.yml` triggers only on `pull_request`/`issue_comment`/
+# `workflow_dispatch` -- never on a plain `push`. So the "it still becomes a
+# reviewed PR" argument was true of the branch-then-PR path and false of a
+# direct push to the default branch, which is precisely the case a confused
+# or compromised session would take. `DEFAULT_BRANCH_NAMES` and
+# `_push_targets_default_branch` below close that: the exemption is refused,
+# regardless of URL, for a push that would update `main` or `master` --
+# unresolvable cases (an unclear refspec, a config-driven bare push) are
+# refused the exemption too, in the same fail-closed direction as everything
+# else in this file that cannot determine what a push ships.
+DEFAULT_BRANCH_NAMES = frozenset({"main", "master"})
 
 # `owner/repo` of a push URL, accepted only on github.com: `https://` (with
 # or without credentials), scp-style `git@github.com:owner/repo`, or
@@ -1283,6 +1355,90 @@ def _parse_push(argv: list[str]) -> tuple[list[str], str | None] | None:
     return positionals, repo
 
 
+def _refspec_dest_branch(spec: str) -> str | None:
+    """The bare branch name a refspec would write on the remote, or None if unclear.
+
+    Only a spec naming an ordinary branch is resolved: a leading `+` (force)
+    is stripped, the destination side of a `src:dest` pair is taken (or the
+    whole spec when there is no colon, which is git's own "same name on both
+    sides" reading), and a `refs/heads/<name>` form is reduced to `<name>`.
+    Anything in another ref namespace (`refs/tags/...`, `refs/for/...`, a bare
+    `:dest` with an empty source that deletes a ref), a glob pattern (git
+    accepts a single `*` on either side of a refspec, e.g.
+    `refs/heads/*:refs/heads/*` to push every branch -- documented in
+    `man git-push`'s refspec section), or otherwise not a plain branch name
+    returns None -- unclear must not be read as "not the default branch",
+    since that is the direction `push_is_exempt` fails closed in. Without the
+    glob check, `refs/heads/*` reduced to the literal string `"*"`, which is
+    not in `DEFAULT_BRANCH_NAMES` and so read as a clean miss rather than as
+    unclear -- exactly the gap this function exists to close, reopened via a
+    push shape that ships every local branch, `main` included, with no
+    colon-delimited destination naming it literally.
+    """
+    spec = spec.lstrip("+")
+    dest = spec.split(":", 1)[1] if ":" in spec else spec
+    if not dest:
+        return None
+    if dest.startswith("refs/heads/"):
+        dest = dest[len("refs/heads/"):]
+        if not dest:
+            return None
+    elif dest.startswith("refs/") or ":" in dest:
+        return None
+    return None if "*" in dest else dest
+
+
+def _push_targets_default_branch(directory: str | None, argv: list[str],
+                                  env: list[str]) -> bool | None:
+    """True if this push would update `main`/`master` on the remote; None if unclear.
+
+    A bare `git push` (no refspec) ships the current branch under its own
+    name only under the modern `push.default`. `shipped_commits` already
+    established this is not safe to assume: under `push.default=matching`
+    (git's default before 2.0, still present in long-lived global configs) a
+    bare push ships every branch that also exists on the remote, a configured
+    `remote.<name>.push` overrides the question entirely, and a configured
+    `remote.<name>.mirror` makes a bare push behave as `--mirror` (every ref
+    under `refs/`, `main` included) with no `--mirror` on the command line to
+    catch. `push.default=upstream` (and its deprecated synonym `tracking`) is
+    a fourth override, and the one where the destination can differ in NAME
+    from HEAD's own: per `man git-config`, it pushes the current branch to
+    `@{upstream}`, so a branch named `feature` whose `branch.feature.merge`
+    is `refs/heads/main` ships straight to `main` on a bare push regardless
+    of what HEAD is called. Checking only HEAD's own name here would grant
+    the exemption to a bare push that also ships `main` under any of the
+    four -- exactly the gap this function exists to close, reopened on its
+    own bare-push path. `push_is_exempt`'s own caller already refuses the
+    exemption on anything else this function returns other than `False`, so
+    an unresolved HEAD, an unresolvable override, or an unrecognized refspec
+    shape denies the exemption rather than granting it.
+    """
+    parsed = _parse_push(argv)
+    if parsed is None:
+        return None
+    positionals, _repo = parsed
+    refspecs = positionals[1:]
+    if not refspecs:
+        default = _git_config(directory, "--get", "push.default", argv, env)
+        if default and default.lower() in ("matching", "upstream", "tracking"):
+            return None
+        remote = _push_remote(directory, argv, env)
+        if remote and _git_config(directory, "--get-all",
+                                  f"remote.{remote}.push", argv, env):
+            return None
+        if remote:
+            mirror = _git_config(directory, "--get", f"remote.{remote}.mirror",
+                                 argv, env, as_bool=True)
+            if mirror and _is_true(mirror):
+                return None
+        branch = _rev_parse_ref(directory, env, "--abbrev-ref", "HEAD")
+        return branch in DEFAULT_BRANCH_NAMES if branch else None
+    dests = [_refspec_dest_branch(spec) for spec in refspecs]
+    if any(d is None for d in dests):
+        return None
+    return any(d in DEFAULT_BRANCH_NAMES for d in dests)
+
+
 # This hook is registered with a 10s timeout in `hooks/hooks.json`, and a
 # PreToolUse hook killed on timeout does not deny -- the push simply proceeds.
 # So the budget is enforced here rather than left to the harness: one call per
@@ -1595,10 +1751,17 @@ def push_is_exempt(directory: str | None, argv: list[str],
     `_run_git` raises `TimeoutError` then, and letting any exception escape
     here would reach `main`'s fail-open `except` -- a silent allow for the
     whole command, which is what `push_refspecs` guards against the same way.
+
+    A push that would (or might, unresolvably) update `main`/`master` is
+    never exempt either, regardless of the destination URL: see
+    `_push_targets_default_branch` and the comment above
+    `DEFAULT_BRANCH_NAMES`.
     """
     try:
         if not (_is_plain_command(command)
                 and _is_plain_push(directory, argv, env)):
+            return False
+        if _push_targets_default_branch(directory, argv, env) is not False:
             return False
         remote = _push_remote(directory, argv, env)
         if not remote:
@@ -1832,14 +1995,21 @@ def _blank_quoted_regions(text: str) -> tuple[str, bool]:
     return "".join(out), False
 
 
-def parse_report(text: str) -> tuple[str | None, str | None]:
-    """(verdict, reviewed_commit) from one reviewer report.
+def parse_report_all(text: str) -> tuple[str | None, list[str]]:
+    """(verdict, reviewed_commits) from one reviewer report.
 
-    The verdict is the LAST verdict LINE, and the fingerprint is the first one
-    after it. Both halves matter: taking the last verdict anywhere lets a
-    closing sentence that quotes the other verdict decide the report, and
-    taking the fingerprint from anywhere lets a fingerprint quoted in the
-    findings stand in for the report's own.
+    The verdict is the LAST verdict LINE, and the fingerprints are every one
+    found after it, in order, deduplicated. Both halves matter: taking the
+    last verdict anywhere lets a closing sentence that quotes the other
+    verdict decide the report, and taking a fingerprint from anywhere lets a
+    fingerprint quoted in the findings stand in for the report's own.
+
+    A report may name MORE THAN ONE `Reviewed-Commit:` line under its single
+    verdict -- a review that covered several tips in one pass -- and every
+    one found is returned rather than only the first, so a push matching any
+    of them is covered (ai-config#3945). This does not relax which lines
+    count: each is still found by the same scan, over the same blanked text,
+    starting at the same position, that always looked for one.
     """
     # BOTH searches run against the blanked text. Blanking only the verdict
     # search left the asymmetry that mattered: a fenced example whose
@@ -1855,13 +2025,19 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
     # correct.
     blanked, unresolved = _blank_quoted_regions(text)
     if unresolved:
-        return None, None
+        return None, []
     matches = list(VERDICT_LINE.finditer(blanked))
     if not matches:
-        return None, None
+        return None, []
     last = matches[-1]
     verdict = "clean" if last.group(1).lower().startswith("ready") else "needs_work"
-    sha = REVIEWED_COMMIT.search(blanked, last.end())
+    shas: list[str] = []
+    seen: set[str] = set()
+    for m in REVIEWED_COMMIT.finditer(blanked, last.end()):
+        sha = m.group(1).lower()
+        if sha not in seen:
+            seen.add(sha)
+            shas.append(sha)
     if verdict == "clean" and _extract_review_payload is not None and _payload_is_blocking is not None:
         try:
             payload = _extract_review_payload(text)
@@ -1869,7 +2045,16 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
                 verdict = "needs_work"
         except Exception:
             pass
-    return verdict, (sha.group(1).lower() if sha else None)
+    return verdict, shas
+
+
+def parse_report(text: str) -> tuple[str | None, str | None]:
+    """(verdict, reviewed_commit) from one reviewer report -- the FIRST
+    `Reviewed-Commit:` line after the verdict, for a caller that only wants
+    one. See `parse_report_all` for every line a report may state.
+    """
+    verdict, shas = parse_report_all(text)
+    return verdict, (shas[0] if shas else None)
 
 
 
@@ -1957,8 +2142,164 @@ def _is_reviewer_record(record: dict) -> bool:
     return any(ADVERSARIAL_AGENT_NAME.match(c) for c in candidates)
 
 
-def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bool]:
-    """(verdict, reviewed_commit, saw_reviewer_call) from the transcript.
+# --- hand-back delivery (ai-config#3945) ------------------------------------
+#
+# Matched against free text (a dispatch result's pointer sentence), not
+# against a structured field -- the harness states the id in prose
+# ("delivered to you as a message from ... (its SubagentHandback call)")
+# alongside a plain `agentId: <id>` line, and this is the fallback route to
+# it, used only when no `.meta.json` in the subagents directory names the
+# dispatch's own `toolUseId`. `[\w-]+` matches the same id shape
+# `TASK_ID_KEYS`' own text-mined fallback already accepts elsewhere in this
+# file.
+AGENT_ID_IN_TEXT = re.compile(r"\bagentId[:=]\s*[`\"']?([\w-]+)", re.I)
+
+
+def _subagents_dir(transcript_path: str) -> str:
+    """The `subagents/` directory a hand-back subagent's own transcript and
+    `.meta.json` live under, next to the PARENT session's own transcript file.
+
+    Measured layout (Claude Code desktop, Windows, 2026-09-25): a transcript
+    at `<dir>/<session-id>.jsonl` has its subagents under
+    `<dir>/<session-id>/subagents/`.
+    """
+    base = os.path.basename(transcript_path)
+    session_id = base[:-len(".jsonl")] if base.lower().endswith(".jsonl") else base
+    return os.path.join(os.path.dirname(transcript_path), session_id, "subagents")
+
+
+def _read_json_file(path: str):
+    try:
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _agent_type_is_admitted(agent_type) -> bool:
+    """True when a `.meta.json`'s bare `agentType` string names an admitted
+    reviewer persona.
+
+    Mirrors `_is_reviewer_dispatch`'s two persona checks, with no prompt to
+    consult here: the prompt-based fallback branch already ran once, against
+    the ORIGINAL dispatch's own `inp`, before this call's id was ever added
+    to `reviewer_call_ids`. This is independent confirmation that the
+    harness's own record of which agent actually ran agrees with that
+    dispatch -- not a replacement for the check that already happened.
+    """
+    if not isinstance(agent_type, str) or not agent_type:
+        return False
+    return bool(ADVERSARIAL_AGENT_NAME.match(agent_type) or FALLBACK_AGENT_NAME.match(agent_type))
+
+
+def _last_subagent_handback_message(subagent_transcript_path: str) -> str | None:
+    """The `message` input of the LAST `SubagentHandback` tool_use in this
+    subagent's own transcript, or None.
+
+    Only a `SubagentHandback` tool_use's own `input.message` counts. The
+    subagent's reasoning text, its other tool calls, and any tool RESULT in
+    its transcript are never read here -- none of those is the report the
+    subagent chose to hand back, and admitting them would let a verdict the
+    subagent merely discussed while exploring stand in for the one it
+    actually returned.
+    """
+    last: str | None = None
+    try:
+        with open(subagent_transcript_path, "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except Exception:
+                    continue
+                if not isinstance(record, dict):
+                    continue
+                for b in _iter_blocks(record):
+                    if b.get("type") != "tool_use":
+                        continue
+                    if str(b.get("name") or "").lower() != "subagenthandback":
+                        continue
+                    inp = b.get("input") or {}
+                    msg = inp.get("message") if isinstance(inp, dict) else None
+                    if isinstance(msg, str) and msg:
+                        last = msg
+    except OSError:
+        return None
+    return last
+
+
+def _handback_report_text(transcript_path: str, call_id, res_text: str) -> str | None:
+    """The report text a hand-back-only dispatch result points at, or None.
+
+    Claude Code sometimes delivers a dispatched subagent's report as a
+    message from the subagent's own `SubagentHandback` call rather than
+    inside the `Agent` tool's own result (ai-config#3945): the parent
+    transcript's `tool_result` then carries only a pointer sentence and an
+    `agentId`, and the actual report lives in a sibling
+    `subagents/agent-<agentId>.jsonl` file this function reads directly.
+
+    Located by `toolUseId` FIRST -- the `.meta.json` beside that subagent's
+    transcript names the dispatching call's own id, which is an EXACT match
+    against `call_id` -- falling back to the `agentId` printed in the
+    pointer sentence only when no `.meta.json` names this call. The fallback
+    is intentionally the weaker of the two: a text-mined id could in
+    principle collide with an unrelated id string elsewhere in a result, so
+    it is used only when the exact match finds nothing, and even then the
+    matching `.meta.json`'s `agentType` must still independently confirm an
+    admitted reviewer before anything in that file is read.
+    """
+    if not isinstance(call_id, str) or not call_id:
+        return None
+    subagents_dir = _subagents_dir(transcript_path)
+    try:
+        entries = os.listdir(subagents_dir)
+    except OSError:
+        return None
+
+    meta_path = None
+    for name in entries:
+        if not name.endswith(".meta.json"):
+            continue
+        candidate = os.path.join(subagents_dir, name)
+        meta = _read_json_file(candidate)
+        if isinstance(meta, dict) and str(meta.get("toolUseId") or "") == call_id:
+            meta_path = candidate
+            break
+
+    if meta_path is None:
+        agent_id_match = AGENT_ID_IN_TEXT.search(res_text)
+        if not agent_id_match:
+            return None
+        candidate = os.path.join(subagents_dir, f"agent-{agent_id_match.group(1)}.meta.json")
+        if os.path.isfile(candidate):
+            meta_path = candidate
+
+    if meta_path is None:
+        return None
+
+    meta = _read_json_file(meta_path)
+    if not isinstance(meta, dict) or not _agent_type_is_admitted(meta.get("agentType")):
+        return None
+
+    base = os.path.basename(meta_path)
+    if not (base.startswith("agent-") and base.endswith(".meta.json")):
+        return None
+    agent_id = base[len("agent-"):-len(".meta.json")]
+    subagent_jsonl = os.path.join(subagents_dir, f"agent-{agent_id}.jsonl")
+    if not os.path.isfile(subagent_jsonl):
+        return None
+
+    return _last_subagent_handback_message(subagent_jsonl)
+
+
+def read_latest_review(transcript_path: str) -> tuple[str | None, list[str], bool]:
+    """(verdict, reviewed_commits, saw_reviewer_call) from the transcript.
+
+    `reviewed_commits` is every `Reviewed-Commit:` line the winning report
+    named (see `parse_report_all`), not just one -- empty when no report
+    supplied a fingerprint.
 
     Only the reviewer's own call results and attributed subagent reports are
     consulted, and an errored result on the dispatch itself is skipped -- a failed
@@ -1976,12 +2317,17 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
     runs tools sequentially per session, so the nearest outstanding use of that
     name is the result's partner -- and fed through the same dispatch predicate
     and report parser as the native path.
+
+    A third shape is read only at the native `tool_result` site: Claude Code's
+    hand-back delivery, where the dispatch's own result carries no report at
+    all, only a pointer to a sibling subagent transcript (ai-config#3945,
+    `_handback_report_text`).
     """
     reviewer_call_ids: set[str] = set()
     reviewer_task_ids: set[str] = set()
     saw_reviewer_call = False
     verdict: str | None = None
-    reviewed_commit: str | None = None
+    reviewed_commits: list[str] = []
     pending_omo_uses: dict[str, list[str]] = {}
     ambiguous_omo_names: set[str] = set()
 
@@ -2073,11 +2419,11 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                         # complete, correctly-fingerprinted report WILL
                         # authorize. No signal available here distinguishes it.
                         if not record.get("is_error"):
-                            found, sha = parse_report(
+                            found, shas = parse_report_all(
                                 _result_text({"content": record.get("tool_output")})
                             )
                             if found:
-                                verdict, reviewed_commit = found, sha
+                                verdict, reviewed_commits = found, shas
                 continue
 
             is_assistant = (
@@ -2093,9 +2439,9 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                     record.get("message") if isinstance(record.get("message"), dict) else record
                 )
                 if content_text:
-                    found, sha = parse_report(content_text)
+                    found, shas = parse_report_all(content_text)
                     if found:
-                        verdict, reviewed_commit = found, sha
+                        verdict, reviewed_commits = found, shas
 
             for b in _iter_blocks(record):
                 b_type = b.get("type")
@@ -2142,9 +2488,9 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                     elif tool_name == "send_message" and record_is_reviewer:
                         msg_text = str(inp.get("Message") or inp.get("message") or "")
                         if msg_text:
-                            found, sha = parse_report(msg_text)
+                            found, shas = parse_report_all(msg_text)
                             if found:
-                                verdict, reviewed_commit = found, sha
+                                verdict, reviewed_commits = found, shas
 
                 elif b_type == "tool_result":
                     call_id = b.get("tool_use_id")
@@ -2162,10 +2508,22 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                                 reviewer_task_ids.add(tid_match.group(1))
 
                         if not b.get("is_error"):
-                            found, sha = parse_report(res_text)
+                            found, shas = parse_report_all(res_text)
+                            if not found:
+                                # The result itself carries no report -- the
+                                # hand-back shape this dispatch's OWN result
+                                # points at, if any (ai-config#3945). Tried
+                                # only here, and only after the direct read
+                                # found nothing: a report already present in
+                                # the result is read from the result, exactly
+                                # as before.
+                                handback_text = _handback_report_text(
+                                    transcript_path, call_id, res_text)
+                                if handback_text:
+                                    found, shas = parse_report_all(handback_text)
                             if found:
                                 saw_reviewer_call = True
-                                verdict, reviewed_commit = found, sha
+                                verdict, reviewed_commits = found, shas
 
                 # Genuine task notifications from tracked background reviewer dispatches
                 origin = record.get("origin")
@@ -2181,12 +2539,12 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                         or (sender_id and sender_id in reviewer_task_ids)
                     ):
                         text = str(b.get("text") or b.get("content") or "")
-                        found, sha = parse_report(text)
+                        found, shas = parse_report_all(text)
                         if found:
                             saw_reviewer_call = True
-                            verdict, reviewed_commit = found, sha
+                            verdict, reviewed_commits = found, shas
 
-    return verdict, reviewed_commit, saw_reviewer_call
+    return verdict, reviewed_commits, saw_reviewer_call
 
 
 def _opencode_transcript_fallback(session_id) -> str:
@@ -2217,7 +2575,7 @@ def verify_review(transcript_path: str, directory: str | None,
     """(is_clean, reason) -- is there a clean verdict for what this push ships?"""
     saw_reviewer_call = False
     verdict: str | None = None
-    reviewed_commit: str | None = None
+    reviewed_commits: list[str] = []
 
     # `transcript_path and` stays here, unlike the two conjuncts removed below,
     # and the difference is not cosmetic. Those two restated a fact a preceding
@@ -2239,7 +2597,7 @@ def verify_review(transcript_path: str, directory: str | None,
     # future caller need not.
     if transcript_path and os.path.exists(transcript_path):
         try:
-            verdict, reviewed_commit, saw_reviewer_call = read_latest_review(transcript_path)
+            verdict, reviewed_commits, saw_reviewer_call = read_latest_review(transcript_path)
         except Exception as e:
             return False, f"Failed reading transcript: {e}"
 
@@ -2292,7 +2650,7 @@ def verify_review(transcript_path: str, directory: str | None,
             "Address, rebut, or defer every finding, commit, and re-dispatch the reviewer."
         )
 
-    if not reviewed_commit:
+    if not reviewed_commits:
         return False, (
             "The clean verdict does not say which commit it read.\n"
             "The reviewer must state `Reviewed-Commit: <full sha>` on its own line "
@@ -2302,25 +2660,33 @@ def verify_review(transcript_path: str, directory: str | None,
             "not a verdict."
         )
 
-    try:
-        resolved_commit = _rev_parse(directory, env, f"{reviewed_commit}^{{commit}}")
-    except TimeoutError as e:
-        return False, (
-            f"This guard {e}.\n"
-            "It refuses rather than letting the push through unchecked; re-run once the "
-            "repository is responsive, or use the override and say so."
-        )
-    if resolved_commit is None:
-        return False, (
-            f"The clean verdict's fingerprint `{reviewed_commit}` does not resolve to any "
-            "commit in this repository.\n"
-            "That is a fabricated or corrupted fingerprint, not a stale verdict for a "
-            "different commit -- a reviewer that recalls or reconstructs a SHA instead of "
-            "reading it can get a prefix right and invent the rest. Re-dispatch the "
-            "reviewer and tell it to obtain the SHA by running `git rev-parse HEAD` and "
-            "copy the 40-character output verbatim, not reconstruct or abbreviate it."
-        )
-    reviewed_commit = resolved_commit
+    # Every stated fingerprint must resolve. A report naming several
+    # `Reviewed-Commit:` lines under one verdict (ai-config#3945) is accepted
+    # when the push ships ANY of them, but a fabricated or corrupted line
+    # anywhere in that list is still refused outright rather than silently
+    # dropped -- the same fail-fast posture a single fingerprint already had,
+    # extended rather than loosened by there being more than one.
+    resolved_commits: list[str] = []
+    for candidate in reviewed_commits:
+        try:
+            resolved = _rev_parse(directory, env, f"{candidate}^{{commit}}")
+        except TimeoutError as e:
+            return False, (
+                f"This guard {e}.\n"
+                "It refuses rather than letting the push through unchecked; re-run once the "
+                "repository is responsive, or use the override and say so."
+            )
+        if resolved is None:
+            return False, (
+                f"The clean verdict's fingerprint `{candidate}` does not resolve to any "
+                "commit in this repository.\n"
+                "That is a fabricated or corrupted fingerprint, not a stale verdict for a "
+                "different commit -- a reviewer that recalls or reconstructs a SHA instead of "
+                "reading it can get a prefix right and invent the rest. Re-dispatch the "
+                "reviewer and tell it to obtain the SHA by running `git rev-parse HEAD` and "
+                "copy the 40-character output verbatim, not reconstruct or abbreviate it."
+            )
+        resolved_commits.append(resolved)
 
     try:
         commits, why = shipped_commits(directory, argv, env)
@@ -2339,17 +2705,18 @@ def verify_review(transcript_path: str, directory: str | None,
     if not commits:
         return True, "This push ships no commits (a ref deletion)."
 
-    unreviewed = sorted(c for c in commits if not c.startswith(reviewed_commit))
+    unreviewed = sorted(c for c in commits
+                        if not any(c.startswith(rc) for rc in resolved_commits))
     if unreviewed:
         return False, (
-            f"The clean verdict is for commit {reviewed_commit}, but this push would ship "
-            f"{', '.join(c[:12] for c in unreviewed)}.\n"
+            f"The clean verdict is for commit {', '.join(resolved_commits)}, but this push "
+            f"would ship {', '.join(c[:12] for c in unreviewed)}.\n"
             "A push ships commits, so whatever differs -- a later commit, a `main` merge, "
             "a rebase, or a branch other than the reviewed one -- is unreviewed. "
             "Re-dispatch the reviewer against what you are actually pushing."
         )
 
-    return True, f"Clean adversarial self-review verified at {reviewed_commit}."
+    return True, f"Clean adversarial self-review verified at {', '.join(resolved_commits)}."
 
 
 DENY_TAIL = (

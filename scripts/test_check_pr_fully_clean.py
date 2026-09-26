@@ -6778,14 +6778,19 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     # `_find_html_comment_spans` already treats as extending to the end of
     # the string, matching every other unterminated-comment handling in
     # this module) was still trusted as a real block start.
+    # The swallowed marker still opens no block. Since the orphan scan now
+    # runs when no block is found (sixteenth round, r4101514487), the live
+    # nonzero Findings line after the comment's close is read as an orphan,
+    # and a nonzero orphan is decisive: not-clean, the fail-closed direction.
     check(
         "copilot_verdict: a marker swallowed by an earlier unclosed HTML "
-        "comment is not trusted as a real block start",
+        "comment is not trusted as a real block start, and its live nonzero "
+        "Findings line still reads as not-clean",
         checker.copilot_verdict(
             "<!-- unterminated comment with no close\n\n"
             "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
             f"### \U0001f7e2 Approval recommended\n\n**Findings:** 5 {_v2_picture}\n"
-        ) == "",
+        ) == "not-clean",
     )
     # (b) The block-END search (`<details`/`##`, via `.search()`) also
     # never checked its own candidate against comment spans. A fake,
@@ -7325,6 +7330,26 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             "<!-- ccr-overview-v2 -->\n\n## Copilot review overview\n\n"
             "### \U0001f7e2 Approval recommended\n\n**Findings:** None\n"
         ) == "not-clean",
+    )
+    # PR [ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review, sixteenth round:
+    # `_copilot_v2_findings_count` previously returned `None` early when `blocks` was empty,
+    # skipping the orphan scan entirely. A cited marker followed by a live nonzero Findings line
+    # with NO later block returned no verdict ("") instead of "not-clean".
+    check(
+        "copilot_verdict: a real block orphaned by a code-span-cited marker "
+        "with no subsequent blocks still counts its nonzero Findings line as not-clean",
+        checker.copilot_verdict(
+            "``<!-- ccr-overview-v2 -->``\n\n## Copilot review overview\n\n"
+            "### Approval recommended\n\n**Findings:** 5 <picture><img></picture>\n"
+        ) == "not-clean",
+    )
+    check(
+        "copilot_verdict: a cited marker with an uncited Findings: None line "
+        "and no subsequent block yields no verdict (absent overview, cannot manufacture clean)",
+        checker.copilot_verdict(
+            "``<!-- ccr-overview-v2 -->``\n\n## Copilot review overview\n\n"
+            "### Approval recommended\n\n**Findings:** None\n"
+        ) == "",
     )
     check(
         "copilot_verdict: an uncited top-level nonzero Findings line in a "

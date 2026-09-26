@@ -118,13 +118,18 @@ WHERE IT DELIBERATELY DOES NOT FIRE
   fingerprint, so nothing here can check them. They are an open gap, tracked as
   ai-config#1929, not a decision that they are safe.
 - A push whose every resolved push URL ends in an `EXEMPT_REPOS` entry
-  (Morrison-Lab's mln, mlg and mlr) passes with no verdict and no override.
+  (Morrison-Lab's ai-config, mln, mlg and mlr) passes with no verdict and no override.
   Only a github.com URL (https or ssh) on a configured remote counts, and only
   for a plain push in a plain command (`[cd DIR &&] git ... [| tail N]`): no
   `-c`, no environment setting of any kind, and no ssh command, proxy, exec
   path or receive-pack program that could deliver the pack elsewhere. A
   push URL on any other host, a local path, a literal URL in the remote
-  position, or anything else is still gated.
+  position, or anything else is still gated. The exemption is also refused
+  outright -- regardless of URL -- for a push that would (or might,
+  unresolvably) update `main`/`master`: see `_push_targets_default_branch`.
+  A feature-branch push stays exempt; a direct push to the default branch
+  does not, since that is exactly the case with no GitHub-side PR/mwc gate
+  to fall back on.
 
 Authorized override: `ALLOW_UNREVIEWED_PUSH=1`, as an environment assignment on
 the pushing command itself.
@@ -570,11 +575,50 @@ DEGRADED_OVERRIDE = re.compile(r"(?:^|[;&|`(\s])ALLOW_UNREVIEWED_PUSH=1\s")
 # override. A constant rather than an environment variable or a file in the
 # pushed repository, because both of those are writable by the session the
 # guard is checking; widening this list is a reviewed change to this file.
+#
+# `morrison-lab/ai-config` joined the same list on 2026-09-26, at the same
+# owner's request: the DATA 571 project's cloud sessions push infra/config
+# fixes to this repository itself (not only to the three course repos above),
+# under the same background-every-dispatch harness, so the same #3045
+# starvation blocked those pushes too -- confirmed live: this repo's own
+# `git diff` on this constant was, itself, the pending change that a
+# foreground reviewer dispatch could never return a verdict on before the
+# push it was gating.
+#
+# Exempting this repo's OWN name here is a larger step than exempting the
+# three course repos, because this file -- and every sibling guard --
+# lives in it: a push under this entry could weaken a guard with no LOCAL
+# self-review at all. What still stands between such a push and `main` is
+# the ordinary GitHub-side gate: a feature-branch push is a pull request,
+# and this repo's own CLAUDE.md scopes its standing `mwc` merge grant to a
+# PR that is fully clean -- CI green and every review finding addressed --
+# so the automated reviewer (or a human) still reads the diff before it
+# merges. This entry removes the PRE-push check on ai-config pushes, not
+# the PRE-merge one; widening it further, or relying on it as the only
+# safeguard for a change to a guard, is exactly the "reviewed change to
+# this file" the paragraph above already calls for.
 EXEMPT_REPOS = frozenset({
+    "morrison-lab/ai-config",
     "morrison-lab/mln",
     "morrison-lab/mlg",
     "morrison-lab/mlr",
 })
+
+# A second adversarial round on the ai-config addition above found the backstop
+# argument overclaimed its own coverage: `EXEMPT_REPOS` was checked by URL
+# alone, with no branch discrimination, so a direct `git push origin main`
+# read as exempt exactly like a feature-branch push, and this repo's own
+# `claude-review.yml` triggers only on `pull_request`/`issue_comment`/
+# `workflow_dispatch` -- never on a plain `push`. So the "it still becomes a
+# reviewed PR" argument was true of the branch-then-PR path and false of a
+# direct push to the default branch, which is precisely the case a confused
+# or compromised session would take. `DEFAULT_BRANCH_NAMES` and
+# `_push_targets_default_branch` below close that: the exemption is refused,
+# regardless of URL, for a push that would update `main` or `master` --
+# unresolvable cases (an unclear refspec, a config-driven bare push) are
+# refused the exemption too, in the same fail-closed direction as everything
+# else in this file that cannot determine what a push ships.
+DEFAULT_BRANCH_NAMES = frozenset({"main", "master"})
 
 # `owner/repo` of a push URL, accepted only on github.com: `https://` (with
 # or without credentials), scp-style `git@github.com:owner/repo`, or
@@ -1311,6 +1355,90 @@ def _parse_push(argv: list[str]) -> tuple[list[str], str | None] | None:
     return positionals, repo
 
 
+def _refspec_dest_branch(spec: str) -> str | None:
+    """The bare branch name a refspec would write on the remote, or None if unclear.
+
+    Only a spec naming an ordinary branch is resolved: a leading `+` (force)
+    is stripped, the destination side of a `src:dest` pair is taken (or the
+    whole spec when there is no colon, which is git's own "same name on both
+    sides" reading), and a `refs/heads/<name>` form is reduced to `<name>`.
+    Anything in another ref namespace (`refs/tags/...`, `refs/for/...`, a bare
+    `:dest` with an empty source that deletes a ref), a glob pattern (git
+    accepts a single `*` on either side of a refspec, e.g.
+    `refs/heads/*:refs/heads/*` to push every branch -- documented in
+    `man git-push`'s refspec section), or otherwise not a plain branch name
+    returns None -- unclear must not be read as "not the default branch",
+    since that is the direction `push_is_exempt` fails closed in. Without the
+    glob check, `refs/heads/*` reduced to the literal string `"*"`, which is
+    not in `DEFAULT_BRANCH_NAMES` and so read as a clean miss rather than as
+    unclear -- exactly the gap this function exists to close, reopened via a
+    push shape that ships every local branch, `main` included, with no
+    colon-delimited destination naming it literally.
+    """
+    spec = spec.lstrip("+")
+    dest = spec.split(":", 1)[1] if ":" in spec else spec
+    if not dest:
+        return None
+    if dest.startswith("refs/heads/"):
+        dest = dest[len("refs/heads/"):]
+        if not dest:
+            return None
+    elif dest.startswith("refs/") or ":" in dest:
+        return None
+    return None if "*" in dest else dest
+
+
+def _push_targets_default_branch(directory: str | None, argv: list[str],
+                                  env: list[str]) -> bool | None:
+    """True if this push would update `main`/`master` on the remote; None if unclear.
+
+    A bare `git push` (no refspec) ships the current branch under its own
+    name only under the modern `push.default`. `shipped_commits` already
+    established this is not safe to assume: under `push.default=matching`
+    (git's default before 2.0, still present in long-lived global configs) a
+    bare push ships every branch that also exists on the remote, a configured
+    `remote.<name>.push` overrides the question entirely, and a configured
+    `remote.<name>.mirror` makes a bare push behave as `--mirror` (every ref
+    under `refs/`, `main` included) with no `--mirror` on the command line to
+    catch. `push.default=upstream` (and its deprecated synonym `tracking`) is
+    a fourth override, and the one where the destination can differ in NAME
+    from HEAD's own: per `man git-config`, it pushes the current branch to
+    `@{upstream}`, so a branch named `feature` whose `branch.feature.merge`
+    is `refs/heads/main` ships straight to `main` on a bare push regardless
+    of what HEAD is called. Checking only HEAD's own name here would grant
+    the exemption to a bare push that also ships `main` under any of the
+    four -- exactly the gap this function exists to close, reopened on its
+    own bare-push path. `push_is_exempt`'s own caller already refuses the
+    exemption on anything else this function returns other than `False`, so
+    an unresolved HEAD, an unresolvable override, or an unrecognized refspec
+    shape denies the exemption rather than granting it.
+    """
+    parsed = _parse_push(argv)
+    if parsed is None:
+        return None
+    positionals, _repo = parsed
+    refspecs = positionals[1:]
+    if not refspecs:
+        default = _git_config(directory, "--get", "push.default", argv, env)
+        if default and default.lower() in ("matching", "upstream", "tracking"):
+            return None
+        remote = _push_remote(directory, argv, env)
+        if remote and _git_config(directory, "--get-all",
+                                  f"remote.{remote}.push", argv, env):
+            return None
+        if remote:
+            mirror = _git_config(directory, "--get", f"remote.{remote}.mirror",
+                                 argv, env, as_bool=True)
+            if mirror and _is_true(mirror):
+                return None
+        branch = _rev_parse_ref(directory, env, "--abbrev-ref", "HEAD")
+        return branch in DEFAULT_BRANCH_NAMES if branch else None
+    dests = [_refspec_dest_branch(spec) for spec in refspecs]
+    if any(d is None for d in dests):
+        return None
+    return any(d in DEFAULT_BRANCH_NAMES for d in dests)
+
+
 # This hook is registered with a 10s timeout in `hooks/hooks.json`, and a
 # PreToolUse hook killed on timeout does not deny -- the push simply proceeds.
 # So the budget is enforced here rather than left to the harness: one call per
@@ -1623,10 +1751,17 @@ def push_is_exempt(directory: str | None, argv: list[str],
     `_run_git` raises `TimeoutError` then, and letting any exception escape
     here would reach `main`'s fail-open `except` -- a silent allow for the
     whole command, which is what `push_refspecs` guards against the same way.
+
+    A push that would (or might, unresolvably) update `main`/`master` is
+    never exempt either, regardless of the destination URL: see
+    `_push_targets_default_branch` and the comment above
+    `DEFAULT_BRANCH_NAMES`.
     """
     try:
         if not (_is_plain_command(command)
                 and _is_plain_push(directory, argv, env)):
+            return False
+        if _push_targets_default_branch(directory, argv, env) is not False:
             return False
         remote = _push_remote(directory, argv, env)
         if not remote:

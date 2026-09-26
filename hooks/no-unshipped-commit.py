@@ -634,13 +634,91 @@ def pending_commit(path):
     return scan_transcript(path)[1]
 
 
+def _default_branch_ref(cwd):
+    """`origin/<default>` for `cwd`, or None when it cannot be resolved.
+
+    Prefers `origin/HEAD` --- the remote's own configured default, set by
+    `git remote set-head origin -a` or an ordinary clone --- and falls back
+    to `origin/main` then `origin/master` only when that symref is unset,
+    which a shallow or `--single-branch` fetch can leave absent even though
+    the remote answers normally.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "symbolic-ref", "-q", "--short", "refs/remotes/origin/HEAD"],
+            cwd=cwd, capture_output=True, text=True, timeout=10)
+    except Exception:
+        result = None
+    if result is not None and result.returncode == 0:
+        ref = result.stdout.strip()
+        if ref:
+            return ref
+    for candidate in ("origin/main", "origin/master"):
+        try:
+            check = subprocess.run(
+                ["git", "rev-parse", "--verify", "-q", candidate],
+                cwd=cwd, capture_output=True, text=True, timeout=10)
+        except Exception:
+            continue
+        if check.returncode == 0:
+            return candidate
+    return None
+
+
+def _upstream_configured(cwd):
+    """Whether HEAD's branch has an upstream CONFIGURED, gone ref or not.
+
+    Distinct from whether `@{u}` RESOLVES: `git rev-list --count @{u}..HEAD`
+    fails identically, and with the same exit code, whether no upstream was
+    ever set or a real one was set and its remote-tracking ref later
+    vanished (a squash-merged branch whose PR auto-deleted the remote
+    branch) --- so that failure alone cannot tell the two apart, and the two
+    want different answers. A genuinely unconfigured branch (or a detached
+    HEAD) falls back to the remote's default below; a gone tracking ref
+    stays undefined, because a fallback comparison against `origin/<default>`
+    for a squash-merged branch counts the pre-squash commits as unshipped
+    even though their content already shipped, which would newly block a
+    session this hook used to leave alone.
+
+    `branch.<name>.merge` is read purely from git config, so it still
+    answers yes for a gone ref; a detached HEAD has no branch name at all
+    and always answers no.
+    """
+    try:
+        branch = subprocess.run(
+            ["git", "symbolic-ref", "-q", "--short", "HEAD"],
+            cwd=cwd, capture_output=True, text=True, timeout=10)
+    except Exception:
+        return False
+    if branch.returncode != 0:
+        return False
+    name = branch.stdout.strip()
+    if not name:
+        return False
+    try:
+        cfg = subprocess.run(
+            ["git", "config", "--get", f"branch.{name}.merge"],
+            cwd=cwd, capture_output=True, text=True, timeout=10)
+    except Exception:
+        return False
+    return cfg.returncode == 0 and bool(cfg.stdout.strip())
+
+
 def unpushed_count(cwd):
     """Commits on HEAD that its upstream lacks, or None when git cannot say.
 
     `@{u}..HEAD` is ahead-only, so a branch behind its upstream counts 0 ---
-    staleness is not unshippedness. No upstream, a detached HEAD, and a gone
-    upstream branch all exit non-zero and return None: the count is
-    undefined there, and the caller falls back to the transcript verdict.
+    staleness is not unshippedness. A configured-but-gone upstream stays
+    undefined (see `_upstream_configured`), and so does any other failure
+    git cannot explain.
+
+    NO upstream at all --- an untracked branch, or a detached HEAD --- is
+    different: the branch was never told what to compare against, so
+    falling back to `git rev-list --count origin/<default>..HEAD` is a real
+    substitute rather than a guess, and a session sitting exactly on that
+    tip has genuinely nothing to ship. A worktree left detached at
+    `origin/main` with a clean tree used to read this exact case as
+    undefined and block every Stop over it (ai-config#3739).
     """
     try:
         result = subprocess.run(
@@ -648,10 +726,26 @@ def unpushed_count(cwd):
             cwd=cwd, capture_output=True, text=True, timeout=10)
     except Exception:
         return None
-    if result.returncode != 0:
+    if result.returncode == 0:
+        try:
+            return int(result.stdout.strip())
+        except ValueError:
+            return None
+    if _upstream_configured(cwd):
+        return None
+    default_ref = _default_branch_ref(cwd)
+    if not default_ref:
         return None
     try:
-        return int(result.stdout.strip())
+        fallback = subprocess.run(
+            ["git", "rev-list", "--count", f"{default_ref}..HEAD"],
+            cwd=cwd, capture_output=True, text=True, timeout=10)
+    except Exception:
+        return None
+    if fallback.returncode != 0:
+        return None
+    try:
+        return int(fallback.stdout.strip())
     except ValueError:
         return None
 
@@ -1022,13 +1116,48 @@ def main():
     reason = decide(payload.get("cwd") or "", path)
     if not reason:
         return
-    text = last_assistant_text(path)
-    key = hashlib.sha256((path + reason + text).encode()).hexdigest()[:16]
+    # ai-config#3739: the sentinel used to key on
+    # sha256(path + reason + last_assistant_text(path)). Including the reply
+    # text meant a differently-worded reply produced a fresh key every time,
+    # so an unchanged unshipped state re-blocked on every single Stop --- the
+    # measured incident was eight consecutive blocks in one session, none of
+    # them suppressed, because no two replies were byte-identical. Dropping
+    # the text keys the sentinel on (path, reason) alone: a genuinely
+    # unchanged state (same transcript, same derived reason) is suppressed
+    # after the first block. `reason` names only counts and paths, never a
+    # commit, so the key also carries the tip SHA of every local branch and
+    # worktree HEAD: a new unshipped commit at the same count (push A, then
+    # commit B) changes the key and blocks once again (#4010 review).
+    key = hashlib.sha256(
+        (path + reason + _state_fingerprint(payload.get("cwd") or "")).encode()
+    ).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-unshipped-commit-{key}")
     if os.path.exists(sentinel):
         return
     open(sentinel, "w").close()
     print(json.dumps({"decision": "block", "reason": reason}))
+
+
+def _state_fingerprint(cwd):
+    """Tip SHAs of every local branch and worktree HEAD, or "" when git fails.
+
+    Folded into the sentinel key so the once-per-state suppression is per
+    commit, not per count. An empty result falls back to (path, reason).
+    """
+    if not cwd:
+        return ""
+    parts = []
+    for args in (["for-each-ref", "--format=%(refname) %(objectname)", "refs/heads/"],
+                 ["worktree", "list", "--porcelain"]):
+        try:
+            out = subprocess.run(["git", "-C", cwd, *args], capture_output=True,
+                                 text=True, timeout=5)
+        except (OSError, subprocess.SubprocessError):
+            return ""
+        if out.returncode != 0:
+            return ""
+        parts.append(out.stdout)
+    return "\n".join(parts)
 
 
 if __name__ == "__main__":

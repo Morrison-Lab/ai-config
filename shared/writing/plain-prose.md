@@ -36,6 +36,12 @@ When PSW and this guidance disagree, PSW wins.
   - **Do:** apply those PSW sections when writing or reviewing prose.
   - **Don't:** copy their text here; link the section instead
     (see [`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md)).
+- **Put an inline list of three or more phrases in a bullet list**,
+  introduced by a sentence ending in a colon, and number sequential steps.
+  A short series of single words may stay inline.
+  PSW's rule and examples are proposed in `Morrison-Lab/psw#60` ---
+  once merged, they live at `chapters/conciseness.qmd`,
+  "Put lists in bullet points".
 
 This is a default, not an absolute rule. Keep a clause or a technical term when
 removing it would lose meaning or precision. Never trade an honest hedge for

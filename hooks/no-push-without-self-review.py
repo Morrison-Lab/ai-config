@@ -1335,19 +1335,29 @@ def _refspec_dest_branch(spec: str) -> str | None:
     whole spec when there is no colon, which is git's own "same name on both
     sides" reading), and a `refs/heads/<name>` form is reduced to `<name>`.
     Anything in another ref namespace (`refs/tags/...`, `refs/for/...`, a bare
-    `:dest` with an empty source that deletes a ref) or otherwise not a plain
-    branch name returns None -- unclear must not be read as "not the default
-    branch", since that is the direction `push_is_exempt` fails closed in.
+    `:dest` with an empty source that deletes a ref), a glob pattern (git
+    accepts a single `*` on either side of a refspec, e.g.
+    `refs/heads/*:refs/heads/*` to push every branch -- documented in
+    `man git-push`'s refspec section), or otherwise not a plain branch name
+    returns None -- unclear must not be read as "not the default branch",
+    since that is the direction `push_is_exempt` fails closed in. Without the
+    glob check, `refs/heads/*` reduced to the literal string `"*"`, which is
+    not in `DEFAULT_BRANCH_NAMES` and so read as a clean miss rather than as
+    unclear -- exactly the gap this function exists to close, reopened via a
+    push shape that ships every local branch, `main` included, with no
+    colon-delimited destination naming it literally.
     """
     spec = spec.lstrip("+")
     dest = spec.split(":", 1)[1] if ":" in spec else spec
     if not dest:
         return None
     if dest.startswith("refs/heads/"):
-        return dest[len("refs/heads/"):] or None
-    if dest.startswith("refs/") or ":" in dest:
+        dest = dest[len("refs/heads/"):]
+        if not dest:
+            return None
+    elif dest.startswith("refs/") or ":" in dest:
         return None
-    return dest
+    return None if "*" in dest else dest
 
 
 def _push_targets_default_branch(directory: str | None, argv: list[str],
@@ -1358,10 +1368,12 @@ def _push_targets_default_branch(directory: str | None, argv: list[str],
     name only under the modern `push.default`. `shipped_commits` already
     established this is not safe to assume: under `push.default=matching`
     (git's default before 2.0, still present in long-lived global configs) a
-    bare push ships every branch that also exists on the remote, and a
-    configured `remote.<name>.push` overrides the question entirely.
-    Checking only HEAD's own name here would grant the exemption to a bare
-    push that also ships `main` under either override -- exactly the gap
+    bare push ships every branch that also exists on the remote, a configured
+    `remote.<name>.push` overrides the question entirely, and a configured
+    `remote.<name>.mirror` makes a bare push behave as `--mirror` (every ref
+    under `refs/`, `main` included) with no `--mirror` on the command line to
+    catch. Checking only HEAD's own name here would grant the exemption to a
+    bare push that also ships `main` under any of the three -- exactly the gap
     this function exists to close, reopened on its own bare-push path.
     `push_is_exempt`'s own caller already refuses the exemption on anything
     else this function returns other than `False`, so an unresolved HEAD, an
@@ -1381,6 +1393,11 @@ def _push_targets_default_branch(directory: str | None, argv: list[str],
         if remote and _git_config(directory, "--get-all",
                                   f"remote.{remote}.push", argv, env):
             return None
+        if remote:
+            mirror = _git_config(directory, "--get", f"remote.{remote}.mirror",
+                                 argv, env, as_bool=True)
+            if mirror and _is_true(mirror):
+                return None
         branch = _rev_parse_ref(directory, env, "--abbrev-ref", "HEAD")
         return branch in DEFAULT_BRANCH_NAMES if branch else None
     dests = [_refspec_dest_branch(spec) for spec in refspecs]

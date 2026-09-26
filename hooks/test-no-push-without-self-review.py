@@ -3189,6 +3189,12 @@ def exempt_repo_cases() -> tuple[int, int]:
         (":main", "main"),
         ("main:", None),
         ("", None),
+        # A single `*` is a valid glob on either side of a refspec (man
+        # git-push), so a dest reducing to it is not a plain branch name and
+        # must not be read as a clean non-match against DEFAULT_BRANCH_NAMES.
+        ("refs/heads/*:refs/heads/*", None),
+        ("*:*", None),
+        ("feature:main*", None),
     ):
         try:
             got = mod._refspec_dest_branch(spec)
@@ -3332,6 +3338,10 @@ def exempt_repo_cases() -> tuple[int, int]:
         ("an unresolvable refspec on an exempt remote is denied",
          origin_mln, [], "push origin feature:refs/for/main", None,
          "{git}", True),
+        ("a wildcard refspec pushing every branch on an exempt remote is "
+         "denied (review finding, PR #4013)",
+         origin_mln, [], "push origin refs/heads/*:refs/heads/*", None,
+         "{git}", True),
         ("a non-exempt repository is denied",
          [("origin", other)], [], "push origin main", None, "{git}", True),
         ("a lookalike repository name is denied",
@@ -3452,7 +3462,15 @@ def exempt_repo_cases() -> tuple[int, int]:
     # `_push_targets_default_branch` must consult both rather than trusting
     # HEAD's name alone, or a bare push under either override on a feature
     # branch would read as `False` (not targeting main) while the real push
-    # ships main too (gha review finding, PR #4013).
+    # ships main too (review finding, PR #4013).
+    #
+    # A third override, `remote.<name>.mirror`, makes a bare push behave as
+    # `--mirror` -- every ref under `refs/`, `main` included -- with no
+    # `--mirror` flag on the command line for anything to catch. This is the
+    # one entry `shipped_commits`' own `CONFIG_LIKE_INDETERMINATE_FLAGS` loop
+    # already checks (unconditionally, on the bare-push path) that this
+    # function's first two-override fix still left unported (adversarial
+    # review finding, PR #4013).
     for label, extra_config in (
         ("an exempt remote is denied for a bare `git push` on a feature "
          "branch when `push.default` is `matching`",
@@ -3460,6 +3478,9 @@ def exempt_repo_cases() -> tuple[int, int]:
         ("an exempt remote is denied for a bare `git push` on a feature "
          "branch when `remote.origin.push` is configured",
          ["remote.origin.push", "refs/heads/*:refs/heads/*"]),
+        ("an exempt remote is denied for a bare `git push` on a feature "
+         "branch when `remote.origin.mirror` is configured",
+         ["remote.origin.mirror", "true"]),
     ):
         try:
             rc, denied = run_e2e(

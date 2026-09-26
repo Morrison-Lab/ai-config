@@ -569,10 +569,13 @@ try:
     assert run_hook({"transcript_path": commit_only, "cwd": pushed_root}).stdout.strip() == ""
     # No transcript_path: silent, whatever the repo state.
     assert run_hook({"cwd": unpushed_root}).stdout.strip() == ""
-    # The count is undefined without an upstream or on a detached HEAD.
+    # No remote at all: genuinely undefined, since there is nothing to fall
+    # back to either (ai-config#3739's fix only fires when a remote exists).
     assert subject.unpushed_count(no_upstream_root) is None
     run("git checkout -q --detach HEAD", unpushed_root)
-    assert subject.unpushed_count(unpushed_root) is None
+    # A detached HEAD has no upstream, but now falls back to the remote's
+    # default branch (ai-config#3739): 1 commit sits ahead of origin/main.
+    assert subject.unpushed_count(unpushed_root) == 1
     # No cwd in the payload: repository state is unknowable, so the verdict
     # falls back to the transcript scan (the old behaviour, both directions).
     _fallback = subject.decide("", commit_only)
@@ -1163,6 +1166,107 @@ finally:
     for _path in (no_commit, commit_only, commit_and_push):
         os.unlink(_path)
     shutil.rmtree(hook_tmp, ignore_errors=True)
+
+# --- ai-config#3739: no-upstream/detached-HEAD fallback, and a sentinel that
+# no longer keys on the reply's own wording -------------------------------
+noupstream_root, noupstream_bare, noupstream_run = gitrepo(
+    BASE,
+    "git remote add origin BARE",
+    "git push -q -u origin main",
+)
+noupstream_run("git checkout -q --detach HEAD")
+
+feature_root, feature_bare, feature_run = gitrepo(
+    BASE,
+    "git remote add origin BARE",
+    "git push -q -u origin main",
+    "git checkout -q -b feature",  # no upstream for feature
+)
+
+reworded_root, reworded_bare, reworded_run = gitrepo(
+    BASE,
+    "git remote add origin BARE",
+    "git push -q -u origin main",
+    HOOK,  # one unshipped commit
+)
+
+commit_only_3739 = transcript(["git commit -m hook"])
+
+
+def write_transcript_with_reply(path, reply_text):
+    """(Re)write `path` with a commit plus a trailing reply of `reply_text`.
+
+    Writing to a FIXED path (rather than a fresh tempfile per call) is the
+    point: the transcript_path, the derived reason, and the repo state all
+    stay identical across two calls, and only the reply's wording changes.
+    """
+    with open(path, "w") as stream:
+        stream.write(json.dumps({"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "name": "Bash",
+             "input": {"command": "git commit -m hook"}}]}}) + "\n")
+        stream.write(json.dumps({"type": "assistant", "message": {"content": [
+            {"type": "text", "text": reply_text}]}}) + "\n")
+
+
+hook_tmp2 = tempfile.mkdtemp()
+hook_env2 = dict(os.environ, TMPDIR=hook_tmp2,
+                 GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_SYSTEM="/dev/null")
+
+
+def run_hook2(payload):
+    return subprocess.run(
+        [sys.executable, hook], input=json.dumps(payload),
+        capture_output=True, text=True, cwd=hook_tmp2, env=hook_env2)
+
+
+try:
+    # Detached HEAD exactly at origin/main, clean tree: nothing to ship, so
+    # the no-upstream fallback must not block.
+    assert subject.decide(noupstream_root, commit_only_3739) == "", \
+        "a detached HEAD sitting exactly on origin/main must not block (ai-config#3739)"
+    assert subject.unpushed_count(noupstream_root) == 0
+
+    noupstream_run("git commit --allow-empty -q -m extra")
+    _reason = subject.decide(noupstream_root, commit_only_3739)
+    assert _reason and _reason.startswith("1 commit(s) on HEAD are not on its upstream"), _reason
+    assert subject.unpushed_count(noupstream_root) == 1
+
+    # A branch with no upstream at all (never pushed), sitting exactly on the
+    # remote's default branch: zero commits beyond it, so no block.
+    assert subject.decide(feature_root, commit_only_3739) == "", \
+        "a no-upstream branch with nothing beyond origin/main must not block"
+    assert subject.unpushed_count(feature_root) == 0
+
+    # The sentinel used to key on sha256(path + reason + last_assistant_text
+    # (path)); a differently-worded reply produced a fresh key every time, so
+    # an unchanged unshipped state re-blocked on every Stop. The transcript
+    # path, the reason, and the repo state all stay IDENTICAL across the two
+    # calls below -- only the trailing reply text differs -- and the second
+    # call must now be suppressed.
+    _reply_handle, _reply_path = tempfile.mkstemp()
+    os.close(_reply_handle)
+    write_transcript_with_reply(_reply_path, "First reply, worded one way.")
+    _payload = {"transcript_path": _reply_path, "cwd": reworded_root}
+    _first = run_hook2(_payload)
+    _block = json.loads(_first.stdout)
+    assert _block["decision"] == "block", _first.stdout + _first.stderr
+    assert _block["reason"].startswith("1 commit(s) on HEAD"), _first.stdout
+
+    write_transcript_with_reply(_reply_path, "A completely different reply.")
+    _second = run_hook2(_payload)
+    assert _second.stdout.strip() == "", \
+        "a differently-worded reply over an unchanged state must not re-block: " + _second.stdout
+finally:
+    for _root in (noupstream_root, noupstream_bare, feature_root, feature_bare,
+                  reworded_root, reworded_bare):
+        shutil.rmtree(_root, ignore_errors=True)
+    os.unlink(commit_only_3739)
+    if os.path.exists(_reply_path):
+        os.unlink(_reply_path)
+    shutil.rmtree(hook_tmp2, ignore_errors=True)
+
+print("PASS: no-upstream and detached-HEAD fall back to the remote's default branch (ai-config#3739)")
+print("PASS: the sentinel no longer keys on the reply's own wording, so an unchanged state stays suppressed (ai-config#3739)")
 
 # Verify that hooks/no-unshipped-commit.py's fallback constants stay in sync with scripts/lib/git_cmd.py
 lib_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib")

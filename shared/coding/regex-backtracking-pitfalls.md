@@ -92,6 +92,174 @@ past the lookahead's blind spot entirely.)
   fixed once one phrasing of it stops matching; vary the optional pieces of
   the match and re-test.
 
+## Quadratic cost can come from restart positions, not from backtracking
+
+Every section above describes a pattern that is slow **on one match
+attempt**, so every remedy below targets the attempt: make the quantifiers
+disjoint, flatten the nesting, scan line by line.
+A `finditer` sweep has a second cost axis those remedies never touch.
+`finditer` restarts the engine at each position where the pattern can begin,
+and when the tail of the pattern can run to the end of the string, each
+restart scans the whole remainder.
+The total is then quadratic in the number of **start positions**, with no
+backtracking anywhere.
+
+The tell is that rewriting the quantifier changes nothing, which reads as
+"I have not found the pathological construct yet" and is really "the cost is
+not in the construct".
+Confirm it by holding the input length fixed and varying the number of
+positions the pattern can start at.
+If time tracks the starts rather than the length, no rewrite of the pattern
+will help.
+
+Measured 2026-09-24 against a heredoc matcher whose opener is `<<` and whose
+body runs to a terminator that an unterminated heredoc never supplies:
+
+```text
+openers   chars   seconds
+    200    1614     0.020
+    400    3214     0.080
+    800    6414     0.314
+   1600   12814     1.207
+   3200   25614     4.787
+```
+
+Doubling the openers quadruples the time.
+The same matcher over ONE terminated heredoc is untroubled by length:
+240024 characters take 0.003s --- ten times the input of the 3200-opener case
+and a sixteen-hundredth of the time.
+
+Rewriting the body quantifier as a negated character class, in place of a
+DOTALL `.`, is equivalent to the engine and changed nothing.
+
+**The cost is the number of start positions multiplied by the work each start
+does, and both factors need bounding.**
+An earlier revision of this section stated the first factor alone and wrote
+"length is not the variable", on the strength of a measurement that had held
+openers-per-line fixed at one and never varied the other factor.
+That is false for the very matcher it cites.
+The pattern opens with a capturing `([^\n]*)` that may match empty, so the
+engine also restarts at every character of every line and each restart walks
+that line to its end, which makes the second factor the sum of the SQUARES of
+the line lengths.
+At an identical 25600 bytes, one long line took 1.65s and the same bytes
+broken into 80-character lines took 0.007s, with no opener in either.
+So a short input with many starts is one expensive case and a long LINE with
+no start at all is another.
+
+**Bound both, and bound them over the region the matcher will actually
+scan.**
+The shipped guard refuses past 32 heredoc openers, past a restart-cost budget,
+and past a third term covered below, counting none of the three over heredoc
+BODIES, which the matcher never rescans.
+Skipping bodies is what makes the cost bound safe for the case a plain length
+cap would have broken: a single heredoc carrying a 60KB body still matches, in
+0.0008s, because its body scores nothing.
+A 20000-opener command is refused in 0.036s, essentially all of it the split
+into lines.
+
+**A third factor hides between the first two, and bounding them is what
+exposes it.**
+Both bounds above are proxies: a count of start positions, and a restart cost
+summed per line.
+Neither can see a construct whose single match attempt scans to the END of the
+input instead of to the end of its own line.
+In the shipped guard that construct is an UNTERMINATED heredoc opener, where
+the matcher walks from the opener to the end of the string looking for a
+terminator that never arrives.
+At 3.6 MB of four-character lines, 0 untied openers took 0.33s and 31 took
+33.84s -- against a registered 10-second timeout -- while the restart cost
+moved by 3000 and the opener count stayed well inside its bound.
+Neither instrument registered the input that nearly stopped the hook.
+
+Charging that third term correctly took a second measurement, and the first
+one was wrong in the way this section opens with.
+It held the untied opener's line at four characters and so read the cost as
+untied openers times total length.
+The pattern opens with a `([^\n]*)` that may match empty, so the restarts are
+positions on the LINE rather than occurrences of the opener.
+Varying the line length instead, at 200000 trailing lines, lines of
+400/800/1600/2400 characters took 5.60s/11.26s/22.78s/34.40s -- all four
+carrying a single opener, and all four admitted.
+The charge is the untied LINE's length, once per line, times the total length,
+so two untied openers sharing a line cost what one does.
+A terminated heredoc scores nothing under this term, which is what keeps the
+64 KB body case above admitted.
+
+Say which way the refusal falls, because that is a separate decision from the
+bound.
+This one is an EXEMPTION -- past the bound the body is unreadable and the hook
+stays silent -- which is right for a warn-only guard and wrong for a guard
+whose silence is an approval.
+
+- **Do:** vary each factor with the other held fixed, before concluding a
+  pattern backtracks.
+- **Do:** bound the start count AND the span each start scans.
+- **Do:** compute either bound over the region the matcher rescans, so the
+  input's own inert bulk does not vote.
+- **Do:** ask whether any construct in the pattern can scan past the region a
+  bound is computed over -- an unterminated opener, an unclosed delimiter, a
+  lookahead with no floor -- and charge it its own term.
+- **Don't:** read "rewriting the quantifier changed nothing" as evidence you
+  have not found the construct --- it is evidence the cost is elsewhere.
+- **Don't:** treat a length cap as a proxy for the start count, or the start
+  count as a proxy for length; they are independent, and a measurement that
+  varied only one of them cannot say the other is inert.
+- **Don't:** read two bounded factors as a bounded cost -- each bound is a
+  proxy, and the axis that actually times out can sit in the gap between them.
+
+## The same quadratic has a caller-side twin that no regex review can see
+
+Everything above is a property of a pattern, so every tell above is
+something you can find by reading one.
+The commonest shape of this defect is not in a pattern at all.
+It is a loop that calls a per-item helper, where the helper rescans the
+prefix from index 0 to answer a question about its item.
+Each call is linear, every regex in it is linear, and the loop is
+quadratic.
+
+Reading the helper finds nothing, because the helper is correct.
+Reading the loop finds nothing, because the loop is one line.
+The cost lives in the composition, and the composition is the one thing
+neither reading covers.
+
+The tell is a helper whose first statement resets an accumulator to the
+start of the input.
+`for m in RX.finditer(text, 0, item.start())` inside a function called once
+per item is the canonical spelling, and it looks like careful scoping
+rather than like a scan.
+The remedy is the one the section above already describes on its other
+axis: compute the boundaries once, and have each item ask by bisection
+which one precedes it.
+
+Two things make it survive review.
+It is invisible to a cost test whose input has many items but only ONE
+call into the helper, and equally invisible to one with many calls over a
+short input, so a suite can carry a cost ceiling that the defect passes.
+And a second fix landing in the same change can hide it: a caller that
+stops at the first item never runs the loop to completion, so the
+quadratic is unreachable by that route even with the helper unchanged.
+Both halves then look pinned by one test and neither is.
+
+- **Do:** ask of every per-item helper whether it starts from index 0.
+- **Do:** build the cost test so the loop runs to COMPLETION, and check
+  how many times the helper was entered rather than how long the input is.
+- **Do:** mutate each fix separately when two land together -- a survivor
+  there means one test was covering both.
+- **Don't:** read "every regex here is linear" as "this loop is linear".
+
+(Measured on Morrison-Lab/ai-config PR
+[#3928](https://github.com/Morrison-Lab/ai-config/pull/3928), which added the
+section above and shipped this defect in the same diff.
+`hooks/no-stale-pr-status.py` resolved each assertion's sentence start by
+rescanning from index 0, so an ordinary multi-PR status recap cost 3.97s at
+70 KB and 9.31s at 105 KB against a registered 10-second timeout, in a
+blocking hook that fails open -- a timeout there is a silent approval.
+Computing the starts once and bisecting took the same recap to 0.04s and
+526 KB to 0.23s.
+Having the rule in the diff was not enough: it was written about patterns,
+and the defect was in a loop.)
+
 ## Remedies
 
 1. **Replace nested quantifiers with linear scans.**

@@ -1048,6 +1048,110 @@ the cause".
 See [`address-every-comment.cases.md`](address-every-comment.cases.md),
 "A hex-prefix finding closed by fixing a length bug on the same line".
 
+**A reviewer's supporting row can run cleanly and still not be an instance of
+the defect, and the rule above is what routes it into your suite.**
+
+The section above says to paste the reviewer's literal input into a test and
+run it, because a restatement agrees with your fix by construction.
+That is right, and it has a residual.
+It covers the input that reproduces, and the section before it covers the
+input that errors.
+Neither covers the third outcome: the input runs, raises nothing, and is
+simply not an instance of the finding, because an earlier gate stops it
+before the flagged code is reached.
+
+Both available readings of that outcome are wrong.
+Reading it as refuting the finding is wrong whenever another row does
+reproduce, and a real finding usually carries more than one.
+Keeping it as the regression fixture is worse, and the rule above is exactly
+what licenses keeping it: a case built from the reviewer's own words reads as
+the finding's own acceptance criterion, which makes it the least-questioned
+fixture in the suite while pinning nothing.
+Provenance is not discrimination.
+
+The check is the one
+[`fixtures-are-not-evidence`](fixtures-are-not-evidence.md) already
+prescribes, applied to a row you did not write: revert the fix and confirm
+the case fails.
+A reviewer-supplied case that passes against the unfixed code is not evidence
+for the finding, whatever the finding's own merits.
+
+- **Do:** run each row a finding supplies on its own, and say in the reply
+  which ones reproduced.
+- **Do:** derive a replacement for a row that does not reproduce, and record
+  in the reply that the reviewer's row does not reproduce and at which gate
+  it stops.
+- **Don't:** read one non-reproducing row as refuting a finding whose other
+  rows reproduce.
+- **Don't:** adopt a reviewer's row as a fixture without a mutation control,
+  which the section above's own remedy does not ask for.
+
+**The mirror is the likelier error, and it wears the same clothes.**
+Rejecting a row also rests on a measurement, and that measurement is taken
+under whatever inputs are nearest to hand -- the suite's own constants, the
+one verdict form already in the file, the single config the harness defaults
+to.
+A row that passes under that one input is then reported as one that "does not
+reproduce", which is a claim about *every* input the row could carry.
+It reads as the diligent outcome, because running the row at all is more than
+the finding asked for, and the reply says so.
+So state which inputs a non-reproducing verdict was measured across, and
+widen the sweep before dropping the row rather than after.
+
+- **Do:** enumerate the inputs a row could carry, and measure the row across
+  them, before reporting that it does not reproduce.
+- **Do:** say in the reply which inputs were measured, so a one-input check
+  reads as a one-input check.
+- **Don't:** generalize a single measurement into a claim about every form
+  the row could take.
+
+(Measured 2026-09-24 on `hooks/flag-self-authored-verdict-echo.py`.
+A review found the guard's negation window over-broad, and offered
+"None are deferred; all five are addressed in `f120e5a`" among its rows.
+That row was reported as not an instance, on the stated ground that
+`classify_verdict()` returns `''` for it "whatever verdict form it carries"
+-- which was measured under one form and was false.
+The row classifies `not-clean` under `Changes requested`, `Blocked`,
+`Not ready to merge` and `Not clean`, and reaches the window under each of
+them.
+The row suppresses a verdict under one family, `Needs ... work`, which
+happened to be the constant the test file already defined -- and that is a
+separate defect in `classify_verdict()`'s own suffix guard, filed as
+[ai-config#3937](https://github.com/Morrison-Lab/ai-config/issues/3937),
+rather than a property of the row.
+Eight verdict forms were measured with the row and again without it, and the
+row changes the answer for `Needs more work` and `Needs work` and for no
+other.
+That second measurement is the one the first correction still lacked: the
+first pass replaced "every verdict form" with "exactly one form", which is
+another claim about a population, made from four forms tried by hand.
+Naming the population and the count is what makes either statement
+checkable.
+A later review round caught the original generalization, and the row is now a
+fixture with its verdict spelled out.
+
+**A third round then caught the same shape on an axis the second had held
+fixed without saying so.**
+The eight-form sweep varied the verdict and kept one body: a blank line
+between the verdict and the row.
+That guard's window is a character count, so the separation decides it, and
+at a blank line the row already starts past the 60 characters -- all eight
+forms classify the same with the row and without it.
+Re-measured across three separations, the suppression appears only at one
+newline and at the same line.
+So the corrected claim was itself a population sampled at a single point, and
+it read as settled precisely because the round before it had been the careful
+one.
+The fixture still spells its verdict out, but on the ground the third
+measurement supplied rather than the second's: `Changes requested` is a
+verdict family no other fixture in that file carries, so it is what pins the
+behaviour outside `Needs ... work` at any separation.
+Fixing a generalization does not immunize its replacement.
+Ask what the new measurement held fixed, and name it, or the next round finds
+the next axis.
+The finding itself was real throughout and reproduced on three further
+constructions.)
+
 **Count a round's findings before pushing its fix, because disposing of one
 correctly generates no evidence about the others.**
 

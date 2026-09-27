@@ -319,6 +319,38 @@ Adding one invalid escape to `hooks/flag-cop-out-offer.py` and running `hooks/te
 - **Don't:** broaden a category-only filter to `error::DeprecationWarning` to cover the gap, which errors on every unrelated deprecation as well.
 - **Don't:** put a regex in the `-W`/`PYTHONWARNINGS` message field, which is escaped to a literal there unlike `warnings.filterwarnings()`'s own `message=`, so `error:invalid.*sequence::` matches nothing and the filter is vacuous with no error.
 
+## A VALID escape in a non-raw docstring corrupts prose, and no warning fires
+
+Everything above is about the INVALID escape, which at least announces
+itself.
+The commoner corruption is a valid one.
+A docstring or comment-adjacent literal that quotes a regex writes
+`\n\s*\n` to mean three characters of pattern, and Python reads the two
+`\n` sequences as newlines while leaving `\s` alone -- so the rendered
+docstring carries a line break where the pattern's own text belongs, and
+`check-python-escapes.py` flags only the `\s`.
+Fixing the flagged half by escaping it, rather than by making the literal
+raw, leaves the silent half in place and closes the only signal there was.
+
+Measured 2026-09-24 on `hooks/flag-self-authored-verdict-echo.py`, whose
+`_clause_start_ends` docstring explained why a variable-length clause
+pattern backtracks to fit `endpos`.
+The checker reported one invalid escape on that line;
+reading the loaded `__doc__` showed the sentence had been split across two
+lines at the very words it was quoting.
+`r"""` fixed both at once, and the checker then examined 388 files with 0
+invalid escapes.
+
+- **Do:** make any docstring that quotes a regex a raw literal, whatever the
+  checker says about it.
+- **Do:** read the loaded `__doc__` back when a literal quotes a pattern,
+  since only the rendered string shows what a reader will get.
+- **Don't:** treat a clean `check-python-escapes.py` run as evidence that a
+  docstring's pattern survived -- it sees invalid escapes only, and `\n`,
+  `\t`, `\r` and `\\` are all valid.
+- **Don't:** silence the flagged escape by doubling it while leaving the
+  literal non-raw, which repairs the visible half and hides the other.
+
 ## `Path.write_text` writes CRLF on Windows, and `read_text` hides it
 
 `pathlib.Path.write_text("a\nb\n")` writes `b"a\r\nb\r\n"` on Windows, so any tool that reads those bytes without normalizing --- `grep`, `awk`, a shell anchor match, a later regex against LF-normalized text --- sees content the script never intended to write.

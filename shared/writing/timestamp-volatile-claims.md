@@ -234,6 +234,48 @@ because both states share that timestamp.)
   from two different revisions can be individually accurate and jointly
   impossible.
 
+### Adding the provenance is not taking the measurement
+
+The rule above is easy to satisfy in appearance and miss in substance,
+because everything it asks for is *text you write* rather than a command
+you run.
+A revision that attaches the date, the command, and the expression to a
+figure reads as the corrected version of an undated one --- and that is
+exactly the reading the next reviewer gives it, since the apparatus is what
+they were told to look for.
+
+The near-miss is a revision that carries all three and leaves the NUMBER
+where it was.
+Nothing about the sentence says so: a stale figure is indistinguishable from
+a re-derived one once the command sits beside it, and a reviewer who re-runs
+the command is the only detector.
+
+(Morrison-Lab/ai-config#3928, round 20, finding 4.
+`hooks/flag-self-authored-verdict-echo.py`'s dotted-code-span figure was
+corrected once, from an undated 11017 to a dated 12739 carrying its command
+and citing this fragment by name.
+Re-running that command gives 12783 at the branch's merge base, 12798 at
+171efa1a and 12805 at f6e6d242 --- 12739 reproduces at no commit on the
+branch, so the revision that added the provenance had not re-measured.
+The same revision also asserted the file count had "moved 744 -> 745 within
+this branch" while `git log --diff-filter=AD -- '*.md'` returns nothing over
+that range and the denominator was 746 throughout --- a movement invented in
+the course of explaining the correction, and the most persuasive sentence in
+the passage, since a figure shown to be moving reads as one somebody watched.
+The figure now names a commit rather than a date, because the total moves
+with every prose commit and 2026-09-25 alone holds two of the three totals
+above.)
+
+- **Do:** re-run the command in the same edit that attaches it, and paste
+  what it returned.
+- **Do:** name the commit when the figure moves faster than the calendar
+  --- a per-commit corpus count is dated by a SHA, not by a day.
+- **Don't:** treat adding a date, a command, or a cited convention as
+  having re-derived the figure it now sits beside.
+- **Don't:** narrate a figure's history from memory while correcting it ---
+  "it has since moved X -> Y" is a second claim, derivable by one `git log`,
+  and asserting it unverified is how a correction adds an error.
+
 ## Relationship to other rules
 
 - [`fact-check-prose.md`](fact-check-prose.md) checks that a claim is *true*

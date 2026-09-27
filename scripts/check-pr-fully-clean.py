@@ -2270,7 +2270,7 @@ COPILOT_SUPPRESSED_BLOCK = re.compile(r"\bSuppressed\s+comments\b", re.IGNORECAS
 # false negative is not.
 COPILOT_PREVIOUSLY_MISSED = re.compile(r"\bPreviously\s+missed\b", re.IGNORECASE)
 COPILOT_OPEN_ITEMS_HEADING = re.compile(
-    r"<strong>[ \t]*Open[ \t]*\([0-9]+\)[ \t]*</strong>", re.IGNORECASE
+    r"<strong>[ \t]*Open[ \t]*\([ \t]*[0-9]+[ \t]*\)[ \t]*</strong>", re.IGNORECASE
 )
 # Copilot reports its own inline-finding count in the `Review details` block, as
 # `0`, `0 new`, or a positive integer. This is the only count available to a

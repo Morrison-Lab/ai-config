@@ -6472,6 +6472,43 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "'Open (N)' listing still blocks",
         checker.copilot_verdict(copilot_balanced_open_items_body) == "not-clean",
     )
+    # [ai-config#4005](https://github.com/Morrison-Lab/ai-config/issues/4005):
+    # `COPILOT_OPEN_ITEMS_HEADING` previously missed `<strong>Open ( 1 )</strong>` with
+    # inner whitespace inside the parentheses.
+    copilot_balanced_open_items_spaced_body = (
+        copilot_empty_balanced_closer_look_body
+        + "\n\n<details open>\n<summary><strong>Open ( 1 )</strong></summary>\n\n"
+        f"- {_v2_picture} [Some open finding](#discussion_r1) · New\n"
+        "</details>"
+    )
+    check(
+        "copilot_verdict: a Balanced 'Needs a closer look' with an "
+        "'Open ( 1 )' listing with inner spaces still blocks",
+        checker.copilot_verdict(copilot_balanced_open_items_spaced_body) == "not-clean",
+    )
+    copilot_balanced_open_items_tab_spaced_body = (
+        copilot_empty_balanced_closer_look_body
+        + "\n\n<details open>\n<summary><strong>Open (\t1\t)</strong></summary>\n\n"
+        f"- {_v2_picture} [Some open finding](#discussion_r1) · New\n"
+        "</details>"
+    )
+    check(
+        "copilot_verdict: a Balanced 'Needs a closer look' with an "
+        "'Open (\\t1\\t)' listing with inner tabs still blocks",
+        checker.copilot_verdict(copilot_balanced_open_items_tab_spaced_body) == "not-clean",
+    )
+    check(
+        "COPILOT_OPEN_ITEMS_HEADING matches '<strong>Open ( 1 )</strong>'",
+        bool(checker.COPILOT_OPEN_ITEMS_HEADING.search("<strong>Open ( 1 )</strong>")),
+    )
+    check(
+        "COPILOT_OPEN_ITEMS_HEADING matches '<strong>Open (  12  )</strong>'",
+        bool(checker.COPILOT_OPEN_ITEMS_HEADING.search("<strong>Open (  12  )</strong>")),
+    )
+    check(
+        "COPILOT_OPEN_ITEMS_HEADING rejects non-digit '<strong>Open ( a )</strong>'",
+        not bool(checker.COPILOT_OPEN_ITEMS_HEADING.search("<strong>Open ( a )</strong>")),
+    )
 
     copilot_balanced_nonzero_closer_look_body = (
         copilot_empty_balanced_closer_look_body.replace(

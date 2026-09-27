@@ -189,21 +189,6 @@ class CheckMrFullyCleanTests(unittest.TestCase):
         self.assertIn("FULLY CLEAN", result.stdout)
         self.assertNotIn("demorrison", result.stdout)
 
-    def test_addressed_reply_without_mr_author_is_not_reviewer_verdict(self):
-        """An addressed reply is not classified as a reviewer verdict even if mr.author is missing."""
-        value = payload()
-        value["notes"].append({
-            "id": 16191,
-            "type": "Note",
-            "created_at": "2026-09-26T15:10:00Z",
-            "author": {"username": "contributor"},
-            "body": "Addressed findings from review of `01234567`:\n\n- **Changes requested**: fixed.\n",
-        })
-        result = self.run_checker(value)
-        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
-        self.assertIn("FULLY CLEAN", result.stdout)
-        self.assertNotIn("contributor", result.stdout)
-
     def test_non_author_reviewer_verdict_still_blocks(self):
         """A genuine reviewer verdict from another identity still blocks (#4018)."""
         value = payload()
@@ -214,6 +199,21 @@ class CheckMrFullyCleanTests(unittest.TestCase):
             "created_at": "2026-09-26T15:15:00Z",
             "author": {"username": "yyren"},
             "body": "Verdict: Changes requested\n\nPlease fix the concurrency issue.",
+        })
+        result = self.run_checker(value)
+        self.assertEqual(result.returncode, 1, result.stderr + result.stdout)
+        self.assertIn("Standing reviewer verdict(s) are not clean: yyren.", result.stdout)
+
+    def test_non_author_addressing_note_with_verdict_still_blocks(self):
+        """A third-party reviewer's note starting with Addressing still blocks (#4021 review finding)."""
+        value = payload()
+        value["mr"]["author"] = {"username": "demorrison"}
+        value["notes"].append({
+            "id": 16194,
+            "type": "Note",
+            "created_at": "2026-09-26T15:25:00Z",
+            "author": {"username": "yyren"},
+            "body": "Addressing your fix in `abc1234`, the concurrency issue is still present.\n\n**Changes requested**",
         })
         result = self.run_checker(value)
         self.assertEqual(result.returncode, 1, result.stderr + result.stdout)
@@ -242,28 +242,6 @@ class CheckMrFullyCleanTests(unittest.TestCase):
         self.assertTrue(MODULE._is_mr_author("DeMorrison", "demorrison"))
         self.assertFalse(MODULE._is_mr_author("yyren", "demorrison"))
         self.assertFalse(MODULE._is_mr_author("", "demorrison"))
-
-    def test_is_addressed_reply_helper(self):
-        self.assertTrue(MODULE._is_addressed_reply("Addressed the `claude-manual` reviews..."))
-        self.assertTrue(MODULE._is_addressed_reply("Addressing comments..."))
-        self.assertTrue(MODULE._is_addressed_reply("- Addressed: fixed bug"))
-        self.assertFalse(MODULE._is_addressed_reply("Verdict: Changes requested"))
-        self.assertFalse(MODULE._is_addressed_reply("Ready for merge"))
-        self.assertFalse(MODULE._is_addressed_reply(""))
-
-    def test_addressed_prefix_with_review_marker_still_blocks(self):
-        """A review starting with 'Addressed' that carries a review body marker still blocks."""
-        value = payload()
-        value["notes"].append({
-            "id": 16194,
-            "type": "Note",
-            "created_at": "2026-09-26T15:25:00Z",
-            "author": {"username": "reviewer"},
-            "body": "Addressed comments review:\n\nVerdict: Changes requested\n\nStill broken.",
-        })
-        result = self.run_checker(value)
-        self.assertEqual(result.returncode, 1, result.stderr + result.stdout)
-        self.assertIn("Standing reviewer verdict(s) are not clean: reviewer.", result.stdout)
 
 
 if __name__ == "__main__":

@@ -14,7 +14,6 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -98,17 +97,6 @@ def _identity(body: str, author: str) -> str:
     return _PR._reviewer_identity(body, author)
 
 
-_ADDRESSED_REPLY = re.compile(
-    r"\A[ \t]*(?:[-*#>]|[0-9]+[.)])*[ \t]*(?:Addressed|Addressing)\b",
-    re.IGNORECASE,
-)
-
-
-def _is_addressed_reply(body: str) -> bool:
-    """True when *body* is an author/driver status note reporting findings addressed."""
-    return bool(_ADDRESSED_REPLY.match((body or "").strip()))
-
-
 def _mr_author(mr: dict) -> str:
     author = mr.get("author") or {}
     if isinstance(author, dict):
@@ -176,10 +164,6 @@ def _check_notes(
         body = str(note.get("body") or "")
         author = _note_author(note)
         identity = _identity(body, author)
-
-        # An author reply reporting findings as addressed is not a review.
-        if _is_addressed_reply(body) and not _PR.has_review_body_marker(body):
-            continue
 
         # Exclude the MR author's own notes from reviewer identities.
         # If an agent posted under the MR author's login with a recognized review

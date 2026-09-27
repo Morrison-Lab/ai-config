@@ -152,6 +152,97 @@ class CheckMrFullyCleanTests(unittest.TestCase):
         second = {"id": 2, "author": {}}
         self.assertNotEqual(MODULE._note_author(first), MODULE._note_author(second))
 
+    def test_mr_author_addressed_reply_is_not_counted_as_reviewer_verdict(self):
+        """Regression test for #4018 modeled on note 16189."""
+        value = payload()
+        value["mr"]["author"] = {"username": "demorrison"}
+        value["notes"].append({
+            "id": 16189,
+            "type": "Note",
+            "created_at": "2026-09-26T15:00:00Z",
+            "author": {"username": "demorrison"},
+            "body": (
+                "Addressed the `claude-manual` reviews of pipelines 9531 and 9535:\n\n"
+                "- **Changes requested** in pipeline 9531:\n"
+                "  - **Medium**, NA-unsafe index access in process_batch: wrapped in is.na() check.\n"
+                "- **Low**, docstring typo in validate(): fixed.\n"
+            ),
+        })
+        result = self.run_checker(value)
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn("FULLY CLEAN", result.stdout)
+        self.assertNotIn("demorrison", result.stdout)
+
+    def test_mr_author_note_without_review_marker_is_not_reviewer_verdict(self):
+        """The MR author's own notes are not reviewer identities (#4018)."""
+        value = payload()
+        value["mr"]["author"] = {"username": "demorrison"}
+        value["notes"].append({
+            "id": 16190,
+            "type": "Note",
+            "created_at": "2026-09-26T15:05:00Z",
+            "author": {"username": "demorrison"},
+            "body": "Checking whether **Changes requested** was resolved on this branch.",
+        })
+        result = self.run_checker(value)
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn("FULLY CLEAN", result.stdout)
+        self.assertNotIn("demorrison", result.stdout)
+
+    def test_non_author_reviewer_verdict_still_blocks(self):
+        """A genuine reviewer verdict from another identity still blocks (#4018)."""
+        value = payload()
+        value["mr"]["author"] = {"username": "demorrison"}
+        value["notes"].append({
+            "id": 16192,
+            "type": "Note",
+            "created_at": "2026-09-26T15:15:00Z",
+            "author": {"username": "yyren"},
+            "body": "Verdict: Changes requested\n\nPlease fix the concurrency issue.",
+        })
+        result = self.run_checker(value)
+        self.assertEqual(result.returncode, 1, result.stderr + result.stdout)
+        self.assertIn("Standing reviewer verdict(s) are not clean: yyren.", result.stdout)
+
+    def test_non_author_addressing_note_with_verdict_still_blocks(self):
+        """A third-party reviewer's note starting with Addressing still blocks (#4021 review finding)."""
+        value = payload()
+        value["mr"]["author"] = {"username": "demorrison"}
+        value["notes"].append({
+            "id": 16194,
+            "type": "Note",
+            "created_at": "2026-09-26T15:25:00Z",
+            "author": {"username": "yyren"},
+            "body": "Addressing your fix in `abc1234`, the concurrency issue is still present.\n\n**Changes requested**",
+        })
+        result = self.run_checker(value)
+        self.assertEqual(result.returncode, 1, result.stderr + result.stdout)
+        self.assertIn("Standing reviewer verdict(s) are not clean: yyren.", result.stdout)
+
+    def test_system_note_is_ignored(self):
+        """GitLab system notes are not treated as reviewer verdicts."""
+        value = payload()
+        value["notes"].append({
+            "id": 16193,
+            "type": "Note",
+            "system": True,
+            "created_at": "2026-09-26T15:20:00Z",
+            "author": {"username": "demorrison"},
+            "body": "marked this merge request as draft",
+        })
+        result = self.run_checker(value)
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+
+    def test_mr_author_helper(self):
+        self.assertEqual(MODULE._mr_author({"author": {"username": "demorrison"}}), "demorrison")
+        self.assertEqual(MODULE._mr_author({"author": {"name": "Douglas Morrison"}}), "Douglas Morrison")
+        self.assertEqual(MODULE._mr_author({"author": "demorrison"}), "demorrison")
+        self.assertEqual(MODULE._mr_author({}), "")
+        self.assertTrue(MODULE._is_mr_author("demorrison", "demorrison"))
+        self.assertTrue(MODULE._is_mr_author("DeMorrison", "demorrison"))
+        self.assertFalse(MODULE._is_mr_author("yyren", "demorrison"))
+        self.assertFalse(MODULE._is_mr_author("", "demorrison"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -97,6 +98,34 @@ def _identity(body: str, author: str) -> str:
     return _PR._reviewer_identity(body, author)
 
 
+_ADDRESSED_REPLY = re.compile(
+    r"\A[ \t]*(?:[-*#>]|[0-9]+[.)])*[ \t]*(?:Addressed|Addressing)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_addressed_reply(body: str) -> bool:
+    """True when *body* is an author/driver status note reporting findings addressed."""
+    return bool(_ADDRESSED_REPLY.match((body or "").strip()))
+
+
+def _mr_author(mr: dict) -> str:
+    author = mr.get("author") or {}
+    if isinstance(author, dict):
+        known = author.get("username") or author.get("name")
+        if known:
+            return str(known).strip()
+    elif isinstance(author, str) and author:
+        return author.strip()
+    return ""
+
+
+def _is_mr_author(name: str, mr_author: str) -> bool:
+    if not name or not mr_author:
+        return False
+    return name.strip().lower() == mr_author.strip().lower()
+
+
 def _note_time(note: dict) -> str:
     return str(note.get("created_at") or "")
 
@@ -130,15 +159,37 @@ def _check_pipelines(pipelines: list[dict], sha: str) -> list[str]:
     return issues
 
 
-def _check_notes(notes: list[dict], discussions: list[dict], sha: str, quorum: int) -> list[str]:
+def _check_notes(
+    notes: list[dict],
+    discussions: list[dict],
+    sha: str,
+    quorum: int,
+    mr_author: str = "",
+) -> list[str]:
     issues: list[str] = []
     current_clean: set[str] = set()
     latest: dict[str, tuple[str, str]] = {}
 
     for note in notes:
+        if note.get("system") is True:
+            continue
         body = str(note.get("body") or "")
         author = _note_author(note)
         identity = _identity(body, author)
+
+        # An author reply reporting findings as addressed is not a review.
+        if _is_addressed_reply(body) and not _PR.has_review_body_marker(body):
+            continue
+
+        # Exclude the MR author's own notes from reviewer identities.
+        # If an agent posted under the MR author's login with a recognized review
+        # marker, identity will be the agent (Claude, Codex, etc.) rather than
+        # the MR author. Unmarked notes from the MR author are never reviewers.
+        if _is_mr_author(identity, mr_author):
+            continue
+        if _is_mr_author(author, mr_author) and not _PR.has_review_body_marker(body):
+            continue
+
         verdict = _PR.classify_verdict(body, "", author)
         if verdict in ("clean", "not-clean"):
             prior = latest.get(identity)
@@ -286,7 +337,10 @@ def main(argv: list[str] | None = None) -> int:
     issues.extend(_check_pipelines(_payload_value(payload, "pipelines", list), sha))
     issues.extend(_check_notes(
         _payload_value(payload, "notes", list),
-        _payload_value(payload, "discussions", list), sha, args.quorum,
+        _payload_value(payload, "discussions", list),
+        sha,
+        args.quorum,
+        mr_author=_mr_author(mr),
     ))
     issues.extend(_check_currency(payload, sha))
 

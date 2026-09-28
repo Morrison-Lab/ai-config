@@ -47,7 +47,11 @@ until someone makes that decision and retires the graded item.
 - **Don't:** leave a graded item in use once the notes carry its solution.
 - **Don't:** read "exercises may migrate" as licence for notes content that answers graded work by accident.
 
-### The leak check covers what we grade, not what another class assigned
+(Ezra, 2026-09-28: "it's ok for exercises to migrate from mlg to the lecture-notes repos, if we think they would be better to include in the notes than reserve them for evaluation materials";
+"and not just from mlg; from any evaluation-material repo (e.g. epi204)";
+"we just need to be intentional about what we migrate, and not do it accidentally".)
+
+## The leak check covers what we grade, not what another class assigned
 
 What goes in the notes and what is held back for assessment is our decision.
 The leak check protects the items we grade --- this course's current and planned homework, quizzes and exams --- from being answered by accident.
@@ -66,7 +70,3 @@ just don't leak solutions ACCIDENTALLY.";
 
 - **Do:** check new notes content against the items this course grades, and decide what to hold back on the merits.
 - **Don't:** treat another class's problem sets or keys as ruling content out of the notes, or present such a check as a gate.
-
-(Ezra, 2026-09-28: "it's ok for exercises to migrate from mlg to the lecture-notes repos, if we think they would be better to include in the notes than reserve them for evaluation materials";
-"and not just from mlg; from any evaluation-material repo (e.g. epi204)";
-"we just need to be intentional about what we migrate, and not do it accidentally".)

@@ -23,7 +23,8 @@ without asking confirmation before every merge.
   Pushing, building, or driving a PR to 100% clean CI
   DOES NOT grant permission to merge.
   One repository is exempted standing --- see "The standing per-repository
-  grant" below --- and the Scope Limit binds that exemption too.
+  grant" below --- and so are infra-only PRs in any Morrison-Lab repository
+  --- see "The standing infra-PR grant". The Scope Limit binds both.
 - **MWC Override Scope**: When the user explicitly issues `/mwc`, the bare word `mwc`, "merge when confident", "merge at will", or "maw", that baseline prohibition is suspended for the current session only.
   The bare word is listed here, not only in `CLAUDE.md`'s general "Bare keyword directives" convention, so this file is self-contained: a slash command is routed to this skill by the harness itself, while a bare word in prose is a convention the model must recognize on its own, and it recognizes it most reliably when the file governing the mechanics (`enable-mwc`, `check-mwc`, the Scope Limit) names the exact form it will see rather than only implying it maps here.
 - **Scope Limit**: An MWC grant applies ONLY to PRs that are 100% clean
@@ -491,6 +492,49 @@ A session working *in* the ai-config checkout has the least reason to name the r
 - **Do:** re-issue with `-R` as the first response to any merge refusal in a repo that carries a grant, before investigating anything.
 - **Don't:** read the refusal as the grant not applying, the PR not qualifying, or the hook being broken --- the commonest cause is an underspecified command, and none of those three readings is checkable against it.
 - **Don't:** infer the target from the working directory the way the rest of `gh` does; that is precisely the inference the guard refuses to make.
+
+## The standing infra-PR grant
+
+A second standing grant covers **infra PRs** in any `Morrison-Lab/*` repository.
+An infra PR is one where every changed path is tooling or agent configuration
+(user directive, 2026-09-28: "let's create a standing infra-PR mwc grant in ai-config").
+`INFRA_PATH_PATTERNS` in `hooks/no-unauthorized-merge.py` is the operative list:
+
+- `.github/**`: CI workflows, reusable actions and their scripts, dependabot,
+  and Copilot's instructions
+- `.claude/**`
+- `CLAUDE.md`, `AGENTS.md` and `GEMINI.md`, at any depth
+- `.lintr`, `.lintr.R`, `lychee.toml`, `_typos.toml` and `inst/WORDLIST`
+
+A top-level `scripts/` is deliberately absent, because in a content repository it can hold analysis code.
+
+The grant is decided by what the PR changes, so the guard reads the PR's file list from GitHub (`gh api .../pulls/N/files`).
+It checks every changed path, and a renamed file's previous path as well, so moving a content file under `.github/` does not qualify.
+Every doubt denies:
+
+- no single bare PR number in the command;
+- a failed or timed-out fetch;
+- an empty file list, or one that disagrees with the PR's `changed_files`;
+- a list at the API's 3000-file cap;
+- any one path outside the list.
+
+The target and merge-type ambiguity tests are the per-repository grant's, unchanged.
+
+The PR number is read only from quote-masked text, so a number inside a `--body` or `-t` cannot stand in for the real one.
+Without that, `gh pr merge -R o/r --body "see 12"` would check PR 12's files while merging the current branch's PR.
+`gh pr merge --auto` and the MCP auto-merge tools are not covered, because auto-merge merges whatever the PR holds once its checks pass, not what the guard just read.
+
+The Scope Limit binds this grant exactly as it binds the other one: the guard checks what the PR changes, not whether it is fully clean.
+Run `check-pr-fully-clean.py` first.
+
+- **Do:** merge a fully clean infra PR with the PR number and `-R` in the command (`gh pr merge 15 -R Morrison-Lab/pds --squash`), or through the MCP merge tool with `owner`, `repo` and `pullNumber`.
+- **Do:** push nothing between the clean check and the merge.
+  The file list is read at merge time, but a push landing between that read and the merge is not seen; `--match-head-commit <sha>` closes that window.
+- **Don't:** read a refusal as the PR not being infra until the command names one PR number and one target.
+- **Don't:** expect this grant to clear Claude Code's own auto-mode permission checker, which is separate from this hook and may still need a permission rule.
+
+`NO_UNAUTHORIZED_MERGE_DISABLE_INFRA_GRANT=1` turns the grant off; nothing turns it on.
+The hook's test suite sets it so that no subprocess case depends on a live PR's files.
 
 ## Session Lock & Hook Integration
 

@@ -288,6 +288,9 @@ NON_OPERATION_TOKENS = {
     "GITHUB_OUTPUT",
     "GITHUB_TOKEN",
     "GITLAB_TOKEN",
+    # Python constant in no-unauthorized-merge.py: the paths an infra PR may
+    # change under the standing infra-PR merge grant, not an operation
+    "INFRA_PATH_PATTERNS",
     "NOT_CRAN",
     "NOT_PLANNED",
     # env var: one of the two auth routes delegate-to-opencode names for the

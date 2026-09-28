@@ -491,3 +491,18 @@ Verify through a different reader rather than concluding the state did not chang
 - **Do:** confirm a refused-path write through a different reader, since the read on that path is refused as well.
 - **Don't:** read a refusal on a compound command as a verdict on the operation you cared about --- it may be the `sleep` beside it.
 - **Don't:** reshape a refused single-purpose command a second time, and never hand it to a peer session.
+
+## Check the clones before saying a repository is out of reach
+
+A cloud session can carry more repositories than its system prompt's scope list names:
+`add_repo` calls from earlier in the conversation, or from before a compaction,
+leave clones under `/home/user/` that the list never shows.
+So "I can't reach that repository" is a claim about state, and it needs the query that settles it.
+
+On 2026-09-28 a session told the user it could not reach `Morrison-Lab/mlg` to change a quiz,
+in the same session where its own subagent had just read that quiz from `/home/user/mlg`.
+`add_repo` then answered `already_present`.
+
+- **Do:** run `ls /home/user` and `git -C <dir> remote -v` before saying a repository is unreachable,
+  then call `add_repo`, which reports `already_present` for an attached one.
+- **Don't:** read the system prompt's Repository Scope list as the set of repositories the session holds.

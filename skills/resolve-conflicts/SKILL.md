@@ -235,3 +235,13 @@ Confirm which physical branch is "ours" before you reach for `--ours` /
   "The recovery has a silent failure mode of its own, and no merge produces
   it", which is why the batch pass's per-merge re-check never surfaces this
   one.
+- ❌ Rewriting a file from scratch with no conflict in sight,
+  such as rebasing a repo's instruction files on another repo's.
+  That is a one-sided merge of the old file, and it drops content the same way,
+  with no markers to warn you.
+  Before pushing, list what the old version had
+  (`git diff <base> -- <path>`, removed lines),
+  and confirm each substantive line either moved somewhere or was deliberately cut.
+  On 2026-09-28 a rebuild of Morrison-Lab/mln's `CLAUDE.md` and `AUTHORING.md` on rme's layout
+  dropped repository roles, a CI deadlock's symptoms, conversion history and rule links
+  until that audit restored them.

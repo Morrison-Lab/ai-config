@@ -1,6 +1,6 @@
 # Standing push and settings authorizations
 
-Granted by the user (dougmor@gmail.com) on 2026-09-28, for all sessions and all projects:
+Granted by the repository owner on 2026-09-28, for all sessions and all projects:
 
 - **Non-force push to any repository the user has push access to.**
   Push to an existing branch, or create a new branch and push it, without asking first ---

@@ -339,7 +339,7 @@ Bypass mechanisms for emergency slides:
 
 ## `claude-code-review.yml@v2` can 403 on `commits/<sha>/check-runs` even when the caller grants `checks: read`
 
-Measured 2026-09-28 on `Morrison-Lab/mln`, [mln#221](https://github.com/Morrison-Lab/mln/pull/221): a consumer's `claude-review.yml` called `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2` with `checks: read` set in its own `permissions:` block, and the review job still 403'd fetching `commits/<sha>/check-runs`.
+Measured 2026-09-28 on `Morrison-Lab/mln`, on [mln#218](https://github.com/Morrison-Lab/mln/pull/218) (fixed in [mln#221](https://github.com/Morrison-Lab/mln/pull/221)): a consumer's `claude-review.yml` called `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2` with `checks: read` set in its own `permissions:` block, and the review job still 403'd fetching `commits/<sha>/check-runs`.
 The reviewer turned that 403 into a `NOT_CLEAN` finding on a diff with nothing wrong in it --- the finding was the tooling failure, not the code.
 
 The caller's `permissions:` block is not the whole story for a reusable `workflow_call`: the **callee** (`claude-code-review.yml`) has its own `permissions:` block on the calling job, and at `@v2` that block lacked `checks: read` even though the workflow's steps call the check-runs endpoint.

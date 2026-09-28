@@ -714,7 +714,7 @@ a review-request event.
 
 ## CI/review lifecycle state read as a review finding produces a loop no round can close
 
-Measured 2026-09-28 on `Morrison-Lab/mln` ([mln#225](https://github.com/Morrison-Lab/mln/pull/225)): once on `claude-code-review.yml@v3`, the reviewer runs `check-pr-fully-clean.py` inside its own review job as part of its process, and recorded two things it observed there as findings: a sibling build still in progress, and its **own** in-progress review job plus a `require-clean-verdict` check failing on the **prior** round's verdict.
+Measured 2026-09-28 on `Morrison-Lab/mln`, on [mln#218](https://github.com/Morrison-Lab/mln/pull/218) (fixed in [mln#225](https://github.com/Morrison-Lab/mln/pull/225)): once on `claude-code-review.yml@v3`, the reviewer runs `check-pr-fully-clean.py` inside its own review job as part of its process, and recorded two things it observed there as findings: a sibling build still in progress, and its **own** in-progress review job plus a `require-clean-verdict` check failing on the **prior** round's verdict.
 Three consecutive rounds came back `NOT_CLEAN` on an unchanged, clean diff --- every round's finding was about CI/review lifecycle timing, not about the code, and re-requesting review could never close the loop because the next round would observe the same kind of in-flight state (now caused by itself) and report it again.
 
 This is the CI-side twin of [`recheck-review-findings.md`](../shared/workflow/recheck-review-findings.md)'s "green checks is not a review verdict" trap, but inverted: there the risk is treating passing CI as a clean verdict, here the reviewer treated its own run's transient CI state as a *defect to report*.

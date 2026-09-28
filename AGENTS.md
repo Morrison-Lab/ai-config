@@ -754,9 +754,11 @@ This grants no merge authority: the strict merge policy below still applies.
   [`revert-merge.md`](shared/workflow/revert-merge.md).
 - **Infrastructure PRs carry a standing `mwc` grant, in every repo the user can push to.**
   A PR whose diff is only infrastructure --- CI workflows, tooling and scripts, configuration,
-  and agent or contributor instruction files (`CLAUDE.md`, `AGENTS.md`, `.github/`, `.claude/`, `tools/`) ---
+  and recorded instructions and notes for AI and human developers
+  (`CLAUDE.md`, `AGENTS.md`, `.github/`, `.claude/`, memories, skills, contributor docs, `tools/`) ---
   may be merged without asking once it is fully clean
-  (user directive, 2026-09-28: "infra PRs are always mwc").
+  (user directives, 2026-09-28: "infra PRs are always mwc";
+  "'infra' includes recording instructions and notes for ai and human developers").
   Every other rule in this section still binds, including the clean automated review on the current head,
   so a quota-skipped review still holds the merge.
   A PR that also touches content (lecture notes, assessments, package code) is not infrastructure.

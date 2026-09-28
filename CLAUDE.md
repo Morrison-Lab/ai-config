@@ -364,7 +364,7 @@ A new symptom of a tracked defect family is a comment on that family's issue, no
 `scripts/triage-backlog.py` is the instrument and the `triage` skill runs it.
 (Measured 2026-09-03: 15 to 410 open issues in six weeks with 14 not-planned closes in the repo's history, ai-config#3134.)
 
-## If you see something, say something --- file an issue for every noticed mistake or idea
+## If you see something, say something --- file an issue for every noticed mistake, concern, or idea, your own mistakes included
 
 [shared/workflow/report-mistakes-proactively.md](shared/workflow/report-mistakes-proactively.md)
 

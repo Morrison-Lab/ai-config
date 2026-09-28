@@ -98,12 +98,12 @@ about what happened is not pinned to anything the check verifies.
 - **Do:** key a rule to the state it cares about (noticed, true, done),
   and say explicitly when an instrument can only see a proxy for that
   state.
-- **Do:** write down the cheapest behaviour that would satisfy a rule
-  as drafted, before shipping it, and confirm that behaviour is the
-  one actually wanted.
-- **Don't:** phrase a rule around a visible proxy --- anything
-  observable that can stand in for the state the rule cares about ---
-  when it is that state, not the proxy, that the rule needs to change.
+- **Do:** before shipping a rule, name the cheapest behaviour that
+  satisfies it as drafted, and rewrite the rule until that behaviour
+  is the one you want.
+- **Don't:** key a rule to an observable stand-in (a comment, a
+  mention, a report --- examples, not an exhaustive list) when the
+  rule exists to change the thing the stand-in stands for.
 - **Don't:** let a rule's Don't side reward the unwanted behaviour by
   making it the easiest way to avoid the rule's penalty.
 
@@ -124,9 +124,9 @@ The fix keys the rule to *noticing* the defect --- a state the rule can
 still only check indirectly, but one that does not make silence the
 compliant path.
 
-- **Do** (the repo owner's words, 2026-09-28): key the Don't to
-  *noticing* a defect without filing it, not to *mentioning* one
-  without filing it.
-- **Don't** (inferred from the incident): write a Don't whose
-  condition is something the model says or writes, when the behaviour
-  it is meant to rule out is something the model does or fails to do.
+- **Do:** key the Don't to *noticing* a defect without filing it, not
+  to *mentioning* one without filing it (the repo owner's words,
+  2026-09-28).
+- **Don't:** write a Don't whose condition is something the model says
+  or writes, when the behaviour it is meant to rule out is something
+  the model does or fails to do (inferred from the incident).

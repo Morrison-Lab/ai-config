@@ -345,3 +345,30 @@ If the old owner has no user-site repo, creating one is the only route.
 - **Do:** update the site's own `site-url`, and any Analytics stream keyed
   to the old host.
 - **Don't:** read GitHub's repository redirect as covering the Pages site.
+
+## A rename redirects the repository but not its Pages site, either
+
+The transfer case above has a same-owner twin.
+GitHub redirects git and web URLs after `Morrison-Lab/mln` was renamed to `mlds`, and again to `lds`,
+but the project's Pages URL `https://morrison-lab.github.io/<old>/` returned 404
+(measured 2026-09-28 after mln -> mlds).
+
+Here the old owner is the *same* owner, so the fix lives in the org's own user site.
+Create `<org>/<org>.github.io` with Pages enabled, holding:
+
+- one stub per old page under `<old>/`: a meta refresh, a `rel=canonical` link, and a
+  `location.replace` script that preserves `location.search` and `location.hash`;
+- a root `404.html` that rewrites `/<old>/...` to `/<new>/...`, for deep paths with no stub.
+
+It takes effect only once no project repo claims the old path.
+Verified live 2026-09-28: after the rename, `/mlds/chapters/index.html` served the stub.
+
+A removed PR preview is the same problem one level down.
+A project site's own root `404.html` (for Quarto, listed under `project: resources:`)
+can send `/<site>/pr-preview/pr-N/<page>` to `/<site>/<page>`,
+after a HEAD request for `pr-preview/pr-N/index.html` confirms the preview is really gone.
+
+- **Do:** put the redirect stubs in the org's `<org>.github.io` user-site repo.
+- **Do:** verify the old Pages URL after a rename, as after a transfer.
+- **Don't:** create a new repo under the old name to host redirects: its Pages site shadows the
+  user-site stubs, and claiming the name breaks GitHub's own repository redirect.

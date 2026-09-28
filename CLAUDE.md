@@ -1521,8 +1521,12 @@ and a read-through inspects each sentence rather than the sequence.
 [`shared/writing/grouping-levels.md`](shared/writing/grouping-levels.md)
 
 A heading, or a navbar dropdown, is only meaningful when it has a sibling ---
-a lone child heading, or a dropdown hiding pages a flat bar had room for,
-adds structure the reader gains nothing from.
+a lone child heading, or a navbar reduced to "Home" plus one catch-all
+dropdown that groups everything else on the site, adds structure the reader
+gains nothing from.
+Several topical dropdowns (or dropdowns alongside flat items) are fine; the
+defect is one dropdown with no sibling of its own kind, not a dropdown's
+mere presence.
 The inverse case is a single page carrying two topics that never earned
 sharing one grouping in the first place --- length alone doesn't say so, but
 two independent nouns joined by "and", a vague catch-all title, or

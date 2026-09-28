@@ -98,26 +98,37 @@ Answer: yes.)
 ## Site navigation
 
 The same test applies one level up, to a site's navbar rather than to a
-page's headings: a dropdown groups several pages under one label, and that
-grouping earns its place only when a flat bar would not fit.
+page's headings, and it is a test on **each** dropdown, not on whether the
+navbar has any.
+A dropdown is a grouping level, so it needs a sibling the same way a heading
+does: a dropdown grouping several pages into a real topical section is fine,
+and so are several such dropdowns side by side.
+What fails the test is a dropdown with no sibling of its own kind --- a navbar
+whose only items are "Home" plus one catch-all dropdown ("Notes",
+"Chapters"), where that single dropdown groups *everything else on the site*
+rather than dividing anything.
+That is the lone-wrapper-heading defect one level up: a grouping level with
+exactly one member.
 
-List pages as top-level navbar items by default.
-Add a dropdown menu only when the flat list of top-level items would be too
-cluttered to fit --- typically at desktop width, since that is where a wide
-navbar actually runs out of room.
-Prefer shortening a navbar item's label over reaching for a dropdown: a
-navbar item's `text` can differ from the page's `title`, so a long page title
-does not by itself justify hiding the page behind a menu.
+It is not a fit problem, so "would a flat bar fit them all" is the wrong
+question to ask about it.
+A flat navbar, several topical dropdowns, and a sidebar are all fine
+structures on their own terms; the defect is specifically a menu bar whose
+*only* items are "Home" and a single everything-else dropdown, whatever the
+reason given for it.
 
-Quarto already collapses the navbar into a hamburger menu below its
-responsive breakpoint, so a dropdown buys nothing for narrow screens --- the
-only question worth asking is whether the *desktop* bar has room.
+Prefer shortening a navbar item's label over reaching for a dropdown at all:
+a navbar item's `text` can differ from the page's `title`, so a long page
+title is never by itself a reason to hide a page behind a menu.
 
-- **Do:** list each page as its own top-level navbar entry when the bar has
-  room for them.
+- **Do:** group pages into dropdowns that divide the site into real topical
+  sections, with more than one such dropdown (or dropdowns alongside flat
+  items) where that reflects the site's actual structure.
 - **Do:** shorten an item's `text` before reaching for a dropdown menu.
-- **Don't:** collapse a handful of short page names into a dropdown "for
-  tidiness" when a flat bar would still fit.
+- **Don't:** reduce the navbar to "Home" plus a single catch-all dropdown
+  ("Notes", "Chapters") that groups everything else on the site --- that
+  dropdown has no sibling and divides nothing, the same defect as a lone
+  wrapper heading.
 - **Don't:** treat a long page `title` as a reason to hide the page in a
   menu --- change the navbar `text` instead.
 
@@ -126,11 +137,14 @@ menu bar, why not list each page of notes individually in the menu bar
 instead of the notes drop down?
 shouldn't we only use drop downs when the menu bar would be too cluttered
 otherwise?"
-Answer: yes --- see `Morrison-Lab/mds`'s `_quarto-website.yml`, whose
-`navbar.left` renders as "Home | Notes" with a dropdown arrow, hiding six
-short page names --- Notation, Proof Writing, Algebra, Calculus, Linear
-Algebra, Vector Calculus --- behind a menu that this section's test would
-keep at the top level instead.)
+Answer, refined after a follow-up clarification: "it's also ok to group
+pages into sections with drop-down menus; we just don't want the only menu
+bar items to be 'home' and 'chapters' etc" --- see `Morrison-Lab/mds`'s
+`_quarto-website.yml`, whose `navbar.left` renders as "Home | Notes" with a
+dropdown arrow, hiding six page names --- Notation, Proof Writing, Algebra,
+Calculus, Linear Algebra, Vector Calculus --- behind the site's only
+dropdown, which is exactly the one-member grouping this section's test
+rejects.)
 
 ## Page scope
 

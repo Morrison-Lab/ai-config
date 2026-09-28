@@ -251,6 +251,10 @@ jobs:
       - name: Run validate-workflow guard tests
         # ai-config#1730: the new-line-breaks job's pull_request gate and base-ref.
         run: python3 scripts/test_validate_workflow.py
+      - name: Run check-merge-commit-ci tests
+        # Post-merge CI verification: every workflow run on a merge commit,
+        # not only the PR's own CI (Morrison-Lab/mds#19).
+        run: python3 scripts/test_check_merge_commit_ci.py
       - name: Check that all scripts/test_*.py test suites are gated
         # ai-config#2540: verify every test suite in scripts/ is gated in CI.
         run: python3 scripts/check-test-suites-covered.py

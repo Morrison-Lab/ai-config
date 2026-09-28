@@ -178,6 +178,24 @@ obvious objective and complete every safe, authorized, relevant step. Do not
 reduce an instruction to the smallest literal action when its context makes a
 larger in-scope outcome clear.
 
+The same holds for a permission or a rule the user states:
+don't narrow its scope unnecessarily.
+A grant covers what it says, and a restriction binds only as far as it says;
+adding conditions, exceptions or protections the user never stated is narrowing,
+and it reads as caution while quietly undoing what the user decided.
+On 2026-09-28 the user had said exercises may move from evaluation material into the notes
+and only accidental leaks matter;
+a session then still checked a proposed lecture exercise against another class's public problem sets
+as if a match would rule it out.
+The user: "cai: don't narrow scope unnecessarily".
+This is not the surface axis in [`challenge-the-assignment.cases.md`](shared/workflow/challenge-the-assignment.cases.md),
+which is about carrying an instruction to a different context;
+this is about shrinking an instruction inside the context it was given for.
+
+- **Do:** apply a grant or rule at the breadth the user stated, and name a limit only when the user stated it or a harder rule forces it.
+- **Do:** when a stated rule seems to leave a gap, ask about the gap rather than filling it with a restriction of your own.
+- **Don't:** add unstated conditions to a permission, or treat material the user excluded from a rule as still covered by it.
+
 ## "Or" always means "and/or", not xor, unless xor is explicitly specified
 
 In instructions, prompts, specifications, issue descriptions, and checklists, treat "or" as inclusive ("and/or") unless exclusive choice is explicitly stated (e.g., "either A or B, but not both", "mutually exclusive", or "xor").

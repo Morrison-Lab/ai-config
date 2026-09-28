@@ -349,9 +349,10 @@ If the old owner has no user-site repo, creating one is the only route.
 ## A rename redirects the repository but not its Pages site, either
 
 The transfer case above has a same-owner twin.
-GitHub redirects git and web URLs after `Morrison-Lab/mln` was renamed to `mlds`, and again to `lds`,
+GitHub redirects git and web URLs after a repository is renamed,
 but the project's Pages URL `https://morrison-lab.github.io/<old>/` returned 404
-(measured 2026-09-28 after mln -> mlds).
+(measured 2026-09-28 after `Morrison-Lab/mln` was renamed to `mlds`;
+the later rename to `lds` was not separately measured, and is assumed to behave the same).
 
 Here the old owner is the *same* owner, so the fix lives in the org's own user site.
 Create `<org>/<org>.github.io` with Pages enabled, holding:
@@ -360,8 +361,9 @@ Create `<org>/<org>.github.io` with Pages enabled, holding:
   `location.replace` script that preserves `location.search` and `location.hash`;
 - a root `404.html` that rewrites `/<old>/...` to `/<new>/...`, for deep paths with no stub.
 
-It takes effect only once no project repo claims the old path.
-Verified live 2026-09-28: after the rename, `/mlds/chapters/index.html` served the stub.
+Verified live 2026-09-28: after the rename, `/mlds/chapters/index.html` served the stub,
+because no project repo claimed that path any more.
+That the user site serves it *only* once the path is unclaimed is an inference from this one observation, not a separate measurement.
 
 A removed PR preview is the same problem one level down.
 A project site's own root `404.html` (for Quarto, listed under `project: resources:`)

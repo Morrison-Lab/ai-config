@@ -27,79 +27,14 @@ The fragment above walks through the specific moments this gets skipped even by 
 
 ## Record both the pattern and the anti-pattern
 
-When I tell you what to do, or what not to do, in a `cai` or `ums` statement, write down **both** sides: the behaviour to adopt and the behaviour to stop.
-Record them explicitly, as a labelled pair, not as a paragraph that leaves one side implied.
-
-Both halves carry information the other cannot.
-A rule stated only as the anti-pattern says what to stop without saying what replaces it, which invites a second wrong behaviour that merely avoids the named one.
-A rule stated only as the pattern is the more common failure and the harder one to notice: it reads as complete, but the specific move that prompted the correction usually *looks* like compliance from the inside, so the next reader has to re-derive which near-miss was actually being ruled out.
-The near-miss is the whole content of the correction.
-Naming it is what makes the entry falsifiable rather than merely agreeable.
-
-Keep the pair concrete enough to check against.
-"Do: run the pass before flagging a stopping point" and "Don't: recommend a fresh session while a pass is owed" both name an observable action, whereas "be diligent about UMS" names nothing and cannot be violated.
-Where a correction only ever surfaced as one side, derive the other rather than omitting it, and say which side came from the user and which you inferred.
-
-This applies to how the entry is *written*, so it composes with whatever the entry is about.
-It also applies to this entry: below is its own pair.
-
-- **Do:** state the adopted behaviour and the retired one, labelled, in every `cai`/`ums` entry that records a correction.
-- **Do:** make each side an action a later reader could observe you taking or not taking.
-- **Don't:** write only the corrected behaviour and leave the reader to infer which specific move it displaced.
-- **Don't:** state the pair so abstractly that no concrete action would violate it.
+When a `cai` or `ums` entry records a correction, write both sides as a labelled pair: the behaviour to adopt (**Do**) and the specific near-miss to stop (**Don't**), each an action a later reader could observe.
+Detail, rationale, and cases: [`shared/writing/record-pattern-and-anti-pattern.md`](shared/writing/record-pattern-and-anti-pattern.md).
 
 ## No empty promises
 
-[`shared/workflow/no-empty-promises.md`](shared/workflow/no-empty-promises.md)
-
-A commitment about my own future behaviour --- "going forward, I will X", "from
-now on I won't Y", "I'll always Z", "I won't do that again", "that is owed
-by me" --- must ship an
-**implemented accountability mechanism in the same turn**, or not be made at
-all.
-A memory or rule entry is the minimum and is always available; a hook is the
-right form when the condition is decidable from the transcript (the "memory +
-hook pair" the directive names); a filed issue covers work someone has to
-schedule.
-
-The promise is costless to produce and invisible to every instrument --- no file
-changes, no check turns red --- while reading exactly like accountability, which
-is why it needs a mechanism rather than an intention.
-It is worse than silence, too: silence leaves the problem visibly unaddressed,
-while a promise closes it on the record so nobody returns to it.
-
-The near-miss is the promise that names its own mechanism in the future tense
-("going forward I'll check this --- I'll add a hook for it"), which reads as
-compliance and satisfies nothing.
-The test is mechanical: if the sentence commits to future behaviour, something
-in the same turn must already exist that a later reader could open.
-
-There is no "not mechanizable" escape, unlike
-[`no-mistake-without-a-hook.py`](hooks/no-mistake-without-a-hook.py) --- the
-memory route is always open, so the honest alternative to building a mechanism
-is to drop the promise and state the plain fact.
-[`hooks/no-empty-promise.py`](hooks/no-empty-promise.py) is this rule's own
-mechanism: a `Stop` guard that blocks a forward-looking commitment when the turn
-wrote nothing durable.
-
-An owed **action** is the case where the mechanism has to *fire* rather than merely record.
-"I owe this PR the ARDI loop" commits to one specific next step, and a memory entry documenting that loop does not run it --- so arm the step (a `ScheduleWakeup` carrying it, a cron or scheduled task, a PR watcher) and report what fires and when.
-A durable record still clears such a debt, and is right when the debt is somebody else's to schedule.
-The implication runs one way only: a timer fires once and dies, so it cannot keep a standing rule.
-
-- **Do:** ship the mechanism in the same turn, and name it in the past tense.
-- **Do:** arm the next step, and report its clock time, when what you owe is an action rather than a rule.
-- **Do:** drop the promise and state the fact when no mechanism is worth
-  building.
-- **Don't:** end a turn carrying a promise and no mechanism --- a durable
-  artifact for a standing rule, and either that or an armed firing for an
-  owed action.
-- **Don't:** promise the mechanism itself in the future tense.
-- **Don't:** reach for a written record when the owed action is *yours* and
-  has a next step you could arm --- documenting an ARDI loop is not running
-  one.
-  (A record is a valid discharge, and the wrong instinct here; the `Do` above
-  says which case is which.)
+A commitment about your own future behaviour ships an implemented mechanism in the same turn (a memory entry at minimum, a hook, a filed issue, or an armed wake for an owed action), or is not made;
+`hooks/no-empty-promise.py` guards it.
+Detail, rationale, and cases: [`shared/workflow/no-empty-promises.md`](shared/workflow/no-empty-promises.md).
 
 ## Generalize instructions to every AI agent by default
 
@@ -127,26 +62,8 @@ larger in-scope outcome clear.
 
 ## Status requests do not make issues report-only
 
-Treat a request for status as a request to inspect live state and finish every
-safe, in-scope, concrete action that inspection reveals. A report is the recap
-after the work, not a substitute for it. When an issue cannot be fixed
-directly, carry it forward with an actual next action. **Every issue noticed,
-however small or outside the current task's scope, must at minimum be filed in
-the owning GitHub, GitLab, or equivalent tracker.** File it before reporting
-it; use the correct private tracker and redact sensitive details when needed.
-
-- **Do:** fix an actionable CI defect, review finding, or configuration gap
-  before reporting it as status; revalidate and continue the sweep.
-- **Do:** turn an issue outside current authority into a filed/routed blocker,
-  not an unowned observation.
-- **Do:** file every noticed issue in its owning tracker, even when it is
-  trivial, already fixed locally, or outside the active task.
-- **Don't:** interpret "status" as report-only after discovering a concrete,
-  safe, in-scope repair.
-- **Don't:** end with "this failed" or "this needs a fix" when the fix is
-  available to perform in the same turn.
-- **Don't:** leave a noticed issue as chat prose because it seems too small or
-  too far outside the current scope to track.
+A request for status means inspect live state and finish every safe, in-scope fix it reveals before reporting, and file every noticed issue, however small, in its owning tracker.
+Detail, rationale, and cases: [`shared/workflow/status-requests-act.md`](shared/workflow/status-requests-act.md).
 
 ## Flag good moments to `/clear` in long-running sessions
 
@@ -169,89 +86,16 @@ Use `/clear`'s menu when there is nothing left to carry forward; use `compress-s
 
 ## Actively manage quota usage: models, compaction, and workflow structure
 
-Treat quota as something to manage continuously through a session, not only at a wrap-up or fan-out moment.
-Three levers; when any applies, act on it without waiting to be asked.
-
-**Model tier.**
-For dispatched work (`Agent` calls, `Workflow` `agent()` calls), route model and effort per [`when-to-orchestrate`](shared/workflow/when-to-orchestrate.md)'s "Route each agent's model/effort" section.
-Cheap tier for mechanical, bounded work; inherit or escalate only for judgment-heavy work.
-Don't default every dispatched call to the conductor's own tier out of caution.
-
-The conductor's own tier cannot be switched from inside the conversation --- it's client-side only (`memories/preferences.md`).
-So the lever there is to **recommend** a change rather than make one.
-When the current tier is clearly underpowered for the task ahead, say so and suggest escalating via `/model` or `select-model`.
-When a long stretch of ahead-of-time-known mechanical work doesn't need the current tier, say so and prefer delegating it instead.
-That means a cheaper-tier subagent, or a separately-billed agent CLI before spending this session's own quota, rather than burning the conductor's tier on it.
-Active delegation budgets include `codex` (ChatGPT plan, operationalized by
-`delegate-to-codex`), `opencode` (OpenCode Go subscription and free hosted
-models via Zen, operationalized by `delegate-to-opencode`), `agy` CLI
-(headless dispatch available since the 2026-08-25 clarification), and
-OpenRouter (prepaid credit balance for frontier/stealth previews).
-Local and on-device models are prohibited because they can crash the user's
-computer.
-When hosted quota is unavailable, report the blocker or use
-deterministic checks instead of starting a local inference runtime.
-`agy` (Google Antigravity)'s **API** route was retired for dispatched work on 2026-08-20 (ai-config#1776), and a 2026-09-01 retest (`workflow_dispatch` run 33557587761) still failed, now with `request failed (code 403): Spend cap breached` rather than the original 429.
-The `agy --print` CLI is a separate path and was never affected --- it is confirmed working on Windows as of 2026-09-02 via a fresh install from the official `antigravity-cli` GitHub release (user directives that day: "start using agy as a subagent where feasible", "use agy cli for it").
-Route dispatchable subagent work to the `agy` CLI accordingly.
-The interactive subscription/extension was never affected and was never at quota.
-`memories/delegation.md` carries the rule, the usage-window semantics across `opencode`, `codex`, and `agy`, the prepaid-balance details, and the Windows install/mechanics writeup.
-Ground the recommendation in `assess-model-fit`/`select-model` rather than a guess.
-
-**Compaction.**
-Already covered by the two sections above --- the `/clear` flag for a clean stopping point, and the `compress-session` flag for mid-task bloat.
-Add quota/usage pressure itself as a trigger for both, distinct from context size alone.
-The agent has no direct view into it, though --- the usage bar lives in the client's UI, not in the conversation (`memories/preferences.md`).
-So key this off what's actually visible: the user naming or showing usage pressure, or --- inside a `Workflow` run with a stated token target --- `budget.spent()`/`budget.remaining()`.
-Either is reason enough to compress or recommend a lighter model, on the same terms those sections already set out.
-
-**Workflow structure.**
-[`restructure-for-efficiency`](shared/workflow/restructure-for-efficiency.md)
-
-The two levers above spend less on the work **as shaped**, and their saving expires with the session.
-This one changes the shape, so it pays every future session --- and it is the one that never announces itself, because following an expensive procedure correctly reads as compliance, and pulling either lever above reads as having managed quota.
-So ask separately what a procedure costs *by construction*: always-loaded content only some sessions read, a judgment made twice that wants an instrument, a serial loop the base outruns, a monitoring loop polling state only a human can change, an enumerated brief that should have been a query, work at this tier a free CLI could do.
-The deliverable is a change to the corpus --- fixed in stride when small, filed with its measurement when not, per `report-mistakes-proactively` --- never a quieter run of the same procedure.
-That last clause covers a loop you armed yourself: once repeated firings return the same reading, delete the routine rather than lengthening its interval.
-`python3 scripts/check-context-closure.py` is the built instrument for the always-loaded pool.
-Its budget is advisory by design, so read an over-budget line as the prompt it is.
-Two boundaries.
-Efficiency never outranks correctness, so no saving is bought with a skipped check.
-And the restructuring goes in its own issue or PR rather than happening inside whatever task noticed it.
-
-Human steps are in scope too --- a merge method, a batching habit, a review-request convention each shape the procedure and each has a price.
-Naming one and stopping there is `no-empty-promises` pointed outward, so every suggestion about human behaviour ships a mechanism in the same reply: a written rule at minimum, then a visible marker at the moment of the action, then a guard, then a setting that removes the option.
-Pick the rung from the cost of the mistake rather than the strength of the opinion, and leave the decision with the user, per `flag-practice-slippage`.
-
-- **Do:** ask what a procedure costs by construction, separately from what this run costs.
-- **Do:** ship a mechanism in the same reply that names a human behaviour change.
-- **Don't:** read a pulled lever as having answered the structural question.
-- **Don't:** name a behaviour change with nothing behind it.
-
-When several levers genuinely apply at once, do the self-directed ones first.
-Compress, compact, or file the structural finding before asking the user to act on a model change.
-Only the model change costs them a step.
+Manage quota continuously with three levers, unasked: route each dispatched agent's model tier per [`when-to-orchestrate`](shared/workflow/when-to-orchestrate.md) and recommend a conductor-tier change rather than ignore a mismatch;
+compress or recommend `/clear` under visible usage pressure;
+and fix a procedure that is expensive by construction in its own issue or PR.
+Local and on-device models are prohibited.
+Detail, rationale, and cases: [`shared/workflow/manage-quota.md`](shared/workflow/manage-quota.md).
 
 ## Keep a running on-disk session lab notebook
 
-Maintain a "lab notebook" for each session — a dated, append-only file written to *as work happens*, not only when pausing — so that if the session is interrupted with no clean exit (compaction, a forced `/clear`, a crash, a SLURM walltime death), the trail is already on disk and a later session (or I) can pick it up.
-The whole point is surviving an interruption that never gives you a clean stop, so the file must live on disk and be updated frequently, not held in context and flushed at the end.
-
-**Where.** In the session's project auto-memory directory, as a `session-YYYY-MM-DD[-slug].md` file, with a one-line pointer added to that directory's `MEMORY.md` like any other memory.
-One notebook per session; start it near session start and keep appending.
-
-**Cadence — frequently, and to disk right away.** Append a short, timestamped entry at each state change worth resuming from: a task or subtask started, a decision made or a question I answered, a PR/issue opened, a branch cut, a job launched (SLURM/background/CI, with its id), a blocker hit, a checkpoint reached.
-Not every tool call — that's noise — but every step whose loss would cost real reconstruction.
-
-**What each entry carries.** Enough for a cold reader to resume without this conversation: what we're doing and why, what's done versus in flight (branches, open PRs/issues, running jobs and their ids), open questions and decisions, and the next concrete step.
-
-**Relationship to the pause-time and context conventions.** The notebook is the *running recorder*; the others are point-in-time:
-
-- `handoff` writes a single snapshot *when you pause cleanly* — the notebook is its always-current substrate, so a handoff can finalize or point at the notebook instead of rebuilding state from scratch.
-- `compress-session` distills the *conversation context* to survive compaction — the notebook is a durable on-disk trail, not a context-window optimization.
-- The `/clear` flag above is about *choosing* a clean stop — the notebook is insurance for the stops you don't choose.
-
-Fold a finished session's notebook into durable memory (or prune it) during UMS once its content is captured elsewhere, so the memory directory doesn't accumulate stale logs.
+Keep a dated, append-only `session-YYYY-MM-DD[-slug].md` notebook in the project auto-memory directory, and append a timestamped entry at every state change worth resuming from, so an interruption with no clean exit loses nothing.
+Detail, rationale, and cases: [`shared/workflow/session-lab-notebook.md`](shared/workflow/session-lab-notebook.md).
 
 ## Keep ai-config and repo checkouts fresh
 
@@ -286,9 +130,8 @@ both warn, never block, when a Pacific clock time appears with no clock read in 
 
 ## State the actual time when reporting a scheduled check-in
 
-When telling the user I've scheduled a wakeup or check-in (`ScheduleWakeup`, or an equivalent poll-later mechanism), state the clock time it fires at, not just the relative delay or a bare "I scheduled a check-in."
-The tool result already returns a clock time (e.g. "Next wakeup scheduled for 08:22:00") — surface that time in the chat reply instead of dropping it, converting to Pacific local time per the "Timestamp recaps in local time" section above if the returned time is in a different zone.
-"Scheduled a check-in to continue monitoring both" leaves the user unable to tell whether that's one minute away or twenty; "I'll check back at 08:22 PT (~4 min)" does not.
+When reporting a scheduled wakeup or check-in, state the clock time it fires at in Pacific time ("I'll check back at 08:22 PT (~4 min)"), not only the delay.
+Detail, rationale, and cases: [`shared/workflow/state-check-in-time.md`](shared/workflow/state-check-in-time.md).
 
 ## Bare keyword directives
 
@@ -322,69 +165,14 @@ See [`finish-wave`](skills/finish-wave/SKILL.md).
 
 ## Link PRs in tables
 
-When listing PRs in a table (or anywhere they could be clickable), make each PR number a markdown link to the PR URL — `[#237](https://github.com/<owner>/<repo>/pull/237)`.
-The plain text form forces the user to copy/paste; the linked form lets them open the PR in one click.
-
-**The same rule covers any forge artifact I reference, not just a PR number in a table.**
-Telling the user I replied to a comment, filed an issue, posted a review, or kicked off a run --- in a table or in ordinary chat prose --- and naming it without a link leaves them to go find it themselves, which is the exact cost the table-only version of this rule already removes for PR numbers.
-A comment has no number to recognize the way a PR does, so its link is the *only* way the user can locate it without re-deriving the search themselves.
-
-- **Do:** link every comment, review, issue, PR, or run I mention having acted on, wherever the mention occurs --- table or prose.
-- **Don't:** report "I replied to that" or "filed the issue" as a bare fact with no URL attached.
-
-(Directive from the user, 2026-09-09: telling them a reply had been posted without linking it made them go find it themselves.)
+Link every PR, issue, comment, review, or run you mention having acted on, in tables and chat prose alike, e.g. `[#237](https://github.com/<owner>/<repo>/pull/237)`.
+Detail, rationale, and cases: [`shared/writing/link-forge-artifacts.md`](shared/writing/link-forge-artifacts.md).
 
 ## Tag chat output by category so long recaps stay scannable
 
-Recaps get long across many parallel tracks, so tag categories of output with a stable marker and let the eye jump straight to what needs the user's attention.
-Terminal markdown can't force text color, so the emoji plus the `===` frame plus the bold label *is* the signal.
-Readers skim past a question or a flag buried mid-paragraph; a marked, set-apart block is harder to miss.
-
-Reserve a **`===` box** for the output a user is waiting on — something they must respond to (a question, an offer, a blocker) or the headline answer they asked for — and use a lighter **emoji-prefix** (bold label, no box) for informational categories they can skim.
-Boxing everything defeats the purpose, so keep the box meaningful.
-
-Boxed (a `===` line above and below the labeled block):
-
-- ❓ **QUESTION** — need the user's input. For a real either/or, prefer the AskUserQuestion picker over a boxed question. When a question is posed inline in chat prose rather than through a box, still set it apart — its own paragraph (blank line before and after, since a bare newline collapses back into the surrounding paragraph), in bold.
-- 💡 **OFFER** — optional work I can do if they want it.
-- 🛑 **BLOCKER** — stopped; need their call.
-- ✅ **ANSWER** — the headline answer to a question they asked (put nuance below the box).
-- 🧭 **RECOMMENDATION** --- the course of action I think they should take,
-  when the decision is theirs.
-  Distinct from the two categories it is most easily confused with:
-  an ✅ **ANSWER** reports what is true,
-  and a 💡 **OFFER** proposes work I would do.
-  A recommendation is a judgment about what *they* should do,
-  including about things I will not be doing ---
-  which PR to merge first, which option to decline, whether to stop.
-  Lead the box with the action and put the reasoning below it,
-  so the box holds the call rather than the argument for it.
-  It boxes because it feeds a decision they are waiting to make;
-  an opinion nobody was waiting on is a 📊 **UPDATE** with a view in it,
-  and stays unboxed.
-  - **Do:** box the recommendation, lead with the action,
-    keep the reasoning under the box.
-  - **Don't:** bury it in a closing paragraph,
-    or fold it into an ✅ **ANSWER** box
-    so a factual claim and a judgment read as one thing.
-- 🔀 **MERGE ORDER** --- several PRs are ready,
-  and merging them in the wrong order would produce a wrong result.
-  The one category labeled with a markdown **heading** (`### 🔀 MERGE ORDER`) rather than bold text,
-  since a heading is the only "large font" lever a terminal has.
-  List the PRs in the order to merge, each linked per "Link PRs in tables" above,
-  naming what each one's position depends on.
-  The PR-side and draft-gating surfaces live in the "Surface merge-order constraints" section.
-
-Prefixed, no box (informational, frequent):
-
-- 📊 **UPDATE** — status or progress.
-- ⚠️ **FLAG** --- non-blocking heads-up or risk.
-- ✔️ **DONE** — a completed action.
-- 🟢 **ALL CLEAR** — nothing needs the user right now; work continues in the background. The recap's standing sign-off.
-
-Keep the markers stable so they become muscle memory.
-The set-apart ❓ **QUESTION** format also gives the `prompt-me` / `prompt-me-all` skills a reliable signal to key off when they sweep the transcript for unanswered questions later.
-The user may tune the emoji set; the full taxonomy and rationale live in `memories/preferences.md`.
+Box (a `===` line above and below) only what the user is waiting on: ❓ **QUESTION**, 💡 **OFFER**, 🛑 **BLOCKER**, ✅ **ANSWER**, 🧭 **RECOMMENDATION**, and `### 🔀 MERGE ORDER` as a heading.
+Prefix without a box the informational ones: 📊 **UPDATE**, ⚠️ **FLAG**, ✔️ **DONE**, 🟢 **ALL CLEAR**.
+Detail, rationale, and cases: [`shared/writing/tag-chat-output.md`](shared/writing/tag-chat-output.md).
 
 ## Never close a reply by offering to do work you are already allowed to do
 
@@ -415,152 +203,20 @@ It warns rather than blocks, because authorization is not lexically decidable.
 
 ## Always produce a reply --- never end a turn silently
 
-Every turn ends with user-visible prose.
-The section above governs what a reply should contain; this one governs that it
-has to exist at all.
-
-The user cannot see tool calls, so a turn carrying work and no prose is
-indistinguishable from a turn where nothing happened.
-That makes silence worse than a terse reply: a short line reports a result,
-while no line reports nothing and reads as a stall.
-
-Four moments produce the empty turn, and none of them feels like withholding:
-
-- **After an interruption.**
-  The work completed, the reporting did not, and resuming feels like the
-  request is already satisfied.
-  Report what finished, in the past tense, rather than assuming the tool
-  results were visible.
-- **On resuming from a context-window summary.**
-  The sharpest of the four, and the one that produced every observed
-  recurrence.
-  A summary reads like a report --- it is written in the past tense, it
-  enumerates what was done, and it is the first thing in the new window ---
-  so the work it describes feels already reported to the user.
-  It was not.
-  The user saw the work itself and never saw the summary, which exists for
-  you rather than for them.
-- **A no-change background tick.**
-  A scheduled check-in that finds nothing still gets one line.
-  "Nothing changed" and "the loop died" are the same observation otherwise,
-  and only one of them is fine.
-- **A run of tool calls with no natural summary.**
-  Say what they established, even when the answer is that nothing moved.
-
-The harness sometimes instructs otherwise --- a PR-subscription wake asks for a
-check-in to be re-armed "silently without messaging the user".
-This preference wins.
-Re-arm as instructed and still emit the one line.
-
-- **Do:** end every turn with prose, however short.
-- **Do:** report completed work after an interruption, since the user saw none
-  of it.
-- **Do:** give a no-change tick a single line that says so.
-- **Do:** treat a context-window summary as material for you rather than as a
-  report already delivered.
-- **Don't:** reply `No response requested.`, or any equivalent placeholder that
-  occupies the reply without carrying information.
-- **Don't:** read a harness instruction to stay silent as overriding this.
-
-(Directive from the user, 2026-08-16: "cai: I always want a response".
-A dispatch was issued and verified, the turn was interrupted mid-tool-use, and
-the resumed turn emitted `No response requested.` and nothing else.
-The user had to ask "did you do it".
-Dupe-checked at the time over `CLAUDE.md`, `shared/`, `memories/` and
-`skills/`: `empty response`, `no response`, `null reply`, `always respond` and
-`end the turn` each returned 0 hits, so the corpus governed a reply's contents
-at length and never its existence.
-`without messaging the user` also returned 0, which is how the conflicting
-instruction was identified as the harness's own wake boilerplate rather than
-ours.
-Tracked as ai-config#1568.
-
-**Third occurrence, 2026-08-17, recorded here rather than as a sibling entry**,
-per "Record both the pattern and the anti-pattern" above and the
-recurrence bullet in [`ums`](skills/ums/SKILL.md).
-All three fell in one session, each on resuming after a context-window
-summary, which is why that moment is now named in the list above --- the
-original entry's three moments did not cover it, so the rule was loaded and
-matched nothing.
-
-That count meets
-[`deterministic-tools`](shared/principles/deterministic-tools.md)'s
-third-occurrence bar, and the condition is lexically decidable over one
-artifact, so the rule now ships a guard: `hooks/no-placeholder-reply.py`
-blocks a reply whose **whole** stripped message is a placeholder.
-Whole-message anchoring rather than substring, because this corpus quotes the
-banned string constantly --- this very paragraph does --- so a substring
-matcher would block every reply that cites the rule it enforces.
-The line it draws is between a claim about the **request**, which reports
-nothing, and a claim about the **work**: `Nothing to report.` and
-`No change.` are deliberately not matched, since a no-change tick is
-behaviour this section requires.
-Tracked as ai-config#1579.)
+End every turn with user-visible prose, however short: after an interruption, on resuming from a context-window summary, on a no-change tick, and even when a harness wake says to re-arm silently.
+Never reply with a placeholder such as `No response requested.` (`hooks/no-placeholder-reply.py` blocks it).
+Detail, rationale, and cases: [`shared/workflow/always-reply.md`](shared/workflow/always-reply.md).
 
 ## Surface merge-order constraints
 
-When two or more PRs are open and merging them in the wrong order would produce a wrong result,
-say so where I'll act on it, not in ordinary prose I'll skim past.
-Three surfaces, escalating in strength; use as many as the situation earns.
-
-1. **In chat** --- the boxed `### 🔀 MERGE ORDER` marker above.
-2. **On the PRs** --- lead each affected PR's body with a `> [!IMPORTANT]` alert
-   naming that PR's position and its prerequisite,
-   e.g. "Merge [#N](url) first --- this PR is stacked on its branch."
-   Update or drop the alert once the prerequisite merges.
-3. **Draft-gating** --- hold the dependent PR as a draft until its prerequisite merges,
-   then mark it ready.
-   GitHub won't merge a draft,
-   so this makes the wrong action unavailable rather than merely discouraged.
-
-Draft-gating is the last resort, not the default, because it costs something real:
-converting a ready PR to draft **drops auto-merge and merge-queue membership**,
-and a draft doesn't trigger the `@claude` review bot (see `shared/workflow/pr-on-claim.md`),
-so drafting an unreviewed PR stalls its own ARDI loop.
-Drive the PR to fully clean first, and draft-gate only if the prerequisite still hasn't merged.
-Say in chat and on the PR that it's being held and why,
-and un-draft promptly once the prerequisite lands.
-A silent draft is never a substitute for stating the order.
-
-This fires only when order changes the outcome:
-a stacked PR whose base is another open PR,
-a PR that would conflict or show a misleading diff if the other landed first,
-a migration that must precede its consumer.
-Two PRs touching disjoint files usually have no constraint,
-and saying so plainly is the right answer, not an occasion for the marker.
-But "disjoint" is a claim about their file *sets*, so derive both sets and check the intersection before asserting it, rather than recalling what each PR is "about" --- which is `metacognitive-monitoring.md`'s scope-claim failure (check the population, don't recall it).
-`python3 scripts/pr-overlap.py -R <owner>/<repo>` is that derivation, sweeping every pair of open PRs at once and reporting how many pairs it examined alongside how many collided.
-Fall back to `gh pr diff <N> --name-only` per PR only where the script cannot run, noting that the hand method misses a rename, whose new path is all the diff reports.
-A follow-up PR that extends into a `shared/` (or any) file a prior PR also edited is a common collision, and the two conflict at merge time.
-**An empty intersection settles the *collision* cases above and cannot see the *dependency* ones.**
-A migration and its consumer, or a PR whose prose cites content another PR adds, are ordering constraints whose file sets never overlap ---
-so a derived intersection of zero is evidence about conflicts, not a proof that either order is safe.
-Ask separately whether one PR asserts something the other makes true.
-For a citation the better fix is to dissolve the dependency rather than sequence it,
-by phrasing it as a conditional that is accurate either way ---
-see [`challenge-ambiguous-terminology`](shared/workflow/challenge-ambiguous-terminology.md)'s cross-repo citation trap, which applies to a same-repo sibling PR unchanged.
-The rationale behind each surface lives in `memories/preferences.md`,
-alongside the rest of the taxonomy.
+When merge order changes the outcome, say so where it will be acted on: the `### 🔀 MERGE ORDER` chat marker, a `> [!IMPORTANT]` alert leading each affected PR body, and draft-gating only as a last resort.
+Derive file-set overlap with `python3 scripts/pr-overlap.py` rather than recalling it, and check dependencies separately, since an empty overlap cannot see them.
+Detail, rationale, and cases: [`shared/workflow/surface-merge-order.md`](shared/workflow/surface-merge-order.md).
 
 ## Present decisions one at a time
 
-When more than one decision needs my input, go through them one at a time:
-pose the single most pressing question, wait for my answer, then pose the next.
-Don't batch several decisions into one message or one multi-question `AskUserQuestion` call.
-
-Two reasons.
-The answer to the first question often changes or moots the later ones, so a batch makes me answer against stale premises.
-And a wall of questions invites a partial reply that leaves the rest silently unanswered — the exact failure mode `prompt-me` / `prompt-me-all` exist to recover from.
-
-Mechanics:
-
-- Rank by how blocking each decision is, most pressing first (the same ranking `prompt-me` uses), and pose only the top one — via a single-question `AskUserQuestion` call for a real either/or, or one boxed ❓ **QUESTION** otherwise.
-- Say how many more are queued behind it ("2 more decisions after this one"), so the backlog is visible without being posed.
-- Fold each answer into the framing of the next question, and silently drop any queued question the answer mooted.
-- Keep working on whatever the pending decision doesn't block while waiting.
-
-This changes how decisions are *posed*, not whether to ask at all: `research-before-asking` still gates each question, and an `away` grant still means don't block on questions — resolve them by judgment, or skip-and-note, per that skill's scope.
-And it yields to an explicit request for the full backlog — `prompt-me-all` / "ask me everything at once" is the user opting into a batch view.
+Pose only the single most pressing decision, say how many more are queued, and fold each answer into the next, unless the user asks for the whole backlog (`prompt-me-all`).
+Detail, rationale, and cases: [`shared/workflow/present-decisions-one-at-a-time.md`](shared/workflow/present-decisions-one-at-a-time.md).
 
 ## Title Claude sessions with the PR/issue number
 
@@ -570,57 +226,16 @@ So `#316 session title convention`, not `PR #316 session title convention` or `P
 
 ## Re-check for latest review findings before reporting PR status
 
-[`shared/workflow/recheck-review-findings.md`](shared/workflow/recheck-review-findings.md)
-
-Before reporting on a PR --- and especially before calling one clean or ready --- pull the review state fresh.
-Never answer from chat context or from a verdict you cached, which applies equally to any other question about that live PR ("did you fix it", "why haven't you responded").
-
-Five traps, each of which returns something that reads exactly like good news:
-
-- **CI green is not a review verdict.**
-  `gh pr checks` reports check state and says nothing about findings.
-- **The newest round is not the only unread one.**
-  Several can land in one monitoring gap, and a test-only push gets a fresh clean verdict that says nothing about the earlier round's open findings.
-  Diff the round list against what you last handled.
-- **Filtering by author login silently returns the previous round.**
-  The login varies by repo and by run (`claude`, `claude[bot]`, `github-actions[bot]` have each carried a real verdict), and the stale result is indistinguishable from "no new review yet".
-  Match on the body marker `**Claude finished`.
-- **A formal review's finding can sit where a comments-only scan never looks.**
-  Its top-level body is often empty with the finding in an inline comment on a different endpoint, and the mirror case puts the finding in the body itself, possibly inside a collapsed `<details>`.
-  A bot's `COMMENTED` review carrying a finding is blocking exactly as a human's `CHANGES_REQUESTED` is.
-- **A later clean bot verdict does not clear a human's `CHANGES_REQUESTED`.**
-  Only that human, or an explicit dismissal, resolves a review *state*, and an automated "Ready for merge" posted afterwards does not touch it.
-  It feeds the merge gate directly, so it binds under `mwc` as much as under any other grant.
-
-A review-gating check run can also read green over a `NOT_CLEAN` verdict, so a check named for the verdict is not the verdict --- see [`review-verdict-pitfalls`](shared/workflow/review-verdict-pitfalls.md).
-
-- **Do:** read every round since the one you last processed, every formal review's state and body whoever posted it, and the inline comments.
-- **Don't:** treat green checks, a login-filtered query, or a named verdict-gating check as evidence the review is clean.
-- **Don't:** read a `COMMENTED` state as making a review blocking on its own --- what blocks is the finding inside it.
-- **Don't:** read a later clean verdict as clearing a standing `CHANGES_REQUESTED`, which blocks on its own until that human or an explicit dismissal resolves it.
-  The two run opposite ways, which is why they are separate bullets: one state does not block by itself and the other does.
-
+Before reporting on a PR, pull every review round, formal review state and body, and inline comment fresh;
+green checks, a login-filtered query, or a later clean bot verdict over a human's `CHANGES_REQUESTED` are not a clean review.
 (A specific case of the standing **never assume;
 always verify** rule in `memories/preferences.md` --- confirm the verdict with a fresh query, don't recall it.)
+Detail, rationale, and cases: [`shared/workflow/recheck-review-findings.md`](shared/workflow/recheck-review-findings.md).
 
 ## Post in-chat feedback to the PR
 
-When the user gives feedback, corrections, or guidance in the CLI or chat while working a PR, paraphrase it and post it as a PR comment:
-
-```
-gh pr comment <N> --body "<paraphrase>
-
-_Posted by Claude Code (AI agent) --- not written by a human._"
-```
-
-One to three sentences is enough.
-The trailing marker is required, per the section above: this comment paraphrases the user in the user's own voice under the user's own login, which is the shape most easily read as their own writing.
-Don't quote verbatim — paraphrase so it reads naturally in the PR thread.
-Skip trivial acknowledgments or conversational exchanges with nothing to act on.
-Post it only on a PR that passes `memories/reviewing-prs.md`'s scope test.
-Feedback about an out-of-scope PR, such as a request not to touch it, stays in chat and the session notebook rather than on that PR.
-
-This makes context visible to future @claude sessions, other reviewers, and contributors who only see the PR thread.
+Paraphrase the user's in-chat feedback about an in-scope PR as a one-to-three-sentence PR comment that carries the agent-authorship marker.
+Detail, rationale, and cases: [`shared/workflow/post-feedback-to-pr.md`](shared/workflow/post-feedback-to-pr.md).
 
 ## Subscribe to PR updates automatically
 
@@ -628,24 +243,9 @@ When opening or taking over a PR in any repo, subscribe/watch that PR's activity
 
 ## Monitor every pushed PR head to completion
 
-Whenever ending a turn while waiting for CI completion or AI reviews after pushing to a PR in any repository, launch a `schedule` timer (e.g. 120s) to actively monitor that exact head commit.
-If no review has arrived when the timer expires, verify whether review workflow runs are still in progress in CI (`gh run list` / `gh pr view --json statusCheckRollup`). If the reviewer failed, was canceled, skipped with no replacement, or produced a stub review with no stated verdict, invoke self-review fallback per `shared/workflow/self-review-fallback.md`; otherwise fix any dispatch or workflow failures discovered along the way and schedule another timer to maintain continuous monitoring until a review lands, self-review fallback triggers, or CI completes.
-Keep polling and address actionable failures or findings until all workflows and check runs are complete and passing (success or skipped), the current-head review is clean, and no review threads remain unresolved.
-Once that commit is fully clean and green, stop the **intensive head poll** for it; don't restart that poll for the same commit unless something regresses.
-A later push creates a new head commit and starts a new monitoring cycle automatically.
-
-**Ending the head poll does not end the PR watch.**
-The two run at different frequencies and answer different questions, and only the first one is finished when a head goes green:
-
-- The **head poll** asks "is this commit done?" and terminates when it is.
-- The **PR watch** above ("Subscribe to PR updates automatically") asks "is this PR still mergeable and still clean?" and runs until the PR merges or closes.
-
-That distinction is load-bearing because a clean head can regress with **no push of yours at all**.
-The base branch advancing is enough: the PR goes `CONFLICTING`, or `main` catches up to an R package's `DESCRIPTION` version, or a sibling PR merges a colliding append --- each turning a green, review-clean head red while nothing about that commit changed.
-`shared/workflow/fully-clean.md` says the same thing about verdicts: a clean CI run and a clean review are a snapshot, not a standing guarantee.
-
-So keep checking mergeability and check state at the lower PR-watch frequency after the head poll ends, and **restart the intensive poll if state regresses** --- a new conflict, a check flipping red, a fresh review comment.
-Re-derive it from a live query rather than trusting the earlier verdict.
+After a push you end a turn on, arm a timer that polls that head until CI and the current-head review are fully clean, falling back to self-review when the reviewer fails.
+Then keep the lower-frequency PR watch running until merge or close, and restart the head poll on any regression.
+Detail, rationale, and cases: [`shared/workflow/monitor-pushed-heads.md`](shared/workflow/monitor-pushed-heads.md).
 
 ## Claim a GitHub PR/issue before working on it
 
@@ -797,16 +397,9 @@ Step 3 (own-repo fallback) is not covered by `sup`; use `gh issue create` in the
 
 ## Wrap up a merged PR with UMS
 
-When a PR/MR you were working on **merges**, run the `post-merge` skill: verify the merge actually landed, tidy the local branch (checkout `main`, pull, `git branch -d`), confirm any deferred items have follow-up issues, then run **UMS** to capture what the PR's review lifecycle taught — recurring review findings, corrections, and guidance given along the way.
-A merge is the natural checkpoint to bank lessons before the context is lost.
-
-This is not the *first* checkpoint, though, and it should rarely be the one carrying the whole backlog.
-Per "Run UMS proactively" above, the pass already ran when the review verdict came back clean, so `post-merge`'s UMS covers what the merge itself taught -- a conflict resolved on the way in, a check that only fires on `main`, a squash that reshaped the history.
-Run it regardless: a short pass that finds nothing new is the expected outcome when the verdict-time pass did its job, not a reason to skip the step.
-
-"merge it" / "merge this" / "merge the PR" as bare directives (no slash) trigger the `merge-it` skill: when the PR isn't merged yet, it merges the ready PR (squash by default) **then** chains straight into `post-merge` (tidy + UMS); when the PR is already merged it goes directly to `post-merge`.
-Either way the post-merge wrap-up — including the UMS follow-up PR — runs **automatically, without asking**.
-If the phrase is clearly part of ordinary prose rather than a standalone directive, treat it as such.
+When a PR you drove merges, run `post-merge` (verify the merge, tidy the branch, confirm follow-up issues, then UMS) without asking;
+a bare "merge it" runs `merge-it`, which chains into `post-merge`.
+Detail, rationale, and cases: [`shared/workflow/wrap-up-merged-pr.md`](shared/workflow/wrap-up-merged-pr.md).
 
 ## When you revert a merge, reopen its issue
 
@@ -836,35 +429,10 @@ A fallback self-review is easy to under-scrutinize precisely because it feels li
 
 ## Watch and ARDI every PR you touch --- don't ask first
 
-"Touch" here means driving the branch: you opened it, were asked to iterate or take it to clean, or are pushing fixes.
-A request to post a review and leave findings, with no request to edit, is not that kind of touch.
-
-**Driving.**
-The persistent-loop standing yes lives in `AGENTS.md` and applies to every agent.
-This section is only the Claude-specific half: how this harness wakes, and how it must not double-trigger review.
-
-When you open (or are handed) a PR/MR to drive, in any repo, subscribe to its activity and run the ARDI loop to clean **automatically** --- never ask "should I watch this?" or "should I iterate it?" first.
-That answer is a standing yes across all PRs you are driving.
-Subscribe with `subscribe_pr_activity` when that tool exists (provided by the GitHub MCP server in remote/web sessions), or babysit locally.
-A subscription does not replace the persistent loop: PR-activity webhooks do not deliver CI success, new pushes, or merge / merge-conflict transitions (see [`memories/github-mcp-tools.md`](memories/github-mcp-tools.md)).
-Claude's wake is a `/loop`, `send_later`, `CronCreate`, or schedule timer, per `AGENTS.md`.
-Re-arm it periodically, since webhooks can't fill that gap --- and word each re-arm against a re-derivable set of PRs rather than a fixed number, per `ardi.md`'s "A scheduled check-in can outlive the PR it names" section.
-Drive every review round to fully-clean.
-
-This watch process never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review --- don't also post "@claude review again" in the same round.
-On workflows with `concurrency: cancel-in-progress`, the two triggers race and cancel each other, leaving the latest commit's review canceled and `require-review` red for no code reason.
-Only post the mention when a round pushed no code (all Rebut/Defer).
-
-Surface to me only when an item is ambiguous, architecturally significant, or deadlocked (the escalation rule above still applies), or when the PR is clean.
-Stop watching only when the PR merges or closes, or I tell you to back off.
-
-**Review-only.**
-Do not start ARDI, do not push fixes, and do not merge.
-Leave the findings and stop unless asked to iterate.
-A later request to iterate is a driving request.
-The review you post still carries both representations, per `AGENTS.md`'s own review-only rule.
-
-(UCD-SERG/shigella#31, 2026-08-25.)
+Subscribe to and ARDI-loop every PR you drive, unasked, until it merges or closes, re-arming a wake because webhooks miss CI success and merge state.
+After a push, don't also post "@claude review again";
+and on a PR you were asked only to review, leave findings without pushing, iterating, or merging.
+Detail, rationale, and cases: [`shared/workflow/watch-and-ardi.md`](shared/workflow/watch-and-ardi.md).
 
 ## Babysit PRs efficiently — batch pushes, trust CI's own reports, skip redundant lookups
 
@@ -984,25 +552,9 @@ Research and reading are dispatchable too, sized by how much comprehension the r
 
 ## Never launch a subagent on Fable without explicit, specific permission
 
-An `Agent` call that omits `model` inherits the conductor's model.
-In a Fable session that makes the cheapest thing to type the most expensive thing to run, and nothing reports the substitution: the call reads as "default", the transcript records `claude-fable-5-1`, and the account hits its usage limit.
-Measured 2026-09-01: 10 launches in one session, 8 of them inherited Fable (six adversarial reviews, two sidecars), and only the two that set `model: sonnet` did not.
-
-The rule is the user's, verbatim: never spawn a subagent on Fable without their explicit, specific permission.
-"Specific" means for that launch, not a standing yes for the session.
-`hooks/no-fable-subagent.py` is the mechanism: it denies an `Agent` launch that names Fable, or that omits `model` while the session's own model is Fable, and warns on a `Workflow` launch in a Fable session, whose `agent()` calls it cannot inspect.
-`FABLE_SUBAGENT_OK=1` on the one approved command is how a grant is recorded.
-Exporting it for a session is the violation wearing an environment variable.
-The persona files under `.claude/agents/` and `.opencode/agents/` deliberately carry no `model:` (per `skills/agent-builder/SKILL.md`, the tier is pinned at the call site so one persona serves every tier), which is exactly why the call site has to name it: every `Agent()`, `Task`, or `Workflow` `agent()` invocation passes `model`, and the hook denies the Claude Code launch that does not.
-
-- **Do:** pass `model` on every `Agent` call, `sonnet` or `haiku` for bounded or mechanical work, and ask before naming Fable.
-- **Do:** set `FABLE_SUBAGENT_OK=1` only on the single command the user approved, after they approved it.
-- **Don't:** omit `model` and let the launch inherit, which in a Fable session is a Fable launch nobody chose.
-- **Don't:** treat a `daytb`, `away`, or `mwc` grant as covering the model tier; none of them does.
-
-(Directive from the user, 2026-09-01: "have you been spawning subagents using fable?
-don't ever do that without my explicit specific permission".
-Tracked as ai-config#2927.)
+Pass `model` on every `Agent` call and `Workflow` `agent()` call, and never launch a subagent on Fable without the user's explicit permission for that launch (`hooks/no-fable-subagent.py`;
+`FABLE_SUBAGENT_OK=1` on the approved command only).
+Detail, rationale, and cases: [`shared/workflow/no-fable-subagents.md`](shared/workflow/no-fable-subagents.md).
 
 ## Derive a set of work items; never hand over an enumeration of it
 
@@ -1028,33 +580,10 @@ the fragment carries the mechanisms (a per-agent mistake ledger prepended to eve
 
 ## Subagent worktrees are assigned, and an incident never silently repeals a decision
 
-Two rules, one incident, and the second is the general form of the first.
-
-**Assign the worktree on the `Agent` call.** Set `isolation` yourself rather than leaving each subagent to organize its own working directory, and brief every agent you isolate to stay inside the worktree it was given and to **push early** --- a pushed commit survives anything that happens to a working tree.
-Deciding that a particular agent does not need one is fine.
-Leaving it unmarked is what is not.
-`hooks/flag-unassigned-worktree.py` mechanizes exactly this, and warns rather than blocks.
-
-**Verify a dispatched agent's liveness before touching a worktree you did not just create --- never infer it from a snapshot.**
-A clean `git status` and an unlisted agent both describe one instant.
-Neither says whether the session working that worktree has actually stopped, and a quiet worktree can mean either "finished" or "between edits".
-Ask the agent directly (`SendMessage` to its id, or the equivalent for a peer session) before editing or reclaiming its worktree, including one that has sat quietly for hours --- a long stretch is a reason to ask sooner, not evidence of abandonment.
-[`memories/subagent-worktrees.md`](memories/subagent-worktrees.md) carries the case where both directions of that misreading --- read as live when quiet, read as dead when live --- happened to the same agent in one session.
-
-**"Stay inside the worktree it was given" holds only while the agent works in the session's own repo.**
-`isolation: "worktree"` places that worktree in the **session's primary repository**, never in a repository the brief happens to name --- so a dispatch into a different clone hands the agent a worktree of the wrong repo, and the instruction above is unfollowable as written.
-Name the target clone by path instead, and tell the agent to create its own worktree there off `origin/<default-branch>` --- resolved from that repo, never hard-coded, per `memories/subagent-worktrees.md`'s measured `fatal: invalid reference: origin/main` failure on a repo whose default is named otherwise.
-Measured 2026-08-07.
-[`memories/git-worktrees.md`](memories/git-worktrees.md) carries the evidence.
-[`shared/workflow/challenge-the-assignment.md`](shared/workflow/challenge-the-assignment.md) covers the general form --- a brief must not assert anything about the recipient's environment, which the author cannot query even in principle.
-
-**The general rule is the more valuable half.** When an incident makes you stop doing something you had decided to do, either re-argue the decision explicitly or fix the misuse --- never just change the behaviour.
-A repealed decision changes no artifact, so review, tests, and hooks are all blind to it by construction, and the only detector is someone who remembers.
-It is more dangerous than ordinary drift because the incident supplies an apparent reason, so from the inside it feels like having learned something rather than like lapsing.
-If you cannot point at the message where a decision was reversed, it was not reversed.
-It lapsed.
-
-[shared/workflow/incidents-dont-repeal-decisions.md](shared/workflow/incidents-dont-repeal-decisions.md)
+Set `isolation` on every `Agent` call or decide explicitly that it needs none, brief isolated agents to stay in their worktree and push early, and ask an agent before touching its worktree.
+More generally, when an incident makes you stop doing something you decided to do, re-argue the decision or fix the misuse;
+never just change the behaviour.
+Detail, rationale, and cases: [`shared/workflow/assign-subagent-worktrees.md`](shared/workflow/assign-subagent-worktrees.md).
 
 ## Non-destructive actions
 
@@ -1800,34 +1329,14 @@ When *I* iterate a PR, the ARDI loop above is the mechanism — it already addre
 
 ## Encoding reusable feedback into ai-config
 
-When the user gives feedback, corrections, or guidance that applies beyond the current session (a standing rule, style preference, workflow change, or behavioral note), decide on your own how to encode it --- don't ask.
-Choose the right form (memory bullet in CLAUDE.md, update to a shared fragment in `shared/`, new or revised skill, etc.) and commit the change.
-Only surface the choice if it's ambiguous or touches something architecturally significant.
-
-**Put the memory in the repo where it belongs, and don't wait for confirmation to do it.**
-Session-local auto-memory is a scratchpad, not a home.
-A learning parked there is invisible to every other session and to everyone else, so a reusable one has to land in a version-controlled repo --- `ai-config` for a cross-cutting rule, the specific repo for a repo-specific gotcha.
-And "decide on your own --- don't ask" above rules out the adjacent move too.
-*Offering* to upstream a learning is not upstreaming it, and it spends a round trip to hear an answer already written here.
-Open the PR.
-
-- **Do:** commit a reusable learning to the repo that owns it, in the same stride you notice it.
-- **Do:** pick the home by scope --- an `ai-config` shared fragment, `CLAUDE.md`, or `memories/` for a cross-repo rule;
-  the specific repo's own docs for a repo-specific one.
-- **Don't:** leave a reusable learning in session-local auto-memory as a substitute for committing it.
-- **Don't:** offer to upstream it, or ask which repo --- decide and do it, surfacing the choice only when it is genuinely ambiguous or architecturally significant.
+Commit feedback that outlives the session to the repo that owns it in the same stride, choosing the form yourself;
+never park it in session-local auto-memory or offer to upstream it instead.
+Detail, rationale, and cases: [`shared/workflow/encode-reusable-feedback.md`](shared/workflow/encode-reusable-feedback.md).
 
 ## PowerShell CLI Command Safety
 
-- **Never pass backtick-containing content in PowerShell double-quoted strings**: PowerShell treats `` ` `` as its escape character — `` `b `` (Backspace, 0x08), `` `n ``, `` `t ``, `` `r ``, etc. — so Markdown code spans and other backtick-containing text will be silently corrupted. Use single-quoted strings (`'...'` / `@'...'@`) for inline content, or write to a file and pass `--body-file` for multi-line PR descriptions.
-- **Use body files for GitHub PR descriptions**: Write multi-line PR descriptions to a temp file and pass `--body-file <file>` to `gh pr create`/`gh pr edit`, or `gh api -F body=@<file>` for raw API calls. This avoids terminal string-escaping corruption for any content with backticks or other shell-special characters.
-- **The hazard is not PowerShell-specific, and not limited to PR descriptions**: bash and zsh double-quoted strings run backtick spans as command substitution, so `gh pr comment`, `gh issue comment`, `gh api .../comments -f body="..."` / `.../replies -f body="..."`, and `git commit -m "..."` corrupt a backtick-carrying body exactly as `gh pr create --body "..."` does (a `` `ms.` `` code span runs `ms.` as a command and vanishes). Use `--body-file` / `-F body=@<file>` for comment and review-reply bodies too, in any shell, and `git commit -F <file>` for a commit message. See `memories/git.md`'s "`gh pr comment` / `gh api ... -f body=` run backtick spans too" and "`git commit -m "..."` runs backtick spans as shell commands" sections.
-- **`git commit -m` is the surface that enumeration hides**, because every other entry posts to GitHub, so a commit message reads as a different kind of thing while the shell treats it identically.
-  Measured 2026-08-17: an unescaped span inside a bash double-quoted string runs, so `` `echo SUBSTITUTED` `` became `SUBSTITUTED` in the resulting message.
-  The same day a `-m` message quoting a merge command in backticks was refused by `hooks/no-unauthorized-merge.py`; those backticks were backslash-escaped, so what actually matched is unverified, and blocking is the safe direction rather than a defect.
-  `git commit -F <file>` succeeded immediately either way, which is why the remedy needs no diagnosis first.
-  - **Do:** `git commit -F` a backtick-carrying message from the session scratchpad, outside the worktree.
-  - **Don't:** pass a backtick-carrying message through `git commit -m "..."`, or spend a round diagnosing a guard refusal when the file route costs one command.
+Never pass backtick-carrying text inside a double-quoted string in any shell: use `--body-file`, `-F body=@<file>`, or `git commit -F <file>`.
+Detail, rationale, and cases: [`shared/coding/powershell-cli-safety.md`](shared/coding/powershell-cli-safety.md).
 
 ## Tool transport collapses doubled backslashes
 

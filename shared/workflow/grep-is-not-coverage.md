@@ -1020,7 +1020,7 @@ truncation point is hardest to predict.
 Its truncated output held no match for Robert & Casella's *Monte Carlo
 Statistical Methods*, which was then reported as "not in the library" and
 filed as an access-request issue.
-A subsequent top-level listing of the mount's `texts_by_title` index folder
+A subsequent top-level listing of the mount's `Texts_by_Title` index folder
 --- run once the recursive crawl itself was recognized as the wrong approach,
 see [`memories/course-repos.md`](../../memories/course-repos.md)'s "List a
 cloud-sync mount's top level before searching it" --- showed the book's

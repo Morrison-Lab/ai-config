@@ -89,14 +89,16 @@ Only the reading-shelf repo, never the notes or graded-material repos, since the
 A recursive `find` or `grep -r` over it has to fault in and stream every folder it touches, and running one twice with 300-400 second timeouts made the user's machine lag badly enough that their Remote Control client showed "Can't reach your computer."
 
 The fix is not a shorter search.
-It is a narrower one: list the top-level index directory first (this library keeps a `texts_by_title` folder for exactly this purpose) and descend only into the specific folders a task actually needs.
+It is a narrower one: list the top-level index directory first (this library keeps a `Texts_by_Title` folder for exactly this purpose) and descend only into the specific folders a task actually needs.
 
-- **Do (from the user):** on a network, cloud-sync, or streaming mount (Google Drive, OneDrive, SMB), or any large tree, list the top level first --- a single index directory such as a by-title folder --- and descend only into the folders you have chosen.
-- **Don't (inferred):** run a recursive `find`/`grep -r`/glob `**` over such a mount.
+- **Do:** on a network, cloud-sync, or streaming mount (Google Drive, OneDrive, SMB), or any large tree, list the top level first --- a single index directory such as a by-title folder --- and descend only into the folders you have chosen.
+- **Don't:** run a recursive `find`/`grep -r`/glob `**` over such a mount.
   A long timeout does not make that acceptable;
   it only makes the damage last longer.
 
-(The user, 2026-09-28, after two timed-out recursive searches: "let's not crawl all of my drive;
+(The Do side is the user's, 2026-09-28, after two timed-out recursive searches;
+the Don't side is inferred.
+The user's words: "let's not crawl all of my drive;
 just get the folder names from texts_by_title and look through them."
 A follow-up issue for a possible guard --- warning on a recursive `find`/`grep -r` whose path is under `G:\`, `/g/My Drive`, or `OneDrive` --- is tracked in [ai-config#4072](https://github.com/Morrison-Lab/ai-config/issues/4072);
 see [`grep-is-not-coverage.md`](../shared/workflow/grep-is-not-coverage.md)'s "A `timeout`-killed search's output is partial, not complete" section for the companion mistake this same incident produced, where the truncated output of the first (pre-fix) recursive search was read as a complete absence.)
@@ -105,9 +107,11 @@ see [`grep-is-not-coverage.md`](../shared/workflow/grep-is-not-coverage.md)'s "A
 
 When a task needs a book, paper, or other reference that is not in `G:\My Drive\Texts 2` (confirmed by a real, non-truncated search --- see the section above and [`grep-is-not-coverage.md`](../shared/workflow/grep-is-not-coverage.md)'s timeout section before concluding absence), file an access-request issue in the reading-shelf repo (`Morrison-Lab/mlr`) rather than only mentioning the gap in chat.
 
-- **Do (from the user, verbatim: "whenever there are texts we should get access to, file issues (or other refs)"):** file one issue per reference, carrying the full citation, its DOI when it has one, where it was searched and when, and the likely access route (a library subscription, a publisher purchase, an author copy) --- labelled `ai-authored` and `model:<id>` per [`label-agent-filed-issues`](../shared/workflow/label-agent-filed-issues.md).
-- **Don't (inferred):** mention the missing reference only in chat, or silently drop it from the task instead of filing it.
+- **Do:** file one issue per reference, carrying the full citation, its DOI when it has one, where it was searched and when, and the likely access route (a library subscription, a publisher purchase, an author copy) --- labelled `ai-authored` and `model:<id>` per [`label-agent-filed-issues`](../shared/workflow/label-agent-filed-issues.md).
+- **Don't:** mention the missing reference only in chat, or silently drop it from the task instead of filing it.
 
-(Filed as [Morrison-Lab/mlr#10](https://github.com/Morrison-Lab/mlr/issues/10), [#11](https://github.com/Morrison-Lab/mlr/issues/11), and [#12](https://github.com/Morrison-Lab/mlr/issues/12), 2026-09-28, for Robert & Casella's *Monte Carlo Statistical Methods*, Gelman & Rubin (1992), and Brooks & Gelman (1998) respectively.
+(The Do side is the user's, 2026-09-28, verbatim: "whenever there are texts we should get access to, file issues (or other refs)";
+the Don't side is inferred.
+Filed as [Morrison-Lab/mlr#10](https://github.com/Morrison-Lab/mlr/issues/10), [#11](https://github.com/Morrison-Lab/mlr/issues/11), and [#12](https://github.com/Morrison-Lab/mlr/issues/12), 2026-09-28, for Robert & Casella's *Monte Carlo Statistical Methods*, Gelman & Rubin (1992), and Brooks & Gelman (1998) respectively.
 Issue #10 was later found to rest on a truncated search --- the book is present under a search that was not cut short --- and was corrected rather than left standing;
 see the timeout section linked above.)

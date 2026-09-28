@@ -106,9 +106,16 @@ state.)
 
 ## Site navigation
 
-The same test applies one level up, to a site's navbar instead of a page's
-headings, and it is a test on **each** dropdown, not on whether the navbar
-has any.
+The same test applies one level up, to a site's navbar and sidebar instead of
+a page's headings.
+Two separate questions follow from that: whether a grouping earns its place
+(below), and, once it does, what order its items and its groups come in
+(further below).
+
+### Grouping
+
+This is a test on **each** dropdown or sidebar section, not on whether the
+navbar or sidebar has any.
 A dropdown is a grouping level, so it needs a sibling the same way a heading
 does: a dropdown grouping several pages into a real topical section is fine,
 and so are several such dropdowns side by side.
@@ -164,8 +171,6 @@ dropdown has.
 A site can use dropdowns, a sidebar, or both for the same grouping --- the
 test is about whether the grouping divides something, not about which
 control renders it.
-Groups, and the items within them, follow the same natural topic progression
-as the rest of this section.
 
 Showing the same grouping in both a sidebar and navbar dropdowns is fine, but
 the two lists then have to be kept in step by hand --- Quarto does not derive
@@ -175,8 +180,7 @@ sidebar's YAML and `# keep in sync with the sidebar` beside the navbar's, so
 an edit to one is not missed in the other.
 
 - **Do:** use a dropdown, a collapsible sidebar section, or both, wherever
-  the site's pages fall into a real topical group, ordered by the same
-  topic progression as the rest of the site.
+  the site's pages fall into a real topical group.
 - **Do:** mark a navbar dropdown and a sidebar section that mirror the same
   grouping with a comment pointing at each other, so an edit to one is not
   missed in the other.

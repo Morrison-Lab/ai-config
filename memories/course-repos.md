@@ -5,6 +5,8 @@ Morrison-Lab courses split into a student-facing **notes** repository
 and a private **evaluation-material** repository holding assignments, quizzes, exams and their answers
 (`Morrison-Lab/mlg`, `Morrison-Lab/epi204`).
 Each repo's own `CLAUDE.md` has the details; these rules hold across all of them.
+The names above were checked against the account's repository listing on 2026-09-28;
+older entries in this corpus that say `ucdavis/epi204` or `d-morrison/rme` predate the moves.
 
 ## None of these repos is a record of past classes
 

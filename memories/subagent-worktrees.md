@@ -276,68 +276,84 @@ An adversarial reviewer sent to settle the same question reported #3023 as human
 The "not tracked here" rule in "A quiet worktree is not evidence the session working it has stopped" has a sharper case that is not about peers at all.
 A user in a claude.ai cloud session may offer a Remote Control session they have open on their own machine, for work only that machine can do: copying files off a local drive, or editing `~/.claude/settings.json`.
 The cloud session can *see* that session and still cannot *reach* it.
-The reverse direction works: the local session can message the cloud session.
+The reverse direction works: a local session can message the cloud session.
 
 `mcp__Claude_Code_Remote__get_session` reads the session record from the server, and it answered for the user's local session here.
 `ListAgents` and `SendMessage` answer a different question: which agents this session can message.
-From the cloud session, `SendMessage` to the user's session failed three ways.
-By title and by raw `session_...` id it failed with "No agent named ... is reachable".
-By the exact address the local session's own message arrived from, `bridge:session_...`, it got past name resolution and was refused on the credential:
+Two walls stand between the cloud session and a local one.
+
+The first is name resolution.
+Sent by the session's title or by its raw `session_...` id, `SendMessage` failed with "No agent named ... is reachable",
+because the target was not in the cloud session's `ListAgents`.
+That failure was measured against two different local Remote Control sessions.
+
+The second is the credential.
+A second local Remote Control session sent the cloud session a message,
+and it arrived as a `<cross-session-message from="bridge:session_..." from-name="<title>">` turn.
+Sent to that exact `bridge:session_...` address, `SendMessage` got past name resolution and was refused:
 
 > Failed to send to bridge:session_...: auth: this cloud session cannot message other sessions yet --
 > its credential is accepted for its own work but not for delivering to another session,
 > so a reply from here is not possible;
 > say so in your response instead of retrying
 
-(The ` -- ` stands in for an em dash in the original, since this repository keeps its source ASCII.)
+(The ` -- ` stands in for an em dash in the original, since this repository keeps its source ASCII, and the id is elided.)
 
-So the limit sits on the cloud side's credential, not on the local session being missing from `ListAgents`.
-That was measured, not read off a tool description.
-The error names no target-specific cause, and "cannot message other sessions" reads as covering every other session, not just this one;
-only the Remote Control target was tried, so that wider reach is inferred from the wording.
+The refusal itself was measured.
+That the credential is its cause is the error text's own account, not something tested separately.
+The text says "cannot message other sessions", which reads as covering every other session;
+only local Remote Control sessions were tried, so that wider reach is inferred from the wording.
 The "yet" suggests the limit may be lifted later, so re-test before relying on it.
 
 Messages flow the other way.
-The user had the local session send a message to the cloud session, addressing it by the name the local session's `ListAgents` gave it (of the form `user-04 [8081ef]`),
-and it arrived as a `<cross-session-message from="bridge:session_..." from-name="<title>">` turn.
-The cloud session could read it, and could not answer it.
+The second local session addressed the cloud session by its `ListAgents` name.
+The cloud session's own `ListAgents` printed that name, of the form `<name> [<ref>]`, as "the name other sessions use to message it".
+The cloud session could read the message that arrived, and could not answer it.
 
 Not even the session record's inbound-messaging field settles reachability.
-A read of the local session's record showed `external_metadata.cross_session_inbound: "available"`, and `ListAgents` from the cloud session still listed nothing but its own subagents.
-That field describes the target, and the refusal is about the sender.
+A read of the first local session's record showed `external_metadata.cross_session_inbound: "available"`, and `ListAgents` from the cloud session still listed nothing but its own subagents.
+That field describes the target, and the credential refusal is about the sender.
 
 This is also the case where this file's standing advice for a quiet peer, to ask the session directly (`SendMessage` to its id), has no route.
-Fall back to observation instead.
+Two routes remain.
+One is observation.
 What was observed working from the cloud is polling `get_session`:
 between two reads, `session_status` went from `IDLE` to `RUNNING`, `updated_at` moved, and the title changed.
 Watching the forge for the PR the local session opens is the natural complement, since that is where its work lands.
+The other is to have the local session send its reports to the cloud session, the direction that works.
 
-A second wall sits behind the first.
+A third wall sits behind the first two.
 The cloud session runs in its own container, so it has no access to the user's `~/.claude/settings.json`.
 That is inferred from where the session runs, not measured.
 On that reading, a change to local settings (such as `autoMode.environment`) has to be made on the user's machine.
 
 - **Do:** tell the user plainly, on the first failed send, that this session cannot message their Remote Control session, and say why:
-  the cloud session's credential is refused for delivery to another session.
+  by name or id the target is not in this session's `ListAgents`,
+  and by its `bridge:` address the send is refused on this session's credential.
 - **Do:** hand them paste-ready instructions (the exact commands or the exact settings edit) to run in the local session themselves.
 - **Do:** follow the local session by polling `get_session` (`session_status`, `status_bucket`, `updated_at`, title) and by watching the forge for the PR it opens.
-- **Do:** when a report needs to reach the cloud session, have the local session send it there with `SendMessage`, addressed by the cloud session's name in the local `ListAgents`.
-- **Do:** run the coordinator locally when the work needs two-way coordination, since only the local side can both send and receive.
+- **Do:** when a report needs to reach the cloud session, have the local session send it there with `SendMessage`, addressed by the name the cloud session's `ListAgents` gives for itself.
+- **Do:** (a recommendation, not measured as a whole) when work needs two-way messaging, run the session that sends instructions and collects replies (the coordinator) locally:
+  a local session can message the cloud session and its local peers,
+  while the cloud session was refused on every send it tried.
 - **Don't:** read `get_session`'s `connection_status: "connected"`, or `cross_session_inbound: "available"`, as reachability from this session;
   neither gave the cloud session a route to the target when measured.
 - **Don't:** retry `SendMessage` with other spellings of the target (title, `session_...` id, `bridge:session_...` address, a guessed name);
   all three spellings failed when measured,
-  and the `auth:` refusal says no spelling can fix it.
+  and the `auth:` refusal says a reply is not possible and not to retry.
 
-(Measured 2026-09-28 in a claude.ai cloud session, ai-config#4064 and ai-config#4070.
-The first `get_session` on the user's session returned `connection_status: "connected"`, `session_status: IDLE`, origin `claude_code_cli`, and the session's default title (the machine name).
+(Measured 2026-09-28 in a claude.ai cloud session, ai-config#4064 and ai-config#4070, against two different local Remote Control sessions.
+The first local session, tagged `remote-control-repl`:
+the first `get_session` on it returned `connection_status: "connected"`, `session_status: IDLE`, origin `claude_code_cli`, and the session's default title (the machine name).
 `ListAgents` listed only the cloud session's own subagent.
 `SendMessage` failed with "No agent named '<title>' is reachable" by the session title and again by the raw `session_...` id.
 A second `get_session` at 10:52 UTC returned `connection_status: "connected"`, `session_status: RUNNING`, `status_bucket: WORKING`, `updated_at` 10:51:12Z, `environment_kind: "bridge"`, tags `["remote-control-repl"]` and `external_metadata.cross_session_inbound: "available"`,
 and the title had changed to "Settings merge and MCMC books PR" after the user pasted tasks into it (per the user).
 `ListAgents` from the cloud session still listed only subagents.
-At about 11:25 UTC a local Remote Control session (tag `remote-control-sdk`, `environment_kind: "bridge"`) sent the cloud session a message, which arrived as a `<cross-session-message>` turn from `bridge:session_...`.
-`SendMessage` replies from the cloud session failed by title and by raw id with "No agent named ... is reachable", and by the exact `bridge:session_...` address with the `auth:` refusal quoted in this section.)
+The second local session, tagged `remote-control-sdk`, with `environment_kind: "bridge"`, the title "Local session cloud connectivity" and a different `session_...` id:
+at about 11:25 UTC it sent the cloud session a message, which arrived as a `<cross-session-message>` turn from `bridge:session_...`.
+`SendMessage` replies from the cloud session to it failed by title and by raw id with "No agent named ... is reachable",
+and by the exact `bridge:session_...` address with the `auth:` refusal quoted in this section.)
 
 ## A subagent that has REPORTED COMPLETION can still be resumed, so its worktree is not yours to work in
 

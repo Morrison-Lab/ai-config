@@ -30,7 +30,8 @@ A heredoc stays fine for a short, plain-ASCII body with no backslashes and no ba
   They are for the rare case where a heredoc is genuinely unavoidable.
 
 (2026-09-28: the user asked whether heredocs should be avoided, since they kept mangling content, and handed the call over with `daytb`.
-Both sides of the pair are inferred from that session's two failures.)
+Both sides of the pair are inferred from that session's two failures.
+Tracked as [ai-config#4083](https://github.com/Morrison-Lab/ai-config/issues/4083).)
 
 ## The collapse, measured
 

@@ -72,17 +72,24 @@ concurrency group when `1d5b337` was pushed a minute later, and
     clean, silently, mirroring `check-pr-fully-clean.py`'s identical
     handling (ai-config#2277) rather than reimplementing a second
     incompatible rule for the same shape.
-(b) A same-named run of the same workflow, on a LATER commit on the same
-    branch, that succeeded, because the concurrency group cancelled this
-    one rather than letting both run. Treated as clean, with an explicit
-    "superseded by <sha> (success)" note in the output -- never silently,
-    since the SHA actually being reported on did not itself produce a
-    passing run. The decision to treat this as clean rather than not-clean
-    is a judgment call, made here because the later commit's run covers
-    the same branch state this SHA merged into; note that the check
-    against a branch's CURRENT head (no (b) case possible, since nothing
-    is later) is still the one that matters for the "is `main` OK right
-    now" question this script exists to answer.
+(b) The NEXT completed run of the same workflow on the same branch after
+    this cancelled one -- not the next SUCCESS. Given cancelled X, failed
+    Z, then successful Y in that order, X is reported NOT clean, naming Z,
+    because Z is the run that actually answers "did the change X carried
+    pass" -- a success-only query would silently skip Z and report X
+    "superseded by Y (success)" instead. A chain of cancellations (X, then
+    W, also cancelled by a still-newer push) is walked past rather than
+    treated as an answer, so the same rule reaches through as many
+    cancellations as it takes to find a real completed run. When that run
+    succeeded, X is treated as clean, with an explicit "superseded by
+    <sha> (success)" note in the output -- never silently, since the SHA
+    actually being reported on did not itself produce a passing run. This
+    is a judgment call, made here because the next run's own result
+    (success or failure) is a more direct answer about the branch state X
+    merged into than X's own cancellation was; note that the check against
+    a branch's CURRENT head (no next run possible, since nothing is later)
+    is still the one that matters for the "is `main` OK right now"
+    question this script exists to answer.
 """
 from __future__ import annotations
 
@@ -203,12 +210,25 @@ def find_same_sha_success(cancelled: Dict[str, Any], runs: List[Dict[str, Any]])
     return None
 
 
-def find_superseding_branch_success(
+def find_next_completed_branch_run(
     repo: str, cancelled: Dict[str, Any]
 ) -> Optional[Dict[str, Any]]:
-    """Case (b): a same-workflow run on a LATER commit of the same branch
-    that succeeded, because a `concurrency: cancel-in-progress` group
-    cancelled this one rather than letting both run to completion.
+    """Case (b): the NEXT completed run of the same workflow on the same
+    branch, after this cancelled one.
+
+    Deliberately not "the next SUCCESS" -- querying for `status=success`
+    alone would silently skip an intervening failure. Given cancelled X,
+    failed Z, successful Y in that order, a success-only query returns Y
+    and reports X "superseded by Y (success)" with Z's failure invisible.
+    Fetching every conclusion and walking chronologically is what lets the
+    caller see Z and report X not-clean because of it, rather than because
+    of anything about X's own (cancelled) run.
+
+    Other CANCELLED runs are skipped when walking forward, not treated as
+    the answer: a chain of cancellations (X cancelled, then W also
+    cancelled by a still-newer push) supersedes across the whole chain,
+    and W is exactly as uninformative about "is main OK" as X's own
+    cancellation was.
     """
     workflow_id = cancelled.get("workflow_id")
     branch = cancelled.get("head_branch")
@@ -224,8 +244,6 @@ def find_superseding_branch_success(
             "GET",
             "-f",
             f"branch={branch}",
-            "-f",
-            "status=success",
             "--paginate",
             "--slurp",
         ]
@@ -239,10 +257,14 @@ def find_superseding_branch_success(
         for r in candidates
         if r.get("created_at", "") > created_at and r.get("head_sha") != cancelled_sha
     ]
-    if not later:
-        return None
     later.sort(key=lambda r: r.get("created_at", ""))
-    return later[0]
+    for r in later:
+        if r.get("status") != "completed":
+            continue
+        if r.get("conclusion") == "cancelled":
+            continue
+        return r
+    return None
 
 
 def fetch_runs(repo: str, sha: str) -> List[Dict[str, Any]]:
@@ -299,16 +321,28 @@ def evaluate(runs: List[Dict[str, Any]], repo: Optional[str] = None) -> int:
             if find_same_sha_success(run, runs) is not None:
                 continue
             # Case (b): a later commit on the same branch superseded this
-            # one via a concurrency group, and ITS run succeeded. Reported
-            # explicitly, never silently, since this exact SHA did not
-            # itself produce a passing run.
+            # one via a concurrency group. Read the NEXT completed run on
+            # that branch, not the next SUCCESS -- an intervening failure
+            # between this cancellation and a later success must not be
+            # skipped over. Reported explicitly either way, never
+            # silently, since this exact SHA did not itself produce a
+            # passing run.
             if repo is not None:
-                later = find_superseding_branch_success(repo, run)
-                if later is not None:
-                    later_sha = (later.get("head_sha") or "")[:8]
-                    notes.append(
-                        f"  - {name}: cancelled on this SHA, but superseded "
-                        f"by {later_sha} (success) -- treated as clean"
+                next_run = find_next_completed_branch_run(repo, run)
+                if next_run is not None:
+                    next_sha = (next_run.get("head_sha") or "")[:8]
+                    if next_run.get("conclusion") == "success":
+                        notes.append(
+                            f"  - {name}: cancelled on this SHA, but "
+                            f"superseded by {next_sha} (success) -- "
+                            "treated as clean"
+                        )
+                        continue
+                    not_clean.append(
+                        f"  - {name}: cancelled on this SHA; the next run "
+                        f"on this branch ({next_sha}) concluded "
+                        f"'{next_run.get('conclusion')}', not success -- "
+                        f"NOT superseded-clean {next_run.get('html_url', '')}"
                     )
                     continue
         not_clean.append(f"  - {name}: conclusion={conclusion} {url}")

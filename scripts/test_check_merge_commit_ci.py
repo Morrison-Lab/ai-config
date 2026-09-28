@@ -215,6 +215,68 @@ check(
     out,
 )
 
+# Load-bearing case: cancelled X, then a FAILED run Z, then a successful
+# run Y, in that chronological order. The next-COMPLETED-run rule must
+# stop at Z, the first completed run after X, and never skip past it to
+# reach Y just because Y is a success. A success-only query would have
+# reported X "superseded by Y (success)" with Z's failure invisible --
+# exactly the gap the bot review caught.
+FAILED_RUN_Z = workflow_run(
+    "Quarto Publish", 42, SHA_OTHER, "failure", "2026-09-01T00:02:00Z"
+)
+SUCCESS_RUN_Y = workflow_run(
+    "Quarto Publish",
+    42,
+    "1111111111111111111111111111111111111a",
+    "success",
+    "2026-09-01T00:03:00Z",
+)
+mod.run_gh = fake_gh_branch_runs([SUCCESS_RUN_Y, FAILED_RUN_Z])  # order-independent
+try:
+    code, out = capture_evaluate([CANCELLED_RUN_B], repo="acme/widgets")
+finally:
+    mod.run_gh = original_run_gh
+check(
+    "cancelled X, failed Z, successful Y: X is NOT clean (Z, not Y, is "
+    "the next completed run)",
+    code == mod.NOT_CLEAN_EXIT,
+    out,
+)
+check(
+    "the report names Z (the intervening failure), not Y",
+    SHA_OTHER[:8] in out and "failure" in out,
+    out,
+)
+check(
+    "the report does NOT claim X was superseded-clean by Y",
+    "superseded by" not in out,
+    out,
+)
+
+# Chain of cancellations: cancelled X, then a second cancelled run W (a
+# still-newer push superseded W in turn), then a successful run Y. The
+# walk must skip past W -- a cancelled run answers nothing about the
+# branch state -- and land on Y.
+CANCELLED_RUN_W = workflow_run(
+    "Quarto Publish", 42, FAILED_RUN_Z["head_sha"], "cancelled", "2026-09-01T00:02:00Z"
+)
+mod.run_gh = fake_gh_branch_runs([CANCELLED_RUN_W, SUCCESS_RUN_Y])
+try:
+    code, out = capture_evaluate([CANCELLED_RUN_B], repo="acme/widgets")
+finally:
+    mod.run_gh = original_run_gh
+check(
+    "cancelled X, cancelled W, successful Y: X is clean with a note "
+    "(the walk skips past W to reach Y)",
+    code == 0,
+    out,
+)
+check(
+    "the note names Y, not W",
+    SUCCESS_RUN_Y["head_sha"][:8] in out and "superseded" in out,
+    out,
+)
+
 # Without `repo=`, case (b) is never attempted -- offline callers get the
 # conservative (not-clean) answer rather than a network call they did not
 # ask for.

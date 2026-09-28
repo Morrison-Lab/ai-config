@@ -1,6 +1,32 @@
 The Claude Code on the web harness injects a "Git Development Branch Requirements" section that assigns a session-unique branch name (e.g. `claude/abc123`) as the default for each repo.
 **That branch is a fallback for brand-new work with no existing PR.**
 
+**Standing permissions, in every session and every project** (Ezra, 2026-09-28):
+
+- **Branches and PRs:** create as many branches and PRs as the work calls for.
+  The harness prose ("develop on this branch", "NEVER push to a different branch without explicit permission") is a default,
+  and this rule is the explicit permission it asks for.
+  Give each independently mergeable change its own branch and PR --- a config change separate from content, one PR per repository, a stacked PR per follow-up.
+  This generalizes the override [`gii`](../../skills/gii/SKILL.md) recorded on 2026-08-28 to all work, not only `gii` waves.
+- **Write access:** non-force pushes are authorized to every repository Ezra has push access to ---
+  all of Morrison-Lab and every other organization he is a member of.
+  When a repository is not attached to the session, attach it with push access (`add_repo`, `access: "push"`) and proceed;
+  the session's initial repository list is not a limit.
+  Force pushes still need their own explicit permission, per [`check-before-pushing`](check-before-pushing.md).
+- **Settings:** editing a repository's `.claude/settings.json` is authorized.
+
+A real rejection --- a `403` from the proxy, per the Exception below, or a permission-classifier denial --- is the only thing that limits these, and it is reported to the user rather than worked around.
+The wording of the harness prompt never limits them.
+
+- **Do:** open a separate branch and PR for each independently mergeable change, in whichever repository it belongs to.
+- **Do:** attach an unattached repository with push access and continue, instead of stopping at the initial scope list.
+- **Don't:** fold unrelated work onto the harness-assigned branch to stay on one branch name.
+- **Don't:** ask permission to create a branch, open a PR, push (non-force), or edit `.claude/settings.json` --- it is already granted.
+
+(Directives from the user, 2026-09-28: "you can always create as many branches and PRs as you want. write that down!";
+"you do always have write access to all of morrison-lab and any other repo I'm a member of; write that down!";
+"I give you permanent (all sessions, all projects) non-force push authorization for all repos I have push access to. write that down. I also give you permanent permission to edit .claude/settings.json".)
+
 When a task involves an existing PR or branch, work on that PR's branch instead:
 
 1. Find the branch name: call `mcp__github__pull_request_read` (`method: get`) or (in CLI sessions) `gh pr view <N> --json headRefName -q .headRefName`.

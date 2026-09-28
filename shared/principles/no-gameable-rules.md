@@ -98,10 +98,12 @@ about what happened is not pinned to anything the check verifies.
 - **Do:** key a rule to the state it cares about (noticed, true, done),
   and say explicitly when an instrument can only see a proxy for that
   state.
-- **Do:** ask, before shipping a Do/Don't pair or a hook condition,
-  whether the cheapest compliant behaviour is the one actually wanted.
-- **Don't:** phrase a rule around what gets said, written, or reported,
-  when what it actually cares about is what happened or what is true.
+- **Do:** write down the cheapest behaviour that would satisfy a rule
+  as drafted, before shipping it, and confirm that behaviour is the
+  one actually wanted.
+- **Don't:** phrase a rule around a visible proxy --- anything
+  observable that can stand in for the state the rule cares about ---
+  when it is that state, not the proxy, that the rule needs to change.
 - **Don't:** let a rule's Don't side reward the unwanted behaviour by
   making it the easiest way to avoid the rule's penalty.
 

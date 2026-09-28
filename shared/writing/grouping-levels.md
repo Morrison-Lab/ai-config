@@ -114,8 +114,8 @@ Two separate questions follow from that: whether a grouping earns its place
 
 ### Grouping
 
-This is a test on **each** dropdown or sidebar section, not on whether the
-navbar or sidebar has any.
+The grouping test applies to **each** dropdown or sidebar section, not to
+whether the navbar or sidebar has any.
 A dropdown is a grouping level, so it needs a sibling the same way a heading
 does: a dropdown grouping several pages into a real topical section is fine,
 and so are several such dropdowns side by side.
@@ -181,10 +181,12 @@ reminder to check, not the thing being checked: a comment added once and never
 revisited satisfies "there is a comment" forever, even after the two lists
 have drifted apart, which is exactly the gap a rule stated as "mark it" leaves
 open.
-An edit to either list that leaves the other unchanged violates this rule
-even with the comment sitting right next to it, so treat a change to either
-list as an occasion to diff it against its counterpart before committing or
-approving, with the comment there only to make that check easy to find.
+An edit to either list that leaves the other unchanged violates this rule,
+even with the comment sitting right next to that edited list.
+So treat a change to the navbar's list as an occasion to diff it against the
+sidebar's list, and a change to the sidebar's list as an occasion to diff it
+against the navbar's, before committing or approving either change.
+The comment is there only to make that diff easy to find, not to replace it.
 
 - **Do:** treat a dropdown or a collapsible sidebar section as optional ---
   you may group pages into one, or both, where the site's pages fall into
@@ -207,18 +209,25 @@ Grouping is not the only question a navbar or sidebar raises --- once the
 items and the groups are settled, their order is a separate question, and it
 has the same answer as the rest of this document: derive it, don't inherit
 it.
-Menu and sidebar items, and the groups themselves, follow the natural
-progression of topics **as much as possible**, so each item comes after what
-it builds on.
+Menu items follow the natural progression of topics **as much as possible**,
+so each item comes after what it builds on --- the directive's own words,
+quoted in full below.
+Extending that rule to sidebar items and to the groups themselves is
+inferred, not quoted: the directive names only "menu bars", but the user's
+separate sidebar clarification above treats a sidebar and a navbar as the
+same kind of thing for grouping purposes, and nothing suggests ordering
+should split the two where grouping does not.
 Find that progression from the dependencies among the pages --- which page's
 content a reader needs before another page's makes sense --- rather than from
 the order the pages were created in or from the alphabet, neither of which
 tracks what a reader needs first.
 "As much as possible" is doing real work, not softening the rule into
-politeness: when no dependency runs between two items in either direction ---
-neither page's content is a prerequisite for the other's --- this rule has
-nothing to say about their relative order, and creation order, the alphabet,
-or any other tiebreak is fine for that pair.
+politeness.
+When no dependency runs between two items in either direction, this rule has
+nothing to say about their relative order.
+That is the case where neither page's content is a prerequisite for the
+other's.
+Creation order, the alphabet, or any other tiebreak is fine for that pair.
 
 - **Do:** derive a menu's order, item by item and group by group, from the
   dependencies among the pages it lists, so each item comes after the

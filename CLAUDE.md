@@ -1516,6 +1516,22 @@ and a read-through inspects each sentence rather than the sequence.
 
 [`shared/writing/quarto-revealjs-div-styling.md`](shared/writing/quarto-revealjs-div-styling.md)
 
+## Writing style: a grouping level must earn its place
+
+[`shared/writing/grouping-levels.md`](shared/writing/grouping-levels.md)
+
+A heading, or a navbar dropdown, is only meaningful when it has a sibling ---
+a lone child heading, or a dropdown hiding pages a flat bar had room for,
+adds structure the reader gains nothing from.
+The inverse case is a single page carrying two topics that never earned
+sharing one grouping in the first place --- length alone doesn't say so, but
+two independent nouns joined by "and", a vague catch-all title, or
+non-building sections do.
+Covers the Quarto-specific consequences too: `title` is already the page's
+h1, `revealjs` slide boundaries move with heading levels, a fragment-repo's
+`{#sec-...}` ids must survive a restructure or a page split, and Quarto's own
+responsive navbar already collapses to a hamburger menu on narrow screens.
+
 ## Challenge ambiguous phrasing and terminology in review
 
 [shared/workflow/challenge-ambiguous-terminology.md](shared/workflow/challenge-ambiguous-terminology.md)

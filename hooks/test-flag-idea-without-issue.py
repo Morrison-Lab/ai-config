@@ -1,7 +1,8 @@
 """Test the flag-idea-without-issue guard.
 
-The value is concentrated in the negative cases: an OFFER discharged by a
-filed issue, a FLAG that carries no idea-proposal vocabulary, and a marker
+The value is concentrated in the negative cases: a routine OFFER with no
+idea-cue, a FLAG that carries no idea-proposal vocabulary, a filing that
+happened before an unrelated later idea rather than after it, and a marker
 name quoted in a code span must never warn -- a guard that fires on those
 gets switched off and takes the incident case with it.
 
@@ -42,11 +43,21 @@ CASES = [
         "created from a template."
     )], True, "a FLAG proposing two ideas with idea-cue vocabulary warns"),
 
-    # A bare OFFER always counts as proposing work, no idea-cue needed.
+    # An OFFER with idea-proposal vocabulary still warns.
     ([say(
-        "\U0001F4A1 **OFFER** --- I can wire up a nightly job that reruns "
-        "this check across every repo in the org."
-    )], True, "an OFFER proposing optional work warns with no filing"),
+        "\U0001F4A1 **OFFER** --- I can add a mechanism that reruns this "
+        "check nightly across every repo in the org."
+    )], True, "an OFFER proposing a mechanism warns with no filing"),
+
+    # ROUTINE CONTINUATION OFFERS carry no idea-cue and must not warn -- an
+    # OFFER is no longer an unconditional pass.
+    ([say(
+        "\U0001F4A1 **OFFER** --- want me to merge this now that it's "
+        "clean?"
+    )], False, "a routine 'want me to merge' OFFER does not warn"),
+    ([say(
+        "\U0001F4A1 **OFFER** --- I can push this fix now."
+    )], False, "a routine 'I can push this fix now' OFFER does not warn"),
 
     # A FLAG with no idea-proposal vocabulary is a plain heads-up or risk
     # note, not an idea, and must not warn.
@@ -54,18 +65,31 @@ CASES = [
         "⚠️ **FLAG** --- the deploy took eleven minutes this run, "
         "about twice the usual time."
     )], False, "a FLAG that names a risk with no proposal does not warn"),
+    # A bare "could" naming a risk (not phrase-bound to a proposal) must not
+    # warn -- item #4's optional tightening.
+    ([say(
+        "⚠️ **FLAG** --- heads up, review could take a while given "
+        "the size of this diff."
+    )], False, "a bare 'could' in a plain time estimate does not warn"),
 
-    # DISCHARGED: an issue was filed somewhere in the turn.
+    # DISCHARGE IS TURN-SCOPED BY ORDERING, NOT A WHOLE-TRANSCRIPT SEARCH.
     ([say(
         "⚠️ **FLAG** --- we could sweep the other repos for the "
         "same gap."
     ), ISSUE_CLI], False,
-     "an issue-create call anywhere in the turn discharges the FLAG"),
+     "an idea followed by its own filing, later in the same turn, "
+     "does not warn"),
     ([say(
         "\U0001F4A1 **OFFER** --- I can build a mechanism to propagate "
         "template changes automatically."
     ), PR_CLI], False,
-     "a PR-create call anywhere in the turn discharges the OFFER"),
+     "a PR-create call after the OFFER, in the same turn, discharges it"),
+    ([ISSUE_CLI, say(
+        "⚠️ **FLAG** --- separately, we could sweep the docs repo "
+        "for the same gap."
+    )], True,
+     "an unrelated EARLIER filing does not discharge a LATER, distinct "
+     "idea (regression test for whole-transcript search)"),
 
     # ALREADY-FILED CITATION IN THE SAME MESSAGE DISCHARGES.
     ([say(
@@ -93,6 +117,15 @@ CASES = [
         "This corpus tags an optional idea with `\U0001F4A1 **OFFER**` and "
         "a heads-up with `⚠️ **FLAG**`."
     )], False, "marker names quoted in code spans are not live markers"),
+    # The corpus's own rule text about this hook, verbatim (minus the link
+    # markup), must not self-trigger -- both markers there are backtick-quoted.
+    ([say(
+        "- **Don't:** raise an idea only as a chat-only `⚠️ **FLAG**` or "
+        "`\U0001F4A1 **OFFER**`, or wait for the user to ask whether it is "
+        "worth filing, before recording it."
+    )], False,
+     "report-mistakes-proactively.md's own Don't bullet, quoted "
+     "verbatim, does not self-trigger"),
 ]
 
 

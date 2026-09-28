@@ -28,35 +28,68 @@ convention), not on a defect-shaped assertion or a permission-asking close.
 
 WHAT COUNTS AS "PROPOSING WORK"
 --------------------------------
-A `💡 **OFFER**` is, by CLAUDE.md's own definition, "optional work I can do
-if they want it" -- every instance proposes work, so any OFFER block
-qualifies without a further vocabulary check.
+Both `💡 **OFFER**` and `⚠️ **FLAG**` need an idea-proposal cue in their own
+text (see IDEA_CUE) -- vocabulary for suggesting a new mechanism, sweep,
+follow-up, or improvement, rather than merely naming a risk or offering
+routine continuation work. Earlier revisions let every OFFER through
+unconditionally, on the reasoning that CLAUDE.md defines one as "optional
+work I can do if they want it" -- but that definition covers the ordinary
+"want me to merge this now that it's clean?" and "I can push this fix now"
+just as much as a genuine proposal, and neither of those is an idea to file.
+Gating every FLAG the same way (rather than only the OFFER-shaped ones)
+would make this as disruptive as gating every FLAG in
+`no-unfiled-finding.py`'s sibling, and get switched off for it.
 
-A `⚠️ **FLAG**` is defined more broadly ("non-blocking heads-up or risk"),
-and most flags are not issue-shaped -- a merge-order note, a status update,
-a risk with no proposal attached. Gating every FLAG would make this as
-disruptive as gating every FLAG in `no-unfiled-finding.py`'s sibling, and
-get switched off for it. So a FLAG additionally needs an idea-proposal cue
-in its own text (see IDEA_CUE) -- vocabulary for suggesting a new mechanism,
-sweep, or follow-up, rather than merely naming a risk.
+`could`/`should` are deliberately phrase-bound (`we could`, `it should`,
+`could add`, and similar), not bare words, because an earlier draft matched
+`could` anywhere and fired on a plain status line like "review could take a
+while" -- a time estimate, not a proposal.
 
 DISCHARGE
 ---------
-An issue or PR reference anywhere in the message -- a citation of one already
-filed (reusing `no-unfiled-finding.py`'s `RX_ALREADY`), a bare issue/PR URL,
-or an issue-create / issue-comment / PR-create tool call anywhere in the
-turn -- discharges the warning. Matching on presence in the message, not
-argument extraction, keeps this a lexical guard rather than a semantic one:
-whether the cited issue is the SAME idea the FLAG names is not lexically
-decidable, and a false negative here (a citation that turns out to be
-unrelated) is the same shape of miss `RX_ALREADY` already accepts everywhere
-else in this file's sibling.
+Turn-scoped, not session-scoped. A citation of an issue/PR already filed
+(reusing `no-unfiled-finding.py`'s `RX_ALREADY`) or a bare issue/PR URL
+discharges when it sits in the SAME message as the FLAG/OFFER -- checked
+against that message's own text, so this half was always turn-scoped.
 
-WARNS, never blocks. Whether a given FLAG/OFFER is genuinely idea-shaped
-is not fully decidable from vocabulary alone -- IDEA_CUE will both miss a
+The creation-call half is turn-scoped by ordering, the same way the sibling
+hooks use `scan()`'s `last_file`/`last_say`: an issue-create, issue-comment,
+or PR-create call ONLY discharges when it ran at or after the message
+carrying the FLAG/OFFER (`_last_create_index()` below, compared against
+`scan()`'s own `last_say`). An earlier revision searched the WHOLE transcript
+for a creation call, so any unrelated filing anywhere earlier in the session
+silenced every later, unrelated idea for the rest of that session -- the
+same "shares a call, decides nothing" shape
+`shared/workflow/check-before-pushing.md` and this corpus's own
+`no-stale-pr-status.py`-adjacent guards warn against, here applied to time
+rather than to a shared Bash call. Matching on presence, not argument
+extraction, keeps both discharges lexical rather than semantic: whether the
+cited issue is the SAME idea the FLAG names is not decidable this way, and a
+false negative here (a citation that turns out to be unrelated) is the same
+shape of miss `RX_ALREADY` already accepts everywhere else in this file's
+sibling.
+
+WARNS, never blocks. Whether a given FLAG/OFFER is genuinely idea-shaped is
+not fully decidable from vocabulary alone -- IDEA_CUE will both miss a
 proposal phrased unusually and catch a risk note that happens to share a
 word ("consider", "worth") with a real proposal. A block on a guess this
 loose would be worse than the omission it exists to catch.
+
+WHAT THIS HOOK CANNOT SEE, AND WHY THE RULE STILL COVERS IT
+-------------------------------------------------------------
+This hook is lexical: it can only warn on a FLAG or OFFER that was actually
+typed into the reply. It has no way to notice a defect that a session
+noticed and never mentioned at all -- a plain prose aside describing another
+repo's content in passing, with no marker and no proposal language, is
+invisible to a pattern match by construction.
+The fragment's own rule is NOT scoped to what got said: it is keyed to
+NOTICING a defect, and staying silent about a noticed one is the same
+violation as flagging it and leaving it unfiled, not a way to avoid tripping
+this hook. See "An idea is filed the same way a mistake is" and its second
+dated incident (Morrison-Lab/rme#1209, a defect named in an ANSWER block
+with no marker at all) for the case this hook cannot catch. Read this
+hook's silence on a given reply as "no marker-shaped idea went unfiled in
+that reply", never as "nothing was noticed and left unfiled".
 
 Fails OPEN on any parse trouble or missing sibling, and fires at most once
 per distinct message.
@@ -100,15 +133,30 @@ MARKER = re.compile(
     re.S,
 )
 
-# Vocabulary a FLAG needs to read as proposing an idea rather than merely
-# naming a risk or a status. Deliberately broad -- this only gates a WARN,
-# and a FLAG that trips it and isn't actually idea-shaped costs one line of
-# context, not a blocked turn.
+# Vocabulary a FLAG or OFFER needs to read as proposing an idea rather than
+# merely naming a risk, a status, or routine continuation work. Deliberately
+# broad -- this only gates a WARN, and a marker that trips it and isn't
+# actually idea-shaped costs one line of context, not a blocked turn.
+#
+# `could`/`should` are phrase-bound (a subject pronoun or "it"/"this"/"that"
+# right before, or a build/file/track-shaped verb right after), not bare
+# words -- a bare `\bcould\b` fired on an ordinary time estimate like "review
+# could take a while", which names a risk, not a proposal.
 IDEA_CUE = re.compile(
-    r"\b(could|should|worth (building|adding|doing|a )|"
-    r"consider (building|adding)|a mechanism (to|for)|propos\w*|"
-    r"sweep\w*|follow-?up|we could|it would (help|let)|"
-    r"add(?:ing)? a (check|hook|mechanism)|build\w* a (hook|mechanism|check))\b",
+    r"\b(?:we|you|i|it|this|that)\s+(?:could|should)\b|"
+    r"\b(?:could|should)\s+(?:add|build|extend|automate|file|create|propose|sweep|track)\b|"
+    r"\bworth\s+(?:building|adding|doing|tracking|filing|an\s+issue|a\b)|"
+    r"\bconsider\s+(?:building|adding)\b|"
+    r"\ba\s+mechanism\s+(?:to|for)\b|"
+    r"\bmechanisms?\b|"
+    r"\bimprovements?\b|"
+    r"\bpropos\w*|"
+    r"\bsweep\w*|"
+    r"\bfollow-?up\b|"
+    r"\bit\s+would\s+(?:help|let)\b|"
+    r"\badd(?:ing)?\s+a\s+(?:check|hook|mechanism)\b|"
+    r"\bbuild\w*\s+a\s+(?:hook|mechanism|check)\b|"
+    r"\bissue-worthy\b",
     re.I,
 )
 
@@ -117,9 +165,10 @@ RX_ALREADY_URL = re.compile(
 )
 
 # An idea can land directly as a PR too, not only an issue -- discharge
-# either creation path, anywhere in the turn (not gated to occurring after
-# the marker), the same breadth `RX_FILE`-style discharges use elsewhere in
-# this corpus.
+# either creation path, when it runs AT OR AFTER the flagged message (see
+# `_last_create_index()` and its use in `main()`), the same breadth
+# `RX_FILE`-style discharges use elsewhere in this corpus, turn-scoped rather
+# than session-scoped.
 RX_CREATE = re.compile(
     r"create_issue|gh\s+issue\s+create|gh\s+issue\s+comment|"
     r"issues/\d+/comments|mcp__github__create_issue|"
@@ -132,20 +181,50 @@ RX_CREATE = re.compile(
 
 def find_unfiled_idea(text):
     """Return the matched marker text (e.g. "FLAG" or "OFFER"), or None if
-    every FLAG/OFFER is filed.
+    no marker proposes an idea, or every one that does is already filed.
     """
     stripped = visible_prose(text) if visible_prose else text
     for m in MARKER.finditer(stripped):
         kind = m.group("kind")
         body = m.group("body") or ""
-        is_offer = "OFFER" in kind
-        if not is_offer and not IDEA_CUE.search(body):
+        if not IDEA_CUE.search(body):
             continue
         window = kind + body
         if RX_ALREADY.search(window) or RX_ALREADY_URL.search(window):
             continue
-        return "OFFER" if is_offer else "FLAG"
+        return "OFFER" if "OFFER" in kind else "FLAG"
     return None
+
+
+def _last_create_index(path):
+    """Index of the last transcript line carrying a tool_use block matching
+    RX_CREATE, or -1 if none. Walked separately from `scan()` because that
+    sibling function's own `last_file` tracks its own issue-only RX_FILE,
+    not this hook's broader RX_CREATE (which also discharges on a PR-create
+    call) -- so its index cannot be reused directly for this comparison.
+    """
+    last = -1
+    i = 0
+    try:
+        with open(path, errors="ignore") as fh:
+            for line in fh:
+                i += 1
+                try:
+                    m = json.loads(line)
+                except Exception:
+                    continue
+                blocks = (m.get("message") or {}).get("content") or m.get("content") or []
+                if not isinstance(blocks, list):
+                    continue
+                for b in blocks:
+                    if not isinstance(b, dict) or b.get("type") != "tool_use":
+                        continue
+                    blob = (b.get("name") or "") + " " + json.dumps(b.get("input") or {})
+                    if RX_CREATE.search(blob):
+                        last = i
+    except Exception:
+        pass
+    return last
 
 
 def main() -> int:
@@ -155,7 +234,7 @@ def main() -> int:
     try:
         payload = json.load(sys.stdin)
         transcript_path = payload.get("transcript_path") or ""
-        _, _, text = scan(transcript_path)
+        _, last_say, text = scan(transcript_path)
     except Exception:
         return 0  # fail open
 
@@ -166,15 +245,13 @@ def main() -> int:
     if not label:
         return 0
 
-    # A create call ran ANYWHERE in this turn's transcript -- reread it raw
-    # rather than trusting `scan`'s single last-text return, since the idea
-    # may be filed by a tool call that ran after the FLAG/OFFER text itself.
-    try:
-        with open(transcript_path, errors="ignore") as fh:
-            raw = fh.read()
-    except Exception:
-        raw = ""
-    if RX_CREATE.search(raw):
+    # Turn-scoped: a create call only discharges when it ran AT OR AFTER the
+    # message carrying the FLAG/OFFER, the same `last_file`/`last_say`
+    # ordering the sibling hooks use. An earlier revision searched the whole
+    # transcript, so an unrelated filing anywhere earlier in the session
+    # silenced every later, unrelated idea for the rest of that session.
+    last_create = _last_create_index(transcript_path)
+    if last_create > last_say:
         return 0
 
     key = hashlib.sha256(text.encode()).hexdigest()[:16]

@@ -13,7 +13,7 @@ The Write tool passes bytes through unchanged, and it succeeds or fails on its o
 A heredoc fails in two ways the Write tool cannot:
 
 - **The body is transformed.**
-  Doubled backslashes collapse in transit (everything below this section).
+  Doubled backslashes collapse in transit.
 - **The body is silently never written.**
   When a hook denies the Bash call carrying the heredoc, no segment of that call runs, so the file keeps whatever an earlier step left there.
   A later `-F` then ships that stale content (see [`claude-code-hooks.md`](../../memories/claude-code-hooks.md)'s whole-call deny section).
@@ -26,8 +26,8 @@ A heredoc stays fine for a short, plain-ASCII body with no backslashes and no ba
 - **Do:** use Write or Edit for any content carrying a backslash, a backtick, code, or more than a few lines, and hand the command a file path.
 - **Do:** give the scratch file a unique, task-specific name, so a denied or skipped write can never hand a later command a stale file.
 - **Don't:** embed a patch script, regex, commit message or PR body in a heredoc.
-- **Don't:** treat the `chr(92)` workarounds below as the default route.
-  They are for the rare case where a heredoc is genuinely unavoidable.
+- **Don't:** treat building backslashes with `chr(92)` or a placeholder token as the default route.
+  That workaround is for the rare case where a heredoc is genuinely unavoidable.
 
 (2026-09-28: the user asked whether heredocs should be avoided, since they kept mangling content, and handed the call over with `daytb`.
 Both sides of the pair are inferred from that session's two failures.

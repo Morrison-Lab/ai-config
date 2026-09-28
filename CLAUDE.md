@@ -10,8 +10,9 @@ Worked-example case records for the rules below live in
 [`CLAUDE.cases.md`](CLAUDE.cases.md), moved out of this auto-loaded context.
 
 <!--
-Some sections below pull their body from a fragment in `shared/` via Claude
-Code's `@path` import (e.g. `@shared/workflow/run-ums-proactively.md`). Those fragments
+Some sections below summarize a fragment in `shared/` and link it rather than
+`@`-importing it, since every import counts toward Claude Code's always-loaded
+instruction limit (see scripts/check-context-closure.py). Those fragments
 are the single source of truth for guidance shared with the UCD-SERG lab manual,
 which transcludes the same files. Edit the fragment, not the inlined copy, and
 keep fragments ASCII (write `---` for em-dashes) so the manual's character check
@@ -20,10 +21,10 @@ passes. See README.md, "Shared content".
 
 ## Run UMS proactively, as learnings accumulate
 
-@shared/workflow/run-ums-proactively.md
+[`shared/workflow/run-ums-proactively.md`](shared/workflow/run-ums-proactively.md) (linked, not imported: read it whenever a pass may be owed)
 
 Don't wait for `/clear`, a wrap-up step, or a merge to run `ums` (Update Memories and Skills) --- run it the moment a learning shows up: a corrected mistake, a new preference, a tool quirk, a workflow gap.
-The fragment above walks through the specific moments this gets skipped even by someone trying to follow the rule --- an offer to run it standing in for running it, a new instruction preempting an owed pass, a recommendation to `/clear` or start fresh while a pass is still owed, a PR-count worry used to justify deferring it, a corrected belief or a corrected false state-claim that never gets banked because nothing merged, reading a review and treating ARD work as the pass, answering a questioned claim ("are you sure about that?") with the corrected fact so nothing looks like an admission, and a pause that ends the turn with the pass still owed, waiting on CI, a review round, or an answer from the user --- and gives the fix for each: run the pass now, delegate it as pre-authorized sidecar work, and report it in the past tense rather than announcing an intention.
+The fragment walks through the specific moments this gets skipped even by someone trying to follow the rule --- an offer to run it standing in for running it, a new instruction preempting an owed pass, a recommendation to `/clear` or start fresh while a pass is still owed, a PR-count worry used to justify deferring it, a corrected belief or a corrected false state-claim that never gets banked because nothing merged, reading a review and treating ARD work as the pass, answering a questioned claim ("are you sure about that?") with the corrected fact so nothing looks like an admission, and a pause that ends the turn with the pass still owed, waiting on CI, a review round, or an answer from the user --- and gives the fix for each: run the pass now, delegate it as pre-authorized sidecar work, and report it in the past tense rather than announcing an intention.
 
 ## Record both the pattern and the anti-pattern
 
@@ -67,8 +68,11 @@ Detail, rationale, and cases: [`shared/workflow/status-requests-act.md`](shared/
 
 ## Flag good moments to `/clear` in long-running sessions
 
-@shared/workflow/flag-session-boundaries.md
+[`shared/workflow/flag-session-boundaries.md`](shared/workflow/flag-session-boundaries.md) (linked, not imported: read it before declaring a stopping point)
 
+Every message that ends a turn or a stretch of work states `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`.
+Before every non-clean pause, arm a timer or other wake that resumes the next step, and report when it fires.
+Exception: when a harness posts the final message somewhere and no person reads the session turn by turn (a CI or `@claude` workflow run), put the declaration inside the substantive reply or omit it, never after it, since the harness keeps only the last message ([rme#1081](https://github.com/d-morrison/rme/issues/1081)).
 Proactively flag a good stopping point with the `⚠️ **FLAG** ---` tag.
 This could be a checkpointed or wrapped multi-step task, a PR merged with no other in-flight work on this conversation, or an open question answered with nothing pending.
 Place the tag at the natural end of that turn's recap (or immediately before a `wrap-up` report) rather than mid-task.
@@ -78,7 +82,7 @@ Default to archive-and-start-new over a bare `/clear` whenever the session might
 
 ## Flag good moments to run `compress-session`, too
 
-The mid-task counterpart is covered in the fragment above.
+The mid-task counterpart is covered in [`flag-session-boundaries`](shared/workflow/flag-session-boundaries.md#flag-good-moments-to-run-compress-session-too)'s section of the same name.
 Don't wait for automatic compaction to guess what matters.
 Flag it yourself (using the same `⚠️ **FLAG** ---` tag) once a session has grown large with a live task still in flight.
 This applies when there are many tool calls, long tool outputs no longer needed, or a session is already through one auto-compaction.
@@ -330,8 +334,11 @@ Covers marketplace verification, permission review, avoiding redundant submodule
 
 ## File an issue before starting a new task
 
-@shared/workflow/issue-first.md
+[`shared/workflow/issue-first.md`](shared/workflow/issue-first.md) (linked, not imported: read it before filing or deferring)
 
+Before branching, editing, or opening a PR for new work, search the tracker across all states (`gh issue list --state all --search`, `glab issue list --all --search`) and file an issue if none covers the task;
+surface a closed match and confirm rather than redoing the work.
+Label every agent-filed issue `ai-authored` and `model:<model-id>` in the creating command.
 The `st` (Start Task) skill operationalizes this; `gi` (Grab Issue) is the path when the issue already exists.
 
 Its last section is the mirror, and it covers requests that arrive rather than work you go looking for: a request the user makes mid-flight may be deferred on your own judgment when it would grow the change past what it set out to do, provided the deferred item is filed as an issue in the same reply and the reply says what was deferred and why.
@@ -403,7 +410,7 @@ Detail, rationale, and cases: [`shared/workflow/wrap-up-merged-pr.md`](shared/wo
 
 ## When you revert a merge, reopen its issue
 
-@shared/workflow/revert-merge.md
+[`shared/workflow/revert-merge.md`](shared/workflow/revert-merge.md)
 
 GitHub does not automatically reopen the issue a reverted PR closed.
 Reopen it explicitly (`gh issue reopen <issue-number>`).
@@ -600,7 +607,8 @@ More generally --- not just inside the named heavy skills --- always look for op
 When a task turns out to be workflow-shaped (decomposable, verification-bearing, and at a scale that earns it --- see the fragment's criteria), say so and propose a workflow even if no skill mandated one.
 The same opt-in gate still applies: propose with a cost estimate and wait unless an opt-in signal is already present.
 
-@shared/workflow/when-to-orchestrate.md
+[`shared/workflow/when-to-orchestrate.md`](shared/workflow/when-to-orchestrate.md) (linked, not imported) carries the criteria, the shared-runner exception, and per-agent model and effort routing;
+read it before launching or proposing a workflow, and before choosing a dispatched agent's model.
 
 ## Agent teams: a third parallelism primitive, human-gated and advisory
 

@@ -58,11 +58,10 @@ A list of banned phrases is illustrative of that conflation, not the
 definition of it --- rewording around a listed phrase while still describing
 the paradigm as a property of the model is still the conflation, so read the
 examples as instances, not as the check itself.
-Applying the corpus's no-gameable-rules principle here (`shared/principles/no-gameable-rules.md`,
-[PR #4047](https://github.com/Morrison-Lab/ai-config/pull/4047), not yet
-merged as of this writing): key the rule to *whether structure and method
-are conflated*, so that no rewording of a banned phrase can satisfy the
-letter of a phrase list while still attaching a paradigm to the model.
+Applying the corpus's [`no-gameable-rules`](../principles/no-gameable-rules.md)
+principle here: key the rule to *whether structure and method are
+conflated*, so that no rewording of a banned phrase can satisfy the letter
+of a phrase list while still attaching a paradigm to the model.
 
 With that said, the commonest surface form of the conflation is a paradigm
 adjective modifying the model noun, each of these attaching a paradigm to
@@ -113,8 +112,8 @@ mention of a prior.
   regression model", only a regression model fitted using Bayesian
   inference.
 - **Don't:** give a paradigm-prefixed model name, such as "Bayesian
-  regression", as an example of a kind of model (inferred from the incident
-  below).
+  regression", as an example of a kind of model (inferred from the
+  `Morrison-Lab/pds#12` incident this fragment records).
 
 ## Incident
 

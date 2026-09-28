@@ -131,7 +131,9 @@ RX_CREATE = re.compile(
 
 
 def find_unfiled_idea(text):
-    """Return the matched marker text, or None if every FLAG/OFFER is filed."""
+    """Return the matched marker text (e.g. "FLAG" or "OFFER"), or None if
+    every FLAG/OFFER is filed.
+    """
     stripped = visible_prose(text) if visible_prose else text
     for m in MARKER.finditer(stripped):
         kind = m.group("kind")
@@ -142,7 +144,7 @@ def find_unfiled_idea(text):
         window = kind + body
         if RX_ALREADY.search(window) or RX_ALREADY_URL.search(window):
             continue
-        return kind.split("**")[1] if "**" in kind else kind
+        return "OFFER" if is_offer else "FLAG"
     return None
 
 
@@ -184,9 +186,10 @@ def main() -> int:
     except Exception:
         pass
 
+    article = "an" if label == "OFFER" else "a"
     print(json.dumps({"systemMessage": (
-        f"Your reply raises an idea in a {label} with no issue or PR filed "
-        "for it in this transcript. Per "
+        f"Your reply raises an idea in {article} {label} block with no "
+        "issue or PR filed for it in this transcript. Per "
         "shared/workflow/report-mistakes-proactively.md's 'An idea is filed "
         "the same way a mistake is', a chat-only FLAG or OFFER is a "
         "heads-up, not a filing -- file it now (dupe-check, then "

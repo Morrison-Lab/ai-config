@@ -72,6 +72,7 @@ Detail, rationale, and cases: [`shared/workflow/status-requests-act.md`](shared/
 
 Every message that ends a turn or a stretch of work states `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`.
 Before every non-clean pause, arm a timer or other wake that resumes the next step, and report when it fires.
+Exception: when a harness posts the final message somewhere and no person reads the session turn by turn (a CI or `@claude` workflow run), put the declaration inside the substantive reply or omit it, never after it, since the harness keeps only the last message ([rme#1081](https://github.com/d-morrison/rme/issues/1081)).
 Proactively flag a good stopping point with the `⚠️ **FLAG** ---` tag.
 This could be a checkpointed or wrapped multi-step task, a PR merged with no other in-flight work on this conversation, or an open question answered with nothing pending.
 Place the tag at the natural end of that turn's recap (or immediately before a `wrap-up` report) rather than mid-task.

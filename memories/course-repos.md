@@ -50,3 +50,13 @@ until someone makes that decision and retires the graded item.
 (Ezra, 2026-09-28: "it's ok for exercises to migrate from mlg to the lecture-notes repos, if we think they would be better to include in the notes than reserve them for evaluation materials";
 "and not just from mlg; from any evaluation-material repo (e.g. epi204)";
 "we just need to be intentional about what we migrate, and not do it accidentally".)
+
+## Where the book PDFs for a course's reading shelf come from
+
+The user keeps a collection of textbook PDFs in `G:\My Drive\Texts 2` on their Windows machine (the XPS).
+A cloud session cannot read that folder, but the user can open a Remote Control session there on request.
+Copying a book from it into a course's reading-shelf repository (`Morrison-Lab/mlr` for the machine learning course) is pre-authorized, as needed (the user, 2026-09-28).
+Only the reading-shelf repo, never the notes or graded-material repos, since the books are copyrighted.
+
+- **Do:** ask the user for the Remote Control session when a task needs a book's text, and copy just the books the task needs into the reading-shelf repo.
+- **Don't:** copy a book into the notes repo or the graded-material repo.

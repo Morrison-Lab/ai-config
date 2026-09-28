@@ -277,6 +277,64 @@ check(
     out,
 )
 
+# Load-bearing case, from the re-review: cancelled X, then an IN-PROGRESS
+# run Z, then a successful run Y. The walk must stop at Z -- the first
+# non-cancelled run -- rather than skip an unfinished run to reach a later
+# success. Z's own conclusion is None while in progress, so this also
+# guards against a bare `next_run.get("conclusion") == "success"` read
+# quietly passing on missing data.
+IN_PROGRESS_RUN_Z = {
+    **workflow_run(
+        "Quarto Publish", 42, SHA_OTHER, None, "2026-09-01T00:02:00Z"
+    ),
+    "status": "in_progress",
+}
+assert IN_PROGRESS_RUN_Z["conclusion"] is None
+mod.run_gh = fake_gh_branch_runs([SUCCESS_RUN_Y, IN_PROGRESS_RUN_Z])
+try:
+    code, out = capture_evaluate([CANCELLED_RUN_B], repo="acme/widgets")
+finally:
+    mod.run_gh = original_run_gh
+check(
+    "cancelled X, in-progress Z, successful Y: X is NOT clean -- Z is "
+    "unresolved, so X cannot be read as superseded-clean via Y",
+    code == mod.NOT_CLEAN_EXIT,
+    out,
+)
+check(
+    "the report names Z as still in progress",
+    SHA_OTHER[:8] in out and "in_progress" in out,
+    out,
+)
+check(
+    "the report does NOT claim X was superseded-clean via Y",
+    "superseded by" not in out,
+    out,
+)
+
+# A "skipped" successor counts exactly as OK_CONCLUSIONS says it does --
+# consistent with every other run this script reads, not held to a
+# stricter bar just because it is the successor in case (b).
+SKIPPED_RUN_Y = workflow_run(
+    "Quarto Publish", 42, SUCCESS_RUN_Y["head_sha"], "skipped", "2026-09-01T00:03:00Z"
+)
+mod.run_gh = fake_gh_branch_runs([SKIPPED_RUN_Y])
+try:
+    code, out = capture_evaluate([CANCELLED_RUN_B], repo="acme/widgets")
+finally:
+    mod.run_gh = original_run_gh
+check(
+    "cancelled X, successor Y concludes 'skipped': X is clean with a note "
+    "(skipped is in OK_CONCLUSIONS, same as everywhere else in this script)",
+    code == 0,
+    out,
+)
+check(
+    "the note names the skipped conclusion explicitly",
+    "skipped" in out and "superseded" in out,
+    out,
+)
+
 # Without `repo=`, case (b) is never attempted -- offline callers get the
 # conservative (not-clean) answer rather than a network call they did not
 # ask for.

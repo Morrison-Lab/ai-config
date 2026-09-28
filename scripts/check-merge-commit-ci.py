@@ -72,24 +72,37 @@ concurrency group when `1d5b337` was pushed a minute later, and
     clean, silently, mirroring `check-pr-fully-clean.py`'s identical
     handling (ai-config#2277) rather than reimplementing a second
     incompatible rule for the same shape.
-(b) The NEXT completed run of the same workflow on the same branch after
-    this cancelled one -- not the next SUCCESS. Given cancelled X, failed
-    Z, then successful Y in that order, X is reported NOT clean, naming Z,
-    because Z is the run that actually answers "did the change X carried
-    pass" -- a success-only query would silently skip Z and report X
-    "superseded by Y (success)" instead. A chain of cancellations (X, then
-    W, also cancelled by a still-newer push) is walked past rather than
-    treated as an answer, so the same rule reaches through as many
-    cancellations as it takes to find a real completed run. When that run
-    succeeded, X is treated as clean, with an explicit "superseded by
-    <sha> (success)" note in the output -- never silently, since the SHA
+(b) The NEXT run of the same workflow on the same branch after this
+    cancelled one -- not the next SUCCESS, and not the next COMPLETED run
+    either.
+    Not the next success: given cancelled X, failed Z, then successful Y
+    in that order, X is reported NOT clean, naming Z, because Z is the run
+    that actually answers "did the change X carried pass" -- a
+    success-only query would silently skip Z and report X "superseded by
+    Y (success)" instead.
+    Not the next completed run: given cancelled X, in-progress Z, then
+    successful Y, X is reported NOT clean, naming Z as still unresolved --
+    skipping past an unfinished Z to reach Y would report X clean while Z
+    has not actually finished. This reports the same exit code
+    (`NOT_CLEAN_EXIT`) as an ordinary in-progress run elsewhere in this
+    script, rather than `NO_RUNS_EXIT`: a run exists here, it just has not
+    resolved yet, which is a different situation from no run existing for
+    the SHA being checked at all.
+    A chain of cancellations (X, then W, also cancelled by a still-newer
+    push) is walked past rather than treated as an answer, so the same
+    rule reaches through as many cancellations as it takes to find the
+    first run that is not itself cancelled. When that run's conclusion is
+    in `OK_CONCLUSIONS` (success, or a deliberate skip -- judged by the
+    SAME set as every other run this script reads, not a stricter one), X
+    is treated as clean, with an explicit "superseded by <sha>
+    (<conclusion>)" note in the output -- never silently, since the SHA
     actually being reported on did not itself produce a passing run. This
-    is a judgment call, made here because the next run's own result
-    (success or failure) is a more direct answer about the branch state X
-    merged into than X's own cancellation was; note that the check against
-    a branch's CURRENT head (no next run possible, since nothing is later)
-    is still the one that matters for the "is `main` OK right now"
-    question this script exists to answer.
+    is a judgment call, made here because the next run's own result is a
+    more direct answer about the branch state X merged into than X's own
+    cancellation was; note that the check against a branch's CURRENT head
+    (no next run possible, since nothing is later) is still the one that
+    matters for the "is `main` OK right now" question this script exists
+    to answer.
 """
 from __future__ import annotations
 
@@ -210,25 +223,35 @@ def find_same_sha_success(cancelled: Dict[str, Any], runs: List[Dict[str, Any]])
     return None
 
 
-def find_next_completed_branch_run(
+def find_next_branch_run(
     repo: str, cancelled: Dict[str, Any]
 ) -> Optional[Dict[str, Any]]:
-    """Case (b): the NEXT completed run of the same workflow on the same
-    branch, after this cancelled one.
+    """Case (b): the run of the same workflow, on the same branch, that
+    actually follows this cancellation and can answer what happened next.
 
     Deliberately not "the next SUCCESS" -- querying for `status=success`
     alone would silently skip an intervening failure. Given cancelled X,
     failed Z, successful Y in that order, a success-only query returns Y
     and reports X "superseded by Y (success)" with Z's failure invisible.
-    Fetching every conclusion and walking chronologically is what lets the
-    caller see Z and report X not-clean because of it, rather than because
-    of anything about X's own (cancelled) run.
+
+    Just as deliberately not "the next COMPLETED run" either: a still
+    queued/in-progress run is exactly as relevant as a finished one -- it
+    means "not resolved yet", which the caller must report as such rather
+    than skip past to whatever finishes after it. Given cancelled X,
+    in-progress Z, successful Y, walking past Z because it has not
+    completed and returning Y would report X clean while Z's outcome is
+    still unknown. Fetching every conclusion, walking chronologically, and
+    stopping at the first non-cancelled run regardless of its status is
+    what lets the caller see Z either way.
 
     Other CANCELLED runs are skipped when walking forward, not treated as
     the answer: a chain of cancellations (X cancelled, then W also
     cancelled by a still-newer push) supersedes across the whole chain,
     and W is exactly as uninformative about "is main OK" as X's own
-    cancellation was.
+    cancellation was. A `cancelled` conclusion only ever appears on a
+    `completed` run -- GitHub sets `conclusion` only once a run finishes --
+    so `conclusion == "cancelled"` is the one case skipped regardless of
+    `status`.
     """
     workflow_id = cancelled.get("workflow_id")
     branch = cancelled.get("head_branch")
@@ -259,8 +282,6 @@ def find_next_completed_branch_run(
     ]
     later.sort(key=lambda r: r.get("created_at", ""))
     for r in later:
-        if r.get("status") != "completed":
-            continue
         if r.get("conclusion") == "cancelled":
             continue
         return r
@@ -321,28 +342,56 @@ def evaluate(runs: List[Dict[str, Any]], repo: Optional[str] = None) -> int:
             if find_same_sha_success(run, runs) is not None:
                 continue
             # Case (b): a later commit on the same branch superseded this
-            # one via a concurrency group. Read the NEXT completed run on
-            # that branch, not the next SUCCESS -- an intervening failure
-            # between this cancellation and a later success must not be
-            # skipped over. Reported explicitly either way, never
+            # one via a concurrency group. Read the NEXT run on that
+            # branch (skipping only further cancellations), not the next
+            # SUCCESS and not the next COMPLETED run -- an intervening
+            # failure must not be skipped over to reach a later success,
+            # and an intervening run that has not finished yet must not be
+            # skipped over either (that would report X clean via a later
+            # success while the actual next run's outcome is still
+            # unknown). Reported explicitly in every branch, never
             # silently, since this exact SHA did not itself produce a
             # passing run.
             if repo is not None:
-                next_run = find_next_completed_branch_run(repo, run)
+                next_run = find_next_branch_run(repo, run)
                 if next_run is not None:
                     next_sha = (next_run.get("head_sha") or "")[:8]
-                    if next_run.get("conclusion") == "success":
+                    next_url = next_run.get("html_url", "")
+                    if next_run.get("status") != "completed":
+                        # Not exit 3 (NO_RUNS_EXIT): that code means no run
+                        # exists at all for the SHA being checked. Here a
+                        # run exists and is simply unresolved, which is the
+                        # same "still in progress" shape the direct
+                        # (non-superseded) in-progress case above already
+                        # reports as NOT_CLEAN_EXIT -- this matches it
+                        # rather than inventing a second convention.
+                        not_clean.append(
+                            f"  - {name}: cancelled on this SHA; the next "
+                            f"run on this branch ({next_sha}) is still "
+                            f"{next_run.get('status')} -- not yet resolved, "
+                            f"so this cannot be read as superseded-clean "
+                            f"{next_url}"
+                        )
+                        continue
+                    # `next_run`'s conclusion is judged by the SAME
+                    # OK_CONCLUSIONS set as any other run in this script
+                    # (so a "skipped" successor counts as clean too, not
+                    # only "success") -- there is no stated reason for a
+                    # successor to be held to a stricter bar than every
+                    # other run this script reads.
+                    next_conclusion = next_run.get("conclusion")
+                    if next_conclusion in OK_CONCLUSIONS:
                         notes.append(
                             f"  - {name}: cancelled on this SHA, but "
-                            f"superseded by {next_sha} (success) -- "
-                            "treated as clean"
+                            f"superseded by {next_sha} ({next_conclusion}) "
+                            "-- treated as clean"
                         )
                         continue
                     not_clean.append(
                         f"  - {name}: cancelled on this SHA; the next run "
                         f"on this branch ({next_sha}) concluded "
-                        f"'{next_run.get('conclusion')}', not success -- "
-                        f"NOT superseded-clean {next_run.get('html_url', '')}"
+                        f"'{next_conclusion}', not success -- NOT "
+                        f"superseded-clean {next_url}"
                     )
                     continue
         not_clean.append(f"  - {name}: conclusion={conclusion} {url}")

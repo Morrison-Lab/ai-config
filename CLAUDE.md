@@ -1869,5 +1869,6 @@ Granted by the user (dougmor@gmail.com) on 2026-09-28, for all sessions and all 
   When it refuses, show the exact change and ask the user to approve it
   (switching the session out of auto mode lets them approve it directly).
 
-- **Do:** push, and open the PR, without asking; say in the same reply what you pushed and where.
+- **Do:** push, and open the PR, without asking,
+  and say in the same reply what you pushed and where.
 - **Don't:** read "push" as covering a force push, a merge, or bypassing a tool's permission check.

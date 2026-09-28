@@ -8,6 +8,9 @@ See [`memories/mention-triggers.md`](../../memories/mention-triggers.md).
 
 **Quota-skipped:** surfaces as a bot comment --- either `Claude review skipped --- API quota exhausted` (the review workflow) or `You've hit your org's monthly spend limit` (the agent workflow).
 Both mean no bot will respond on this run; re-running the workflow only helps once the quota actually resets.
+A second reviewer's quota-skip carries the same shape but a different tell: `copilot-pull-request-reviewer` posts a normal-looking `COMMENTED` review, with a real `commit_id` and timestamp, whose entire body is *"Copilot was unable to review this pull request because the user who requested the review has reached their quota limit."* --- a check keyed on "did a review object land on this head" reads it as a review;
+only the body distinguishes it (see [`review-verdict-pitfalls.md`](review-verdict-pitfalls.md)'s quota-refusal case and [`memories/github-mcp-tools.md`](../../memories/github-mcp-tools.md)'s `request_copilot_review` note).
+
 The reset date is not the only way out: the user can usually switch the repository's review OAuth token to another account, so ask them to, in the same reply that reports the skip, and re-run the review once they have.
 Waiting days for a reset, with a PR held on its review, is the worse default.
 
@@ -18,8 +21,6 @@ Waiting days for a reset, with a PR held on its review, is the worse default.
 "I switched gha's oauth key to a different account;
 I can usually do that if you ask.
 reviews should work now".)
-A second reviewer's quota-skip carries the same shape but a different tell: `copilot-pull-request-reviewer` posts a normal-looking `COMMENTED` review, with a real `commit_id` and timestamp, whose entire body is *"Copilot was unable to review this pull request because the user who requested the review has reached their quota limit."* --- a check keyed on "did a review object land on this head" reads it as a review;
-only the body distinguishes it (see [`review-verdict-pitfalls.md`](review-verdict-pitfalls.md)'s quota-refusal case and [`memories/github-mcp-tools.md`](../../memories/github-mcp-tools.md)'s `request_copilot_review` note).
 
 **Provider quotas reset independently, and each has to be checked on its own, not inferred from another provider's state.**
 [`memories/copilot-reviews.md`](../../memories/copilot-reviews.md) already records that Copilot and `claude-review` **fail** independently (one quota-dead does not mean the other is);

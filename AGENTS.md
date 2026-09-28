@@ -46,16 +46,16 @@ authority remains governed by the strict merge policy below.
 
 Do not infer membership from a public repository, prior contributions, a fork,
 organization membership, technical write access, available credentials,
-collaborator access elsewhere, or the ability to post.
+collaborator access elsewhere, or the ability to post ---
+with one exception: for non-force pushes and PRs only, the user's own push access does count,
+per [`use-existing-pr-branch`](shared/workflow/use-existing-pr-branch.md)'s standing permissions (user grant, 2026-09-28).
+That exception does not extend to comments, issues, or other communication,
+which still need membership or explicit approval.
 `/daytb`, `away`, default-to-action rules,
 and standing authorization to open PRs or file issues
 do not grant permission to communicate with a non-member repository.
 This gate takes precedence
 over automatic filing, PR-opening, review, and follow-up rules.
-One exception, granted by the user on 2026-09-28:
-push access the user holds counts as positive verification for non-force pushes and PRs,
-per [`use-existing-pr-branch`](shared/workflow/use-existing-pr-branch.md)'s standing permissions.
-Comments, issues and other communication still need membership or explicit approval.
 
 ## Graph and display equation defaults
 

@@ -75,6 +75,23 @@ proposal phrased unusually and catch a risk note that happens to share a
 word ("consider", "worth") with a real proposal. A block on a guess this
 loose would be worse than the omission it exists to catch.
 
+LEXICAL LIMITS
+--------------
+- IDEA_CUE is checked only against the 400 characters immediately following
+  a FLAG/OFFER marker (MARKER's `body` group), not the whole message -- a
+  cue sitting past that window goes undetected. This is a known limit, not
+  desired behaviour: a marker whose proposal is stated more than 400
+  characters after the marker itself reads, to this hook, the same as a
+  marker with no proposal at all.
+- IDEA_CUE's phrase-bound forms (`could`/`should`, the mechanism/sweep/
+  follow-up/improvement patterns below) are deliberately narrow rather than
+  bare words, for the same reason `could`/`should` are phrase-bound: a bare
+  mechanism/sweep/follow-up/propose/improvement word-stem match (no
+  surrounding proposal phrase required) fires on ordinary status and
+  negated text ("the retry mechanism failed twice", "I already ran a sweep
+  and found nothing", "no improvement over the previous run"), none of
+  which propose anything.
+
 WHAT THIS HOOK CANNOT SEE, AND WHY THE RULE STILL COVERS IT
 -------------------------------------------------------------
 This hook is lexical: it can only warn on a FLAG or OFFER that was actually
@@ -135,27 +152,45 @@ MARKER = re.compile(
 
 # Vocabulary a FLAG or OFFER needs to read as proposing an idea rather than
 # merely naming a risk, a status, or routine continuation work. Deliberately
-# broad -- this only gates a WARN, and a marker that trips it and isn't
-# actually idea-shaped costs one line of context, not a blocked turn.
+# broad in SHAPE -- this only gates a WARN, and a marker that trips it and
+# isn't actually idea-shaped costs one line of context, not a blocked turn --
+# but every alternative below is phrase-bound to a proposal form rather than
+# a bare word, because a bare word fires on ordinary status and negated text.
 #
 # `could`/`should` are phrase-bound (a subject pronoun or "it"/"this"/"that"
 # right before, or a build/file/track-shaped verb right after), not bare
 # words -- a bare `\bcould\b` fired on an ordinary time estimate like "review
 # could take a while", which names a risk, not a proposal.
+#
+# `mechanism`, `improvement`, `propose`, `sweep`, and `follow-up` are
+# phrase-bound the same way, for the identical reason: an earlier revision
+# matched each as a bare word (`\bmechanisms?\b`, `\bimprovements?\b`,
+# `\bpropos\w*`, `\bsweep\w*`, `\bfollow-?up\b`) and fired on "the retry
+# mechanism in the deploy script failed twice this run", "I already ran a
+# sweep of the repo for TODOs and found three, all pre-existing", and "no
+# improvement over the previous run" -- a status report, a completed and
+# unproductive sweep, and a negated result, none of them proposals.
+#
+# The `worth ...` alternative below deliberately has NO bare `\ba\b` branch:
+# an earlier revision's `worth\s+(?:...|a\b)` matched "isn't worth a redo",
+# "worth a shot re-running", and "isn't worth a rewrite" -- every one of
+# those a dismissal, not a proposal. `worth an improvement` is its own,
+# separately phrase-bound alternative rather than folded into that list.
 IDEA_CUE = re.compile(
     r"\b(?:we|you|i|it|this|that)\s+(?:could|should)\b|"
     r"\b(?:could|should)\s+(?:add|build|extend|automate|file|create|propose|sweep|track)\b|"
-    r"\bworth\s+(?:building|adding|doing|tracking|filing|an\s+issue|a\b)|"
+    r"\bworth\s+(?:building|adding|doing|tracking|filing|an\s+issue)\b|"
+    r"\bworth\s+an?\s+improvement\b|"
     r"\bconsider\s+(?:building|adding)\b|"
     r"\ba\s+mechanism\s+(?:to|for)\b|"
-    r"\bmechanisms?\b|"
-    r"\bimprovements?\b|"
-    r"\bpropos\w*|"
-    r"\bsweep\w*|"
-    r"\bfollow-?up\b|"
+    r"\b(?:add(?:ing)?|build(?:ing)?|create(?:ing)?)\b(?:\s+\S+){0,3}\s+mechanisms?\b|"
+    r"\bpropos(?:e|ing)\b|"
+    r"\ba\s+sweep\s+for\b|"
+    r"\b(?:file|open)\s+a\s+follow-?up\b|"
+    r"\ba\s+follow-?up\s+(?:issue|item)\b|"
     r"\bit\s+would\s+(?:help|let)\b|"
-    r"\badd(?:ing)?\s+a\s+(?:check|hook|mechanism)\b|"
-    r"\bbuild\w*\s+a\s+(?:hook|mechanism|check)\b|"
+    r"\badd(?:ing)?\s+a\s+(?:check|hook)\b|"
+    r"\bbuild\w*\s+a\s+(?:hook|check)\b|"
     r"\bissue-worthy\b",
     re.I,
 )
@@ -247,11 +282,18 @@ def main() -> int:
 
     # Turn-scoped: a create call only discharges when it ran AT OR AFTER the
     # message carrying the FLAG/OFFER, the same `last_file`/`last_say`
-    # ordering the sibling hooks use. An earlier revision searched the whole
-    # transcript, so an unrelated filing anywhere earlier in the session
-    # silenced every later, unrelated idea for the rest of that session.
+    # ordering the sibling hooks use. `>=`, not `>`: a single JSONL line can
+    # hold both the FLAG/OFFER text and the filing tool_use in the same
+    # content array (one turn, no intervening message), in which case
+    # `_last_create_index()` and `scan()`'s `last_say` return the SAME index
+    # -- a strict `>` would treat that same-message filing as not yet having
+    # happened, which contradicts this comment's own "AT OR AFTER" and the
+    # module docstring's DISCHARGE section. An earlier revision searched the
+    # whole transcript instead of comparing indices at all, so an unrelated
+    # filing anywhere earlier in the session silenced every later, unrelated
+    # idea for the rest of that session.
     last_create = _last_create_index(transcript_path)
-    if last_create > last_say:
+    if last_create >= last_say:
         return 0
 
     key = hashlib.sha256(text.encode()).hexdigest()[:16]

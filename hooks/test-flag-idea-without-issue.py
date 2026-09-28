@@ -126,6 +126,66 @@ CASES = [
     )], False,
      "report-mistakes-proactively.md's own Don't bullet, quoted "
      "verbatim, does not self-trigger"),
+
+    # BARE-WORD FALSE POSITIVES (mechanism/sweep/improvement/propose/
+    # follow-up) -- a status report, a completed sweep, and a negated
+    # result must not read as proposals just because they share a word
+    # with one.
+    ([say(
+        "⚠️ **FLAG** --- the retry mechanism in the deploy script "
+        "failed twice this run; investigating."
+    )], False,
+     "a status report naming an existing mechanism does not warn"),
+    ([say(
+        "⚠️ **FLAG** --- I already ran a sweep of the repo for "
+        "TODOs and found three, all pre-existing."
+    )], False,
+     "a completed, unproductive sweep does not warn"),
+    ([say(
+        "⚠️ **FLAG** --- performance is roughly the same; no "
+        "improvement over the previous run."
+    )], False,
+     "a negated 'no improvement' result does not warn"),
+
+    # BARE `worth a` FALSE POSITIVES -- a dismissal ("isn't worth a
+    # redo/rewrite") or a hedge ("worth a shot") is not a proposal.
+    ([say(
+        "⚠️ **FLAG** --- the migration script has some rough edges, "
+        "but isn't worth a redo at this point."
+    )], False, "'isn't worth a redo' does not warn"),
+    ([say(
+        "⚠️ **FLAG** --- the flaky test might pass now; worth a shot "
+        "re-running before we dig further."
+    )], False, "'worth a shot re-running' does not warn"),
+    ([say(
+        "⚠️ **FLAG** --- the module is awkward in places but isn't "
+        "worth a rewrite right now."
+    )], False, "'isn't worth a rewrite' does not warn"),
+
+    # THE 400-CHARACTER CUE WINDOW IS A KNOWN LIMIT, NOT DESIRED BEHAVIOUR:
+    # a cue past MARKER's `body` window goes undetected, and this case
+    # documents that gap rather than treating the miss as correct.
+    ([say(
+        "⚠️ **FLAG** --- " + ("this filler sentence pads the message. " * 12) +
+        "we could sweep the archive for stale entries."
+    )], False,
+     "KNOWN LIMIT: an idea-cue more than 400 characters past the marker "
+     "goes undetected, not because it isn't a proposal"),
+
+    # SAME-MESSAGE TEXT + TOOL_USE: a single JSONL line carrying both the
+    # FLAG/OFFER text and the filing tool_use in one content array is a
+    # same-turn filing, and `>=` (not `>`) must discharge it -- the
+    # docstring's own "AT OR AFTER" language requires the boundary to
+    # count as discharged.
+    ([{"type": "assistant", "message": {"content": [
+        {"type": "text", "text": (
+            "⚠️ **FLAG** --- we could sweep the docs for stale links."
+        )},
+        {"type": "tool_use", "input": {
+            "command": "gh issue create --title x --body y"}},
+    ]}}], False,
+     "a FLAG and its filing tool_use in the SAME message discharges "
+     "(>= boundary)"),
 ]
 
 

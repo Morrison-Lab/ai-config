@@ -118,6 +118,14 @@ without asking confirmation before every merge.
   rerunning, per [`fully-clean`](../../shared/workflow/fully-clean.md).
 - **Session Duration**: The grant expires automatically when the session ends
   or when explicitly revoked via `/mwc revoke` or `disable-mwc`.
+- **The grant covers the merge decision, not what happens on `main` after.**
+  A repo can run a workflow on `push` that never runs on the PR at all --- a
+  full or PDF render, a deploy ---
+  so a PR merged fully-clean under `mwc` can still turn `main` red.
+  `post-merge`'s step 1.1
+  ([`verify-merge-commit-ci`](../../shared/workflow/verify-merge-commit-ci.md))
+  is what checks that, and it is not optional under `mwc`:
+  an autonomous merge is not done until the merge commit's own workflow runs are read and green.
 
 ## Another session's PR: clean, and clean for twenty minutes
 

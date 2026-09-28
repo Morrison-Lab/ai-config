@@ -41,6 +41,36 @@ Confirm `state == MERGED` and `mergedAt` is set. If it isn't actually merged,
 **stop and report** — don't tidy a branch whose work hasn't landed. (The
 standing **never assume; always verify** rule applied to closing out a PR.)
 
+### 1.1. Verify CI passed on the merge commit itself, not only on the PR
+
+[`verify-merge-commit-ci`](../../shared/workflow/verify-merge-commit-ci.md)
+
+The PR's own CI being green proves nothing about a workflow that only runs
+on `push` to the base branch --- a full or PDF render, a deploy, a publish
+step.
+Take `<merge-sha>` from the PR's own `mergeCommit.oid`, not from
+`headRefOid` --- the head is the PR branch's last commit, and a squash or
+merge commit gets its own, different SHA on the base branch:
+
+```bash
+merge_sha=$(gh pr view <N> --json mergeCommit -q .mergeCommit.oid)
+python3 scripts/check-merge-commit-ci.py -R <owner>/<repo> --sha "$merge_sha"
+```
+
+Exit 0 is clean.
+Exit 1 means a run failed or is still in progress ---
+fix it before anything else,
+per [`fixing-mistakes-is-top-priority`](../../shared/workflow/fixing-mistakes-is-top-priority.md).
+Exit 3 means no workflow runs are attached to that SHA yet, which is not a clean verdict;
+retry, or schedule a check-in, rather than moving on.
+This step applies whether the merge happened under an explicit instruction or under an `mwc` grant ---
+the grant covers the merge decision, not what happens on `main` afterward.
+
+- **Do:** run this check against the merge commit before step 5's report,
+  every time, not only when a push-triggered workflow is already suspected.
+- **Don't:** read the PR's own green CI as covering a workflow that only
+  triggers on `push`.
+
 ### 1.25. Check for reviews that landed just before the merge
 
 A review can post after your last processed round and before the human merges.
@@ -933,6 +963,8 @@ Do-Confirm; per
 [`shared/workflow/skill-checklists.md`](../../shared/workflow/skill-checklists.md).
 
 - [ ] The merge actually landed (step 1's verification, not the notification).
+- [ ] Step 1.1's instrument ran against the merge commit and reported clean
+      (exit 0) --- not merely that the PR's own CI was green.
 - [ ] The local branch is tidied and `main` is fast-forwarded.
 - [ ] Every deferred item has a filed follow-up issue.
 - [ ] Step 3.75 ran `install-hooks.py --fix` on this ai-config merge, and the
@@ -978,6 +1010,10 @@ When this post-merge wrap-up completes the session's work **and no PR this sessi
 ## Anti-patterns
 
 - ❌ Deleting the branch before confirming the merge actually landed.
+- ❌ Reporting a merge done from the PR's own green CI without running step
+  1.1's instrument against the merge commit --- a push-only workflow (a full
+  or PDF render, a deploy) never ran on the PR at all
+  ([Morrison-Lab/mds#19](https://github.com/Morrison-Lab/mds/pull/19)).
 - ❌ Reaching for `git branch -D` (force) without checking why `-d` refused.
 - ❌ Running `-D` without comparing the local ref against the PR's merged
   head --- step 1 confirms the PR merged, and `-D` deletes whatever your

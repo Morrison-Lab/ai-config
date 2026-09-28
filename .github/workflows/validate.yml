@@ -423,10 +423,9 @@ jobs:
         #
         # The root file's CHARACTER CAP is the exception, and gates without
         # --strict (ai-config#897, #1258). It is not our budget but the
-        # harness's hard limit on the auto-loaded CLAUDE.md, past which that
-        # file is not loaded whole -- a failure that shows up nowhere else,
-        # since a rule that never loaded looks exactly like one that loaded
-        # and was obeyed. The cry-wolf objection above does not transfer:
+        # CLI's per-file limit on the auto-loaded CLAUDE.md, past which it
+        # warns at every launch (2.1.283 still loads the file whole;
+        # ai-config#4061). The cry-wolf objection above does not transfer:
         # this one is a cliff rather than a heuristic, it can only be crossed
         # by a PR that adds to CLAUDE.md, and the run prints the remaining
         # headroom every time so the wall is visible before it is hit.
@@ -445,6 +444,14 @@ jobs:
         # either -- the default is a round 100 KB policy line that no
         # fragment currently reaches, and the run prints the examined count
         # and every breach's headroom on each PR.
+        #
+        # The CLI TOTAL-LIMIT gate is the third exception (ai-config#4061).
+        # Claude Code warns at every launch once its instruction files pass
+        # a total it derives from the model's context window, 120,000 chars
+        # at the floor. The closure is gated, in the CLI's own character
+        # count, at that floor less a 20,000-char margin for the repo
+        # CLAUDE.md loaded alongside. Like the root cap, crossing it is a
+        # warning every session pays for, not a heuristic.
         #
         # It still exits non-zero on a dangling ANCHORED import (one written
         # on its own line), which is a defect rather than a size finding.

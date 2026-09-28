@@ -1232,7 +1232,8 @@ On 2026-09-28, `subscribe_pr_activity` returned `Could not subscribe to this PR.
 while PRs in the same repo opened under the user's account subscribed fine.
 The cause (author, app installation or something else) is not established.
 Four refusals and three successes is a pattern, not a rule.
-The session had taken over those PRs, the refusal went unnoticed, and the user merged mln#166 with no event reaching the session;
+The session had taken over six mln PRs from that other session, including mln#166, whose subscription apparently hit the same refusal.
+The refusals went unnoticed, and the user merged mln#166 with no event reaching the session;
 the user had to report the merge.
 
 - **Do:** read each `subscribe_pr_activity` result, and when it refuses, poll the PR from a scheduled check-in instead and say so.

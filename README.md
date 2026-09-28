@@ -333,9 +333,12 @@ python3 scripts/check-context-closure.py            # this repo's closure
 python3 scripts/check-context-closure.py --base ../consumer-repo
 ```
 
-The `--budget` total is advisory: it reports and exits 0 over it, serving as a trend line on every PR rather than a gate.
-Three things do gate, all without `--strict`.
-The root file's hard character cap (`--root-char-cap`, 150,000 -- the harness's own limit, past which the file is not loaded whole) and the per-fragment byte cap (`--fragment-cap`) both fail on the level.
+The closure's **total** gates against the Claude Code CLI's own instruction-file limit, counted the way the CLI counts (UTF-16 characters after frontmatter and block-level HTML comments are stripped).
+The CLI warns at every launch once the files it loads pass `max(120,000, per-file limit)` characters, where the per-file limit is `max(40,000, round(context_window * 0.05 * chars_per_token))` and `chars_per_token` is 3 for current models: 120,000 on a 200k-context model, 150,000 on a 1M-context one (ai-config#4061).
+The gate is the 120,000 floor (`--total-char-limit`) less 20,000 reserved for the repo `CLAUDE.md` loaded alongside (`--repo-margin`, set to `0` when measuring a consumer's own file).
+The `--budget` byte total is advisory: it reports and exits 0 over it, serving as a trend line, and its `--compare` form is the pin-bump report.
+Three more things gate, all without `--strict`.
+The root file's character cap (`--root-char-cap`, 150,000 -- the CLI's per-file limit on a 1M-context model) and the per-fragment byte cap (`--fragment-cap`) both fail on the level.
 The **growth ratchet** fails on the delta: under `--baseline REV`, once the root file sits at or above `--root-growth-gate-fraction` of its cap (0.90 by default), the branch may not grow it at all.
 Below that line the ratchet is inactive and reports so;
 `--no-root-growth-gate` turns it off for a caller whose baseline is not a merge base.

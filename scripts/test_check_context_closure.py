@@ -1276,5 +1276,90 @@ with tempfile.TemporaryDirectory() as tmp:
         ccc.main(gate + ["--baseline", rev]) == 0,
     )
 
+# --- the CLI's own instruction-file limits (ai-config#4061) -------------------
+# The formula read out of the Claude Code 2.1.283 bundle. Pinned at the three
+# settings that matter here: a current model at 200k and 1M context, and a
+# legacy (4 chars/token) model at 1M.
+check(
+    "a 200k-context current model: per-file 40,000 (floor), total 120,000",
+    ccc.cli_limits(200_000, 3) == (40_000, 120_000),
+)
+check(
+    "a 1M-context current model: per-file and total both 150,000",
+    ccc.cli_limits(1_000_000, 3) == (150_000, 150_000),
+)
+check(
+    "a 1M-context legacy model counts 4 chars/token: 200,000 each",
+    ccc.cli_limits(1_000_000, 4) == (200_000, 200_000),
+)
+check(
+    "Math.round rounds half up, unlike Python's round()",
+    # 813,310 * 0.05 * 3 = 121,996.5: JS Math.round gives 121,997 (checked
+    # with node), Python's round() gives the even 121,996.
+    ccc.cli_limits(813_310, 3)[0] == 121_997,
+)
+
+# What the CLI counts: frontmatter and BLOCK-level HTML comments are stripped,
+# a comment inside a paragraph is kept, and the length is in UTF-16 units.
+check(
+    "a block-level HTML comment and its trailing blank line are not counted",
+    ccc.cli_char_count("a\n\n<!--\nhidden\n-->\n\nb\n") == len("a\n\nb\n"),
+)
+check(
+    "an HTML comment inside a paragraph IS counted, as the CLI keeps it",
+    ccc.cli_char_count("text <!-- c --> more\n") == len("text <!-- c --> more\n"),
+)
+check(
+    "a comment inside a code fence is code, not a comment",
+    ccc.cli_char_count("```\n<!-- c -->\n```\n") == len("```\n<!-- c -->\n```\n"),
+)
+check(
+    "text after the comment on its closing line is kept",
+    ccc.cli_char_count("<!-- c --> tail\n") == len(" tail\n"),
+)
+check(
+    "YAML frontmatter is not counted",
+    ccc.cli_char_count("---\npaths: x\n---\nbody\n") == len("body\n"),
+)
+check(
+    "a character outside the BMP counts as two UTF-16 units",
+    # U+1F600, written as an escape per the ascii-punctuation rule.
+    ccc.cli_char_count("\U0001F600") == 2,
+)
+
+# The gate fails regardless of --strict, and the margin is subtracted from
+# the limit rather than added to it.
+with tempfile.TemporaryDirectory() as tmp:
+    base = Path(tmp)
+    (base / "CLAUDE.md").write_text("@frag.md\n" + "x" * 90 + "\n", encoding="utf-8")
+    (base / "frag.md").write_text("y" * 50, encoding="utf-8")
+    # 10 + 91 + 50 = 151 chars across the closure.
+    common = ["--base", str(base), "--budget", "100000000"]
+    check(
+        "a closure over the CLI total-limit gate exits 1 without --strict",
+        ccc.main(common + ["--total-char-limit", "200", "--repo-margin", "60"]) == 1,
+    )
+    check(
+        "the same closure under the gate exits 0",
+        ccc.main(common + ["--total-char-limit", "200", "--repo-margin", "40"]) == 0,
+    )
+    check(
+        "a margin that eats the whole limit is a usage error, not a size finding",
+        ccc.main(common + ["--total-char-limit", "200", "--repo-margin", "200"]) == 2,
+    )
+    over, text = ccc.render_total_chars([("CLAUDE.md", 101), ("frag.md", 50)], 200, 60)
+    check(
+        "the gate report names the total, the gate, and the overshoot",
+        over and "151 chars" in text and "Gate: 140" in text and "by 11 chars" in text,
+    )
+    over, text = ccc.render_total_chars([("CLAUDE.md", 101)], 200, 60)
+    check("an under-gate report says how much room is left",
+          not over and "Under the gate by 39 chars" in text)
+
+check(
+    "this repo's own closure is under the CLI total-limit gate",
+    ccc.main([]) == 0,
+)
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

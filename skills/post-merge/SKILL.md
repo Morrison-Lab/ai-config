@@ -48,10 +48,13 @@ standing **never assume; always verify** rule applied to closing out a PR.)
 The PR's own CI being green proves nothing about a workflow that only runs
 on `push` to the base branch --- a full or PDF render, a deploy, a publish
 step.
-Run the instrument against the actual merge commit before reporting the merge done:
+Take `<merge-sha>` from the PR's own `mergeCommit.oid`, not from
+`headRefOid` --- the head is the PR branch's last commit, and a squash or
+merge commit gets its own, different SHA on the base branch:
 
 ```bash
-python3 scripts/check-merge-commit-ci.py -R <owner>/<repo> --sha <merge-sha>
+merge_sha=$(gh pr view <N> --json mergeCommit -q .mergeCommit.oid)
+python3 scripts/check-merge-commit-ci.py -R <owner>/<repo> --sha "$merge_sha"
 ```
 
 Exit 0 is clean.

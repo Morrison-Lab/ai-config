@@ -11,9 +11,19 @@ the PR's own check list would have shown it.
 
 This script is the deterministic instrument for that second question: list
 every workflow run GitHub attaches to one commit SHA, and exit non-zero if
-any of them is not a completed success (or a deliberate skip/neutral).
+any of them is not a completed success (or a deliberate skip).
 It says nothing about PR-level checks, review state, or mergeability --
 `check-pr-fully-clean.py` already owns those.
+
+NOT COVERED. A workflow triggered by `workflow_run` (a deploy that waits on
+a build, a post-publish check) is attached to the SHA of the run that
+triggered it, and does not start until that upstream run finishes -- so a
+check made immediately after the push-triggered runs complete can miss a
+`workflow_run` job that has not started registering yet. This script has no
+way to know such a workflow exists on the SHA it has not yet seen; re-run
+the check once, after the push-triggered runs are confirmed complete, to
+catch a late-starting one. See `verify-merge-commit-ci.md` for the
+scheduling guidance this implies.
 
 Incident this exists for: Morrison-Lab/mds's `publish.yml` renders every
 format, PDF included, on push to `main`; its `preview.yml` renders HTML
@@ -28,22 +38,57 @@ anyone looking at that job.
 
 Exit codes:
 0: every workflow run on this SHA completed successfully (or was
-   skipped/neutral by design).
+   deliberately skipped by design).
 1: at least one run on this SHA failed, or is still queued/in progress --
    NOT clean. Distinguished from 3 below: this code means runs exist and
    at least one of them is bad or unfinished.
-2: called wrong, or the repository/SHA could not be resolved, or `gh` is
-   not installed. Never used for a verdict about the commit.
-3: no workflow runs are attached to this SHA yet. This is NOT a clean
-   verdict -- a repo with push-triggered workflows takes a few seconds to
-   register them, and a `main`-only workflow's absence here means it has
-   not started, not that it does not apply. Retry rather than reading this
-   as "nothing to check".
+2: called wrong, the repository could not be resolved, `--sha` is not a
+   full 40-character hex SHA, `--sha` does not resolve to a real commit on
+   the repository, or `gh` is not installed. Never used for a verdict about
+   the commit -- a typo'd, truncated, or wrong-repo SHA must not produce the
+   same exit as "no runs registered yet" (3), which is why `--sha` is
+   validated against the commit itself before the runs are ever queried.
+3: `--sha` resolved to a real commit, but no workflow runs are attached to
+   it yet. This is NOT a clean verdict -- a repo with push-triggered
+   workflows takes a few seconds to register them, and a `main`-only
+   workflow's absence here means it has not started, not that it does not
+   apply. Retry, but bound the retry: if this SHA still reads exit 3 after
+   about 15 minutes, check whether the repository has any workflow
+   triggered by `push` to the default branch at all. If it has none, say so
+   explicitly -- that is the permanent, expected case, not a stuck check.
+   If it has one, escalate that the run never registered, since a push
+   trigger normally queues within seconds.
+
+CANCELLED-BUT-SUPERSEDED RUNS. A `concurrency: cancel-in-progress` group
+cancels an in-flight run when a newer commit is pushed to the same branch
+before it finishes, which leaves a `cancelled` run sitting on an otherwise
+clean SHA. Two shapes, decided differently, both measured on this repo's
+own `main` (merge commit `25bd0c6`'s `Quarto Publish` was cancelled by the
+concurrency group when `1d5b337` was pushed a minute later, and
+`1d5b337`'s own `Quarto Publish` succeeded):
+
+(a) A same-named run of the same workflow, on the SAME sha, that
+    succeeded -- ordinarily a manual or automatic re-run. Treated as
+    clean, silently, mirroring `check-pr-fully-clean.py`'s identical
+    handling (ai-config#2277) rather than reimplementing a second
+    incompatible rule for the same shape.
+(b) A same-named run of the same workflow, on a LATER commit on the same
+    branch, that succeeded, because the concurrency group cancelled this
+    one rather than letting both run. Treated as clean, with an explicit
+    "superseded by <sha> (success)" note in the output -- never silently,
+    since the SHA actually being reported on did not itself produce a
+    passing run. The decision to treat this as clean rather than not-clean
+    is a judgment call, made here because the later commit's run covers
+    the same branch state this SHA merged into; note that the check
+    against a branch's CURRENT head (no (b) case possible, since nothing
+    is later) is still the one that matters for the "is `main` OK right
+    now" question this script exists to answer.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from typing import Any, Dict, List, Optional
@@ -53,8 +98,15 @@ USAGE_EXIT = 2
 NOT_CLEAN_EXIT = 1
 NO_RUNS_EXIT = 3
 
-# Conclusions that do not block a clean verdict on their own.
-OK_CONCLUSIONS = {"success", "skipped", "neutral"}
+# Conclusions that do not block a clean verdict on their own. `neutral` is
+# deliberately excluded: GitHub's own docs describe it as a step that
+# "completed and returned neither a passing nor a failing result", so
+# treating it as clean would be the more permissive reading with no stated
+# reason to prefer it. Callers who want a `neutral` run to count as clean
+# report so explicitly rather than getting it for free.
+OK_CONCLUSIONS = {"success", "skipped"}
+
+FULL_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
 def die(message: str) -> None:
@@ -88,13 +140,109 @@ def resolve_repo(explicit: Optional[str]) -> str:
 
 
 def resolve_sha(repo: str, explicit: Optional[str]) -> str:
-    if explicit:
-        return explicit
-    out = run_gh(["api", f"repos/{repo}/commits/HEAD", "-q", ".sha"])
-    sha = out.strip()
-    if not sha:
-        die("Could not resolve HEAD's SHA. Pass --sha explicitly.")
-    return sha
+    """Resolve the SHA to check, and prove it names a real commit.
+
+    A typo'd, truncated, or wrong-repo SHA and a genuinely un-registered
+    push produce the SAME symptom against `actions/runs?head_sha=` --- an
+    empty list --- so nothing downstream of that query can tell them apart.
+    Settling it here, against the commit itself, is what lets exit 3 mean
+    only "this real commit has no runs yet" rather than "this string did
+    not match anything".
+    """
+    if explicit is None:
+        out = run_gh(["api", f"repos/{repo}/commits/HEAD", "-q", ".sha"])
+        sha = out.strip()
+        if not sha:
+            die("Could not resolve HEAD's SHA. Pass --sha explicitly.")
+        return sha
+
+    if not FULL_SHA_RE.match(explicit):
+        die(
+            f"--sha must be a full 40-character hex commit SHA, got: {explicit!r}\n"
+            "A short/abbreviated SHA is not accepted: it can under-match "
+            "another commit, and the runs query below needs the exact "
+            "value, not a prefix."
+        )
+
+    # `run_gh` already exits 2 with the API's own error text on a 404, which
+    # is exactly the "does not resolve" case -- so the die() below only
+    # fires on the pathological case where the API returns 200 with an
+    # empty/mismatched sha field.
+    out = run_gh(["api", f"repos/{repo}/commits/{explicit}", "-q", ".sha"])
+    resolved = out.strip()
+    if resolved.lower() != explicit.lower():
+        die(
+            f"--sha {explicit!r} did not resolve to itself on {repo} "
+            f"(API returned {resolved!r}); refusing to guess which commit "
+            "was meant."
+        )
+    return explicit
+
+
+def _run_key(run: Dict[str, Any]) -> tuple:
+    """Identify "the same workflow's same job" across runs.
+
+    Scoped by `workflow_id` rather than `name` alone, since a job name is
+    not unique across workflows (two workflows can each define a job
+    called the same thing) -- the same ambiguity `check-pr-fully-clean.py`
+    disambiguates for the same reason.
+    """
+    return (run.get("workflow_id"), run.get("name"))
+
+
+def find_same_sha_success(cancelled: Dict[str, Any], runs: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Case (a): a same-workflow run on the SAME sha that succeeded."""
+    key = _run_key(cancelled)
+    for other in runs:
+        if other is cancelled:
+            continue
+        if _run_key(other) != key:
+            continue
+        if other.get("status") == "completed" and other.get("conclusion") == "success":
+            return other
+    return None
+
+
+def find_superseding_branch_success(
+    repo: str, cancelled: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
+    """Case (b): a same-workflow run on a LATER commit of the same branch
+    that succeeded, because a `concurrency: cancel-in-progress` group
+    cancelled this one rather than letting both run to completion.
+    """
+    workflow_id = cancelled.get("workflow_id")
+    branch = cancelled.get("head_branch")
+    created_at = cancelled.get("created_at")
+    cancelled_sha = cancelled.get("head_sha")
+    if not (workflow_id and branch and created_at):
+        return None
+    out = run_gh(
+        [
+            "api",
+            f"repos/{repo}/actions/workflows/{workflow_id}/runs",
+            "-X",
+            "GET",
+            "-f",
+            f"branch={branch}",
+            "-f",
+            "status=success",
+            "--paginate",
+            "--slurp",
+        ]
+    )
+    pages = json.loads(out)
+    candidates: List[Dict[str, Any]] = []
+    for page in pages:
+        candidates.extend(page.get("workflow_runs", []))
+    later = [
+        r
+        for r in candidates
+        if r.get("created_at", "") > created_at and r.get("head_sha") != cancelled_sha
+    ]
+    if not later:
+        return None
+    later.sort(key=lambda r: r.get("created_at", ""))
+    return later[0]
 
 
 def fetch_runs(repo: str, sha: str) -> List[Dict[str, Any]]:
@@ -118,7 +266,12 @@ def fetch_runs(repo: str, sha: str) -> List[Dict[str, Any]]:
     return runs
 
 
-def evaluate(runs: List[Dict[str, Any]]) -> int:
+def evaluate(runs: List[Dict[str, Any]], repo: Optional[str] = None) -> int:
+    """`repo` enables the cross-commit supersede lookup (case (b) above);
+    without it, only the same-SHA supersede case (a) is checked, and a
+    cancelled run with no same-SHA success is reported not-clean. Tests
+    that want case (b) pass `repo` and monkeypatch `run_gh`.
+    """
     if not runs:
         print("No workflow runs found for this SHA yet.", file=sys.stderr)
         print(
@@ -129,6 +282,7 @@ def evaluate(runs: List[Dict[str, Any]]) -> int:
         return NO_RUNS_EXIT
 
     not_clean: List[str] = []
+    notes: List[str] = []
     for run in runs:
         name = run.get("name") or run.get("path") or "(unnamed workflow)"
         status = run.get("status")
@@ -137,8 +291,27 @@ def evaluate(runs: List[Dict[str, Any]]) -> int:
         if status != "completed":
             not_clean.append(f"  - {name}: status={status} (not yet completed) {url}")
             continue
-        if conclusion not in OK_CONCLUSIONS:
-            not_clean.append(f"  - {name}: conclusion={conclusion} {url}")
+        if conclusion in OK_CONCLUSIONS:
+            continue
+        if conclusion == "cancelled":
+            # Case (a): a same-SHA re-run succeeded. Silent, mirroring
+            # check-pr-fully-clean.py's identical handling (ai-config#2277).
+            if find_same_sha_success(run, runs) is not None:
+                continue
+            # Case (b): a later commit on the same branch superseded this
+            # one via a concurrency group, and ITS run succeeded. Reported
+            # explicitly, never silently, since this exact SHA did not
+            # itself produce a passing run.
+            if repo is not None:
+                later = find_superseding_branch_success(repo, run)
+                if later is not None:
+                    later_sha = (later.get("head_sha") or "")[:8]
+                    notes.append(
+                        f"  - {name}: cancelled on this SHA, but superseded "
+                        f"by {later_sha} (success) -- treated as clean"
+                    )
+                    continue
+        not_clean.append(f"  - {name}: conclusion={conclusion} {url}")
 
     total = len(runs)
     if not_clean:
@@ -151,6 +324,8 @@ def evaluate(runs: List[Dict[str, Any]]) -> int:
     for run in runs:
         name = run.get("name") or run.get("path") or "(unnamed workflow)"
         print(f"  - {name}: {run.get('conclusion')}")
+    for line in notes:
+        print(line)
     return 0
 
 
@@ -171,7 +346,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     sha = resolve_sha(repo, args.sha)
     print(f"Checking workflow runs for {repo}@{sha}...")
     runs = fetch_runs(repo, sha)
-    return evaluate(runs)
+    return evaluate(runs, repo=repo)
 
 
 if __name__ == "__main__":

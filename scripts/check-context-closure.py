@@ -115,6 +115,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from fences import (  # noqa: E402
     count_unbalanced_fences,
+    find_fence_spans,
     strip_code as _shared_strip_code,
 )
 
@@ -182,7 +183,6 @@ def cli_limits(
 
 _FRONTMATTER_RE = re.compile(r"\A---[ \t]*\r?\n.*?^---[ \t]*(?:\r?\n|\Z)", re.S | re.M)
 _HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
-_FENCE_OPEN_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 _BLOCK_COMMENT_OPEN_RE = re.compile(r"^ {0,3}<!--")
 
 
@@ -195,36 +195,30 @@ def strip_block_html_comments(text: str) -> str:
     else is left. This approximates that lexer: a block starts on a line
     opening with `<!--` outside a code fence and runs to the line holding
     `-->`. A comment inside a paragraph is not a block and is kept, as the
-    CLI keeps it.
+    CLI keeps it. Fences come from the shared `lib/fences.py` tracker, and
+    an unclosed fence runs to the end of the file, as `marked` reads it.
     """
-    lines = text.splitlines(keepends=True)
+    lines = text.split("\n")
+    fenced, _unclosed, _orphans = find_fence_spans(text, swallow_unclosed=True)
+    last = len(lines) - 1
     out: list[str] = []
-    fence = None
     i = 0
-    while i < len(lines):
-        line = lines[i]
-        opener = _FENCE_OPEN_RE.match(line)
-        if fence is None and opener:
-            fence = opener.group(1)
-        elif fence is not None:
-            stripped = line.strip()
-            if stripped.startswith(fence[0] * len(fence)) and set(stripped) <= {fence[0]}:
-                fence = None
-        elif _BLOCK_COMMENT_OPEN_RE.match(line):
+    while i <= last:
+        if i not in fenced and _BLOCK_COMMENT_OPEN_RE.match(lines[i]):
             j = i
-            while j < len(lines) and "-->" not in lines[j]:
+            while j <= last and "-->" not in lines[j]:
                 j += 1
-            if j < len(lines):
+            if j <= last:
                 j += 1
-                while j < len(lines) and not lines[j].strip():
+                while j <= last and not lines[j].strip():
                     j += 1
-                block = "".join(lines[i:j])
+                block = "\n".join(lines[i:j]) + ("\n" if j <= last else "")
                 rest = _HTML_COMMENT_RE.sub("", block)
                 if rest.strip():
                     out.append(rest)
                 i = j
                 continue
-        out.append(line)
+        out.append(lines[i] + ("\n" if i < last else ""))
         i += 1
     return "".join(out)
 

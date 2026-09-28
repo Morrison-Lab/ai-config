@@ -1314,6 +1314,16 @@ check(
     ccc.cli_char_count("```\n<!-- c -->\n```\n") == len("```\n<!-- c -->\n```\n"),
 )
 check(
+    "a backtick line whose info string holds a backtick opens no fence",
+    # Not a CommonMark fence opener, so the comment below it is a block
+    # comment and is stripped. Checked against marked's lexer.
+    ccc.cli_char_count("```a`b\n<!-- c -->\n") == len("```a`b\n"),
+)
+check(
+    "an unclosed fence runs to the end of the file, as marked reads it",
+    ccc.cli_char_count("x\n\n```\n<!-- c -->\n") == len("x\n\n```\n<!-- c -->\n"),
+)
+check(
     "text after the comment on its closing line is kept",
     ccc.cli_char_count("<!-- c --> tail\n") == len(" tail\n"),
 )

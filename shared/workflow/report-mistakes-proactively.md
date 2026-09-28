@@ -12,6 +12,19 @@ immediately, in the owning tracker, without waiting to be asked.
 See "An idea is filed the same way a mistake is" below for the boundary
 and the incident that produced this extension.
 
+Two more kinds are filed on the same terms
+(user directive, 2026-09-28: "always open issues for all your ideas, concerns, mistakes, etc"):
+
+- **A concern:** a risk, gap or doubt where nothing is broken yet.
+  Examples: a guard that may fail open under a timeout, a check that fails intermittently, or a rule a session could not follow.
+- **Your own mistake,** including one you already corrected in the session.
+  Examples: a wrong claim you later retracted, or a guessed identifier you acted on.
+  The fix is in the conversation, but the lesson is not.
+  The issue records what went wrong and what would have prevented it.
+
+- **Do:** file the concern or your own mistake before the report that mentions it, and link the issue from that report.
+- **Don't:** leave a concern or a self-correction only in chat because it seems minor, already fixed, or not yet a bug.
+
 Worked-example case records for the rules below live in
 [`report-mistakes-proactively.cases.md`](report-mistakes-proactively.cases.md), moved out of the auto-loaded context.
 

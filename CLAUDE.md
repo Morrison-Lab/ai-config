@@ -1494,7 +1494,7 @@ It is also the natural shape to write when the facts were discovered in
 that order, which is why it survives self-review: the prose narrates the
 author's own path rather than exposing the subject to a reader who never
 walked it.
-Lead with what is the case, and present an idealization or a
+Lead with what is actually the case, and present an idealization or a
 prior approach afterward as an extension, not a correction --- except when
 the **reader** already holds the wrong model and the passage exists to
 correct it, in which case presenting it first is the point.
@@ -1657,7 +1657,9 @@ math, apply this in addition to the fact-check above.
 
 ## Writing style: models vs. inference methods
 
-[`shared/writing/models-vs-inference.md`](shared/writing/models-vs-inference.md): a model is never "Bayesian"; only how it is fitted is.
+[`shared/writing/models-vs-inference.md`](shared/writing/models-vs-inference.md)
+
+A model is never "Bayesian"; only how it is fitted is.
 
 ## Hyperlink technical terms and results; no forward references
 

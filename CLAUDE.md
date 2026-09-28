@@ -33,11 +33,9 @@ Detail, rationale, and cases: [`shared/writing/record-pattern-and-anti-pattern.m
 
 ## No empty promises
 
-[`shared/workflow/no-empty-promises.md`](shared/workflow/no-empty-promises.md)
-
 A commitment about your own future behaviour ships an implemented mechanism in the same turn (a memory entry at minimum, a hook, a filed issue, or an armed wake for an owed action), or is not made;
 `hooks/no-empty-promise.py` guards it.
-Detail, rationale, and cases: [`shared/workflow/no-empty-promises.rationale.md`](shared/workflow/no-empty-promises.rationale.md).
+Detail, rationale, and cases: [`shared/workflow/no-empty-promises.md`](shared/workflow/no-empty-promises.md).
 
 ## Generalize instructions to every AI agent by default
 
@@ -74,6 +72,7 @@ Detail, rationale, and cases: [`shared/workflow/status-requests-act.md`](shared/
 
 Every message that ends a turn or a stretch of work states `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`.
 Before every non-clean pause, arm a timer or other wake that resumes the next step, and report when it fires.
+Exception: when a harness posts the final message somewhere and no person reads the session turn by turn (a CI or `@claude` workflow run), put the declaration inside the substantive reply or omit it, never after it, since the harness keeps only the last message ([rme#1081](https://github.com/d-morrison/rme/issues/1081)).
 Proactively flag a good stopping point with the `⚠️ **FLAG** ---` tag.
 This could be a checkpointed or wrapped multi-step task, a PR merged with no other in-flight work on this conversation, or an open question answered with nothing pending.
 Place the tag at the natural end of that turn's recap (or immediately before a `wrap-up` report) rather than mid-task.
@@ -231,11 +230,11 @@ So `#316 session title convention`, not `PR #316 session title convention` or `P
 
 ## Re-check for latest review findings before reporting PR status
 
-[`shared/workflow/recheck-review-findings.md`](shared/workflow/recheck-review-findings.md)
-
 Before reporting on a PR, pull every review round, formal review state and body, and inline comment fresh;
 green checks, a login-filtered query, or a later clean bot verdict over a human's `CHANGES_REQUESTED` are not a clean review.
-Detail, rationale, and cases: [`shared/workflow/recheck-review-findings.rationale.md`](shared/workflow/recheck-review-findings.rationale.md).
+(A specific case of the standing **never assume;
+always verify** rule in `memories/preferences.md` --- confirm the verdict with a fresh query, don't recall it.)
+Detail, rationale, and cases: [`shared/workflow/recheck-review-findings.md`](shared/workflow/recheck-review-findings.md).
 
 ## Post in-chat feedback to the PR
 

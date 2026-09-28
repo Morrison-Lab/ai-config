@@ -129,6 +129,6 @@ while this session was waiting on an independent re-review of the corrected head
 An earlier independent review had already shown the first fix addressed the symptom rather than the cause
 (see [`memories/reviewing-prs.md`](../../memories/reviewing-prs.md)),
 and the cause fix landed before the merge.
-The pending re-review then came back clean, so nothing defective shipped.
+The pending re-review then came back clean, finding no defect in what had shipped.
 The rule held all the same:
 the review ran to its verdict, and the session slid `v3` only after that clean verdict returned.)

@@ -59,7 +59,8 @@ A PR can be merged by another session while this one is still waiting on its rev
 see [`revert-premature-merge`](../../shared/workflow/revert-premature-merge.md)'s pending-review section.
 The gate applies however the slide is done:
 Morrison-Lab/gha slides by dispatching its `slide-major-tag.yml` workflow rather than by the `git push` in step 4,
-and gha's own `CLAUDE.md` tag-slide bar does not yet carry this gate.
+and gha's own `CLAUDE.md` tag-slide bar does not yet carry this gate
+([Morrison-Lab/gha#977](https://github.com/Morrison-Lab/gha/issues/977)).
 
 ### 4. Slide the tag
 

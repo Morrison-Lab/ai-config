@@ -209,8 +209,8 @@ Grouping is not the only question a navbar or sidebar raises --- once the
 items and the groups are settled, their order is a separate question, and it
 has the same answer as the rest of this document: derive it, don't inherit
 it.
-Menu items follow "the natural progression of topics ... as much as
-possible", so each item comes after what it builds on.
+Menu items follow "the natural progression of topics as much as possible",
+so each item comes after what it builds on.
 Extending that rule to sidebar items and to the groups themselves is
 inferred, not quoted: the directive names only "menu bars", but the user's
 separate sidebar clarification above treats a sidebar and a navbar as the

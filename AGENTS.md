@@ -765,8 +765,9 @@ This grants no merge authority: the strict merge policy below still applies.
   (user, 2026-09-28, "fine with that definition of infra for now").
   The rule was written for the lecture-notes and assessment repos, where the consumer is a student reading the site or an assessment.
   A PR that also touches content (lecture notes, assessments, package code) is not infrastructure.
-  Whether the grant covers a change in a repo whose consumers are other repos, such as a `Morrison-Lab/gha` workflow change that alters what callers run, is not settled;
-  do not read it as covered, and use that repo's own merge policy instead.
+  Every PR in `Morrison-Lab/gha` or `Morrison-Lab/ai-config` counts as infrastructure,
+  including one that changes what their consumers run:
+  both are infrastructure repos (user, 2026-09-28, "let's say that everything in gha is infra"; "so is ai-config").
   `hooks/no-unauthorized-merge.py` cannot classify a diff yet ([#4039](https://github.com/Morrison-Lab/ai-config/issues/4039)),
   so where the hook is active, clear it with `ALLOW_MERGE=1` on that one merge command, and say in the reply why the PR qualified.
   Do not enable a session-wide `/mwc` for it: that marker authorizes every merge in the session, not only infrastructure PRs.

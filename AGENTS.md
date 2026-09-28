@@ -763,7 +763,8 @@ This grants no merge authority: the strict merge policy below still applies.
   so a quota-skipped review still holds the merge.
   A PR that also touches content (lecture notes, assessments, package code) is not infrastructure.
   `hooks/no-unauthorized-merge.py` cannot classify a diff yet ([#4039](https://github.com/Morrison-Lab/ai-config/issues/4039)),
-  so where the hook is active, record the grant with `/mwc` for the session.
+  so where the hook is active, clear it with `ALLOW_MERGE=1` on that one merge command, and say in the reply why the PR qualified.
+  Do not enable a session-wide `/mwc` for it: that marker authorizes every merge in the session, not only infrastructure PRs.
   - **Do:** merge a fully clean infrastructure PR without asking, and say in the same reply that you did and why it qualified.
   - **Don't:** extend the grant to a PR that mixes infrastructure with content, or merge one whose review was skipped.
 

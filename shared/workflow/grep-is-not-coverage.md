@@ -981,6 +981,52 @@ grep -rn <term> memories/ | head -20        # then read one path at a time
   `memories/` had none;
   the command never got there.
 
+## A `timeout`-killed search's output is partial, not complete
+
+The `head -N` section above caps a result by **count**.
+A wall-clock `timeout` on a long-running recursive search caps it by
+**time** instead, and the reading error is the same one: whatever the
+process printed before it was killed gets read as the whole answer, when it
+is only the prefix the process reached before running out of clock.
+
+The two mechanisms differ enough that recognizing one does not protect
+against the other.
+A capped grep still finishes its own pass over the arguments it was given,
+so "the count equals the cap" is a visible tell.
+A killed `find` or `grep -r` never finishes at all --- it stops wherever the
+filesystem walk happened to be, mid-directory, with no marker in its output
+saying so.
+Nothing about a clean, well-formatted partial listing looks incomplete.
+
+This is sharpest on a slow or remote filesystem (a network share, a
+cloud-sync or streaming mount), because that is exactly where a recursive
+walk is most likely to need the timeout in the first place --- the mount
+that makes the search slow enough to hit a timeout is the same mount whose
+truncation point is hardest to predict.
+
+- **Do:** treat the output of any command a `timeout` (or an equivalent
+  wall-clock cutoff) actually killed as partial, and say so.
+- **Do:** re-run a bounded query --- a single top-level listing, a narrower
+  path --- before asserting that a search result is absent, and only draw
+  the absence conclusion from that bounded query's complete result.
+- **Don't:** file an issue, close a task, or report a "not found" finding on
+  the strength of a search that was killed by its own timeout.
+- **Don't:** treat a partial listing's clean formatting as evidence it
+  finished --- a killed walk's output looks identical to a complete one.
+
+(Morrison-Lab/mlr#10, 2026-09-28: a recursive `find` over `G:\My Drive\Texts
+2`, a Google Drive streaming mount with 1700+ book folders, was killed by a
+300-400 second `timeout` partway through.
+Its truncated output held no match for Robert & Casella's *Monte Carlo
+Statistical Methods*, which was then reported as "not in the library" and
+filed as an access-request issue.
+A subsequent top-level listing of the mount's `texts_by_title` index folder
+--- run once the recursive crawl itself was recognized as the wrong approach,
+see [`memories/course-repos.md`](../../memories/course-repos.md)'s "List a
+cloud-sync mount's top level before searching it" --- showed the book's
+folder present.
+The issue was corrected rather than left standing.)
+
 ## Where this fires
 
 The skills whose workflows run exactly this grep, and whose next step is to

@@ -54,12 +54,15 @@ The leak check protects the items we grade --- this course's current and planned
 A third party's assessment material kept in an evaluation repo for reference,
 such as the Stanford CS229 problem sets and keys in `mlg`,
 is not a constraint on the notes: that another class assigned a problem does not stop us teaching it.
+CS229's keys in particular have been public online for years,
+so there is nothing about them left to protect.
 
 On 2026-09-28 a session recommending a lecture exercise reported that it had checked the exercise against mlg's text and PDFs, CS229's problem sets included,
 as if a match there would have ruled it out.
 The user: "it's up to us to decide what content to put in the lecture notes versus saving for exams/hw/etc;
 what another class did doesn't matter.
-just don't leak solutions ACCIDENTALLY."
+just don't leak solutions ACCIDENTALLY.";
+"the stanford cs229 materials are particularly useless to protect, since they're available online".
 
 - **Do:** check new notes content against the items this course grades, and decide what to hold back on the merits.
 - **Don't:** treat another class's problem sets or keys as ruling content out of the notes, or present such a check as a gate.

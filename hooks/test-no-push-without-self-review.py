@@ -1664,6 +1664,30 @@ def structured_payload_cases() -> tuple[int, int]:
     v, s = mod.parse_report(r4)
     check("parse_report: fenced NOT_CLEAN payload is ignored and retains clean verdict", v, s, "clean", HEAD.lower())
 
+    # 5. The payload vocabulary on the verdict line itself (ai-config#3991).
+    fp = f"\n\nReviewed-Commit: {HEAD}"
+    for line, want in [
+        ("### Verdict: CLEAN", "clean"),
+        ("### Verdict: **CLEAN**", "clean"),
+        ("### Verdict: NOT_CLEAN", "needs_work"),
+        ("### Verdict: Not clean", "needs_work"),
+        ("### Verdict: not-clean", "needs_work"),
+        ("### Verdict: NOTCLEAN", "needs_work"),
+    ]:
+        v, s = mod.parse_report(line + fp)
+        check(f"parse_report: verdict line {line!r} reads as {want}", v, s, want, HEAD.lower())
+
+    # CLEANUP is not CLEAN, and a quoted verdict is not a verdict.
+    for line in ["### Verdict: CLEANUP needed", "The last round said Verdict: CLEAN"]:
+        v, s = mod.parse_report(line + fp)
+        check(f"parse_report: {line!r} is no verdict", v, s, None, None)
+
+    # A CLEAN line still loses to a blocking payload.
+    r6 = ("### Verdict: CLEAN" + fp + "\n\n"
+          '<!-- review-data: {"schema_version": "1.0", "verdict": "NOT_CLEAN", "findings": []} -->')
+    v, s = mod.parse_report(r6)
+    check("parse_report: CLEAN verdict line + NOT_CLEAN payload is needs_work", v, s, "needs_work", HEAD.lower())
+
     return failures, ran
 
 

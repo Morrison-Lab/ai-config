@@ -358,9 +358,12 @@ what the pattern matches rather than how a docstring reads.
 no warning fires.
 The boundary is needed at all because an alternation of tag names is a
 prefix match: `<(?:p|h[1-6]|li)[^>]*>` matches `<pre ...>` through its `p`.
-(Morrison-Lab/gha#976, 2026-09-28: that missing boundary let `<p` match
-`<pre>` and swallow widget JSON up to the next `</p>`, which hung a preview
-highlighter; see [`reviewing-prs.md`](reviewing-prs.md) for the review side.)
+(Morrison-Lab/mds#22 and Morrison-Lab/gha#976, 2026-09-28: the defect was
+a MISSING `\b`, which let `<p` match `<pre>` and swallow widget JSON up to
+the next `</p>`, hanging a preview highlighter.
+The backspace trap was avoided while writing the fix: it uses `rf''`,
+because a plain f-string would have turned the new `\b` into a backspace.
+See [`reviewing-prs.md`](reviewing-prs.md) for the review side.)
 
 - **Do:** end a tag-name alternation with `\b`, and write the literal as
   `r''` or `rf''` so the `\b` reaches `re` intact.

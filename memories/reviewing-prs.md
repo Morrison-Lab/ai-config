@@ -268,12 +268,13 @@ So a reviewer rating such a fix must run the tool's own job on a real input and 
 Morrison-Lab/mds#22 and Morrison-Lab/gha#976, 2026-09-28:
 a preview highlighter hung, and the fix skipped any element that embeds `<script>`.
 The review bot rated both PRs "Ready for merge" several times, on byte-identity and fuzz evidence.
-An independent adversarial reviewer took a real page, edited one sentence, and showed the edit went unhighlighted.
+An independent adversarial reviewer took a real page, edited one sentence, and showed the edit went unhighlighted
+(per the session that ran it;
+results recorded in the mds#22 PR body's Exercise 2 table).
 It then found the real cause:
 the element regex `<(?:p|h[1-6]|li|blockquote)[^>]*>` had no word boundary,
 so `<p` matched `<pre ...>` and the match swallowed widget JSON up to the next `</p>`.
-The fix author had stated a different root cause, confidently and wrongly,
-and nothing in the equivalence checks could contradict it.
+The fix's commit message and PR body named a different root cause, and nothing in the equivalence checks could contradict it.
 (The regex half of this lesson is in [`python.md`](python.md)'s valid-escape section.)
 
 - **Do:** for a "stop the hang or crash" fix, make a change on a real input that the tool should detect (edit a sentence, add a row), and confirm it is still detected.

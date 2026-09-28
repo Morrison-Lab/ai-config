@@ -124,6 +124,11 @@ and findings go through the choice the section above sets out, which for a fix t
 - **Don't:** treat the merge as the review verdict, or cancel the review because the PR is `MERGED`.
 - **Don't:** slide a tag over a merge whose review has not returned.
 
-(Morrison-Lab/gha#976, 2026-09-28: merged by the same account from another session while this session was waiting on an independent re-review.
-The re-review then found the fix addressed the symptom rather than the cause;
-see [`memories/reviewing-prs.md`](../../memories/reviewing-prs.md).)
+(Morrison-Lab/gha#976, 2026-09-28: merged by the same account, from another session as far as this one can tell,
+while this session was waiting on an independent re-review of the corrected head.
+An earlier independent review had already shown the first fix addressed the symptom rather than the cause
+(see [`memories/reviewing-prs.md`](../../memories/reviewing-prs.md)),
+and the cause fix landed before the merge.
+The pending re-review then came back clean, so nothing defective shipped.
+The rule held all the same:
+the review ran to its verdict, and the session slid `v3` only after that clean verdict returned.)

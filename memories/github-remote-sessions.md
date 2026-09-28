@@ -58,7 +58,9 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   delete it via the GitHub UI/API, or just leave it if it's identical to `main` and has no PR. (Seen on ai-config, 2026-06-28.)
   The GitHub MCP tools have no branch-delete call either, so the session has no route at all.
   (Seen again 2026-09-28: three `git push --delete` attempts on a template-repo test branch each returned "remote end hung up", while pushes worked.)
-  **Do:** before pushing a throwaway branch, such as a test of a template repo's workflows, either tell the user up front that they will have to delete it, or test through a `workflow_dispatch` on an existing ref so no branch is created.
+  **Do:** before pushing a throwaway branch, such as a test of a template repo's workflows, either tell the user up front that they will have to delete it, or, if the session can dispatch, use a dispatchable caller that already exists on an existing ref, so no branch is created.
+  Whether a session can dispatch at all varies.
+  See the `actions_run_trigger` note in [`gha-reusable-workflows.md`](gha-reusable-workflows.md), which records both a 403 and a working dispatch.
   **Don't:** push a throwaway branch on the assumption that the session can clean it up afterwards.
 - **GitHub Pages sites (`<owner>.github.io`, incl. `rossjrw/pr-preview-action` PR-preview links) are policy-blocked in at least some sandboxes** --- both WebFetch and a direct `curl`/CONNECT through the agent proxy get a `403` (`gateway answered 403 to CONNECT (policy denial)`, confirmed via `curl -sS "$HTTPS_PROXY/__agentproxy/status"`).
   Don't retry or assume it's transient --- treat it the same as an unavailable preview and fall back to rendering the chapter locally (rme's own CLAUDE.md already names this fallback for "no preview has deployed yet");

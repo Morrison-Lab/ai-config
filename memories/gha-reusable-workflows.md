@@ -78,6 +78,11 @@ Generic Actions-authoring material stays there.
   **Diagnose by checking `run_attempt`** (> 1 means this is a re-run, not a fresh dispatch) **and `created_at`** (`mcp__github__actions_get`, `method: get_workflow_run` --- compare against when the fix landed), then read `referenced_workflows[].sha` in the same response --- it shows the ACTUAL resolved commit for that run, which you can diff against the tag's current `get_tag` SHA to confirm staleness.
   **Only a genuinely NEW run (a new `run_id`) re-resolves the tag fresh** --- a new commit (`pull_request: synchronize`) is the reliable trigger;
   an `@claude review` comment sometimes causes the bot to re-run the existing stale run instead of dispatching a new one (observed on UCD-SERG/serodynamics#193 --- a direct `workflow_dispatch` via `actions_run_trigger` would have sidestepped this, but that call 403s in these sessions too, per the note above).
+  Counter-measurement, 2026-09-28, in a claude.ai cloud session: `mcp__github__actions_run_trigger` worked.
+  `run_workflow` dispatched gha's `slide-major-tag.yml` on `main`, and `rerun_failed_jobs` re-ran a job on Morrison-Lab/gha#976 and on Morrison-Lab/mds#21.
+  So the 403 is a property of some sessions, not of the tool.
+  Try the call once before routing around it.
+  The throwaway-branch rule in [`github-remote-sessions.md`](github-remote-sessions.md) leans on this.
 - **Testing a reusable workflow that calls `anthropics/claude-code-action` (a review or agent workflow) before merge is DOUBLY constrained -- a branch-pinned caller cannot exercise the change even when it runs.**
   Two independent mechanisms both defeat the obvious "point a caller at the test branch and dispatch it" approach:
   1. **The action's own workflow-validation guard refuses to run unless the CALLER's workflow file is byte-identical to that repo's DEFAULT branch** (`Workflow validation failed ... must exist and have identical content to the version on the repository's default branch`).

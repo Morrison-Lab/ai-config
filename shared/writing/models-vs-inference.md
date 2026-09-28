@@ -31,17 +31,17 @@ Naming the method a chapter happens to use does not make that method part of
 the model it is applied to.
 This is the same distinction `Morrison-Lab/rme`'s `CLAUDE.md` draws in its
 ["Content Writing"
-section](https://github.com/Morrison-Lab/rme/blob/main/CLAUDE.md#L119),
+section](https://github.com/Morrison-Lab/rme/blob/main/CLAUDE.md#content-writing),
 whose random-effects example this fragment reuses.
 
 ### The hierarchical case
 
-A hierarchy --- random effects, multiple levels --- is model structure, not a
-method, and it follows the same rule as any other structure: it can be
-fitted by maximum likelihood or by Bayesian inference.
-A hyperprior on the top-level parameters is part of Bayesian inference for
-that structure, not part of the model, the same way an ordinary prior is not
-part of the model it is placed on (see below).
+A hierarchy --- group-level parameters with their own distribution, at one
+or more levels --- is model structure, not a method, and it follows the
+same rule as any other structure: it can be fitted by maximum likelihood or
+by Bayesian inference.
+A prior or a hyperprior on the top-level parameters is part of Bayesian
+inference for that structure, not part of the model.
 So write "a hierarchical model fitted by Bayesian inference", never "a
 Bayesian hierarchical model".
 [`Morrison-Lab/sds#6`](https://github.com/Morrison-Lab/sds/pull/6) fixed its
@@ -65,17 +65,26 @@ are conflated*, so that no rewording of a banned phrase can satisfy the
 letter of a phrase list while still attaching a paradigm to the model.
 
 With that said, the commonest surface form of the conflation is a paradigm
-adjective modifying the model noun: "Bayesian regression model", "Bayesian
-model", "frequentist model", "likelihood model", "MLE model".
-Each attaches a paradigm to the model noun.
+adjective modifying the model noun, each of these attaching a paradigm to
+the model noun:
+
+- "Bayesian regression model"
+- "Bayesian model"
+- "frequentist model"
+- "likelihood model"
+- "MLE model"
+
 Name the model and the method as two separate phrases instead: "a linear
 regression model fitted by Bayesian inference", "Bayesian inference for a
 logistic regression model".
 
-A phrase that names only the method, with no model noun attached, is fine:
-"Bayesian inference", "Bayesian analysis", "the MLE of $\beta$".
-These say how parameters are learned and claim nothing about the model's
-structure.
+A phrase that names only the method, with no model noun attached, is fine,
+because each says how parameters are learned and claims nothing about the
+model's structure:
+
+- "Bayesian inference"
+- "Bayesian analysis"
+- "the MLE of $\beta$"
 
 **A carve-out**: a few phrases contain the words "Bayesian model" while
 naming a method or a procedure, not a model --- "Bayesian model averaging"
@@ -88,11 +97,13 @@ so they are fine as written.
 The prior is part of the Bayesian inference setup, not a change to the
 model's structure.
 Placing a prior on a parameter does not turn the regression model the
-parameter belongs to into a different model.
-Where a prior does act like model structure, most notably a hierarchical
-prior that introduces its own distributional layer, say so, but keep the
-point brief: name the added structure once and move on, rather than
-relitigating the model/method line for every mention of the prior.
+parameter belongs to into a different model, and the same holds for a
+hyperprior on a hierarchical model's top-level parameters --- see "The
+hierarchical case" above, which is the one place this applies often enough
+to need its own section.
+Keep the point brief wherever else it comes up: name the model's structure
+once and move on, rather than relitigating the model/method line for every
+mention of a prior.
 
 ## Do / Don't
 

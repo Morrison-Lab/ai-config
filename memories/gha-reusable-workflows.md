@@ -294,6 +294,16 @@ so the pattern is load-bearing rather than a workaround invented for this PR.
   (2nd occurrence, 2026-09-24 on [Morrison-Lab/gha#931](https://github.com/Morrison-Lab/gha/issues/931) ([PR #933](https://github.com/Morrison-Lab/gha/pull/933));
   prior: 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826).)
 
+- **Run a reusable check locally with the *caller's* inputs, not the action's defaults --- otherwise the local run and CI are different configurations.**
+  A reusable workflow's behaviour is set by the caller's `with:` block, and a bare local invocation silently substitutes defaults for every input the caller overrode.
+  `check-new-line-breaks` is the sharp case, because two of its inputs decide the *file set* rather than the strictness: `paths-ignore` removes files, and `globs` (default `'*.md'`) decides what is eligible at all.
+  A caller that ignores `README.md` without adding `*.Rmd` to `globs` covers neither the generated file nor its source, so the job reports success having examined nothing --- while a local run without `NLB_PATHS_IGNORE` examines the file and reports success for the opposite reason.
+  Both are green, and they mean opposite things.
+  - **Do:** read the caller's `with:` block and pass every input it sets, e.g. `NLB_GLOBS='*.md *.Rmd' NLB_PATHS_IGNORE='README.md' NLB_BASE_REF=origin/main python3 check-new-line-breaks/check-new-line-breaks.py`, and read the job log's `Examined N added line(s) across M file(s)` line rather than the exit status alone.
+  - **Don't:** describe what CI checked from a local run whose inputs you did not match.
+  ([Morrison-Lab/qbt#78](https://github.com/Morrison-Lab/qbt/pull/78), 2026-09-27: a PR asserted the gate had been "passing vacuously" on a reflowed `README.md`.
+  The review showed it had never run on that file at all, and CI's log read `Examined 0 added line(s) across 0 file(s)` on both the PR head and its base.)
+
 - **Historically, `check-new-line-breaks` did not see a sentence that opens with a digit or an opening parenthesis, so a two-sentence line passed silently.**
   Its `_SENT_BREAK_RE` lookahead class was `` [A-Z"'`*\[] ``, which admitted an uppercase letter or a markup character --- and neither a digit nor `(`.
   This corpus opens sentences with derived counts constantly, because `CLAUDE.md` asks for numbers derived rather than recalled --- "19 sites across ...", "308 cases passed ..." --- so the blind spot sat exactly where the prose most often lands.

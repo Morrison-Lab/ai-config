@@ -49,10 +49,12 @@ PATTERNS = [
 ]
 RX = re.compile("|".join(PATTERNS), re.I)
 
-# "I haven't filed an issue" is an offer in waiting unless the same line says
-# why none is needed. The reason can come before or after the clause ("Since
-# this is already tracked, I haven't filed ..."), so it is checked over the
-# whole line in code rather than by a one-sided lookahead.
+# "I haven't filed an issue" is an offer in waiting unless the same sentence
+# says why none is needed. The reason can come before or after the clause
+# ("Since this is already tracked, I haven't filed ..."), so it is checked in
+# code rather than by a one-sided lookahead. The window is the sentence, not
+# the line: a paragraph has no internal newlines, so a line-wide scan let an
+# unrelated "already" three sentences away excuse the clause.
 NOT_FILED_RX = re.compile(
     r"i (haven['\u2019]t|have not|didn['\u2019]t|did not) (yet )?file[d]? "
     r"(an?|the) [^.!?,;\n]{0,40}?\b(issue|follow-?up|bug)(?![\w-])",
@@ -61,6 +63,23 @@ NOT_FILED_RX = re.compile(
 NOT_FILED_EXCUSE_RX = re.compile(
     r"\b(already|duplicate|dupe|covers|covered|tracks|tracked)\b", re.I
 )
+# A sentence ends at a newline, or at terminal punctuation followed by
+# whitespace or the end of text -- so the dots inside a URL
+# ("github.com/.../issues/981") do not end one -- unless the punctuation
+# closes a common abbreviation ("e.g.", "i.e.", "etc.", "vs.", "cf.").
+SENTENCE_END_RX = re.compile(
+    r"\n|(?<!\be\.g)(?<!\bi\.e)(?<!\betc)(?<!\bvs)(?<!\bcf)[.!?]+(?=\s|$)",
+    re.I,
+)
+
+
+def sentence_around(text, start, end):
+    """The sentence of `text` containing the span [start, end)."""
+    s_start = 0
+    for b in SENTENCE_END_RX.finditer(text, 0, start):
+        s_start = b.end()
+    after = SENTENCE_END_RX.search(text, end)
+    return text[s_start:after.start() if after else len(text)]
 
 
 def find_offer(prose):
@@ -69,10 +88,7 @@ def find_offer(prose):
     if hit:
         return hit
     for m in NOT_FILED_RX.finditer(prose):
-        start = prose.rfind("\n", 0, m.start()) + 1
-        end = prose.find("\n", m.end())
-        line = prose[start:] if end < 0 else prose[start:end]
-        if not NOT_FILED_EXCUSE_RX.search(line):
+        if not NOT_FILED_EXCUSE_RX.search(sentence_around(prose, m.start(), m.end())):
             return m
     return None
 

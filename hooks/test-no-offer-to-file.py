@@ -141,6 +141,39 @@ CASES = [
         "duplicate explanation before a didn't-file clause does not block",
     ),
     (
+        [TOOL, say(
+            "The root cause is a race condition in the retry loop that was already "
+            "present before this change, and the fix here just adds a lock. "
+            "I haven't filed an issue about the retry-loop race, since it's out of "
+            "scope for this PR and not something I want to track right now."
+        )],
+        True,
+        "unrelated excuse word in an earlier sentence does not excuse the clause",
+    ),
+    (
+        [TOOL, say(
+            "I haven't filed an issue. The flaky test was already fixed upstream."
+        )],
+        True,
+        "excuse word in the next sentence does not excuse the clause",
+    ),
+    (
+        [TOOL, say(
+            "Tests pass. I haven't filed an issue since "
+            "https://github.com/Morrison-Lab/gha/issues/981 already tracks it."
+        )],
+        False,
+        "excuse after a URL in the same sentence does not block",
+    ),
+    (
+        [TOOL, say(
+            "I haven't filed an issue for the other hooks (e.g. the Stop guards) "
+            "because gha#981 already covers them."
+        )],
+        False,
+        "an e.g. abbreviation does not end the sentence",
+    ),
+    (
         [TOOL, say("Since the test passes now, I haven't filed an issue about it.")],
         True,
         "a non-excuse reason before the not-filed clause still blocks",

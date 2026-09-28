@@ -8,6 +8,15 @@ See [`memories/mention-triggers.md`](../../memories/mention-triggers.md).
 
 **Quota-skipped:** surfaces as a bot comment --- either `Claude review skipped --- API quota exhausted` (the review workflow) or `You've hit your org's monthly spend limit` (the agent workflow).
 Both mean no bot will respond on this run; re-running the workflow only helps once the quota actually resets.
+The reset date is not the only way out: the user can usually switch the repository's review OAuth token to another account, so ask them to, in the same reply that reports the skip, and re-run the review once they have.
+Waiting days for a reset, with a PR held on its review, is the worse default.
+
+- **Do:** report the quota skip with a request to switch the review token, and re-run the workflow when the user says it is switched.
+- **Don't:** plan around the reset date as the only way the review can come back.
+
+(User, 2026-09-28, on Morrison-Lab/gha#962:
+"I switched gha's oauth key to a different account; I can usually do that if you ask.
+reviews should work now".)
 A second reviewer's quota-skip carries the same shape but a different tell: `copilot-pull-request-reviewer` posts a normal-looking `COMMENTED` review, with a real `commit_id` and timestamp, whose entire body is *"Copilot was unable to review this pull request because the user who requested the review has reached their quota limit."* --- a check keyed on "did a review object land on this head" reads it as a review;
 only the body distinguishes it (see [`review-verdict-pitfalls.md`](review-verdict-pitfalls.md)'s quota-refusal case and [`memories/github-mcp-tools.md`](../../memories/github-mcp-tools.md)'s `request_copilot_review` note).
 

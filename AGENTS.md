@@ -752,6 +752,18 @@ This grants no merge authority: the strict merge policy below still applies.
   explicitly and immediately reopen the corresponding issue(s)
   (`gh issue reopen <issue-number>`) per
   [`revert-merge.md`](shared/workflow/revert-merge.md).
+- **Infrastructure PRs carry a standing `mwc` grant, in every repo the user can push to.**
+  A PR whose diff is only infrastructure --- CI workflows, tooling and scripts, configuration,
+  and agent or contributor instruction files (`CLAUDE.md`, `AGENTS.md`, `.github/`, `.claude/`, `tools/`) ---
+  may be merged without asking once it is fully clean
+  (user directive, 2026-09-28: "infra PRs are always mwc").
+  Every other rule in this section still binds, including the clean automated review on the current head,
+  so a quota-skipped review still holds the merge.
+  A PR that also touches content (lecture notes, assessments, package code) is not infrastructure.
+  `hooks/no-unauthorized-merge.py` cannot classify a diff yet ([#4039](https://github.com/Morrison-Lab/ai-config/issues/4039)),
+  so where the hook is active, record the grant with `/mwc` for the session.
+  - **Do:** merge a fully clean infrastructure PR without asking, and say in the same reply that you did and why it qualified.
+  - **Don't:** extend the grant to a PR that mixes infrastructure with content, or merge one whose review was skipped.
 
 ## Only work PRs opened by the user, assigned to the user, explicitly requested by the user, or authored by the Actions app
 

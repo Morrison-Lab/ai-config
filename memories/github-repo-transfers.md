@@ -357,8 +357,9 @@ the later rename to `lds` was not separately measured, and is assumed to behave 
 Here the old owner is the *same* owner, so the fix lives in the org's own user site.
 Create `<org>/<org>.github.io` with Pages enabled, holding:
 
-- one stub per old page under `<old>/`: a meta refresh, a `rel=canonical` link, and a
-  `location.replace` script that preserves `location.search` and `location.hash`;
+- one stub per old page under `<old>/`:
+  a meta refresh, a `rel=canonical` link,
+  and a `location.replace` script that preserves `location.search` and `location.hash`;
 - a root `404.html` that rewrites `/<old>/...` to `/<new>/...`, for deep paths with no stub.
 
 Verified live 2026-09-28: after the rename, `/mlds/chapters/index.html` served the stub,
@@ -372,5 +373,6 @@ after a HEAD request for `pr-preview/pr-N/index.html` confirms the preview is re
 
 - **Do:** put the redirect stubs in the org's `<org>.github.io` user-site repo.
 - **Do:** verify the old Pages URL after a rename, as after a transfer.
-- **Don't:** create a new repo under the old name to host redirects: its Pages site shadows the
-  user-site stubs, and claiming the name breaks GitHub's own repository redirect.
+- **Don't:** create a new repo under the old name to host redirects.
+  Expected (from the user, not separately measured): its Pages site shadows the user-site stubs,
+  and claiming the name breaks GitHub's own repository redirect.

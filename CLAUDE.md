@@ -1870,7 +1870,3 @@ It is scoped to the **target**, so a merge from an ai-config checkout into anoth
 
 - **Do:** merge a fully-clean ai-config PR without asking, and say in the same reply that you did and why it qualified.
 - **Don't:** read it as covering a PR that is not fully clean, or another repo's PR merged from an ai-config checkout.
-
-**Infrastructure PRs in any repo carry a standing grant too**, on the same fully-clean terms,
-but the hook cannot yet enforce it by repo the way it does this one;
-`AGENTS.md`'s Strict Merge Control Policy says what counts as infrastructure and how to record each merge.

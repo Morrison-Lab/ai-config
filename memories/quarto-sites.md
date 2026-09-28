@@ -558,27 +558,28 @@ Error executing Rscript: The pipe is being closed (os error 232)
 That line names the symptom (the child process's stdout pipe closed because
 Rscript exited early) rather than the cause, and reads like an OS-level or
 IPC fault --- nothing in it mentions a package.
-The actual reason is further down the same log, as an ordinary R
-`there is no package called 'knitr'` (or `rmarkdown`) error from the
-`Rscript` child before it exited.
+The actual reason is in the block Quarto prints right after that line:
+an `R installation:` summary listing `knitr: (None)` and `rmarkdown: (None)`,
+then `The knitr package is not available in this R installation.`
 
 On a machine with more than one R installation, Quarto's own R discovery can
 resolve an `Rscript` whose library was never set up for this project ---
 independent of whichever R version `Rscript` on `PATH` would report.
-`QUARTO_R` overrides that resolution: point it at the `Rscript.exe` (or
-`Rscript`) belonging to the R installation that actually has the project's
-packages, and Quarto uses that one instead of whatever it would otherwise
-have picked.
+`QUARTO_R` overrides that resolution.
+Quarto's documentation gives it as the R installation's `bin` directory;
+pointing it at the `Rscript.exe` inside that directory also worked on
+2026-09-28, with Quarto 1.x on Windows.
+Use the directory form, since it is the documented one.
 
 - **Do:** read the full render log past Quarto's own `Error executing
   Rscript: ...` line rather than debugging the pipe/OS-error message itself
   --- the real cause is the R error underneath it.
-- **Do:** set `QUARTO_R` to the correct `Rscript` path when a machine has
-  more than one R installation and Quarto is resolving the wrong one.
+- **Do:** set `QUARTO_R` to the right R installation's `bin` directory when
+  a machine has more than one R and Quarto resolves the wrong one.
 - **Don't:** read "pipe is being closed (os error 232)" as an environment or
   IPC problem to work around --- it is Quarto's generic wrapper for "the R
-  child process exited," and the specific reason is a missing-package error
-  a few lines earlier in the same log.
+  child process exited," and the specific reason is the missing-package
+  report printed right after it.
 
 (Measured 2026-09-28 on a Windows machine with multiple R installations,
 working in `Morrison-Lab/mln`; the local, machine-specific `QUARTO_R` path

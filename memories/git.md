@@ -1227,47 +1227,6 @@ echo "rc=$?"
 - **Don't:** feed `git commit -F -` from a heredoc inside a compound command.
 - **Don't:** report a commit landed on the strength of having issued the command.
 
-## A push guard's whole-call denial plus a generic scratch filename can commit a stale, unrelated message
-
-[`claude-code-hooks.md`](claude-code-hooks.md)'s "A hook's deny rejects the
-WHOLE call, so a compound command's setup segments never run either" already
-covers the general mechanism: a `PreToolUse` hook decides over the whole
-command string, so a denied call runs none of its segments, not just the one
-that tripped the guard.
-This is that mechanism landing on `git commit -F`, with a second, independent
-mistake compounding it.
-
-A single Bash call both wrote a commit-message file via heredoc and ran `git
-push`; a `PreToolUse` push guard denied the whole call, so the heredoc segment
-never executed.
-The next call assumed the heredoc had run and passed the same target path to
-`git commit -F`.
-That path was a generic name (e.g. a shared scratch directory's `m.txt`, not a
-unique session-scoped one) that an unrelated earlier script in the same
-session had already written to, so `git commit -F` silently committed that
-script's stale content instead --- a real commit, with an unrelated message,
-from a filename that looked deliberate.
-Fixed by amending before push.
-
-Either half of the compound alone would have been caught by the other's
-remedy: a unique, session-scoped filename would not have collided with the
-unrelated script's output, and reading back `git log -1` after the denied call
-would have shown the commit never happened at all.
-
-- **Do:** write a commit-message file under a unique, session-scoped name
-  (the session scratchpad, never a generic name a different step in the same
-  session could also have written) in the same call that commits.
-- **Do:** read back `git log -1` (and `git status --short`) before `git
-  push`, confirming the commit that landed is the one you intended, not just
-  that some commit exists.
-- **Don't:** reuse a generic scratch filename across calls or scripts in one
-  session --- an unrelated earlier write can leave content a later `-F` picks
-  up silently.
-
-(Inferred by the agent from a 2026-09-28 `mln` session incident, not
-user-stated as a rule at the time; recorded here as the Do/Don't pair per
-`CLAUDE.md`'s "Record both the pattern and the anti-pattern".)
-
 ## A `.gitattributes` extension pattern is case-sensitive wherever the checkout is
 
 `*.jpg binary` does not match `GATES.JPG` on a case-sensitive checkout, and macOS hides that:

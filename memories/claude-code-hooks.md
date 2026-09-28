@@ -288,6 +288,17 @@ Re-running the python part alone under `ALLOW_WHOLE_FILE_PUNCT=1` edited the fil
 Caught by `remote: error: GH013: Repository rule violations found for refs/heads/main`, not by anything local.
 Tracked as ai-config#1609.)
 
+A second case, where the skipped setup was a commit-message file rather than a branch.
+One call wrote the message with a heredoc and then pushed; the push guard denied it, so the heredoc never ran.
+The next call ran `git commit -F` on the same path, a generic scratch name that an unrelated earlier script had already written, and committed that script's text as the message.
+It was caught and amended before the push only because `git log -1` was read back.
+
+- **Do:** write a commit-message file under a unique, session-scoped name, in the same call that commits.
+- **Do:** read `git log -1` back before pushing.
+- **Don't:** reuse a generic scratch filename across calls, where an earlier write can feed a later `-F` silently.
+
+(2026-09-28, `Morrison-Lab/mln`; the pair is inferred from the incident rather than user-stated.)
+
 ## A hook matcher has three branches, and only the third is a regex
 
 Measured 2026-09-04 by extracting the matcher functions from the standalone native `claude` binary this container runs, version 2.1.260 per `claude --version`,

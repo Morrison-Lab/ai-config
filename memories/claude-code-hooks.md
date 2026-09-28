@@ -289,7 +289,8 @@ Caught by `remote: error: GH013: Repository rule violations found for refs/heads
 Tracked as ai-config#1609.)
 
 A second case, where the skipped setup was a commit-message file rather than a branch.
-One call wrote the message with a heredoc and then pushed; the push guard denied it, so the heredoc never ran.
+One call wrote the message with a heredoc and then pushed.
+The push guard denied the call, so the heredoc never ran.
 The next call ran `git commit -F` on the same path, a generic scratch name that an unrelated earlier script had already written, and committed that script's text as the message.
 It was caught and amended before the push only because `git log -1` was read back.
 

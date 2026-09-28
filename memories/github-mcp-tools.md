@@ -1226,10 +1226,11 @@ The user merged it with the web UI's Merge button.
 - **Don't:** push the merge commit to the default branch yourself to get around it without the user's go-ahead,
   since that skips the repository's merge path.
 
-## `subscribe_pr_activity` can refuse a PR another session's app opened
+## `subscribe_pr_activity` can refuse a PR, and the refusal is silent
 
 On 2026-09-28, `subscribe_pr_activity` returned `Could not subscribe to this PR.` for four Morrison-Lab/mln PRs opened by `claude[bot]` from another session (mln#168, #170, #171, #156),
 while PRs in the same repo opened under the user's account subscribed fine.
+The cause (author, app installation or something else) is not established; four refusals and three successes is a pattern, not a rule.
 The session had taken over those PRs, the refusal went unnoticed, and the user merged mln#166 with no event reaching the session;
 the user had to report the merge.
 

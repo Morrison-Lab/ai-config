@@ -183,6 +183,15 @@ lifecycle taught.
 Do this without a separate prompt --- opening the UMS follow-up
 branch + PR is a standing yes (`preferences.md`).
 
+**The merge is not done at step 3.**
+`post-merge`'s own step 1.1
+([`verify-merge-commit-ci`](../../shared/workflow/verify-merge-commit-ci.md))
+checks that every workflow triggered on the merge commit itself --- not only
+the PR's own CI --- actually passed,
+since a repo can run a workflow on `push` (a full/PDF render, a deploy) that never ran on the PR at all.
+Don't report the merge finished between steps 3 and 4;
+step 4's chain into `post-merge` is what actually runs that check.
+
 ## Relationship to other skills
 
 - **`post-merge`** — step 4 delegates to it. `post-merge` assumes the PR is
@@ -203,6 +212,10 @@ branch + PR is a standing yes (`preferences.md`).
   a busy, multi-threaded conversation makes this easy to drop, but the chain
   isn't optional follow-up; it's part of the merge action itself. See `mwc`'s
   own anti-pattern entry for the concrete case this happened in.
+- ❌ Reporting the merge done on the strength of the PR's own green CI,
+  without `post-merge`'s step 1.1 confirming the merge commit's own
+  workflow runs also passed --- a push-only render or deploy never ran on
+  the PR ([Morrison-Lab/mds#19](https://github.com/Morrison-Lab/mds/pull/19)).
 - ❌ Merging a PR that isn't fully clean (red or still-in-progress CI, or open
   findings) without the user explicitly saying so.
 - ❌ Letting the squash commit inherit a stale PR description — pass an accurate

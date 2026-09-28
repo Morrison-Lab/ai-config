@@ -156,6 +156,38 @@ Vector Calculus --- behind the site's only dropdown, exactly the one-member
 grouping this section's test rejects.
 Read this as that history, not as mds's current state.)
 
+The same grouping test carries over to a sidebar's collapsible sections, not
+just a navbar's dropdowns: group pages into a section only where the site's
+topics actually fall into several such groups, and never collapse a sidebar
+to a single catch-all section, the same defect a lone catch-all navbar
+dropdown has.
+A site can use dropdowns, a sidebar, or both for the same grouping --- the
+test is about whether the grouping divides something, not about which
+control renders it.
+Groups, and the items within them, follow the same natural topic progression
+as the rest of this section.
+
+Showing the same grouping in both a sidebar and navbar dropdowns is fine, but
+the two lists then have to be kept in step by hand --- Quarto does not derive
+one from the other --- so mark each with a comment pointing at its
+counterpart, for example `# keep in sync with navbar.left` beside the
+sidebar's YAML and `# keep in sync with the sidebar` beside the navbar's, so
+an edit to one is not missed in the other.
+
+- **Do:** use a dropdown, a collapsible sidebar section, or both, wherever
+  the site's pages fall into a real topical group, ordered by the same
+  topic progression as the rest of the site.
+- **Do:** mark a navbar dropdown and a sidebar section that mirror the same
+  grouping with a comment pointing at each other, so an edit to one is not
+  missed in the other.
+- **Don't:** collapse a sidebar to a single catch-all section --- the same
+  defect a single catch-all navbar dropdown has.
+- **Don't:** let a mirrored sidebar section and navbar dropdown drift apart
+  silently.
+
+(User clarification, 2026-09-28: "if there's natural grouping, you can use
+drop-downs to group them, both in sidebars and menu bars.")
+
 ### Order
 
 Grouping is not the only question a navbar or sidebar raises --- once the

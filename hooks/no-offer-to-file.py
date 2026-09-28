@@ -11,6 +11,9 @@ Two distinct shapes, both matched below:
   1. a pure offer   -- "worth saving as a memory?"
   2. a bundled one  -- "want me to file the issue and open that PR?", where a
      genuinely discretionary action (the PR) carries an ungated one (the issue)
+  3. a statement   -- "I can also file an issue about X. Say if you want it."
+     or "I haven't filed an issue about it. Say if you want one." -- the same
+     offer with no question mark, which the question-form patterns missed
 
 Fires once per distinct message (sentinel keyed by content hash) so a block
 cannot loop. Fails OPEN: a guard that wedges the session costs more than the
@@ -32,6 +35,17 @@ PATTERNS = [
     r"worth (an issue|filing|a memory|saving|capturing|recording)\b[^.]*\?",
     r"(let me know|tell me) if you('d| would) like me to (file|record|save)",
     r"i (could|can) file (an|a) (issue|follow-?up)[^.]*\?",
+    # Statement-shaped offers: no question mark, same intent. Each needs a
+    # filing/recording word in view so a report of work done cannot match.
+    r"i can (also )?file (an?|the) [^.!?\n]{0,60}?\b(issue|follow-?up|bug)",
+    r"i (haven['\u2019]t|have not|didn['\u2019]t|did not) (yet )?file[d]? "
+    r"(an?|the) [^.!?\n]{0,40}?\b(issue|follow-?up|bug)\b"
+    r"(?![^\n]{0,200}?\b(already|duplicate|dupe|covers|covered|tracks|tracked)\b)",
+    r"\b(file|filing|issue|memory|memories|record|recording)\b[^\n]{0,240}?"
+    r"\b(say|tell me|let me know) (if|whether) you('d| would)? (want|like) "
+    r"((it|one|them)(?=\s*([.!?)\n]|$))|me to (file|record|save|capture|note|open an issue))",
+    r"\b(file|filing|issue|memory|memories|record|recording)\b[^\n]{0,240}?"
+    r"\b(just )?say the word\b",
 ]
 RX = re.compile("|".join(PATTERNS), re.I)
 

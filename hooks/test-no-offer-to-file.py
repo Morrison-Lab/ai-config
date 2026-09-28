@@ -72,6 +72,75 @@ CASES = [
     ([TOOL, say("I could file an issue about this?")], True, "i could file an issue blocks"),
     ([TOOL, say("Want me to file the issue and open that PR?")], True, "bundled offer blocks"),
 
+    # Statement-shaped offers (no question mark): both let through before
+    (
+        [TOOL, say(
+            "I can also file a gha issue about the `@claude` job committing "
+            "leftover session files onto PR branches, since that will happen "
+            "again whenever someone writes \"@claude review\". Say if you want it."
+        )],
+        True,
+        "statement offer 'I can also file ... Say if you want it' blocks",
+    ),
+    (
+        [TOOL, say("I haven't filed an issue about it. Say if you want one.")],
+        True,
+        "statement offer 'I haven't filed an issue ... Say if you want one' blocks",
+    ),
+    ([TOOL, say("I haven't filed an issue about it.")], True, "haven't filed an issue alone blocks"),
+    ([TOOL, say("I can file an issue for the flaky test.")], True, "i can file an issue statement blocks"),
+    (
+        [TOOL, say("The memory entry would cover this. Just say the word.")],
+        True,
+        "say the word near a memory mention blocks",
+    ),
+    (
+        [TOOL, say("This deserves an issue. Let me know if you want me to file it.")],
+        True,
+        "let me know if you want me to file blocks",
+    ),
+
+    # Legitimate reports that share vocabulary with the statement patterns
+    (
+        [TOOL, say("I filed https://github.com/Morrison-Lab/gha/issues/981 about it.")],
+        False,
+        "report of a filed issue by URL does not block",
+    ),
+    (
+        [TOOL, say(
+            "I haven't filed an issue because "
+            "https://github.com/Morrison-Lab/gha/issues/981 already tracks it."
+        )],
+        False,
+        "not filing a duplicate does not block",
+    ),
+    (
+        [TOOL, say(
+            "Filed https://github.com/Morrison-Lab/gha/issues/981. "
+            "Say if you want me to open a PR for the fix."
+        )],
+        False,
+        "discretionary PR offer after a filed issue does not block",
+    ),
+    (
+        [TOOL, say(
+            "Filed https://github.com/Morrison-Lab/gha/issues/981 and recorded "
+            "the lesson in memories/hooks.md. Say if you want it closed once the PR merges."
+        )],
+        False,
+        "say if you want it <verb> after a filing report does not block",
+    ),
+    (
+        [TOOL, say("The hook matches `I can also file a gha issue` statements now.")],
+        False,
+        "statement pattern quoted in a code span does not block",
+    ),
+    (
+        [TOOL, say("I can't file an issue in that repo: the token lacks access.")],
+        False,
+        "reporting inability to file does not block",
+    ),
+
     # Negative cases: trigger phrases quoted inside inline code spans
     (
         [TOOL, say("We shouldn't add a hook for `want me to file` because it is too broad.")],
